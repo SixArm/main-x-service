@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/healthz": {
+    '/healthz': {
         parameters: {
             query?: never;
             header?: never;
@@ -27,9 +27,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
+                        'application/json': {
                             /** @constant */
-                            status?: "ok";
+                            status?: 'ok';
                         };
                     };
                 };
@@ -43,7 +43,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/request": {
+    '/api/auth/request': {
         parameters: {
             query?: never;
             header?: never;
@@ -62,7 +62,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
+                    'application/json': {
                         /** Format: email */
                         email: string;
                     };
@@ -75,13 +75,13 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
+                        'application/json': {
                             sent?: boolean;
                             magic_link?: string | null;
                         };
                     };
                 };
-                422: components["responses"]["Validation"];
+                422: components['responses']['Validation'];
             };
         };
         delete?: never;
@@ -90,7 +90,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/verify": {
+    '/api/auth/verify': {
         parameters: {
             query?: never;
             header?: never;
@@ -109,7 +109,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
+                    'application/json': {
                         token: string;
                     };
                 };
@@ -119,14 +119,14 @@ export interface paths {
                 200: {
                     headers: {
                         /** @description cts_session=<jwt>; HttpOnly; SameSite=Lax; Path=/ */
-                        "Set-Cookie"?: string;
+                        'Set-Cookie'?: string;
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["UserBody"];
+                        'application/json': components['schemas']['UserBody'];
                     };
                 };
-                401: components["responses"]["Unauthorized"];
+                401: components['responses']['Unauthorized'];
             };
         };
         delete?: never;
@@ -135,7 +135,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/me": {
+    '/api/auth/me': {
         parameters: {
             query?: never;
             header?: never;
@@ -158,10 +158,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["UserBody"];
+                        'application/json': components['schemas']['UserBody'];
                     };
                 };
-                401: components["responses"]["Unauthorized"];
+                401: components['responses']['Unauthorized'];
             };
         };
         put?: never;
@@ -172,7 +172,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/logout": {
+    '/api/auth/logout': {
         parameters: {
             query?: never;
             header?: never;
@@ -206,7 +206,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats": {
+    '/api/stats': {
         parameters: {
             query?: never;
             header?: never;
@@ -229,7 +229,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Stats"];
+                        'application/json': components['schemas']['Stats'];
                     };
                 };
             };
@@ -242,7 +242,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/folders": {
+    '/api/folders': {
         parameters: {
             query?: never;
             header?: never;
@@ -268,10 +268,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["FolderList"];
+                        'application/json': components['schemas']['FolderList'];
                     };
                 };
-                503: components["responses"]["Upstream"];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -285,7 +285,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["CreateFolder"];
+                    'application/json': components['schemas']['CreateFolder'];
                 };
             };
             responses: {
@@ -296,11 +296,11 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Folder"];
+                        'application/json': components['schemas']['Folder'];
                     };
                 };
-                422: components["responses"]["Validation"];
-                503: components["responses"]["Upstream"];
+                422: components['responses']['Validation'];
+                503: components['responses']['Upstream'];
             };
         };
         delete?: never;
@@ -309,7 +309,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/folders/{id}": {
+    '/api/folders/{id}': {
         parameters: {
             query?: never;
             header?: never;
@@ -321,7 +321,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
@@ -333,11 +333,11 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Folder"];
+                        'application/json': components['schemas']['Folder'];
                     };
                 };
-                404: components["responses"]["NotFound"];
-                503: components["responses"]["Upstream"];
+                404: components['responses']['NotFound'];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -348,7 +348,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/folders/{id}/history": {
+    '/api/folders/{id}/history': {
         parameters: {
             query?: never;
             header?: never;
@@ -361,7 +361,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
@@ -373,10 +373,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["MoveList"];
+                        'application/json': components['schemas']['MoveList'];
                     };
                 };
-                503: components["responses"]["Upstream"];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -387,7 +387,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/patients": {
+    '/api/patients': {
         parameters: {
             query?: never;
             header?: never;
@@ -411,10 +411,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PatientList"];
+                        'application/json': components['schemas']['PatientList'];
                     };
                 };
-                503: components["responses"]["Upstream"];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -425,7 +425,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/patients/{nhs}": {
+    '/api/patients/{nhs}': {
         parameters: {
             query?: never;
             header?: never;
@@ -450,7 +450,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PatientShow"];
+                        'application/json': components['schemas']['PatientShow'];
                     };
                 };
             };
@@ -463,7 +463,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/places": {
+    '/api/places': {
         parameters: {
             query?: never;
             header?: never;
@@ -474,7 +474,7 @@ export interface paths {
             parameters: {
                 query?: {
                     q?: string;
-                    kind?: "building" | "room" | "cabinet";
+                    kind?: 'building' | 'room' | 'cabinet';
                 };
                 header?: never;
                 path?: never;
@@ -488,10 +488,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PlacesIndex"];
+                        'application/json': components['schemas']['PlacesIndex'];
                     };
                 };
-                503: components["responses"]["Upstream"];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -504,10 +504,10 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
+                    'application/json': {
                         name: string;
                         /** @enum {string} */
-                        kind: "building" | "room" | "cabinet";
+                        kind: 'building' | 'room' | 'cabinet';
                         /** Format: uuid */
                         contained_in_place?: string | null;
                         description?: string | null;
@@ -523,10 +523,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Place"];
+                        'application/json': components['schemas']['Place'];
                     };
                 };
-                422: components["responses"]["Validation"];
+                422: components['responses']['Validation'];
             };
         };
         delete?: never;
@@ -535,7 +535,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/places/{id}": {
+    '/api/places/{id}': {
         parameters: {
             query?: never;
             header?: never;
@@ -547,7 +547,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
@@ -559,11 +559,11 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PlaceShow"];
+                        'application/json': components['schemas']['PlaceShow'];
                     };
                 };
-                404: components["responses"]["NotFound"];
-                503: components["responses"]["Upstream"];
+                404: components['responses']['NotFound'];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -574,7 +574,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/places/{id}/history": {
+    '/api/places/{id}/history': {
         parameters: {
             query?: never;
             header?: never;
@@ -587,7 +587,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
@@ -599,11 +599,11 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PlaceHistory"];
+                        'application/json': components['schemas']['PlaceHistory'];
                     };
                 };
-                404: components["responses"]["NotFound"];
-                503: components["responses"]["Upstream"];
+                404: components['responses']['NotFound'];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -614,7 +614,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workers": {
+    '/api/workers': {
         parameters: {
             query?: never;
             header?: never;
@@ -638,10 +638,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkerList"];
+                        'application/json': components['schemas']['WorkerList'];
                     };
                 };
-                503: components["responses"]["Upstream"];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -652,7 +652,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workers/{id}": {
+    '/api/workers/{id}': {
         parameters: {
             query?: never;
             header?: never;
@@ -665,7 +665,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
@@ -677,11 +677,11 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkerShow"];
+                        'application/json': components['schemas']['WorkerShow'];
                     };
                 };
-                404: components["responses"]["NotFound"];
-                503: components["responses"]["Upstream"];
+                404: components['responses']['NotFound'];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -692,7 +692,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/moves": {
+    '/api/moves': {
         parameters: {
             query?: never;
             header?: never;
@@ -716,10 +716,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["MoveList"];
+                        'application/json': components['schemas']['MoveList'];
                     };
                 };
-                503: components["responses"]["Upstream"];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -733,7 +733,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["CreateMove"];
+                    'application/json': components['schemas']['CreateMove'];
                 };
             };
             responses: {
@@ -744,12 +744,12 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Move"];
+                        'application/json': components['schemas']['Move'];
                     };
                 };
-                404: components["responses"]["NotFound"];
-                422: components["responses"]["Validation"];
-                503: components["responses"]["Upstream"];
+                404: components['responses']['NotFound'];
+                422: components['responses']['Validation'];
+                503: components['responses']['Upstream'];
             };
         };
         delete?: never;
@@ -758,7 +758,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/moves/{id}": {
+    '/api/moves/{id}': {
         parameters: {
             query?: never;
             header?: never;
@@ -770,7 +770,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
@@ -782,10 +782,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Move"];
+                        'application/json': components['schemas']['Move'];
                     };
                 };
-                404: components["responses"]["NotFound"];
+                404: components['responses']['NotFound'];
             };
         };
         put?: never;
@@ -796,7 +796,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/volumes": {
+    '/api/volumes': {
         parameters: {
             query?: never;
             header?: never;
@@ -821,10 +821,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["VolumeList"];
+                        'application/json': components['schemas']['VolumeList'];
                     };
                 };
-                503: components["responses"]["Upstream"];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -837,7 +837,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": {
+                    'application/json': {
                         nhs_number: string;
                         title: string;
                         /** Format: uuid */
@@ -853,11 +853,11 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Volume"];
+                        'application/json': components['schemas']['Volume'];
                     };
                 };
-                422: components["responses"]["Validation"];
-                503: components["responses"]["Upstream"];
+                422: components['responses']['Validation'];
+                503: components['responses']['Upstream'];
             };
         };
         delete?: never;
@@ -866,7 +866,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/volumes/{id}": {
+    '/api/volumes/{id}': {
         parameters: {
             query?: never;
             header?: never;
@@ -878,7 +878,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
@@ -890,10 +890,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["VolumeShow"];
+                        'application/json': components['schemas']['VolumeShow'];
                     };
                 };
-                404: components["responses"]["NotFound"];
+                404: components['responses']['NotFound'];
             };
         };
         put?: never;
@@ -907,13 +907,13 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
             requestBody: {
                 content: {
-                    "application/json": {
+                    'application/json': {
                         title: string;
                     };
                 };
@@ -925,16 +925,16 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["VolumeShow"];
+                        'application/json': components['schemas']['VolumeShow'];
                     };
                 };
-                404: components["responses"]["NotFound"];
-                422: components["responses"]["Validation"];
+                404: components['responses']['NotFound'];
+                422: components['responses']['Validation'];
             };
         };
         trace?: never;
     };
-    "/api/volumes/{id}/folders": {
+    '/api/volumes/{id}/folders': {
         parameters: {
             query?: never;
             header?: never;
@@ -949,13 +949,13 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
             requestBody: {
                 content: {
-                    "application/json": {
+                    'application/json': {
                         /** Format: uuid */
                         folder_id: string;
                     };
@@ -968,11 +968,11 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["VolumeShow"];
+                        'application/json': components['schemas']['VolumeShow'];
                     };
                 };
-                404: components["responses"]["NotFound"];
-                422: components["responses"]["Validation"];
+                404: components['responses']['NotFound'];
+                422: components['responses']['Validation'];
             };
         };
         delete?: never;
@@ -981,7 +981,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/volumes/{id}/folders/{folder_id}": {
+    '/api/volumes/{id}/folders/{folder_id}': {
         parameters: {
             query?: never;
             header?: never;
@@ -997,7 +997,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                     folder_id: string;
                 };
                 cookie?: never;
@@ -1010,10 +1010,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["VolumeShow"];
+                        'application/json': components['schemas']['VolumeShow'];
                     };
                 };
-                404: components["responses"]["NotFound"];
+                404: components['responses']['NotFound'];
             };
         };
         options?: never;
@@ -1021,7 +1021,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/volumes/{id}/move": {
+    '/api/volumes/{id}/move': {
         parameters: {
             query?: never;
             header?: never;
@@ -1036,13 +1036,13 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    id: components["parameters"]["Id"];
+                    id: components['parameters']['Id'];
                 };
                 cookie?: never;
             };
             requestBody: {
                 content: {
-                    "application/json": {
+                    'application/json': {
                         /** Format: uuid */
                         to_cabinet_id?: string | null;
                         /** Format: uuid */
@@ -1059,12 +1059,12 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["VolumeShow"];
+                        'application/json': components['schemas']['VolumeShow'];
                     };
                 };
-                404: components["responses"]["NotFound"];
-                422: components["responses"]["Validation"];
-                503: components["responses"]["Upstream"];
+                404: components['responses']['NotFound'];
+                422: components['responses']['Validation'];
+                503: components['responses']['Upstream'];
             };
         };
         delete?: never;
@@ -1073,7 +1073,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/alerts": {
+    '/api/alerts': {
         parameters: {
             query?: never;
             header?: never;
@@ -1096,10 +1096,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AlertList"];
+                        'application/json': components['schemas']['AlertList'];
                     };
                 };
-                503: components["responses"]["Upstream"];
+                503: components['responses']['Upstream'];
             };
         };
         put?: never;
@@ -1155,7 +1155,7 @@ export interface components {
             cabinet_id?: string | null;
             cabinet_label?: string;
             /** @enum {string} */
-            status?: "in-cabinet" | "in-transit";
+            status?: 'in-cabinet' | 'in-transit';
             /** Format: date-time */
             last_moved_at?: string | null;
             notes?: string | null;
@@ -1185,9 +1185,9 @@ export interface components {
             source?: string;
         };
         PatientShow: {
-            patient?: components["schemas"]["Patient"] | null;
-            folders?: components["schemas"]["Folder"][];
-            history?: components["schemas"]["Move"][];
+            patient?: components['schemas']['Patient'] | null;
+            folders?: components['schemas']['Folder'][];
+            history?: components['schemas']['Move'][];
             nhs_number?: string;
             patient_service_match?: boolean;
         };
@@ -1197,7 +1197,7 @@ export interface components {
             name?: string;
             place_type?: string;
             /** @enum {string} */
-            place_kind?: "building" | "room" | "cabinet" | "other";
+            place_kind?: 'building' | 'room' | 'cabinet' | 'other';
             description?: string | null;
             /** Format: uuid */
             contained_in_place?: string | null;
@@ -1205,18 +1205,18 @@ export interface components {
             capacity?: number | null;
             source?: string;
         };
-        Cabinet: components["schemas"]["Place"] & {
+        Cabinet: components['schemas']['Place'] & {
             folder_count?: number;
         };
         PlacesIndex: {
             query?: string | null;
             kind?: string | null;
-            buildings?: components["schemas"]["Place"][];
-            rooms?: components["schemas"]["Place"][];
-            cabinets?: components["schemas"]["Cabinet"][];
+            buildings?: components['schemas']['Place'][];
+            rooms?: components['schemas']['Place'][];
+            cabinets?: components['schemas']['Cabinet'][];
         };
-        PlaceShow: components["schemas"]["Place"] & {
-            folders?: components["schemas"]["Folder"][];
+        PlaceShow: components['schemas']['Place'] & {
+            folders?: components['schemas']['Folder'][];
         };
         Presence: {
             /** Format: uuid */
@@ -1236,8 +1236,8 @@ export interface components {
             entered_reason?: string | null;
             left_reason?: string | null;
         };
-        PlaceHistory: components["schemas"]["Place"] & {
-            presences?: components["schemas"]["Presence"][];
+        PlaceHistory: components['schemas']['Place'] & {
+            presences?: components['schemas']['Presence'][];
         };
         Worker: {
             /** Format: uuid */
@@ -1246,10 +1246,10 @@ export interface components {
             role?: string | null;
         };
         WorkerShow: {
-            worker?: components["schemas"]["Worker"];
-            moved_folders?: components["schemas"]["Folder"][];
-            patient_folders?: components["schemas"]["Folder"][];
-            moves?: components["schemas"]["Move"][];
+            worker?: components['schemas']['Worker'];
+            moved_folders?: components['schemas']['Folder'][];
+            patient_folders?: components['schemas']['Folder'][];
+            moves?: components['schemas']['Move'][];
         };
         Move: {
             /** Format: uuid */
@@ -1297,12 +1297,12 @@ export interface components {
             cabinet_id?: string | null;
             cabinet_label?: string;
             /** @enum {string} */
-            status?: "in-cabinet" | "in-transit";
+            status?: 'in-cabinet' | 'in-transit';
             folder_count?: number;
         };
-        VolumeShow: components["schemas"]["Volume"] & {
-            folders?: components["schemas"]["Folder"][];
-            history?: components["schemas"]["Move"][];
+        VolumeShow: components['schemas']['Volume'] & {
+            folders?: components['schemas']['Folder'][];
+            history?: components['schemas']['Move'][];
         };
         Alert: {
             /** Format: uuid */
@@ -1322,27 +1322,27 @@ export interface components {
             reason?: string | null;
         };
         FolderList: {
-            items?: components["schemas"]["Folder"][];
+            items?: components['schemas']['Folder'][];
             query?: string;
         };
         PatientList: {
-            items?: components["schemas"]["Patient"][];
+            items?: components['schemas']['Patient'][];
             query?: string;
         };
         WorkerList: {
-            items?: components["schemas"]["Worker"][];
+            items?: components['schemas']['Worker'][];
             query?: string;
         };
         MoveList: {
-            items?: components["schemas"]["Move"][];
+            items?: components['schemas']['Move'][];
             query?: string;
         };
         VolumeList: {
-            items?: components["schemas"]["Volume"][];
+            items?: components['schemas']['Volume'][];
             query?: string;
         };
         AlertList: {
-            items?: components["schemas"]["Alert"][];
+            items?: components['schemas']['Alert'][];
         };
     };
     responses: {
@@ -1352,7 +1352,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"];
+                'application/json': components['schemas']['Error'];
             };
         };
         /** @description Authentication required. */
@@ -1361,7 +1361,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"];
+                'application/json': components['schemas']['Error'];
             };
         };
         /** @description An upstream Main-X-Service is unreachable. */
@@ -1370,7 +1370,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["Error"];
+                'application/json': components['schemas']['Error'];
             };
         };
         /** @description Validation failure — each failing field is keyed. */
@@ -1379,7 +1379,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["ValidationError"];
+                'application/json': components['schemas']['ValidationError'];
             };
         };
     };

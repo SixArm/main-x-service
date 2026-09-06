@@ -51,10 +51,10 @@
     // References:
     //   - WAI-ARIA Grid Pattern: https://www.w3.org/WAI/ARIA/apg/patterns/grid/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label,
         caption = undefined,
         children,

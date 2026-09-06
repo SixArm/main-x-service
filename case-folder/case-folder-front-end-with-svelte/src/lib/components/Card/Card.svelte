@@ -46,10 +46,10 @@
     // References:
     //   - MDN article element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/article
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         heading = undefined,
         headingLevel = 3,
         href = undefined,
@@ -67,11 +67,7 @@
 </script>
 
 <!-- Card.svelte -->
-<article
-    class={`card ${className}`}
-    aria-label={label}
-    {...restProps}
->
+<article class={`card ${className}`} aria-label={label} {...restProps}>
     {#if heading}
         {#if headingLevel === 2}
             <h2>

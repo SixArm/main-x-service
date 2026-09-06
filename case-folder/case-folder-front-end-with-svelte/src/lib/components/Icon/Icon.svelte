@@ -13,7 +13,7 @@
         faPrint,
         faXmark,
         faPlus,
-        faMinus
+        faMinus,
     } from '@fortawesome/free-solid-svg-icons';
 
     // Named FontAwesome (free, solid) icons used across the app. Rendered
@@ -32,7 +32,7 @@
         printer: faPrint,
         xmark: faXmark,
         plus: faPlus,
-        minus: faMinus
+        minus: faMinus,
     };
 
     /** The set of valid icon `name` props — the keys of {@link ICONS}. */
@@ -57,7 +57,7 @@
     let {
         name,
         label = undefined,
-        class: className = ''
+        class: className = '',
     }: { name: string; label?: string; class?: string } = $props();
 
     const def = $derived(ICONS[name]);

@@ -43,9 +43,9 @@
     //   - MDN input type="text": https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input/text
 
     let {
-        class: className = "",
+        class: className = '',
         label,
-        value = $bindable(""),
+        value = $bindable(''),
         required = false,
         disabled = false,
         ...restProps

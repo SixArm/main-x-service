@@ -116,14 +116,22 @@ work — install **fails loudly** if it is absent.
 
 ```bash
 npm run check
+npm run format:check
+npm run lint
 USE_UPSTREAM_STUBS=1 cargo run -- start   # in ../case-folder-service-with-rust
 npm run test:e2e
 ```
 
-Both required green:
+All required green:
 
 - `npm run check` — zero errors. Warnings in third-party / pre-existing
   components are tolerated unless they came in with this PR.
+- `npm run format:check` (Prettier + `prettier-plugin-svelte`, scoped
+  to `src`) — zero style issues. `npm run format` fixes them. Config
+  is `.prettierrc` (`tabWidth: 4`, `singleQuote: true`, matching this
+  project's existing style — no reformatting churn on adoption).
+- `npm run lint` (ESLint) — unchanged; runs alongside Prettier rather
+  than in place of it, same as every sibling front-end.
 - `npm run test:e2e` — the Playwright suite (14 spec files, 73
   `test()` cases; see [spec/testing.md](spec/testing.md) for the table).
   The Loco API must be running in **stub mode** (see Prerequisites in

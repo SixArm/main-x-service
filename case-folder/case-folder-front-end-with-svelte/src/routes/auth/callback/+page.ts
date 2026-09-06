@@ -22,7 +22,9 @@ export async function load({ url, fetch }) {
     } catch (e) {
         // Surface a readable reason (expired / already-used token, etc.).
         const message =
-            e instanceof ApiError ? e.message : (e as Error).message ?? 'Sign-in failed.';
+            e instanceof ApiError
+                ? e.message
+                : ((e as Error).message ?? 'Sign-in failed.');
         return { error: message };
     }
     // Success — hand off to the dashboard. The layout's `me()` check will

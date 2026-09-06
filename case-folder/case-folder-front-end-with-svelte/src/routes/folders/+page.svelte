@@ -38,12 +38,16 @@
         if (debounce) clearTimeout(debounce);
         debounce = setTimeout(() => {
             const next = query.trim();
-            const target = next ? `/folders?q=${encodeURIComponent(next)}` : '/folders';
+            const target = next
+                ? `/folders?q=${encodeURIComponent(next)}`
+                : '/folders';
             goto(target, { keepFocus: true, replaceState: true });
         }, 200);
     }
 
-    function badgeType(status: string): 'success' | 'warning' | 'info' | 'default' {
+    function badgeType(
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
@@ -72,7 +76,10 @@
 </div>
 
 <div class="panel">
-    <DataTable label={t('folders.tableLabel')} caption={t('folders.tableCaption')}>
+    <DataTable
+        label={t('folders.tableLabel')}
+        caption={t('folders.tableCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('folders.colNhsNumber')}</th>
@@ -88,7 +95,10 @@
             {#each cache.folders as folder (folder.id)}
                 <DataTableRow>
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(folder.nhsNumber)}" class="nhs-number">
+                        <a
+                            href="/patients/{nhsSlug(folder.nhsNumber)}"
+                            class="nhs-number"
+                        >
                             {folder.nhsNumber}
                         </a>
                     </DataTableTD>
@@ -98,13 +108,20 @@
                     </DataTableTD>
                     <DataTableTD>{folder.cabinetLabel}</DataTableTD>
                     <DataTableTD>
-                        <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
+                        <Badge type={badgeType(folder.status)}
+                            >{statusLabel(folder.status)}</Badge
+                        >
                     </DataTableTD>
                     <DataTableTD>
-                        {folder.lastMovedAt ? new Date(folder.lastMovedAt).toLocaleString('en-GB') : '—'}
+                        {folder.lastMovedAt
+                            ? new Date(folder.lastMovedAt).toLocaleString(
+                                  'en-GB',
+                              )
+                            : '—'}
                     </DataTableTD>
                     <DataTableTD>
-                        <a href="/move?folder={folder.id}">{t('common.move')}</a>
+                        <a href="/move?folder={folder.id}">{t('common.move')}</a
+                        >
                     </DataTableTD>
                 </DataTableRow>
             {/each}

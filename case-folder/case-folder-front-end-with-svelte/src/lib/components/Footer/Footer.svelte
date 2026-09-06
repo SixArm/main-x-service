@@ -48,10 +48,10 @@
     // References:
     //   - MDN footer element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/footer
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label = undefined,
         children,
         ...restProps
@@ -65,10 +65,6 @@
 </script>
 
 <!-- Footer.svelte -->
-<footer
-    class={`footer ${className}`}
-    aria-label={label}
-    {...restProps}
->
+<footer class={`footer ${className}`} aria-label={label} {...restProps}>
     {@render children?.()}
 </footer>

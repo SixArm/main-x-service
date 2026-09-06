@@ -45,10 +45,10 @@
     //   - MDN dl element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dl
     //   - WAI-ARIA landmark regions: https://www.w3.org/WAI/ARIA/apd/practices/landmark-regions/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label,
         children,
         ...restProps
@@ -62,10 +62,6 @@
 </script>
 
 <!-- SummaryList: a description list for key-value pair presentation -->
-<dl
-    class={`summary-list ${className}`}
-    aria-label={label}
-    {...restProps}
->
+<dl class={`summary-list ${className}`} aria-label={label} {...restProps}>
     {@render children?.()}
 </dl>

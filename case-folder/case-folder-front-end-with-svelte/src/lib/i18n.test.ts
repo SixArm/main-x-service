@@ -15,7 +15,7 @@ import {
     STRINGS_BY_LOCALE,
     isRtl,
     translate,
-    type Locale
+    type Locale,
 } from './i18n.svelte';
 
 describe('i18n catalog', () => {
@@ -33,7 +33,7 @@ describe('i18n catalog', () => {
             'bn',
             'pt',
             'id',
-            'ur'
+            'ur',
         ]);
     });
 
@@ -51,7 +51,9 @@ describe('i18n catalog', () => {
     it('spot-checks a non-Latin locale (zh) against English', () => {
         // Chinese must differ from English on a representative chrome key.
         expect(translate('nav.dashboard', 'zh')).toBe('仪表板');
-        expect(translate('nav.dashboard', 'zh')).not.toBe(translate('nav.dashboard', 'en'));
+        expect(translate('nav.dashboard', 'zh')).not.toBe(
+            translate('nav.dashboard', 'en'),
+        );
         // And the placeholder shape is preserved across locales.
         expect(STRINGS_BY_LOCALE.zh['scan.matches']).toContain('{n}');
     });
@@ -61,7 +63,9 @@ describe('i18n catalog', () => {
         expect(isRtl('ur')).toBe(true);
         // Region subtags still resolve (ar-EG → ar).
         expect(isRtl('ar-EG')).toBe(true);
-        for (const locale of LOCALES.filter((l): l is Locale => l !== 'ar' && l !== 'ur')) {
+        for (const locale of LOCALES.filter(
+            (l): l is Locale => l !== 'ar' && l !== 'ur',
+        )) {
             expect(isRtl(locale), `${locale} should be LTR`).toBe(false);
         }
     });

@@ -43,12 +43,19 @@
             <a href="/patients/{nhsSlug(move.nhsNumber)}">{move.patientName}</a>
             (<span class="nhs-number">{move.nhsNumber}</span>)
         </SummaryListItem>
-        <SummaryListItem term={t('common.from')}>{move.fromCabinetLabel}</SummaryListItem>
-        <SummaryListItem term={t('common.to')}>{move.toCabinetLabel}</SummaryListItem>
+        <SummaryListItem term={t('common.from')}
+            >{move.fromCabinetLabel}</SummaryListItem
+        >
+        <SummaryListItem term={t('common.to')}
+            >{move.toCabinetLabel}</SummaryListItem
+        >
         <SummaryListItem term={t('common.movedBy')}>
-            {move.movedBy}{#if move.workerRole} ({move.workerRole}){/if}
+            {move.movedBy}{#if move.workerRole}
+                ({move.workerRole}){/if}
         </SummaryListItem>
-        <SummaryListItem term={t('common.reason')}>{move.reason ?? '—'}</SummaryListItem>
+        <SummaryListItem term={t('common.reason')}
+            >{move.reason ?? '—'}</SummaryListItem
+        >
     </SummaryList>
 </div>
 
@@ -60,7 +67,9 @@
         {#each data.folders as folder (folder.id)}
             <li>
                 <a href="/folders/{folder.id}">{folder.title}</a>
-                — <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
+                — <Badge type={badgeType(folder.status)}
+                    >{statusLabel(folder.status)}</Badge
+                >
                 <span class="muted">{folder.cabinetLabel}</span>
             </li>
         {/each}

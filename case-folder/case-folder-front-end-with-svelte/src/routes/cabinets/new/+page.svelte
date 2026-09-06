@@ -33,8 +33,8 @@
     const roomOptions = $derived(
         cache.rooms.map((r) => ({
             id: r.id,
-            label: `${cache.buildingById(r.buildingId)?.name ?? '?'} — ${r.name}`
-        }))
+            label: `${cache.buildingById(r.buildingId)?.name ?? '?'} — ${r.name}`,
+        })),
     );
 
     async function handleSubmit() {
@@ -49,13 +49,16 @@
                 label: label.trim(),
                 roomId,
                 // Blank ⇒ uncapped (null); otherwise coerce to a sane ≥1 integer.
-                capacity: capacity === '' ? null : Math.max(1, Number(capacity) || 1),
-                description: description.trim() || undefined
+                capacity:
+                    capacity === '' ? null : Math.max(1, Number(capacity) || 1),
+                description: description.trim() || undefined,
             });
             await goto('/cabinets');
         } catch (e) {
             if (e instanceof ApiError && e.status === 422) {
-                const body = e.body as { errors?: Record<string, string> } | null;
+                const body = e.body as {
+                    errors?: Record<string, string>;
+                } | null;
                 labelError = body?.errors?.name ?? '';
                 if (!labelError) submitError = e.message;
             } else {
@@ -72,18 +75,25 @@
 
 {#if cache.rooms.length === 0}
     <Alert type="warning" heading={t('cabinetNew.noRoomsHeading')}>
-        {t('cabinetNew.noRoomsCreate')} <a href="/buildings/new">{t('cabinetNew.noRoomsBuilding')}</a>
+        {t('cabinetNew.noRoomsCreate')}
+        <a href="/buildings/new">{t('cabinetNew.noRoomsBuilding')}</a>
         {t('cabinetNew.noRoomsBody')}
     </Alert>
 {/if}
 
 {#if submitError}
-    <Alert type="error" heading={t('cabinetNew.cannotSave')}>{submitError}</Alert>
+    <Alert type="error" heading={t('cabinetNew.cannotSave')}
+        >{submitError}</Alert
+    >
 {/if}
 
 <Form label={t('cabinetNew.formLabel')} onsubmit={handleSubmit}>
     <Field label={t('cabinetNew.labelLabel')} required error={labelError}>
-        <input bind:value={label} required placeholder={t('cabinetNew.labelPlaceholder')} />
+        <input
+            bind:value={label}
+            required
+            placeholder={t('cabinetNew.labelPlaceholder')}
+        />
     </Field>
     <Field label={t('cabinetNew.roomLabel')} required error={roomError}>
         <select bind:value={roomId} required>
@@ -93,7 +103,10 @@
             {/each}
         </select>
     </Field>
-    <Field label={t('cabinetNew.capacityLabel')} description={t('cabinetNew.capacityDescription')}>
+    <Field
+        label={t('cabinetNew.capacityLabel')}
+        description={t('cabinetNew.capacityDescription')}
+    >
         <input type="number" min="1" bind:value={capacity} />
     </Field>
     <Field label={t('common.description')}>
@@ -101,6 +114,8 @@
     </Field>
     <div class="actions">
         <a href="/cabinets" class="button secondary">{t('common.cancel')}</a>
-        <Button type="submit" disabled={cache.rooms.length === 0}>{t('cabinetNew.saveCabinet')}</Button>
+        <Button type="submit" disabled={cache.rooms.length === 0}
+            >{t('cabinetNew.saveCabinet')}</Button
+        >
     </div>
 </Form>

@@ -50,10 +50,10 @@
     //   - MDN form element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/form
     //   - WAI Forms Tutorial: https://www.w3.org/WAI/tutorials/forms/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label,
         onsubmit = undefined,
         onreset = undefined,

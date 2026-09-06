@@ -35,7 +35,13 @@
 
     import { cache } from '$lib/store/cache.svelte';
     import { api } from '$lib/api/client';
-    import { i18n, t, isRtl, LOCALE_LABELS, type StringKey } from '$lib/i18n.svelte';
+    import {
+        i18n,
+        t,
+        isRtl,
+        LOCALE_LABELS,
+        type StringKey,
+    } from '$lib/i18n.svelte';
 
     let { children } = $props();
 
@@ -47,8 +53,10 @@
     // chrome is present even when the API is unreachable in local dev.
     const isBareRoute = $derived(
         ['/login', '/auth/callback'].some(
-            (p) => page.url.pathname === p || page.url.pathname.startsWith(`${p}/`)
-        )
+            (p) =>
+                page.url.pathname === p ||
+                page.url.pathname.startsWith(`${p}/`),
+        ),
     );
 
     // The i18n store is the single source of truth for the locale: this
@@ -59,7 +67,10 @@
         if (!browser) return;
         const locale = i18n.locale;
         document.documentElement.setAttribute('lang', locale);
-        document.documentElement.setAttribute('dir', isRtl(locale) ? 'rtl' : 'ltr');
+        document.documentElement.setAttribute(
+            'dir',
+            isRtl(locale) ? 'rtl' : 'ltr',
+        );
     });
 
     // Hamburger toggle state for the header navigation (narrow viewports).
@@ -90,7 +101,7 @@
         { href: '/scan', key: 'nav.scan' },
         { href: '/history', key: 'nav.history' },
         { href: '/alerts', key: 'nav.alerts' },
-        { href: '/reports', key: 'nav.reports' }
+        { href: '/reports', key: 'nav.reports' },
     ];
 
     // The Lily LocalePicker renders these 13 codes; its labels come from the
@@ -104,40 +115,99 @@
     // England/Scotland/Wales patient & practitioner themes; the
     // practitioner-facing English theme is the sensible NHS default.
     const themes = [
-        'abyss', 'acid', 'aqua', 'autumn', 'black', 'bumblebee', 'business',
-        'caramellatte', 'cmyk', 'coffee', 'corporate', 'cupcake', 'cyberpunk',
-        'dark', 'dim', 'dracula', 'emerald', 'fantasy', 'forest', 'garden',
-        'halloween', 'lemonade', 'light', 'lofi', 'luxury', 'night', 'nord',
-        'pastel', 'retro', 'silk', 'sunset', 'synthwave',
+        'abyss',
+        'acid',
+        'aqua',
+        'autumn',
+        'black',
+        'bumblebee',
+        'business',
+        'caramellatte',
+        'cmyk',
+        'coffee',
+        'corporate',
+        'cupcake',
+        'cyberpunk',
+        'dark',
+        'dim',
+        'dracula',
+        'emerald',
+        'fantasy',
+        'forest',
+        'garden',
+        'halloween',
+        'lemonade',
+        'light',
+        'lofi',
+        'luxury',
+        'night',
+        'nord',
+        'pastel',
+        'retro',
+        'silk',
+        'sunset',
+        'synthwave',
         'united-kingdom-national-health-service-england-for-patients',
         'united-kingdom-national-health-service-england-for-practitioners',
         'united-kingdom-national-health-service-scotland-for-patients',
         'united-kingdom-national-health-service-scotland-for-practitioners',
         'united-kingdom-national-health-service-wales-for-patients',
         'united-kingdom-national-health-service-wales-for-practitioners',
-        'valentine', 'winter', 'wireframe'
+        'valentine',
+        'winter',
+        'wireframe',
     ];
 
     // Human-readable labels for the theme select — the FULL theme name for
     // each slug (DaisyUI names title-cased; the NHS slugs spelled out in full).
     const THEME_LABELS: Record<string, string> = {
-        abyss: "Abyss", acid: "Acid", aqua: "Aqua", autumn: "Autumn",
-        black: "Black", bumblebee: "Bumblebee", business: "Business",
-        caramellatte: "Caramellatte", cmyk: "Cmyk", coffee: "Coffee",
-        corporate: "Corporate", cupcake: "Cupcake", cyberpunk: "Cyberpunk",
-        dark: "Dark", dim: "Dim", dracula: "Dracula", emerald: "Emerald",
-        fantasy: "Fantasy", forest: "Forest", garden: "Garden",
-        halloween: "Halloween", lemonade: "Lemonade", light: "Light",
-        lofi: "Lofi", luxury: "Luxury", night: "Night", nord: "Nord",
-        pastel: "Pastel", retro: "Retro", silk: "Silk", sunset: "Sunset",
-        synthwave: "Synthwave", valentine: "Valentine", winter: "Winter",
-        wireframe: "Wireframe",
-        "united-kingdom-national-health-service-england-for-patients": "United Kingdom National Health Service England for Patients",
-        "united-kingdom-national-health-service-england-for-practitioners": "United Kingdom National Health Service England for Practitioners",
-        "united-kingdom-national-health-service-scotland-for-patients": "United Kingdom National Health Service Scotland for Patients",
-        "united-kingdom-national-health-service-scotland-for-practitioners": "United Kingdom National Health Service Scotland for Practitioners",
-        "united-kingdom-national-health-service-wales-for-patients": "United Kingdom National Health Service Wales for Patients",
-        "united-kingdom-national-health-service-wales-for-practitioners": "United Kingdom National Health Service Wales for Practitioners",
+        abyss: 'Abyss',
+        acid: 'Acid',
+        aqua: 'Aqua',
+        autumn: 'Autumn',
+        black: 'Black',
+        bumblebee: 'Bumblebee',
+        business: 'Business',
+        caramellatte: 'Caramellatte',
+        cmyk: 'Cmyk',
+        coffee: 'Coffee',
+        corporate: 'Corporate',
+        cupcake: 'Cupcake',
+        cyberpunk: 'Cyberpunk',
+        dark: 'Dark',
+        dim: 'Dim',
+        dracula: 'Dracula',
+        emerald: 'Emerald',
+        fantasy: 'Fantasy',
+        forest: 'Forest',
+        garden: 'Garden',
+        halloween: 'Halloween',
+        lemonade: 'Lemonade',
+        light: 'Light',
+        lofi: 'Lofi',
+        luxury: 'Luxury',
+        night: 'Night',
+        nord: 'Nord',
+        pastel: 'Pastel',
+        retro: 'Retro',
+        silk: 'Silk',
+        sunset: 'Sunset',
+        synthwave: 'Synthwave',
+        valentine: 'Valentine',
+        winter: 'Winter',
+        wireframe: 'Wireframe',
+        'united-kingdom-national-health-service-england-for-patients':
+            'United Kingdom National Health Service England for Patients',
+        'united-kingdom-national-health-service-england-for-practitioners':
+            'United Kingdom National Health Service England for Practitioners',
+        'united-kingdom-national-health-service-scotland-for-patients':
+            'United Kingdom National Health Service Scotland for Patients',
+        'united-kingdom-national-health-service-scotland-for-practitioners':
+            'United Kingdom National Health Service Scotland for Practitioners',
+        'united-kingdom-national-health-service-wales-for-patients':
+            'United Kingdom National Health Service Wales for Patients',
+        'united-kingdom-national-health-service-wales-for-practitioners':
+            'United Kingdom National Health Service Wales for Practitioners',
     };
 
     // Mark a nav link as the current page for `aria-current`. The
@@ -175,8 +245,12 @@
         />
         {#if user}
             <span class="auth-status">
-                {t('auth.signedInAs')} <strong>{user.name}</strong>{#if user.role} ({user.role}){/if}
-                <button type="button" class="signout" onclick={signOut}>{t('auth.signOut')}</button>
+                {t('auth.signedInAs')}
+                <strong>{user.name}</strong>{#if user.role}
+                    ({user.role}){/if}
+                <button type="button" class="signout" onclick={signOut}
+                    >{t('auth.signOut')}</button
+                >
             </span>
         {/if}
     </div>

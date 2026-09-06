@@ -16,15 +16,31 @@
     // resolved at render time (so the bar relabels on a locale switch).
     export const DEFAULT_BUTTONS: BarButton[] = [
         { key: 'patient', labelKey: 'buttonBar.patient', icon: 'person' },
-        { key: 'referrals', labelKey: 'buttonBar.referrals', icon: 'envelope-open' },
+        {
+            key: 'referrals',
+            labelKey: 'buttonBar.referrals',
+            icon: 'envelope-open',
+        },
         { key: 'activate', labelKey: 'buttonBar.activate', icon: 'hospital' },
         { key: 'case-notes', labelKey: 'buttonBar.caseNotes', icon: 'folder' },
         { key: 'pathways', labelKey: 'buttonBar.pathways', icon: 'footprints' },
-        { key: 'legal-status', labelKey: 'buttonBar.legalStatus', icon: 'scales' },
-        { key: 'documents', labelKey: 'buttonBar.documents', icon: 'clipboard' },
+        {
+            key: 'legal-status',
+            labelKey: 'buttonBar.legalStatus',
+            icon: 'scales',
+        },
+        {
+            key: 'documents',
+            labelKey: 'buttonBar.documents',
+            icon: 'clipboard',
+        },
         { key: 'wrapper', labelKey: 'buttonBar.wrapper', icon: 'box' },
         { key: 'audit', labelKey: 'buttonBar.audit', icon: 'magnifying-glass' },
-        { key: 'quick-reports', labelKey: 'buttonBar.quickReports', icon: 'printer' }
+        {
+            key: 'quick-reports',
+            labelKey: 'buttonBar.quickReports',
+            icon: 'printer',
+        },
     ];
 </script>
 
@@ -50,7 +66,7 @@
         active = undefined,
         onselect = undefined,
         label = undefined,
-        class: className = ''
+        class: className = '',
     }: {
         buttons?: BarButton[];
         active?: string;

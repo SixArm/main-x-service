@@ -18,7 +18,9 @@
     const history = $derived(data.history);
 
     // Folder status → Badge colour (green = located, amber = in transit).
-    function badgeType(status: string): 'success' | 'warning' | 'info' | 'default' {
+    function badgeType(
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
@@ -49,28 +51,46 @@
 
 <div class="panel">
     <SummaryList label={t('folderDetail.detailsLabel')}>
-        <SummaryListItem term={t('folderDetail.folderTitle')}>{folder.title}</SummaryListItem>
+        <SummaryListItem term={t('folderDetail.folderTitle')}
+            >{folder.title}</SummaryListItem
+        >
         <SummaryListItem term={t('common.patient')}>
-            <a href="/patients/{nhsSlug(folder.nhsNumber)}">{folder.patientName}</a>
+            <a href="/patients/{nhsSlug(folder.nhsNumber)}"
+                >{folder.patientName}</a
+            >
         </SummaryListItem>
-        <SummaryListItem term={t('folderDetail.currentCabinet')}>{folder.cabinetLabel}</SummaryListItem>
+        <SummaryListItem term={t('folderDetail.currentCabinet')}
+            >{folder.cabinetLabel}</SummaryListItem
+        >
         {#if folder.volumeId}
             <SummaryListItem term={t('common.volume')}>
-                <a href="/volumes/{folder.volumeId}">{folder.volumeTitle ?? t('common.volume')}</a>
+                <a href="/volumes/{folder.volumeId}"
+                    >{folder.volumeTitle ?? t('common.volume')}</a
+                >
             </SummaryListItem>
         {/if}
         <SummaryListItem term={t('common.status')}>
-            <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
+            <Badge type={badgeType(folder.status)}
+                >{statusLabel(folder.status)}</Badge
+            >
         </SummaryListItem>
         <SummaryListItem term={t('common.lastMoved')}>
-            {folder.lastMovedAt ? new Date(folder.lastMovedAt).toLocaleString('en-GB') : '—'}
+            {folder.lastMovedAt
+                ? new Date(folder.lastMovedAt).toLocaleString('en-GB')
+                : '—'}
         </SummaryListItem>
         {#if folder.notes}
-            <SummaryListItem term={t('common.notes')}>{folder.notes}</SummaryListItem>
+            <SummaryListItem term={t('common.notes')}
+                >{folder.notes}</SummaryListItem
+            >
         {/if}
     </SummaryList>
-    <div style="margin-top: var(--nhs-space-3); display:flex; gap: var(--nhs-space-2);">
-        <a href="/move?folder={folder.id}" class="button">{t('folderDetail.moveThisFolder')}</a>
+    <div
+        style="margin-top: var(--nhs-space-3); display:flex; gap: var(--nhs-space-2);"
+    >
+        <a href="/move?folder={folder.id}" class="button"
+            >{t('folderDetail.moveThisFolder')}</a
+        >
     </div>
 </div>
 
@@ -86,7 +106,8 @@
                 <span>{move.toCabinetLabel}</span>
             </div>
             <p class="move-meta">
-                {move.movedBy}{#if move.workerRole} ({move.workerRole}){/if}
+                {move.movedBy}{#if move.workerRole}
+                    ({move.workerRole}){/if}
                 · {new Date(move.movedAt).toLocaleString('en-GB')}
                 {#if move.reason}· {move.reason}{/if}
             </p>

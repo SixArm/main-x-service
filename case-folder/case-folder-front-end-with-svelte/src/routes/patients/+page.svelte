@@ -24,7 +24,7 @@
         return cache.patients.filter(
             (p) =>
                 p.name.toLowerCase().includes(q) ||
-                p.nhsNumber.replaceAll(' ', '').includes(q.replaceAll(' ', ''))
+                p.nhsNumber.replaceAll(' ', '').includes(q.replaceAll(' ', '')),
         );
     });
 
@@ -47,7 +47,10 @@
 </div>
 
 <div class="panel">
-    <DataTable label={t('patients.tableLabel')} caption={t('patients.tableCaption')}>
+    <DataTable
+        label={t('patients.tableLabel')}
+        caption={t('patients.tableCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.nhsNumber')}</th>
@@ -62,7 +65,10 @@
             {#each filtered as patient (patient.id)}
                 <DataTableRow>
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(patient.nhsNumber)}" class="nhs-number">
+                        <a
+                            href="/patients/{nhsSlug(patient.nhsNumber)}"
+                            class="nhs-number"
+                        >
                             {patient.nhsNumber}
                         </a>
                     </DataTableTD>
@@ -71,13 +77,18 @@
                     <DataTableTD>{patient.folderCount}</DataTableTD>
                     <DataTableTD>{patient.source}</DataTableTD>
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(patient.nhsNumber)}">{t('common.view')}</a>
+                        <a href="/patients/{nhsSlug(patient.nhsNumber)}"
+                            >{t('common.view')}</a
+                        >
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if filtered.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={6}>{t('patients.noMatch')} <strong>{query}</strong>.</DataTableTD>
+                    <DataTableTD colspan={6}
+                        >{t('patients.noMatch')}
+                        <strong>{query}</strong>.</DataTableTD
+                    >
                 </DataTableRow>
             {/if}
         </DataTableBody>

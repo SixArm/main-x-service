@@ -46,7 +46,9 @@
             magicLink = res.magicLink;
         } catch (e) {
             if (e instanceof ApiError && e.status === 422) {
-                const body = e.body as { errors?: Record<string, string> } | null;
+                const body = e.body as {
+                    errors?: Record<string, string>;
+                } | null;
                 emailError = body?.errors?.email ?? e.message;
             } else {
                 submitError = (e as Error).message;
@@ -64,20 +66,28 @@
 
 {#if sent}
     <Alert type="success" heading={t('login.checkEmail')}>
-        {t('login.sentPrefix')} <strong>{email}</strong> {t('login.sentBody')}
+        {t('login.sentPrefix')} <strong>{email}</strong>
+        {t('login.sentBody')}
     </Alert>
     {#if magicLink}
         <!-- Dev convenience: the API exposes the link directly so you can
              click it without an email server. Never shown in production. -->
         <p class="dev-magic-link">
             {t('login.devShortcut')}
-            <a href={magicLink} data-testid="magic-link">{t('login.openLink')}</a>
+            <a href={magicLink} data-testid="magic-link"
+                >{t('login.openLink')}</a
+            >
         </p>
     {/if}
 {:else}
     <Form label={t('login.formLabel')} onsubmit={handleSubmit}>
         <Field label={t('login.emailLabel')} required error={emailError}>
-            <input type="email" bind:value={email} required autocomplete="email" />
+            <input
+                type="email"
+                bind:value={email}
+                required
+                autocomplete="email"
+            />
         </Field>
         <div class="actions">
             <Button type="submit">{t('login.submit')}</Button>

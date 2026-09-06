@@ -10,7 +10,7 @@ export async function load({ fetch, params }) {
     try {
         const [folder, history] = await Promise.all([
             api.folders.show(params.id, { fetch }),
-            api.folders.history(params.id, { fetch })
+            api.folders.history(params.id, { fetch }),
         ]);
         return { folder, history };
     } catch (e) {

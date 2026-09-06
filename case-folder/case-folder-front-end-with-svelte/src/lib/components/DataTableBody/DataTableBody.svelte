@@ -31,10 +31,10 @@
     // References:
     //   - HTML tbody element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/tbody
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         children,
         ...restProps
     }: {
@@ -45,9 +45,6 @@
 </script>
 
 <!-- DataTableBody.svelte -->
-<tbody
-    class={`data-table-body ${className}`}
-    {...restProps}
->
+<tbody class={`data-table-body ${className}`} {...restProps}>
     {@render children?.()}
 </tbody>

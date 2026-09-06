@@ -64,25 +64,25 @@
     //   - WAI-ARIA alert role: https://www.w3.org/TR/wai-aria-1.2/#alert
     //   - WAI-ARIA status role: https://www.w3.org/TR/wai-aria-1.2/#status
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
-        type = "info",
+        class: className = '',
+        type = 'info',
         heading = undefined,
-        role = "alert",
+        role = 'alert',
         live = undefined,
         children,
         ...restProps
     }: {
         /** The alert severity type */
-        type?: "info" | "success" | "warning" | "error";
+        type?: 'info' | 'success' | 'warning' | 'error';
         /** Optional heading text for the alert */
         heading?: string;
         /** ARIA role: "alert" for assertive, "status" for polite */
-        role?: "alert" | "status";
+        role?: 'alert' | 'status';
         /** ARIA live region politeness override */
-        live?: "assertive" | "polite" | "off";
+        live?: 'assertive' | 'polite' | 'off';
         /** The alert content */
         children: Snippet;
         [key: string]: unknown;
@@ -90,7 +90,7 @@
 
     // Default aria-live based on role if not explicitly set
     let ariaLive = $derived(
-        live ?? (role === "alert" ? "assertive" : "polite"),
+        live ?? (role === 'alert' ? 'assertive' : 'polite'),
     );
 </script>
 

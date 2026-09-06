@@ -34,7 +34,10 @@
 <h3>{t('roomDetail.presenceHistory')}</h3>
 <p>{t('roomDetail.presenceIntro')}</p>
 <div class="panel">
-    <DataTable label={t('roomDetail.presenceTable')} caption={t('roomDetail.presenceCaption')}>
+    <DataTable
+        label={t('roomDetail.presenceTable')}
+        caption={t('roomDetail.presenceCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.folder')}</th>
@@ -47,20 +50,29 @@
         <DataTableBody>
             {#each data.presences as p (p.cabinetId + p.folderId + p.enteredAt)}
                 <DataTableRow>
-                    <DataTableTD><a href="/folders/{p.folderId}">{p.folderTitle}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/folders/{p.folderId}">{p.folderTitle}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(p.nhsNumber)}">{p.patientName}</a>
+                        <a href="/patients/{nhsSlug(p.nhsNumber)}"
+                            >{p.patientName}</a
+                        >
                     </DataTableTD>
                     <DataTableTD>{p.cabinetLabel}</DataTableTD>
                     <DataTableTD>{when(p.enteredAt)}</DataTableTD>
                     <DataTableTD>
-                        {#if p.leftAt}{when(p.leftAt)}{:else}<Badge type="success">{t('common.stillHere')}</Badge>{/if}
+                        {#if p.leftAt}{when(p.leftAt)}{:else}<Badge
+                                type="success">{t('common.stillHere')}</Badge
+                            >{/if}
                     </DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.presences.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={5}>{t('roomDetail.noPresence')}</DataTableTD>
+                    <DataTableTD colspan={5}
+                        >{t('roomDetail.noPresence')}</DataTableTD
+                    >
                 </DataTableRow>
             {/if}
         </DataTableBody>

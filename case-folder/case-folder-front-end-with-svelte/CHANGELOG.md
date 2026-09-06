@@ -10,6 +10,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — Prettier, and a first-time `src` reformat (ST-17)
+
+`package.json` had no `prettier`/`prettier-plugin-svelte` devDependency,
+no `format`/`format:check` script, and no `.prettierrc` — this app's
+`npm run lint` (ESLint only) was the one place in the family relying on
+ESLint alone for style. Added both as devDependencies, `format`
+(`prettier --write src`) / `format:check` (`prettier --check src`)
+scripts scoped to `src` (not `.` — that also touches `spec/*.md`,
+`pnpm-lock.yaml`, and config files, discovered by trying it and
+reverting), and a `.prettierrc` (`tabWidth: 4`, `singleQuote: true`,
+`prettier-plugin-svelte`) matching this project's existing style. The
+accompanying first-time reformat (85 files under `src` had never been
+Prettier-formatted) is mechanical only — trailing commas, line wraps,
+quote normalisation, no logic changes — verified by hand-diffing
+several files and by `npm run check` / `npm run test:unit` / `npm run
+lint` all staying green (50/50, 0 errors, 0 issues). `AGENTS.md`
+§"CI gate" now lists `npm run format:check`. See spec/tasks.md ST-17.
+
 ### Added — test coverage for the signed-in role suffix (ST-18)
 
 `UserView.role` is rendered next to the signed-in user's name in the

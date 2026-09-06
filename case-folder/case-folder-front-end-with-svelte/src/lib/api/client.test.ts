@@ -14,7 +14,7 @@ import {
     toPatient,
     toRoom,
     toStats,
-    toWorker
+    toWorker,
 } from './client';
 
 describe('snake → camel mappers', () => {
@@ -31,7 +31,7 @@ describe('snake → camel mappers', () => {
             last_moved_at: '2026-06-01T10:15:32+00:00',
             notes: null,
             volume_id: 'v1',
-            volume_title: 'Alice — Vol 1'
+            volume_title: 'Alice — Vol 1',
         });
         expect(folder.patientId).toBe('p1');
         expect(folder.cabinetLabel).toContain('Cabinet A1');
@@ -55,7 +55,7 @@ describe('snake → camel mappers', () => {
             moved_by: 'Mira',
             worker_role: 'administrator',
             moved_at: '2026-06-01T10:15:32+00:00',
-            reason: 'Created'
+            reason: 'Created',
         });
         expect(move.folderId).toBe('f1');
         expect(move.toCabinetLabel).toBe('Cabinet A1');
@@ -69,7 +69,7 @@ describe('snake → camel mappers', () => {
             name: 'Alice Johnson',
             date_of_birth: '1980-04-12',
             folder_count: 3,
-            source: 'patient-service'
+            source: 'patient-service',
         });
         expect(patient.id).toBe('p1');
         expect(patient.nhsNumber).toBe('943 476 5919');
@@ -85,7 +85,7 @@ describe('snake → camel mappers', () => {
             name: 'Bob Smith',
             date_of_birth: null,
             folder_count: 0,
-            source: 'snapshot'
+            source: 'snapshot',
         });
         expect(patient.dateOfBirth).toBeNull();
         expect(patient.folderCount).toBe(0);
@@ -101,12 +101,12 @@ describe('snake → camel mappers', () => {
             contained_in_place: null,
             container_path: 'Main Hospital',
             capacity: null,
-            source: 'place-service'
+            source: 'place-service',
         });
         expect(building).toEqual({
             id: 'b1',
             name: 'Main Hospital',
-            description: 'Acute site'
+            description: 'Acute site',
         });
     });
 
@@ -120,7 +120,7 @@ describe('snake → camel mappers', () => {
             contained_in_place: 'b1',
             container_path: 'Main Hospital — Records Room',
             capacity: null,
-            source: 'place-service'
+            source: 'place-service',
         });
         expect(room.id).toBe('r1');
         expect(room.name).toBe('Records Room');
@@ -139,7 +139,7 @@ describe('snake → camel mappers', () => {
             container_path: 'Main Hospital — Records Room — Cabinet A1',
             capacity: 100,
             source: 'place-service',
-            folder_count: 7
+            folder_count: 7,
         });
         expect(cabinet.id).toBe('c1');
         expect(cabinet.label).toBe('Cabinet A1');
@@ -150,15 +150,17 @@ describe('snake → camel mappers', () => {
     });
 
     it('maps a worker with and without a role', () => {
-        expect(toWorker({ id: 'w1', name: 'Mira', role: 'administrator' })).toEqual({
+        expect(
+            toWorker({ id: 'w1', name: 'Mira', role: 'administrator' }),
+        ).toEqual({
             id: 'w1',
             name: 'Mira',
-            role: 'administrator'
+            role: 'administrator',
         });
         expect(toWorker({ id: 'w2', name: 'Sam', role: null })).toEqual({
             id: 'w2',
             name: 'Sam',
-            role: null
+            role: null,
         });
     });
 
@@ -167,7 +169,7 @@ describe('snake → camel mappers', () => {
             patients: 6,
             folders: { total: 9, in_cabinet: 7, in_transit: 2 },
             places: { buildings: 3, rooms: 4, cabinets: 5 },
-            moves_24h: 1
+            moves_24h: 1,
         });
         expect(stats.folders.inCabinet).toBe(7);
         expect(stats.folders.inTransit).toBe(2);
@@ -177,7 +179,9 @@ describe('snake → camel mappers', () => {
 
 describe('ApiError', () => {
     it('carries status and body', () => {
-        const err = new ApiError('boom', 422, { errors: { nhs_number: 'bad' } });
+        const err = new ApiError('boom', 422, {
+            errors: { nhs_number: 'bad' },
+        });
         expect(err).toBeInstanceOf(Error);
         expect(err.name).toBe('ApiError');
         expect(err.status).toBe(422);

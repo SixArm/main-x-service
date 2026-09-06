@@ -33,12 +33,14 @@
         try {
             const id = await cache.addBuilding({
                 name: name.trim(),
-                description: description.trim() || undefined
+                description: description.trim() || undefined,
             });
             await goto(`/buildings/${id}`);
         } catch (e) {
             if (e instanceof ApiError && e.status === 422) {
-                const body = e.body as { errors?: Record<string, string> } | null;
+                const body = e.body as {
+                    errors?: Record<string, string>;
+                } | null;
                 nameError = body?.errors?.name ?? '';
                 if (!nameError) submitError = e.message;
             } else {
@@ -54,7 +56,9 @@
 <p>{t('buildingNew.intro')}</p>
 
 {#if submitError}
-    <Alert type="error" heading={t('buildingNew.cannotSave')}>{submitError}</Alert>
+    <Alert type="error" heading={t('buildingNew.cannotSave')}
+        >{submitError}</Alert
+    >
 {/if}
 
 <Form label={t('buildingNew.formLabel')} onsubmit={handleSubmit}>

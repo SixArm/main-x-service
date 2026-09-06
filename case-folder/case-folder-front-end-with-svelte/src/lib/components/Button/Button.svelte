@@ -52,11 +52,11 @@
     // References:
     //   - WAI-ARIA Button Pattern: https://www.w3.org/WAI/ARIA/apg/patterns/button/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
-        type = "button",
+        class: className = '',
+        type = 'button',
         disabled = false,
         pressed = undefined,
         label = undefined,
@@ -65,7 +65,7 @@
         ...restProps
     }: {
         /** HTML button type */
-        type?: "button" | "submit" | "reset";
+        type?: 'button' | 'submit' | 'reset';
         /** Whether the button is disabled */
         disabled?: boolean;
         /** Toggle button pressed state (undefined = not a toggle button) */

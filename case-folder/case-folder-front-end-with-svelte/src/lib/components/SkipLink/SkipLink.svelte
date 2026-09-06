@@ -46,9 +46,9 @@
     //   - WebAIM Skip Navigation Links: https://webaim.org/techniques/skipnav/
 
     let {
-        class: className = "",
-        href = "#content",
-        label = "Skip to content",
+        class: className = '',
+        href = '#content',
+        label = 'Skip to content',
         ...restProps
     }: {
         /** Target anchor. */
@@ -60,8 +60,4 @@
 </script>
 
 <!-- SkipLink.svelte -->
-<a
-    class={`skip-link ${className}`}
-    {href}
-    {...restProps}>{label}</a
->
+<a class={`skip-link ${className}`} {href} {...restProps}>{label}</a>

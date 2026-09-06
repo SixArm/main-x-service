@@ -42,7 +42,7 @@
     //   - MDN hr element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/hr
 
     let {
-        class: className = "",
+        class: className = '',
         label = undefined,
         ...restProps
     }: {
@@ -53,8 +53,4 @@
 </script>
 
 <!-- Separator.svelte -->
-<hr
-    class={`separator ${className}`}
-    aria-label={label}
-    {...restProps}
-/>
+<hr class={`separator ${className}`} aria-label={label} {...restProps} />

@@ -54,12 +54,19 @@
             <DataTableBody>
                 {#each data.folders as folder (folder.id)}
                     <DataTableRow>
-                        <DataTableTD><a href="/folders/{folder.id}">{folder.title}</a></DataTableTD>
+                        <DataTableTD
+                            ><a href="/folders/{folder.id}">{folder.title}</a
+                            ></DataTableTD
+                        >
                         <DataTableTD>
-                            <a href="/patients/{nhsSlug(folder.nhsNumber)}">{folder.patientName}</a>
+                            <a href="/patients/{nhsSlug(folder.nhsNumber)}"
+                                >{folder.patientName}</a
+                            >
                         </DataTableTD>
                         <DataTableTD>
-                            <Badge type={badgeType(folder.status)}>{statusLabel(folder.status)}</Badge>
+                            <Badge type={badgeType(folder.status)}
+                                >{statusLabel(folder.status)}</Badge
+                            >
                         </DataTableTD>
                     </DataTableRow>
                 {/each}
@@ -75,7 +82,10 @@
 <h3>{t('cabinetDetail.presenceHistory')}</h3>
 <p>{t('cabinetDetail.presenceIntro')}</p>
 <div class="panel">
-    <DataTable label={t('cabinetDetail.presenceTable')} caption={t('cabinetDetail.presenceCaption')}>
+    <DataTable
+        label={t('cabinetDetail.presenceTable')}
+        caption={t('cabinetDetail.presenceCaption')}
+    >
         <DataTableHead>
             <DataTableRow>
                 <th scope="col">{t('common.folder')}</th>
@@ -88,20 +98,29 @@
         <DataTableBody>
             {#each data.presences as p (p.folderId + p.enteredAt)}
                 <DataTableRow>
-                    <DataTableTD><a href="/folders/{p.folderId}">{p.folderTitle}</a></DataTableTD>
+                    <DataTableTD
+                        ><a href="/folders/{p.folderId}">{p.folderTitle}</a
+                        ></DataTableTD
+                    >
                     <DataTableTD>
-                        <a href="/patients/{nhsSlug(p.nhsNumber)}">{p.patientName}</a>
+                        <a href="/patients/{nhsSlug(p.nhsNumber)}"
+                            >{p.patientName}</a
+                        >
                     </DataTableTD>
                     <DataTableTD>{when(p.enteredAt)}</DataTableTD>
                     <DataTableTD>
-                        {#if p.leftAt}{when(p.leftAt)}{:else}<Badge type="success">{t('common.stillHere')}</Badge>{/if}
+                        {#if p.leftAt}{when(p.leftAt)}{:else}<Badge
+                                type="success">{t('common.stillHere')}</Badge
+                            >{/if}
                     </DataTableTD>
                     <DataTableTD>{p.leftReason ?? ''}</DataTableTD>
                 </DataTableRow>
             {/each}
             {#if data.presences.length === 0}
                 <DataTableRow>
-                    <DataTableTD colspan={5}>{t('cabinetDetail.noPresence')}</DataTableTD>
+                    <DataTableTD colspan={5}
+                        >{t('cabinetDetail.noPresence')}</DataTableTD
+                    >
                 </DataTableRow>
             {/if}
         </DataTableBody>

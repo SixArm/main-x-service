@@ -52,10 +52,10 @@
     //   - WAI-ARIA status role: https://www.w3.org/TR/wai-aria-1.2/#status
     //   - WAI-ARIA Live Regions: https://www.w3.org/WAI/ARIA/apd/practices/live-regions/
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label = undefined,
         urgent = false,
         children,
@@ -71,9 +71,9 @@
 <!-- Notification.svelte -->
 <div
     class={`notification ${className}`}
-    role={urgent ? "alert" : "status"}
+    role={urgent ? 'alert' : 'status'}
     aria-label={label}
-    aria-live={urgent ? "assertive" : "polite"}
+    aria-live={urgent ? 'assertive' : 'polite'}
     {...restProps}
 >
     {@render children?.()}

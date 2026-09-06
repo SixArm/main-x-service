@@ -30,10 +30,10 @@
     // References:
     //   - HTML tr element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/tr
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         children,
         ...restProps
     }: {
@@ -44,9 +44,6 @@
 </script>
 
 <!-- DataTableRow.svelte -->
-<tr
-    class={`data-table-row ${className}`}
-    {...restProps}
->
+<tr class={`data-table-row ${className}`} {...restProps}>
     {@render children?.()}
 </tr>

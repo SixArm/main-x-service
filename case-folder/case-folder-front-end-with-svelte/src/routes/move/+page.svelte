@@ -18,7 +18,11 @@
     import { cache } from '$lib/store/cache.svelte';
     import { api, ApiError } from '$lib/api/client';
     import type { Folder } from '$lib/store/types';
-    import { formatNhsNumber, isValidNhsNumber, normaliseNhsNumber } from '$lib/store/nhs';
+    import {
+        formatNhsNumber,
+        isValidNhsNumber,
+        normaliseNhsNumber,
+    } from '$lib/store/nhs';
 
     import BackLink from '$lib/components/BackLink/BackLink.svelte';
     import Alert from '$lib/components/Alert/Alert.svelte';
@@ -89,7 +93,9 @@
     });
 
     // Map a folder status to a Badge colour for the side pane.
-    function badgeType(status: string): 'success' | 'warning' | 'info' | 'default' {
+    function badgeType(
+        status: string,
+    ): 'success' | 'warning' | 'info' | 'default' {
         if (status === 'in-cabinet') return 'success';
         if (status === 'in-transit') return 'warning';
         return 'default';
@@ -113,27 +119,32 @@
 
         // The sentinel "__transit" and the empty option both mean "no
         // cabinet" (folder in transit); send null in both cases.
-        const target = toCabinetId === '__transit' || toCabinetId === '' ? null : toCabinetId;
+        const target =
+            toCabinetId === '__transit' || toCabinetId === ''
+                ? null
+                : toCabinetId;
         try {
             const event = await cache.recordMove({
                 folderId,
                 toCabinetId: target,
                 workerId: workerId || null,
                 movedBy: movedBy.trim() || undefined,
-                reason: reason.trim() || undefined
+                reason: reason.trim() || undefined,
             });
             success = tf('move.recordedSummary', {
                 patient: event.patientName,
                 folder: event.folderTitle,
                 from: event.fromCabinetLabel,
-                to: event.toCabinetLabel
+                to: event.toCabinetLabel,
             });
             reason = '';
             // Refresh the patient folders pane to reflect the new location.
             lookupFolders(nhsNumber);
         } catch (e) {
             if (e instanceof ApiError && e.status === 422) {
-                const body = e.body as { errors?: Record<string, string> } | null;
+                const body = e.body as {
+                    errors?: Record<string, string>;
+                } | null;
                 const errs = body?.errors ?? {};
                 folderError = errs.folder_id ?? folderError;
                 cabinetError = errs.to_cabinet_id ?? cabinetError;
@@ -162,15 +173,33 @@
     <Form label={t('move.formLabel')} onsubmit={handleSubmit}>
         <Field label={t('move.patientNhs')} required error={nhsError}>
             <UnitedKingdomNationalHealthServiceNumberInput
-                label={t('common.nhsNumber')} bind:value={nhsNumber} oninput={onNhsInput} required
+                label={t('common.nhsNumber')}
+                bind:value={nhsNumber}
+                oninput={onNhsInput}
+                required
             />
         </Field>
 
-        <Field label={t('move.folder')} required error={folderError} description={patientFolders.length ? t('move.pickFolderDescription') : t('move.enterNhsDescription')}>
-            <select bind:value={folderId} required disabled={patientFolders.length === 0}>
+        <Field
+            label={t('move.folder')}
+            required
+            error={folderError}
+            description={patientFolders.length
+                ? t('move.pickFolderDescription')
+                : t('move.enterNhsDescription')}
+        >
+            <select
+                bind:value={folderId}
+                required
+                disabled={patientFolders.length === 0}
+            >
                 <option value="">{t('move.selectFolderOption')}</option>
                 {#each patientFolders as f (f.id)}
-                    <option value={f.id}>{f.title} — {f.cabinetLabel} · {statusLabel(f.status)}</option>
+                    <option value={f.id}
+                        >{f.title} — {f.cabinetLabel} · {statusLabel(
+                            f.status,
+                        )}</option
+                    >
                 {/each}
             </select>
         </Field>
@@ -185,26 +214,42 @@
             </select>
         </Field>
 
-        <Field label={t('move.workerLabel')} description={t('move.workerDescription')}>
+        <Field
+            label={t('move.workerLabel')}
+            description={t('move.workerDescription')}
+        >
             <select bind:value={workerId}>
                 <option value="">{t('move.freeTextOnly')}</option>
                 {#each cache.workers as w (w.id)}
-                    <option value={w.id}>{w.name}{w.role ? ` — ${w.role}` : ''}</option>
+                    <option value={w.id}
+                        >{w.name}{w.role ? ` — ${w.role}` : ''}</option
+                    >
                 {/each}
             </select>
         </Field>
 
-        <Field label={t('move.movedByLabel')} description={t('move.movedByDescription')}>
-            <input bind:value={movedBy} placeholder={t('move.movedByPlaceholder')} />
+        <Field
+            label={t('move.movedByLabel')}
+            description={t('move.movedByDescription')}
+        >
+            <input
+                bind:value={movedBy}
+                placeholder={t('move.movedByPlaceholder')}
+            />
         </Field>
 
         <Field label={t('common.reason')}>
-            <input bind:value={reason} placeholder={t('move.reasonPlaceholder')} />
+            <input
+                bind:value={reason}
+                placeholder={t('move.reasonPlaceholder')}
+            />
         </Field>
 
         <div class="actions">
             <a href="/" class="button secondary">{t('common.cancel')}</a>
-            <Button type="submit" disabled={!folderId}>{t('move.recordMove')}</Button>
+            <Button type="submit" disabled={!folderId}
+                >{t('move.recordMove')}</Button
+            >
         </div>
     </Form>
 
@@ -213,9 +258,13 @@
         {#if patientFolders.length > 0}
             <ul style="list-style: none; padding: 0; margin: 0;">
                 {#each patientFolders as f (f.id)}
-                    <li style="padding: var(--nhs-space-1) 0; border-bottom: 1px solid var(--nhs-pale-grey);">
+                    <li
+                        style="padding: var(--nhs-space-1) 0; border-bottom: 1px solid var(--nhs-pale-grey);"
+                    >
                         <strong>{f.title}</strong>
-                        <Badge type={badgeType(f.status)}>{statusLabel(f.status)}</Badge><br />
+                        <Badge type={badgeType(f.status)}
+                            >{statusLabel(f.status)}</Badge
+                        ><br />
                         <small>{f.cabinetLabel}</small>
                     </li>
                 {/each}

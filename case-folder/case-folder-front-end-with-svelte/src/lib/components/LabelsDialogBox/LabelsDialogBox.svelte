@@ -37,7 +37,7 @@
         selected = $bindable([]),
         onprint = undefined,
         onclose = undefined,
-        class: className = ''
+        class: className = '',
     }: {
         open?: boolean;
         volumes?: LabelOption[];
@@ -57,8 +57,10 @@
     // query, or the whole list when no query is set.
     const filtered = $derived(
         query.trim()
-            ? volumes.filter((v) => v.title.toLowerCase().includes(query.trim().toLowerCase()))
-            : volumes
+            ? volumes.filter((v) =>
+                  v.title.toLowerCase().includes(query.trim().toLowerCase()),
+              )
+            : volumes,
     );
 
     // Apply the current search text as the active filter.
@@ -91,33 +93,60 @@
             <h2 id="labels-dialog-title">{t('labels.title')}</h2>
 
             <div class="labels-dialog-search">
-                <TextInput label={t('labels.searchLabel')} placeholder={t('labels.searchPlaceholder')} bind:value={search} />
+                <TextInput
+                    label={t('labels.searchLabel')}
+                    placeholder={t('labels.searchPlaceholder')}
+                    bind:value={search}
+                />
                 <Button type="button" onclick={find}>{t('labels.find')}</Button>
-                <Button type="button" onclick={clear}>{t('labels.clear')}</Button>
+                <Button type="button" onclick={clear}
+                    >{t('labels.clear')}</Button
+                >
             </div>
 
-            <ul class="labels-dialog-list" role="listbox" aria-multiselectable="true" aria-label={t('labels.volumeTitles')}>
+            <ul
+                class="labels-dialog-list"
+                role="listbox"
+                aria-multiselectable="true"
+                aria-label={t('labels.volumeTitles')}
+            >
                 {#each filtered as option (option.id)}
-                    <li role="option" aria-selected={selected.includes(option.id)}>
+                    <li
+                        role="option"
+                        aria-selected={selected.includes(option.id)}
+                    >
                         <label>
-                            <input type="checkbox" value={option.id} bind:group={selected} />
+                            <input
+                                type="checkbox"
+                                value={option.id}
+                                bind:group={selected}
+                            />
                             {option.title}
                         </label>
                     </li>
                 {/each}
                 {#if filtered.length === 0}
-                    <li class="labels-dialog-empty">{t('labels.noMatching')}</li>
+                    <li class="labels-dialog-empty">
+                        {t('labels.noMatching')}
+                    </li>
                 {/if}
             </ul>
 
             <footer class="labels-dialog-footer">
                 <label class="labels-dialog-copies">
                     {t('labels.numberOfCopies')}
-                    <InputCount label={t('labels.copiesLabel')} bind:value={copies} />
+                    <InputCount
+                        label={t('labels.copiesLabel')}
+                        bind:value={copies}
+                    />
                 </label>
                 <div class="labels-dialog-actions">
-                    <Button type="button" onclick={print}>{t('labels.print')}</Button>
-                    <Button type="button" onclick={close}>{t('labels.close')}</Button>
+                    <Button type="button" onclick={print}
+                        >{t('labels.print')}</Button
+                    >
+                    <Button type="button" onclick={close}
+                        >{t('labels.close')}</Button
+                    >
                 </div>
             </footer>
         </div>

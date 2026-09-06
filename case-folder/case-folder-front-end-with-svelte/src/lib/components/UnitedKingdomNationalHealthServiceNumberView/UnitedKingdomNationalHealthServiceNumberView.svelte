@@ -41,9 +41,9 @@
     //   - NHS Number: https://www.nhs.uk/using-the-nhs/about-the-nhs/what-is-an-nhs-number/
 
     let {
-        class: className = "",
+        class: className = '',
         label,
-        value = "",
+        value = '',
         ...restProps
     }: {
         /** Accessible label for screen readers */

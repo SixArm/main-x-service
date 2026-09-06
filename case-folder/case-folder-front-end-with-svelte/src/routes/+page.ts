@@ -14,13 +14,14 @@ export async function load({ fetch }) {
     try {
         // Fire all five reads concurrently — they are independent, so the
         // page is gated only on the slowest one rather than their sum.
-        const [stats, places, folders, recentMoves, patients] = await Promise.all([
-            api.stats({ fetch }),
-            api.places.list({}, { fetch }),
-            api.folders.list({}, { fetch }),
-            api.moves.list({}, { fetch }),
-            api.patients.list({}, { fetch })
-        ]);
+        const [stats, places, folders, recentMoves, patients] =
+            await Promise.all([
+                api.stats({ fetch }),
+                api.places.list({}, { fetch }),
+                api.folders.list({}, { fetch }),
+                api.moves.list({}, { fetch }),
+                api.patients.list({}, { fetch }),
+            ]);
         // Hydrate the cache; subsequent renders read these reactively.
         cache.setStats(stats);
         cache.setBuildings(places.buildings);

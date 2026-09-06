@@ -15,7 +15,7 @@ export async function load({ fetch, params }) {
         const [show, places, history] = await Promise.all([
             api.places.show(params.id, { fetch }),
             api.places.list({}, { fetch }),
-            api.places.history(params.id, { fetch })
+            api.places.history(params.id, { fetch }),
         ]);
         cache.setRooms(places.rooms);
         cache.setCabinets(places.cabinets);
@@ -23,7 +23,7 @@ export async function load({ fetch, params }) {
             building: show.place,
             // Narrow the global room list down to this building's rooms.
             rooms: places.rooms.filter((r) => r.buildingId === params.id),
-            presences: history.presences
+            presences: history.presences,
         };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404) {

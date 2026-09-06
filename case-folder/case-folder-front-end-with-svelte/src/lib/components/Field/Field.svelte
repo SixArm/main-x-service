@@ -52,10 +52,10 @@
     //   - WAI Forms Tutorial: https://www.w3.org/WAI/tutorials/forms/
     //   - WAI-ARIA Error Handling: https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA21
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         label,
         description = undefined,
         error = undefined,
@@ -99,10 +99,7 @@
     {/if}
     {@render children?.()}
     {#if error}
-        <p
-            id={errorId}
-            role="alert"
-        >
+        <p id={errorId} role="alert">
             {error}
         </p>
     {/if}

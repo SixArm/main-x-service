@@ -49,10 +49,10 @@
     //   - WAI Forms Tutorial - Labels: https://www.w3.org/WAI/tutorials/forms/labels/
     //   - HTML label element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/label
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         for: forProp = undefined,
         children,
         ...restProps
@@ -64,10 +64,6 @@
 </script>
 
 <!-- Label.svelte -->
-<label
-    class={`label ${className}`}
-    for={forProp}
-    {...restProps}
->
+<label class={`label ${className}`} for={forProp} {...restProps}>
     {@render children?.()}
 </label>

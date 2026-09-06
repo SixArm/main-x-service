@@ -61,11 +61,11 @@
     // References:
     //   - WAI-ARIA region role: https://www.w3.org/TR/wai-aria-1.2/#region
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
-        type = "info",
+        class: className = '',
+        type = 'info',
         dismissible = false,
         onclose = undefined,
         closeLabel = undefined,
@@ -73,7 +73,7 @@
         ...restProps
     }: {
         /** Banner variant for semantic meaning */
-        type?: "info" | "success" | "warning" | "error";
+        type?: 'info' | 'success' | 'warning' | 'error';
         /** Whether the banner can be dismissed */
         dismissible?: boolean;
         /** Callback when the banner is dismissed */
@@ -104,10 +104,7 @@
     >
         {@render children?.()}
         {#if dismissible}
-            <button
-                type="button"
-                aria-label={closeLabel}
-                onclick={dismiss}
+            <button type="button" aria-label={closeLabel} onclick={dismiss}
             ></button>
         {/if}
     </div>

@@ -46,10 +46,10 @@
     //   - MDN dd element: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/dd
     //   - HTML spec div in dl: https://html.spec.whatwg.org/multipage/grouping-content.html#the-dl-element
 
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     let {
-        class: className = "",
+        class: className = '',
         term,
         children,
         ...restProps
@@ -63,10 +63,7 @@
 </script>
 
 <!-- SummaryListItem: a term-description pair within a description list -->
-<div
-    class={`summary-list-item ${className}`}
-    {...restProps}
->
+<div class={`summary-list-item ${className}`} {...restProps}>
     <dt>{term}</dt>
     <dd>{@render children?.()}</dd>
 </div>
