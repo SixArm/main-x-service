@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — score address `line2`/`county`/`country` as low-weight supporting fields (OQ-L, resolves OQ-G)
+
+`Address.line2`/`county`/`country` were stored but never read by
+`MatchingEngine::compare_addresses` (`src/matcher.rs`) — the address
+score only ever consulted `postcode`/`city`/`line1`. Each of the three
+now contributes a small **additive** sub-weight (line2 `0.1`, county
+`0.1`, country `0.05`) in the existing weight-renormalised average,
+only when populated on both sides; the original three fields' weights
+(`0.5`/`0.3`/`0.2`) are unchanged, so an address comparison where none
+of the three new fields is populated is byte-identical to before. Each
+is guarded against a shared blank value scoring a spurious `1.0`
+(`Scorer::jaro_winkler_similarity("", "")` is `1.0` by design) —
+mirroring `local_id_score`'s "blank on both sides is not shared
+identity" rule. Four new unit tests; `cargo test` (173 lib tests, up
+from 169) + `cargo clippy --all-targets -- -D warnings` + `cargo doc
+--no-deps` all clean. Closes OQ-G, removed from spec §10's open list.
+See spec/10-open-questions.md OQ-L.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

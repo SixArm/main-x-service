@@ -48,6 +48,11 @@ When both sides have an `address`, run a weight-renormalised average across popu
 | Postcode | `0.5` | `1.0` if `normalize_postcode(a) == normalize_postcode(b)`, else `0.0`. |
 | City | `0.3` | `Scorer::jaro_winkler_similarity` on the normalised city names. |
 | Line 1 | `0.2` | `parse_address_line` on each side; with house numbers present on both, `0.6 * jaro_winkler(street) + 0.4 * (house_number_a == house_number_b)`. Otherwise the street similarity alone. |
+| Line 2 (OQ-L) | `0.1` | `Scorer::jaro_winkler_similarity` on the normalised text. Does not participate when either side's normalised form is empty (a shared blank is not shared identity). |
+| County (OQ-L) | `0.1` | Same treatment as line 2. |
+| Country (OQ-L) | `0.05` | Same treatment as line 2. |
+
+Postcode/city/line 1 keep their original weights unchanged (still summing to `1.0` among themselves); line 2/county/country are **additive** low-weight supporting fields on top, so an address comparison where none of the three is populated on either side is byte-identical to before OQ-L landed.
 
 If no sub-component is populated on both sides, the address score is the neutral `0.5`.
 
