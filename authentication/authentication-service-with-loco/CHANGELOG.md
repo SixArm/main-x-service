@@ -10,6 +10,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Removed — the unwired password-era loco scaffolding
+
+`src/mailers/auth.rs`'s `Emailer::send_welcome` / `Emailer::forgot_password`
+(plus their `welcome`/`forgot` embedded template directories) and
+`src/models/users.rs`'s `set_forgot_password_sent` were loco starter
+code the passwordless magic-link flow never called — no route reached
+them, only their own test did. Removed, along with the
+`can_set_forgot_password_sent` model test that only existed to
+exercise them; the live magic-link email path is unaffected (it
+renders from `src/i18n.rs`, not these templates). `reset_token`/
+`reset_sent_at` columns and `users::find_by_reset_token` (also dead)
+are left in place — a schema change, not a code-cleanup one, and not
+named by the removal decision this closes. `cargo test --lib` 90/90;
+the DB-gated suite 40/40; `cargo clippy --all-targets -- -D warnings`
+/ `cargo fmt --check` clean. See spec/index.md §5/§13.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

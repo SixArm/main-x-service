@@ -110,17 +110,21 @@ sign-in.
   timestamps. The durable authentication audit trail (T-10). Never
   stores tokens or secrets.
 
-**Retained loco scaffolding (decision).** The generated mailer
-(`src/mailers/auth.rs`) still carries `Emailer::send_welcome` /
+**Removed loco scaffolding (2026-09-06).** The generated mailer
+(`src/mailers/auth.rs`) used to carry `Emailer::send_welcome` /
 `Emailer::forgot_password`, the `welcome` / `forgot` embedded template
-dirs, and the password-era model helpers (`set_forgot_password_sent`,
-etc.). They are **intentionally retained, unwired** loco starter code:
-the passwordless flow never checks a password and no route calls them.
-They survive to keep the generated schema/model surface intact and to
-ease future diffs against fresh loco scaffolds. The live magic-link
-email path does **not** use these templates — it renders from the
-`src/i18n.rs` catalog (§6.11). This records the code↔spec agreement
-noted in the CHANGELOG "Notes". See §13 for the removal task.
+dirs, and the password-era model helper `users::set_forgot_password_sent`.
+They were **unwired** loco starter code from the start: the passwordless
+flow never checks a password and no route ever called them. Retained for
+a period to keep the generated schema/model surface intact and ease
+diffs against fresh loco scaffolds, they are now removed per the §13
+task, along with the password-era model test (`can_set_forgot_password_sent`)
+that only existed to exercise them. The `reset_token`/`reset_sent_at`
+columns and the (also-dead, but not named by the removal task)
+`users::find_by_reset_token` helper are left in place — out of scope
+for this pass, since removing the columns is a schema change, not a
+code-cleanup one. The live magic-link email path does **not** use the
+removed templates — it renders from the `src/i18n.rs` catalog (§6.11).
 
 ## 6. Functional requirements
 
@@ -756,11 +760,20 @@ only by that subject.
       + params + mailer-bridge render unit tests + a DB-gated
       anti-enumeration request test. *(2026-06-15.)*
 - [ ] Optional Mailpit docker-compose service for realistic dev email.
-- [ ] Remove the unwired password-era loco scaffolding (mailer
+- [x] Remove the unwired password-era loco scaffolding (mailer
       `send_welcome` / `forgot_password`, the `welcome` / `forgot`
       template dirs, `users::set_forgot_password_sent` and the password-era
       model tests) now that the decision to retain them is recorded (§5).
-      Tracked so code and spec stay aligned; low priority.
+      *(Resolved 2026-09-06.)* All four removed from
+      `src/mailers/auth.rs` (+ the `welcome`/`forgot` template
+      directories), `src/models/users.rs`, and
+      `tests/models/users.rs`. `reset_token`/`reset_sent_at`
+      columns and `users::find_by_reset_token` (also dead, but not
+      named by this task) are deliberately left in place — a schema
+      change, not a code-cleanup one. `cargo test --lib` 90/90; the
+      DB-gated suite (`scripts/ci-check.sh test-db`) 40/40; `cargo
+      clippy --all-targets -- -D warnings` / `cargo fmt --check`
+      clean.
 - [ ] Add an end-to-end handler test that a `cy` issuance request renders
       the Welsh subject/body through `Emailer::send_magic_link` (the
       current coverage pins the catalog + params + anti-enumeration shape,
