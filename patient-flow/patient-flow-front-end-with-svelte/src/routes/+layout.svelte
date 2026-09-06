@@ -1,8 +1,9 @@
 <script lang="ts">
   import "../app.css";
   import { page } from "$app/state";
-  import { LocalePicker } from "lily-design-system-svelte-locale-picker";
   import { ThemePicker } from "lily-design-system-svelte-theme-picker";
+  import { SharePicker, type ShareTarget } from "lily-design-system-svelte-share-picker";
+  import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
 
   let { children } = $props();
 
@@ -36,14 +37,58 @@
     "united-states-web-design-system", "valentine", "winter", "wireframe",
   ];
 
-  // The family's supported locales. Patient Flow has no translation
-  // catalogue (yet) — the Lily LocalePicker still owns the document
-  // language + writing direction (`lang`/`dir`, RTL for ar/ur) and
-  // persists the choice, so the chrome is ready for a catalogue.
-  const LOCALES = [
-    "en", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt",
-    "id", "ur",
+  // Text sizes offered by the Lily TextSizePicker. Applied as
+  // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
+  // `data-theme`); see app.css for the corresponding font-size scale.
+  const SIZES = ["small", "medium", "large", "x-large"];
+  const SIZE_LABELS: Record<string, string> = {
+    small: "Small",
+    medium: "Medium",
+    large: "Large",
+    "x-large": "Extra large",
+  };
+
+  // Share destinations for the Lily SharePicker. Lily ships no
+  // third-party URLs — each `href` builder is ours. `url`/`title` are
+  // supplied by SharePicker at share time (current page URL; the leaf
+  // page's title, sourced from `page.data.title` below — the
+  // `page.data.title` convention, set per-route by each route's load
+  // function so it stays in sync with that page's own <svelte:head>
+  // <title> without SharePicker having to read the DOM).
+  const SHARE_TARGETS: ShareTarget[] = [
+    {
+      id: "linkedin",
+      label: "LinkedIn",
+      href: (url) =>
+        `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+    },
+    {
+      id: "mastodon",
+      label: "Mastodon",
+      href: (url, title) =>
+        `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+    },
+    {
+      id: "bluesky",
+      label: "Bluesky",
+      href: (url, title) =>
+        `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
+    },
+    {
+      id: "reddit",
+      label: "Reddit",
+      href: (url, title) =>
+        `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+    },
   ];
+
+  // The `page.data.title` convention: each route's own load function
+  // (`+page.ts`/`+page.server.ts`) returns a plain `title` string that
+  // mirrors what that route's `<svelte:head><title>` renders, so the
+  // layout — which does not know which leaf page is active — can read
+  // it here for SharePicker without scraping `document.title`. Falls
+  // back to the brand name for the rare route that sets none.
+  const pageTitle = $derived(page.data?.title ?? "Patient Flow");
 </script>
 
 {#if !kiosk}
@@ -62,10 +107,20 @@
       themes={THEMES}
       storageKey="mxi.patient-flow.theme"
     />
-    <LocalePicker
-      label="Language"
-      locales={LOCALES}
-      storageKey="mxi.patient-flow.locale"
+    <TextSizePicker
+      label="Text size"
+      sizes={SIZES}
+      sizeLabels={SIZE_LABELS}
+      defaultValue="medium"
+      storageKey="mxi.patient-flow.text-size"
+    />
+    <SharePicker
+      label="Share"
+      title={pageTitle}
+      targets={SHARE_TARGETS}
+      copyLabel="Copy link"
+      copiedLabel="Link copied"
+      copyFailedLabel="Could not copy — copy it from the address bar"
     />
     <a href="/signin">Sign in</a>
   </nav>
@@ -80,7 +135,8 @@
     flex: 1;
   }
   nav.top :global(.theme-picker-button),
-  nav.top :global(.locale-picker-button) {
+  nav.top :global(.text-size-picker-button),
+  nav.top :global(.share-picker-button) {
     font: inherit;
     padding: 0.15rem 0.3rem;
     max-width: 11rem;

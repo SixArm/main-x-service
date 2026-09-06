@@ -18,10 +18,17 @@ import {
 } from "$lib/server/session";
 import { verifyMagicLink } from "$lib/server/auth";
 
+// `page.data.title` convention (see `../+layout.svelte`): mirrors this
+// route's own <svelte:head><title> so SharePicker gets the right title
+// without reading the DOM. Static because the load function either
+// returns an error state (all of which the page renders with this same
+// title) or redirects before the client ever renders.
+const TITLE = "Could not sign you in — Main X Auth";
+
 export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
   const token = url.searchParams.get("token");
   if (!token) {
-    return { error: "missingToken" as const };
+    return { error: "missingToken" as const, title: TITLE };
   }
 
   // Server-to-server: consume the magic-link token. The auth service sets
@@ -46,14 +53,14 @@ export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
     return { error: "serviceUnavailable" as const };
   }
   if (!upstream.ok) {
-    return { error: "invalidToken" as const };
+    return { error: "invalidToken" as const, title: TITLE };
   }
 
   // Re-host the same opaque session id on THIS origin so the browser
   // sends it back to our BFF (httpOnly — JS can never read it).
   const sid = sessionIdFromResponse(upstream);
   if (!sid) {
-    return { error: "noSession" as const };
+    return { error: "noSession" as const, title: TITLE };
   }
   cookies.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
 

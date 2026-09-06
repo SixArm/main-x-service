@@ -1,6 +1,7 @@
 <!--
   Root layout for the auth SPA: a top navigation bar (brand, hamburger,
-  nav, locale switcher, signed-in badge) wrapping the routed page content.
+  nav, theme/text-size/share pickers, signed-in badge) wrapping the
+  routed page content.
 
   Props:
   - `children`: Snippet — the active route, rendered via {@render children()}.
@@ -8,21 +9,21 @@
   State / reactivity:
   - reads `page.url.pathname` (reactive) to mark the active nav link;
   - reads `i18n.locale` / `t(...)` so the whole chrome re-renders on a
-    locale switch;
+    locale switch (there is no locale-switcher UI in the chrome — the
+    stored locale is read on boot; see `$lib/i18n.svelte.ts`);
+  - reads `page.data.title` for SharePicker's share title;
   - reads `session.*` so the signed-in badge appears/disappears live.
-
-  Events:
-  - `onLocaleChange` — the locale <select> change handler.
 -->
 <script lang="ts">
     import "../app.css";
     import { browser } from "$app/environment";
     import { page } from "$app/state";
-    import { i18n, t, isRtl, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
+    import { i18n, t, isRtl, type StringKey } from "$lib/i18n.svelte";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
     import { ThemePicker } from "lily-design-system-svelte-theme-picker";
-    import { LocalePicker } from "lily-design-system-svelte-locale-picker";
+    import { SharePicker, type ShareTarget } from "lily-design-system-svelte-share-picker";
+    import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
@@ -65,9 +66,62 @@
         "united-kingdom-national-health-service-wales-for-practitioners": "United Kingdom National Health Service Wales for Practitioners",
     };
 
+    // Text sizes offered by the Lily TextSizePicker. Applied as
+    // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
+    // `data-theme`); see app.css for the corresponding font-size scale.
+    const SIZES = ["small", "medium", "large", "x-large"];
+    const SIZE_LABELS: Record<string, string> = {
+        small: "Small",
+        medium: "Medium",
+        large: "Large",
+        "x-large": "Extra large",
+    };
+
+    // Share destinations for the Lily SharePicker. Lily ships no
+    // third-party URLs — each `href` builder is ours. `url`/`title` are
+    // supplied by SharePicker at share time (current page URL; the leaf
+    // page's title, sourced from `page.data.title` below — the
+    // `page.data.title` convention, set per-route by each route's load
+    // function so it stays in sync with that page's own <svelte:head>
+    // <title> without SharePicker having to read the DOM).
+    const SHARE_TARGETS: ShareTarget[] = [
+        {
+            id: "linkedin",
+            label: "LinkedIn",
+            href: (url) =>
+                `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+        },
+        {
+            id: "mastodon",
+            label: "Mastodon",
+            href: (url, title) =>
+                `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+        },
+        {
+            id: "bluesky",
+            label: "Bluesky",
+            href: (url, title) =>
+                `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
+        },
+        {
+            id: "reddit",
+            label: "Reddit",
+            href: (url, title) =>
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+        },
+    ];
+
     // The routed page content + the layout load data (server-resolved
     // signed-in user from the httpOnly session cookie).
     let { children, data }: { children: Snippet; data: LayoutData } = $props();
+
+    // The `page.data.title` convention: each route's own load function
+    // (`+page.ts`/`+page.server.ts`) returns a plain `title` string that
+    // mirrors what that route's `<svelte:head><title>` renders, so the
+    // layout — which does not know which leaf page is active — can read
+    // it here for SharePicker without scraping `document.title`. Falls
+    // back to the brand name for the rare route that sets none.
+    const pageTitle = $derived(page.data?.title ?? t("brand"));
 
     // The i18n store is the single source of truth for the locale: mirror it
     // onto `<html lang>` and `<html dir>` (rtl for ar/ur) whenever it changes.
@@ -126,17 +180,21 @@
                     themeLabels={THEME_LABELS}
                     storageKey="lily-theme"
                 />
-                <label class="locale">
-                    <span>{t("nav.locale")}</span>
-                    <LocalePicker
-                        label={t("nav.locale")}
-                        locales={[...i18n.locales]}
-                        localeLabels={LOCALE_LABELS}
-                        value={i18n.locale}
-                        applyDir={false}
-                        onChange={(code) => i18n.set(code)}
-                    />
-                </label>
+                <TextSizePicker
+                    label={t("nav.text_size")}
+                    sizes={SIZES}
+                    sizeLabels={SIZE_LABELS}
+                    defaultValue="medium"
+                    storageKey="lily-text-size"
+                />
+                <SharePicker
+                    label={t("nav.share")}
+                    title={pageTitle}
+                    targets={SHARE_TARGETS}
+                    copyLabel={t("share.copy_link")}
+                    copiedLabel={t("share.copied")}
+                    copyFailedLabel={t("share.copy_failed")}
+                />
                 <!-- Signed-in badge: shown only when a session is present
                      (resolved server-side from the httpOnly cookie). -->
                 {#if data.user}
@@ -248,7 +306,9 @@
         align-items: stretch;
         gap: 0.75rem;
     }
-    .chrome :global(.theme-picker-button) {
+    .chrome :global(.theme-picker-button),
+    .chrome :global(.text-size-picker-button),
+    .chrome :global(.share-picker-button) {
         padding: 0.375rem 0.5rem;
         font-size: 0.875rem;
         color: var(--mxi-color-fg);
@@ -256,17 +316,6 @@
         border: 1px solid var(--mxi-color-border);
         border-radius: 0.25rem;
         cursor: pointer;
-    }
-    .locale {
-        display: flex;
-        align-items: center;
-        gap: 0.4rem;
-        font-size: 0.85rem;
-    }
-    .locale :global(select) {
-        padding: 0.3rem 0.4rem;
-        border-radius: var(--mxi-radius);
-        border: 1px solid var(--mxi-color-border);
     }
     .who {
         font-size: 0.85rem;

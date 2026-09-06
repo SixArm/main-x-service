@@ -15,10 +15,16 @@ import { getUserAttributes, putUserAttributes } from "$lib/server/admin";
 import { requireSignedIn } from "$lib/server/session";
 import type { UserAttributes } from "$lib/api/types";
 
+// `page.data.title` convention (see `../../+layout.svelte`): mirrors this
+// route's own <svelte:head><title> so SharePicker gets the right title
+// without reading the DOM.
+const TITLE = "Attributes — Main X Auth";
+
 export const load: PageServerLoad = async ({ url, locals, fetch }) => {
   requireSignedIn(locals);
   const pid = url.searchParams.get("pid")?.trim() || null;
-  if (!pid) return { pid: null, target: null as UserAttributes | null };
+  if (!pid)
+    return { pid: null, target: null as UserAttributes | null, title: TITLE };
   const result = await getUserAttributes(
     fetch,
     locals.sessionId,
@@ -26,9 +32,15 @@ export const load: PageServerLoad = async ({ url, locals, fetch }) => {
     pid,
   );
   if (!result.ok) {
-    return { pid, target: null, error: result.message, status: result.status };
+    return {
+      pid,
+      target: null,
+      error: result.message,
+      status: result.status,
+      title: TITLE,
+    };
   }
-  return { pid, target: result.data };
+  return { pid, target: result.data, title: TITLE };
 };
 
 /** Parse the editor text into the string→string-array attribute map, or
@@ -63,7 +75,8 @@ export const actions: Actions = {
       });
     }
 
-    if (!locals.sessionId) return fail(401, { message: "Sign in as an admin." });
+    if (!locals.sessionId)
+      return fail(401, { message: "Sign in as an admin." });
     const result = await putUserAttributes(
       fetch,
       locals.sessionId,

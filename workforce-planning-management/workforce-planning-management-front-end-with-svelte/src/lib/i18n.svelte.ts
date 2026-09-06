@@ -10,7 +10,19 @@ import { browser } from "$app/environment";
 
 /** Locales the UI is translated into. */
 export const LOCALES = [
-  "en", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
+  "en",
+  "cy",
+  "es",
+  "fr",
+  "de",
+  "ar",
+  "ru",
+  "hi",
+  "zh",
+  "bn",
+  "pt",
+  "id",
+  "ur",
 ] as const;
 
 /** A supported locale code (one of {@link LOCALES}). */
@@ -21,9 +33,19 @@ export const DEFAULT_LOCALE: Locale = "en";
 
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
-  en: "English", cy: "Cymraeg", es: "Español", fr: "Français", de: "Deutsch",
-  ar: "العربية", ru: "Русский", hi: "हिन्दी", zh: "中文", bn: "বাংলা",
-  pt: "Português", id: "Bahasa Indonesia", ur: "اردو",
+  en: "English",
+  cy: "Cymraeg",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+  ar: "العربية",
+  ru: "Русский",
+  hi: "हिन्दी",
+  zh: "中文",
+  bn: "বাংলা",
+  pt: "Português",
+  id: "Bahasa Indonesia",
+  ur: "اردو",
 };
 
 /** Right-to-left locales; the layout mirrors `<html dir>`. */
@@ -32,7 +54,9 @@ export const RTL_LOCALES = ["ar", "ur"] as const satisfies readonly Locale[];
 /** Whether `locale` is written right-to-left. */
 export function isRtl(locale: string): boolean {
   const primary = normaliseLocale(locale);
-  return primary !== null && (RTL_LOCALES as readonly string[]).includes(primary);
+  return (
+    primary !== null && (RTL_LOCALES as readonly string[]).includes(primary)
+  );
 }
 
 /** localStorage key under which the chosen UI locale persists. */
@@ -85,7 +109,8 @@ const STRINGS = {
     "adj.title": "Reasonable adjustments",
     "adj.note": "Practical note (optional)",
     "adj.new": "Ask for a change",
-    "adj.hint": "You do not need a diagnosis to ask. Explain the barrier, how it affects your work, and what change would reduce it.",
+    "adj.hint":
+      "You do not need a diagnosis to ask. Explain the barrier, how it affects your work, and what change would reduce it.",
     "adj.barrier": "What barrier do you face?",
     "adj.impact": "How does it affect your work?",
     "adj.change": "What change would reduce it?",
@@ -121,6 +146,11 @@ const STRINGS = {
     "nav.benchmarks": "Benchmarks",
     "nav.signin": "Sign in",
     "chrome.language": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
     "common.loading": "Loading…",
     "common.error": "Failed to load",
     "common.status": "Status",
@@ -197,7 +227,8 @@ const STRINGS = {
     "adj.title": "Addasiadau rhesymol",
     "adj.note": "Nodyn ymarferol (dewisol)",
     "adj.new": "Gofyn am newid",
-    "adj.hint": "Nid oes angen diagnosis arnoch i ofyn. Esboniwch y rhwystr, sut mae'n effeithio ar eich gwaith, a pha newid fyddai'n ei leihau.",
+    "adj.hint":
+      "Nid oes angen diagnosis arnoch i ofyn. Esboniwch y rhwystr, sut mae'n effeithio ar eich gwaith, a pha newid fyddai'n ei leihau.",
     "adj.barrier": "Pa rwystr rydych yn ei wynebu?",
     "adj.impact": "Sut mae'n effeithio ar eich gwaith?",
     "adj.change": "Pa newid fyddai'n ei leihau?",
@@ -233,6 +264,11 @@ const STRINGS = {
     "nav.benchmarks": "Meincnodau",
     "nav.signin": "Mewngofnodi",
     "chrome.language": "Iaith",
+    "nav.share": "Rhannu",
+    "nav.text_size": "Maint testun",
+    "share.copy_link": "Copïo dolen",
+    "share.copied": "Dolen wedi'i chopïo",
+    "share.copy_failed": "Methu copïo — copïwch o'r bar cyfeiriad",
     "common.loading": "Wrthi'n llwytho…",
     "common.error": "Methwyd llwytho",
     "common.status": "Statws",
@@ -309,7 +345,8 @@ const STRINGS = {
     "adj.title": "Ajustes razonables",
     "adj.note": "Nota práctica (opcional)",
     "adj.new": "Pedir un cambio",
-    "adj.hint": "No necesita un diagnóstico para pedir. Explique la barrera, cómo afecta a su trabajo y qué cambio la reduciría.",
+    "adj.hint":
+      "No necesita un diagnóstico para pedir. Explique la barrera, cómo afecta a su trabajo y qué cambio la reduciría.",
     "adj.barrier": "¿Qué barrera enfrenta?",
     "adj.impact": "¿Cómo afecta a su trabajo?",
     "adj.change": "¿Qué cambio la reduciría?",
@@ -345,6 +382,12 @@ const STRINGS = {
     "nav.benchmarks": "Referencias",
     "nav.signin": "Iniciar sesión",
     "chrome.language": "Idioma",
+    "nav.share": "Compartir",
+    "nav.text_size": "Tamaño del texto",
+    "share.copy_link": "Copiar enlace",
+    "share.copied": "Enlace copiado",
+    "share.copy_failed":
+      "No se pudo copiar — cópielo desde la barra de direcciones",
     "common.loading": "Cargando…",
     "common.error": "Error al cargar",
     "common.status": "Estado",
@@ -421,7 +464,8 @@ const STRINGS = {
     "adj.title": "Aménagements raisonnables",
     "adj.note": "Note pratique (facultative)",
     "adj.new": "Demander un changement",
-    "adj.hint": "Aucun diagnostic n'est requis pour demander. Expliquez l'obstacle, son effet sur votre travail et le changement qui le réduirait.",
+    "adj.hint":
+      "Aucun diagnostic n'est requis pour demander. Expliquez l'obstacle, son effet sur votre travail et le changement qui le réduirait.",
     "adj.barrier": "Quel obstacle rencontrez-vous ?",
     "adj.impact": "Quel effet sur votre travail ?",
     "adj.change": "Quel changement le réduirait ?",
@@ -457,6 +501,12 @@ const STRINGS = {
     "nav.benchmarks": "Références",
     "nav.signin": "Se connecter",
     "chrome.language": "Langue",
+    "nav.share": "Partager",
+    "nav.text_size": "Taille du texte",
+    "share.copy_link": "Copier le lien",
+    "share.copied": "Lien copié",
+    "share.copy_failed":
+      "Impossible de copier — copiez-le depuis la barre d'adresse",
     "common.loading": "Chargement…",
     "common.error": "Échec du chargement",
     "common.status": "Statut",
@@ -533,7 +583,8 @@ const STRINGS = {
     "adj.title": "Angemessene Anpassungen",
     "adj.note": "Praktischer Hinweis (optional)",
     "adj.new": "Änderung anfragen",
-    "adj.hint": "Sie brauchen keine Diagnose, um zu fragen. Beschreiben Sie die Barriere, ihre Wirkung auf Ihre Arbeit und welche Änderung sie verringern würde.",
+    "adj.hint":
+      "Sie brauchen keine Diagnose, um zu fragen. Beschreiben Sie die Barriere, ihre Wirkung auf Ihre Arbeit und welche Änderung sie verringern würde.",
     "adj.barrier": "Welche Barriere besteht?",
     "adj.impact": "Wie wirkt sie sich auf Ihre Arbeit aus?",
     "adj.change": "Welche Änderung würde sie verringern?",
@@ -569,6 +620,12 @@ const STRINGS = {
     "nav.benchmarks": "Benchmarks",
     "nav.signin": "Anmelden",
     "chrome.language": "Sprache",
+    "nav.share": "Teilen",
+    "nav.text_size": "Textgröße",
+    "share.copy_link": "Link kopieren",
+    "share.copied": "Link kopiert",
+    "share.copy_failed":
+      "Kopieren fehlgeschlagen — bitte aus der Adressleiste kopieren",
     "common.loading": "Wird geladen…",
     "common.error": "Laden fehlgeschlagen",
     "common.status": "Status",
@@ -645,7 +702,8 @@ const STRINGS = {
     "adj.title": "تعديلات معقولة",
     "adj.note": "ملاحظة عملية (اختيارية)",
     "adj.new": "اطلب تغييراً",
-    "adj.hint": "لا تحتاج إلى تشخيص لتطلب. اشرح العائق وتأثيره على عملك والتغيير الذي يقلله.",
+    "adj.hint":
+      "لا تحتاج إلى تشخيص لتطلب. اشرح العائق وتأثيره على عملك والتغيير الذي يقلله.",
     "adj.barrier": "ما العائق الذي تواجهه؟",
     "adj.impact": "كيف يؤثر على عملك؟",
     "adj.change": "ما التغيير الذي يقلله؟",
@@ -681,6 +739,11 @@ const STRINGS = {
     "nav.benchmarks": "المعايير",
     "nav.signin": "تسجيل الدخول",
     "chrome.language": "اللغة",
+    "nav.share": "مشاركة",
+    "nav.text_size": "حجم النص",
+    "share.copy_link": "نسخ الرابط",
+    "share.copied": "تم نسخ الرابط",
+    "share.copy_failed": "تعذر النسخ — انسخه من شريط العنوان",
     "common.loading": "جارٍ التحميل…",
     "common.error": "فشل التحميل",
     "common.status": "الحالة",
@@ -757,7 +820,8 @@ const STRINGS = {
     "adj.title": "Разумные корректировки",
     "adj.note": "Практическая заметка (необязательно)",
     "adj.new": "Попросить об изменении",
-    "adj.hint": "Диагноз не нужен, чтобы попросить. Опишите барьер, его влияние на работу и какое изменение его уменьшит.",
+    "adj.hint":
+      "Диагноз не нужен, чтобы попросить. Опишите барьер, его влияние на работу и какое изменение его уменьшит.",
     "adj.barrier": "Какой барьер вы встречаете?",
     "adj.impact": "Как он влияет на работу?",
     "adj.change": "Какое изменение его уменьшит?",
@@ -793,6 +857,12 @@ const STRINGS = {
     "nav.benchmarks": "Бенчмарки",
     "nav.signin": "Войти",
     "chrome.language": "Язык",
+    "nav.share": "Поделиться",
+    "nav.text_size": "Размер текста",
+    "share.copy_link": "Копировать ссылку",
+    "share.copied": "Ссылка скопирована",
+    "share.copy_failed":
+      "Не удалось скопировать — скопируйте из адресной строки",
     "common.loading": "Загрузка…",
     "common.error": "Не удалось загрузить",
     "common.status": "Статус",
@@ -869,7 +939,8 @@ const STRINGS = {
     "adj.title": "उचित समायोजन",
     "adj.note": "व्यावहारिक टिप्पणी (वैकल्पिक)",
     "adj.new": "बदलाव माँगें",
-    "adj.hint": "माँगने के लिए निदान की आवश्यकता नहीं। बाधा, काम पर असर और कौन-सा बदलाव उसे कम करेगा — यह बताएँ।",
+    "adj.hint":
+      "माँगने के लिए निदान की आवश्यकता नहीं। बाधा, काम पर असर और कौन-सा बदलाव उसे कम करेगा — यह बताएँ।",
     "adj.barrier": "आप किस बाधा का सामना करते हैं?",
     "adj.impact": "यह आपके काम को कैसे प्रभावित करती है?",
     "adj.change": "कौन-सा बदलाव उसे कम करेगा?",
@@ -905,6 +976,11 @@ const STRINGS = {
     "nav.benchmarks": "बेंचमार्क",
     "nav.signin": "साइन इन",
     "chrome.language": "भाषा",
+    "nav.share": "साझा करें",
+    "nav.text_size": "टेक्स्ट का आकार",
+    "share.copy_link": "लिंक कॉपी करें",
+    "share.copied": "लिंक कॉपी हो गया",
+    "share.copy_failed": "कॉपी नहीं हो सका — इसे एड्रेस बार से कॉपी करें",
     "common.loading": "लोड हो रहा है…",
     "common.error": "लोड विफल",
     "common.status": "स्थिति",
@@ -981,7 +1057,8 @@ const STRINGS = {
     "adj.title": "合理调整",
     "adj.note": "实用备注（可选）",
     "adj.new": "申请改变",
-    "adj.hint": "申请无需诊断证明。说明障碍是什么、它如何影响工作、什么改变能减少它。",
+    "adj.hint":
+      "申请无需诊断证明。说明障碍是什么、它如何影响工作、什么改变能减少它。",
     "adj.barrier": "您面临什么障碍？",
     "adj.impact": "它如何影响您的工作？",
     "adj.change": "什么改变能减少它？",
@@ -1017,6 +1094,11 @@ const STRINGS = {
     "nav.benchmarks": "基准",
     "nav.signin": "登录",
     "chrome.language": "语言",
+    "nav.share": "分享",
+    "nav.text_size": "文字大小",
+    "share.copy_link": "复制链接",
+    "share.copied": "链接已复制",
+    "share.copy_failed": "无法复制 — 请从地址栏复制",
     "common.loading": "加载中…",
     "common.error": "加载失败",
     "common.status": "状态",
@@ -1093,7 +1175,8 @@ const STRINGS = {
     "adj.title": "যুক্তিসঙ্গত সমন্বয়",
     "adj.note": "ব্যবহারিক নোট (ঐচ্ছিক)",
     "adj.new": "পরিবর্তন চান",
-    "adj.hint": "চাওয়ার জন্য রোগনির্ণয়ের দরকার নেই। বাধা, কাজে প্রভাব ও কোন পরিবর্তন তা কমাবে — ব্যাখ্যা করুন।",
+    "adj.hint":
+      "চাওয়ার জন্য রোগনির্ণয়ের দরকার নেই। বাধা, কাজে প্রভাব ও কোন পরিবর্তন তা কমাবে — ব্যাখ্যা করুন।",
     "adj.barrier": "আপনি কোন বাধার সম্মুখীন?",
     "adj.impact": "এটি কাজে কীভাবে প্রভাব ফেলে?",
     "adj.change": "কোন পরিবর্তন তা কমাবে?",
@@ -1129,6 +1212,11 @@ const STRINGS = {
     "nav.benchmarks": "বেঞ্চমার্ক",
     "nav.signin": "সাইন ইন",
     "chrome.language": "ভাষা",
+    "nav.share": "শেয়ার করুন",
+    "nav.text_size": "টেক্সটের আকার",
+    "share.copy_link": "লিঙ্ক কপি করুন",
+    "share.copied": "লিঙ্ক কপি হয়েছে",
+    "share.copy_failed": "কপি করা যায়নি — ঠিকানা বার থেকে কপি করুন",
     "common.loading": "লোড হচ্ছে…",
     "common.error": "লোড ব্যর্থ",
     "common.status": "অবস্থা",
@@ -1205,7 +1293,8 @@ const STRINGS = {
     "adj.title": "Ajustes razoáveis",
     "adj.note": "Nota prática (opcional)",
     "adj.new": "Pedir uma mudança",
-    "adj.hint": "Você não precisa de um diagnóstico para pedir. Explique a barreira, como ela afeta seu trabalho e que mudança a reduziria.",
+    "adj.hint":
+      "Você não precisa de um diagnóstico para pedir. Explique a barreira, como ela afeta seu trabalho e que mudança a reduziria.",
     "adj.barrier": "Que barreira você enfrenta?",
     "adj.impact": "Como ela afeta seu trabalho?",
     "adj.change": "Que mudança a reduziria?",
@@ -1241,6 +1330,12 @@ const STRINGS = {
     "nav.benchmarks": "Benchmarks",
     "nav.signin": "Entrar",
     "chrome.language": "Idioma",
+    "nav.share": "Partilhar",
+    "nav.text_size": "Tamanho do texto",
+    "share.copy_link": "Copiar link",
+    "share.copied": "Link copiado",
+    "share.copy_failed":
+      "Não foi possível copiar — copie a partir da barra de endereço",
     "common.loading": "Carregando…",
     "common.error": "Falha ao carregar",
     "common.status": "Status",
@@ -1317,7 +1412,8 @@ const STRINGS = {
     "adj.title": "Penyesuaian wajar",
     "adj.note": "Catatan praktis (opsional)",
     "adj.new": "Minta perubahan",
-    "adj.hint": "Anda tidak perlu diagnosis untuk meminta. Jelaskan hambatannya, dampaknya pada pekerjaan, dan perubahan apa yang menguranginya.",
+    "adj.hint":
+      "Anda tidak perlu diagnosis untuk meminta. Jelaskan hambatannya, dampaknya pada pekerjaan, dan perubahan apa yang menguranginya.",
     "adj.barrier": "Hambatan apa yang Anda hadapi?",
     "adj.impact": "Bagaimana dampaknya pada pekerjaan Anda?",
     "adj.change": "Perubahan apa yang menguranginya?",
@@ -1353,6 +1449,11 @@ const STRINGS = {
     "nav.benchmarks": "Tolok ukur",
     "nav.signin": "Masuk",
     "chrome.language": "Bahasa",
+    "nav.share": "Bagikan",
+    "nav.text_size": "Ukuran teks",
+    "share.copy_link": "Salin tautan",
+    "share.copied": "Tautan disalin",
+    "share.copy_failed": "Tidak dapat menyalin — salin dari bilah alamat",
     "common.loading": "Memuat…",
     "common.error": "Gagal memuat",
     "common.status": "Status",
@@ -1429,7 +1530,8 @@ const STRINGS = {
     "adj.title": "مناسب ایڈجسٹمنٹس",
     "adj.note": "عملی نوٹ (اختیاری)",
     "adj.new": "تبدیلی کی درخواست کریں",
-    "adj.hint": "درخواست کے لیے تشخیص کی ضرورت نہیں۔ رکاوٹ، کام پر اثر اور کون سی تبدیلی اسے کم کرے گی — بیان کریں۔",
+    "adj.hint":
+      "درخواست کے لیے تشخیص کی ضرورت نہیں۔ رکاوٹ، کام پر اثر اور کون سی تبدیلی اسے کم کرے گی — بیان کریں۔",
     "adj.barrier": "آپ کو کون سی رکاوٹ درپیش ہے؟",
     "adj.impact": "یہ آپ کے کام پر کیسے اثر ڈالتی ہے؟",
     "adj.change": "کون سی تبدیلی اسے کم کرے گی؟",
@@ -1465,6 +1567,11 @@ const STRINGS = {
     "nav.benchmarks": "معیارات",
     "nav.signin": "سائن ان",
     "chrome.language": "زبان",
+    "nav.share": "شیئر کریں",
+    "nav.text_size": "متن کا سائز",
+    "share.copy_link": "لنک کاپی کریں",
+    "share.copied": "لنک کاپی ہو گیا",
+    "share.copy_failed": "کاپی نہیں ہو سکا — اسے ایڈریس بار سے کاپی کریں",
     "common.loading": "لوڈ ہو رہا ہے…",
     "common.error": "لوڈ ناکام",
     "common.status": "حیثیت",
@@ -1516,13 +1623,18 @@ export type StringKey = keyof (typeof STRINGS)["en"];
 export const STRING_KEYS = Object.keys(STRINGS.en) as StringKey[];
 
 /** Raw per-locale strings table, exposed for coverage testing. */
-export const STRINGS_BY_LOCALE: Record<Locale, Record<string, string>> = STRINGS;
+export const STRINGS_BY_LOCALE: Record<
+  Locale,
+  Record<string, string>
+> = STRINGS;
 
 // Normalise raw input to a supported locale, or null if unsupported.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
   const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
-  return (LOCALES as readonly string[]).includes(primary) ? (primary as Locale) : null;
+  return (LOCALES as readonly string[]).includes(primary)
+    ? (primary as Locale)
+    : null;
 }
 
 // Seed the reactive locale from localStorage (default off the browser).

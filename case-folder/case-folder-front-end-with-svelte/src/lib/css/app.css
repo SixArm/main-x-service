@@ -1,6 +1,20 @@
 /* Application-specific styles layered on top of the Lily NHS base. */
 
-/* Utility row — Lily locale + theme pickers above the site header. */
+/* Lily TextSizePicker: attribute-based (`data-text-size` on <html>,
+   mirroring ThemePicker's `data-theme`), scaling the root font size so
+   every `rem`-based measurement in the app follows. "medium" is the
+   unscaled default and carries no rule. */
+:root[data-text-size='small'] {
+    font-size: 87.5%;
+}
+:root[data-text-size='large'] {
+    font-size: 112.5%;
+}
+:root[data-text-size='x-large'] {
+    font-size: 125%;
+}
+
+/* Utility row — Lily theme/text-size/share pickers above the site header. */
 .utility-row {
     background: var(--nhs-pale-grey);
     border-bottom: var(--nhs-border-width) solid var(--nhs-dark-grey);
@@ -17,10 +31,9 @@
     padding-bottom: var(--nhs-space-2);
 }
 
-/* Lily LocalePicker / ThemePicker render native <select> dropdowns; style
-   them as normal NHS selects. (The previous rules here were for the old
-   radio-group picker — border:0/padding:0/flex — which left the <select>
-   borderless, cramped, and too small.) */
+/* Lily ThemePicker / TextSizePicker / SharePicker each render a headless
+   disclosure button; style the shared root class as a normal NHS button
+   so all three sit consistently in the utility row. */
 .utility-row-picker {
     font-size: var(--nhs-font-size-16, 1rem);
     line-height: 1.4;

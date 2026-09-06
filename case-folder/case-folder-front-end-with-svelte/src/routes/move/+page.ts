@@ -16,7 +16,8 @@ export async function load({ fetch }) {
         ]);
         cache.setCabinets(places.cabinets);
         cache.setWorkers(workers.items);
-        return {};
+        // `page.data.title` convention (see `../+layout.svelte`).
+        return { title: 'Move folder · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

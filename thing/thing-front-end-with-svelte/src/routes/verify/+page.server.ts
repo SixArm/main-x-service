@@ -18,10 +18,15 @@ import {
 } from "$lib/server/session";
 import { verifyMagicLink } from "$lib/server/auth";
 
+// `page.data.title` convention (see `../+layout.svelte`): mirrors this
+// route's own <svelte:head><title> so SharePicker gets the right title
+// without reading the DOM.
+const title = "Sign-in link";
+
 export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
   const token = url.searchParams.get("token");
   if (!token) {
-    return { error: "missingToken" as const };
+    return { error: "missingToken" as const, title };
   }
   // A network-level failure (the authentication service unreachable,
   // timed out, DNS failure, connection reset, …) is a different failure
@@ -41,11 +46,11 @@ export const load: PageServerLoad = async ({ url, fetch, cookies }) => {
     return { error: "serviceUnavailable" as const };
   }
   if (!upstream.ok) {
-    return { error: "invalidToken" as const };
+    return { error: "invalidToken" as const, title };
   }
   const sid = sessionIdFromResponse(upstream);
   if (!sid) {
-    return { error: "noSession" as const };
+    return { error: "noSession" as const, title };
   }
   cookies.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
   cookies.set(CSRF_COOKIE, generateCsrfToken(), CSRF_COOKIE_OPTIONS);

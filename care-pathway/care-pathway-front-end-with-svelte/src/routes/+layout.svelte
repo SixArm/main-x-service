@@ -18,9 +18,10 @@
     import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
-    import { i18n, t, LOCALE_LABELS, isRtl } from "$lib/i18n.svelte";
+    import { i18n, t, isRtl } from "$lib/i18n.svelte";
     import { ThemePicker } from "lily-design-system-svelte-theme-picker";
-    import { LocalePicker } from "lily-design-system-svelte-locale-picker";
+    import { SharePicker, type ShareTarget } from "lily-design-system-svelte-share-picker";
+    import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
@@ -63,9 +64,62 @@
         "united-kingdom-national-health-service-wales-for-practitioners": "United Kingdom National Health Service Wales for Practitioners",
     };
 
+    // Text sizes offered by the Lily TextSizePicker. Applied as
+    // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
+    // `data-theme`); see app.css for the corresponding font-size scale.
+    const SIZES = ["small", "medium", "large", "x-large"];
+    const SIZE_LABELS: Record<string, string> = {
+        small: "Small",
+        medium: "Medium",
+        large: "Large",
+        "x-large": "Extra large",
+    };
+
+    // Share destinations for the Lily SharePicker. Lily ships no
+    // third-party URLs — each `href` builder is ours. `url`/`title` are
+    // supplied by SharePicker at share time (current page URL; the leaf
+    // page's title, sourced from `page.data.title` below — the
+    // `page.data.title` convention, set per-route by each route's load
+    // function so it stays in sync with that page's own <svelte:head>
+    // <title> without SharePicker having to read the DOM).
+    const SHARE_TARGETS: ShareTarget[] = [
+        {
+            id: "linkedin",
+            label: "LinkedIn",
+            href: (url) =>
+                `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+        },
+        {
+            id: "mastodon",
+            label: "Mastodon",
+            href: (url, title) =>
+                `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+        },
+        {
+            id: "bluesky",
+            label: "Bluesky",
+            href: (url, title) =>
+                `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
+        },
+        {
+            id: "reddit",
+            label: "Reddit",
+            href: (url, title) =>
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+        },
+    ];
+
     // `data.signedIn` is resolved server-side from the httpOnly session
     // cookie (`+layout.server.ts`).
     let { children, data }: { children: Snippet; data: LayoutData } = $props();
+
+    // The `page.data.title` convention: each route's own load function
+    // (`+page.ts`/`+page.server.ts`) returns a plain `title` string that
+    // mirrors what that route's `<svelte:head><title>` renders, so the
+    // layout — which does not know which leaf page is active — can read
+    // it here for SharePicker without scraping `document.title`. Falls
+    // back to the brand name for the rare route that sets none.
+    const pageTitle = $derived(page.data?.title ?? t("brand.full"));
 
     // Hamburger toggle state for the top navigation bar (narrow viewports).
     let menuOpen = $state(false);
@@ -114,31 +168,35 @@
                     </li>
                 {/each}
             </ul>
-            <!-- Theme switcher: Lily ThemePicker swaps the active theme
-                 stylesheet (from static/assets/themes/<slug>.css) and persists
-                 the choice. The app's design tokens bridge onto the theme's
-                 `--color-*` tokens in app.css, so this restyles the whole UI. -->
-            <ThemePicker
-                label={t("chrome.theme")}
-                themesUrl="/assets/themes/"
-                themes={THEMES}
-                themeLabels={THEME_LABELS}
-                storageKey="lily-theme"
-            />
-            <!-- Locale switcher: the Lily LocalePicker. The i18n store
-                 stays the single source of truth; the select reflects
-                 value={i18n.locale} and writes back via onChange. -->
-            <label class="locale">
-                <span class="locale-label">{t("chrome.language")}</span>
-                <LocalePicker
-                    label={t("chrome.language")}
-                    locales={[...i18n.locales]}
-                    localeLabels={LOCALE_LABELS}
-                    value={i18n.locale}
-                    applyDir={false}
-                    onChange={(code) => i18n.set(code)}
+            <!-- Theme / text-size / share chrome toolbar. Theme switcher:
+                 Lily ThemePicker swaps the active theme stylesheet (from
+                 static/assets/themes/<slug>.css) and persists the choice.
+                 The app's design tokens bridge onto the theme's `--color-*`
+                 tokens in app.css, so this restyles the whole UI. -->
+            <div class="chrome">
+                <ThemePicker
+                    label={t("chrome.theme")}
+                    themesUrl="/assets/themes/"
+                    themes={THEMES}
+                    themeLabels={THEME_LABELS}
+                    storageKey="lily-theme"
                 />
-            </label>
+                <TextSizePicker
+                    label={t("chrome.textSize")}
+                    sizes={SIZES}
+                    sizeLabels={SIZE_LABELS}
+                    defaultValue="medium"
+                    storageKey="lily-text-size"
+                />
+                <SharePicker
+                    label={t("chrome.share")}
+                    title={pageTitle}
+                    targets={SHARE_TARGETS}
+                    copyLabel={t("share.copyLink")}
+                    copiedLabel={t("share.linkCopied")}
+                    copyFailedLabel={t("share.copyFailed")}
+                />
+            </div>
             <!--
                 Session panel. `data.signedIn` is server-resolved from the
                 httpOnly session cookie: signed in shows a status badge + a
@@ -255,25 +313,11 @@
         width: 100%;
         padding: 1.5rem 2rem;
     }
-    .locale {
+    .chrome {
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 0.4rem;
-    }
-    .locale-label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: var(--mxi-color-muted, #666);
-    }
-    .locale :global(select) {
-        font: inherit;
-        padding: 0.35rem 0.5rem;
-        border-radius: 6px;
-        border: 1px solid var(--mxi-color-border, #ddd);
-        background: var(--mxi-color-bg, transparent);
-        color: inherit;
+        gap: 0.5rem;
     }
     .session {
         display: flex;
@@ -308,13 +352,18 @@
         text-decoration: none;
         font-weight: 600;
     }
-    /* Theme select sits in the dropdown panel like the other chrome controls. */
-    .primary-nav :global(.theme-picker) {
+    /* Theme / text-size / share pickers sit in the dropdown panel like the
+       other chrome controls. */
+    .chrome :global(.theme-picker),
+    .chrome :global(.theme-picker-button),
+    .chrome :global(.text-size-picker-button),
+    .chrome :global(.share-picker-button) {
         font: inherit;
         padding: 0.35rem 0.5rem;
         border-radius: 6px;
         border: 1px solid var(--mxi-color-border, #ddd);
         background: var(--mxi-color-bg, transparent);
         color: inherit;
+        cursor: pointer;
     }
 </style>

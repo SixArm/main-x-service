@@ -2,8 +2,15 @@
 // authentication service. No credential is held client-side; the form
 // only carries an email + the UI locale (email language).
 
-import type { Actions } from "./$types";
+import type { Actions, PageServerLoad } from "./$types";
 import { requestMagicLink } from "$lib/server/auth";
+
+// `page.data.title` convention (see `../+layout.svelte`): mirrors this
+// route's own <svelte:head><title> so SharePicker gets the right title
+// without reading the DOM.
+export const load: PageServerLoad = () => {
+  return { title: "Sign in — Main X Auth" };
+};
 
 export const actions: Actions = {
   default: async ({ request, fetch }) => {

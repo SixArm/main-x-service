@@ -13,7 +13,8 @@ export async function load({ fetch, url }) {
     try {
         const list = await api.moves.list({ q }, { fetch });
         cache.setMoves(list.items);
-        return { query: q };
+        // `page.data.title` convention (see `../+layout.svelte`).
+        return { query: q, title: 'Move history · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

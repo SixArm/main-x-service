@@ -30,7 +30,8 @@ export async function load({ fetch }) {
         cache.setFolders(folders.items);
         cache.setMoves(recentMoves.items);
         cache.setPatients(patients.items);
-        return {};
+        // `page.data.title` convention (see `./+layout.svelte`).
+        return { title: 'Dashboard · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

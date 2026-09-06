@@ -148,12 +148,20 @@ export function listContacts(init?: FetchLike): Promise<Contact[]> {
 export function getContact(
   pid: string,
   init?: FetchLike,
-): Promise<{ contact: Contact; activities: Activity[]; deals: Deal[]; tickets: Ticket[] }> {
+): Promise<{
+  contact: Contact;
+  activities: Activity[];
+  deals: Deal[];
+  tickets: Ticket[];
+}> {
   return api(`/contacts/${pid}`, init);
 }
 
 /** Record a consent change. */
-export function recordConsent(pid: string, action: "granted" | "withdrawn"): Promise<unknown> {
+export function recordConsent(
+  pid: string,
+  action: "granted" | "withdrawn",
+): Promise<unknown> {
   return api(`/contacts/${pid}/consent`, {
     method: "POST",
     body: { action, source: "operator ui" },
@@ -165,7 +173,9 @@ export function recordConsent(pid: string, action: "granted" | "withdrawn"): Pro
  * refuses `422` while an open deal, an open ticket, or an active
  * nurture enrolment exists.
  */
-export function eraseContact(pid: string): Promise<{ erased: string; note: string }> {
+export function eraseContact(
+  pid: string,
+): Promise<{ erased: string; note: string }> {
   return api(`/contacts/${pid}/erase`, { method: "POST" });
 }
 
@@ -200,22 +210,34 @@ export function listPipelines(
 }
 
 /** Deals (optionally by pipeline). */
-export function listDeals(pipeline?: string, init?: FetchLike): Promise<Deal[]> {
+export function listDeals(
+  pipeline?: string,
+  init?: FetchLike,
+): Promise<Deal[]> {
   return api(`/deals${pipeline ? `?pipeline=${pipeline}` : ""}`, init);
 }
 
 /** Move a deal to a stage. */
-export function moveDeal(pid: string, stagePid: string, lostReason?: string): Promise<Deal> {
+export function moveDeal(
+  pid: string,
+  stagePid: string,
+  lostReason?: string,
+): Promise<Deal> {
   return api(`/deals/${pid}/stage`, {
     method: "POST",
-    body: { stage_pid: stagePid, ...(lostReason ? { lost_reason: lostReason } : {}) },
+    body: {
+      stage_pid: stagePid,
+      ...(lostReason ? { lost_reason: lostReason } : {}),
+    },
   });
 }
 
 /** The live forecast. */
-export function forecast(
-  init?: FetchLike,
-): Promise<{ as_of: string; open_deals: number; totals_minor: Record<string, number> }> {
+export function forecast(init?: FetchLike): Promise<{
+  as_of: string;
+  open_deals: number;
+  totals_minor: Record<string, number>;
+}> {
   return api("/forecast", init);
 }
 
@@ -228,7 +250,13 @@ export function listCampaigns(init?: FetchLike): Promise<Campaign[]> {
 export function campaignFunnel(
   pid: string,
   init?: FetchLike,
-): Promise<{ campaign: Campaign; leads: number; won_deals: number; won_revenue_minor: number; roi: Ratio }> {
+): Promise<{
+  campaign: Campaign;
+  leads: number;
+  won_deals: number;
+  won_revenue_minor: number;
+  roi: Ratio;
+}> {
   return api(`/campaigns/${pid}/funnel`, init);
 }
 
@@ -263,16 +291,19 @@ export function articleStatus(pid: string, to: string): Promise<Article> {
 }
 
 /** The sales dashboard. */
-export function salesDashboard(
-  init?: FetchLike,
-): Promise<{ win_rate: Ratio; open_deals: number; pipeline_by_stage: Record<string, unknown> }> {
+export function salesDashboard(init?: FetchLike): Promise<{
+  win_rate: Ratio;
+  open_deals: number;
+  pipeline_by_stage: Record<string, unknown>;
+}> {
   return api("/dashboards/sales", init);
 }
 
 /** The SLA dashboard. */
-export function slaDashboard(
-  init?: FetchLike,
-): Promise<{ open_tickets: number; by_priority: { priority: string; open: number; breached: number }[] }> {
+export function slaDashboard(init?: FetchLike): Promise<{
+  open_tickets: number;
+  by_priority: { priority: string; open: number; breached: number }[];
+}> {
   return api("/dashboards/sla", init);
 }
 
@@ -336,7 +367,10 @@ export function followups(
   upcoming_30d: Followup[];
   open_by_recorder: Record<string, number>;
 }> {
-  return api(`/insights/followups${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`, init);
+  return api(
+    `/insights/followups${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`,
+    init,
+  );
 }
 
 /** Pipeline-hygiene findings. */
@@ -388,7 +422,12 @@ export function slaRegister(init?: FetchLike): Promise<{
     breached: string;
     overdue_hours: number;
   }>;
-  workload: Array<{ assignee_ref: string; open: number; breached: number; at_risk_4h: number }>;
+  workload: Array<{
+    assignee_ref: string;
+    open: number;
+    breached: number;
+    at_risk_4h: number;
+  }>;
 }> {
   return api("/insights/sla", init);
 }
@@ -411,7 +450,10 @@ export function dpo(init?: FetchLike): Promise<{
 }
 
 /** Relationship-cadence aging (untouched contacts/accounts). */
-export function cadence(days?: number, init?: FetchLike): Promise<{
+export function cadence(
+  days?: number,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   derivation: string;
   threshold_days: number;
@@ -434,7 +476,10 @@ export function cadence(days?: number, init?: FetchLike): Promise<{
 }
 
 /** Engagement workload (touches, kinds, recorded sentiment). */
-export function engagementWorkload(days?: number, init?: FetchLike): Promise<{
+export function engagementWorkload(
+  days?: number,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   window_days: number;
   touches: number;
@@ -447,7 +492,10 @@ export function engagementWorkload(days?: number, init?: FetchLike): Promise<{
 }
 
 /** Stage funnel for one pipeline (audit-derived, honest ratios). */
-export function funnel(pipelinePid: string, init?: FetchLike): Promise<{
+export function funnel(
+  pipelinePid: string,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   pipeline: { pid: string; name: string };
   derivation: string;
@@ -464,11 +512,17 @@ export function funnel(pipelinePid: string, init?: FetchLike): Promise<{
     } | null;
   }>;
 }> {
-  return api(`/insights/funnel?pipeline=${encodeURIComponent(pipelinePid)}`, init);
+  return api(
+    `/insights/funnel?pipeline=${encodeURIComponent(pipelinePid)}`,
+    init,
+  );
 }
 
 /** Member-account health (+ silent list). */
-export function membersHealth(days?: number, init?: FetchLike): Promise<{
+export function membersHealth(
+  days?: number,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   derivation: string;
   threshold_days: number;
@@ -478,7 +532,11 @@ export function membersHealth(days?: number, init?: FetchLike): Promise<{
     display_name: string;
     tier: string;
     stakeholder_role: string | null;
-    membership: { status: string; joined_on: string; renewal_on: string | null } | null;
+    membership: {
+      status: string;
+      joined_on: string;
+      renewal_on: string | null;
+    } | null;
     contacts: number;
     days_since_touch: number;
     silent: boolean;
@@ -490,7 +548,10 @@ export function membersHealth(days?: number, init?: FetchLike): Promise<{
 }
 
 /** Per-account consent rollup (DPO). */
-export function consentByAccount(days?: number, init?: FetchLike): Promise<{
+export function consentByAccount(
+  days?: number,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   window_days: number;
   note: string;
@@ -501,21 +562,27 @@ export function consentByAccount(days?: number, init?: FetchLike): Promise<{
     withdrawals_in_window: number;
   }>;
 }> {
-  return api(`/insights/consent-by-account${days ? `?days=${days}` : ""}`, init);
+  return api(
+    `/insights/consent-by-account${days ? `?days=${days}` : ""}`,
+    init,
+  );
 }
 
 /** The declared-stakeholder register + power–interest grid. */
 export function stakeholdersView(init?: FetchLike): Promise<{
   as_of: string;
   note: string;
-  by_role: Record<string, Array<{
-    pid: string;
-    display_name: string;
-    marketing_consent: string;
-    influence: number | null;
-    interest: number | null;
-    days_since_touch: number;
-  }>>;
+  by_role: Record<
+    string,
+    Array<{
+      pid: string;
+      display_name: string;
+      marketing_consent: string;
+      influence: number | null;
+      interest: number | null;
+      days_since_touch: number;
+    }>
+  >;
   grid: Record<string, number>;
   stakeholders_without_grid_scores: number;
   undeclared_contacts: number;
@@ -543,7 +610,10 @@ export function partnershipsRegister(init?: FetchLike): Promise<{
 }
 
 /** Membership renewals due + the lapsed list. */
-export function membershipsView(days?: number, init?: FetchLike): Promise<{
+export function membershipsView(
+  days?: number,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   window_days: number;
   memberships: number;

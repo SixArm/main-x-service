@@ -41,7 +41,11 @@ async function bearer(
 ): Promise<AdminResult<string>> {
   const token = await exchangeToken(fetchFn, sid, csrf);
   if (!token) {
-    return { ok: false, status: 401, message: "session expired — sign in again" };
+    return {
+      ok: false,
+      status: 401,
+      message: "session expired — sign in again",
+    };
   }
   return { ok: true, data: token };
 }

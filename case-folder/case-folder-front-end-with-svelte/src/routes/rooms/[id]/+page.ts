@@ -12,7 +12,12 @@ export async function load({ fetch, params }) {
             api.places.show(params.id, { fetch }),
             api.places.history(params.id, { fetch }),
         ]);
-        return { place: show.place, presences: history.presences };
+        // `page.data.title` convention (see `../../+layout.svelte`).
+        return {
+            place: show.place,
+            presences: history.presences,
+            title: `${show.place.name} · Case Tracking`,
+        };
     } catch (e) {
         if (e instanceof ApiError && e.status === 404)
             error(404, 'Room not found');

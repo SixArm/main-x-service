@@ -11,7 +11,8 @@ export async function load({ fetch }) {
     try {
         const places = await api.places.list({ kind: 'cabinet' }, { fetch });
         cache.setCabinets(places.cabinets);
-        return {};
+        // `page.data.title` convention (see `../../+layout.svelte`).
+        return { title: 'New folder · Case Tracking' };
     } catch (e) {
         error(503, (e as Error).message);
     }

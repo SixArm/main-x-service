@@ -63,40 +63,66 @@ export function changeStatus(pid: string, to: string): Promise<Employee> {
 }
 
 /** The manager forest for one organization. */
-export function orgChart(organization: string, init?: FetchLike): Promise<OrgNode[]> {
-  return api(`/org-chart?organization=${encodeURIComponent(organization)}`, init);
+export function orgChart(
+  organization: string,
+  init?: FetchLike,
+): Promise<OrgNode[]> {
+  return api(
+    `/org-chart?organization=${encodeURIComponent(organization)}`,
+    init,
+  );
 }
 
 /** Requisitions (optionally by status). */
-export function listRequisitions(status?: string, init?: FetchLike): Promise<Requisition[]> {
+export function listRequisitions(
+  status?: string,
+  init?: FetchLike,
+): Promise<Requisition[]> {
   return api(`/requisitions${status ? `?status=${status}` : ""}`, init);
 }
 
 /** One requisition. */
-export function getRequisition(pid: string, init?: FetchLike): Promise<Requisition> {
+export function getRequisition(
+  pid: string,
+  init?: FetchLike,
+): Promise<Requisition> {
   return api(`/requisitions/${pid}`, init);
 }
 
 /** One requisition transition. */
-export function requisitionStatus(pid: string, to: string): Promise<Requisition> {
+export function requisitionStatus(
+  pid: string,
+  to: string,
+): Promise<Requisition> {
   return api(`/requisitions/${pid}/status`, { method: "POST", body: { to } });
 }
 
 /** A requisition's applications. */
-export function listApplications(pid: string, init?: FetchLike): Promise<Application[]> {
+export function listApplications(
+  pid: string,
+  init?: FetchLike,
+): Promise<Application[]> {
   return api(`/requisitions/${pid}/applications`, init);
 }
 
 /** One application stage transition. */
 export function applicationStage(
   pid: string,
-  body: { to: string; employee_number?: string; salary_minor?: number; salary_currency?: string },
+  body: {
+    to: string;
+    employee_number?: string;
+    salary_minor?: number;
+    salary_currency?: string;
+  },
 ): Promise<{ pid: string; stage: string; employee_pid: string | null }> {
   return api(`/applications/${pid}/stage`, { method: "POST", body });
 }
 
 /** An employee's onboarding checklist. */
-export function listOnboarding(pid: string, init?: FetchLike): Promise<OnboardingItem[]> {
+export function listOnboarding(
+  pid: string,
+  init?: FetchLike,
+): Promise<OnboardingItem[]> {
   return api(`/employees/${pid}/onboarding`, init);
 }
 
@@ -106,12 +132,18 @@ export function completeItem(pid: string): Promise<OnboardingItem> {
 }
 
 /** An employee's leave balances. */
-export function listEntitlements(pid: string, init?: FetchLike): Promise<LeaveEntitlement[]> {
+export function listEntitlements(
+  pid: string,
+  init?: FetchLike,
+): Promise<LeaveEntitlement[]> {
   return api(`/employees/${pid}/leave-entitlements`, init);
 }
 
 /** An employee's leave requests. */
-export function listLeaveRequests(pid: string, init?: FetchLike): Promise<LeaveRequest[]> {
+export function listLeaveRequests(
+  pid: string,
+  init?: FetchLike,
+): Promise<LeaveRequest[]> {
   return api(`/employees/${pid}/leave-requests`, init);
 }
 
@@ -127,7 +159,18 @@ export function decideLeave(
 export function listShifts(
   filters?: { department?: string; date?: string },
   init?: FetchLike,
-): Promise<{ shift: { pid: string; department: string; starts_at: string; ends_at: string; required_headcount: number }; assignments: { pid: string; employee_pid: string }[] }[]> {
+): Promise<
+  {
+    shift: {
+      pid: string;
+      department: string;
+      starts_at: string;
+      ends_at: string;
+      required_headcount: number;
+    };
+    assignments: { pid: string; employee_pid: string }[];
+  }[]
+> {
   const params = new URLSearchParams();
   if (filters?.department) params.set("department", filters.department);
   if (filters?.date) params.set("date", filters.date);
@@ -141,7 +184,10 @@ export function listReviews(pid: string, init?: FetchLike): Promise<Review[]> {
 }
 
 /** An employee's training enrolments. */
-export function listTraining(pid: string, init?: FetchLike): Promise<TrainingEnrollment[]> {
+export function listTraining(
+  pid: string,
+  init?: FetchLike,
+): Promise<TrainingEnrollment[]> {
   return api(`/employees/${pid}/training-enrollments`, init);
 }
 
@@ -159,7 +205,9 @@ export function listSuccession(init?: FetchLike): Promise<SuccessionEntry[]> {
 }
 
 /** The succession gap report. */
-export function successionGaps(init?: FetchLike): Promise<{ gaps: SuccessionEntry["plan"][] }> {
+export function successionGaps(
+  init?: FetchLike,
+): Promise<{ gaps: SuccessionEntry["plan"][] }> {
   return api("/succession-plans/gaps", init);
 }
 
@@ -187,7 +235,10 @@ export function runPayslips(pid: string, init?: FetchLike): Promise<Payslip[]> {
 }
 
 /** One employee's payslips (self-service). */
-export function employeePayslips(pid: string, init?: FetchLike): Promise<Payslip[]> {
+export function employeePayslips(
+  pid: string,
+  init?: FetchLike,
+): Promise<Payslip[]> {
   return api(`/employees/${pid}/payslips`, init);
 }
 
@@ -201,15 +252,18 @@ export function benchmarkComparison(
   organization: string,
   init?: FetchLike,
 ): Promise<{ organization: string; rows: ComparisonRow[] }> {
-  return api(`/benchmarks/comparison?organization=${encodeURIComponent(organization)}`, init);
+  return api(
+    `/benchmarks/comparison?organization=${encodeURIComponent(organization)}`,
+    init,
+  );
 }
 
 // ─── Learning & development ─────────────────────────────────────────
 
 /** The skills catalog. */
-export function listSkills(init?: FetchLike): Promise<
-  Array<{ pid: string; name: string; category: string }>
-> {
+export function listSkills(
+  init?: FetchLike,
+): Promise<Array<{ pid: string; name: string; category: string }>> {
   return api("/skills", init);
 }
 
@@ -259,14 +313,19 @@ export function trainingAnalytics(init?: FetchLike): Promise<{
 }
 
 /** Learning paths with step counts. */
-export function listPaths(init?: FetchLike): Promise<
+export function listPaths(
+  init?: FetchLike,
+): Promise<
   Array<{ pid: string; name: string; summary: string | null; steps: number }>
 > {
   return api("/learning-paths", init);
 }
 
 /** One path's per-member honest progress. */
-export function pathProgress(pathPid: string, init?: FetchLike): Promise<{
+export function pathProgress(
+  pathPid: string,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   path: { pid: string; name: string };
   steps: Array<{ course_ref: string; title: string; position: number }>;
@@ -282,11 +341,22 @@ export function pathProgress(pathPid: string, init?: FetchLike): Promise<{
 }
 
 /** The mentorship overview (active pairs, load, unmatched, stale). */
-export function mentorshipOverview(days?: number, init?: FetchLike): Promise<{
+export function mentorshipOverview(
+  days?: number,
+  init?: FetchLike,
+): Promise<{
   as_of: string;
   active_pairings: number;
-  mentor_load: Array<{ mentor_pid: string; mentor: string | null; active_mentees: number }>;
-  unmatched_employees: Array<{ pid: string; display_name: string; department: string }>;
+  mentor_load: Array<{
+    mentor_pid: string;
+    mentor: string | null;
+    active_mentees: number;
+  }>;
+  unmatched_employees: Array<{
+    pid: string;
+    display_name: string;
+    department: string;
+  }>;
   stale_days: number;
   stale_mentorships: Array<{
     pid: string;
@@ -295,7 +365,10 @@ export function mentorshipOverview(days?: number, init?: FetchLike): Promise<{
     last_session: string | null;
   }>;
 }> {
-  return api(`/learning/mentorship-overview${days ? `?days=${days}` : ""}`, init);
+  return api(
+    `/learning/mentorship-overview${days ? `?days=${days}` : ""}`,
+    init,
+  );
 }
 
 /** Change a mentorship's lifecycle status. */
@@ -323,7 +396,11 @@ export function workingTime(
       value_minutes_per_week: number | null;
     };
     over_48h: boolean;
-    rest_breaches: Array<{ prev_end: string; next_start: string; gap_minutes: number }>;
+    rest_breaches: Array<{
+      prev_end: string;
+      next_start: string;
+      gap_minutes: number;
+    }>;
   }>;
 }> {
   const qs = department ? `?department=${encodeURIComponent(department)}` : "";
@@ -334,8 +411,14 @@ export function workingTime(
 
 /** The closed suggestion categories (navigation, never a label). */
 export const ADJUSTMENT_CATEGORIES = [
-  "written_instructions", "agendas_in_advance", "quieter_workspace",
-  "flexible_breaks", "clear_priorities", "equipment", "schedule", "other",
+  "written_instructions",
+  "agendas_in_advance",
+  "quieter_workspace",
+  "flexible_breaks",
+  "clear_priorities",
+  "equipment",
+  "schedule",
+  "other",
 ] as const;
 
 /** One adjustment request (words may be withheld on masked reads). */
@@ -362,7 +445,12 @@ export function listAdjustmentRequests(
 /** Ask for a change: barrier + impact + change, all required. */
 export function createAdjustmentRequest(
   pid: string,
-  body: { category: string; barrier: string; impact: string; adjustment: string },
+  body: {
+    category: string;
+    barrier: string;
+    impact: string;
+    adjustment: string;
+  },
 ): Promise<{ pid: string }> {
   return api(`/employees/${pid}/adjustment-requests`, { method: "POST", body });
 }
@@ -373,7 +461,10 @@ export function decideAdjustment(
   to: string,
   note?: string,
 ): Promise<AdjustmentRequest> {
-  return api(`/adjustment-requests/${pid}/status`, { method: "POST", body: { to, note } });
+  return api(`/adjustment-requests/${pid}/status`, {
+    method: "POST",
+    body: { to, note },
+  });
 }
 
 // ─── Ergonomic (DSE) assessments (WPM-R32) ──────────────────────────
@@ -426,7 +517,9 @@ export function answerErgonomicItem(
 }
 
 /** Complete an assessment (every item must be answered). */
-export function completeErgonomicAssessment(pid: string): Promise<ErgonomicAssessment> {
+export function completeErgonomicAssessment(
+  pid: string,
+): Promise<ErgonomicAssessment> {
   return api(`/ergonomic-assessments/${pid}/complete`, { method: "POST" });
 }
 
@@ -461,7 +554,10 @@ export interface Notification {
 }
 
 /** The employee's notifications, unread first ($sub-owned). */
-export function listNotifications(pid: string, init?: FetchLike): Promise<Notification[]> {
+export function listNotifications(
+  pid: string,
+  init?: FetchLike,
+): Promise<Notification[]> {
   return api(`/employees/${pid}/notifications`, init);
 }
 
@@ -494,7 +590,9 @@ export function retentionSweep(): Promise<{
 }
 
 /** Erase (anonymise) a terminated/retired employee (destructive). */
-export function eraseEmployee(pid: string): Promise<{ erased: string; note: string }> {
+export function eraseEmployee(
+  pid: string,
+): Promise<{ erased: string; note: string }> {
   return api(`/employees/${pid}/erase`, { method: "POST" });
 }
 
@@ -529,7 +627,10 @@ export interface AppraisalGroup {
 }
 
 /** The subject's appraisals. */
-export function listAppraisals(pid: string, init?: FetchLike): Promise<AppraisalSummary[]> {
+export function listAppraisals(
+  pid: string,
+  init?: FetchLike,
+): Promise<AppraisalSummary[]> {
   return api(`/employees/${pid}/appraisals`, init);
 }
 
@@ -538,11 +639,17 @@ export function createAppraisal(
   pid: string,
   competencies: string[],
 ): Promise<{ pid: string }> {
-  return api(`/employees/${pid}/appraisals`, { method: "POST", body: { competencies } });
+  return api(`/employees/${pid}/appraisals`, {
+    method: "POST",
+    body: { competencies },
+  });
 }
 
 /** One appraisal + its nominations (who responded, never what). */
-export function getAppraisal(pid: string, init?: FetchLike): Promise<{
+export function getAppraisal(
+  pid: string,
+  init?: FetchLike,
+): Promise<{
   pid: string;
   employee_pid: string;
   status: string;
@@ -593,13 +700,24 @@ export interface AppraisalRequest {
 }
 
 /** The rater's own pending 360 requests ($sub-owned). */
-export function appraisalRequests(pid: string, init?: FetchLike): Promise<AppraisalRequest[]> {
+export function appraisalRequests(
+  pid: string,
+  init?: FetchLike,
+): Promise<AppraisalRequest[]> {
   return api(`/employees/${pid}/appraisal-requests`, init);
 }
 
 /** The group-floored report (shared appraisals only). */
-export function appraisalReport(pid: string, init?: FetchLike): Promise<{
-  appraisal: { pid: string; employee_pid: string; competencies: string[]; shared_on: string | null };
+export function appraisalReport(
+  pid: string,
+  init?: FetchLike,
+): Promise<{
+  appraisal: {
+    pid: string;
+    employee_pid: string;
+    competencies: string[];
+    shared_on: string | null;
+  };
   groups: AppraisalGroup[];
   derivation: string;
 }> {
@@ -639,13 +757,18 @@ export interface WellbeingPrompt {
 }
 
 /** The configured entitlement rules. */
-export function listWellbeingEntitlements(init?: FetchLike): Promise<WellbeingEntitlement[]> {
+export function listWellbeingEntitlements(
+  init?: FetchLike,
+): Promise<WellbeingEntitlement[]> {
   return api("/wellbeing-entitlements", init);
 }
 
 /** Add an entitlement rule (HR configuration). */
 export function createWellbeingEntitlement(
-  body: Partial<Omit<WellbeingEntitlement, "pid">> & { name: string; description: string },
+  body: Partial<Omit<WellbeingEntitlement, "pid">> & {
+    name: string;
+    description: string;
+  },
 ): Promise<{ pid: string }> {
   return api("/wellbeing-entitlements", { method: "POST", body });
 }
@@ -659,7 +782,12 @@ export function deleteWellbeingEntitlement(pid: string): Promise<unknown> {
 export function employeeWellbeingPrompts(
   pid: string,
   init?: FetchLike,
-): Promise<{ as_of: string; age_known: boolean; derivation: string; prompts: WellbeingPrompt[] }> {
+): Promise<{
+  as_of: string;
+  age_known: boolean;
+  derivation: string;
+  prompts: WellbeingPrompt[];
+}> {
   return api(`/employees/${pid}/wellbeing-prompts`, init);
 }
 
