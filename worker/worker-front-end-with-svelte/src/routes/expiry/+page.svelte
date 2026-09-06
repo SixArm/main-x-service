@@ -33,16 +33,30 @@
 
     // One all-day event per document expiry date; the id keeps the
     // owning record so selection can navigate to it.
+    //
+    // T-28 (found while writing its Playwright test, not by inspection):
+    // `end` must be *exclusive* for an all-day event — `@svar-ui/
+    // calendar-store` filters out any event whose `end` is not strictly
+    // after its `start` (`!(e.end > start)`), so `end: day` (the same
+    // Date as `start`) made every expiry event vanish silently: this
+    // calendar has never actually shown a document on it. `end` is now
+    // the following day, the minimum exclusive span a single calendar
+    // day needs.
     const events = $derived(
         records.flatMap((record) =>
             (record.documents ?? [])
                 .filter((doc) => doc.expiry_date)
                 .map((doc, index) => {
                     const day = new Date(doc.expiry_date ?? "");
+                    const nextDay = new Date(
+                        day.getFullYear(),
+                        day.getMonth(),
+                        day.getDate() + 1,
+                    );
                     return {
                         id: `${record.id ?? ""}::${index}`,
                         start: day,
-                        end: day,
+                        end: nextDay,
                         allDay: true,
                         text: `${record.name.family} — ${doc.document_type}`,
                     };

@@ -185,7 +185,7 @@
     assessments and the derived profile renders; an i18n-parity
     extension for the new keys across every locale.
 
-- [ ] T-28: **`/expiry` Playwright smoke coverage.** The credential-expiry
+- [x] T-28: **`/expiry` Playwright smoke coverage.** *(resolved 2026-09-06.)* The credential-expiry
   calendar is the only route in the route map with zero e2e coverage
   (verified: `tests/e2e/workers.spec.ts` navigates `/`, `/workers`,
   `/workers/new`, `/workers/match`, `/workers/[id]`, `/workers/merge`,
@@ -196,6 +196,30 @@
   navigates to `/workers/{id}`.
   - **Acceptance:** the new Playwright test passes locally against the
     route stub and is added to the standard `e2e` run.
+  - **Resolved — and a genuine, previously-undiscovered product bug
+    found in the process, not just a test-writing gap.** Writing the
+    "select an event" assertion required a real event to actually
+    render, and it never did: `+page.svelte`'s per-document event
+    built `end: day` — the *same* `Date` object as `start` — but
+    `@svar-ui/calendar-store` (verified directly in
+    `node_modules/.pnpm/@svar-ui+calendar-store@2.6.0/…/dist/
+    index.d.mts`/`index.mjs`) requires an all-day event's `end` to be
+    strictly *after* `start` (`!(e.end > start)` silently drops the
+    event); an equal `start`/`end` therefore filtered out **every**
+    expiry event this calendar has ever been asked to show, since the
+    route shipped. Fixed by making `end` the following calendar day
+    (the minimum exclusive span a one-day all-day event needs),
+    verified directly against the compiled library (not by inspection)
+    with a throwaway Playwright/Node script before writing the real
+    test. New test stubs one worker with one document expiring on the
+    15th of the *current* month (a fixed future date would eventually
+    scroll outside the calendar's default month view and stop
+    rendering, since the widget always opens on today's month),
+    asserts the heading + `expiry-calendar` testid + the rendered
+    event text, clicks it, and asserts the resulting `/workers/{id}`
+    URL. Verified: `npm test` (81 passed, unaffected — no unit test
+    covers this component), `npx playwright test` (16 passed, up from
+    15), `npm run check` (0 errors), `npm run lint` clean.
 
 - [ ] T-29: **Expiry-calendar truncation indicator.** `/expiry`'s
   `onMount` calls `repo.search({ q: "*", limit: 200 })` and only reads

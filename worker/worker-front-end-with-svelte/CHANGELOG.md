@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — the expiry calendar never actually showed any events (T-28)
+
+`/expiry`'s per-document event built `end: day` — the *same* `Date`
+object as `start` — but `@svar-ui/calendar-store` requires an all-day
+event's `end` to be strictly *after* `start`; an equal `start`/`end`
+silently filtered out **every** expiry event this calendar was ever
+asked to show, since the route shipped. Found while writing its first
+Playwright test (T-28's actual acceptance criterion — "the only route
+in the route map with zero e2e coverage" — turned into "the only route
+whose one feature never worked"), verified directly against the
+compiled library before touching the app code. Fixed by making `end`
+the following calendar day, the minimum exclusive span a one-day
+all-day event needs. New Playwright test stubs one worker with one
+document expiring on the 15th of the *current* month (the widget
+always opens on today's month, so a fixed future date would eventually
+scroll out of view), asserts the rendered event, clicks it, and
+asserts the resulting `/workers/{id}` navigation. See spec/13-tasks.md
+T-28.
+
 ### Added — test coverage for the phonetic search toggle (T-30)
 
 `SearchOptions.phonetic` was wired all the way to the

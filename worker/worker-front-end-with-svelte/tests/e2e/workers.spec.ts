@@ -26,6 +26,57 @@ test.describe("Worker front-end smoke", () => {
         await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
     });
 
+    // Pins T-28: the credential-expiry calendar (`/expiry`) renders and its
+    // one calendar event navigates to the owning worker's detail page.
+    // Previously the only route in the map with zero e2e coverage.
+    test("expiry calendar renders and navigates to the worker on select", async ({
+        page,
+    }) => {
+        const id = "0c4f1e2a-0000-4000-8000-00000000000e";
+        // The Calendar's month view defaults to the current month, so the
+        // fixture's expiry date must fall inside it (a fixed future date
+        // would eventually drift out of view and stop rendering the event).
+        const today = new Date();
+        const dayInThisMonth = new Date(today.getFullYear(), today.getMonth(), 15)
+            .toISOString()
+            .slice(0, 10);
+        const worker = {
+            id,
+            name: { family: "Bennet", given: ["Jane"] },
+            gender: "female",
+            documents: [
+                {
+                    document_type: "Passport",
+                    number: "X1234567",
+                    expiry_date: dayInThisMonth,
+                },
+            ],
+        };
+        await page.route("**/api/workers/search**", async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true, data: [worker], error: null }),
+            });
+        });
+        await page.route(`**/api/workers/${id}`, async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: "application/json",
+                body: JSON.stringify({ success: true, data: worker, error: null }),
+            });
+        });
+
+        await page.goto("/expiry");
+        await expect(page.getByRole("heading", { name: "Expiries" })).toBeVisible();
+        const calendar = page.getByTestId("expiry-calendar");
+        await expect(calendar).toBeVisible();
+
+        // The one event this fixture produces: "Bennet — Passport".
+        await calendar.getByText("Bennet", { exact: false }).click();
+        await expect(page).toHaveURL(`/workers/${id}`);
+    });
+
     // Pins: the workers list shows its heading, the search box, and the
     // (main-scoped) "New worker" link — i.e. the page chrome loads even if
     // the API call fails.
