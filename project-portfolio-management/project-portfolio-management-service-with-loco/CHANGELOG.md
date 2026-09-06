@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — gate the oversight bulk-read endpoints as a privileged read (SEC-PPM-3)
+
+`evidence_pack`, `auditor_trail`, `board_pack`, and `board_investments`
+relied solely on the coarse `/api/*` blanket guard, so under the
+built-in default ABAC policy any signed-in caller — not just
+`svc`/`admin` — could pull the full audit trail or board investment
+register. A new `authorize_oversight_read` helper (mirroring
+case-service's `authorize_bulk`, SEC-G1) gates all four at
+`Action::Destructive`, a no-op when
+`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` is off. New assertions in
+`tests/enforcement.rs` prove `403` for a plain-read-tier token and
+`200` for `access=admin`/`svc=true`, verified against a real Postgres.
+`cargo test --lib` 368/368; `cargo clippy --all-targets -- -D
+warnings` / `cargo fmt --check` clean. See spec/index.md SEC-PPM-3.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

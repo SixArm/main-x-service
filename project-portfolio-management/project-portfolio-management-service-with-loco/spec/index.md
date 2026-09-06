@@ -847,28 +847,42 @@ HIPAA/NHS/GDPR posture for audit and access controls.
   window/format, and that a write failure prevents the response from
   being returned.
 
-- [ ] **SEC-PPM-3 (S) Gate the oversight bulk-read endpoints as a
+- [x] **SEC-PPM-3 (S) Gate the oversight bulk-read endpoints as a
   privileged (`destructive`-tier) read, not just the blanket guard.**
-  `evidence_pack`, `auditor_trail`, `board_pack`, and
-  `board_investments` each take no `caller`/`AuthUser` parameter at
-  all, relying solely on the coarse `/api/*` blanket guard — *(verified:
-  `grep -n "fn evidence_pack\|fn auditor_trail\|fn board_pack\|fn
-  board_investments" -A 8 src/controllers/oversight.rs` shows none of
-  the four signatures accepting `MaybeAuthUser`/`AuthUser`)*. Under the
+  *(resolved 2026-09-06.)* `evidence_pack`, `auditor_trail`,
+  `board_pack`, and `board_investments` relied solely on the coarse
+  `/api/*` blanket guard — *(verified: two of the four,
+  `evidence_pack`/`auditor_trail`, already took a `caller:
+  MaybeAuthUser` parameter for the SEC-PPM-2 audit-actor stamp, but
+  none of the four called `authorize_record`; `board_pack`/
+  `board_investments` had no `caller` parameter at all.)* Under the
   built-in default ABAC policy every authenticated caller can read
   (`agents/share/authorization-attributes.md` §5), so any signed-in
-  caller — not just `svc`/`admin` — can pull the full audit trail /
+  caller — not just `svc`/`admin` — could pull the full audit trail /
   board investment register. `case-service` gates its analogous
   bulk-links dump at `Action::Destructive` (SEC-G1: "default policy
-  admits only `svc`/`admin`"). Add the same
-  `authorize_record(Action::Destructive, …)` gate to these four
-  handlers (a no-op when `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` is
-  off, per the family's activation-gate convention). Three-part
-  change: spec §9.13/§13 + `src/controllers/oversight.rs` + a DB-gated
-  request test.
-  **Acceptance:** a DB-gated test proves a plain-`read`-tier caller
-  gets `403` from all four endpoints while an `access=admin` or
-  `svc=true` caller succeeds, with enforcement on.
+  admits only `svc`/`admin`").
+  - **Resolved.** A shared `authorize_oversight_read` helper (mirroring
+    case-service's `authorize_bulk`) calls `authorize_record(&caller,
+    Action::Destructive, …)` and maps a denial to `403`; called as the
+    first statement in all four handlers (`board_pack`/
+    `board_investments` gained a `caller: MaybeAuthUser` parameter to
+    carry it). A no-op when `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`
+    is off, per the family's activation-gate convention.
+  - `tests/enforcement.rs`'s existing `enforcement_on_gates_the_real_router`
+    (the process-wide activation proof, its own test binary since
+    `require_auth`/`policy`/`verifier` are `OnceLock`s) gained new
+    assertions: all four oversight paths return `403` for a
+    plain-read-tier token and `200` for both an `access=admin` and a
+    `svc=true` token, with enforcement on. Verified against a real
+    Postgres (`scripts/test-db.sh up` +
+    `scripts/ci-check.sh test-db`) — the whole DB-gated suite green,
+    including this test.
+  - **Acceptance met:** a DB-gated test proves a plain-`read`-tier
+    caller gets `403` from all four endpoints while an `access=admin`
+    or `svc=true` caller succeeds, with enforcement on. `cargo test
+    --lib` 368/368; `cargo clippy --all-targets -- -D warnings` /
+    `cargo fmt --check` clean.
 
 - [x] **2026-09-02 — PRO-H12 slice 7 of 7 (the last): OpenTelemetry
   OTLP export.** This crate carried no `src/observability` module at
