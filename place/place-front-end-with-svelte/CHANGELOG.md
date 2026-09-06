@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — page-visit guard on mutation-only pages (T-25)
+
+`/places/new`, `/places/[id]/edit`, `/places/merge`, and `/review`
+rendered their forms to an unauthenticated visitor and let the submit
+fail server-side, rather than redirecting to `/signin` first. Ported
+`thing-front-end-with-svelte`'s T-26 pattern: `requireSignedIn(locals)`
+in `src/lib/server/session.ts`, called from a new `+page.server.ts` on
+each of the four mutation-only routes; read/list/view pages stay
+public. Also added the `SMOKE_STORAGE_STATE` stub session cookie to
+`playwright.config.ts` (this project had none, unlike its siblings —
+three existing smoke tests visited guarded routes anonymously and
+would otherwise have started failing) and a new "page-visit guard"
+Playwright describe block that drops the cookie to pin the redirect
+itself. New `tests/unit/session.test.ts`. Verified to fail with the
+guard files removed and pass with them restored. See spec §13 T-25.
+
 ### Fixed — unreachable authentication service crashed /verify with a raw 500 (T-26)
 
 `/signin` and `/verify` had zero Playwright coverage. Adding it (a real
