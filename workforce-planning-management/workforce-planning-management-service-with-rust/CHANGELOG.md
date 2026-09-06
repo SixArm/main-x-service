@@ -43,6 +43,12 @@ the wrong-type rejection and the matching-type acceptance for `Worker`,
   so benches and tests count — against the 1.95 toolchain. Behaviour is
   unchanged; what changes is that the floor is now a checked claim
   rather than an unstated assumption.
+  *(Corrected 2026-09-06: `Cargo.toml` now declares `rust-version =
+  "1.96"`, matching `ci/msrv.txt` and the repository's current **N-2**
+  policy (`spec/rust-msrv-n-minus-2/index.md`) — the policy tightened
+  from N-3 to N-2 after this entry was written. No behaviour change;
+  `Cargo.toml`, `ci/msrv.txt`, and `scripts/ci-check.sh msrv` already
+  agreed on 1.96 before this correction.)*
 
 ### Changed — loco-rs 1.0.1 (2026-08-02)
 
