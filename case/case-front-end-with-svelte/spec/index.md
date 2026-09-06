@@ -263,20 +263,45 @@ access/audit requirements.
   with a pinned anonymous-303 Playwright test (mirroring person's), or
   spec §8 states the explicit reason case stays unguarded.
 
-- [ ] **FE-5 (S) `Custom(label)` editing for case type / status / schemes.**
-  Already an open §16/roadmap item ("Still open: ... `Custom(label)`
-  editing") but never promoted to a §13 checkbox with a concrete scope —
-  *(verified: `grep -n "Custom" src/lib/components/CaseForm.svelte`
-  shows no `Custom` variant handling in the form; the `case_matcher`
-  wire shape carries a `Custom(String)` case-type/status/identifier-scheme
-  variant per the sibling matcher's serde docs)*. Give `CaseForm` a
-  text input that appears when `Custom` is selected in the case-type /
-  status / identifier-scheme dropdowns, wired to the existing form
-  validation. Three-part change: spec §6/§13 + `CaseForm.svelte` +
-  vitest coverage.
-  **Acceptance:** selecting `Custom` in any of the three dropdowns
-  reveals a label input; a round-trip vitest case pins the payload
-  shape (`{Custom: "<label>"}`) sent on save.
+- [x] **FE-5 (S) `Custom(label)` editing for case type / status / schemes.**
+  *(resolved 2026-09-06.)* Already an open §16/roadmap item ("Still
+  open: ... `Custom(label)` editing") but never promoted to a §13
+  checkbox with a concrete scope — *(verified: `grep -n "Custom"
+  src/lib/components/CaseForm.svelte` showed no `Custom` variant
+  handling in the form; the `case_matcher` wire shape carries a
+  `Custom(String)` case-type/status/identifier-scheme variant per the
+  sibling matcher's serde docs)*.
+  - **Resolved.** Each of the three dropdowns (case type, status, and
+    every identifier row's scheme) gained a "Custom" option; selecting
+    it reveals a text input (`aria-label="Custom label"`, distinct
+    from the wrapping `<label>` so it doesn't collide with the
+    select's own accessible name) bound to a new `*Custom` state
+    field, reassembled in `build()` into the `{ Custom: "<label>" }`
+    wire shape. Client-side validation blocks submit with a new
+    `form.customLabelRequired` message ("A custom label is required.")
+    rather than ever sending `{ Custom: "" }`. Identifier rows changed
+    shape internally (`IdentifierRow { schemeKind, customLabel, value
+    }` instead of a bare `CaseIdentifier`) to let a native `<select>`
+    bind the sentinel while keeping a separate label field per row —
+    a fix that incidentally corrects a real (if minor) prior bug: a
+    seeded Custom-scheme identifier used to be silently dropped on
+    load (the scheme `<select>` only offered unit schemes); it now
+    round-trips instead. New i18n keys `form.customLabel` /
+    `form.customLabelRequired` across all 13 locales.
+  - `tests/unit/case-form.test.ts` gained 4 new cases (one per
+    dropdown proving the `{ Custom: "<label>" }` round-trip, plus the
+    blank-label validation block) and one existing case was rewritten
+    from "drops seeded Custom-scheme identifier rows" to "preserves a
+    seeded Custom-scheme identifier row", reflecting the corrected
+    behaviour rather than pinning the bug. All 5 verified to fail with
+    `CaseForm.svelte`'s changes reverted and pass with them restored.
+  - **Acceptance met:** selecting `Custom` in any of the three
+    dropdowns reveals a label input; a round-trip vitest case pins the
+    payload shape (`{Custom: "<label>"}`) sent on save, for all three.
+    `pnpm test` 77/77 (was 73); `pnpm run check` clean; `pnpm exec
+    playwright test` 8/8 (unchanged); `pnpm run lint` clean save for
+    two pre-existing, untouched files (`src/lib/api/client.ts`,
+    `src/lib/svar-filter-augment.d.ts`).
 
 - [x] vitest unit tests for `ApiClient` + `CaseRepository` + `CaseForm`
   assembly + i18n parity + layout + the merge/link validators
@@ -294,7 +319,8 @@ access/audit requirements.
   withdraw `subject_of` edges, `CaseRepository.listLinks()` /
   `createLink()` / `deleteLink()`, the pure `validateLink` guard,
   13-locale strings, unit + smoke tests.
-- [ ] `Custom(label)` editing for case type / status / schemes.
+- [x] `Custom(label)` editing for case type / status / schemes —
+  promoted to FE-5 above and resolved there.
 - [x] **PRO-P15** *(done 2026-08-29)* Search box + audit/event views —
   the service's Tantivy search (T-6, landed 2026-08-02) had unblocked
   this weeks earlier. Added: a `SearchBox.svelte` (copy-adapted from the
@@ -344,9 +370,9 @@ v0.1: CRUD + duplicate-check UI. v0.2 (done): tests. v0.3 (done): auth
 (BFF + httpOnly cookie + CSRF, per
 [`../../../agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)).
 Since v0.3: merge UI, cross-service links panel, SVAR grid/board routes,
-Lily pickers. Still open: a search box once the service ships search;
-audit views; `Custom(label)` editing; the catalogued-but-unrouted SVAR
-calendar/gantt/filemanager seams (§7).
+Lily pickers, `Custom(label)` editing (FE-5). Still open: a search box
+once the service ships search; audit views; the catalogued-but-unrouted
+SVAR calendar/gantt/filemanager seams (§7).
 
 ## 16. Open questions
 
