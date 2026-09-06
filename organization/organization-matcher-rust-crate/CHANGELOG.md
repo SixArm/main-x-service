@@ -10,6 +10,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
+
+`Cargo.toml` already declares `rust-version = "1.96"` (matching
+`ci/msrv.txt` and the repository's current **N-2** policy), but the
+`[0.1.0] - 2026-08-26` entry below still says `"1.95"` and
+"current-stable-minus-three" — the policy in effect when that entry was
+written, since tightened. That entry is left as-written (a dated record
+of what was true then); this entry is the correction, matching the
+pattern already used for course-service (T-29) and
+authentication-verifier (AV-3). No behaviour change — `Cargo.toml`,
+`ci/msrv.txt`, and `scripts/ci-check.sh msrv` already agreed on 1.96
+before this change.
+
 ### Added — postal-code exact-anchor boost for address matching (§23)
 
 An exact fold-match on postal code — a strong, fine-grained locality
