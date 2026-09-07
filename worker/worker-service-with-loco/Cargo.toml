@@ -48,7 +48,7 @@ tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
 # `prost` is the wire-message crate tonic-build's generated code names
 # directly (PRO-H11), so it is a normal dependency, not merely pulled
 # in transitively through tonic's own "prost" feature.
-prost = "0.13"
+prost = "0.14"
 
 # OpenAPI Documentation
 utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
