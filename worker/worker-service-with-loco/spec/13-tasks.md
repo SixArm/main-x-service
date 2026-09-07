@@ -3,6 +3,19 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **2026-09-07 — prost 0.13 → 0.14 / tonic 0.12 → 0.14 migration.**
+  A Dependabot `prost` bump exposed that tonic 0.12 cannot compile
+  against prost 0.14 generated code. tonic 0.14 split prost codegen
+  out of the core crate into `tonic-prost` (runtime) +
+  `tonic-prost-build` (codegen, replacing `tonic-build` in `build.rs`),
+  so the fix is the whole gRPC stub moving to `tonic = "0.14"` +
+  `tonic-prost` + `tonic-prost-build` together. This also **removed**
+  T-6's `otlp-test-tonic = { package = "tonic" }` rename below: the
+  in-process OTLP collector tests' `tonic = "0.14"` dev-dependency no
+  longer collides with a `tonic = "0.12"` main dependency, since both
+  are 0.14 now. New SOUP register row for `tonic-prost`; the
+  `tonic`/`prost` rows' notes updated to match. See `CHANGELOG.md` for
+  the full verification list.
 - [x] **SEC-M1 (security): input-size caps on the `Worker` payload.**
   `validate_worker` bounds scalar text (`MAX_TEXT_LEN = 1024`), string-array
   cardinality + per-entry (`MAX_ARRAY_LEN = 256` / `MAX_ITEM_LEN = 512`), and
