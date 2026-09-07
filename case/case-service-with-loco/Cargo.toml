@@ -176,7 +176,7 @@ tokio-stream = { version = "0.1", features = ["net"] }
 # dependency (unlike care-pathway, which has one as a main dependency for
 # its journey traversal).
 reqwest = { version = "0.13", default-features = false, features = [
-  "rustls-tls",
+  "rustls",
   "json",
 ] }
 
