@@ -7042,36 +7042,41 @@ crate above.
   fetch. Two crates independently re-run standalone afterward
   (`person-service-with-loco`, `project-portfolio-management-matcher`)
   as an extra spot-check, both green.
-- [ ] **PRO-H14 (M)** **Publish `main-x-service.github.io`.** No
-  `main-x-service.github.io` (or `sixarm*.github.io`) repo exists
-  locally or on GitHub/Codeberg today — confirmed by search, not
-  assumed absent. Scaffold and publish it, following the pattern the
-  maintainer's other `*.github.io` sites already use (e.g.
-  `fhir-rust/fhir-rust.github.io`): a SvelteKit site prerendered by
-  `@sveltejs/adapter-static`, using the Lily Design System, that
-  **renders this monorepo's own Markdown rather than restating it**
-  (the repository stays the source of truth; the site is a view of
-  it) — plus GitHub Pages hosting and a decided routing scheme
-  (`/`, `/docs/…`, `/specs/…`, or equivalent — pick one before
-  building rather than mid-build, since it fixes every link target
-  below).
-  Once the routing scheme is fixed: publish website-appropriate
-  `static/llms.txt` and `static/llms.json` in that site repo — **not**
-  a copy of this repo's root `llms.txt`/`llms.json`, whose links are
-  repo-relative (`README.md`, `agents/share/overview.md`, …) and only
-  resolve inside a git checkout. Each entry's `url` must instead point
+- [ ] **PRO-H14 (M)** **Publish `main-x-service.github.io`.**
+  *(Premise corrected 2026-09-07: the scaffold below now exists — see
+  `main-x-service.github.io/` in this monorepo and
+  `spec/monorepo-github-pages/index.md` — recovered and merged from a
+  previously-unlanded branch. This row's remaining scope is narrower
+  than originally written: the actual publish, not the build.)* A
+  SvelteKit site prerendered by `@sveltejs/adapter-static`, using the
+  Lily Design System, that **renders this monorepo's own Markdown
+  rather than restating it** (the repository stays the source of
+  truth; the site is a view of it) — built, with a routing scheme
+  already in place (`/`, `/architecture/`, `/subprojects/`, `/about/`;
+  flat, no `/docs/` prefix — this is now a decision already reflected
+  in the code, not still open).
+  Still open: (a) publish website-appropriate `static/llms.txt` and
+  `static/llms.json` in the site — **not** a copy of this repo's root
+  `llms.txt`/`llms.json`, whose links are repo-relative and only
+  resolve inside a git checkout; each entry's `url` must instead point
   at wherever that content actually resolves under the site's own
-  domain. See
-  [`spec/llms-json-and-llms-txt/index.md`](spec/llms-json-and-llms-txt/index.md)
-  §"Repo checkout vs. published site — two link sets, not one" for the
-  requirement this task closes.
-  *Blocked on a decision, not on effort:* the site's actual domain
-  (a dedicated `main-x-service.github.io` / `sixarm.github.io` user or
-  org vs. a `sixarm.github.io/main-x-service/` project page under the
-  existing SixArm org) was asked and deliberately deferred
-  (2026-08-30) rather than guessed — guessing here would ship a
-  public-facing site with wrong links, the exact failure the spec note
-  above exists to prevent. Confirm the domain before starting.
+  domain (`spec/llms-json-and-llms-txt/index.md` §"Repo checkout vs.
+  published site — two link sets, not one"). Neither file exists yet
+  in `main-x-service.github.io/static/` — confirmed by listing, not
+  assumed. (b) the actual **publish**: create the sibling read-only
+  repo and enable GitHub Pages — confirmed **not yet done** (`gh repo
+  view SixArm/main-x-service.github.io` resolves nothing).
+  *Still blocked on a decision, not on effort:* the site's actual
+  domain (a dedicated `main-x-service.github.io` / `sixarm.github.io`
+  user or org vs. a `sixarm.github.io/main-x-service/` project page
+  under the existing SixArm org) was asked and deliberately deferred
+  (2026-08-30) and nothing since resolves it — the merged scaffold's
+  own docs assume `SixArm/main-x-service.github.io` but that is the
+  scaffold author's working assumption, not a recorded decision.
+  Creating a new public repository and turning on Pages is an
+  outward-facing, effectively irreversible action; confirm the domain
+  with the maintainer before either the `static/llms.*` files (their
+  `url` values depend on it) or the publish step.
 
 ### PRO-P — per-family targeted fixes
 
