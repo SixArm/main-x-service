@@ -161,7 +161,7 @@ base64 = { version = "0.23" }
 # The activation proof (tests/enforcement.rs) sets process-wide env vars
 # before booting the router, so it must not run beside another test in
 # the same process.
-serial_test = "3.5"
+serial_test = "4.0"
 
 [[bench]]
 name = "matching_bench"
