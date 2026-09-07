@@ -155,7 +155,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the bearer-verification path is exercised without the auth service or
 # any network dependency.
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 base64 = { version = "0.23" }
 # The activation proof (tests/enforcement.rs) sets process-wide env vars
