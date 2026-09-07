@@ -133,24 +133,28 @@ tracing behaves identically regardless of which router a caller or
 test builds — the same precedent `auth::require_auth_middleware`
 already set by being layered on both surfaces.
 
-A second, narrower adaptation: this crate already depends on
-`tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
-in-process OTLP collector tests' `tonic = "0.14"` dev-dependency (used
-to serve the fake collector) is declared as
-`otlp-test-tonic = { package = "tonic", version = "0.14" }` — an
-unrenamed second `tonic` dependency at a different version collides in
-a test binary's extern prelude (`E0464: multiple candidates for rlib
-dependency tonic`). link-graph-service has no gRPC stub of its own, so
-this collision — and the rename — has no analogue there; worker and
-event both carry the same `tonic = "0.12"` gRPC-stub dependency
-(`agents/share/overview.md`'s capability matrix) and will need the same
-rename when this pattern rolls to them. The rename also required
-teaching `src/compliance/soup.rs`'s SOUP-register parser to resolve a
-`package = "…"` inline-table rename to its target crate name — the
-unrenamed manifest alias satisfies neither the "every direct dependency
-is annotated" check (which wants the alias annotated) nor the "no stale
-register entries" check (which wants the annotated name to exist in
-`Cargo.lock`, where only the resolved name appears) at once.
+A second, narrower adaptation applied at the time: this crate's own
+gRPC stub (`src/api/grpc/`) originally sat on `tonic = "0.12"` while
+the in-process OTLP collector tests needed `tonic = "0.14"`, so the
+dev-dependency was declared as
+`otlp-test-tonic = { package = "tonic", version = "0.14" }` to dodge an
+unrenamed second `tonic` dependency colliding in a test binary's
+extern prelude (`E0464: multiple candidates for rlib dependency
+tonic`). **That rename is gone as of the prost 0.14 migration**
+(2026-09-07): tonic 0.14 split prost codegen out of the core crate
+into `tonic-prost` (runtime) + `tonic-prost-build` (codegen, see
+`build.rs`), and bumping the main gRPC stub to `tonic = "0.14"` to
+pick that up means both dependencies now sit on the same line — no
+collision, no rename, one plain `tonic = "0.14"` dev-dependency. Worker
+and event still carry the collision (both still on `tonic = "0.12"` as
+of this writing) and will need this crate's original rename until they
+make the same prost 0.14 move, at which point they can drop it too.
+The `src/compliance/soup.rs` SOUP-register parser still resolves a
+`package = "…"` inline-table rename to its target crate name (needed
+while the rename existed, and for any future one); see
+`renamed_dependencies_report_their_resolved_package_name`'s doc comment
+for why that logic is unit-tested directly rather than via this
+crate's own manifest now.
 
 `tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
 link-graph-service, with `tests/otlp_collector/` — an in-process
@@ -165,8 +169,10 @@ None of this needs a database.
 `src/api/grpc/` is a real `tonic::transport::Server`, not the
 commented-out stub it used to be. `proto/person.proto` (crate root)
 defines `PersonService` — `CreatePerson` / `GetPerson` / `ListPersons`
-/ `DeletePerson` — compiled by `build.rs` (`tonic-build`, pinned to the
-same 0.12 line as the main `tonic` dependency) into
+/ `DeletePerson` — compiled by `build.rs` (`tonic-prost-build`, pinned
+to the same 0.14 line as the main `tonic`/`tonic-prost` dependencies —
+see the OTLP export section above for why this is `tonic-prost-build`
+and not `tonic-build` as of 2026-09-07) into
 `crate::api::grpc::proto`. `App::after_routes` spawns
 `crate::api::grpc::serve` as a background task on `GRPC_PORT` (config
 `server.grpc_port`, default `50051`) alongside the REST router, sharing

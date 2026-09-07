@@ -1,7 +1,9 @@
 //! Build script — compiles `proto/person.proto` into
-//! `crate::api::grpc::proto` via `tonic-build` (PRO-H11).
+//! `crate::api::grpc::proto` via `tonic-prost-build` (PRO-H11; tonic
+//! 0.14 moved prost codegen out of `tonic-build` into this crate —
+//! see `Cargo.toml`'s `tonic-prost`/`tonic-prost-build` comments).
 //!
-//! `tonic_build::compile_protos` shells out to a real `protoc` binary;
+//! `tonic_prost_build::compile_protos` shells out to a real `protoc` binary;
 //! it does **not** bundle one itself (an earlier version of this
 //! comment claimed it did — wrong, and only CI caught it, since a
 //! local `cargo build` succeeded here via a `protoc` already on
@@ -29,6 +31,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     unsafe {
         std::env::set_var("PROTOC", protoc_bin_vendored::protoc_bin_path()?);
     }
-    tonic_build::compile_protos("proto/person.proto")?;
+    tonic_prost_build::compile_protos("proto/person.proto")?;
     Ok(())
 }
