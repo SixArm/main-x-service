@@ -9,6 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — tantivy 0.26 `TopDocs` no longer implements `Collector` directly (2026-09-07)
+
+Bumping `tantivy` 0.22 → 0.26 broke both `Searcher::search` call sites
+in `src/search/mod.rs`: `TopDocs` dropped its direct `impl Collector`
+in favour of requiring an explicit ordering call (`.order_by_score()`,
+…) that returns a value which does implement `Collector`. Both sites
+destructure `(_score, addr)` from the result, exactly matching
+`order_by_score()`'s `Vec<(Score, DocAddress)>` fruit type (one site
+combines it with `Count` in a tuple collector), so the fix is
+`TopDocs::with_limit(n)` → `TopDocs::with_limit(n).order_by_score()`
+at each site. No behaviour change. The same PR also bumped the dev-only
+`base64` 0.22 → 0.23, which needed no code change.
+
+Verified: `cargo build --all-targets` (main crate and `fuzz/`), `cargo
+test --lib` (318 passed), `cargo clippy --all-targets -- -D warnings`,
+`cargo fmt --check`, `cargo deny check` all clean.
+
 ### Fixed — doc drift: stale "check-duplicates has no search-backed blocking yet" comments (2026-09-06)
 
 `CHECK_DUPLICATES_SCAN_CAP`'s doc comment, the `check_duplicates`
