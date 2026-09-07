@@ -38,6 +38,24 @@ otlp_middleware` (4 passed), `cargo clippy --all-targets -- -D
 warnings`, `cargo fmt --check`, `cargo bench --no-run`, `cargo deny
 check` all clean.
 
+### Fixed — tantivy 0.26 `TopDocs` no longer implements `Collector` directly (2026-09-07)
+
+Bumping `tantivy` 0.22 → 0.26 broke every `Searcher::search` call site:
+`TopDocs` dropped its direct `impl Collector` in favour of requiring an
+explicit ordering call (`.order_by_score()`, `.order_by_fast_field()`,
+…) that returns a value which does implement `Collector`. All six call
+sites in this crate destructure `(_score, doc_address)` from the
+result, exactly matching `order_by_score()`'s
+`Vec<(Score, DocAddress)>` fruit type, so the fix is
+`TopDocs::with_limit(limit)` → `TopDocs::with_limit(limit).order_by_score()`
+at each site (`src/search/mod.rs` ×3, `src/search/index.rs` tests ×3).
+No behaviour change — scoring and ordering are identical to 0.22's
+implicit default.
+
+Verified: `cargo build --lib` / `--all-targets`, `cargo test --lib`
+(355 passed), `cargo clippy --all-targets -- -D warnings`, `cargo fmt
+--check`, `cargo deny check` all clean.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

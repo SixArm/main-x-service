@@ -216,7 +216,7 @@ impl SearchEngine {
             .map_err(|e| crate::Error::Search(format!("Failed to parse query: {e}")))?;
 
         let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(limit))
+            .search(&query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("Search failed: {e}")))?;
 
         let mut person_ids = Vec::new();
@@ -276,7 +276,7 @@ impl SearchEngine {
 
         let bool_query = BooleanQuery::new(subqueries);
         let top_docs = searcher
-            .search(&bool_query, &TopDocs::with_limit(limit))
+            .search(&bool_query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {e}")))?;
 
         let mut person_ids = Vec::new();
@@ -370,7 +370,10 @@ impl SearchEngine {
         };
 
         let top_docs = searcher
-            .search(final_query.as_ref(), &TopDocs::with_limit(limit))
+            .search(
+                final_query.as_ref(),
+                &TopDocs::with_limit(limit).order_by_score(),
+            )
             .map_err(|e| crate::Error::Search(format!("Search failed: {e}")))?;
 
         let mut person_ids = Vec::new();

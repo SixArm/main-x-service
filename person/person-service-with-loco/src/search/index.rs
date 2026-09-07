@@ -373,7 +373,9 @@ mod tests {
         let searcher = person_index.reader().searcher();
         let term = Term::from_field_text(schema.family_name, "jonson"); // typo
         let query = FuzzyTermQuery::new(term, 1, true);
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(10)).unwrap();
+        let top_docs = searcher
+            .search(&query, &TopDocs::with_limit(10).order_by_score())
+            .unwrap();
         assert_eq!(
             top_docs.len(),
             1,
@@ -439,7 +441,9 @@ mod tests {
         let searcher = person_index.reader().searcher();
         let term = Term::from_field_text(schema.family_name, "nonexistent");
         let query = TermQuery::new(term, IndexRecordOption::Basic);
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(10)).unwrap();
+        let top_docs = searcher
+            .search(&query, &TopDocs::with_limit(10).order_by_score())
+            .unwrap();
         assert_eq!(
             top_docs.len(),
             0,
@@ -485,7 +489,9 @@ mod tests {
             Box::new(TermQuery::new(name_term, IndexRecordOption::Basic)),
             Box::new(TermQuery::new(dob_term, IndexRecordOption::Basic)),
         ]);
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(10)).unwrap();
+        let top_docs = searcher
+            .search(&query, &TopDocs::with_limit(10).order_by_score())
+            .unwrap();
         assert_eq!(
             top_docs.len(),
             1,
