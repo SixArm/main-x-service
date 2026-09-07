@@ -8,6 +8,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — tantivy 0.26 `TopDocs` no longer implements `Collector` directly (2026-09-07)
+
+Bumping `tantivy` 0.22.1 → 0.26.1 broke both `Searcher::search` call
+sites in `src/search/mod.rs`: `TopDocs` dropped its direct `impl
+Collector` in favour of requiring an explicit ordering call
+(`.order_by_score()`, …) that returns a value which does implement
+`Collector`. Both sites destructure `(_score, addr)` from the result,
+exactly matching `order_by_score()`'s `Vec<(Score, DocAddress)>` fruit
+type (one site combines it with `Count` in a tuple collector), so the
+fix is `TopDocs::with_limit(n)` → `TopDocs::with_limit(n).order_by_score()`
+at each site. No behaviour change — scoring and ordering are identical
+to 0.22's implicit default.
+
+Verified: `cargo build --all-targets`, `cargo test --lib` (231
+passed), `cargo clippy --all-targets -- -D warnings`, `cargo fmt
+--check`, `cargo deny check` all clean.
+
 ### Added — persist and serve the review-queue `score_breakdown` (T-14)
 
 `POST /api/places/deduplicate` always wrote `score_breakdown: None` on
