@@ -173,7 +173,7 @@ insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
 ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 sha2 = { version = "0.10" }
-base64 = { version = "0.22" }
+base64 = { version = "0.23" }
 # `macros` + `net` power the boot-time key-set fetch tests in src/auth.rs
 # (#[tokio::test] + an ephemeral-port TcpListener serving the key set).
 # `time` lets tests/otlp_collector's `wait_for` poll with `tokio::time::sleep`
