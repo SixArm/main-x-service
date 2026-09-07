@@ -1446,7 +1446,7 @@ dependencies = [
  "aws-sdk-s3",
  "axum",
  "axum-test 21.1.0",
- "base64 0.22.1",
+ "base64 0.23.1",
  "care-pathway-matcher",
  "chrono",
  "criterion",
