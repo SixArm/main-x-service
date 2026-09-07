@@ -150,7 +150,10 @@ impl SearchEngine {
         let wanted = offset.saturating_add(limit).max(1);
         let s = self.index.schema();
         let (top, total) = searcher
-            .search(query.as_ref(), &(TopDocs::with_limit(wanted), Count))
+            .search(
+                query.as_ref(),
+                &(TopDocs::with_limit(wanted).order_by_score(), Count),
+            )
             .map_err(|e| crate::Error::Search(format!("search: {e}")))?;
         let mut ids = Vec::new();
         for (_score, addr) in top.into_iter().skip(offset) {
@@ -272,7 +275,7 @@ impl SearchEngine {
     ) -> Result<Vec<String>> {
         let s = self.index.schema();
         let top = searcher
-            .search(query, &TopDocs::with_limit(limit))
+            .search(query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("search: {e}")))?;
         let mut ids = Vec::with_capacity(top.len());
         for (_score, addr) in top {
