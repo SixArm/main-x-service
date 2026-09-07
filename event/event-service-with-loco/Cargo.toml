@@ -206,7 +206,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 # (matching person-service's/worker-service's post-fix pin), but was
 # still dead scaffolding until now: no `build.rs`, no `proto/`
 # directory.
-tonic-build = "0.12"
+tonic-build = "0.14"
 # `tonic_build::compile_protos` shells out to a real `protoc` binary —
 # it does not bundle one. `protoc-bin-vendored` ships prebuilt
 # `protoc` binaries for the platforms this family builds on;
