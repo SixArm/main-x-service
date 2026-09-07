@@ -1,8 +1,8 @@
 //! Build script — compiles `proto/event.proto` into
-//! `crate::api::grpc::proto` via `tonic-build` (PRO-H11, following
+//! `crate::api::grpc::proto` via `tonic-prost-build` (PRO-H11, following
 //! person-service's and worker-service's reference implementations).
 //!
-//! `tonic_build::compile_protos` shells out to a real `protoc` binary;
+//! `tonic_prost_build::compile_protos` shells out to a real `protoc` binary;
 //! it does **not** bundle one itself. Person-service's and
 //! worker-service's own `build.rs`, on their first landing, each
 //! claimed otherwise and each broke CI (whose runner has no `protoc`
@@ -30,6 +30,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     unsafe {
         std::env::set_var("PROTOC", protoc_bin_vendored::protoc_bin_path()?);
     }
-    tonic_build::compile_protos("proto/event.proto")?;
+    tonic_prost_build::compile_protos("proto/event.proto")?;
     Ok(())
 }

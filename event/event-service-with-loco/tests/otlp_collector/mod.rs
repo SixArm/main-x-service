@@ -24,12 +24,12 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_server::{TraceService, TraceServiceServer},
 };
 use opentelemetry_proto::tonic::trace::v1::Span;
-// Renamed dev-dependency (`otlp-test-tonic = { package = "tonic" }`) — see
-// the Cargo.toml comment: this crate's main deps already carry
-// `tonic = "0.12"` for its own gRPC stub, so an unrenamed `tonic = "0.14"`
-// dev-dependency collides in the test binary's extern prelude (E0464).
-use otlp_test_tonic::{Request, Response, Status};
+// A plain `tonic = "0.14"` dev-dependency: this crate's main gRPC stub
+// depends on the same tonic 0.14 line (since the tonic-prost split, see
+// Cargo.toml's `tonic-prost` comment), so there is no longer a version
+// collision to rename around.
 use tokio::net::TcpListener;
+use tonic::{Request, Response, Status};
 
 /// Everything the collector has received.
 #[derive(Clone, Default)]
@@ -40,7 +40,7 @@ pub struct Captured {
     pub metrics: Arc<Mutex<Vec<ExportMetricsServiceRequest>>>,
 }
 
-#[otlp_test_tonic::async_trait]
+#[tonic::async_trait]
 impl TraceService for Captured {
     async fn export(
         &self,
@@ -51,7 +51,7 @@ impl TraceService for Captured {
     }
 }
 
-#[otlp_test_tonic::async_trait]
+#[tonic::async_trait]
 impl MetricsService for Captured {
     async fn export(
         &self,
@@ -118,7 +118,7 @@ pub async fn start() -> (String, Captured) {
     let captured = Captured::default();
     let service = captured.clone();
     tokio::spawn(async move {
-        otlp_test_tonic::transport::Server::builder()
+        tonic::transport::Server::builder()
             .add_service(TraceServiceServer::new(service.clone()))
             .add_service(MetricsServiceServer::new(service))
             .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
