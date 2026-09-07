@@ -94,7 +94,7 @@ async-trait = "0.1"
 strsim = "0.11"
 
 # Prometheus metrics (text exposition for /metrics.prom)
-prometheus = "0.13"
+prometheus = "0.14"
 
 # Sibling matcher crate
 thing-matcher = { version = "0.7.0", path = "../thing-matcher-rust-crate" }
