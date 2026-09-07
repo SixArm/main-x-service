@@ -125,7 +125,7 @@ fluvio = ["dep:fluvio"]
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.27"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 # An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
 # `tests/otlp_middleware.rs` (PRO-H12, ported from person-service): the
