@@ -68,11 +68,20 @@ database:
   dangerously_truncate: false
   dangerously_recreate: false
 
-auth:
-  jwt:
-    secret: {{ get_env(name="JWT_SECRET") }}
-    expiration: 604800
-
+# No `auth:` block: loco's own top-level `Config.auth` field is
+# `Option<Auth>` (loco-rs 1.1.0's config/mod.rs) — safe to omit
+# entirely, and this crate's `loco-rs` dependency already takes
+# `default-features = false` without `auth` (agents/share/jwt.md;
+# security.md §7 — the family issues PASETO v4.public, never JWT). The
+# block used to render a JWT_SECRET env-var lookup with no default —
+# note: even inside a YAML comment, Tera still expands a literal
+# double-brace template expression, so do not requote the old line
+# here to explain it — so a fresh container with no JWT_SECRET set (a
+# variable nothing in this crate reads, ever) failed at boot with a
+# Tera rendering error before the server ever started. Found rolling
+# the identical fix from project-portfolio-management-service, which
+# found it running a real container for its T-28o runbook
+# verification.
 
 # Cache provider: in-memory (loco `cache_inmem`, enabled by default).
 cache:

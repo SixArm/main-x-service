@@ -48,6 +48,13 @@ COPY project-portfolio-management/project-portfolio-management-matcher-rust-crat
 COPY project-portfolio-management/project-portfolio-management-service-with-loco/Cargo.toml project-portfolio-management/project-portfolio-management-service-with-loco/Cargo.lock project-portfolio-management/project-portfolio-management-service-with-loco/
 COPY project-portfolio-management/project-portfolio-management-service-with-loco/migration project-portfolio-management/project-portfolio-management-service-with-loco/migration
 COPY project-portfolio-management/project-portfolio-management-service-with-loco/src project-portfolio-management/project-portfolio-management-service-with-loco/src
+# Cargo parses the whole manifest even for a --bin-only build, and this
+# crate's Cargo.toml declares `[[bench]] name = "service_bench"` — the
+# same trap place-service's own container fix already documented for
+# its `bridge_bench`. Without this, cargo refuses to parse the
+# manifest at all ("can't find `service_bench` bench at
+# `benches/service_bench.rs`").
+COPY project-portfolio-management/project-portfolio-management-service-with-loco/benches project-portfolio-management/project-portfolio-management-service-with-loco/benches
 
 WORKDIR /app/project-portfolio-management/project-portfolio-management-service-with-loco
 

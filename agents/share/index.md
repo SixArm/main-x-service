@@ -75,6 +75,7 @@ Per-crate `spec.md`:
 | [authentication-sessions.md](authentication-sessions.md)         | Cookie sessions (Postgres) + PASETO v4 cross-service tokens + BFF front-end (supersedes the RS256-JWT model) |
 | [jwt-enforcement.md](jwt-enforcement.md)                         | Blanket `/api/*` auth enforcement (coordinated; credential now PASETO/session) |
 | [authorization-attributes.md](authorization-attributes.md)       | ABAC: `attrs` claim + policy language + default policy (read allow / mutation deny), 401/403 split, sourcing |
+| [runbooks/first-deployment.md](runbooks/first-deployment.md) | Runbook: standing up any registry for the first time — activation order (ABAC policy → auth gate → PASETO key source → event transport → integrity → optional loops), a verification command per step, and the container-boot defects it found along the way |
 | [runbooks/integrity-activation.md](runbooks/integrity-activation.md) | Runbook: activating the integrity/audit controls (they are all default-off), verifying each took effect, checkpoint storage, MAC-key rotation |
 | [runbooks/paseto-key-rotation.md](runbooks/paseto-key-rotation.md) | Runbook: rotating the PASETO signing key with zero downtime — the peer-refresh-timing trap, symptom → check → action |
 | [runbooks/reconciliation-divergence.md](runbooks/reconciliation-divergence.md) | Runbook: link-graph reconciliation divergence — what a pass does, the gauge's two sharp edges, symptom → check → action |

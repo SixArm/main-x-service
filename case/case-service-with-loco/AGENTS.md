@@ -304,3 +304,18 @@ every crate's `target/`, or the build context would try to copy
 hundreds of GB of build artifacts). The wired multi-service
 `examples/compose/` stacks (DEP-1) that build on this are not yet
 written.
+
+**Re-verified 2026-09-07** for
+[`agents/share/runbooks/first-deployment.md`](../../agents/share/runbooks/first-deployment.md)'s
+T-28o exercise (run against project-portfolio-management-service, then
+rolled here), which found two more real defects the 2026-08-03 pass had
+not: (3) the same dead loco JWT `auth:` block as portfolio's — a
+`JWT_SECRET` env-var lookup with no `default` crashed a fresh container
+with the var unset, for a value this crate reads nowhere (`loco-rs` is
+built without the `auth` feature; PASETO, never JWT). loco's
+`Config.auth` is `Option<Auth>`, so the fix is deleting the block, not
+defaulting it. (4) The Dockerfile never `COPY`'d `benches/`, and Cargo
+refuses to parse a `[[bench]]`-declaring manifest at all without that
+path present, even for a `--bin`-only build — `cargo build --release
+--bin case-service` failed before compiling anything. Both fixed and
+re-verified against a real container + real Postgres.
