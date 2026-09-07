@@ -8004,17 +8004,31 @@ green as it sits; these finish it)**
   legitimate near-duplicate cannot be created through the UI — an
   authorisation-shaped (`destructive`-class) question recorded in each
   closure for the service specs to take up if a deployment needs it.
-- [ ] **WEB-7 (S)** **Review-queue wire-shape divergence.** Person and
-  worker `ReviewQueueItem` carry `provenance` and a serialised
-  `score_breakdown`; place-service and thing-service carry **neither**
-  — `review_queue` has no `provenance` column, and `score_breakdown` is
-  stored but never serialised and always written `NULL` by the batch
-  scan (each front-end's T-23 / T-24 verified this against the Rust
-  source and substituted `detection_method` in the UI). Both service
-  specs need a §13 row to add the column and serialise the breakdown;
-  the front-end panels are already generic and light up with no change.
-  Organization: verify before claiming either way — the grep this
-  finding rests on did not cover its loco-style layout.
+- [x] **WEB-7 (S)** **Review-queue wire-shape divergence.** *(re-verified
+  2026-09-07 against the live Rust source rather than trusting the
+  original finding — half of it was already stale.)* `score_breakdown`
+  **is** stored and serialised by both place-service and thing-service
+  today (`src/api/rest/handlers.rs`'s `deduplicate` writes
+  `serde_json::to_value(&result.breakdown).ok()`, not `None` — the
+  gap the front-ends' T-23/T-24 found on 2026-08-04 has since closed on
+  the backend side; the front-end panels are generic over presence, so
+  they should already render the real breakdown with no front-end
+  change, though that has not been re-verified against a running
+  front-end here). The **narrower, still-real** gap is `provenance`:
+  neither `place_service`'s nor `thing_service`'s `review_queue` table
+  has the column, unlike person / worker / organization / case (which
+  route bulk-import-detected keyless duplicates through it — see
+  `agents/share/bulk-import-export.md` §6). That asymmetry tracks a
+  real capability difference, not an oversight: place and thing have
+  **no bulk import module at all** (`src/bulk/` does not exist in
+  either crate — confirmed by listing, not assumed), so there is no
+  writer that would ever populate anything other than a constant
+  `provenance` value. Adding the column now would be a dead field with
+  one hard-coded value until a bulk-import task lands for either
+  service; **closing this as "not a gap"** rather than adding it
+  speculatively. Revisit only if/when place or thing gain bulk
+  import/export (`agents/share/overview.md`'s capability matrix still
+  shows both `–` on that row).
 - [x] **WEB-8 (S)** **Change-aware CI matrix.** PRs #172–#178 touched
   no Rust (spec, CHANGELOG, one OpenAPI YAML, SvelteKit) and each ran
   all 168 checks for roughly an hour; two needed the watch re-armed
