@@ -4947,7 +4947,7 @@ dependencies = [
  "authentication-verifier",
  "axum",
  "axum-test",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "criterion",
  "ed25519-dalek 3.0.0",
