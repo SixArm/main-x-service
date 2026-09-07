@@ -156,7 +156,7 @@ tokio-stream = { version = "0.1", features = ["net"] }
 # HTTP request against a served router; this crate has no other direct
 # `reqwest` dependency.
 reqwest = { version = "0.13", default-features = false, features = [
-  "rustls-tls",
+  "rustls",
   "json",
 ] }
 
