@@ -47,7 +47,7 @@ loco-rs = { version = "1.1.0", default-features = false, features = ["cli", "wit
 migration = { path = "migration" }
 
 # Search Engine
-tantivy = "0.22"
+tantivy = "0.26"
 
 # gRPC
 tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
