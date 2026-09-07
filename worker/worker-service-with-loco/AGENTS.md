@@ -121,19 +121,21 @@ person-service anticipated, confirmed rather than assumed:
   test builds — the same precedent `auth::apply_enforcement` already set
   by being layered on both surfaces. No third surface exists (verified
   by grepping for `Router::new` and `create_router` rather than assumed).
-- **A renamed `tonic` dev-dependency.** This crate already depends on
+- **A renamed `tonic` dev-dependency — gone as of the prost 0.14
+  migration (2026-09-07).** This crate originally depended on
   `tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
   in-process OTLP collector tests' `tonic = "0.14"` dev-dependency (used
-  to serve the fake collector) is declared as
-  `otlp-test-tonic = { package = "tonic", version = "0.14" }` — an
-  unrenamed second `tonic` dependency at a different version collides in
-  a test binary's extern prelude (`E0464: multiple candidates for rlib
-  dependency tonic`). The rename also required teaching
-  `src/compliance/soup.rs`'s SOUP-register parser to resolve a
-  `package = "…"` inline-table rename to its target crate name — this
-  crate's parser had the identical gap person-service's did (an earlier,
-  unpatched copy of the same `declared_dependencies` function), fixed the
-  identical way rather than needing a new approach.
+  to serve the fake collector) needed the same
+  `otlp-test-tonic = { package = "tonic", version = "0.14" }` rename
+  person-service's did, to dodge an unrenamed second `tonic` dependency
+  colliding in a test binary's extern prelude (`E0464: multiple
+  candidates for rlib dependency tonic`). Bumping the main gRPC stub to
+  `tonic = "0.14"` (forced by a Dependabot `prost` bump — tonic 0.12
+  cannot compile prost 0.14's generated code) put both dependencies on
+  the same line, so the rename is gone: one plain `tonic = "0.14"`
+  dev-dependency. `src/compliance/soup.rs`'s SOUP-register parser still
+  resolves a `package = "…"` inline-table rename to its target crate
+  name (needed while the rename existed, and for any future one).
 
 `tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
 person-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
@@ -153,10 +155,11 @@ commented-out stub it used to be — following person-service's
 reference implementation for this repo's gRPC rollout.
 `proto/worker.proto` (crate root) defines `WorkerService` —
 `CreateWorker` / `GetWorker` / `ListWorkers` / `DeleteWorker` —
-compiled by `build.rs` (`tonic-build`, already correctly pinned to the
-same 0.12 line as the main `tonic` dependency in this crate's manifest
-— unlike person-service's, which needed fixing from a mismatched
-0.14). `App::after_routes` spawns `crate::api::grpc::serve` as a
+compiled by `build.rs` (`tonic-prost-build`, pinned to the same 0.14
+line as the main `tonic`/`tonic-prost` dependencies — tonic 0.14 split
+prost codegen out of `tonic-build` into this crate, 2026-09-07; see the
+OTLP export section above). `App::after_routes` spawns
+`crate::api::grpc::serve` as a
 background task on `GRPC_PORT` (config `server.grpc_port`, default
 `50051`) alongside the REST router, sharing one cloned `AppState` — a
 bind/serve failure is logged, not fatal, so REST still boots if the

@@ -1,8 +1,8 @@
 //! Build script — compiles `proto/worker.proto` into
-//! `crate::api::grpc::proto` via `tonic-build` (PRO-H11, following
+//! `crate::api::grpc::proto` via `tonic-prost-build` (PRO-H11, following
 //! person-service's reference implementation).
 //!
-//! `tonic_build::compile_protos` shells out to a real `protoc` binary;
+//! `tonic_prost_build::compile_protos` shells out to a real `protoc` binary;
 //! it does **not** bundle one itself (an earlier version of this
 //! comment, and of person-service's, claimed it did — wrong, and only
 //! CI caught it, since local `cargo build` succeeded via a `protoc`
@@ -29,6 +29,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     unsafe {
         std::env::set_var("PROTOC", protoc_bin_vendored::protoc_bin_path()?);
     }
-    tonic_build::compile_protos("proto/worker.proto")?;
+    tonic_prost_build::compile_protos("proto/worker.proto")?;
     Ok(())
 }
