@@ -42,7 +42,7 @@ loco-rs = { version = "1.1.0", default-features = false, features = ["cli", "wit
 migration = { path = "migration" }
 
 # Search Engine
-tantivy = "0.22"
+tantivy = "0.26"
 
 # gRPC (PRO-H11: a real Tonic server, generated from proto/person.proto
 # by build.rs). tonic 0.14 split the prost codec out of the core crate
