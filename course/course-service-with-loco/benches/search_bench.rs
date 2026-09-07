@@ -4,7 +4,8 @@
 //! course, exact search, fuzzy search, and the duplicate-detector
 //! blocking query against a populated 100-course index.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use tempfile::TempDir;
 use uuid::Uuid;
 

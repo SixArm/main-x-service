@@ -4,7 +4,8 @@
 //! baseline for the canonical `course-matcher` algorithm driven
 //! through the service's `CourseMatcher` facade + adapter.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use uuid::Uuid;
 
 use course_service::config::MatchingConfig;

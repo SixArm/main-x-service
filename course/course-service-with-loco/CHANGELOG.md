@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — criterion 0.8 deprecated `criterion::black_box` (2026-09-07)
+
+Bumping `criterion` 0.5.1 → 0.8.2 (dev-dependency) turned `use of
+deprecated function criterion::black_box` into a hard `clippy
+--all-targets -- -D warnings` failure across all three bench files
+(`matching_bench.rs`, `search_bench.rs`, `validation_bench.rs`) — 22
+call sites total. Fixed by importing `std::hint::black_box` (the
+function criterion's own deprecation notice points to) instead of
+re-exporting it from `criterion`; every call site is unchanged text,
+only the import moved. No behaviour change.
+
+Verified: `cargo build --all-targets`, `cargo test --lib` (135
+passed), `cargo clippy --all-targets -- -D warnings`, `cargo fmt
+--check`, `cargo bench --no-run`, `cargo deny check` all clean.
+
 ### Added — persist the review queue to `course_match_scores` (T-27)
 
 `POST /api/courses/deduplicate` classified pairs into the review band

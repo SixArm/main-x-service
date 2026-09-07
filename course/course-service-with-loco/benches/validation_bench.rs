@@ -5,7 +5,8 @@
 //! FR-21..FR-28 branch exercised at least once).
 
 use chrono::Utc;
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use uuid::Uuid;
 
 use course_service::models::{
