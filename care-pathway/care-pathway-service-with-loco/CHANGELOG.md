@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — two container-boot defects, found rolling the T-28o runbook exercise here (2026-09-07)
+
+Same class of defect found writing
+[`agents/share/runbooks/first-deployment.md`](../../agents/share/runbooks/first-deployment.md)
+against project-portfolio-management-service, confirmed here and fixed:
+(1) `config/production.yaml`'s dead loco JWT `auth:` block (`secret:
+{{ get_env(name="JWT_SECRET") }}`, no `default`) crashed boot with the
+env var unset, for a value this crate reads nowhere (`loco-rs` built
+without the `auth` feature; PASETO, never JWT) — removed entirely
+(`Config.auth` is `Option<Auth>`). (2) `Dockerfile` never `COPY`'d the
+`entity-ref` sibling path dependency at all — added 2026-08-24 for the
+`continues_as` journey-link write side, **after** this Dockerfile's
+2026-08-03 verification, so the two silently diverged: `cargo build
+--release --bin care-pathway-service` failed with "failed to read
+/app/link/entity-ref-rust-crate/Cargo.toml". Both fixed and
+re-verified: `podman build` from the repo root, `db migrate` against a
+real Postgres, all migrations (including `m20260824_000015_entity_links`)
+applying clean.
+
 ### Fixed — tantivy 0.26 `TopDocs` no longer implements `Collector` directly (2026-09-07)
 
 Bumping `tantivy` 0.22 → 0.26 broke both `Searcher::search` call sites

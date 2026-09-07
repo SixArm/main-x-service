@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — two container-boot defects, found rolling the T-28o runbook exercise here (2026-09-07)
+
+Same two defects found writing
+[`agents/share/runbooks/first-deployment.md`](../../agents/share/runbooks/first-deployment.md)
+against project-portfolio-management-service, confirmed to affect this
+crate too and fixed the same way: (1) `config/production.yaml`'s dead
+loco JWT `auth:` block (`secret: {{ get_env(name="JWT_SECRET") }}`, no
+`default`) crashed boot with the env var unset, for a value this crate
+reads nowhere (`loco-rs` built without the `auth` feature; PASETO,
+never JWT) — removed entirely (`Config.auth` is `Option<Auth>`). (2)
+`Dockerfile` never `COPY`'d `benches/`, and this crate's `Cargo.toml`
+declares `[[bench]] name = "service_bench"` — Cargo refuses to parse
+the manifest at all without that path present, even for a `--bin`-only
+build. Both fixed and re-verified: `podman build` from the repo root,
+`db migrate` + `start` against a real Postgres, `GET /_health` → `200`.
+
 ### Added — real-time duplicate check on create (`409`) (ORG-T3)
 
 `POST /api/organizations` validated and inserted unconditionally,

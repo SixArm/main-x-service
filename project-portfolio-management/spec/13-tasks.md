@@ -662,15 +662,31 @@ described manual check confirms it. Split tasks too big for one PR
     dropped. **Acceptance:** re-importing the same export is idempotent
     (upsert by the deterministic id); an unmapped status lands the task
     in the initial state **and** names it in the report.
-  - [ ] **T-28o (S) — Go-live runbook.** Depends on root `tasks.md`
-    EV-4 for the family shape. Portfolio's own page leads with the
-    activation gate — `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`
-    defaults **off**, and a deployment reachable by untrusted callers
-    must set it and mount an ABAC policy before it is reachable — then
-    the PASETO keys URL, event transport, the optional scheduler ticker
-    and flow-gauge loop, and who owns each knob (the deploying
-    operator; there is no vendor-side configuration). **Acceptance:**
-    the runbook is verified against a fresh container, not read.
+  - [x] **T-28o (S) — Go-live runbook.** Landed together with root
+    `tasks.md` EV-4 (the family shape) — `agents/share/runbooks/first-deployment.md`.
+    Every activation-order step and every verification command in that
+    runbook was proved against a real container running this crate
+    (`podman build` from the repo root + a throwaway Postgres via
+    `scripts/test-db.sh`), not read from source:
+    `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` off ⇒ `GET /api/plans`
+    with no token returns `200`; the same flag `=1` ⇒ `401`; `/_health`
+    and `/metrics.prom` stay `200` regardless. **Acceptance met, and
+    then some**: the exercise found two real, previously-undiscovered
+    boot-time defects rather than confirming a clean bill of health —
+    `config/production.yaml`'s dead loco JWT `auth:` block crashed a
+    fresh container with no `JWT_SECRET` set (removed; this crate
+    issues PASETO, never JWT, and already builds `loco-rs` without the
+    `auth` feature), and this crate's own `Dockerfile` never `COPY`'d
+    `benches/`, which breaks manifest parsing for any
+    `[[bench]]`-declared crate (`service_bench`, this crate's own).
+    Both fixed in the same pass; the identical `auth:` block defect was
+    then rolled to organization, care-pathway, and case (verified
+    against a real container each), and case's Dockerfile turned out
+    to share the same missing-`benches/` defect, and care-pathway's was
+    missing the `entity-ref` sibling dependency its `continues_as`
+    links (2026-08-24) had added since that Dockerfile's last
+    verification (2026-08-03). See the runbook's own "What 'verified
+    against a fresh container' found" section.
   - [ ] **T-28p (S) — Operator onboarding guide.** A role-by-role
     "first hour" walkthrough (executive, PMO, resource manager) in the
     front-end docs, each step naming the route it lands on. It makes

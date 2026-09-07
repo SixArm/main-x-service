@@ -9,6 +9,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — two container-boot defects, found via the T-28o runbook exercise (2026-09-07)
+
+Writing [`agents/share/runbooks/first-deployment.md`](../../agents/share/runbooks/first-deployment.md)'s
+family go-live runbook (root `tasks.md` EV-4) meant actually building
+and booting this crate from a fresh container against a real Postgres,
+not reading the prior 2026-08-03 "verified end-to-end" claim as still
+current. Two real, previously-undiscovered defects turned up:
+
+1. `config/production.yaml`'s dead loco JWT `auth:` block —
+   `secret: {{ get_env(name="JWT_SECRET") }}` had no `default` — crashed
+   boot with no `JWT_SECRET` env var set, for a value this crate reads
+   *nowhere* (`loco-rs` is built without the `auth` Cargo feature; this
+   family issues PASETO v4.public, never JWT — `agents/share/jwt.md`).
+   loco's own `Config.auth` field is `Option<Auth>`, so the fix is
+   deleting the block entirely, not defaulting it. The identical defect
+   was found and fixed in organization's, care-pathway's, and case's
+   `production.yaml` too.
+2. `Dockerfile` never `COPY`'d `benches/` — this crate's `Cargo.toml`
+   declares `[[bench]] name = "service_bench"`, and Cargo refuses to
+   parse the manifest at all without that path present, even for a
+   `--bin`-only build. The identical gap existed in case-service's
+   Dockerfile and (independently) in organization-service's.
+
+Both fixed and re-verified: `podman build` from the repo root, `db
+migrate` against a real Postgres, `start`, then
+`PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` toggled off→on against the
+live container confirming `GET /api/plans` goes `200`→`401` while
+`/_health`/`/metrics.prom` stay `200` throughout — exactly what the new
+runbook documents. See root `tasks.md` EV-4 and this crate's own T-28o.
+
 ### Security — gate the oversight bulk-read endpoints as a privileged read (SEC-PPM-3)
 
 `evidence_pack`, `auditor_trail`, `board_pack`, and `board_investments`

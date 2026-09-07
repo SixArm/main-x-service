@@ -38,6 +38,13 @@ WORKDIR /app
 COPY integrity/integrity-mac-rust-crate integrity/integrity-mac-rust-crate
 COPY authentication/authentication-verifier-rust-crate authentication/authentication-verifier-rust-crate
 COPY care-pathway/care-pathway-matcher-rust-crate care-pathway/care-pathway-matcher-rust-crate
+# `entity-ref` (the continues_as journey-link write side, landed
+# 2026-08-24) is a sibling path dependency this Dockerfile never
+# picked up — this crate's container was last verified 2026-08-03,
+# before that dependency existed. Found building a fresh image for
+# the T-28o runbook verification: "failed to read
+# /app/link/entity-ref-rust-crate/Cargo.toml".
+COPY link/entity-ref-rust-crate link/entity-ref-rust-crate
 
 # This crate itself: manifests first (better layer caching), then the
 # nested `migration` sub-crate (loco's sea-orm-migration bridge — a
@@ -49,6 +56,13 @@ COPY care-pathway/care-pathway-service-with-loco/migration care-pathway/care-pat
 # via a relative include_str! from src/compliance/../../compliance/).
 COPY care-pathway/care-pathway-service-with-loco/compliance care-pathway/care-pathway-service-with-loco/compliance
 COPY care-pathway/care-pathway-service-with-loco/src care-pathway/care-pathway-service-with-loco/src
+# Cargo parses the whole manifest even for a --bin-only build, and
+# this crate's Cargo.toml declares `[[bench]] name = "service_bench"`
+# — the same trap place-service's own container fix documented for
+# its `bridge_bench`. Without this, cargo refuses to parse the
+# manifest at all ("can't find `service_bench` bench at
+# `benches/service_bench.rs`").
+COPY care-pathway/care-pathway-service-with-loco/benches care-pathway/care-pathway-service-with-loco/benches
 
 WORKDIR /app/care-pathway/care-pathway-service-with-loco
 

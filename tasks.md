@@ -7763,16 +7763,33 @@ green as it sits; these finish it)**
   redirects). Portfolio is the first adopter (T-28m); the other nine
   registries copy it when a consumer asks. Publishing the signature
   pre-image format is part of the contract, or nobody can verify it.
-- [ ] **EV-4 (S)** A family **go-live runbook**,
+- [x] **EV-4 (S)** A family **go-live runbook**,
   [`agents/share/runbooks/first-deployment.md`](agents/share/runbooks/first-deployment.md),
   beside the four existing runbooks: the ordered checklist for standing
-  up any registry, leading with the activation gate
-  (`<ENTITY>_REQUIRE_AUTH` defaults **off** — security.md §4), then the
-  ABAC policy mount, the PASETO keys URL, the event transport, the
-  integrity controls (which already have their own runbook), and a
-  verification step per item that proves it took effect rather than
-  reads that it was set. Portfolio's own page (T-28o) is the first
-  instance and should be written against a fresh container.
+  up any registry — ABAC policy mount → activation gate
+  (`<ENTITY>_REQUIRE_AUTH` defaults **off** — security.md §4) → PASETO
+  key source → event transport → integrity controls (which keep their
+  own runbook, referenced not duplicated) → any optional background
+  loop — with a verification command per step, not a "confirm the env
+  var is set" checkbox. Doubles as **T-28o**: every worked example and
+  every verification command was run against a real
+  `project-portfolio-management-service` container + real Postgres, not
+  written from reading the source. That verification found and fixed
+  two real, previously undiscovered defects (both landed in this same
+  change): (1) `config/production.yaml`'s dead loco JWT `auth:` block
+  (no `default` on its `JWT_SECRET` lookup) crashed boot with no env
+  var set, in **all four** loco-idiomatic registries — organization,
+  care-pathway, case, and portfolio, not portfolio alone — fixed by
+  removing the block entirely (loco's `Config.auth` is
+  `Option<Auth>`; this family issues PASETO, never JWT, and already
+  dropped loco's `auth` Cargo feature family-wide per security.md §7);
+  (2) two Dockerfiles had fallen out of sync with their own crate —
+  portfolio's and case's never `COPY`'d `benches/` (breaks
+  `[[bench]]`-declared manifest parsing), care-pathway's never
+  `COPY`'d the `entity-ref` sibling dependency its `continues_as`
+  journey links (2026-08-24) added after that Dockerfile's last
+  verification (2026-08-03). See the runbook's own "What 'verified
+  against a fresh container' found" section for the full account.
 - [ ] **EV-5 (S)** Record the "no black-box output" property as a
   family rule in
   [`agents/share/time-based-analysis.md`](agents/share/time-based-analysis.md)

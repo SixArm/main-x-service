@@ -50,6 +50,13 @@ COPY case/case-service-with-loco/migration case/case-service-with-loco/migration
 # via a relative include_str! from src/compliance/../../compliance/).
 COPY case/case-service-with-loco/compliance case/case-service-with-loco/compliance
 COPY case/case-service-with-loco/src case/case-service-with-loco/src
+# Cargo parses the whole manifest even for a --bin-only build, and
+# this crate's Cargo.toml declares `[[bench]] name = "service_bench"`
+# — the same trap place-service's own container fix documented for
+# its `bridge_bench`. Without this, cargo refuses to parse the
+# manifest at all ("can't find `service_bench` bench at
+# `benches/service_bench.rs`").
+COPY case/case-service-with-loco/benches case/case-service-with-loco/benches
 
 WORKDIR /app/case/case-service-with-loco
 
