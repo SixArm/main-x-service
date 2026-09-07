@@ -427,24 +427,33 @@ mod tests {
         );
     }
 
-    /// A `alias = { package = "real-name", … }` dependency (PRO-H9's
-    /// `otlp-test-tonic = { package = "tonic", … }`, renamed to avoid an
-    /// extern-prelude collision with the main `tonic = "0.12"` dependency)
-    /// is reported under its **resolved** crate name, not the manifest
-    /// alias — otherwise no single register row could satisfy both
+    /// A `alias = { package = "real-name", … }` dependency is reported
+    /// under its **resolved** crate name, not the manifest alias —
+    /// otherwise no single register row could satisfy both
     /// `unannotated_direct_dependencies` (which wants the alias annotated)
     /// and `stale_register_entries` (which wants the annotated name to
     /// exist in `Cargo.lock`, where only the resolved name appears).
+    ///
+    /// This crate no longer carries a live example: PRO-H9 originally
+    /// needed `otlp-test-tonic = { package = "tonic", version = "0.14" }`
+    /// to dodge an extern-prelude collision with the main `tonic = "0.12"`
+    /// dependency (`src/api/grpc/`), but the prost/tonic 0.14 migration
+    /// (tonic 0.14 split prost codegen into `tonic-prost`/
+    /// `tonic-prost-build`) unified both to the same 0.14 line, so the
+    /// rename is gone. The parser itself is still unit-tested directly
+    /// below (`renamed_package_extracts_the_package_value`); this test
+    /// now only pins that a plain `tonic` dependency resolves to itself
+    /// and that no manifest alias leaks through.
     #[test]
     fn renamed_dependencies_report_their_resolved_package_name() {
         let direct = declared_dependencies();
         assert!(
             direct.contains(&"tonic".to_string()),
-            "expected the resolved name `tonic`, not the manifest alias: {direct:?}"
+            "expected the resolved name `tonic`: {direct:?}"
         );
         assert!(
             !direct.contains(&"otlp-test-tonic".to_string()),
-            "the manifest alias must not itself appear: {direct:?}"
+            "no manifest alias should leak through: {direct:?}"
         );
     }
 

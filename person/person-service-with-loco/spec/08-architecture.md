@@ -48,9 +48,10 @@ is no hand-rolled `Config::from_env → AppState → serve` path.
 
 `proto/person.proto` (crate root, alongside `Cargo.toml`) and `build.rs`
 are the gRPC codegen inputs: `build.rs` compiles the `.proto` via
-`tonic-build` into `$OUT_DIR`, included by `tonic::include_proto!` in
-`src/api/grpc/mod.rs`'s `proto` submodule — the generated code is never
-checked in.
+`tonic-prost-build` (tonic 0.14 split prost codegen out of `tonic-build`
+into this crate; 2026-09-07) into `$OUT_DIR`, included by
+`tonic::include_proto!` in `src/api/grpc/mod.rs`'s `proto` submodule —
+the generated code is never checked in.
 
 Migrations run via the loco CLI (`cargo loco db migrate`) and are
 **auto-run in development** (`auto_migrate`, per

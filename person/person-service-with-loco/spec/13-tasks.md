@@ -1,5 +1,20 @@
 ## 13. Tasks
 
+- [x] **2026-09-07 — prost 0.13 → 0.14 / tonic 0.12 → 0.14 migration.**
+  A Dependabot `prost` bump exposed that tonic 0.12 cannot compile
+  against prost 0.14 generated code (60 `E0277`/well-formedness errors
+  in the gRPC stub). tonic 0.14 turned out to have split prost codegen
+  out of the core crate into `tonic-prost` (runtime codec,
+  `tonic_prost::ProstCodec`) + `tonic-prost-build` (the `build.rs`
+  codegen, replacing `tonic_build::compile_protos`), so the fix is the
+  whole gRPC stub moving to `tonic = "0.14"` + `tonic-prost = "0.14"` +
+  `tonic-prost-build` together, not merely bumping `prost`. This also
+  **removed** the PRO-H9 `otlp-test-tonic = { package = "tonic" }`
+  rename (T-6's note below): the in-process OTLP collector tests'
+  `tonic = "0.14"` dev-dependency no longer collides with a
+  `tonic = "0.12"` main dependency, since both are 0.14 now. New SOUP
+  register row for `tonic-prost`; the `tonic`/`prost` rows' notes
+  updated to match. See `CHANGELOG.md` for the full verification list.
 - [x] **2026-08-21 — TSV bulk format + fuzzed row decoders.**
   `BulkFormat::Tsv` is accepted for import and export alongside `jsonl`,
   `csv`, and (export-only) `parquet`. TSV shares the CSV codec rather
