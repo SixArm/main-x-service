@@ -117,14 +117,19 @@ needed the same two adaptations, confirmed rather than assumed:
   and an `axum_router` merged inside `create_router`) rather than
   booting its own router. `observability::trace_mw` is layered as the
   outermost middleware on both surfaces, exactly as person's is.
-- **A renamed `tonic` dev-dependency.** This crate already depends on
+- **A renamed `tonic` dev-dependency — gone as of the prost 0.14
+  migration (2026-09-07).** This crate originally depended on
   `tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
   in-process OTLP collector tests' `tonic = "0.14"` dev-dependency (used
-  to serve the fake collector) is declared as
-  `otlp-test-tonic = { package = "tonic", version = "0.14" }` — an
-  unrenamed second `tonic` dependency at a different version collides
-  in a test binary's extern prelude (`E0464: multiple candidates for
-  rlib dependency tonic`).
+  to serve the fake collector) needed the same
+  `otlp-test-tonic = { package = "tonic", version = "0.14" }` rename
+  person-service's did, to dodge an unrenamed second `tonic` dependency
+  colliding in a test binary's extern prelude (`E0464: multiple
+  candidates for rlib dependency tonic`). Bumping the main gRPC stub to
+  `tonic = "0.14"` (forced by Dependabot `prost`/`tonic-build` bumps —
+  tonic 0.12 cannot compile prost 0.14's generated code) put both
+  dependencies on the same line, so the rename is gone: one plain
+  `tonic = "0.14"` dev-dependency.
 
 **One difference from person's port**: this crate has **no
 `src/compliance/soup.rs`** — its `src/compliance/` module covers only
@@ -151,9 +156,10 @@ commented-out stub it used to be — following person-service's and
 worker-service's reference implementations for this repo's gRPC
 rollout. `proto/event.proto` (crate root) defines `EventService` —
 `CreateEvent` / `GetEvent` / `ListEvents` / `DeleteEvent` — compiled
-by `build.rs` (`tonic-build`, already correctly pinned to the same
-0.12 line as the main `tonic` dependency in this crate's manifest, as
-worker's was). `App::after_routes` spawns `crate::api::grpc::serve` as
+by `build.rs` (`tonic-prost-build`, pinned to the same 0.14 line as
+the main `tonic`/`tonic-prost` dependencies — tonic 0.14 split prost
+codegen out of `tonic-build` into this crate, 2026-09-07; see the OTLP
+export section above). `App::after_routes` spawns `crate::api::grpc::serve` as
 a background task on `GRPC_PORT` (config `server.grpc_port`, default
 `50051`) alongside the REST router, sharing one cloned `AppState` — a
 bind/serve failure is logged, not fatal, so REST still boots if the

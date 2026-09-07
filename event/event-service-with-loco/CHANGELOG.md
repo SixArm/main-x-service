@@ -8,6 +8,34 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — prost 0.14 / tonic 0.14 migration (tonic-prost split) (2026-09-07)
+
+Dependabot `prost` 0.13 → 0.14.4 and `tonic-build` 0.12.3 → 0.14.6
+bumps together broke `src/api/grpc/`: tonic 0.12's generated-code
+shape does not compile against prost 0.14. tonic 0.14 split its prost
+codec out of the core crate into `tonic-prost` (the runtime
+`ProstCodec`, which generated server/client code now names directly)
++ `tonic-prost-build` (the `build.rs` codegen crate, replacing
+`tonic-build`), so the real fix is moving the whole gRPC stub to
+`tonic = "0.14"` + `tonic-prost = "0.14"` + `tonic-prost-build`
+together, mirroring person-service's and worker-service's identical
+fix.
+
+This also **removes** the PRO-H9 `otlp-test-tonic = { package = "tonic",
+version = "0.14" }` rename: it existed only to dodge a version
+collision between the main gRPC stub's `tonic = "0.12"` and the OTLP
+collector tests' `tonic = "0.14"`; with both now on 0.14 there is
+nothing to rename, so `tests/otlp_collector/mod.rs` goes back to a
+plain `use tonic::{...}`. This crate carries no SOUP register (unlike
+person's/worker's), so no register update was needed. See
+`spec/13-tasks.md` for the task record and `AGENTS.md`'s OTLP/gRPC
+sections for the updated adaptation notes.
+
+Verified: `cargo build --all-targets`, `cargo test --lib` (167
+passed) + `cargo test --test otlp_export --test otlp_middleware` (4
+passed), `cargo clippy --all-targets -- -D warnings`, `cargo fmt
+--check`, `cargo bench --no-run`, `cargo deny check` all clean.
+
 ### Removed — the dead `organizations` table cluster and `Organization` model (T-14)
 
 `db::models::organizations` (plus its three child tables
