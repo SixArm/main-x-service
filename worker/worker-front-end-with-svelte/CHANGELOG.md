@@ -9,6 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — search response field-name mismatch (`items` vs `workers`) (T-32)
+
+`WorkerRepository.search()` read `data.items` from the service's
+search response, but the real service names the field `workers`
+(`worker-service-with-loco/src/api/rest/handlers.rs::SearchResponse`)
+— `items` never matched anything a real `worker-service` sends. Both
+the unit and e2e search stubs made the same wrong assumption, so
+`npm test` and its e2e suite stayed green while `/workers` would have
+crashed (`workers.map is not a function` on `undefined`) against a
+real backend. Found cross-checking every sibling front-end after
+thing-front-end's identical bug surfaced (its own spec §13 T-30).
+Fixed `data.items` → `data.workers` plus the two stubs
+(`review-queue`'s own `items` field, confirmed correct, left
+untouched). Verified against a real `worker-service` + Postgres.
+`npm run check` (0/0), `npm test` (84/84), `npm run test:e2e` (17/17).
+See spec §13 T-32.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (T-31)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

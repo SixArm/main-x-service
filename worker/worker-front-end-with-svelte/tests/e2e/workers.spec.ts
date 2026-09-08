@@ -109,7 +109,7 @@ test.describe("Worker front-end smoke", () => {
                 contentType: "application/json",
                 body: JSON.stringify({
                     success: true,
-                    data: { items: [worker], total: 250 },
+                    data: { workers: [worker], total: 250 },
                     error: null,
                 }),
             });
