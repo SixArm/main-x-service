@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — search response field-name mismatch (`items` vs `results`) (T-28)
+
+`PlaceRepository.search()` read `data.items` from the service's search
+response, but the real service names the field `results`
+(`place-service-with-loco/src/api/rest/handlers.rs::SearchResponse`) —
+`items` never matched anything a real `place-service` sends. Both
+stubs in this crate's own test suite made the same wrong assumption.
+Found live-verifying the identical bug found and fixed in
+thing-front-end (its own spec §13 T-30): the same `results` field
+name meant this crate's `search()` needed checking too, and did have
+the bug, with the same crash surface — `PlaceGrid`'s `places.map(...)`
+is unconditional, exactly like `ThingGrid`'s, so `places =
+res.items` (`undefined`, pre-fix) would have thrown on every real
+search the same way. Verified post-fix against a real `place-service`
++ Postgres: `/places` renders cleanly and a real search finds a
+seeded record. Fixed `data.items` → `data.results` plus the two
+stubs (`review-queue`'s own `items` field, confirmed correct, left
+untouched). `pnpm run check` (0/0), `pnpm test` (59/59), `pnpm
+test:e2e` (19/19), `pnpm run lint` clean. See spec §13 T-28.
+
 ### Added — `mask_sensitive` toggle on the list/search page (T-27)
 
 `GET /api/places/search` accepts `mask_sensitive` and

@@ -61,4 +61,10 @@ Per [`agents/share/authentication-sessions.md`](../../agents/share/authenticatio
 
 - FHIR Place UI. Out of scope for MVP.
 - Consent management UI. Out of scope for MVP (Place Service has `/consents` endpoints but no front-end yet).
-- GDPR-export download UI. Out of scope for MVP.
+
+GDPR-export download UI **was** out of scope — corrected 2026-09-08:
+it landed on the detail page (`repo.exportGdpr` / the "Export data
+(GDPR)" button in `src/routes/places/[id]/+page.svelte`) as part of
+the family-wide WEB-5 roll-out; this line was stale, not a live gap
+(same stale claim found and fixed the same way in thing-front-end's
+own `AGENTS.md`).

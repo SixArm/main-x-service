@@ -171,3 +171,28 @@
     clean; `npx playwright test tests/e2e/places.spec.ts` 14/14 (was
     13); `npm run lint` clean.
 
+
+- [x] **T-28 — Fix `search()`'s `items` vs `results` field-name
+  mismatch, found live-verifying the identical thing-front-end T-30
+  finding here.** *(2026-09-08.)* `PlaceRepository.search()` read
+  `data.items` from the service's enveloped search response, but the
+  real service's `SearchResponse` (`place-service-with-loco/src/api/rest/handlers.rs`)
+  names the field `results` — `items` was never a real field on any
+  response this service sends. Both stubs in this crate's own test
+  suite (`tests/unit/places.test.ts`, `tests/e2e/places.spec.ts`)
+  encoded the same wrong name, so neither caught it: `data.items` was
+  always `undefined` against a real backend. Found because
+  thing-front-end's identical bug (spec §13 T-30 there) prompted a
+  cross-check of every sibling front-end sharing the same `results`
+  field name (place-service also uses `results`, confirmed by
+  reading its Rust source) — verified live against a real
+  `place-service` + Postgres: `/places` no longer errors, and a real
+  search finds a seeded record. The review-queue endpoint genuinely
+  does use `items` (`ReviewQueueListResponse`, confirmed separately)
+  and was left untouched. Fixed `data.items` → `data.results` in
+  `src/lib/api/places.ts::search()` plus the two stubs.
+  **Acceptance met:** `pnpm run check` (0/0), `pnpm test` (59/59,
+  unchanged count — both touched stubs still assert the same
+  behaviour under the corrected field name), `pnpm test:e2e` (19/19,
+  unchanged), `pnpm run lint` clean, and a live walkthrough against a
+  real service confirmed the fix.

@@ -81,14 +81,16 @@ describe("PlaceRepository", () => {
         expect(result.total).toBe(1);
     });
 
-    // Pins: an enveloped `{ items, total }` search payload trusts the
-    // service-supplied total rather than the page length.
+    // Pins: an enveloped `{ results, total }` search payload trusts the
+    // service-supplied total rather than the page length. `results` is
+    // the real service's field name; this stub used to say `items`,
+    // matching the client's own bug rather than the service.
     it("trusts the service total on enveloped search responses", async () => {
         const client = new ApiClient({
             baseUrl: "http://test",
             fetch: mockFetch(async () =>
                 jsonResponse(
-                    { success: true, data: { items: [samplePlace], total: 42 }, error: null },
+                    { success: true, data: { results: [samplePlace], total: 42 }, error: null },
                 ),
             ),
         });

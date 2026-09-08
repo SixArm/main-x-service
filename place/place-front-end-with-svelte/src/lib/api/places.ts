@@ -77,7 +77,13 @@ export class PlaceRepository {
    * Full-text search for places.
    *
    * Normalizes the two response shapes the service may return — a bare
-   * `Place[]` or a `{ items, total }` envelope — into a single shape.
+   * `Place[]` or a `{ results, total }` envelope — into a single shape.
+   * `results` is the real service's field name
+   * (place-service-with-loco/src/api/rest/handlers.rs::SearchResponse);
+   * this used to say `items`, a name the service never actually sends,
+   * found only by running this client against a real place-service
+   * (mirrors the identical thing-front-end T-30 finding — see its
+   * spec §13).
    * @param opts - Query string plus pagination/matching flags.
    * @returns The matched places and a total count.
    */
@@ -85,7 +91,7 @@ export class PlaceRepository {
     opts: SearchOptions,
   ): Promise<{ items: Place[]; total: number }> {
     const data = await this.http.get<
-      Place[] | { items: Place[]; total?: number }
+      Place[] | { results: Place[]; total?: number }
     >("/api/places/search", {
       query: {
         q: opts.q,
@@ -99,7 +105,7 @@ export class PlaceRepository {
     // Bare array: total is just the array length.
     if (Array.isArray(data)) return { items: data, total: data.length };
     // Enveloped: trust `total`, falling back to the page length.
-    return { items: data.items, total: data.total ?? data.items.length };
+    return { items: data.results, total: data.total ?? data.results.length };
   }
 
   /**
