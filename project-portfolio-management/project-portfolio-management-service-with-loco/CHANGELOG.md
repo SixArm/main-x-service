@@ -9,6 +9,35 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — outbound signed webhooks as a relay sink (T-28m, root `tasks.md` EV-3)
+
+`src/webhooks.rs`: a `WebhookSink` beside the relay's existing
+`LoggingSink`/`FluvioSink`, delivering the outbox envelope to
+operator-configured URLs (`PROJECT_PORTFOLIO_MANAGEMENT_WEBHOOKS[_FILE]`,
+JSON, per-target event-kind filter). Every delivery is signed
+(`X-Mxi-Signature`, HMAC-SHA256 over the exact request body through the
+shared `integrity-mac` crate's new `Domain::Webhook`) and carries
+`X-Mxi-Event-Id` for receiver-side dedup. A `5xx`/transport failure is
+retried with exponential backoff; a `4xx` is not. Delivery is
+**best-effort and never blocks the durable bus**: `WebhookSink::send`
+spawns each delivery and returns immediately, and `src/relay.rs`'s new
+`CompositeSink` keeps the primary sink's failure as the only thing that
+leaves an outbox row unpublished. Every delivery's final outcome is
+recorded in a new `webhook_deliveries` table. No MAC key configured ⇒
+webhook delivery refuses to start (logged, the primary relay is
+unaffected) rather than send unsigned deliveries.
+
+Verified live against a real Postgres and three local mock HTTP
+receivers, not just unit-tested: the sent signature was independently
+reproduced from the root key and the published HKDF derivation; a
+`503,503,200` receiver was retried exactly 3 times and a `400` receiver
+exactly once, both confirmed in the delivery log; the no-key refusal
+left zero deliveries while the primary outbox row still published.
+`cargo test --lib` 382/382 (was 366); `cargo fmt`/`clippy --all-targets
+-D warnings` clean in this crate and its `migration/` subcrate;
+DB-gated suite 80/80. See this crate's `spec/13-tasks.md` T-28m and
+root `tasks.md` EV-3 for the full record.
+
 ### Fixed — two container-boot defects, found via the T-28o runbook exercise (2026-09-07)
 
 Writing [`agents/share/runbooks/first-deployment.md`](../../agents/share/runbooks/first-deployment.md)'s

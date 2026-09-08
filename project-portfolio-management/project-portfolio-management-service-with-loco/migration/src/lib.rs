@@ -37,6 +37,7 @@ mod m20260826_000002_ceremonies;
 mod m20260826_000003_value;
 mod m20260902_000001_automation_multi_action;
 mod m20260902_000002_automation_milestone_fires;
+mod m20260908_000001_webhook_deliveries;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -74,6 +75,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260826_000003_value::Migration),
             Box::new(m20260902_000001_automation_multi_action::Migration),
             Box::new(m20260902_000002_automation_milestone_fires::Migration),
+            Box::new(m20260908_000001_webhook_deliveries::Migration),
             // inject-above (do not remove this comment)
         ]
     }

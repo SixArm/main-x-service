@@ -108,6 +108,9 @@ pub mod value;
 pub mod version;
 /// Pure PPM visibility rules (schedule math, RAG, capacity, CSV).
 pub mod visibility;
+/// Outbound webhook delivery — the `WebhookSink` family contract
+/// (`agents/share/event-bus.md` §12, repo `tasks.md` EV-3).
+pub mod webhooks;
 pub mod workers;
 /// Custom workflows: configurable task and issue state vocabularies,
 /// each state declaring the category every derived view computes from.

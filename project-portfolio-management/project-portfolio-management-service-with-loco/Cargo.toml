@@ -89,6 +89,15 @@ opentelemetry-otlp = { version = "0.32", default-features = false, features = [
 opentelemetry-semantic-conventions = { version = "0.32" }
 tracing-opentelemetry = { version = "0.33" }
 
+# Outbound webhook delivery (agents/share/event-bus.md §12, repo
+# tasks.md EV-3, this crate's own spec/13-tasks.md T-28m) — src/webhooks.rs.
+# Previously a dev-only dependency for `tests/otlp_middleware.rs`; now a
+# real main dependency too, so both uses share one declaration.
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls",
+  "json",
+] }
+
 [features]
 # Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
 # feature to build or test; only `FluvioSink` — the real-broker producer
@@ -142,13 +151,9 @@ opentelemetry-proto = { version = "0.32", default-features = false, features = [
 # so there is no `E0464` extern-prelude collision to dodge.
 tonic = "0.14"
 tokio-stream = { version = "0.1", features = ["net"] }
-# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
-# HTTP request against a served router; this crate has no other `reqwest`
-# dependency.
-reqwest = { version = "0.13", default-features = false, features = [
-  "rustls",
-  "json",
-] }
+# `reqwest` moved to [dependencies] above (src/webhooks.rs); the
+# mounted-middleware test (`tests/otlp_middleware.rs`) reuses that same
+# declaration rather than needing its own.
 
 [[bench]]
 name = "service_bench"

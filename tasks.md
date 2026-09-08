@@ -7752,17 +7752,39 @@ green as it sits; these finish it)**
   under the vocabulary gate, and the same fail-closed posture on
   metadata/certificate fetch as SEC-V1), then the auth service task.
   Magic link stays the default; federation is opt-in per deployment.
-- [ ] **EV-3 (M)** Outbound **webhook sink** as a family contract in
-  [`agents/share/event-bus.md`](agents/share/event-bus.md): a
+- [x] **EV-3 (M)** Outbound **webhook sink** as a family contract in
+  [`agents/share/event-bus.md`](agents/share/event-bus.md) §12: a
   `WebhookSink` beside `LoggingSink` / `FluvioSink` in each crate's
   relay, delivering the outbox envelope to configured URLs, signed with
   an HMAC through the shared `integrity-mac` crate under its own HKDF
   domain (`webhook`) so a tag cannot transfer between purposes, with a
   per-URL event-kind filter, retry with backoff, a delivery log, and
   the SEC-V1 / SEC-B11 fetch posture (HTTPS outside loopback, no
-  redirects). Portfolio is the first adopter (T-28m); the other nine
-  registries copy it when a consumer asks. Publishing the signature
-  pre-image format is part of the contract, or nobody can verify it.
+  redirects). **Portfolio landed as the reference implementation
+  (2026-09-08, T-28m)**: `src/webhooks.rs` (config parsing, the
+  HTTPS/loopback URL gate, the retry-with-backoff delivery loop, the
+  `WebhookSink` `EventSink` impl) + `src/relay.rs`'s new `CompositeSink`
+  (primary sink's failure still gates the outbox row; every secondary
+  sink's failure is swallowed, never re-blocking it) + a new
+  `compliance::mac::Domain::Webhook` + the `webhook_deliveries` table
+  (migration + SeaORM model). Verified **live**, not just unit-tested:
+  a real boot against a real Postgres, with three mock HTTP receivers,
+  confirmed (1) the signature is independently reproducible — a
+  receiver-side HMAC recomputed from the root key, the published HKDF
+  `info` string, and the exact captured request body matched the sent
+  `X-Mxi-Signature` byte-for-byte; (2) a `503`-then-`200` receiver was
+  attempted 3 times and recorded `delivered`, a `400` receiver was
+  attempted once and recorded `failed` — the retry-policy acceptance
+  criterion, pinned by direct observation rather than inference; (3)
+  with `PROJECT_PORTFOLIO_MANAGEMENT_WEBHOOKS` set but no
+  `PORTFOLIO_INTEGRITY_MAC_KEY`, delivery refused to start (logged
+  `error`, zero deliveries, zero delivery-log rows) while the primary
+  outbox row still published normally. `cargo test --lib` 382/382 (was
+  366), `cargo fmt`/`clippy --all-targets -D warnings` clean in both
+  the crate and its `migration/` subcrate, DB-gated suite 80/80. The
+  other nine registries copy this shape when a consumer asks; the
+  signature pre-image format is published in event-bus.md §12, per
+  this task's own condition that nobody could verify it otherwise.
 - [x] **EV-4 (S)** A family **go-live runbook**,
   [`agents/share/runbooks/first-deployment.md`](agents/share/runbooks/first-deployment.md),
   beside the four existing runbooks: the ordered checklist for standing
