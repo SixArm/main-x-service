@@ -68,7 +68,7 @@ src/
 
 tests/
 ├── unit/                         vitest: client / cases / case-form / i18n / layout / link-validation / merge-validation (70 tests, 7 files)
-└── e2e/smoke.spec.ts             Playwright: 8 tests over the routes above + check-duplicates self-exclusion
+└── e2e/smoke.spec.ts             Playwright: 10 tests over the routes above + check-duplicates self-exclusion + search + recent activity
 ```
 
 ## API consumption
