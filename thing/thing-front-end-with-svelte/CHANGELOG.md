@@ -9,6 +9,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — the Things list page crashed on every real search (T-30)
+
+`ThingRepository.search()` read `data.items` from the service's search
+response, but the real service names the field `results`
+(`src/api/rest/handlers.rs::SearchResponse`) — `items` never matched
+anything a real `thing-service` sends. Every stub in this crate's own
+test suite made the same wrong assumption, so `pnpm test` and `pnpm
+test:e2e` stayed green while `/things` hard-crashed
+(`things.map is not a function` on `undefined`) against a real
+backend, always. Found running this crate against a real service +
+Postgres and clicking through every route (root `tasks.md` entity-level
+T-5's live-walkthrough acceptance criterion) — the first time this
+client had been exercised against anything but its own mocks. Fixed
+`data.items` → `data.results` plus the two stubs that encoded the old
+name. `pnpm run check` (0/0), `pnpm test` (94/94), `pnpm test:e2e`
+(20/20). Also corrected: `AGENTS.md`'s "What does NOT live here" list
+still said GDPR-export download UI was out of scope — it landed
+already (WEB-5). See spec §13 T-30. A separate, still-open backend gap
+the same walkthrough found — `q="*"` never lists anything against the
+real service — is tracked in `thing-service-with-loco`'s own spec §13
+T-15, not here.
+
 ### Fixed — unreachable authentication service crashed /verify with a raw 500, and new E2E coverage for /signin and /verify (T-23)
 
 `tests/e2e/things.spec.ts` had no Playwright coverage for `/signin` or

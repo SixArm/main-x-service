@@ -520,3 +520,43 @@ clearly described manual check confirms the acceptance criterion.
     and a single-digit-transposed invalid one for each of
     ISBN-10/ISBN-13/ISSN/GTIN-8/GTIN-13.
 
+- [ ] **T-15 — No way to enumerate all things.** *(Found 2026-09-08, a
+  live operator walkthrough of thing-front-end-with-svelte against a
+  real running instance of this service — repo `tasks.md` root
+  entity-level T-5.)* This crate has no plain `GET /api/things` list
+  endpoint (confirmed: it answers `405`) — `/api/things/search` is the
+  only enumeration surface. The front-end's list page defaults to
+  `q="*"` (with `fuzzy=true`) on load, on the stated assumption that a
+  bare `*` lists everything. It does not: `SearchEngine::fuzzy_search`
+  tokenises the query first (`s.split(|c| !c.is_alphanumeric())`), so
+  `tokenise("*")` is `[]` and the function returns `Ok(Vec::new())`
+  immediately — confirmed empirically (`curl
+  '/api/things/search?q=*'` → `{"results":[],"total":0}` against a
+  seeded record) and by reading `src/search/mod.rs`. The **non-fuzzy**
+  path (`SearchEngine::search`, Tantivy's real `QueryParser`) was
+  checked too, since person-service's own docs say `q=*` parses to
+  `AllQuery` "in isolation" for its grammar — not so here: `curl
+  '/api/things/search?q=*&fuzzy=false'` and even a bare empty `q=`
+  **both** return zero hits against the same seeded record, while a
+  real substring query (`q=widget`) finds it immediately. So today,
+  with any real deployment of this service, **the Things list page
+  shows nothing on load, always**, regardless of how many records
+  exist — an operator has to already know a search term. Unlike
+  person-service (which has a real `GET /api/persons` list endpoint
+  documented for exactly this reason — its own spec's `restful.md`
+  notes call `/search` "not a list-all mechanism"), this crate has no
+  such fallback at all.
+  **Not fixed in this pass** — the two candidate shapes (teach
+  `SearchEngine::search`/`fuzzy_search` to special-case an
+  empty/wildcard query as "return the first N documents," used by
+  `check-duplicates`'s blocking path too so any change there needs its
+  own re-verification; or add a real `GET /api/things` list endpoint
+  mirroring person's) are a real design choice, not a one-line
+  workaround, and deserve their own three-part PR rather than being
+  folded into an unrelated front-end fix.
+  **Acceptance:** `GET /api/things` (or the chosen equivalent) returns
+  every active thing with no query term required, honouring the family
+  pagination convention (`limit`/`offset` + `X-Total-Count`/`X-Limit`/
+  `X-Offset` headers, `agents/share/restful.md`); a request-level test
+  seeds N things and asserts all N come back with no `q`.
+

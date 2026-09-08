@@ -103,7 +103,7 @@ export class ThingRepository {
     offset: number;
   }> {
     const { data, response } = await this.http.getWithHeaders<
-      Thing[] | { items: Thing[]; total?: number }
+      Thing[] | { results: Thing[]; total?: number }
     >("/api/things/search", {
       query: {
         q: opts.q,
@@ -114,7 +114,14 @@ export class ThingRepository {
         mask_sensitive: opts.mask_sensitive,
       },
     });
-    const items = Array.isArray(data) ? data : data.items;
+    // The service's `SearchResponse` names the array field `results`
+    // (src/api/rest/handlers.rs), not `items` — confirmed against the
+    // Rust source after a live walkthrough against a real thing-service
+    // found this client crashing `/things` on every real search (empty
+    // or not): `data.items` was always `undefined`, so `.map` on it in
+    // `ThingGrid` threw. Every stub in this crate's own tests encoded
+    // the same wrong field name, so nothing here ever caught it.
+    const items = Array.isArray(data) ? data : data.results;
     const bodyTotal = Array.isArray(data) ? undefined : data.total;
     const header = (name: string): number | undefined => {
       const raw = response.headers.get(name);

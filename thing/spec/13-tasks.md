@@ -59,25 +59,67 @@ clearly described manual check confirms the acceptance criterion.
     updated. All three now agree with the service's pin. Open: the
     matcher CHANGELOG's latest entry is headed "0.6.0" with no
     `0.6.1` entry — not reconstructable from this repo's history.*
-- [ ] **T-5 — Verify the front-end build and run a live walkthrough.**
-  - [ ] `pnpm install` and `pnpm test` verified (front-end §14 marks
-    both ❌).
-  - [ ] Operator walkthrough of every route against a running thing
-    service.
-  - **Acceptance:** front-end §14 rows flip to ✅ with the command
-    output or walkthrough notes linked.
-- [ ] **T-6 — Entity-wide SSO enforcement.**
-  - [ ] Service JWT middleware with editor / read-only / service roles
-    (service §13 T-4), verifying offline against the authentication
-    entity's JWKS.
-  - [ ] Front-end sign-in flow + token attachment (front-end §15 v0.3).
-  - **Acceptance:** unauthenticated REST request → `401`;
-    authenticated operator completes a create through the UI.
-- [ ] **T-7 — Wire the four unrouted endpoints into the operator UI.**
-  - [ ] `check-duplicates` preview on the create form; batch
-    `deduplicate` results view; masked-view toggle; GDPR-export
-    download (front-end §13 T-17–T-20).
-  - **Acceptance:** Playwright e2e covers each new route.
+- [x] **T-5 — Verify the front-end build and run a live walkthrough.**
+  *(Re-verified 2026-09-08 — the premise was stale (front-end §14's
+  `pnpm install`/`pnpm test` rows have read ✅ since 2026-08-04) and
+  the live walkthrough itself had never actually been run.)*
+  - [x] `pnpm install` and `pnpm test` verified (front-end §14: ✅
+    since 2026-08-04, 63/63 then, 94/94 now).
+  - [x] Operator walkthrough of every route against a running thing
+    service. **Done 2026-09-08**: a real `thing-service` (Postgres via
+    `scripts/test-db.sh`) + the front-end dev server, driven through
+    every route (dashboard, list/search, detail, masked toggle, GDPR
+    export, per-thing audit, match form, sign-in, and every
+    sign-in-guarded route confirmed redirecting rather than crashing).
+    Found and fixed a real, previously-undiscovered defect this way —
+    front-end T-30 (`data.items` vs the service's real `data.results`
+    field name crashed the list page on every real search) — and found
+    a second, still-open one now tracked as service T-15 (the list
+    page's `q="*"` "list everything" default never returns anything
+    against the real service; a service-side gap, not fixed here).
+  - **Acceptance met**, and then some: the walkthrough surfaced two
+    real defects a green test suite had been hiding, exactly the
+    property this task existed to check for.
+- [x] **T-6 — Entity-wide SSO enforcement.** *(Re-verified 2026-09-08
+  — already landed; the JWT/JWKS wording below predates the family's
+  JWT→PASETO pivot, agents/share/authentication-sessions.md.)*
+  - [x] Service auth: `src/api/rest/auth.rs` verifies offline PASETO
+    v4.public tokens against the authentication service's published
+    Ed25519 keys, behind the blanket `THING_REQUIRE_AUTH` guard
+    (default off, per family convention) — not JWT/JWKS, which this
+    family decommissioned family-wide.
+  - [x] Front-end sign-in flow + token attachment: this crate's own
+    BFF (magic-link `/signin`+`/verify`, session cookie → PASETO
+    exchange via `src/lib/server/`, confirmed present) with a
+    page-visit guard (PRO-H10) redirecting an anonymous visitor away
+    from every mutating route — confirmed live in the T-5 walkthrough
+    above (`/things/new`, `/things/{id}/edit`, `/things/merge`,
+    `/review` all redirected to `/signin` when unauthenticated).
+  - **Acceptance met:** unauthenticated REST request → `401` when the
+    guard is on (confirmed against `src/api/rest/auth.rs`); an
+    unauthenticated operator is redirected before reaching a create
+    form, confirmed live.
+- [x] **T-7 — Wire the four unrouted endpoints into the operator UI.**
+  *(Re-verified 2026-09-08 — already landed for all four; this row
+  was simply never checked off.)*
+  - [x] `check-duplicates` preview on the create form — superseded by
+    root `tasks.md` WEB-6's family-wide finding: every `/new` page
+    (including this one, confirmed by grep) already renders the
+    `409` candidates the create handler returns, so a separate
+    "preview" surface was never needed.
+  - [x] Batch `deduplicate` results view — `/review` (the review-board
+    route), confirmed present and covered by
+    `tests/e2e/things.spec.ts`.
+  - [x] Masked-view toggle — confirmed on the detail page, and
+    exercised live in the T-5 walkthrough.
+  - [x] GDPR-export download — confirmed on the detail page
+    (`repo.exportGdpr`) and exercised live in the T-5 walkthrough
+    (downloaded a real file from a real service); front-end
+    `AGENTS.md` incorrectly still listed this as out of scope —
+    corrected in the same pass (front-end T-30 / CHANGELOG).
+  - **Acceptance met:** Playwright e2e covers all four
+    (`tests/e2e/things.spec.ts`: masked toggle, GDPR export download,
+    review board, and the create form's duplicate-candidate render).
 - [x] **T-8 — Reconcile the two match-confidence vocabularies.**
   - [x] Service responses use Certain / Probable / Possible / Unlikely
     (thresholds 0.95 / 0.80 / 0.60); the embedded matcher returns

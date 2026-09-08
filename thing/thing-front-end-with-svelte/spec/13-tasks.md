@@ -217,3 +217,37 @@
     test` (13 passed, unaffected), `npm run check` (0 errors), `npm
     run lint` clean (prettier auto-fixed two files' formatting).
 
+
+- [x] **T-30 — Fix `search()`'s `items` vs `results` field-name
+  mismatch, found by a live operator walkthrough.** *(2026-09-08,
+  closes root `tasks.md` entity-level T-5's live-walkthrough
+  acceptance criterion.)* `ThingRepository.search()` read
+  `data.items` from the service's enveloped search response, but the
+  real service's `SearchResponse` (`src/api/rest/handlers.rs`) names
+  the field `results` — `items` was never a real field on any
+  response this service sends. Every stub in this crate's own test
+  suite (`tests/unit/things.test.ts`, `tests/e2e/things.spec.ts`)
+  encoded the same wrong name, so the mismatch was invisible to both
+  suites: `data.items` was always `undefined` against a real backend,
+  and `ThingGrid`'s `things.map(...)` threw on it — the `/things`
+  list page hard-crashed on every real search, empty or not. Found
+  running this crate's dev server against a real `thing-service` +
+  Postgres (not stubbed) and clicking through every route, per root
+  `tasks.md` entity-level T-5's "operator walkthrough" acceptance
+  criterion — the first time this crate's client code had been
+  exercised against the real service rather than its own mocks.
+  Fixed: `data.items` → `data.results` in
+  `src/lib/api/things.ts::search()`, and the two unit-test stubs that
+  had encoded the wrong name. No other endpoint in this client has
+  the same drift (checked each response shape against the
+  corresponding Rust struct, not assumed). **Acceptance met:**
+  `pnpm run check` (0/0), `pnpm test` (94/94, was 92 — no tests
+  removed, the two touched stubs still assert the same behaviour
+  under the corrected field name), `pnpm test:e2e` (20/20, unchanged
+  — the stubs already used `items` consistently with the pre-fix bug,
+  so no e2e assertion needed to change), and a live walkthrough
+  confirmed the fix against a real service (search-by-term now works
+  end to end; the *separate*, still-open finding that the "list
+  everything" `q="*"` default itself never returns results against
+  this backend — a service-side gap, not a client one — is tracked as
+  the sibling crate's own spec §13 T-15, not fixed here).
