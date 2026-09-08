@@ -504,7 +504,7 @@ described manual check confirms it. Split tasks too big for one PR
   | Resource management | `allocations` (person ref + role + percent + window); `GET /capacity` with `over_allocated`; `GET /capacity/utilization` (T-24); `GET /assignees/workload`; reassignment by largest slack | **Skill-based** allocation — an allocation carries a `role` string, no skills; no scale evidence for the "50+ concurrent projects" question | T-28c, T-28d |
   | Reporting and analytics | Persona surfaces already exist — `at-a-glance`, `executive/*`, `board/*`, `financials/*`, `technology/*`, `auditor/*`, `compliance/*`, `regulator/*`, `risk/heatmap`; saved `report_definitions` (filter + field projection) run on demand; Monte-Carlo delivery forecast | Nothing ties a persona surface to the **caller** — every user gets the whole nav; `report_definitions` has no `group_by` (PPM-9 promised one) and no scheduled run (PPM-9 says synchronous only, awaiting T-8) | T-28e, T-28f |
   | Financial management | `budget_lines` per plan; variance per currency (`insights::variance_by_currency`, `GET /financials/variance`); exposure; TPC with cost-estimate-to-complete; value realization with ROI (T-22) | **Cost forecasting** — no phased baseline, so SPI/CPI are permanently `no_baseline` (T-23) and there is no EAC/ETC or portfolio-level overrun forecast; actuals arrive by hand until T-8 lands | **T-28b** — the single highest-leverage gap in the table |
-  | Integrations | Open API: hand-written OpenAPI 3 + Swagger UI, pinned two-way against mounted routes; inbound `POST /devops/events`; the durable outbox → relay (event bus); deterministic external ids for Jira / Asana / Trello / MS Project / GitHub / Linear | **Outbound** — the `notify` action is in-app only (no email, push, or webhook transport); no PM-tool import path (T-8 open, and no source-tool codec); two-way sync is roadmap only | T-28m (webhook sink, family-shaped), T-28n (import codec). **Refused:** a native-connector catalogue / no-code integration builder — the open API, bulk, and signed webhooks *are* the integration surface of a service like this one. |
+  | Integrations | Open API: hand-written OpenAPI 3 + Swagger UI, pinned two-way against mounted routes; inbound `POST /devops/events`; the durable outbox → relay (event bus); deterministic external ids for Jira / Asana / Trello / MS Project / GitHub / Linear; **outbound signed webhooks** (`src/webhooks.rs`, T-28m, landed 2026-09-08 — family-shaped, root `tasks.md` EV-3 carries the contract) | The in-app `notify` action is still not email/push; no PM-tool import path (T-8 open, and no source-tool codec); two-way sync is roadmap only | T-28n (import codec). **Refused:** a native-connector catalogue / no-code integration builder — the open API, bulk, and signed webhooks *are* the integration surface of a service like this one. |
   | Task management | Gantt (`/gantt`, `/plans/[pid]/schedule`); `plan_dependencies` with cycle refusal, critical path, and slipping-dependency violations (`src/visibility.rs`); the append-only transition log; multi-plan reviews + rollup | **Automatic reprioritisation when a deadline shifts** — exactly the field-change trigger T-21 deferred for want of a declared field set. This checklist supplies it: the plan timeframe and a milestone's due date are the two dates a shift is asked about | T-28g |
   | AI capabilities | Every derived figure here is deterministic and discloses its inputs: Smart Score components, forecast by seed, constraint ranking, aging WIP, the controls verdicts. The buyer's question — "which outputs are explainable and auditable vs black-box" — is answered *all of them, none* | No portfolio-**optimisation** recommendation (the evaluator scores a scenario a planner wrote; it proposes none); no **demand** forecast (the intake pipeline has arrival history nobody forecasts from); no assistant | T-28h, T-28i, T-28j. **Refused:** an LLM assistant *inside the service* — it would be the one output that could not disclose its inputs, in a service whose every other number does. If one is ever wanted it sits at the front-end BFF over the open API and cites the endpoint it read. |
   | Usability | Hamburger top-nav, 13 locales with parity tests, SVAR grid / Kanban / Gantt, Lily headless; `viewport` meta present | One `@media` rule in the whole app and two data-grid dependencies that are desktop-shaped — mobile is **unverified**, not absent; no per-user saved views (report definitions are shared); no role-specific UX (see reporting); no onboarding path beyond the README quick start | T-28k, T-28l, T-28p, and T-28f |
@@ -640,7 +640,7 @@ described manual check confirms it. Split tasks too big for one PR
     identity), served through the BFF so the browser holds nothing.
     **Acceptance:** two users on one route see their own views; a view
     is scoped to its route and never applied elsewhere.
-  - [ ] **T-28m (M) — Outbound webhooks as a relay sink.** Not a new
+  - [x] **T-28m (M) — Outbound webhooks as a relay sink.** Not a new
     `notify` transport: a `WebhookSink` beside `LoggingSink` /
     `FluvioSink` in `src/relay.rs`, delivering the outbox envelope to
     configured URLs, **signed** with an HMAC over the body through the
@@ -653,6 +653,64 @@ described manual check confirms it. Split tasks too big for one PR
     signature with the published pre-image format; a 5xx is retried
     and a 4xx is not; a URL configured without the feature refuses to
     start rather than silently logging.
+    **Landed 2026-09-08.** `src/webhooks.rs` — `WebhookTarget` (url +
+    optional `kinds` filter) parsed from
+    `PROJECT_PORTFOLIO_MANAGEMENT_WEBHOOKS[_FILE]` (inline JSON or a
+    file path, mirroring the ABAC policy loader's precedence and
+    fail-open-on-malformed-config posture); `url_is_permitted` (HTTPS
+    to any host, HTTP only to loopback — the SEC-V1/SEC-B11 pattern
+    copied from `authentication-verifier`'s key-set fetch and
+    link-graph's presence probe); a non-redirecting shared `reqwest`
+    client; `deliver_with_retry` (bounded exponential backoff, `5xx`/
+    transport errors retried, `4xx` not); `WebhookSink: EventSink`,
+    whose `send` never blocks or errors — it spawns one delivery task
+    per matching target and returns immediately, so a slow or
+    unreachable receiver can never stall the durable-bus row it fanned
+    out from. `src/relay.rs` gained `CompositeSink` (primary sink's
+    failure still gates `drain_once`'s retry; every secondary sink's
+    failure is swallowed) and `spawn` now wraps the primary sink in one
+    when webhook targets are configured — refusing to start webhook
+    delivery specifically (not the relay) when no
+    `PORTFOLIO_INTEGRITY_MAC_KEY[_FILE]` is active. New
+    `compliance::mac::Domain::Webhook` (a receiver is handed only this
+    domain's derived subkey, never the root key — cross-domain
+    non-transfer pinned by a dedicated unit test). New
+    `webhook_deliveries` table (migration
+    `m20260908_000001_webhook_deliveries` + a SeaORM model with an
+    insert-only `record` + a `recent` read) — one row per target's
+    *final* outcome for one event, not one row per HTTP attempt.
+
+    **Verified live**, not just unit-tested: booted a real release
+    binary against a real Postgres with `PROJECT_PORTFOLIO_MANAGEMENT_
+    EVENT_TRANSPORT=outbox` + `_EVENT_RELAY=1` and three local mock
+    HTTP receivers. (1) **Signature**: created a plan, captured the
+    exact POST body and `X-Mxi-Signature`, then independently
+    recomputed HMAC-SHA256 in a separate Python script — HKDF-SHA256
+    over the configured root key with `info = "mxi/<service>/webhook/
+    d1"`, then HMAC-SHA256(subkey, raw body) — and it matched the sent
+    signature byte-for-byte; this is what "the receiver verifies the
+    signature with the published pre-image format" means in practice,
+    proven rather than asserted. (2) **Retry policy**: one target
+    returning `503, 503, 200` was attempted exactly 3 times and its
+    delivery-log row read `attempts=3, status=delivered`; a second
+    target returning `400` was attempted exactly once and read
+    `attempts=1, status=failed, status_code=400` — captured from both
+    the receivers' own request logs and the `webhook_deliveries` table,
+    not inferred from the retry-loop's source. (3) **No-key refusal**:
+    restarted with `PROJECT_PORTFOLIO_MANAGEMENT_WEBHOOKS` set but
+    `PORTFOLIO_INTEGRITY_MAC_KEY` unset — the log carried the refusal
+    line naming both env vars, a subsequent plan create produced zero
+    webhook requests and zero new `webhook_deliveries` rows, and the
+    corresponding `event_outbox` row was still `published_at`-stamped
+    (the primary relay sink is unaffected by the refusal). `cargo test
+    --lib` 382/382 (was 366; +16 new: 3 `mac.rs`, 1
+    `webhook_deliveries.rs`, 12 `webhooks.rs`); `cargo fmt --check` /
+    `cargo clippy --all-targets -- -D warnings` clean in this crate
+    **and** its `migration/` subcrate (which has its own CI job); the
+    DB-gated suite (`ci/db-suites.txt`) 80/80, including the migration
+    applying cleanly against the shared test database. `reqwest`
+    (already a dev-dependency for `tests/otlp_middleware.rs`) moved to
+    `[dependencies]` rather than duplicated.
   - [ ] **T-28n (M) — Source-tool import codec.** Depends on **T-8**.
     A Jira project export (and Asana's, the two most asked about)
     mapped to plans + tasks: the project key → `JiraProjectKey` so the

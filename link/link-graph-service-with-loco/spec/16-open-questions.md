@@ -48,7 +48,8 @@ opens a §13 task.
 
 - **OQ-8 — Full snapshot vs reference in consumed `data`.** The bus
   envelope's `data` may be a full snapshot or a reference for large
-  records (event-bus.md §11). This service needs only the `EntityRef`s
+  records (event-bus.md §13, renumbered from §11 when §12's outbound
+  webhook sink section was added). This service needs only the `EntityRef`s
   and edge fields — confirm it can ignore large `data` bodies and
   subscribe to a leaner projection if one is offered. *(Lean: consume
   only the fields it needs; tolerate either shape.)*

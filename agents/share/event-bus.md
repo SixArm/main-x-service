@@ -318,7 +318,97 @@ own offset.
   topic → consumer round-trip; partition-key ordering per `pid`;
   at-least-once redelivery dedup on `event_id`.
 
-## 11. Open questions
+## 12. Outbound webhook sink (`WebhookSink`)
+
+A **best-effort notification** fan-out to operator-configured third-party
+URLs, alongside (not instead of) the durable-bus sinks above (repo
+`tasks.md` EV-3). [project-portfolio-management-service](../../project-portfolio-management/project-portfolio-management-service-with-loco)
+is the first adopter (`src/webhooks.rs`, its own `spec/13-tasks.md`
+T-28m); other registries copy this shape when a consumer asks for it —
+the contract below is family-shaped, not portfolio-specific.
+
+**Why "beside", not "instead of".** The relay's primary sink
+(`LoggingSink`/`FluvioSink`) is the at-least-once path §5/§6 already
+depend on: a send failure there leaves the outbox row unpublished, and
+`drain_once` retries it — correct, because the durable bus is meant to
+never silently drop an event. Webhook delivery must **never** gate that:
+an operator's slow or unreachable receiver would otherwise stall the
+entire outbox forever over a target the family has no control over. So
+`WebhookSink::send` never returns an error — each matching target gets
+its own bounded retry-with-backoff on a spawned task, and a target still
+failing once that is exhausted is recorded in a delivery log and moved
+past, never re-blocking the row it fanned out from. The reference
+composes it via a `CompositeSink`: the **primary** sink's result still
+governs `drain_once`'s retry exactly as a lone sink would; every
+**secondary** sink (webhook or otherwise) is delivered to only after the
+primary succeeds, and its own failure is swallowed (logged, never
+propagated).
+
+**Configuration** — `<ENTITY>_WEBHOOKS` (inline JSON) or
+`<ENTITY>_WEBHOOKS_FILE` (a path; takes precedence when both are set,
+mirroring the ABAC policy loader's precedence, §5 of
+[authorization-attributes.md](authorization-attributes.md)) — a JSON
+array of targets:
+
+```json
+[
+  { "url": "https://ops.example.com/hook" },
+  { "url": "https://audit.example.com/hook", "kinds": ["created", "merged"] }
+]
+```
+
+`kinds` omitted or `null` means every kind (`created`/`updated`/
+`deleted`/`merged`). Unset ⇒ no targets (the feature is off); malformed
+JSON, or a file that fails to read, is logged and treated as no targets
+— an optional feature's config typo must not block boot. Every target
+must additionally be `https://`, or `http://` to a **loopback** host
+(`127.0.0.1`/`::1`/`localhost`, for local dev) — the same SEC-V1/SEC-B11
+posture the PASETO key fetch and the link-graph presence probe already
+use; a target failing this check is dropped at load time with a
+warning, not silently sent to in plaintext.
+
+**Signing.** Every delivery carries `X-Mxi-Event-Id: <uuid>` (the
+envelope's dedup key, per §6) and `X-Mxi-Signature: <tag>`, where `<tag>`
+is the shared `integrity-mac` crate's `KeySet::tag` under its own
+domain (`"webhook"`) — i.e. `"<scheme>.<key id>:<hex>"`, HMAC-SHA256
+over the **exact request body bytes** (the compact JSON serialization of
+the outbox envelope), signed before sending and never re-serialized
+afterwards, so signer and sender always agree on what was signed. **This
+is the published pre-image format** EV-3 requires for a receiver to
+verify at all: HMAC-SHA256(subkey, raw POST body) compared against the
+hex after the scheme/key-id prefix. A receiver never holds the service's
+**root** MAC key — only the `webhook`-domain subkey, which an operator
+derives offline (HKDF-SHA256 over the root key, `info` string
+`mxi/<service>/webhook/<scheme>` — see `integrity-mac`'s module docs,
+"Domain separation") and hands to the receiver as *their* configured
+verification secret; deriving it under its own domain means handing it
+out cannot be turned into a forged tag in any other domain (audit rows,
+record digests, …). **No MAC key configured** ⇒ the relay refuses to
+start webhook delivery at all (logged `error`) when targets are
+configured, rather than send unsigned deliveries — the primary relay
+sink is unaffected. Verified live in the reference implementation
+(2026-09-08): a receiver-side HMAC recomputed independently from the
+root key, the published `info` string, and the exact captured request
+body matched the sent `X-Mxi-Signature` byte-for-byte.
+
+**Retry policy.** A `5xx` response, or a transport-level failure (no
+response at all — connection refused, timeout, TLS failure), is
+**retried** with exponential backoff: the receiver or its infrastructure
+is presumed to be having a transient problem. A `4xx` response is **not
+retried**: it is the receiver rejecting this exact request, and
+resending it unchanged would just repeat the rejection. Verified live in
+the reference implementation: a receiver returning `503` twice then
+`200` was attempted three times and recorded `delivered`; a receiver
+returning `400` was attempted once and recorded `failed` — pinning this
+section's own acceptance criterion.
+
+**Delivery log.** One row per target's final outcome for one event
+(not one row per HTTP attempt) — `event_id`, `entity`, `kind`, `url`,
+`attempts`, `status` (`delivered`/`failed`), `status_code`, `error`. It
+is the operator-facing record of what was (or was not) delivered; it
+does not gate outbox progression.
+
+## 13. Open questions
 
 - Shared `mxi-events` crate now, or copy-per-crate? The stated trigger
   ("extract when the first real consumer ships") fired 2026-08-03 when

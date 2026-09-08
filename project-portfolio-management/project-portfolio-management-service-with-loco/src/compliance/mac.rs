@@ -73,6 +73,17 @@ pub enum Domain {
     AuditRow,
     /// Row-level record content integrity.
     Record,
+    /// Outbound webhook delivery signing (`agents/share/event-bus.md`
+    /// §12, repo `tasks.md` EV-3, this crate's own T-28m).
+    ///
+    /// A receiver never holds this service's **root** key — it holds
+    /// only this domain's derived subkey, computed offline from the
+    /// root key plus the published HKDF `info` string
+    /// (`KeyConfig::info("webhook")`). Deriving it under its own domain
+    /// means handing it to an external receiver cannot be turned into a
+    /// forged `audit-row` or `record` tag — see the shared crate's
+    /// module docs ("Domain separation").
+    Webhook,
 }
 
 impl Domain {
@@ -82,12 +93,13 @@ impl Domain {
         match self {
             Self::AuditRow => "audit-row",
             Self::Record => "record",
+            Self::Webhook => "webhook",
         }
     }
 
     /// Every domain, so the key set derives them all at load time rather
     /// than on first use.
-    const ALL: [&'static str; 2] = ["audit-row", "record"];
+    const ALL: [&'static str; 3] = ["audit-row", "record", "webhook"];
 }
 
 /// The process key set, loaded once.
@@ -175,7 +187,7 @@ mod tests {
     /// separation — two domains sharing one would silently share a key.
     #[test]
     fn every_domain_has_a_distinct_label() {
-        let labels: Vec<&str> = [Domain::AuditRow, Domain::Record]
+        let labels: Vec<&str> = [Domain::AuditRow, Domain::Record, Domain::Webhook]
             .iter()
             .map(|d| d.as_str())
             .collect();
@@ -191,12 +203,34 @@ mod tests {
     /// invisible without this.
     #[test]
     fn all_lists_every_domain() {
-        for domain in [Domain::AuditRow, Domain::Record] {
+        for domain in [Domain::AuditRow, Domain::Record, Domain::Webhook] {
             assert!(
                 Domain::ALL.contains(&domain.as_str()),
                 "{domain:?} missing from Domain::ALL"
             );
         }
-        assert_eq!(Domain::ALL.len(), 2);
+        assert_eq!(Domain::ALL.len(), 3);
+    }
+
+    /// A tag computed under `Webhook` never verifies under `Record` or
+    /// `AuditRow`, even over the identical bytes — pins the cross-domain
+    /// non-transfer property this whole enum exists to guarantee, for
+    /// the specific domain a webhook receiver is handed a subkey for.
+    #[test]
+    fn webhook_tag_does_not_verify_under_another_domain() {
+        let config = super::CONFIG;
+        let keys = integrity_mac::KeySet::load_with_domains(
+            &config,
+            Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+            None,
+            None,
+            &Domain::ALL,
+        );
+        let preimage = b"the exact webhook request body bytes";
+        let tag = keys.tag(Domain::Webhook.as_str(), preimage).unwrap();
+        assert!(matches!(
+            keys.verify(Domain::Record.as_str(), Some(&tag), preimage),
+            integrity_mac::MacVerdict::Invalid
+        ));
     }
 }

@@ -680,40 +680,11 @@ dependencies = [
  "mime",
  "pretty_assertions",
  "reserve-port",
- "rust-multipart-rfc7578_2 0.8.0",
+ "rust-multipart-rfc7578_2",
  "serde",
  "serde_json",
  "serde_urlencoded",
  "smallvec",
- "tokio",
- "tower",
- "url",
-]
-
-[[package]]
-name = "axum-test"
-version = "21.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bf0893561659ea1365921a0aed8bbb620fae83dae00b53fe64d41fea4877640"
-dependencies = [
- "anyhow",
- "axum",
- "bytes",
- "bytesize 2.7.0",
- "cookie",
- "educe 0.7.6",
- "expect-json",
- "http",
- "http-body-util",
- "hyper",
- "hyper-util",
- "mime",
- "pretty_assertions",
- "reserve-port",
- "rust-multipart-rfc7578_2 0.9.0",
- "serde",
- "serde_json",
- "serde_urlencoded",
  "tokio",
  "tower",
  "url",
@@ -2021,18 +1992,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "educe"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e451fac8dd8dece16234604bf1efce6e90fddd8ab6ad4d66eec0eca5160959dd"
-dependencies = [
- "enum-ordinalize",
- "proc-macro2",
- "quote",
- "syn 3.0.3",
-]
-
-[[package]]
 name = "ego-tree"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2062,9 +2021,6 @@ name = "email_address"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e079f19b08ca6239f47f8ba8509c11cf3ea30095831f7fed61441475edd8c449"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "encode_unicode"
@@ -2165,35 +2121,6 @@ checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
  "pin-project-lite",
-]
-
-[[package]]
-name = "expect-json"
-version = "1.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e80819dbfe83c8a651f5344b08910d0037dac72988aef27ee4e6bedd7ae2e33"
-dependencies = [
- "chrono",
- "email_address",
- "expect-json-macros",
- "num",
- "regex",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "typetag",
- "uuid",
-]
-
-[[package]]
-name = "expect-json-macros"
-version = "1.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0637949cd816934f3b7aab44ff98e7ec1fb903c379e07dcb9eac943ec33499e"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
@@ -2479,7 +2406,7 @@ checksum = "1cf906f9af088b1d94a4d93b93706a6f28ead49e2ee16485a6358ca619f06072"
 dependencies = [
  "bytes",
  "derive_builder",
- "educe 0.6.0",
+ "educe",
  "flate2",
  "fluvio-future",
  "fluvio-protocol",
@@ -3880,7 +3807,7 @@ dependencies = [
  "axum",
  "axum-client-ip",
  "axum-extra",
- "axum-test 17.3.0",
+ "axum-test",
  "backtrace_printer",
  "byte-unit",
  "bytes",
@@ -4236,20 +4163,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
-dependencies = [
- "num-bigint",
- "num-complex",
- "num-integer",
- "num-iter",
- "num-rational",
- "num-traits",
-]
-
-[[package]]
 name = "num-bigint"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4291,27 +4204,6 @@ version = "0.1.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
 dependencies = [
- "num-traits",
-]
-
-[[package]]
-name = "num-iter"
-version = "0.1.46"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c92800bd69a1eac91786bcfe9da64a897eb72911b8dc3095decbd07429e8048b"
-dependencies = [
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-rational"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
-dependencies = [
- "num-bigint",
- "num-integer",
  "num-traits",
 ]
 
@@ -5053,8 +4945,8 @@ dependencies = [
  "async-trait",
  "authentication-verifier",
  "axum",
- "axum-test 21.1.0",
- "base64 0.22.1",
+ "axum-test",
+ "base64 0.23.1",
  "chrono",
  "criterion",
  "ed25519-dalek 3.0.0",
@@ -5080,7 +4972,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
- "sha2 0.11.0",
+ "sha2 0.10.9",
  "sha3",
  "tantivy",
  "tempfile",
@@ -5589,20 +5481,21 @@ dependencies = [
 
 [[package]]
 name = "rstest"
-version = "0.26.1"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5a3193c063baaa2a95a33f03035c8a72b83d97a54916055ba22d35ed3839d49"
+checksum = "6fc39292f8613e913f7df8fa892b8944ceb47c247b78e1b1ae2f09e019be789d"
 dependencies = [
  "futures-timer",
  "futures-util",
  "rstest_macros",
+ "rustc_version",
 ]
 
 [[package]]
 name = "rstest_macros"
-version = "0.26.1"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c845311f0ff7951c5506121a9ad75aec44d083c31583b2ea5a30bcb0b0abba0"
+checksum = "1f168d99749d307be9de54d23fd226628d99768225ef08f6ffb52e0182a27746"
 dependencies = [
  "cfg-if",
  "glob",
@@ -5628,21 +5521,6 @@ dependencies = [
  "http",
  "mime",
  "rand 0.9.5",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "rust-multipart-rfc7578_2"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00bdaa068902270ca7fa8619775e1838e23a63620abac0947ce0f715819b8cec"
-dependencies = [
- "bytes",
- "futures-core",
- "futures-util",
- "http",
- "mime",
- "rand 0.10.2",
  "thiserror 2.0.20",
 ]
 

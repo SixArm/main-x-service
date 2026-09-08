@@ -60,6 +60,56 @@ pub trait EventSink: Send + Sync {
     ) -> Result<(), SinkError>;
 }
 
+/// A sink that fans out to a **primary** sink plus zero or more
+/// **secondary** ones — e.g. [`LoggingSink`]/`FluvioSink` as primary,
+/// [`crate::webhooks::WebhookSink`] as a secondary (`agents/share/event-bus.md`
+/// §12, repo `tasks.md` EV-3).
+///
+/// The **primary**'s result governs [`drain_once`]'s at-least-once
+/// retry, exactly as a single sink would: its failure leaves the row
+/// unpublished. Every **secondary** sink is delivered to only after the
+/// primary succeeds, and its own failure is **swallowed** (logged, never
+/// propagated) — an optional secondary (a misconfigured or unreachable
+/// webhook target) must never re-block the durable bus the primary sink
+/// represents. In practice `WebhookSink::send` already never returns
+/// `Err` (it fans its own delivery attempts out to spawned tasks), but
+/// this stays defensive for any future secondary sink that does send
+/// synchronously.
+pub struct CompositeSink {
+    primary: Box<dyn EventSink>,
+    secondary: Vec<Box<dyn EventSink>>,
+}
+
+impl CompositeSink {
+    /// Build a composite over one primary sink and its secondaries.
+    #[must_use]
+    pub fn new(primary: Box<dyn EventSink>, secondary: Vec<Box<dyn EventSink>>) -> Self {
+        Self { primary, secondary }
+    }
+}
+
+#[async_trait::async_trait]
+impl EventSink for CompositeSink {
+    async fn send(
+        &self,
+        entity: &str,
+        key: &str,
+        payload: &serde_json::Value,
+    ) -> Result<(), SinkError> {
+        self.primary.send(entity, key, payload).await?;
+        for sink in &self.secondary {
+            if let Err(err) = sink.send(entity, key, payload).await {
+                tracing::warn!(
+                    error = %err,
+                    "secondary relay sink failed; outbox row is unaffected (already \
+                     published by the primary sink)"
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
 /// The default **no-broker** sink: log each event at `INFO`. Used in dev /
 /// CI and as an observability tap; the relay drains + acks exactly as it
 /// would against a real broker. Never fails.
@@ -328,6 +378,14 @@ async fn run_drain_loop(
 /// `error`) rather than a silent `LoggingSink` fallback — see
 /// `build_sink`'s doc comment in this file for why a fallback here would
 /// be worse than not running.
+///
+/// **Webhook fan-out** ([`crate::webhooks`], §12): when
+/// `PROJECT_PORTFOLIO_MANAGEMENT_WEBHOOKS[_FILE]` names at least one
+/// target, the primary sink above is wrapped in a [`CompositeSink`] with
+/// a [`crate::webhooks::WebhookSink`] secondary — unless no integrity-MAC
+/// key is configured, in which case webhook delivery refuses to start
+/// (logged `error`) rather than send unsigned deliveries; the primary
+/// relay still starts either way.
 pub fn spawn(db: DatabaseConnection) {
     if !crate::streaming::transport().is_outbox() || !relay_enabled() {
         return;
@@ -344,14 +402,39 @@ pub fn spawn(db: DatabaseConnection) {
     }
     let interval = interval_secs();
     let retention = retention_days();
+    let webhook_targets = crate::webhooks::targets();
     tracing::info!(
         interval_secs = interval,
         retention_days = retention,
         fluvio_endpoint = endpoint.as_deref().unwrap_or("(none — LoggingSink)"),
+        webhook_targets = webhook_targets.len(),
         "starting event-outbox relay"
     );
     tokio::spawn(async move {
-        let sink = build_sink(endpoint.as_deref()).await;
+        let primary = build_sink(endpoint.as_deref()).await;
+        let sink: Box<dyn EventSink> = if webhook_targets.is_empty() {
+            primary
+        } else if crate::compliance::mac::is_enabled() {
+            Box::new(CompositeSink::new(
+                primary,
+                vec![Box::new(crate::webhooks::WebhookSink::new(
+                    webhook_targets,
+                    db.clone(),
+                ))],
+            ))
+        } else {
+            tracing::error!(
+                targets = webhook_targets.len(),
+                "{} names webhook target(s) but no integrity-MAC key is configured \
+                 ({}/{}); webhook delivery will NOT start (an unsigned webhook is a \
+                 different, unauthenticated feature — see agents/share/event-bus.md §12); \
+                 the primary relay sink is unaffected",
+                crate::webhooks::WEBHOOKS_ENV,
+                crate::compliance::mac::KEY_ENV,
+                crate::compliance::mac::KEY_FILE_ENV,
+            );
+            primary
+        };
         run_drain_loop(db, sink, interval, retention).await;
     });
 }

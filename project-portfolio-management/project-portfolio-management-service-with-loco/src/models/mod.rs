@@ -10,3 +10,4 @@ pub mod merge_records;
 pub mod plans;
 pub mod strategy;
 pub mod visibility;
+pub mod webhook_deliveries;

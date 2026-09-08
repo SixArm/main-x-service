@@ -47,6 +47,20 @@ kind label — **and** a project-management tool.
 > `Dockerfile.fluvio-cli` provision a local broker for opt-in manual
 > runs only.
 >
+> **Outbound signed webhooks (T-28m, root `tasks.md` EV-3, 2026-09-08).**
+> `src/webhooks.rs`'s `WebhookSink` is a second, **best-effort**
+> `EventSink`, composed with the primary sink above via `src/relay.rs`'s
+> new `CompositeSink` — its own failures never re-block the outbox row
+> the primary sink already published. Targets come from
+> `PROJECT_PORTFOLIO_MANAGEMENT_WEBHOOKS[_FILE]` (JSON, per-target
+> event-kind filter); every delivery is HMAC-signed
+> (`X-Mxi-Signature`) under a new `compliance::mac::Domain::Webhook`,
+> with `5xx`/transport failures retried and `4xx` not, and every
+> outcome logged to a new `webhook_deliveries` table. Verified live
+> against a real Postgres and three mock receivers — see this crate's
+> `spec/13-tasks.md` T-28m for the full account, including an
+> independently-reproduced signature.
+>
 > **Persistence note.** All plans live in **one `plans` table** with a
 > **nullable `kind`** column (the optional label) and a `parent_pid`
 > column (the containment parent). There is one REST collection
@@ -258,7 +272,8 @@ src/
 ├── openapi.rs                OpenAPI 3 document
 ├── privacy.rs                field masking (lead_ref, owner org) + GDPR export envelope
 ├── compliance/                keyed integrity: mac.rs (integrity-mac binding) + record_integrity.rs (plans) + audit_integrity.rs (audit_logs); default off without PORTFOLIO_INTEGRITY_MAC_KEY[_FILE]
-├── relay.rs                  durable-bus Phase 2/3 outbox relay (poll/ack loop) + FluvioSink (fluvio feature, BUS-3)
+├── relay.rs                  durable-bus Phase 2/3 outbox relay (poll/ack loop) + FluvioSink (fluvio feature, BUS-3) + CompositeSink (primary + best-effort secondaries, e.g. webhooks.rs)
+├── webhooks.rs                outbound signed webhook sink (T-28m, root tasks.md EV-3) — WebhookSink: EventSink, HTTPS/loopback URL gate, retry-with-backoff, HMAC via compliance::mac::Domain::Webhook
 ├── search/                   Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine; kind is a search filter, never a dedup gate)
 ├── streaming.rs              CRUD/merge event stream — durable Envelope + EventPublisher seam (in-memory default, outbox transport); indexes/deindexes on every write
 ├── tasks/search.rs           `search_reindex` CLI task + boot-time rebuild-if-empty
@@ -270,6 +285,7 @@ src/
 │   ├── governance.rs · visibility.rs · strategy.rs   phase record helpers
 │   ├── capabilities.rs       reviews / automations / runs / scheduled actions / notifications
 │   ├── event_outbox.rs       durable-bus Phase 2 outbox enqueue + relay poll/ack
+│   ├── webhook_deliveries.rs webhook delivery log: insert-only `record` + `recent` read
 │   ├── audit_logs.rs         audit-trail record/query helpers
 │   ├── merge_records.rs      merge-history record/query helpers
 │   └── _entities/…           SeaORM entities
@@ -294,7 +310,8 @@ migration/src/                …_000001_plans, …_000002_audit_logs,
                               m20260826_000002_ceremonies,
                               m20260826_000003_value,
                               m20260902_000001_automation_multi_action,
-                              m20260902_000002_automation_milestone_fires
+                              m20260902_000002_automation_milestone_fires,
+                              m20260908_000001_webhook_deliveries
 config/                       development/production/test yaml
 tests/otlp_export.rs          real OTLP/gRPC export proof, in-process collector, no database
 tests/otlp_middleware.rs      the mounted `trace_mw` layer proved end to end over a real HTTP request
