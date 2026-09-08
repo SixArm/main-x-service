@@ -8,6 +8,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Found — no way to enumerate all things (T-15, not yet fixed)
+
+A live operator walkthrough of thing-front-end-with-svelte against a
+real running instance of this service found that the Things list page
+shows nothing on load, always, regardless of how many records exist:
+this crate has no plain list endpoint (`GET /api/things` answers
+`405`), and `SearchEngine::fuzzy_search`/`search` both return zero
+hits for the front-end's `q="*"` "list everything" query — confirmed
+against a seeded record via `curl` and by reading `src/search/mod.rs`
+(`tokenise("*")` is `[]`). Recorded as spec §13 T-15 with the two
+candidate fixes (a real list endpoint, or teaching the search engine
+to treat an empty/wildcard query as "first N documents"); not fixed
+here, since either shape is real backend design work — see T-15 for
+the full account and why `check-duplicates`'s blocking path is a
+dependency either way.
+
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 
 `Cargo.toml` already declares `rust-version = "1.96"` (matching

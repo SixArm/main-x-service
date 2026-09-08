@@ -82,13 +82,17 @@ describe("ThingRepository", () => {
         expect(result.total).toBe(1);
     });
 
-    // Pins: an enveloped { items, total } search response is passed through,
-    // including an explicit total that differs from the page item count.
-    it("normalises enveloped {items,total} search responses", async () => {
+    // Pins: an enveloped { results, total } search response is passed
+    // through, including an explicit total that differs from the page
+    // item count. `results` is the real service's field name
+    // (src/api/rest/handlers.rs::SearchResponse) — this stub used to say
+    // `items`, matching the client's own bug rather than the service, so
+    // it never would have caught the mismatch a live walkthrough found.
+    it("normalises enveloped {results,total} search responses", async () => {
         const client = new ApiClient({
             baseUrl: "http://test",
             fetch: mockFetch(async () =>
-                jsonResponse({ success: true, data: { items: [sampleThing], total: 42 }, error: null }),
+                jsonResponse({ success: true, data: { results: [sampleThing], total: 42 }, error: null }),
             ),
         });
         const repo = new ThingRepository(client);
@@ -97,12 +101,12 @@ describe("ThingRepository", () => {
         expect(result.total).toBe(42);
     });
 
-    // Pins: an enveloped response with items but no total falls back to count.
+    // Pins: an enveloped response with results but no total falls back to count.
     it("falls back to item count when an enveloped response omits total", async () => {
         const client = new ApiClient({
             baseUrl: "http://test",
             fetch: mockFetch(async () =>
-                jsonResponse({ success: true, data: { items: [sampleThing] }, error: null }),
+                jsonResponse({ success: true, data: { results: [sampleThing] }, error: null }),
             ),
         });
         const repo = new ThingRepository(client);
