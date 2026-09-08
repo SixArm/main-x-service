@@ -9,6 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — the Events list page crashed against a real service (T-30)
+
+`EventRepository.search()` read `data.items` from the service's search
+response, but the real service names the field `events`
+(`event-service-with-loco/src/api/rest/handlers.rs::SearchResponse`)
+— `items` never matched anything a real `event-service` sends. Found
+cross-checking every sibling front-end after thing-front-end's
+identical bug surfaced (its own spec §13 T-30). Verified live,
+including reproducing the crash: with the bug present, `/events`
+threw `Cannot read properties of undefined (reading 'map')` on load
+against a real (empty) service; with the fix, it renders cleanly.
+Fixed `data.items` → `data.events`; no test stub needed correcting
+(this crate's one search test uses the bare-array shape). Also
+corrected: `AGENTS.md`'s stale "GDPR-export download UI out of scope"
+line — it landed already (WEB-5). `npm run check` (0/0), `npm test`
+(61/61). See spec §13 T-30.
+
 ### Added — masked-view toggle on the event detail page (T-19)
 
 `EventRepository.masked()` (`GET /api/events/{id}/masked`) already

@@ -52,8 +52,14 @@ export class EventRepository {
    * Full-text search for events.
    *
    * Normalizes the two response shapes the service may return (a bare
-   * array, or an `{ items, total }` object) into a consistent
-   * `{ items, total }` result.
+   * array, or an `{ events, total }` object) into a consistent
+   * `{ items, total }` result. `events` is the real service's field
+   * name (event-service-with-loco/src/api/rest/handlers.rs::SearchResponse)
+   * — this used to say `items`, a name the service never actually
+   * sends, found only by running this client against a real
+   * event-service (mirrors the identical bug found and fixed in
+   * thing-front-end T-30, place-front-end T-28, and worker-front-end;
+   * see any of their spec §13 for the full account).
    *
    * @param opts - Query and filter parameters.
    * @returns The matching events plus a total count for pagination.
@@ -63,7 +69,7 @@ export class EventRepository {
     opts: SearchOptions,
   ): Promise<{ items: Event[]; total: number }> {
     const data = await this.http.get<
-      Event[] | { items: Event[]; total?: number }
+      Event[] | { events: Event[]; total?: number }
     >("/api/events/search", {
       query: {
         q: opts.q,
@@ -79,7 +85,7 @@ export class EventRepository {
     });
     // Service may return a bare array (no total) or an envelope object.
     if (Array.isArray(data)) return { items: data, total: data.length };
-    return { items: data.items, total: data.total ?? data.items.length };
+    return { items: data.events, total: data.total ?? data.events.length };
   }
 
   /** Fetch a single event by id. @throws {ApiError} 404 when absent. */
