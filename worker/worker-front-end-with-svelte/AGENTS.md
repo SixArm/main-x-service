@@ -110,4 +110,10 @@ just this app. A visitor who signs in from a guarded page lands on
 
 - FHIR Worker UI. Out of scope for MVP.
 - Consent management UI. Out of scope for MVP (Worker Service has `/consents` endpoints but no front-end yet).
-- GDPR-export download UI. Out of scope for MVP.
+
+GDPR-export download UI **was** out of scope — corrected 2026-09-08:
+it landed on the detail page (`repo.exportGdpr` / the "Export data
+(GDPR)" button in `src/routes/workers/[id]/+page.svelte`) as part of
+the family-wide WEB-5 roll-out; this line was stale, not a live gap —
+the same stale claim was found and fixed the same way across every
+sibling front-end's own `AGENTS.md`.

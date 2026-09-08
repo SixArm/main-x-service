@@ -73,8 +73,14 @@ export class WorkerRepository {
    * Full-text search for workers.
    *
    * Normalizes the two response shapes the service may emit (a bare array,
-   * or `{ items, total }`) into a single `{ items, total }` result so
-   * callers don't have to branch.
+   * or `{ workers, total }`) into a single `{ items, total }` result so
+   * callers don't have to branch. `workers` is the real service's field
+   * name (worker-service-with-loco/src/api/rest/handlers.rs::SearchResponse)
+   * — this used to say `items`, a name the service never actually
+   * sends, found only by running this client against a real
+   * worker-service (mirrors the identical bug found and fixed in
+   * thing-front-end T-30 and place-front-end T-28; see either spec §13
+   * for the full account).
    *
    * @returns The matching workers plus a total count.
    * @throws {ApiError} On request failure.
@@ -83,7 +89,7 @@ export class WorkerRepository {
     opts: SearchOptions,
   ): Promise<{ items: Worker[]; total: number }> {
     const data = await this.http.get<
-      Worker[] | { items: Worker[]; total?: number }
+      Worker[] | { workers: Worker[]; total?: number }
     >("/api/workers/search", {
       query: {
         q: opts.q,
@@ -97,7 +103,7 @@ export class WorkerRepository {
     // Bare array → synthesize a total from its length; object → trust
     // its `total`, falling back to item count when absent.
     if (Array.isArray(data)) return { items: data, total: data.length };
-    return { items: data.items, total: data.total ?? data.items.length };
+    return { items: data.workers, total: data.total ?? data.workers.length };
   }
 
   /**

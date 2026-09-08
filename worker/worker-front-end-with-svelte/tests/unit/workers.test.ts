@@ -126,14 +126,16 @@ describe("WorkerRepository", () => {
         expect(result.total).toBe(1);
     });
 
-    // Pins: an already-{items,total} payload passes its `total` through
-    // untouched (here 42, not the item count of 1).
-    it("normalises {items,total} search responses unchanged", async () => {
+    // Pins: an already-{workers,total} payload passes its `total` through
+    // untouched (here 42, not the item count of 1). `workers` is the real
+    // service field name; this stub used to say `items`, matching the
+    // client's own bug rather than the service.
+    it("normalises {workers,total} search responses unchanged", async () => {
         const client = new ApiClient({
             baseUrl: "http://test",
             fetch: mockFetch(async () =>
                 jsonResponse(
-                    { success: true, data: { items: [sampleWorker], total: 42 }, error: null },
+                    { success: true, data: { workers: [sampleWorker], total: 42 }, error: null },
                 ),
             ),
         });
