@@ -129,7 +129,7 @@ test.describe("Place front-end smoke", () => {
                 contentType: "application/json",
                 body: JSON.stringify({
                     success: true,
-                    data: { items: [place], total: masked ? 1 : 2 },
+                    data: { results: [place], total: masked ? 1 : 2 },
                     error: null,
                 }),
             });
