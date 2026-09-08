@@ -7986,21 +7986,24 @@ green as it sits; these finish it)**
   than buried here. Portfolio's two files and the nine unmeasured
   front-ends (authentication, organization, care-pathway, case, the
   five consumer apps) remain: measure, then the same one-command fix.
-- [ ] **WEB-5 (M)** **Wire the unwired privacy button — T-20 GDPR
-  export, ×6.** `exportGdpr(id)` (`GET /api/<plural>/{id}/export`)
-  exists in six front-end repositories (person, worker, place, thing,
-  event, course) and is referenced by **zero** routes — the same
-  "method wired, UI absent" gap T-19 just closed for the masked view.
-  Reference shape, person first then copy-adapt (drift accepted): a
-  button on the detail page; `JSON.stringify` the `unknown` payload and
-  hand it to the browser as a Blob download named
-  `<entity>-<id>-export.json`; an `exporting` state disables the button
-  in flight; errors go to the existing banner; the smoke test stubs the
-  route and asserts a Playwright `download` event carrying that
-  filename; keys ×13 locales. Repository-level tests exist for place
-  and thing only — add them for person, worker, event, course. A person
-  WIP exists in this session's git stash (`wip: person-front-end T-20
-  …`, page edits only, i18n keys not yet added).
+- [x] **WEB-5 (M)** **Wire the unwired privacy button — T-20 GDPR
+  export, ×6.** *(Re-verified 2026-09-08 against the live source —
+  already fully landed, just never checked off here.)* `exportGdpr(id)`
+  is wired on the detail page in all six front-ends (person: `117c889a`,
+  the reference; worker/place/thing/event/course: `9501f058`, the
+  roll-out) — exactly the reference shape this row specified: a button
+  on the detail page, `JSON.stringify` the `unknown` payload as a Blob
+  download named `<entity>-<id>-export.json`, an `exporting` state
+  disabling the button in flight, errors to the existing banner. Every
+  crate carries a Playwright test asserting the `download` event and
+  its filename (confirmed by grep, e.g. worker's
+  `tests/e2e/workers.spec.ts::"worker detail downloads the GDPR export
+  as JSON"`), and both `detail.exportGdpr`/`detail.exportingGdpr` keys
+  exist across all 13 locales in every crate (confirmed by count, not
+  assumed). Spot-checked `pnpm run check` clean on worker-front-end
+  post-verification. The stale git-stash WIP this row referenced (a
+  duplicate, pre-`117c889a` draft of the person page) was superseded by
+  the landed commit and dropped.
 - [x] **WEB-6 (S)** **T-13 / T-16 / T-17 are open ×4, identically.**
   SSR-safe loads, theming-tokens module, check-duplicates preview in
   the create form — each open, word-for-word, in person, worker, place,
