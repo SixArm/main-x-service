@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — e2e coverage for the search box and recent-activity page (T-11)
+
+`../spec/13-tasks.md` T-11 ("search box + audit/event views") was
+already fully implemented (`77413e2b`) but never had a smoke test
+visiting either surface — the API-client layer was unit-tested, the
+pages were not. Two new `tests/e2e/smoke.spec.ts` tests: submitting a
+query on `/` swaps the rendered list for the search endpoint's hits
+(and asserts the request's `q` param), and `/audit` renders both the
+recent-audit and recent-events panels from their own stubbed
+endpoints. No application code changed; `pnpm run check` / `pnpm
+test` / `pnpm test:e2e` all green (10/10 e2e, was 8).
+
 ### Added — `Custom(label)` editing for case type / status / identifier scheme (FE-5)
 
 `CaseForm` had no handling for the `case_matcher` wire shape's

@@ -189,12 +189,21 @@ stale prose that used to sit in this file.
 
 ### Open / deferred
 
-- [ ] **T-11 — Front-end search box + audit / event views.**
-  - [ ] A search box on `/` calling `GET /api/cases/search?q=`.
-  - [ ] Audit-trail and event views (consume `/{pid}/audit`,
+- [x] **T-11 — Front-end search box + audit / event views.**
+  *(Re-verified 2026-09-08 against the live source — already landed,
+  `77413e2b`, just never checked off here; e2e coverage was the one
+  real gap, closed in the same pass.)*
+  - [x] A search box on `/` calling `GET /api/cases/search?q=`.
+  - [x] Audit-trail and event views (consume `/{pid}/audit`,
     `/audit/recent`, `/events/recent`).
-  - **Acceptance:** the UI surfaces search results and a case's audit
-    trail.
+  - **Acceptance met:** the UI surfaces search results and a case's
+    audit trail. The API-client layer was already unit-tested
+    (`tests/unit/cases.test.ts`), but no smoke test visited `/` with a
+    real query or `/audit` at all — closed with two new Playwright
+    tests in `tests/e2e/smoke.spec.ts` (search swaps the rendered
+    results; `/audit` renders both the recent-audit and recent-events
+    panels from their own stubbed endpoints). `pnpm run check` /
+    `pnpm test` / `pnpm test:e2e` all green (10/10 e2e, was 8).
 - [x] **T-13 — Thicken crate docs.** *(closed as won't-do, 2026-08
   professionalization audit)*
   - [x] ~~Add a service `agents/` reference set (`models.md`,

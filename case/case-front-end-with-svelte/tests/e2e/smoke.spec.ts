@@ -144,7 +144,9 @@ test("edit page renders the edit form", async ({ page }) => {
 // Pins: the merge route renders its heading and both id inputs.
 test("merge page shows the merge form", async ({ page }) => {
   await page.goto("/merge", { waitUntil: "networkidle" });
-  await expect(page.getByRole("heading", { name: "Merge cases" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Merge cases" }),
+  ).toBeVisible();
   await expect(page.getByTestId("merge-main")).toBeVisible();
   await expect(page.getByTestId("merge-duplicate")).toBeVisible();
   // With no history the empty-state line stands in for the table.
@@ -158,6 +160,65 @@ test("nav exposes the merge link", async ({ page }) => {
   await page.goto("/", { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "Toggle navigation" }).click();
   await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
+});
+
+// Pins: spec §13 T-11 — the list route's search box actually runs a
+// search and swaps the rendered results, not merely that the box exists.
+// A blank query on mount hits the plain list (stubbed above); submitting
+// a query must hit `/api/cases/search?q=...` instead and show only its
+// hits.
+test("search box runs a search and shows its results", async ({ page }) => {
+  await page.route("**/api/cases/search**", async (route) => {
+    const url = new URL(route.request().url());
+    expect(url.searchParams.get("q")).toBe("housing");
+    return route.fulfill({
+      json: [{ pid: PID, title: "Housing benefit appeal (search hit)" }],
+    });
+  });
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(page.getByText("Housing benefit appeal")).toBeVisible();
+  await page.getByRole("searchbox").fill("housing");
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(
+    page.getByText("Housing benefit appeal (search hit)"),
+  ).toBeVisible();
+});
+
+// Pins: spec §13 T-11 — the system-wide activity route renders both the
+// recent-audit and recent-events panels from their own endpoints.
+test("activity page shows recent audit entries and events", async ({
+  page,
+}) => {
+  await page.route("**/api/cases/audit/recent", async (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 1,
+          entity_pid: PID,
+          action: "created",
+          actor: null,
+          created_at: "2026-01-15T10:00:00Z",
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/cases/events/recent", async (route) =>
+    route.fulfill({
+      json: [{ kind: "created", pid: PID, name: CASE.title, seq: 1 }],
+    }),
+  );
+  await page.goto("/audit", { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("heading", { name: "Recent activity" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Recent audit entries" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: PID })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Recent events" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: CASE.title })).toBeVisible();
 });
 
 // Pins: spec §6.6 — check-duplicates excludes the record itself. The stub
