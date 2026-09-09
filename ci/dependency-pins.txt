@@ -1,0 +1,26 @@
+# Emergency version pins for the 47 crates with no committed Cargo.lock
+# (matchers, libraries, migration/ and fuzz/ sub-crates — the standard
+# library-crate posture; the 17 service crates commit their own lockfile
+# and need no entry here). Applied by scripts/ci-check.sh's
+# apply_dependency_pins() before building/testing an unlocked crate.
+#
+# Format: one "<crate-name>@<exact-version>" per line. Blank lines and
+# `#` comments are ignored. A pin naming a package a given crate's
+# dependency graph does not contain is skipped for that crate, not an
+# error — most pins apply to only a handful of crates.
+#
+# This is a break-glass tool, not a place to accumulate stale pins: add
+# a line the day a bad transitive release turns CI red with no change to
+# this repo's own tree (repo tasks.md DEP-3), and remove it once the
+# upstream fix or yank lands — leaving one in place after that only
+# holds a crate back from a release that already fixed the problem it
+# was pinned against. See spec/rust-msrv-n-minus-2/index.md §4 for the
+# decision this file implements.
+#
+# No pin is active right now — the 2026-09-03 tinyvec 1.13.0 incident
+# that motivated this file (repo tasks.md, "Found 2026-09-03") resolved
+# upstream (a fixed release superseded it) before this mechanism landed,
+# so there was nothing left to pin against by the time it existed. Kept
+# as the worked example the next incident can copy:
+#
+# tinyvec@1.12.0   # RUSTSEC-none; 1.13.0 broke no_std+alloc, no rust-version bump (2026-09-03)

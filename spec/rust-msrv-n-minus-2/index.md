@@ -159,6 +159,83 @@ in a consumer's CI. When it happens the choice is to pin the dependency
 back or to raise the MSRV early and say so (§5) — never to quietly drop
 the claim.
 
+### Pinning a bad transitive release (`ci/dependency-pins.txt`, DEP-3)
+
+The MSRV-aware resolver stops a dependency from silently raising the
+floor at the moment we *change* something — `cargo add`, a manifest
+edit. It does nothing about a dependency publishing a **new, broken**
+version with the *same* declared MSRV, on a day nothing in this repo's
+tree changed at all. That happened 2026-09-03: `tinyvec 1.13.0` shipped
+a `no_std`+`alloc` bug and no `rust-version` bump, so `check` and `msrv`
+alike went red on every job that happened to resolve fresh that hour —
+59 checks on one PR — while a PR whose jobs had resolved forty minutes
+earlier stayed green. Full account: repo `tasks.md`, "Found 2026-09-03".
+
+**The exposure is structural, not incidental.** Root `.gitignore`
+ignores every crate's `Cargo.lock`; each of the seventeen **service**
+crates un-ignores its own (`!<crate>/Cargo.lock`), by family convention
+(`agents/share/security.md`) — but the other **forty-seven** (matchers,
+libraries, `migration/` and `fuzz/` sub-crates) resolve fresh on every
+CI run, the standard library-crate posture, and `ci-check.sh`'s
+`--locked` only ever protects a crate that has a lockfile to be
+`--locked` against.
+
+**The decision** (weighed against committing a `Cargo.lock` for all
+sixty-four crates, which reverses the `.gitignore` design above and
+turns every routine `cargo update` into a deliberate per-crate PR, and
+against simply waiting out each incident): a repo-level
+**[`ci/dependency-pins.txt`](../../ci/dependency-pins.txt)**, one
+`<crate>@<version>` per line. `scripts/ci-check.sh` applies every pin —
+via `cargo update -p <crate> --precise <version>` against a freshly
+generated, **not committed**, lockfile — to every crate that has no
+lockfile of its own, before `clippy`/`test`/`test-db`/`msrv`/`bench`/
+`deny`/`evidence` build it, then passes `--locked` for the rest of that
+invocation so the pinned resolution cannot drift again within the same
+job. A pin naming a package a given crate's dependency graph does not
+contain is not an error — most pins apply to only a few crates — so it
+is skipped with a note rather than failing the build. This is
+CI-only and manifest-free (nothing in any crate's own `Cargo.toml`
+changes) and fully reversible (delete the line once a fix ships
+upstream), at the cost the file itself states: dependency-version truth
+now lives in two places for a pinned package until the pin is removed.
+Verified by deliberately pinning `person-matcher-rust-crate` (unlocked)
+to `regex@1.10.6` — several minors behind the `1.13.1` its manifest
+would otherwise resolve — and confirming `scripts/ci-check.sh clippy
+person/person-matcher-rust-crate` built against exactly `1.10.6`
+(`Cargo.lock` after the run named it, and the crate compiled clean),
+then removing the scratch entry and confirming the crate went straight
+back to resolving `1.13.1` on its own — the same proof the task's
+acceptance criterion asked for.
+
+**That same verification pass surfaced a second, more serious defect in
+the *already-shipped* half of this mechanism.** `locked_flag`'s `git
+ls-files --error-unmatch "${crate}/Cargo.lock"` check is always
+evaluated from inside a subshell that has already `cd`'d into the
+crate directory (every call site is `( cd "${crate}" && … $(locked_flag
+"${crate}") … )`), so the crate-prefixed pathspec resolved against the
+wrong base directory and never matched — for any crate, in any of the
+six stages that call it (`clippy`/`test`/`test-db`/`evidence`/`bench`/
+`msrv`). **`--locked` had therefore never actually been passed for any
+of the seventeen crates that commit a `Cargo.lock`, since the check was
+introduced.** Fixed with `git -C "${ROOT}"` (independent of the
+caller's CWD either way). Enabling it for real then had to be checked
+against reality rather than assumed safe: **8 of the 17** committed
+lockfiles turned out to be stale enough that `--locked` would have
+failed outright (`cannot update the lock file … because --locked was
+passed`) — `authentication-service`, `case-service`,
+`contact-relationship-management-service`,
+`content-management-system-service`, `link-graph-service`,
+`organization-service`, `patient-flow-service`,
+`workforce-planning-management-service`. Each was refreshed
+(`cargo update`, no manifest change) and fully re-verified before this
+fix could land without turning those 8 crates' CI red: `cargo test
+--locked`, `cargo clippy --all-targets --locked -- -D warnings`, `cargo
+fmt --check`, `cargo +1.96 check --all-targets --locked` (this
+section's own MSRV stage), and `cargo deny check` where a `deny.toml`
+exists (6 of the 8) — all green, on every one of the 8, before
+committing the refreshed lockfiles alongside the `locked_flag` fix. See
+repo `tasks.md` DEP-3 for the full account.
+
 ## 5. Bumping it
 
 A bump is a **deliberate, single commit**, not a drift:

@@ -7824,7 +7824,7 @@ green as it sits; these finish it)**
 
 ## Found 2026-09-03 (an upstream release turned CI red for 47 crates)
 
-- [ ] **DEP-3 (M)** **Unlocked crates make CI hostage to any
+- [x] **DEP-3 (M)** **Unlocked crates make CI hostage to any
   transitive release.** At 21:13Z `tinyvec 1.13.0` was published with
   a bug (upstream issue #225, fix PR #226 open the same day: a
   `no_std` + `alloc` path uses `vec!` without importing
@@ -7865,6 +7865,52 @@ green as it sits; these finish it)**
   (b), the `check` and `msrv` stages green on a day a bad transitive
   release lands, proven by pinning one deliberately in a scratch
   branch.
+
+  **Landed 2026-09-09, option (b).** `ci/dependency-pins.txt` (one
+  `<crate>@<version>` per line) + `scripts/ci-check.sh`'s new
+  `apply_dependency_pins`: for a crate with no committed `Cargo.lock`,
+  pin every applicable line via `cargo update -p … --precise …` against
+  a freshly generated, uncommitted lockfile, then pass `--locked` for
+  the rest of that invocation so the pin can't drift again within the
+  same job. A pin naming a package the crate's graph doesn't contain is
+  skipped, not an error. No pin is active by default — the file ships
+  with the tinyvec incident as a commented-out worked example, since it
+  had already resolved upstream by the time this landed.
+
+  **Verified exactly as the acceptance criterion asked**: a scratch pin
+  (`regex@1.10.6` in the unlocked `person-matcher-rust-crate`, several
+  minors behind the `1.13.1` it would otherwise resolve) made
+  `scripts/ci-check.sh clippy person/person-matcher-rust-crate` build
+  against precisely `1.10.6` — confirmed in the generated `Cargo.lock`
+  and the compile output — then reverted, confirming the crate went
+  straight back to `1.13.1` unassisted.
+
+  **That verification pass found a second, more serious defect in the
+  already-shipped half of this mechanism.** `locked_flag`'s
+  `git ls-files --error-unmatch "${crate}/Cargo.lock"` check runs from
+  inside a subshell that has already `cd`'d into the crate directory at
+  every one of its six call sites (`clippy`/`test`/`test-db`/
+  `evidence`/`bench`/`msrv`), so the crate-prefixed pathspec resolved
+  against the wrong base and never matched anything —
+  **`--locked` had never actually been passed for any of the
+  seventeen crates that commit a `Cargo.lock`, in any stage, since this
+  check was introduced.** Fixed with `git -C "${ROOT}"`. Turning it on
+  for real, rather than assuming it was safe, found **8 of the 17**
+  committed lockfiles had drifted enough that `--locked` would have
+  failed outright: `authentication-service`, `case-service`,
+  `contact-relationship-management-service`,
+  `content-management-system-service`, `link-graph-service`,
+  `organization-service`, `patient-flow-service`,
+  `workforce-planning-management-service`. Each was refreshed
+  (`cargo update`, no manifest edit) and independently re-verified
+  before the fix could land without reddening those 8 crates' CI:
+  `cargo test --locked`, `cargo clippy --all-targets --locked -- -D
+  warnings`, `cargo fmt --check`, `cargo +1.96 check --all-targets
+  --locked`, and `cargo deny check` where a `deny.toml` exists (6 of
+  the 8) — all green on every one of the 8. See
+  [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md) §4
+  for the full write-up (the MSRV policy doc, per this task's own
+  acceptance line).
 
 ## Phase 11 — Front-end verification gap (2026-09-03)
 
