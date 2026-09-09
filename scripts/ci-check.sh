@@ -125,19 +125,81 @@ db_name_for() {
   printf 'ci_%s' "$(printf '%s' "$1" | tr '/-' '__' | cut -c1-55)"
 }
 
-# `--locked` only where a lockfile is actually committed.
+# Whether ${1} (a crate path, relative to ${ROOT}) commits its own
+# Cargo.lock. Explicit `git -C "${ROOT}"` rather than a bare `git
+# ls-files`: every caller here runs from inside an already-`cd`'d
+# subshell (`( cd "${crate}" && … $(locked_flag "${crate}") … )`, every
+# call site below), so a crate-prefixed *relative* pathspec would
+# resolve against the wrong base and never match — found while adding
+# apply_dependency_pins (DEP-3) below, and just as real a bug for the
+# original, unchanged half of this check: `--locked` had never actually
+# been passed for *any* of the seventeen crates that commit a lockfile,
+# in any stage, since this function was introduced. `-C` pins the
+# directory git resolves the pathspec against regardless of the caller's
+# actual CWD, independent of that assumption either way.
+crate_has_committed_lockfile() {
+  git -C "${ROOT}" ls-files --error-unmatch "${1}/Cargo.lock" >/dev/null 2>&1
+}
+
+# Apply every applicable line of ci/dependency-pins.txt (DEP-3,
+# spec/rust-msrv-n-minus-2/index.md §4) to one *unlocked* crate: pin a
+# named package to an exact version via `cargo update -p … --precise …`
+# against a freshly generated, uncommitted lockfile, so a bad transitive
+# release cannot turn CI red for the 47 crates with no Cargo.lock of
+# their own on a day nothing in this repo's tree changed. A no-op for a
+# crate that already commits its own Cargo.lock (nothing to pin around —
+# its lockfile already fixes every version) or when the pins file is
+# absent or empty. A pin naming a package the crate's own dependency
+# graph does not contain is not an error (most pins apply to only a
+# handful of crates) — it is skipped with a note, not a failure.
 #
-# The `fuzz` sub-crates gitignore their `Cargo.lock`, so on a fresh CI
-# checkout there is nothing to lock against and `--locked` fails outright
-# ("the lock file needs to be updated but --locked was passed"). Passing it
-# unconditionally would have made CI red on its first run for every fuzz
-# crate. Where a lockfile *is* committed, `--locked` is what stops a
-# dependency drifting silently between a local run and CI.
+# `${ROOT}/${crate}` (absolute) rather than `${crate}` (relative) for
+# every `cd` here, for the same reason `crate_has_committed_lockfile`
+# takes `-C "${ROOT}"`: this function is itself called from inside an
+# already-`cd`'d subshell, so a second, relative `cd "${crate}"` would
+# try to descend into `<crate>/<crate>` and fail.
+apply_dependency_pins() {
+  local crate="$1"
+  local pins="${ROOT}/ci/dependency-pins.txt"
+  crate_has_committed_lockfile "${crate}" && return 0
+  [[ -f "${pins}" ]] || return 0
+  local line pkg ver applied=0
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="$(printf '%s' "${line}" | tr -d '[:space:]')"
+    [[ -z "${line}" ]] && continue
+    pkg="${line%%@*}"
+    ver="${line#*@}"
+    if [[ -z "${pkg}" || -z "${ver}" || "${pkg}" == "${line}" ]]; then
+      echo "  ci/dependency-pins.txt: malformed line '${line}' (want pkg@version), skipping" >&2
+      continue
+    fi
+    ( cd "${ROOT}/${crate}" && cargo generate-lockfile >/dev/null 2>&1 ) || true
+    if ( cd "${ROOT}/${crate}" && cargo update -p "${pkg}" --precise "${ver}" >/dev/null 2>&1 ); then
+      echo "  pinned ${pkg}@${ver} (ci/dependency-pins.txt)" >&2
+      applied=1
+    fi
+  done < "${pins}"
+  [[ "${applied}" == 1 ]] && printf -- '--locked'
+}
+
+# `--locked` for a crate with a committed lockfile, or one this run just
+# pinned (see apply_dependency_pins, above) — in both cases a lockfile now
+# exists on disk and `--locked` is what stops the resolution drifting
+# again within this same invocation.
+#
+# The `fuzz` sub-crates gitignore their `Cargo.lock` and carry no pins
+# either, so on a fresh CI checkout there is nothing to lock against and
+# `--locked` fails outright ("the lock file needs to be updated but
+# --locked was passed"). Passing it unconditionally would have made CI
+# red on its first run for every fuzz crate.
 locked_flag() {
   local crate="$1"
-  if git ls-files --error-unmatch "${crate}/Cargo.lock" >/dev/null 2>&1; then
+  if crate_has_committed_lockfile "${crate}"; then
     printf -- '--locked'
+    return 0
   fi
+  apply_dependency_pins "${crate}"
 }
 
 run_stage() {
