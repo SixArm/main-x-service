@@ -33,18 +33,25 @@
     // One repository instance for this page (no global HTTP store).
     const repo = PlaceRepository.withFetch();
 
-    // Fetch a page of results; `*` is the "match all" query for empty input.
+    // Fetch a page of results, or — when the input is empty — enumerate
+    // the collection directly via `repo.list` (mirrors thing-front-end's
+    // T-15/T-31 fix: `/places/search` has no way to mean "everything";
+    // a bare `q="*"` tokenises to nothing server-side and always
+    // returns zero hits, regardless of how many records exist).
     async function runSearch(q: string) {
         loading = true;
         error = null;
         try {
-            const res = await repo.search({
-                q: q || "*",
-                limit: 50,
-                fuzzy,
-                phonetic,
-                mask_sensitive: maskSensitive,
-            });
+            const trimmed = q.trim();
+            const res = trimmed
+                ? await repo.search({
+                      q: trimmed,
+                      limit: 50,
+                      fuzzy,
+                      phonetic,
+                      mask_sensitive: maskSensitive,
+                  })
+                : await repo.list({ limit: 50, mask_sensitive: maskSensitive });
             places = res.items;
             total = res.total;
         } catch (err) {
@@ -71,7 +78,8 @@
         void runSearch(query);
     }
 
-    // Initial load: list everything once on mount. The effect has no
+    // Initial load: list everything once on mount, via `repo.list`
+    // inside runSearch (not a wildcard search). The effect has no
     // reactive deps inside the call, so it runs a single time.
     $effect(() => {
         void runSearch("");

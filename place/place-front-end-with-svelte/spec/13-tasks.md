@@ -196,3 +196,21 @@
   behaviour under the corrected field name), `pnpm test:e2e` (19/19,
   unchanged), `pnpm run lint` clean, and a live walkthrough against a
   real service confirmed the fix.
+
+- [x] **T-29 — Wire `/places` to the service's new list endpoint,
+  mirroring thing-front-end's T-15/T-31.** *(2026-09-09.)* `/places`'s
+  empty-query fallback faked "list everything" with `q="*"`, which
+  never worked (a bare `*` tokenises to nothing server-side, so the
+  list page showed nothing on load, always). The service gained a
+  real `GET /api/places` (own spec §13 T-17); added
+  `PlaceRepository.list()` (`src/lib/api/places.ts`), mirroring
+  `search()`'s response normalisation but hitting the new endpoint
+  directly. `runSearch` in `/places/+page.svelte` now branches on the
+  trimmed query: empty ⇒ `list()`, non-empty ⇒ `search()` — covering
+  the initial mount and the mask-sensitive toggle, both of which run
+  with an empty query in the common case.
+  **Acceptance:** `pnpm run check` (0/0), `pnpm test` (61/61, was
+  59 — 2 new `list()` unit tests), `pnpm run lint` clean, `pnpm
+  test:e2e` (19/19 — the mask-sensitive-toggle test's route stub
+  widened from `**/api/places/search**` to `**/api/places**` since it
+  never types a query term).

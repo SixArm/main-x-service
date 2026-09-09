@@ -131,6 +131,43 @@ describe("PlaceRepository", () => {
         expect(capturedUrl).not.toContain("mask_sensitive");
     });
 
+    // Pins: list() hits the plain collection endpoint, /api/places — not
+    // /api/places/search — since a wildcard search has no way to mean
+    // "everything" server-side.
+    it("GETs /api/places on list", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({
+                    success: true,
+                    data: { results: [samplePlace], total: 1 },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new PlaceRepository(client);
+        const result = await repo.list();
+        expect(capturedUrl).toContain("/api/places");
+        expect(capturedUrl).not.toContain("/search");
+        expect(result.items).toHaveLength(1);
+    });
+
+    // Pins: list() normalises both response shapes, same as search().
+    it("normalises a bare-array list response to {items, total}", async () => {
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async () =>
+                jsonResponse({ success: true, data: [samplePlace], error: null }),
+            ),
+        });
+        const repo = new PlaceRepository(client);
+        const result = await repo.list();
+        expect(result.items).toHaveLength(1);
+        expect(result.total).toBe(1);
+    });
+
     // Pins: each remaining repository method targets its documented path
     // and HTTP verb. A single captured request per call guards against the
     // /match vs /check-duplicates and per-id-path copy artifacts.

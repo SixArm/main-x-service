@@ -489,3 +489,37 @@ clearly described manual check confirms the acceptance criterion.
     from 229, the two new unit tests), 0 failed; `cargo build`/`clippy
     --all-targets -- -D warnings` clean.
 
+- [x] **T-17 (M) — No way to enumerate all places, mirroring
+  thing-service's own T-15.** *(Found and fixed 2026-09-09, checking
+  every sibling crate after thing-service's identical gap surfaced.)*
+  `GET /api/places` answered `405` (no list endpoint existed), and the
+  front-end's `q="*"` "list everything" fallback tokenises to nothing
+  (`src/search/mod.rs::tokenise`), so `/places/search?q=*` returns zero
+  hits regardless of how many records exist — the Places list page
+  showed nothing on load, always. Landed the same fix as thing-service:
+  `src/api/rest/handlers.rs::list_places`, database-backed via the
+  existing `PlaceRepository::list` (already declared, just never wired
+  to HTTP), reusing this crate's own already-mature pagination
+  scaffolding verbatim (`MAX_OFFSET`, `offset_too_large`,
+  `with_page_headers` — this crate's `/places/search` already carried
+  the full family pagination convention, unlike thing's). Registered
+  on both router surfaces (`create_router`, `places_routes`) and the
+  OpenAPI document. The front-end (`place-front-end-with-svelte`)
+  gained a matching `PlaceRepository.list()`, and `/places/+page.svelte`'s
+  `runSearch` now branches on the trimmed query — empty ⇒ `list()`,
+  non-empty ⇒ `search()`.
+  **Verified live**, not just unit-tested: booted a real release
+  binary against a real Postgres. `GET /api/places` (previously a bare
+  `405`) now returns `200` with `X-Total-Count`/`X-Limit`/`X-Offset`;
+  `?offset=10001` is `400`; the *original* bug was reproduced unchanged
+  on `/places/search?q=*` (still `{"results":[],"total":0}`) to confirm
+  this is a new surface, not a rewrite of the broken one.
+  `place-service-with-loco`: `cargo test --lib` 231/231; DB-gated
+  suite adds two request-level tests (list enumerates seeded places
+  with no `q`; the offset bound is enforced), whole suite green;
+  `fmt`/`clippy -D warnings`/`deny check`/`msrv`/`bench --no-run` all
+  clean. `place-front-end-with-svelte`: `pnpm run check` 0/0, `pnpm
+  test` 61/61 (was 59, 2 new), `pnpm run lint` clean, `pnpm test:e2e`
+  19/19 (one route stub widened from `/places/search` to `/places`
+  since it never types a query term).
+
