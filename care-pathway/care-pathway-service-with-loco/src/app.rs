@@ -251,6 +251,7 @@ impl Hooks for App {
         tasks.register(crate::tasks::search::SearchReindex);
         tasks.register(crate::tasks::integrity_key::IntegrityKey);
         tasks.register(crate::tasks::integrity_resign::IntegrityResign);
+        tasks.register(crate::tasks::journeys_seed::JourneysSeed);
         // tasks-inject (do not remove)
     }
     /// Truncate all tables for the loco test harness, in

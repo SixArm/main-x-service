@@ -383,7 +383,14 @@ manual check confirms it. Split tasks too big for one PR
   T-14a → T-14l. Each sub-task is one three-part PR (spec + code +
   tests); the pure parts go in `src/tba.rs` or a sibling
   `src/analytics.rs`, DB-free and property-tested, per
-  [TBA §14](time-based-analysis.md).
+  [TBA §14](time-based-analysis.md). **T-14m landed 2026-09-09** (its
+  own generator lives in `src/data/journeys.rs`, not `src/analytics.rs`
+  — see its entry below); **T-14a landed 2026-09-01** out of the
+  suggested order, ahead of every task it lists here, because it
+  needed none of them to be useful now (see its own entry's scope
+  notes — including why it needs no suppression pass from the
+  still-open T-14k: it exports patient-level rows, which T-14a's own
+  spec text says are gated, not suppressed).
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above (T-14m/T-14k/
@@ -619,17 +626,50 @@ manual check confirms it. Split tasks too big for one PR
     - **Acceptance:** vitest units for the sunburst / Sankey transforms
       from a variants payload and the DFG layout; Playwright smoke with
       the API stubbed; a withheld cell is visibly labelled.
-  - [ ] **T-14m — Seeded synthetic journey cohorts.** A generator in
-    `src/data` plus a loco task (`journeys:seed` with `pathway`, `n`,
-    `seed`, `open_share`, `defects`): deterministic instances with
-    segments, steps, and events across `STAGES`, configurable
-    stage-duration distributions, gap and overlap rates, defect
-    injection for every T-14h code, and a censoring share. `subject_ref`
-    values come from a fixed, obviously fictional UUID namespace. Never
-    real data, never derived from real data — the family's synthetic-
-    only rule, and IPPA-data's own disclaimer ("no responsibility to
-    answer any epidemiological question") is the reason to say so in
-    the docs. Used by every T-14 test and by the repo demo seed (EX-4).
-    - **Acceptance:** the same seed produces byte-identical output;
-      generated cohorts satisfy every §5.1 invariant unless a defect
-      was requested; the README states the data is synthetic.
+  - [x] **T-14m — Seeded synthetic journey cohorts.** Landed 2026-09-09.
+    A pure, DB-free generator in `src/data/journeys.rs` plus a loco
+    task, `journeys:seed` (`pathway`, `n`, `seed`, `open_share`,
+    `defects`): deterministic instances with segments, steps, events,
+    and a care team across `tba::STAGES`, weighted stage-duration
+    distributions and inter-segment gaps, defect injection, and a
+    censoring share (`open_share`). Every `subject_ref` / care-team
+    `member_ref` / `location_ref` carries a **fixed, recognizably-fake
+    byte prefix** (`facade50`/`51`/`52`) rather than an ordinary-looking
+    random UUID — never real data, never derived from real data, the
+    family's synthetic-only rule, and IPPA-data's own disclaimer ("no
+    responsibility to answer any epidemiological question") is the
+    reason to say so here too.
+    - [x] Defect injection covers **seven** of T-14h's eight codes
+      (`no_segments`, `open_segment_past_closure`,
+      `terminal_without_clock_stop`, `step_done_before_enrolled`,
+      `steps_out_of_order`, `segment_clipped_by_clock`,
+      `coverage_below_floor`) — `src/data/journeys.rs`'s
+      `DEFECT_CODES`. The eighth, "anchors unreached", needs T-14d's
+      stage-anchor configuration, which does not exist yet; deferred
+      with a documented reason in `DEFECT_CODES`'s own doc comment, not
+      silently dropped.
+    - [x] The pseudo-random source is a hand-rolled `SplitMix64`
+      (`src/data/journeys.rs`'s private `Rng`), not the `rand` crate:
+      reproducibility across `rand` versions is not part of that
+      crate's own compatibility guarantee, and a new dependency (plus a
+      new `compliance/soup.tsv` row) to generate fixture data was
+      judged not worth it against twenty lines.
+    - **Acceptance:** the same seed produces byte-identical output
+      (`same_seed_produces_byte_identical_output`, comparing the full
+      generated `GeneratedCohort` by `PartialEq`); generated cohorts
+      satisfy every §5.1 invariant unless a defect was requested
+      (`clean_instances_satisfy_segment_invariants`); each defect code
+      actually produces its named condition
+      (`each_defect_produces_its_named_condition`); every synthetic ref
+      carries its fixed prefix
+      (`synthetic_refs_are_always_recognizably_fake`). A live DB-gated
+      round trip (`tests/requests/journeys_seed.rs`) proves the task
+      persists exactly what the generator returns, that a bad argument
+      is refused rather than silently defaulted, and that the persisted
+      rows carry the same synthetic-only markers. "Used by every T-14
+      test" is **not yet true** — no other T-14 sub-task has landed to
+      consume it; this generator is available for T-14b/c/d/e/f/g/h/i/j
+      to build on, not yet exercised by them. The repo demo seed (EX-4)
+      integration and the README statement are follow-ups, not done in
+      this change (this crate's own `README.md`/`AGENTS.md` document it
+      instead — see their `journeys:seed` entries).
