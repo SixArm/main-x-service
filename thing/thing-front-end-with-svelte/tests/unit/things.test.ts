@@ -154,6 +154,65 @@ describe("ThingRepository", () => {
         expect(result.offset).toBe(0);
     });
 
+    // Pins T-15: list() hits the plain collection endpoint, /api/things
+    // — not /api/things/search — since a wildcard search has no way to
+    // mean "everything" server-side.
+    it("GETs /api/things on list", async () => {
+        let capturedUrl = "";
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async (input) => {
+                capturedUrl = String(input);
+                return jsonResponse({
+                    success: true,
+                    data: { results: [sampleThing], total: 1 },
+                    error: null,
+                });
+            }),
+        });
+        const repo = new ThingRepository(client);
+        const result = await repo.list();
+        expect(capturedUrl).toContain("/api/things");
+        expect(capturedUrl).not.toContain("/search");
+        expect(result.items).toHaveLength(1);
+    });
+
+    // Pins: list() prefers the X-Total-Count/X-Limit/X-Offset headers
+    // over the body's own total, same as search() (T-28's convention).
+    it("list() prefers pagination headers over the body", async () => {
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async () =>
+                jsonResponse(
+                    { success: true, data: { results: [sampleThing], total: 1 }, error: null },
+                    200,
+                    { "X-Total-Count": "12", "X-Limit": "10", "X-Offset": "0" },
+                ),
+            ),
+        });
+        const repo = new ThingRepository(client);
+        const result = await repo.list({ limit: 10 });
+        expect(result.total).toBe(12);
+        expect(result.limit).toBe(10);
+        expect(result.offset).toBe(0);
+    });
+
+    // Pins: list() with no pagination headers falls back to item count /
+    // the requested limit / 0, exactly like search()'s equivalent case.
+    it("list() falls back to item count and requested limit when headers are absent", async () => {
+        const client = new ApiClient({
+            baseUrl: "http://test",
+            fetch: mockFetch(async () =>
+                jsonResponse({ success: true, data: { results: [sampleThing] }, error: null }),
+            ),
+        });
+        const repo = new ThingRepository(client);
+        const result = await repo.list({ limit: 50 });
+        expect(result.total).toBe(1);
+        expect(result.limit).toBe(50);
+        expect(result.offset).toBe(0);
+    });
+
     // Pins: get(id) issues GET /api/things/{id}.
     it("GETs /api/things/{id} on get", async () => {
         let capturedUrl = "";

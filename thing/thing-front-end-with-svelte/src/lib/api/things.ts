@@ -30,6 +30,18 @@ export interface ReviewQueueOptions {
 }
 
 /**
+ * Parameters for {@link ThingRepository.list}.
+ *
+ * `limit`/`offset` paginate; `mask_sensitive` requests server-side
+ * masking of sensitive fields, same as {@link SearchOptions}.
+ */
+export interface ListOptions {
+  limit?: number;
+  offset?: number;
+  mask_sensitive?: boolean;
+}
+
+/**
  * Parameters for a Thing search query.
  *
  * `q` is the search text; `fuzzy` enables edit-distance tolerance and
@@ -121,6 +133,55 @@ export class ThingRepository {
     // or not): `data.items` was always `undefined`, so `.map` on it in
     // `ThingGrid` threw. Every stub in this crate's own tests encoded
     // the same wrong field name, so nothing here ever caught it.
+    const items = Array.isArray(data) ? data : data.results;
+    const bodyTotal = Array.isArray(data) ? undefined : data.total;
+    const header = (name: string): number | undefined => {
+      const raw = response.headers.get(name);
+      if (raw === null) return undefined;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : undefined;
+    };
+    return {
+      items,
+      total: header("x-total-count") ?? bodyTotal ?? items.length,
+      limit: header("x-limit") ?? opts.limit ?? items.length,
+      offset: header("x-offset") ?? opts.offset ?? 0,
+    };
+  }
+
+  /**
+   * Enumerate the Things collection directly (T-15) — distinct from
+   * {@link search}: `/things/search` has no way to mean "everything".
+   * A bare `q="*"` tokenises to nothing server-side and returns zero
+   * hits regardless of how many records exist, so a page that wants an
+   * unfiltered list (e.g. on first load, before the visitor has typed
+   * anything) must call this endpoint, not fake a wildcard search.
+   *
+   * Same response-shape normalisation as {@link search}: `total`/
+   * `limit`/`offset` prefer the family-wide `X-Total-Count`/`X-Limit`/
+   * `X-Offset` response headers (`agents/share/restful.md`) over
+   * anything the body carries.
+   *
+   * @param opts - Pagination + masking flags.
+   * @returns The page of things, the total count, and the limit/offset
+   *   the service actually applied.
+   * @throws {ApiError} On a failed request.
+   */
+  async list(opts: ListOptions = {}): Promise<{
+    items: Thing[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    const { data, response } = await this.http.getWithHeaders<
+      Thing[] | { results: Thing[]; total?: number }
+    >("/api/things", {
+      query: {
+        limit: opts.limit,
+        offset: opts.offset,
+        mask_sensitive: opts.mask_sensitive,
+      },
+    });
     const items = Array.isArray(data) ? data : data.results;
     const bodyTotal = Array.isArray(data) ? undefined : data.total;
     const header = (name: string): number | undefined => {

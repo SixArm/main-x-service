@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `/things` lists the real collection instead of faking it with `q="*"` (T-31)
+
+The service's own T-15 landed a real `GET /api/things` collection-list
+endpoint, closing the gap T-30's walkthrough had found: `q="*"` never
+listed anything (it tokenises to nothing server-side), so `/things`
+showed nothing on load, always. Added `ThingRepository.list()`
+(mirrors `search()`'s response normalisation, hitting the new
+endpoint directly) and made `runSearch` in `/things/+page.svelte`
+branch on the trimmed query — empty ⇒ `list()`, non-empty ⇒
+`search()` — covering the initial mount, the mask-sensitive toggle,
+and pagination, all of which run with an empty query in the ordinary
+case. `pnpm run check` (0/0), `pnpm test` (97/97, was 94), `pnpm run
+lint` clean, `pnpm test:e2e` (20/20 — two route stubs widened from
+`/things/search` to `/things` since they never type a query term).
+See spec §13 T-31.
+
 ### Fixed — the Things list page crashed on every real search (T-30)
 
 `ThingRepository.search()` read `data.items` from the service's search
