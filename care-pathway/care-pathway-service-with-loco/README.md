@@ -49,6 +49,8 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time |
 | GET | `/api/instances/flow` | Queueing-theory flow (Little's Law: λ/μ/ρ/κ/τ) |
 | GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
+| GET | `/api/care-pathways/{pid}/export/event-log` | Bulk `event_log` export (`?format=csv\|jsonl`) — bupaR/PM4Py shape, never a `subject_ref` or a person/actor URN |
+| GET | `/api/care-pathways/{pid}/export/journey-features` | Bulk `journey_features` export (`?format=csv\|jsonl`) — one row per instance, LT/VT/PT/%A/%VA/coverage/#HO/per-stage/censored |
 
 Every figure is derived on read — nothing is stored — and the
 denominator is always elapsed calendar time, never the sum of recorded

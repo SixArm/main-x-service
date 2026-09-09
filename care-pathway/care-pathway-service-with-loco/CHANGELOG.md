@@ -9,6 +9,60 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14a: event-log and journey-feature bulk export codecs (2026-09-09)
+
+Two new pathway-scoped export endpoints,
+`GET /api/care-pathways/{pathway}/export/{event-log,journey-features}
+?format=csv|jsonl&status=open|closed|all`, so a bupaR / PM4Py / ehrapy
+user can pull the instance layer as a proper event log or per-journey
+feature vector without a bespoke query — spec `13-tasks.md` T-14a
+(`agents/share/pathway-analytics-triage`-triaged 2026-09-03). Landed
+ahead of T-14a's own suggested order, since the two codecs need none
+of the still-unbuilt sibling tasks (T-14b–T-14m) to be genuinely
+useful now, provided the gaps that remain are documented rather than
+silent (see spec `13-tasks.md` T-14a for the full list of scope
+deviations — no `masking_profile` knob, a synchronous v1 rather than a
+T-10 job, three deferred columns, a deferred DFG cross-check).
+
+- New `src/analytics.rs` (DB-free, pure, unit-tested): `EventLogRow`
+  and `JourneyFeatureRow`, their CSV (hand-rolled, RFC 4180 minimal
+  escaping — no new `csv` dependency) and JSONL renderers, and the
+  builders (`event_log_rows`, `journey_feature_row`) that produce them
+  from plain, already-loaded inputs. `journey_feature_row` builds
+  directly from a `tba::InstanceAnalysis`; `censored` is
+  `clock.running`, the one part of T-14e (right-censoring) buildable
+  without that task's own Kaplan–Meier machinery. Thirteen unit tests,
+  including two that seed an instance with a `subject_ref` and an
+  actor URN and assert neither ever appears in either codec's
+  rendered output — the acceptance criterion that matters most,
+  pinned directly rather than left to code review.
+- New `src/controllers/exports.rs`: loads the pathway's cohort
+  (reusing `controllers::tba::{load_cohort, analyze_cohort}`) plus
+  every segment/step/event/team-membership row in four bounded
+  queries (no N+1), resolves each segment's `actor_ref` to its
+  recorded team **role** (never the raw URN — falls back to `None`,
+  never the ref, when the actor is not a team member), and renders the
+  requested format. Gated as `Action::Destructive` (mirroring the
+  `continues_as` bulk-pull precedent in
+  `agents/share/cross-service-linking.md` §10.2) and audited as a
+  disclosure (`disclosure::action::EXPORT`) on every call.
+- `tests/requests/exports.rs`: a live HTTP round-trip against a real
+  Postgres — seed a pathway, enrol an instance, record a segment with
+  an actor, a team member, and an event; pull both codecs in both
+  formats; assert `200`, the right `Content-Type`
+  (`text/csv`/`application/x-ndjson`), the actor resolves to its team
+  role, the instance pid appears as `case_id`, and neither the seeded
+  `subject_ref` nor any `person:`/raw-actor URN ever appears in the
+  body. Plus a `422` on an unrecognised `?format=` and a `404` on an
+  unknown pathway.
+- Verified: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test --lib` (329, up from 318), the DB-gated suite
+  (`scripts/ci-check.sh test-db`, 55 request tests including the new
+  one), the MSRV check (`cargo +1.96 check --all-targets`), `cargo
+  deny check`, and `cargo bench --no-run` all clean. No new
+  dependency, no new migration — every table this reads already
+  existed.
+
 ### Fixed — two container-boot defects, found rolling the T-28o runbook exercise here (2026-09-07)
 
 Same class of defect found writing

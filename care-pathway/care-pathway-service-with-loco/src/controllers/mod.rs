@@ -5,6 +5,11 @@ pub mod care_pathways;
 /// audit-chain verification.
 pub mod compliance;
 pub mod docs;
+/// Bulk `event_log` / `journey_features` export codecs over the
+/// instance layer (spec `13-tasks.md` T-14a). See [`crate::analytics`]
+/// for the pure row-shaping this module only loads data for and
+/// renders.
+pub mod exports;
 /// HL7 FHIR R5 endpoints for the `PlanDefinition` resource (`/fhir/*`).
 pub mod fhir;
 pub mod insights;
