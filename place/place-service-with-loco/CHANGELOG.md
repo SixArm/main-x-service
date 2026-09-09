@@ -8,6 +8,30 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — `GET /api/places`, a real collection-list endpoint (T-17)
+
+Mirrors thing-service's own T-15: `GET /api/places` answered `405`
+(no list endpoint existed), and `q="*"` — the front-end's "list
+everything" fallback — tokenises to nothing (`src/search/mod.rs`),
+so `/places/search` returns zero hits regardless of collection size.
+The Places list page showed nothing on load, always.
+
+`src/api/rest/handlers.rs::list_places` pages
+[`PlaceRepository::list`] directly (already declared, never wired to
+HTTP), reusing this crate's own already-mature pagination scaffolding
+verbatim — `MAX_OFFSET`, `offset_too_large`, `with_page_headers` —
+since `/places/search` already carried the full family pagination
+convention. Registered on both router surfaces and the OpenAPI
+document.
+
+Verified live against a real Postgres: `GET /api/places` (previously
+`405`) now returns `200` with the correct headers; `?offset=` past
+the bound is `400`; the original bug was reproduced unchanged on
+`/places/search?q=*` to confirm this is a new surface, not a rewrite
+of the broken one. `cargo test --lib` 231/231; the DB-gated suite
+gains two request-level tests; `fmt`/`clippy -D warnings`/`deny
+check`/`msrv`/`bench --no-run` all clean. See spec §13 T-17.
+
 ### Fixed — tantivy 0.26 `TopDocs` no longer implements `Collector` directly (2026-09-07)
 
 Bumping `tantivy` 0.22.1 → 0.26.1 broke both `Searcher::search` call

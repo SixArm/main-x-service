@@ -121,7 +121,10 @@ test.describe("Place front-end smoke", () => {
             address: { address_locality: "New York" },
         };
         let lastUrl = "";
-        await page.route("**/api/places/search**", async (route) => {
+        // The query box is never typed into in this test, so every
+        // fetch (initial load and the toggle's re-fetch) goes through
+        // `repo.list()` → `GET /api/places`, not `/search`.
+        await page.route("**/api/places**", async (route) => {
             lastUrl = route.request().url();
             const masked = lastUrl.includes("mask_sensitive=true");
             await route.fulfill({

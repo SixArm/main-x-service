@@ -109,6 +109,36 @@ export class PlaceRepository {
   }
 
   /**
+   * Enumerate the Places collection directly — distinct from
+   * {@link search}: `/places/search` has no way to mean "everything".
+   * A bare `q="*"` tokenises to nothing server-side and returns zero
+   * hits regardless of how many records exist (mirrors the identical
+   * thing-front-end T-15/T-31 finding), so a page that wants an
+   * unfiltered list (e.g. on first load, before the visitor has typed
+   * anything) must call this endpoint, not fake a wildcard search.
+   *
+   * Same response-shape normalisation as {@link search}: a bare
+   * `Place[]` or a `{ results, total }` envelope.
+   * @param opts - Pagination + masking flags.
+   * @returns The page of places and a total count.
+   */
+  async list(
+    opts: { limit?: number; offset?: number; mask_sensitive?: boolean } = {},
+  ): Promise<{ items: Place[]; total: number }> {
+    const data = await this.http.get<
+      Place[] | { results: Place[]; total?: number }
+    >("/api/places", {
+      query: {
+        limit: opts.limit,
+        offset: opts.offset,
+        mask_sensitive: opts.mask_sensitive,
+      },
+    });
+    if (Array.isArray(data)) return { items: data, total: data.length };
+    return { items: data.results, total: data.total ?? data.results.length };
+  }
+
+  /**
    * Fetch one place by id.
    * @throws {ApiError} `isNotFound` when the id is unknown.
    */

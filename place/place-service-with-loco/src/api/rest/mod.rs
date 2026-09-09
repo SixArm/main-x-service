@@ -55,6 +55,7 @@ impl utoipa::Modify for SecurityAddon {
         handlers::metrics_prom,
         auth::whoami,
         handlers::create_place,
+        handlers::list_places,
         handlers::get_place,
         handlers::update_place,
         handlers::delete_place,
@@ -88,6 +89,7 @@ impl utoipa::Modify for SecurityAddon {
         crate::validation::ValidationError,
         crate::db::audit::AuditEntry,
         handlers::HealthResponse,
+        handlers::ListResponse,
         handlers::SearchResponse,
         handlers::ScoredCandidate,
         handlers::DuplicateCheckResponse,
@@ -125,7 +127,10 @@ pub fn create_router(state: AppState) -> Router {
         .route("/health", get(handlers::health))
         // Auth — echo verified bearer-token claims
         .route("/whoami", get(auth::whoami))
-        .route("/places", post(handlers::create_place))
+        .route(
+            "/places",
+            post(handlers::create_place).get(handlers::list_places),
+        )
         .route("/places/search", get(handlers::search_places))
         .route("/places/nearby", get(handlers::nearby_places))
         .route("/places/match", post(handlers::match_place))
@@ -187,7 +192,10 @@ pub fn places_routes() -> loco_rs::controller::Routes {
         .prefix("/api")
         .add("/health", get(handlers::health))
         .add("/whoami", get(auth::whoami))
-        .add("/places", post(handlers::create_place))
+        .add(
+            "/places",
+            post(handlers::create_place).get(handlers::list_places),
+        )
         .add("/places/search", get(handlers::search_places))
         .add("/places/nearby", get(handlers::nearby_places))
         .add("/places/match", post(handlers::match_place))

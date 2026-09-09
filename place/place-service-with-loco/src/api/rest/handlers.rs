@@ -415,6 +415,99 @@ pub async fn search_places(
     )
 }
 
+/// Query parameters for `GET /api/places` (the plain collection list).
+#[derive(Debug, Clone, Default, Deserialize, IntoParams)]
+pub struct ListQuery {
+    /// Max results (default 10, capped at 100).
+    pub limit: Option<usize>,
+    /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
+    /// beyond that is a `400`.
+    pub offset: Option<u64>,
+    /// Mask sensitive fields in the results.
+    pub mask_sensitive: Option<bool>,
+}
+
+/// Default page size for `GET /api/places` — matches
+/// [`SEARCH_DEFAULT_LIMIT`] so switching between the two surfaces
+/// doesn't surprise a caller.
+pub const LIST_DEFAULT_LIMIT: usize = SEARCH_DEFAULT_LIMIT;
+
+/// Largest page this endpoint will ever serve in one response —
+/// matches [`SEARCH_MAX_LIMIT`].
+pub const LIST_MAX_LIMIT: usize = SEARCH_MAX_LIMIT;
+
+/// Collection-list response payload — the same shape as
+/// [`SearchResponse`], so the two surfaces are interchangeable for a
+/// caller that already handles one.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ListResponse {
+    /// The places on this page.
+    pub results: Vec<Place>,
+    /// Count of places on **this page** (not the global total — that
+    /// is the `X-Total-Count` header, `agents/share/restful.md`).
+    pub total: usize,
+}
+
+/// Enumerate every active place, database-backed and paginated.
+///
+/// `GET /api/places[?limit=&offset=&mask_sensitive=]` — the genuine
+/// "list the collection" endpoint, distinct from `/places/search`:
+/// there was previously no way to enumerate places at all (mirroring
+/// thing-service's own T-15) — `q="*"` tokenises to nothing
+/// (`src/search/mod.rs::tokenise`) and `/places/search` returns zero
+/// hits regardless of how many records exist, so an operator (or the
+/// front-end's own empty-query default) had to already know a search
+/// term. This endpoint pages
+/// [`crate::db::PlaceRepository::list`] directly, so its answer is
+/// only ever as stale as the database itself, never as stale as a
+/// second, independently lifecycled search index.
+///
+/// Returns `200` with the family pagination headers
+/// (`X-Total-Count`/`X-Limit`/`X-Offset`, `agents/share/restful.md`);
+/// an `offset` beyond [`MAX_OFFSET`] is a `400` (SEC-G7).
+#[utoipa::path(get, path = "/api/places", tag = "places",
+    params(ListQuery),
+    responses(
+        (status = 200, body = ListResponse),
+        (status = 400, description = "offset too large", body = crate::api::ApiError)
+    ))]
+pub async fn list_places(
+    State(state): State<AppState>,
+    Query(q): Query<ListQuery>,
+) -> impl IntoResponse {
+    let offset = q.offset.unwrap_or(0);
+    if offset > MAX_OFFSET {
+        return offset_too_large();
+    }
+    let limit = q
+        .limit
+        .filter(|l| *l > 0)
+        .unwrap_or(LIST_DEFAULT_LIMIT)
+        .min(LIST_MAX_LIMIT);
+    let mask_sensitive = q.mask_sensitive.unwrap_or(false);
+    let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
+    let places = state
+        .place_repository
+        .list(limit_u64, offset)
+        .await
+        .unwrap_or_default();
+    let total_count = crate::db::count_active(&state.db).await.unwrap_or(0);
+    let results: Vec<Place> = places
+        .into_iter()
+        .map(|p| if mask_sensitive { mask_place(&p) } else { p })
+        .collect();
+    let count = results.len();
+    let response = (
+        StatusCode::OK,
+        Json(ApiResponse::success(ListResponse {
+            results,
+            total: count,
+        })),
+    )
+        .into_response();
+    with_page_headers(response, total_count, limit_u64, offset)
+}
+
 /// Query parameters for `GET /api/places/nearby`.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct NearbyQuery {

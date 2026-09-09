@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `/places` lists the real collection instead of faking it with `q="*"` (T-29)
+
+The service gained a real `GET /api/places` collection-list endpoint
+(own spec §13 T-17), closing the gap where `q="*"` never listed
+anything (it tokenises to nothing server-side), so `/places` showed
+nothing on load, always. Added `PlaceRepository.list()` (mirrors
+`search()`'s response normalisation, hitting the new endpoint
+directly) and made `runSearch` in `/places/+page.svelte` branch on
+the trimmed query — empty ⇒ `list()`, non-empty ⇒ `search()` —
+covering the initial mount and the mask-sensitive toggle. `pnpm run
+check` (0/0), `pnpm test` (61/61, was 59), `pnpm run lint` clean,
+`pnpm test:e2e` (19/19 — one route stub widened from `/places/search`
+to `/places` since it never types a query term). See spec §13 T-29.
+
 ### Fixed — search response field-name mismatch (`items` vs `results`) (T-28)
 
 `PlaceRepository.search()` read `data.items` from the service's search
