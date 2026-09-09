@@ -32,6 +32,12 @@ use super::{
     EventAttendanceMode, EventStatus, EventType, Identifier, Location, Offer, Party, Reference,
 };
 
+/// Serde default for [`Event::active`]: `true` (a newly created event is
+/// active) — `bool::default()` is `false`, the wrong domain default.
+const fn default_active() -> bool {
+    true
+}
+
 /// An event resource. Mirrors schema.org/Event.
 ///
 /// The full schema.org/Event has 40+ properties; this struct includes the
@@ -41,6 +47,15 @@ use super::{
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Event {
     /// Unique event identifier (internal UUID).
+    ///
+    /// `#[serde(default)]` (nil UUID): the create handler mints a
+    /// fresh id whenever it sees the nil sentinel
+    /// (`src/api/rest/handlers.rs::create_event`), so an omitted `id`
+    /// already worked *once the field parsed at all* — but with no
+    /// default it was nonetheless *required* on the wire, so a
+    /// hand-written create body omitting it failed with `422 missing
+    /// field id` before the handler's own nil-check ever ran.
+    #[serde(default)]
     pub id: Uuid,
 
     /// External identifiers (booking number, ticket, confirmation
@@ -50,6 +65,11 @@ pub struct Event {
 
     /// `false` after soft-delete or when an event is cancelled and
     /// the caller wants to filter it out of default listings.
+    ///
+    /// Defaults to `true` (a newly created event is active) — bare
+    /// `#[serde(default)]` would give `bool::default()` (`false`),
+    /// the wrong domain default here.
+    #[serde(default = "default_active")]
     pub active: bool,
 
     // -----------------------------------------------------------------------
@@ -63,13 +83,16 @@ pub struct Event {
     pub alternate_names: Vec<String>,
 
     /// Long-form description (schema.org/description).
+    #[serde(default)]
     pub description: Option<String>,
 
     /// Short distinguishing description
     /// (schema.org/disambiguatingDescription).
+    #[serde(default)]
     pub disambiguating_description: Option<String>,
 
     /// Canonical URL for this event (schema.org/url).
+    #[serde(default)]
     pub url: Option<String>,
 
     /// Image URLs (schema.org/image).
@@ -93,21 +116,26 @@ pub struct Event {
 
     /// When the event ends (schema.org/endDate). When absent, the
     /// event is open-ended.
+    #[serde(default)]
     pub end_date: Option<DateTime<Utc>>,
 
     /// When the doors open / admission begins (schema.org/doorTime).
+    #[serde(default)]
     pub door_time: Option<DateTime<Utc>>,
 
     /// ISO 8601 duration (e.g. "PT1H30M") if no end date is recorded
     /// (schema.org/duration).
+    #[serde(default)]
     pub duration: Option<String>,
 
     /// The originally scheduled start date if the event was
     /// rescheduled (schema.org/previousStartDate).
+    #[serde(default)]
     pub previous_start_date: Option<DateTime<Utc>>,
 
     /// IANA time-zone name for display (e.g. "`America/Los_Angeles`").
     /// Storage is always UTC.
+    #[serde(default)]
     pub time_zone: Option<String>,
 
     /// All-day event marker — when `true`, the time component of
@@ -118,17 +146,25 @@ pub struct Event {
     // -----------------------------------------------------------------------
     // Status, mode, type
     // -----------------------------------------------------------------------
-    /// Lifecycle status (schema.org/eventStatus).
+    /// Lifecycle status (schema.org/eventStatus). Defaults to
+    /// [`EventStatus::Scheduled`] — the enum's own `#[default]` variant.
+    #[serde(default)]
     pub event_status: EventStatus,
-    /// How attendees join (schema.org/eventAttendanceMode).
+    /// How attendees join (schema.org/eventAttendanceMode). Defaults
+    /// to [`EventAttendanceMode::Offline`] — the enum's own
+    /// `#[default]` variant.
+    #[serde(default)]
     pub event_attendance_mode: EventAttendanceMode,
-    /// Event subtype classification (local enum).
+    /// Event subtype classification (local enum). Defaults to
+    /// [`EventType::Generic`] — the enum's own `#[default]` variant.
+    #[serde(default)]
     pub event_type: EventType,
 
     // -----------------------------------------------------------------------
     // Capacity & accessibility
     // -----------------------------------------------------------------------
     /// schema.org/typicalAgeRange (e.g. "7-9", "18+").
+    #[serde(default)]
     pub typical_age_range: Option<String>,
 
     /// schema.org/inLanguage — ISO 639-1 codes.
@@ -136,18 +172,23 @@ pub struct Event {
     pub in_language: Vec<String>,
 
     /// schema.org/isAccessibleForFree.
+    #[serde(default)]
     pub is_accessible_for_free: Option<bool>,
 
     /// schema.org/maximumAttendeeCapacity (total).
+    #[serde(default)]
     pub maximum_attendee_capacity: Option<u32>,
 
     /// schema.org/maximumPhysicalAttendeeCapacity.
+    #[serde(default)]
     pub maximum_physical_attendee_capacity: Option<u32>,
 
     /// schema.org/maximumVirtualAttendeeCapacity.
+    #[serde(default)]
     pub maximum_virtual_attendee_capacity: Option<u32>,
 
     /// schema.org/remainingAttendeeCapacity (places left).
+    #[serde(default)]
     pub remaining_attendee_capacity: Option<u32>,
 
     // -----------------------------------------------------------------------
@@ -201,6 +242,7 @@ pub struct Event {
     // Hierarchy
     // -----------------------------------------------------------------------
     /// schema.org/superEvent — the event this is part of.
+    #[serde(default)]
     pub super_event: Option<Uuid>,
 
     /// schema.org/subEvent — events that are part of this one.

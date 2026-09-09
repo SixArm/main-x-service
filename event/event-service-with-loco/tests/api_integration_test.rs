@@ -188,3 +188,73 @@ async fn validation_rejects_missing_name() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+/// A hand-built body carrying only the two fields the server does NOT
+/// own — `name` and `start_date` — must succeed. Before this fix every
+/// other field (`id`, `active`, `event_status`, `event_attendance_mode`,
+/// `event_type`, and every `Option<T>` property) had no `#[serde]`
+/// default, so the JSON extractor refused a real client's minimal body
+/// with a cascading `422 missing field …` before the handler — including
+/// its own validation and its own nil-`id` mint — ever ran. Same defect
+/// class as the person/thing/place/worker services' own
+/// QA-SERVER-FIELDS fix, just never landed here.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn create_event_from_a_minimal_hand_written_body_succeeds() {
+    let app = common::create_test_router().await;
+    let title = common::unique_event_name("MinimalBody");
+
+    let payload = json!({
+        "name": title,
+        "start_date": "2026-06-01T18:00:00Z",
+    });
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/events")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "create failed: {}",
+        String::from_utf8_lossy(&body)
+    );
+
+    let created: ApiResponse<Event> = serde_json::from_slice(&body).unwrap();
+    let event = created.data.expect("event in body");
+    assert_eq!(event.name, title);
+
+    // The id is server-minted, not the nil sentinel the omitted field
+    // defaulted to.
+    assert_ne!(event.id, uuid::Uuid::nil());
+
+    // Every field the server owns or that is genuinely optional reads
+    // back its documented default rather than having failed the
+    // extractor.
+    assert!(
+        event.active,
+        "a newly created event should default to active"
+    );
+    assert_eq!(
+        event.event_status,
+        event_service::models::EventStatus::Scheduled
+    );
+    assert_eq!(
+        event.event_attendance_mode,
+        event_service::models::EventAttendanceMode::Offline
+    );
+    assert_eq!(event.event_type, event_service::models::EventType::Generic);
+    assert!(event.description.is_none());
+    assert!(event.end_date.is_none());
+    assert!(event.super_event.is_none());
+}
