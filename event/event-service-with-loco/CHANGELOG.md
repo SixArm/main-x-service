@@ -8,6 +8,32 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — `Event`'s missing `#[serde(default)]`s: QA-SERVER-FIELDS, never landed here (T-16)
+
+Every other `*-service-with-loco` crate (person, thing, place, worker)
+already carries the QA-SERVER-FIELDS fix; `Event` never got it. A
+hand-written `POST /api/events` body carrying only `name` and
+`start_date` failed with a cascading `422 missing field id`, then
+`active`, then `event_status`, and so on — the JSON extractor refusing
+the request before the handler's own nil-`id` mint or validation ever
+ran, for fields the server owns or that are genuinely optional.
+
+Added `#[serde(default)]` to every `Option<T>`/`Vec<T>` field lacking
+it, plus `id` (the nil sentinel `create_event` already mints a fresh
+id for) and the three status/mode/type enums, each of which already
+`derive`s `Default` with a sensible variant — just never wired to the
+field via `serde`. `active: bool` needed a custom default function
+(`true`), since `bool::default()` (`false`) is the wrong domain
+default for a newly created event.
+
+Verified live against a real Postgres: a minimal hand-written body
+now returns `201` with every omitted field reading back its
+documented default. `cargo test --lib` 167/167; DB-gated suite gains
+one request-level test asserting every default by name; the gRPC
+integration suite (unaffected — it builds `proto::Event` via Rust
+struct literals) stayed green 4/4; `fmt`/`clippy -D warnings`/`deny
+check`/`msrv`/`bench --no-run` all clean. See spec §13 T-16.
+
 ### Fixed — prost 0.14 / tonic 0.14 migration (tonic-prost split) (2026-09-07)
 
 Dependabot `prost` 0.13 → 0.14.4 and `tonic-build` 0.12.3 → 0.14.6

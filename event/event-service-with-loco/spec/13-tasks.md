@@ -611,3 +611,45 @@ clearly described manual check confirms the acceptance criterion.
     green on a bare `cargo test --lib`; clippy clean. The same seam and
     tests landed in all six `*-service-with-loco` crates that carry a
     `Config`, so the family is uniform.
+
+- [x] **T-16 (M) — `Event`'s missing `#[serde(default)]`s: the
+  QA-SERVER-FIELDS defect, never landed here.** *(Found and fixed
+  2026-09-09, while checking every sibling crate after thing/place's
+  T-15 gap surfaced — a different bug in the same neighbourhood.)*
+  Every other `*-service-with-loco` crate (person, thing, place,
+  worker) already carries the "QA-SERVER-FIELDS" fix: a server-owned
+  or genuinely-optional field with no `#[serde(default)]` is
+  *required* on the wire even though the handler discards or defaults
+  whatever value it demands. `Event` never got it — confirmed live: a
+  hand-written `POST /api/events` body carrying only `name` and
+  `start_date` (the two genuinely client-supplied fields) failed with
+  a cascading `422 missing field id`, then `active`, then
+  `event_status`, and so on, never reaching `create_event`'s own
+  nil-`id` mint or its validation.
+  Added `#[serde(default)]` to every field in `src/models/event.rs`
+  that was `Option<T>`/`Vec<T>` and lacked it (`description`,
+  `disambiguating_description`, `url`, `end_date`, `door_time`,
+  `duration`, `previous_start_date`, `time_zone`,
+  `typical_age_range`, `is_accessible_for_free`, the four
+  `*_attendee_capacity` fields, `super_event`), plus `id` (bare
+  default — the nil UUID, which `create_event` already mints a fresh
+  id for) and the three status/mode/type enums (`event_status`,
+  `event_attendance_mode`, `event_type` — each already `derive`s
+  `Default` with a sensible `#[default]` variant, `Scheduled`/
+  `Offline`/`Generic`, just never wired to the field via `serde`).
+  `active: bool` needed a custom `default_active() -> bool { true }`
+  rather than a bare default, since `bool::default()` is `false` —
+  the wrong domain default for a newly created event.
+  **Verified live**, not just unit-tested: booted a real release
+  binary against a real Postgres. A hand-written body carrying only
+  `name`/`start_date` now returns `201` with `active: true`,
+  `event_status: "scheduled"`, `event_attendance_mode: "offline"`,
+  `event_type: "generic"`, and a server-minted `id` — every other
+  field reading back its documented default. `cargo test --lib`
+  167/167; the DB-gated suite gains
+  `create_event_from_a_minimal_hand_written_body_succeeds`
+  (`tests/api_integration_test.rs`), asserting every one of those
+  defaults by name; the existing gRPC integration suite (which
+  constructs `proto::Event` via Rust struct literals, unaffected by a
+  serde-only change) stayed green, 4/4; `fmt`/`clippy -D warnings`/
+  `deny check`/`msrv`/`bench --no-run` all clean.
