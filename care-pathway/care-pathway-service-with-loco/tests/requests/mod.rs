@@ -3,6 +3,7 @@
 mod care_pathways;
 mod compliance;
 mod event_outbox;
+mod exports;
 mod fhir;
 mod insights;
 mod instances;

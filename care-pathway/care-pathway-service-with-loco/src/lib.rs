@@ -22,6 +22,11 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+/// Event-log and journey-feature export codecs (spec `13-tasks.md`
+/// T-14a) — pure row-shaping over [`tba::InstanceAnalysis`] plus the
+/// instance layer's segments/steps/events/team, DB-free and
+/// unit-tested. See [`controllers::exports`] for the HTTP surface.
+pub mod analytics;
 pub mod app;
 pub mod auth;
 /// Regulatory-compliance controls: the tamper-evident audit chain,

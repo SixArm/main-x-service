@@ -233,6 +233,29 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    Write side: [`src/controllers/links.rs`](../src/controllers/links.rs);
    stitching read: [`src/journey.rs`](../src/journey.rs). Landed §13
    2026-08-24 through 2026-08-27 (`0.2.0`, CHANGELOG.md).
+20. **Event-log and journey-feature bulk export codecs.** `GET
+   /api/care-pathways/{pid}/export/{event-log,journey-features}
+   ?format=csv|jsonl&status=open|closed|all` render the instance layer
+   as a bupaR/PM4Py-shaped event log (`case_id`, `activity`,
+   `lifecycle`, `timestamp`, `resource` — the team **role** of a
+   segment's `actor_ref`, never the URN) or a per-instance feature
+   vector (LT/VT/PT/%A/%VA/coverage/#HO/per-stage/`censored`), for a
+   notebook consumer to build on rather than a bespoke query. Gated
+   `destructive` (mirroring the `continues_as` bulk-pull precedent
+   above) and audited as a disclosure on every call. `case_id` is
+   always the instance `pid`, never `subject_ref` — the one invariant
+   both the entity-level spec's acceptance criterion and this crate's
+   tests pin directly against seeded data carrying a real `subject_ref`
+   and actor URN, not merely never-constructed. Pure row-shaping:
+   [`src/analytics.rs`](../src/analytics.rs); HTTP surface + loading:
+   [`src/controllers/exports.rs`](../src/controllers/exports.rs). This
+   is a **synchronous v1**, not the native (non-FHIR) bulk
+   import/export API the "Deferred" note above still names — that
+   async job/artifact-store contract remains unbuilt; see the module's
+   own doc comment and the entity-level
+   [`13-tasks.md`](../../spec/13-tasks.md) T-14a for the full scope
+   note (no `masking_profile` knob; three feature columns deferred to
+   still-unbuilt sibling tasks). Landed 2026-09-09.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

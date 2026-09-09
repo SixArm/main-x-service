@@ -385,10 +385,16 @@ manual check confirms it. Split tasks too big for one PR
   `src/analytics.rs`, DB-free and property-tested, per
   [TBA §14](time-based-analysis.md).
 
-  - [ ] **T-14a — Event-log and journey-feature export codecs.**
-    Extends T-10 with two named export codecs, so a bupaR / PM4Py /
-    ehrapy user can consume the instance layer without a bespoke query.
-    - [ ] `event_log` (CSV + JSONL): one row per activity instance.
+  - [x] **T-14a — Event-log and journey-feature export codecs.**
+    Landed 2026-09-09, ahead of the suggested order above (T-14m/T-14k/
+    T-14b–j are still unbuilt) because the two codecs need none of
+    them to produce a real, useful v1 — see the deviations noted below,
+    each an explicit scope decision rather than a silent gap. Pure
+    row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
+    surface + DB loading in `src/controllers/exports.rs`:
+    `GET /api/care-pathways/{pathway}/export/{event-log,journey-features}
+    ?format=csv|jsonl&status=open|closed|all`.
+    - [x] `event_log` (CSV + JSONL): one row per activity instance.
       `case_id` = the instance `pid` (never `subject_ref`; a patient's
       stitched journey across instances is [OQ-9](16-open-questions.md)),
       `activity` = `stage:<stage>` for segments, `step:<name>` for
@@ -396,25 +402,56 @@ manual check confirms it. Split tasks too big for one PR
       = `start` / `complete` (segments carry both; steps and events are
       `complete`-only, as BNSSG's point-in-time rows were), `timestamp`,
       `category`, `waste`, `resource` = the team **role** of
-      `actor_ref` (never the URN), `location_ref`; case attributes
-      `pathway_pid`, `care_setting`, `urgency`, `status`, `outcome`.
-    - [ ] `journey_features` (CSV + JSONL): one row per instance with
-      LT, VT, PT, %A, %VA, coverage, #HO, per-stage durations, gap
-      count, anchors + delays (T-14d), variant string (T-14c),
-      conformance (T-14i), outcome, and a `censored` flag. This is the
-      per-journey feature vector ehrapy's longitudinal tutorial builds
-      by hand — the input to a notebook's clustering, not the service's.
-    - [ ] Both are **patient-level ⇒ non-shareable**
-      (TreatmentPatterns' `exportPatientLevel` split): `masking_profile`
-      masked by default, `full` gated, every export audited, per T-10.
-      Suppression does **not** apply to rows (T-14k applies to
-      aggregates); gating does.
-    - **Acceptance:** exporting a seeded cohort (T-14m) and re-deriving
-      the DFG from the file equals the T-14b endpoint's DFG; a test
-      asserts no codec output ever contains a `subject_ref` or a person
-      URN; the column set is pinned by a snapshot so a bupaR
-      `eventlog(case_id, activity_id, lifecycle_id, timestamp,
-      resource_id)` mapping does not drift.
+      `actor_ref` (never the URN — resolved via `instance_team`; `None`
+      when the actor is not a recorded team member, never a fallback to
+      the raw ref), `location_ref`; case attributes `pathway_pid`,
+      `care_setting`, `urgency`, `status`, `outcome`.
+    - [x] `journey_features` (CSV + JSONL): one row per instance with
+      LT, VT, PT, %A, %VA, coverage, #HO, per-stage durations
+      (`stage_<name>_ms`, one column per `tba::STAGES`), gap count, and
+      a `censored` flag (`clock.running` — the one part of T-14e
+      buildable without that task's own Kaplan–Meier machinery).
+      Anchors + delays (T-14d), variant string (T-14c), and conformance
+      (T-14i) are present as columns (`anchors_delays`, `variant`,
+      `conformance`) but always `null` — those three sibling tasks are
+      not yet built, so there is nothing to compute yet; this is a
+      documented gap (each field's doc comment names the task that
+      fills it), not a silently-empty string, and no other T-14a work
+      is blocked on landing them first.
+    - [x] Both are **patient-level ⇒ non-shareable**, gated as
+      `Action::Destructive` (mirroring the `continues_as` bulk-pull
+      precedent, [cross-service-linking.md §10.2](../../agents/share/cross-service-linking.md))
+      rather than `Read`, and every call is audited as a disclosure
+      (`disclosure::action::EXPORT`) — **deviation from the spec text
+      above**: no separate `masking_profile` knob was built. The codec
+      never produces `subject_ref` or an actor's raw URN in the first
+      place (see the `resource` derivation above), so there is nothing
+      a `full` mode would additionally reveal — the fields a mask would
+      redact are excluded unconditionally, not merely withheld by
+      default. T-10's own async job contract (queue, `bulk_jobs` row,
+      artifact store) is **not yet built** for this crate either; this
+      is a **synchronous v1** that renders on the request path,
+      documented as such in `src/controllers/exports.rs`'s module doc
+      rather than silently presented as the full T-10 contract.
+      Suppression does **not** apply to rows (T-14k, itself unbuilt,
+      would apply to aggregates only); gating does, and is live.
+    - **Acceptance:** the seeded-cohort/T-14b DFG cross-check is
+      **deferred** — T-14m and T-14b do not exist yet, so there is
+      nothing to re-derive against. A test does assert no codec output
+      ever contains a `subject_ref` or a person URN — both a DB-free
+      property test in `src/analytics.rs` (`event_log_never_carries_…`,
+      `journey_features_never_carries_…`) and a live HTTP round-trip in
+      `tests/requests/exports.rs` seeding an instance whose
+      `subject_ref` and actor URN are deliberately present, so the
+      absence is proven against real data, not merely never
+      constructed. The column set is pinned, but by a plain literal
+      assertion (`event_log_csv_header_is_pinned`,
+      `journey_features_csv_header_is_pinned`) rather than an `insta`
+      snapshot — this crate declares `insta` as a dev-dependency but
+      had never actually used it anywhere before this task, and
+      introducing that workflow (`.snap` files, `cargo insta review`)
+      for the first time was judged lower-value than an assertion that
+      already gives the same drift protection.
   - [ ] **T-14b — Directly-follows process map per pathway cohort.**
     `GET /api/care-pathways/{pathway}/process-map?level=stage|step`
     (+ the T-14f cohort filters): nodes (activity, instance count,
