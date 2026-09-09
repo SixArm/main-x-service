@@ -520,7 +520,7 @@ clearly described manual check confirms the acceptance criterion.
     and a single-digit-transposed invalid one for each of
     ISBN-10/ISBN-13/ISSN/GTIN-8/GTIN-13.
 
-- [ ] **T-15 — No way to enumerate all things.** *(Found 2026-09-08, a
+- [x] **T-15 — No way to enumerate all things.** *(Found 2026-09-08, a
   live operator walkthrough of thing-front-end-with-svelte against a
   real running instance of this service — repo `tasks.md` root
   entity-level T-5.)* This crate has no plain `GET /api/things` list
@@ -559,4 +559,36 @@ clearly described manual check confirms the acceptance criterion.
   pagination convention (`limit`/`offset` + `X-Total-Count`/`X-Limit`/
   `X-Offset` headers, `agents/share/restful.md`); a request-level test
   seeds N things and asserts all N come back with no `q`.
+
+  **Landed 2026-09-09 — the second option.** A real `GET /api/things`
+  (`src/api/rest/handlers.rs::list_things`), database-backed via the
+  existing `ThingRepository::list` (already used internally by
+  `/things/deduplicate`'s scan and the FHIR search scan — not new
+  code, just a missing wire) rather than teaching the search index a
+  wildcard special case, so `check-duplicates`'s blocking path is
+  untouched and needs no re-verification. Carries the family
+  pagination convention exactly: `?limit=&offset=`, `X-Total-Count`/
+  `X-Limit`/`X-Offset` response headers (mirroring `organization`
+  `-service`'s reference `PageParams`/`with_page_headers` shape), a
+  clamped (not refused) oversized `limit`, and a `400` past the
+  SEC-G7 `LIST_MAX_OFFSET` bound. Registered on both of this crate's
+  router-construction surfaces (`create_router` and `things_routes`)
+  and the OpenAPI document.
+
+  **Verified live**, not just unit-tested: booted a real release
+  binary against a real Postgres. `GET /api/things` — previously a
+  bare `405` — now returns `200`; a seeded record round-trips with
+  `X-Total-Count: 1`; `?offset=10001` is a `400`; and the *original*
+  bug was reproduced unchanged on `/things/search?q=*` (still
+  `{"results":[],"total":0}`) to confirm this is a new, additional
+  surface, not a rewrite of the broken one. `cargo test --lib`
+  218/218 (new: pure `resolve_list_page` page-resolution tests);
+  DB-gated suite adds two request-level tests
+  (`listing_with_no_query_term_enumerates_seeded_things`,
+  `listing_beyond_the_offset_bound_is_rejected`) — the whole suite
+  20/20 passing; `cargo fmt`/`clippy --all-targets -D warnings`/`deny
+  check`/`msrv`/`bench --no-run` all clean. The front-end fix riding
+  along with this (`thing/spec/13-tasks.md` T-5's note, the
+  `ThingRepository.list` addition) is tracked there, not duplicated
+  here.
 

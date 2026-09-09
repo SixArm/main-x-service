@@ -37,7 +37,10 @@ test.describe("Thing front-end smoke", () => {
     test("things list mask-sensitive toggle re-fetches with mask_sensitive", async ({
         page,
     }) => {
-        await page.route("**/api/things/search**", async (route) => {
+        // The query box is never typed into in this test, so every
+        // fetch (initial load and the toggle's re-fetch) goes through
+        // `repo.list()` → `GET /api/things` (T-15), not `/search`.
+        await page.route("**/api/things**", async (route) => {
             const url = new URL(route.request().url());
             const masked = url.searchParams.get("mask_sensitive") === "true";
             const thing = {
@@ -69,7 +72,9 @@ test.describe("Thing front-end smoke", () => {
     // stopping at the first 50 results with no way to see more.
     test("things list next-page control advances the offset", async ({ page }) => {
         let capturedOffset: string | null = null;
-        await page.route("**/api/things/search**", async (route) => {
+        // No search term is ever typed, so every fetch goes through
+        // `repo.list()` → `GET /api/things` (T-15), not `/search`.
+        await page.route("**/api/things**", async (route) => {
             const url = new URL(route.request().url());
             capturedOffset = url.searchParams.get("offset");
             const onSecondPage = capturedOffset === "50";

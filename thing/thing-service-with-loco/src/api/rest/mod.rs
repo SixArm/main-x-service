@@ -29,6 +29,7 @@ pub use state::AppState;
         handlers::metrics_prom,
         auth::whoami,
         handlers::create_thing,
+        handlers::list_things,
         handlers::get_thing,
         handlers::update_thing,
         handlers::delete_thing,
@@ -55,6 +56,7 @@ pub use state::AppState;
         crate::validation::ValidationError,
         crate::db::audit::AuditEntry,
         handlers::HealthResponse,
+        handlers::ListResponse,
         handlers::SearchResponse,
         handlers::ScoredCandidate,
         handlers::DuplicateCheckResponse,
@@ -90,7 +92,10 @@ pub fn create_router(state: AppState) -> Router {
     let api_routes = Router::new()
         .route("/health", get(handlers::health))
         .route("/whoami", get(auth::whoami))
-        .route("/things", post(handlers::create_thing))
+        .route(
+            "/things",
+            post(handlers::create_thing).get(handlers::list_things),
+        )
         .route("/things/search", get(handlers::search_things))
         .route("/things/match", post(handlers::match_thing))
         .route("/things/check-duplicates", post(handlers::check_duplicates))
@@ -149,7 +154,10 @@ pub fn things_routes() -> loco_rs::controller::Routes {
         .prefix("/api")
         .add("/health", get(handlers::health))
         .add("/whoami", get(auth::whoami))
-        .add("/things", post(handlers::create_thing))
+        .add(
+            "/things",
+            post(handlers::create_thing).get(handlers::list_things),
+        )
         .add("/things/search", get(handlers::search_things))
         .add("/things/match", post(handlers::match_thing))
         .add("/things/check-duplicates", post(handlers::check_duplicates))

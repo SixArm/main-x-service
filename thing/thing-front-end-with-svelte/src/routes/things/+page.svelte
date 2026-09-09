@@ -22,12 +22,12 @@
       (same page), so switching views doesn't require re-submitting
       the query too.
 
-  Reactive notes: an $effect runs the initial unfiltered search once on mount
-  ("*" wildcard); subsequent searches are user-triggered via runSearch
-  (submit, the mask-sensitive toggle's own onchange, or the
-  previous/next page controls). A new query/toggle-submit always starts
-  back at offset 0 (runSearch's default); only the pagination controls
-  advance it.
+  Reactive notes: an $effect runs the initial unfiltered list once on
+  mount (T-15: `repo.list`, not a "*" wildcard search — see runSearch);
+  subsequent searches are user-triggered via runSearch (submit, the
+  mask-sensitive toggle's own onchange, or the previous/next page
+  controls). A new query/toggle-submit always starts back at offset 0
+  (runSearch's default); only the pagination controls advance it.
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
@@ -54,22 +54,32 @@
     const hasPreviousPage = $derived(offset > 0);
     const hasNextPage = $derived(offset + things.length < total);
 
-    // Execute a search; empty input falls back to "*" to list everything.
-    // `requestedOffset` defaults to 0 — a new query or toggle change
-    // starts back at the first page; only the pagination controls pass
-    // a non-zero value.
+    // Execute a search, or — when the input is empty — enumerate the
+    // collection directly via `repo.list` (T-15: `/things/search` has
+    // no way to mean "everything"; a bare `q="*"` tokenises to nothing
+    // server-side and always returns zero hits, regardless of how many
+    // records exist). `requestedOffset` defaults to 0 — a new query or
+    // toggle change starts back at the first page; only the pagination
+    // controls pass a non-zero value.
     async function runSearch(q: string, requestedOffset = 0) {
         loading = true;
         error = null;
         try {
-            const res = await repo.search({
-                q: q || "*",
-                limit: PAGE_SIZE,
-                offset: requestedOffset,
-                fuzzy,
-                phonetic,
-                mask_sensitive: maskSensitive,
-            });
+            const trimmed = q.trim();
+            const res = trimmed
+                ? await repo.search({
+                      q: trimmed,
+                      limit: PAGE_SIZE,
+                      offset: requestedOffset,
+                      fuzzy,
+                      phonetic,
+                      mask_sensitive: maskSensitive,
+                  })
+                : await repo.list({
+                      limit: PAGE_SIZE,
+                      offset: requestedOffset,
+                      mask_sensitive: maskSensitive,
+                  });
             things = res.items;
             total = res.total;
             // The service's actually-applied offset (X-Offset), not just
@@ -97,7 +107,8 @@
         if (thing.id) goto(`/things/${thing.id}`);
     }
 
-    // Populate the grid with an initial wildcard search on first render.
+    // Populate the grid on first render — an empty query routes to
+    // `repo.list` inside runSearch (T-15), not a wildcard search.
     $effect(() => {
         void runSearch("");
     });

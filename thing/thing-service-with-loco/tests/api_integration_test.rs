@@ -164,3 +164,87 @@ async fn omitting_name_fails_validation_not_the_json_extractor() {
         "expected the validation-layer error code, got: {body}"
     );
 }
+
+/// `GET` a path, returning the status, response headers, and parsed body.
+async fn get_things(app: &axum::Router, uri: &str) -> (StatusCode, axum::http::HeaderMap, Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(uri)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let headers = response.headers().clone();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let parsed: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    (status, headers, parsed)
+}
+
+/// T-15 — `GET /api/things` (no `q`) is a genuine "enumerate the
+/// collection" endpoint, distinct from `/things/search` (which returns
+/// zero hits for `q="*"` or an empty `q`, regardless of how many
+/// records exist — the front-end's stated assumption that a bare `*`
+/// lists everything did not hold). Seeds three things carrying no
+/// shared literal prefix (so the fuzzy matcher's duplicate-check on
+/// create cannot flag any pair) and asserts a plain, term-free list
+/// call returns at least those three — "at least" because the suite's
+/// other tests share this database and may have created rows of their
+/// own; the pagination headers on this call name the true collection
+/// size regardless.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn listing_with_no_query_term_enumerates_seeded_things() {
+    let app = test_router().await;
+    let names: Vec<String> = (0..3)
+        .map(|_| uuid::Uuid::new_v4().simple().to_string())
+        .collect();
+    let mut seeded_ids = Vec::new();
+    for name in &names {
+        let (status, body) = post_things(&app, &json!({ "name": name })).await;
+        assert_eq!(status, StatusCode::CREATED, "{body:?}");
+        seeded_ids.push(body["data"]["id"].as_str().unwrap().to_string());
+    }
+
+    // A page large enough to cover this test's own seeded rows alongside
+    // whatever the rest of the suite has already created.
+    let (status, headers, body) = get_things(&app, "/api/things?limit=500").await;
+    assert_eq!(status, StatusCode::OK, "{body:?}");
+
+    let results = body["data"]["results"].as_array().expect("results array");
+    let returned_ids: Vec<&str> = results.iter().map(|r| r["id"].as_str().unwrap()).collect();
+    for id in &seeded_ids {
+        assert!(
+            returned_ids.contains(&id.as_str()),
+            "seeded thing {id} missing from the unfiltered list; returned {returned_ids:?}"
+        );
+    }
+
+    // The family pagination headers (`agents/share/restful.md`): the
+    // total is the true collection size (at least the 3 just seeded),
+    // never the empty answer `/things/search?q=*` gives today.
+    let total_count: u64 = headers["x-total-count"].to_str().unwrap().parse().unwrap();
+    assert!(
+        total_count >= 3,
+        "X-Total-Count should count the whole collection, got {total_count}"
+    );
+    assert_eq!(headers["x-limit"], "500");
+    assert_eq!(headers["x-offset"], "0");
+}
+
+/// An `offset` beyond the SEC-G7 bound is a `400`, not a database query
+/// that materialises and discards ten thousand-plus rows.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn listing_beyond_the_offset_bound_is_rejected() {
+    let app = test_router().await;
+    let (status, _headers, body) = get_things(&app, "/api/things?offset=10001").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body:?}");
+    assert_eq!(body["error"]["code"], "OFFSET_TOO_LARGE");
+}

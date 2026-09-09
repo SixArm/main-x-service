@@ -251,3 +251,26 @@
   everything" `q="*"` default itself never returns results against
   this backend — a service-side gap, not a client one — is tracked as
   the sibling crate's own spec §13 T-15, not fixed here).
+
+- [x] **T-31 — Wire `/things` to the service's new list endpoint,
+  closing T-15 end to end.** *(2026-09-09, follows the service's own
+  T-15 landing.)* `/things`'s empty-query fallback faked "list
+  everything" with `q="*"`, which the service's own T-15 already
+  documented as never working (a bare `*` tokenises to nothing
+  server-side, so the list page showed nothing on load, always,
+  regardless of how many records existed) — the client-side half of
+  the same defect T-30 fixed the search-with-a-real-term half of.
+  Added `ThingRepository.list()` (`src/lib/api/things.ts`), mirroring
+  `search()`'s response normalisation (bare-array or `{results,
+  total}`, the family pagination headers preferred over the body) but
+  hitting the new `GET /api/things` directly. `runSearch` in
+  `/things/+page.svelte` now branches on the trimmed query: empty ⇒
+  `repo.list()`, non-empty ⇒ `repo.search()` — covering the initial
+  mount, the mask-sensitive toggle, and pagination, all of which run
+  with an empty query in the common "just show me things" case.
+  **Acceptance:** `pnpm run check` (0/0), `pnpm test` (97/97, was 94 —
+  3 new `list()` unit tests), `pnpm run lint` clean, `pnpm test:e2e`
+  (20/20 — the mask-sensitive-toggle and next-page tests' route stubs
+  widened from `**/api/things/search**` to `**/api/things**` since
+  neither test ever types a query term, so every one of their fetches
+  now goes through `list()`, not `search()`).

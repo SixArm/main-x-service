@@ -8,21 +8,36 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
-### Found — no way to enumerate all things (T-15, not yet fixed)
+### Added — `GET /api/things`, a real collection-list endpoint (T-15)
 
-A live operator walkthrough of thing-front-end-with-svelte against a
-real running instance of this service found that the Things list page
-shows nothing on load, always, regardless of how many records exist:
-this crate has no plain list endpoint (`GET /api/things` answers
-`405`), and `SearchEngine::fuzzy_search`/`search` both return zero
-hits for the front-end's `q="*"` "list everything" query — confirmed
-against a seeded record via `curl` and by reading `src/search/mod.rs`
-(`tokenise("*")` is `[]`). Recorded as spec §13 T-15 with the two
-candidate fixes (a real list endpoint, or teaching the search engine
-to treat an empty/wildcard query as "first N documents"); not fixed
-here, since either shape is real backend design work — see T-15 for
-the full account and why `check-duplicates`'s blocking path is a
-dependency either way.
+A live operator walkthrough of thing-front-end-with-svelte had found
+that the Things list page showed nothing on load, always, regardless
+of how many records exist: this crate had no plain list endpoint
+(`GET /api/things` answered `405`), and `SearchEngine::fuzzy_search`/
+`search` both return zero hits for the front-end's `q="*"` "list
+everything" query — `tokenise("*")` is `[]`. Recorded as spec §13
+T-15 with two candidate fixes; landed as the second one, so
+`check-duplicates`'s blocking path (which shares the search engine)
+needed no re-verification.
+
+`src/api/rest/handlers.rs::list_things` pages
+[`ThingRepository::list`] directly — already used internally by
+`/things/deduplicate`'s scan and the FHIR search scan, just never
+wired to an HTTP route — carrying the family pagination convention
+(`agents/share/restful.md`): `?limit=&offset=`, `X-Total-Count`/
+`X-Limit`/`X-Offset` response headers, a clamped oversized `limit`,
+and a `400` past the SEC-G7 offset bound. Registered on both router
+surfaces and the OpenAPI document.
+
+Verified live against a real Postgres: `GET /api/things` (previously
+a bare `405`) now returns `200` with the correct headers, `?offset=`
+past the bound is `400`, and the original bug was reproduced
+unchanged on `/things/search?q=*` to confirm this is a new surface,
+not a rewrite of the broken one. `cargo test --lib` 218/218; the
+DB-gated suite gains two request-level tests (list enumerates seeded
+things with no `q`; the offset bound is enforced) — 5/5 in that file,
+20/20 total; `fmt`/`clippy -D warnings`/`deny check`/`msrv`/`bench
+--no-run` all clean. See spec §13 T-15 for the full account.
 
 ### Fixed — doc drift: stale MSRV 1.95/N-3 reference (2026-09-06)
 

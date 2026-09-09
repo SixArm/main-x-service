@@ -74,9 +74,20 @@ clearly described manual check confirms the acceptance criterion.
     Found and fixed a real, previously-undiscovered defect this way —
     front-end T-30 (`data.items` vs the service's real `data.results`
     field name crashed the list page on every real search) — and found
-    a second, still-open one now tracked as service T-15 (the list
+    a second one, at the time left open as service T-15 (the list
     page's `q="*"` "list everything" default never returns anything
-    against the real service; a service-side gap, not fixed here).
+    against the real service; a service-side gap, not fixed in that
+    pass). **T-15 landed 2026-09-09**: a real `GET /api/things`
+    collection-list endpoint (database-backed, not the search index —
+    same shape as `person-service`'s reference `GET /api/persons`),
+    with the family pagination headers, and the front-end's `/things`
+    page now calls it (`ThingRepository.list`) whenever the query box
+    is empty instead of faking a `q="*"` search. Verified live: the
+    old bug reproduces exactly as before on `/things/search?q=*`
+    (untouched, still zero hits) while the new `GET /api/things`
+    returns the seeded record with correct `X-Total-Count`/`X-Limit`/
+    `X-Offset` headers, and `GET /api/things` (no query) now answers
+    `200` where it used to be a bare `405`.
   - **Acceptance met**, and then some: the walkthrough surfaced two
     real defects a green test suite had been hiding, exactly the
     property this task existed to check for.
