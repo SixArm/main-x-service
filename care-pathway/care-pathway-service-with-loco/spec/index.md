@@ -256,6 +256,26 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    [`13-tasks.md`](../../spec/13-tasks.md) T-14a for the full scope
    note (no `masking_profile` knob; three feature columns deferred to
    still-unbuilt sibling tasks). Landed 2026-09-09.
+21. **Seeded synthetic journey cohorts.** `cargo loco task
+   journeys:seed pathway:<pid> [n:] [seed:] [open_share:] [defects:]`
+   generates and persists a deterministic cohort of pathway instances
+   with segments, steps, events, and a care team — fixture data for
+   the T-14 test suite (T-14a above and every still-unbuilt sibling)
+   and for local/demo use, never a production data source. Every
+   generated `subject_ref` / care-team `member_ref` / `location_ref`
+   carries a fixed, recognizably-fake byte prefix
+   (`facade50`/`51`/`52`), never an ordinary-looking random UUID — the
+   same never-real-data discipline T-14a's export codecs observe, one
+   level earlier. `defects:` injects exactly one of seven closed-
+   vocabulary conditions per requested code (an eighth, "anchors
+   unreached", awaits T-14d and is not yet buildable). Pure generator:
+   [`src/data/journeys.rs`](../src/data/journeys.rs) (a hand-rolled
+   `SplitMix64` PRNG, not the `rand` crate — reproducibility across
+   `rand` versions isn't part of that crate's guarantee, and a
+   fixture-only dependency wasn't worth a new SOUP-register row);
+   task: [`src/tasks/journeys_seed.rs`](../src/tasks/journeys_seed.rs).
+   Landed 2026-09-09, spec T-14m. "Used by every T-14 test" is not yet
+   true — no sibling T-14 sub-task has landed to consume it yet.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

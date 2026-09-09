@@ -58,6 +58,24 @@ activity. Full design:
 [`agents/share/time-based-analysis.md`](../../agents/share/time-based-analysis.md),
 [`../spec/time-based-analysis.md`](../spec/time-based-analysis.md).
 
+### Seeded synthetic journey cohorts (T-14m)
+
+```sh
+cargo loco task journeys:seed pathway:<pid>                       # 10 clean instances, seed 42
+cargo loco task journeys:seed pathway:<pid> n:50 seed:7 open_share:0.3
+cargo loco task journeys:seed pathway:<pid> defects:all            # one instance per defect code
+cargo loco task journeys:seed pathway:<pid> defects:no_segments,steps_out_of_order
+```
+
+Deterministic and **synthetic only** — never real data, never derived
+from real data. Every generated `subject_ref` / care-team `member_ref`
+/ `location_ref` carries a fixed, recognizably-fake byte prefix
+(`facade50`/`51`/`52` in hex) rather than an ordinary-looking random
+UUID, so this data can never be mistaken for a real patient's. The
+same seed always produces the same cohort. Pure generator:
+[`src/data/journeys.rs`](./src/data/journeys.rs); task:
+[`src/tasks/journeys_seed.rs`](./src/tasks/journeys_seed.rs).
+
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 
 | Method | Path | Purpose |

@@ -9,6 +9,58 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14m: seeded synthetic journey cohorts (2026-09-09)
+
+A new `journeys:seed` CLI task and its pure generator, so the T-14
+pathway-analytics test suite (T-14a above and every still-unbuilt
+sibling) has deterministic fixture data to build on:
+
+```sh
+cargo loco task journeys:seed pathway:<pid>
+cargo loco task journeys:seed pathway:<pid> n:50 seed:7 open_share:0.3
+cargo loco task journeys:seed pathway:<pid> defects:all
+cargo loco task journeys:seed pathway:<pid> defects:no_segments,steps_out_of_order
+```
+
+- New `src/data/journeys.rs` (DB-free, pure, unit-tested): generates a
+  cohort of `GeneratedInstance`s — segments, steps, events, and a
+  care team — from a `SeedParams` (n, seed, `open_share`, `defects`).
+  Every `subject_ref` / `member_ref` / `location_ref` carries a fixed,
+  recognizably-fake byte prefix (`facade50`/`51`/`52`) rather than an
+  ordinary-looking random UUID. A clean instance satisfies every
+  `spec/time-based-analysis.md` §5.1 segment invariant by construction
+  (positive durations, waste iff unnecessary, at most one open
+  segment). `defects:` injects exactly one of seven closed-vocabulary
+  conditions per requested code (`no_segments`,
+  `open_segment_past_closure`, `terminal_without_clock_stop`,
+  `step_done_before_enrolled`, `steps_out_of_order`,
+  `segment_clipped_by_clock`, `coverage_below_floor`) — an eighth,
+  "anchors unreached", awaits T-14d's stage-anchor configuration and
+  is documented as deferred, not silently missing. The pseudo-random
+  source is a hand-rolled `SplitMix64` (twenty lines), not the `rand`
+  crate: reproducibility across `rand` versions isn't part of that
+  crate's own guarantee, and a fixture-only dependency (plus a new
+  `compliance/soup.tsv` row — this crate is the family's SOUP-register
+  reference) wasn't worth it. 10 unit tests, including
+  `same_seed_produces_byte_identical_output` (the load-bearing
+  property) and `each_defect_produces_its_named_condition`.
+- New `src/tasks/journeys_seed.rs`: the thin impure layer that persists
+  whatever the generator returns, inside one transaction. `n`/`seed`/
+  `open_share` parse with sensible defaults (10/42/0.2); `defects:all`
+  or a comma list; an unknown pathway, a bad numeric argument, or an
+  unknown defect code is refused rather than silently defaulted.
+- `tests/requests/journeys_seed.rs`: a live round trip against a real
+  Postgres — seeds a pathway, runs the task with 6 clean + 2 defect
+  instances, and confirms the database actually holds 8 instances,
+  that the `no_segments` defect instance really has no segments, and
+  that every persisted `subject_ref`/`member_ref` carries its
+  synthetic-fake prefix. Plus every bad-argument path.
+- Verified: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test --lib` (341, up from 329), the DB-gated suite
+  (57 request tests, up from 55), the MSRV check (`cargo +1.96 check
+  --all-targets`), `cargo deny check`, and `cargo bench --no-run` all
+  clean. No new dependency, no new migration.
+
 ### Added — T-14a: event-log and journey-feature bulk export codecs (2026-09-09)
 
 Two new pathway-scoped export endpoints,

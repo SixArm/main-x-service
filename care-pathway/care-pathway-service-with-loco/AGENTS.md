@@ -104,8 +104,16 @@ see `agents/share/event-bus.md`. **Time-based analysis** (`src/tba.rs` +
 links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
-`../../spec/time-based-analysis.md` for the full contract. Deferred
-(spec §13): instance-layer
+`../../spec/time-based-analysis.md` for the full contract. The pathway
+analytics suite T-14 builds on TBA: **T-14a** (event-log/journey-feature
+bulk export codecs, `src/analytics.rs` + `src/controllers/exports.rs`)
+landed 2026-09-01, and **T-14m** (the seeded synthetic journey-cohort
+generator + `journeys:seed` task, `src/data/journeys.rs` +
+`src/tasks/journeys_seed.rs`) landed 2026-09-09 — both ahead of T-14's
+own suggested build order, since each needed none of the sibling T-14
+sub-tasks to be useful now; see `../spec/13-tasks.md` T-14a/T-14m for
+the documented scope deviations from each one's original spec text.
+Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
 (non-FHIR) bulk import/export API. The published key set
@@ -171,6 +179,7 @@ src/
 │   ├── insights.rs         directory/coverage/variants/providers/languages registry lenses
 │   ├── instances.rs        instance lifecycle/review/urgency/team/steps/outcomes + caseload/overdue/care-team-load
 │   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views, constraints, flow
+│   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs)
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
 │   └── metrics.rs          root /metrics.prom Prometheus endpoint
 ├── compliance/
@@ -196,11 +205,15 @@ src/
 ├── tasks/
 │   ├── search.rs             `cargo loco task` Tantivy reindex + boot-time reindex-if-empty
 │   ├── integrity_key.rs      generate/check/report the MAC root key (never logs the key)
-│   └── integrity_resign.rs   re-sign existing rows after a MAC key rotation
+│   ├── integrity_resign.rs   re-sign existing rows after a MAC key rotation
+│   └── journeys_seed.rs      T-14m: `journeys:seed` — persists what src/data/journeys.rs generates
 ├── metrics.rs             process-wide Prometheus registry (CRUD/merge counters + http_requests_total)
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) + ABAC, both reloadable (ReloadableVerifier/ReloadablePolicy — AU-2 key/policy hot-reload)
 ├── version.rs             `Accepts-version` header negotiation middleware (agents/share/api-versioning.md)
 ├── instances.rs            pure instance lifecycle state machine (active↔on_hold→terminal)
+├── analytics.rs            T-14a: pure event_log / journey_features row-shaping + CSV/JSONL codecs, DB-free
+├── data/
+│   └── journeys.rs          T-14m: pure, DB-free synthetic journey-cohort generator (SplitMix64, deterministic)
 ├── tba.rs                 pure time-based analysis: interval union/subtract, the four-bucket
 │                          clock partition, gaps, handoffs, nearest-rank percentiles, the NHS
 │                          access-standard catalogue, cohort rollup, constraint ranking,

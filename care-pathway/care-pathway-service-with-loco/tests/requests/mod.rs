@@ -7,6 +7,7 @@ mod exports;
 mod fhir;
 mod insights;
 mod instances;
+mod journeys_seed;
 mod links;
 mod tba;
 
