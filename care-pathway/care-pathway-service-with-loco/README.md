@@ -45,7 +45,7 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | POST | `/api/instances/{pid}/clock` | Set the pathway clock `start`/`stop` (no `pause`, by design) |
 | GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage, per-stage anchors + adjacent delays |
 | GET | `/api/instances/{pid}/timeline` | The mapped journey as an ordered wall of segments and gaps |
-| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`; `?mode=withhold\|remove` on suppression) |
+| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`), plus censoring-aware Kaplan–Meier survival (`?discontinued=event\|censor`; `?mode=withhold\|remove` on suppression) |
 | GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time (`?mode=withhold\|remove` on suppression) |
 | GET | `/api/instances/flow` | Queueing-theory flow (Little's Law: λ/μ/ρ/κ/τ) |
 | GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
@@ -161,6 +161,39 @@ rather than a new sibling module, since it extends the
 `InstanceAnalysis`/`Standard`/`Compliance` types already there; HTTP
 surface + precedence logic:
 [`src/controllers/tba.rs`](./src/controllers/tba.rs).
+
+### Censoring-aware cohort statistics (T-14e)
+
+`?status=all` mixes a closed instance's finished lead time with an
+open one's still-running lead time as if they were the same kind of
+number, which understates the eventual distribution. Cohort
+time-analysis now also reports `survival.time_to_close`: a
+Kaplan–Meier estimate treating every open instance as right-censored
+at now, with `median_ms`/`p90_ms` read off the curve (`null` with
+reason `curve_did_not_reach` when the curve never drops that far —
+never a fabricated figure) and the numbers of events and censored
+instances disclosed alongside. `?discontinued=event` (default) or
+`?discontinued=censor` selects whether a discontinued closure counts
+as the event or a censoring, echoed as `survival.discontinued`.
+Naming a recognised `from_anchor`/`to_anchor` pair — the same one
+`compliance` uses (T-14d) — adds `survival.time_to_anchor`: a second
+Kaplan–Meier curve for the interval between those two stages, treating
+an instance that reached `from_anchor` but never `to_anchor` as
+censored at the clock's own last-observed instant; an instance that
+never reached `from_anchor` at all is excluded outright, since there
+is no time zero to measure it from. The whole `survival` block is
+withheld under the identical suppression decision as the percentile
+detail — a curve over a handful of instances is exactly as disclosive.
+A two-sample log-rank test (`tba::log_rank`, Mantel–Haenszel form) is
+implemented and unit-tested but has no HTTP surface yet — there is no
+cohort-splitting mechanism in this crate to hand it two sides (T-14f);
+it is ready for that task to call, the same "ready for it, not wired
+to it" posture [`src/suppression.rs`](./src/suppression.rs) already
+documents for its own still-unused 2-D breakdown primitive. Pure logic
+extends `src/tba.rs` itself: `Observation`, `close_observation()`,
+`anchor_observation()`, `KaplanMeier`/`kaplan_meier()`, `LogRank`/
+`log_rank()`; HTTP surface: [`src/controllers/tba.rs`](./src/controllers/tba.rs)
+(`Survival`, `survival_analysis()`).
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 

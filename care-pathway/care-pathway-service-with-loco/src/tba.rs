@@ -1160,6 +1160,322 @@ pub fn anchored_compliance(
     result
 }
 
+// -- T-14e: censoring-aware cohort statistics --------------------------
+
+/// One instance's contribution to a Kaplan–Meier estimate (spec
+/// T-14e): the elapsed time to either the event (`event: true`) —
+/// closure, or reaching a named anchor — or the last time this
+/// instance was observed *without* it (`event: false`,
+/// right-censored: either the clock is still running, or the instance
+/// closed without ever reaching the event). Both cases carry a real
+/// elapsed-time value; only the `event` flag says which one it is,
+/// which is exactly what the estimator needs and no more.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct Observation {
+    /// Elapsed milliseconds from this observation's own time zero.
+    pub time_ms: i64,
+    /// `true` if the event was observed at `time_ms`; `false` if this
+    /// instance was merely still under observation, without the event,
+    /// at `time_ms` (right-censored).
+    pub event: bool,
+}
+
+/// This instance's contribution to a **time-to-close** Kaplan–Meier
+/// estimate. `status` selects the event/censor treatment: `completed`
+/// is always an event, `discontinued` follows `discontinued_is_event`
+/// (spec T-14e's own parameter), and every other status (`active`,
+/// `on_hold`, or anything unrecognised) is the open, right-censored
+/// case. `time_ms` is `analysis.lead_time_ms` either way — closure and
+/// censoring differ only in *what happened* at that elapsed time, not
+/// in the time itself.
+#[must_use]
+pub fn close_observation(
+    analysis: &InstanceAnalysis,
+    status: &str,
+    discontinued_is_event: bool,
+) -> Observation {
+    let event = match status {
+        "completed" => true,
+        "discontinued" => discontinued_is_event,
+        _ => false,
+    };
+    Observation {
+        time_ms: analysis.lead_time_ms,
+        event,
+    }
+}
+
+/// This instance's contribution to a **time-to-anchor** Kaplan–Meier
+/// estimate for the interval `from_anchor` -> `to_anchor` (spec T-14e,
+/// reusing T-14d's own anchor pair) — `None` when `from_anchor` itself
+/// was never reached, since there is then no time zero to measure
+/// from and no honest way to place this instance on the curve at all
+/// (excluded, not assigned an arbitrary origin). When `from_anchor`
+/// *was* reached: `to_anchor` also reached at or after it is the event
+/// (`time_ms` = the interval between them, mirroring
+/// [`anchor_interval`]); otherwise this instance is right-censored at
+/// the clock's own last-observed instant (`clock.stop_ms`, which is
+/// already `as_of` while the clock runs, per [`Clock`]) relative to
+/// `from_anchor` — the same "still under observation, without the
+/// event" case as an open instance in [`close_observation`], just
+/// measured from a later time zero.
+#[must_use]
+pub fn anchor_observation(
+    analysis: &InstanceAnalysis,
+    from_anchor: &str,
+    to_anchor: &str,
+) -> Option<Observation> {
+    let from_ms = analysis
+        .anchors
+        .iter()
+        .find(|a| a.stage == from_anchor)?
+        .first_started_at_ms?;
+    let to_ms = analysis
+        .anchors
+        .iter()
+        .find(|a| a.stage == to_anchor)
+        .and_then(|a| a.first_started_at_ms);
+    Some(match to_ms {
+        Some(to_ms) if to_ms >= from_ms => Observation {
+            time_ms: to_ms - from_ms,
+            event: true,
+        },
+        _ => Observation {
+            time_ms: (analysis.clock.stop_ms - from_ms).max(0),
+            event: false,
+        },
+    })
+}
+
+/// One distinct event time on a Kaplan–Meier survival curve: the
+/// number at risk immediately before it, how many events happened
+/// exactly at it, and the survival probability immediately after.
+/// Censored observations at the same time reduce the *next* step's
+/// risk set but never appear as their own step — a step exists only
+/// where the curve actually drops.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct KmStep {
+    /// This step's elapsed time, milliseconds.
+    pub time_ms: i64,
+    /// Instances still under observation immediately before this time
+    /// (events and censored ties at this same time included).
+    pub at_risk: usize,
+    /// Events at exactly this time (ties are one step, not several).
+    pub events: usize,
+    /// Survival probability immediately after this step, `[0, 1]`.
+    pub survival: f64,
+}
+
+/// Why a percentile could not be read off a Kaplan–Meier curve: it
+/// never dropped that far — heavy censoring left the curve plateaued
+/// above the requested level for its entire observed range.
+const CURVE_DID_NOT_REACH: &str = "curve_did_not_reach";
+
+/// A Kaplan–Meier survival estimate over a cohort's [`Observation`]s
+/// (spec T-14e) — `median_ms`/`p90_ms` are read off the curve as the
+/// first step whose survival drops to `≤ 0.50`/`≤ 0.10`
+/// respectively, matching this crate's existing nearest-rank
+/// [`percentile`] convention exactly when there is no censoring (the
+/// two agree bit-for-bit on a fully-closed cohort — pinned by test).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct KaplanMeier {
+    /// The curve, one entry per distinct event time, in time order.
+    pub steps: Vec<KmStep>,
+    /// Instances that reached the event.
+    pub events: usize,
+    /// Instances right-censored without it.
+    pub censored: usize,
+    /// The median event time, or `None` if the curve never reached it.
+    pub median_ms: Option<i64>,
+    /// [`CURVE_DID_NOT_REACH`] when `median_ms` is `None`.
+    pub median_note: Option<&'static str>,
+    /// The 90th-percentile event time (10% survival), or `None`.
+    pub p90_ms: Option<i64>,
+    /// [`CURVE_DID_NOT_REACH`] when `p90_ms` is `None`.
+    pub p90_note: Option<&'static str>,
+}
+
+/// The first step whose survival has dropped to at most `level`, or
+/// `None` if the curve never reaches it.
+fn read_off(steps: &[KmStep], level: f64) -> Option<i64> {
+    steps
+        .iter()
+        .find(|step| step.survival <= level)
+        .map(|step| step.time_ms)
+}
+
+/// Compute the Kaplan–Meier survival estimator over `observations`
+/// (spec T-14e). An empty sample and an all-censored sample both
+/// produce an empty curve — the former has nothing to say, the latter
+/// never actually observed the event — so both read off `None` with
+/// [`CURVE_DID_NOT_REACH`], never a fabricated median.
+#[must_use]
+pub fn kaplan_meier(observations: &[Observation]) -> KaplanMeier {
+    let censored = observations.iter().filter(|o| !o.event).count();
+    let events_total = observations.len() - censored;
+
+    let mut sorted: Vec<Observation> = observations.to_vec();
+    sorted.sort_by_key(|o| o.time_ms);
+
+    let mut steps = Vec::new();
+    let mut survival = 1.0_f64;
+    let mut at_risk = sorted.len();
+    let mut i = 0;
+    while i < sorted.len() {
+        let time_ms = sorted[i].time_ms;
+        let at_risk_before = at_risk;
+        let mut events_here = 0_usize;
+        let mut tied_here = 0_usize;
+        while i < sorted.len() && sorted[i].time_ms == time_ms {
+            if sorted[i].event {
+                events_here += 1;
+            }
+            tied_here += 1;
+            i += 1;
+        }
+        if events_here > 0 {
+            #[allow(clippy::cast_precision_loss)]
+            let step_survival = (events_here as f64) / (at_risk_before as f64);
+            survival *= 1.0 - step_survival;
+            steps.push(KmStep {
+                time_ms,
+                at_risk: at_risk_before,
+                events: events_here,
+                survival,
+            });
+        }
+        at_risk -= tied_here;
+    }
+
+    let median_ms = read_off(&steps, 0.5);
+    let p90_ms = read_off(&steps, 0.10);
+    KaplanMeier {
+        steps,
+        events: events_total,
+        censored,
+        median_ms,
+        median_note: median_ms.is_none().then_some(CURVE_DID_NOT_REACH),
+        p90_ms,
+        p90_note: p90_ms.is_none().then_some(CURVE_DID_NOT_REACH),
+    }
+}
+
+/// A two-sample log-rank test between two [`Observation`] cohorts
+/// (spec T-14e) — the Mantel–Haenszel form, one degree of freedom.
+/// Ready for T-14f's rule-based cohort split to call with its two
+/// sides; no cohort-splitting mechanism exists yet in this crate (the
+/// same "ready for it, not wired to it" posture `src/suppression.rs`
+/// documents for its own still-unused 2-D breakdown primitive), so
+/// this function has no HTTP surface of its own yet.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct LogRank {
+    /// The chi-square statistic.
+    pub chi_square: f64,
+    /// Always `1` for this two-sample form.
+    pub degrees_of_freedom: u8,
+    /// `None` only when neither group ever contributes a comparable
+    /// event (so there is nothing to test), never a fabricated `1.0`.
+    pub p_value: Option<f64>,
+}
+
+/// Run the log-rank test comparing `group_a` against `group_b`.
+#[must_use]
+pub fn log_rank(group_a: &[Observation], group_b: &[Observation]) -> LogRank {
+    #[derive(Clone, Copy)]
+    struct Tagged {
+        time_ms: i64,
+        event: bool,
+        in_a: bool,
+    }
+    let mut combined: Vec<Tagged> = group_a
+        .iter()
+        .map(|o| Tagged {
+            time_ms: o.time_ms,
+            event: o.event,
+            in_a: true,
+        })
+        .chain(group_b.iter().map(|o| Tagged {
+            time_ms: o.time_ms,
+            event: o.event,
+            in_a: false,
+        }))
+        .collect();
+    combined.sort_by_key(|t| t.time_ms);
+
+    #[allow(clippy::cast_precision_loss)]
+    let (mut n_a, mut n_b) = (group_a.len() as f64, group_b.len() as f64);
+    let (mut observed_a, mut expected_a, mut variance) = (0.0_f64, 0.0_f64, 0.0_f64);
+
+    let mut i = 0;
+    while i < combined.len() {
+        let time_ms = combined[i].time_ms;
+        let (mut events_a, mut events_b, mut ties_a, mut ties_b) =
+            (0_usize, 0_usize, 0_usize, 0_usize);
+        while i < combined.len() && combined[i].time_ms == time_ms {
+            let t = combined[i];
+            match (t.in_a, t.event) {
+                (true, true) => events_a += 1,
+                (true, false) => ties_a += 1,
+                (false, true) => events_b += 1,
+                (false, false) => ties_b += 1,
+            }
+            i += 1;
+        }
+        #[allow(clippy::cast_precision_loss)]
+        let (d_a, d_b) = (events_a as f64, events_b as f64);
+        let d = d_a + d_b;
+        let n = n_a + n_b;
+        if d > 0.0 && n > 1.0 {
+            observed_a += d_a;
+            expected_a += d * n_a / n;
+            variance += d * (n_a / n) * (n_b / n) * (n - d) / (n - 1.0);
+        }
+        #[allow(clippy::cast_precision_loss)]
+        {
+            n_a -= (events_a + ties_a) as f64;
+            n_b -= (events_b + ties_b) as f64;
+        }
+    }
+
+    if variance <= 0.0 {
+        return LogRank {
+            chi_square: 0.0,
+            degrees_of_freedom: 1,
+            p_value: None,
+        };
+    }
+    let chi_square = (observed_a - expected_a) * (observed_a - expected_a) / variance;
+    LogRank {
+        chi_square,
+        degrees_of_freedom: 1,
+        p_value: Some(erfc((chi_square / 2.0).sqrt())),
+    }
+}
+
+/// The complementary error function, via the Abramowitz & Stegun
+/// 7.1.26 rational approximation (max absolute error ~1.5e-7) — not a
+/// statistics library, but sufficient to turn a chi-square(1)
+/// statistic into a p-value worth labelling, which is all
+/// [`log_rank`] needs it for.
+fn erfc(x: f64) -> f64 {
+    1.0 - erf(x)
+}
+
+/// The error function, same approximation as [`erfc`].
+fn erf(x: f64) -> f64 {
+    let sign = if x < 0.0 { -1.0 } else { 1.0 };
+    let x = x.abs();
+    let a1 = 0.254_829_592;
+    let a2 = -0.284_496_736;
+    let a3 = 1.421_413_741;
+    let a4 = -1.453_152_027;
+    let a5 = 1.061_405_429;
+    let p = 0.327_591_1;
+    let t = 1.0 / (1.0 + p * x);
+    let poly = ((((a5 * t + a4) * t) + a3) * t + a2) * t + a1;
+    sign * (1.0 - poly * t * (-x * x).exp())
+}
+
 /// The cohort analysis (spec §7).
 #[derive(Clone, Debug, Serialize)]
 pub struct CohortAnalysis {
@@ -2314,6 +2630,311 @@ mod tests {
         assert_eq!(
             whole_clock.unreached, 0,
             "the whole-clock path never reports unreached"
+        );
+    }
+
+    // -- T-14e: censoring-aware cohort statistics -------------------------
+
+    #[test]
+    fn close_observation_follows_status_and_the_discontinued_parameter() {
+        let closed = analyze(clock(30), &[], T0 + 30 * DAY_MS);
+        assert_eq!(
+            close_observation(&closed, "completed", true),
+            Observation {
+                time_ms: 30 * DAY_MS,
+                event: true
+            }
+        );
+        assert_eq!(
+            close_observation(&closed, "discontinued", true),
+            Observation {
+                time_ms: 30 * DAY_MS,
+                event: true
+            },
+            "discontinued counts as the event when discontinued_is_event"
+        );
+        assert_eq!(
+            close_observation(&closed, "discontinued", false),
+            Observation {
+                time_ms: 30 * DAY_MS,
+                event: false
+            },
+            "discontinued counts as censored when !discontinued_is_event"
+        );
+
+        let open_clock = Clock {
+            start_ms: T0,
+            stop_ms: T0 + 30 * DAY_MS,
+            start_source: "clock_start_at",
+            stop_source: "as_of",
+            running: true,
+        };
+        let open = analyze(open_clock, &[], T0 + 30 * DAY_MS);
+        assert_eq!(
+            close_observation(&open, "active", true),
+            Observation {
+                time_ms: 30 * DAY_MS,
+                event: false
+            },
+            "an open instance is always censored, regardless of the parameter"
+        );
+    }
+
+    #[test]
+    fn anchor_observation_excludes_instances_that_never_reached_from_anchor() {
+        let segments = vec![seg("triaged", "triage", CATEGORY_VALUE_ADDING, 2, 3)];
+        let analysis = analyze(clock(10), &segments, T0 + 10 * DAY_MS);
+        assert_eq!(
+            anchor_observation(&analysis, "referral", "diagnostics"),
+            None,
+            "no time zero to measure from"
+        );
+    }
+
+    #[test]
+    fn anchor_observation_scores_the_interval_when_both_are_reached() {
+        let segments = vec![
+            seg("referred", "referral", CATEGORY_VALUE_ADDING, 0, 1),
+            seg("scanned", "diagnostics", CATEGORY_VALUE_ADDING, 20, 21),
+        ];
+        let analysis = analyze(clock(100), &segments, T0 + 100 * DAY_MS);
+        assert_eq!(
+            anchor_observation(&analysis, "referral", "diagnostics"),
+            Some(Observation {
+                time_ms: 20 * DAY_MS,
+                event: true
+            })
+        );
+    }
+
+    #[test]
+    fn anchor_observation_censors_at_the_clock_when_to_anchor_is_unreached() {
+        let segments = vec![seg("referred", "referral", CATEGORY_VALUE_ADDING, 0, 1)];
+        let analysis = analyze(clock(100), &segments, T0 + 100 * DAY_MS);
+        assert_eq!(
+            anchor_observation(&analysis, "referral", "diagnostics"),
+            Some(Observation {
+                time_ms: 100 * DAY_MS,
+                event: false
+            }),
+            "censored at the clock's own last-observed instant"
+        );
+    }
+
+    /// The literal T-14e acceptance bullet: with no censoring at all,
+    /// Kaplan–Meier's median/p90 read-off must equal this crate's
+    /// existing nearest-rank [`percentile`] exactly.
+    #[test]
+    fn kaplan_meier_matches_nearest_rank_percentile_when_fully_closed() {
+        let values: [i64; 7] = [5, 12, 20, 33, 47, 61, 74].map(|d: i64| d * DAY_MS);
+        let observations: Vec<Observation> = values
+            .iter()
+            .map(|&time_ms| Observation {
+                time_ms,
+                event: true,
+            })
+            .collect();
+        let km = kaplan_meier(&observations);
+        let mut sorted = values.to_vec();
+        sorted.sort_unstable();
+        assert_eq!(km.median_ms, percentile(&sorted, 0.5));
+        assert_eq!(km.p90_ms, percentile(&sorted, 0.90));
+        assert_eq!(km.events, 7);
+        assert_eq!(km.censored, 0);
+    }
+
+    #[test]
+    fn kaplan_meier_groups_ties_into_one_step() {
+        let observations = vec![
+            Observation {
+                time_ms: 10 * DAY_MS,
+                event: true,
+            },
+            Observation {
+                time_ms: 10 * DAY_MS,
+                event: true,
+            },
+            Observation {
+                time_ms: 20 * DAY_MS,
+                event: true,
+            },
+            Observation {
+                time_ms: 20 * DAY_MS,
+                event: false,
+            },
+            Observation {
+                time_ms: 30 * DAY_MS,
+                event: true,
+            },
+        ];
+        let km = kaplan_meier(&observations);
+        assert_eq!(
+            km.steps.len(),
+            3,
+            "one step per distinct event time, ties grouped: {:?}",
+            km.steps
+        );
+        assert_eq!(km.steps[0].at_risk, 5);
+        assert_eq!(km.steps[0].events, 2);
+        assert!((km.steps[0].survival - 0.6).abs() < 1e-9);
+        assert_eq!(km.steps[1].at_risk, 3);
+        assert_eq!(km.steps[1].events, 1);
+        assert!((km.steps[1].survival - 0.4).abs() < 1e-9);
+        assert_eq!(km.steps[2].at_risk, 1);
+        assert_eq!(km.steps[2].events, 1);
+        assert!(km.steps[2].survival.abs() < 1e-9);
+        assert_eq!(km.events, 4);
+        assert_eq!(km.censored, 1);
+        assert_eq!(km.median_ms, Some(20 * DAY_MS));
+        assert_eq!(km.p90_ms, Some(30 * DAY_MS));
+    }
+
+    /// The literal T-14e acceptance bullet: an all-open (here,
+    /// all-censored) cohort returns `null` with the reason.
+    #[test]
+    fn an_all_censored_sample_returns_null_with_the_reason() {
+        let observations: Vec<Observation> = (0..5)
+            .map(|i| Observation {
+                time_ms: i * DAY_MS,
+                event: false,
+            })
+            .collect();
+        let km = kaplan_meier(&observations);
+        assert!(km.steps.is_empty());
+        assert_eq!(km.events, 0);
+        assert_eq!(km.censored, 5);
+        assert_eq!(km.median_ms, None);
+        assert_eq!(km.median_note, Some(CURVE_DID_NOT_REACH));
+        assert_eq!(km.p90_ms, None);
+        assert_eq!(km.p90_note, Some(CURVE_DID_NOT_REACH));
+    }
+
+    #[test]
+    fn an_empty_sample_returns_null_with_the_reason() {
+        let km = kaplan_meier(&[]);
+        assert!(km.steps.is_empty());
+        assert_eq!(km.events, 0);
+        assert_eq!(km.censored, 0);
+        assert_eq!(km.median_ms, None);
+        assert_eq!(km.median_note, Some(CURVE_DID_NOT_REACH));
+    }
+
+    /// The literal T-14e acceptance bullet: the survival function is
+    /// non-increasing and bounded in `[0, 1]`, swept over many random
+    /// samples rather than asserted on one.
+    #[test]
+    fn survival_is_non_increasing_and_bounded_over_random_samples() {
+        // A tiny SplitMix64-style generator — see `data::journeys`'s
+        // `Rng` for the identical rationale not to pull in `rand` here.
+        struct Rng(u64);
+        impl Rng {
+            fn next_u64(&mut self) -> u64 {
+                self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
+                let mut z = self.0;
+                z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+                z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+                z ^ (z >> 31)
+            }
+            #[allow(clippy::cast_possible_truncation)] // reduced mod (hi - lo + 1) first; fixture generation, not a security boundary
+            fn range(&mut self, lo: u64, hi: u64) -> u64 {
+                lo + self.next_u64() % (hi - lo + 1)
+            }
+        }
+
+        for seed in 0..500u64 {
+            let mut rng = Rng(seed);
+            let n = rng.range(1, 30);
+            let observations: Vec<Observation> = (0..n)
+                .map(|_| Observation {
+                    time_ms: i64::try_from(rng.range(0, 100)).unwrap_or(0) * DAY_MS,
+                    event: rng.range(0, 1) == 1,
+                })
+                .collect();
+            let km = kaplan_meier(&observations);
+            let mut previous = 1.0_f64;
+            for step in &km.steps {
+                assert!(
+                    (0.0..=1.0).contains(&step.survival),
+                    "seed {seed}: survival out of range: {step:?}"
+                );
+                assert!(
+                    step.survival <= previous + 1e-9,
+                    "seed {seed}: survival increased from {previous} to {}: {:?}",
+                    step.survival,
+                    km.steps
+                );
+                previous = step.survival;
+            }
+        }
+    }
+
+    /// The literal T-14e acceptance bullet: log-rank on two identical
+    /// cohorts gives p ~= 1.
+    #[test]
+    fn log_rank_on_two_identical_cohorts_gives_p_approx_one() {
+        let group = vec![
+            Observation {
+                time_ms: 5 * DAY_MS,
+                event: true,
+            },
+            Observation {
+                time_ms: 12 * DAY_MS,
+                event: true,
+            },
+            Observation {
+                time_ms: 20 * DAY_MS,
+                event: false,
+            },
+            Observation {
+                time_ms: 30 * DAY_MS,
+                event: true,
+            },
+        ];
+        let result = log_rank(&group, &group.clone());
+        assert!(
+            result.chi_square.abs() < 1e-9,
+            "identical groups: {result:?}"
+        );
+        let p = result
+            .p_value
+            .expect("variance is positive: real events exist");
+        assert!((p - 1.0).abs() < 1e-6, "expected p ~= 1, got {p}");
+    }
+
+    /// Beyond the literal acceptance text: a real survival difference
+    /// is not lost — log-rank must not report p ~= 1 for everything.
+    #[test]
+    fn log_rank_detects_a_real_survival_difference() {
+        let fast: Vec<Observation> = (1..=10_i64)
+            .map(|d| Observation {
+                time_ms: d * DAY_MS,
+                event: true,
+            })
+            .collect();
+        let slow: Vec<Observation> = (1..=10_i64)
+            .map(|d| Observation {
+                time_ms: (d + 50) * DAY_MS,
+                event: true,
+            })
+            .collect();
+        let result = log_rank(&fast, &slow);
+        let p = result.p_value.expect("plenty of events on both sides");
+        assert!(
+            p < 0.05,
+            "expected a small p-value for a real difference, got {p} ({result:?})"
+        );
+    }
+
+    #[test]
+    fn log_rank_with_no_events_anywhere_reports_no_p_value() {
+        let all_censored = vec![Observation {
+            time_ms: 10 * DAY_MS,
+            event: false,
+        }];
+        let result = log_rank(&all_censored, &all_censored.clone());
+        assert_eq!(
+            result.p_value, None,
+            "nothing to test: never fabricate a p-value"
         );
     }
 

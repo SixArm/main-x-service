@@ -386,31 +386,32 @@ manual check confirms it. Split tasks too big for one PR
   [TBA §14](time-based-analysis.md). **T-14a landed 2026-09-09**, then
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
-  below), then **T-14k, T-14b, T-14c, and T-14d, all on 2026-09-10** —
-  six sub-tasks landed. The first four of those six (T-14a, T-14m,
-  T-14k) were out of the suggested order above, because none needed
-  the tasks still ahead of it in this list to be useful now (see each
-  entry's own scope notes; T-14a's covers why it needs no suppression
-  pass from T-14k: it exports patient-level rows, which T-14a's own
-  spec text says are gated, not suppressed — T-14k's own module docs
-  confirm the same thing from the other side). T-14b's own pure logic
-  sits beside T-14a's in `src/analytics.rs` rather than in `src/tba.rs`,
-  matching [TBA §15](time-based-analysis.md)'s own statement that a
-  sequence analysis is not an elapsed-time one. T-14c got its own new
-  file, `src/variants.rs`, rather than adding to the already-large
-  `src/analytics.rs` — the same reasoning that gave T-14k its own
-  `src/suppression.rs` rather than folding into `src/tba.rs`. **T-14d
-  landed in the suggested order** — the third of the "three
-  derivations" trio, right after T-14b and T-14c — its pure logic sits
-  in `src/tba.rs` itself (not a new sibling module), since
-  `StageAnchor`/`Delay`/`anchored_compliance` extend the same
-  `InstanceAnalysis`/`Standard`/`Compliance` types already there,
-  unlike T-14b's/T-14c's genuinely separate sequence-analysis shapes.
+  below), then **T-14k, T-14b, T-14c, T-14d, and T-14e, all on
+  2026-09-10** — seven sub-tasks landed. Three of those seven (T-14a,
+  T-14m, T-14k) were out of the suggested order above, because none
+  needed the tasks still ahead of it in this list to be useful now
+  (see each entry's own scope notes; T-14a's covers why it needs no
+  suppression pass from T-14k: it exports patient-level rows, which
+  T-14a's own spec text says are gated, not suppressed — T-14k's own
+  module docs confirm the same thing from the other side). T-14b's own
+  pure logic sits beside T-14a's in `src/analytics.rs` rather than in
+  `src/tba.rs`, matching [TBA §15](time-based-analysis.md)'s own
+  statement that a sequence analysis is not an elapsed-time one. T-14c
+  got its own new file, `src/variants.rs`, rather than adding to the
+  already-large `src/analytics.rs` — the same reasoning that gave
+  T-14k its own `src/suppression.rs` rather than folding into
+  `src/tba.rs`. The remaining **four landed in the suggested order**:
+  T-14b, T-14c, and T-14d are the "three derivations" trio in full,
+  and **T-14e followed immediately after** — its pure logic sits in
+  `src/tba.rs` itself too (not a new sibling module, same reasoning as
+  T-14d's), since `Observation`/`KaplanMeier`/`LogRank` are a fourth
+  extension of the same file rather than a genuinely separate
+  sequence-analysis shape like T-14b's/T-14c's.
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b/T-14c/T-14d were also still unbuilt (all
-    five have since landed too; T-14e–j remain open) — because the two
+    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e were also still unbuilt
+    (all six have since landed too; T-14f–j remain open) — because the two
     codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
@@ -700,22 +701,73 @@ manual check confirms it. Split tasks too big for one PR
       DB-gated test additionally proves `cancer_fds_28_days` scores
       anchored with no anchor query at all, and that an explicit query
       pair overrides even that standard's own declared anchor.
-  - [ ] **T-14e — Censoring-aware cohort statistics.** Today
+  - [x] **T-14e — Censoring-aware cohort statistics.** Landed
+    2026-09-10, in the suggested order, right after T-14d. Today
     `?status=all` mixes closed lead times with open instances' running
     lead time, which understates the eventual distribution (the
-    survivorship error ehrapy's MIMIC tutorial exists to teach). Add a
+    survivorship error ehrapy's MIMIC tutorial exists to teach). Added a
     Kaplan–Meier estimate of time-to-close and time-to-anchor (T-14d)
     treating open instances as right-censored at `as_of`, with median
     and p90 read off the curve where it reaches them (else `null` with
     reason `curve_did_not_reach`), the numbers of events and censored
-    instances, and a log-rank test between the two sides of a T-14f
-    split. Whether `discontinued` closure is an event or a censor is a
+    instances, and a log-rank test — see the deviation note below for
+    why the test exists without a T-14f split to run it against yet.
+    Whether `discontinued` closure is an event or a censor is a
     parameter, default `event`, echoed. Nearest-rank percentiles stay as
     they are; KM is an additional, labelled block, not a replacement.
+    `src/tba.rs`: `Observation`, `close_observation()` (status +
+    the `discontinued` parameter drive the event/censor split; the
+    elapsed time is `lead_time_ms` either way — only *what happened*
+    at that time differs), `anchor_observation()` (reuses T-14d's own
+    `from_anchor`/`to_anchor` pair; excludes an instance outright when
+    `from_anchor` itself was never reached, rather than assigning it
+    an arbitrary time zero), `KmStep`/`KaplanMeier`/`kaplan_meier()`
+    (the estimator itself — ties grouped into one step, `median_ms`/
+    `p90_ms` read off at survival `≤ 0.50`/`≤ 0.10`, matching this
+    crate's nearest-rank `percentile` convention exactly when there is
+    no censoring — pinned by test), `LogRank`/`log_rank()` (the
+    Mantel–Haenszel two-sample test), and a hand-rolled `erf`/`erfc`
+    (Abramowitz & Stegun 7.1.26) rather than a new statistics
+    dependency. `src/controllers/tba.rs`: `Survival`,
+    `resolve_discontinued()`, `survival_analysis()`, wired into
+    `GET /api/care-pathways/{pathway}/time-analysis` as a new
+    `survival` block, withheld under the identical suppression
+    decision as the percentile detail (a curve over a handful of
+    instances is exactly as disclosive).
+    - [x] **Deviation, disclosed rather than silently worked around:**
+      the log-rank test has no HTTP surface. Its acceptance bullet
+      ("log-rank on two identical cohorts gives p ≈ 1") is provable as
+      a pure unit test with two hand-built groups, and *is* proven
+      that way — but there is no cohort-splitting mechanism in this
+      crate to hand it two real sides from a live request, because
+      T-14f (which builds exactly that) has not landed yet. `log_rank`
+      is implemented, documented, and unit-tested; it is "ready for
+      it, not wired to it" — the same posture `src/suppression.rs`'s
+      own module docs already state for its still-unused 2-D
+      breakdown primitive, quoted verbatim in T-14e's own doc comments
+      so the parallel is explicit rather than merely implied.
     - **Acceptance:** KM on a fully closed cohort equals the empirical
-      distribution; an all-open cohort returns `null` with the reason;
-      log-rank on two identical cohorts gives p ≈ 1; property test: the
-      survival function is non-increasing in `[0, 1]`.
+      distribution
+      (`tba::tests::kaplan_meier_matches_nearest_rank_percentile_when_fully_closed`,
+      comparing directly against the existing nearest-rank
+      `percentile` function on the same values); an all-open cohort
+      returns `null` with the reason
+      (`an_all_censored_sample_returns_null_with_the_reason`); log-rank
+      on two identical cohorts gives p ≈ 1
+      (`log_rank_on_two_identical_cohorts_gives_p_approx_one`);
+      property test: the survival function is non-increasing in
+      `[0, 1]`, swept over 500 random samples of random size and
+      censoring pattern rather than asserted on one
+      (`survival_is_non_increasing_and_bounded_over_random_samples`,
+      a hand-rolled SplitMix64 generator, matching this crate's own
+      existing precedent for property tests rather than a new `rand`/
+      `proptest` dependency). A DB-gated round trip
+      (`tests/requests/tba.rs`'s `censoring_aware_survival_round_trip`)
+      proves time-to-close under both `discontinued` modes, time-to-anchor
+      excluding an instance that never reached `from_anchor`, the
+      absent `time_to_anchor` block when no anchor pair is named, the
+      `422` on an unrecognised `discontinued` value, and the
+      suppression withholding, all against real Postgres.
   - [ ] **T-14f — Rule-based cohort splits and the paired comparison.**
     Every cohort endpoint (`time-analysis`, `constraints`, `variants`,
     `process-map`, `data-quality`) accepts `contains=` / `excludes=`
@@ -898,11 +950,11 @@ manual check confirms it. Split tasks too big for one PR
       persists exactly what the generator returns, that a bad argument
       is refused rather than silently defaulted, and that the persisted
       rows carry the same synthetic-only markers. "Used by every T-14
-      test" is **still not true** — T-14b, T-14c and T-14d have since
-      landed too, but each used a small hand-built fixture rather than
-      this generator (see their own scope notes); this generator
-      remains available for T-14e/f/g/h/i/j to build on, not yet
-      exercised by any of them. The repo demo seed (EX-4)
+      test" is **still not true** — T-14b, T-14c, T-14d and T-14e have
+      since landed too, but each used a small hand-built fixture
+      rather than this generator (see their own scope notes); this
+      generator remains available for T-14f/g/h/i/j to build on, not
+      yet exercised by any of them. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

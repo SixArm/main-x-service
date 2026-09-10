@@ -493,6 +493,12 @@ pub(crate) struct CohortQuery {
     /// `referral` to `triage`.
     #[serde(default)]
     to_anchor: Option<String>,
+    /// `event` (default) | `censor` — whether a `discontinued` closure
+    /// counts as the event or as a right-censoring in the Kaplan–Meier
+    /// survival blocks (spec T-14e). Echoed on the response
+    /// (`survival.discontinued`) rather than silently applied.
+    #[serde(default)]
+    discontinued: Option<String>,
 }
 
 /// Load a pathway's instances, filtered by the query's status lens.
@@ -713,6 +719,77 @@ fn score_compliance(
     }
 }
 
+/// Both Kaplan–Meier blocks for one cohort (spec T-14e).
+#[derive(Debug, serde::Serialize)]
+struct Survival {
+    /// Time-to-close: every instance contributes, closed or still
+    /// open, so `?status=all`'s mixing problem (a running lead time
+    /// read as if it were a finished one) is what this whole block
+    /// exists to correct.
+    time_to_close: tba::KaplanMeier,
+    /// Time-to-anchor for the query's `from_anchor`/`to_anchor` pair
+    /// (reusing T-14d's own mechanism) — `None` when the query names
+    /// no such pair, or names one that does not validate; an invalid
+    /// pair is already surfaced via `compliance.anchor_note`, so this
+    /// block simply omits the block it cannot honestly compute rather
+    /// than repeating that disclosure.
+    time_to_anchor: Option<tba::KaplanMeier>,
+    /// `event` | `censor` — which way `discontinued` closures were
+    /// counted in `time_to_close` (and in `time_to_anchor`, for an
+    /// instance that discontinued before reaching either anchor).
+    discontinued: &'static str,
+}
+
+/// Parse the query's `discontinued` parameter (spec T-14e): `event`
+/// (default) or `censor`, `422`-refusing anything else rather than
+/// silently defaulting a typo'd value.
+fn resolve_discontinued(query: &CohortQuery) -> Result<(bool, &'static str)> {
+    match query.discontinued.as_deref() {
+        None | Some("event") => Ok((true, "event")),
+        Some("censor") => Ok((false, "censor")),
+        Some(other) => Err(refuse(&format!(
+            "unknown discontinued mode `{other}` (expected `event` or `censor`)"
+        ))),
+    }
+}
+
+/// Build both Kaplan–Meier blocks (spec T-14e). `instances` and
+/// `analyses` are zipped positionally — both come from the same
+/// `analyze_cohort` call over the same `instances` slice, so the
+/// pairing is exact.
+fn survival_analysis(
+    instances: &[pathway_instances::Model],
+    analyses: &[tba::InstanceAnalysis],
+    query: &CohortQuery,
+) -> Result<Survival> {
+    let (discontinued_is_event, discontinued_label) = resolve_discontinued(query)?;
+
+    let close_observations: Vec<tba::Observation> = instances
+        .iter()
+        .zip(analyses)
+        .map(|(instance, analysis)| {
+            tba::close_observation(analysis, &instance.status, discontinued_is_event)
+        })
+        .collect();
+
+    let time_to_anchor = match resolve_anchor_pair(query) {
+        Ok(Some((from, to))) => {
+            let observations: Vec<tba::Observation> = analyses
+                .iter()
+                .filter_map(|a| tba::anchor_observation(a, from, to))
+                .collect();
+            Some(tba::kaplan_meier(&observations))
+        }
+        _ => None,
+    };
+
+    Ok(Survival {
+        time_to_close: tba::kaplan_meier(&close_observations),
+        time_to_anchor,
+        discontinued: discontinued_label,
+    })
+}
+
 /// `GET /api/care-pathways/{pathway}/time-analysis` — the cohort view
 /// (spec §7).
 #[debug_handler]
@@ -730,6 +807,7 @@ async fn cohort_time_analysis(
     let analyses = analyze_cohort(&ctx, &instances, as_of_ms).await?;
     let summary = tba::cohort(&analyses);
     let compliance = score_compliance(&analyses, &query)?;
+    let survival = survival_analysis(&instances, &analyses, &query)?;
 
     // Small-number suppression (spec §12.2, generalised T-14k): below
     // the deployment's cell-count floor the percentile detail would
@@ -752,7 +830,7 @@ async fn cohort_time_analysis(
         }
     }
 
-    format::json(serde_json::json!({
+    let mut response = serde_json::json!({
         "as_of": now,
         "pathway": { "pid": template.pid, "name": template.name },
         "note": "lead-time percentiles are nearest-rank, so every one is an \
@@ -764,7 +842,23 @@ async fn cohort_time_analysis(
         "suppression_note": suppressed.then_some(suppression::SUPPRESSED_REASON),
         "cohort": body,
         "compliance": compliance,
-    }))
+        "survival": survival,
+    });
+    // The survival curves carry the identical disclosure risk the
+    // percentile detail above does — a handful of instances' own
+    // closure/anchor times, not an aggregate — so they are withheld
+    // under the same suppression decision, never a separate one.
+    if suppressed && let Some(map) = response.as_object_mut() {
+        match mode {
+            suppression::Mode::Withhold => {
+                map.insert("survival".to_string(), serde_json::Value::Null);
+            }
+            suppression::Mode::Remove => {
+                map.remove("survival");
+            }
+        }
+    }
+    format::json(response)
 }
 
 /// `GET /api/care-pathways/{pathway}/constraints` — the ranked
