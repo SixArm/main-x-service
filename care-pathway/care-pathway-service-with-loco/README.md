@@ -52,6 +52,7 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | GET | `/api/care-pathways/{pid}/export/event-log` | Bulk `event_log` export (`?format=csv\|jsonl`) — bupaR/PM4Py shape, never a `subject_ref` or a person/actor URN |
 | GET | `/api/care-pathways/{pid}/export/journey-features` | Bulk `journey_features` export (`?format=csv\|jsonl`) — one row per instance, LT/VT/PT/%A/%VA/coverage/#HO/per-stage/censored |
 | GET | `/api/care-pathways/{pid}/process-map` | Directly-follows process map (`?level=stage\|step&mode=withhold\|remove`) — nodes/edges with counts + median (+p90) gaps, never a discovered model |
+| GET | `/api/care-pathways/{pid}/variants` | Journey variants — pathway strings, frequency/coverage Pareto, per-position duration lines (named, defaulted, echoed transform parameters) |
 
 Every figure is derived on read — nothing is stored — and the
 denominator is always elapsed calendar time, never the sum of recorded
@@ -111,6 +112,25 @@ withheld even inside an otherwise-large cohort. Never a discovered
 model — pure graph-building lives alongside the T-14a codecs in
 [`src/analytics.rs`](./src/analytics.rs); HTTP surface + suppression
 rendering: [`src/controllers/tba.rs`](./src/controllers/tba.rs).
+
+### Journey variants — pathway strings (T-14c)
+
+Each instance's segment sequence runs through a named, defaulted,
+echoed parameter chain — `min_segment_days` (drop short segments),
+`collapse_gap_days` (merge small same-stage gaps), `combination_window_days`
+(an overlap at least this long becomes a canonical alphabetical `a+b`
+step, converging to `a+b+c` under a three-way overlap; a shorter
+overlap is a handoff to the incoming stage), `min_post_combination_days`
+(drop post-combination stubs — a combination era itself is exempt),
+`filter` (`first`/`changes`/`all`), `max_path_length` — into a
+compact pathway string (`referral-diagnostics-treatment+follow_up-…`).
+The cohort is then reported as a frequency/coverage Pareto (variants
+below the floor fold into `suppressed_instances`, never listed
+individually; visible shares are renormalised to sum to `1.0`) plus
+per-position ("line") duration quantiles with an `overall` pseudo-line.
+Nothing is stored. Pure pipeline:
+[`src/variants.rs`](./src/variants.rs); HTTP surface:
+[`src/controllers/tba.rs`](./src/controllers/tba.rs).
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 

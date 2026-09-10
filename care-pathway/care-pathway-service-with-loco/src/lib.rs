@@ -76,6 +76,11 @@ pub mod tasks;
 /// ranking, cohort percentiles, and queueing-theory flow.
 pub mod tba;
 pub mod validation;
+/// Journey variants (pathway strings): named, defaulted, echoed
+/// transform parameters over a cohort's segments into a frequency/
+/// coverage Pareto plus per-position duration quantiles (spec
+/// `13-tasks.md` T-14c). Pure, DB-free.
+pub mod variants;
 /// Header-based API versioning (`Accepts-version`) for the REST surface.
 pub mod version;
 pub mod workers;

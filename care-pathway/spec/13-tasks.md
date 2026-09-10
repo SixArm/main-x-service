@@ -386,8 +386,8 @@ manual check confirms it. Split tasks too big for one PR
   [TBA §14](time-based-analysis.md). **T-14a landed 2026-09-09**, then
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
-  below), then **T-14k and T-14b, both on 2026-09-10** — the first
-  four sub-tasks landed, all out of the suggested order above, because
+  below), then **T-14k, T-14b, and T-14c, all on 2026-09-10** — five
+  sub-tasks landed, all out of the suggested order above, because
   none needed the tasks still ahead of it in this list to be useful
   now (see each entry's own scope notes; T-14a's covers why it needs
   no suppression pass from T-14k: it exports patient-level rows, which
@@ -395,12 +395,17 @@ manual check confirms it. Split tasks too big for one PR
   module docs confirm the same thing from the other side). T-14b's own
   pure logic sits beside T-14a's in `src/analytics.rs` rather than in
   `src/tba.rs`, matching [TBA §15](time-based-analysis.md)'s own
-  statement that a sequence analysis is not an elapsed-time one.
+  statement that a sequence analysis is not an elapsed-time one. T-14c
+  got its own new file, `src/variants.rs`, rather than adding to the
+  already-large `src/analytics.rs` — the same reasoning that gave
+  T-14k its own `src/suppression.rs` rather than folding into
+  `src/tba.rs`.
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b were also still unbuilt (all three have
-    since landed too; T-14c–j remain open) — because the two codecs needed
+    time, T-14m/T-14k/T-14b/T-14c were also still unbuilt (all four
+    have since landed too, each also out of order; T-14d–j remain
+    open) — because the two codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
     row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
@@ -519,27 +524,76 @@ manual check confirms it. Split tasks too big for one PR
       specific per-node-vs-per-cohort distinction this test needed to
       pin), which is a scope note, not a gap: T-14m remains available
       for a future property-style test over generated cohorts.
-  - [ ] **T-14c — Journey variants (pathway strings).**
-    `GET /api/care-pathways/{pathway}/variants`: per instance, the
-    ordered stage sequence from segments, transformed by **named,
-    defaulted, echoed** parameters: `min_segment_days` (shorter
-    segments dropped), `collapse_gap_days` (same stage separated by ≤ N
-    days ⇒ one step), `combination_window_days` (overlap ≥ N days ⇒ a
-    canonical alphabetical `a+b` step; shorter overlap ⇒ a handoff;
-    FRFS / LRFS decomposition into non-overlapping intervals; stubs
-    shorter than `min_post_combination_days` dropped; iterate until no
-    overlap remains, so three-way overlap converges to `a+b+c`),
-    `filter` = `first` | `changes` | `all`, `max_path_length`. Output:
-    variant string (`referral-diagnostics-treatment+follow_up-…`),
+  - [x] **T-14c — Journey variants (pathway strings).** Landed
+    2026-09-10. `GET /api/care-pathways/{pathway}/variants?status=
+    &min_segment_days=&collapse_gap_days=&combination_window_days=
+    &min_post_combination_days=&filter=&max_path_length=`: per
+    instance, the ordered stage sequence from segments, transformed by
+    **named, defaulted, echoed** parameters: `min_segment_days`
+    (shorter segments dropped), `collapse_gap_days` (same stage
+    separated by ≤ N days ⇒ one step), `combination_window_days`
+    (overlap ≥ N days ⇒ a canonical alphabetical `a+b` step; shorter
+    overlap ⇒ a handoff; FRFS / LRFS decomposition into non-overlapping
+    intervals; stubs shorter than `min_post_combination_days` dropped;
+    iterate until no overlap remains, so three-way overlap converges to
+    `a+b+c`), `filter` = `first` | `changes` | `all`, `max_path_length`.
+    Output: variant string (`referral-diagnostics-treatment+follow_up-…`),
     frequency, share, cumulative coverage (the Pareto), and per-position
     ("line") duration quantiles with `overall` as a pseudo-line. Nothing
-    stored; an attrition row per transformation (T-14g shape).
-    - **Acceptance:** pure tests reproduce TreatmentPatterns' documented
-      cases — two overlapping eras become three intervals under FRFS and
-      under LRFS; `b+a` ≡ `a+b`; a stub below
-      `min_post_combination_days` disappears; `changes` collapses
-      `a-a-b` to `a-b` while `all` keeps it; coverage sums to 1 over the
-      unsuppressed variants and the suppressed count is disclosed.
+    stored.
+    - [x] **FRFS/LRFS, precisely defined.** The two names and their
+      geometric meaning are confirmed against `TreatmentPatterns`' own
+      CRAN documentation (via web search, not guessed): for eras `a`
+      (starts first) and `b` (starts second), **FRFS** ("first
+      received, first stopped") is the shape where `a` also ends first
+      or exactly with `b`; **LRFS** ("last received, first stopped")
+      is the shape where `b`'s whole span nests inside `a`'s. What
+      this crate does with either shape below the combination window —
+      attributing the contested middle stretch to the *incoming*
+      stage as a "handoff" — is this crate's own documented choice,
+      not reproduced from `TreatmentPatterns`' source, which was not
+      available to read in this environment.
+    - [x] **A combination era is exempt from
+      `min_post_combination_days`.** Found while writing the request
+      test: applying the stub floor to *every* resulting era, including
+      the combination itself, could delete a real (if short) `a+b`
+      co-occurrence — the floor's name is "post-combination," what is
+      left *around* a combination, not the combination block itself.
+    - [x] **No `?mode=` knob**, unlike T-14b/T-14k's cohort endpoints:
+      a suppressed variant is always folded into `suppressed_instances`
+      (never listed individually, never a "remove" option that would
+      just be the same list with the fold already applied) — there is
+      no "withhold vs remove" distinction meaningful at the level of
+      an aggregated frequency table the way there is for a single
+      node/edge.
+    - [x] **Attrition row per transformation** (the T-14g shape the
+      spec text names) is **not built** — T-14g itself is unbuilt, and
+      inventing its row shape here to satisfy this task alone risked
+      committing to a format T-14g would then have to match or
+      abandon. Deferred to when T-14g lands.
+    - **Acceptance:** pure tests — `frfs_overlap_becomes_three_intervals`,
+      `lrfs_overlap_becomes_three_intervals` (two overlapping eras
+      become three intervals under each shape); `b+a ≡ a+b`
+      (`overlap_at_or_above_the_window_combines_canonically`, asserting
+      `combined_label` is order-independent directly); a stub below
+      `min_post_combination_days` disappears
+      (`a_post_combination_stub_disappears`) while a short *combination*
+      survives the same floor
+      (`a_short_combination_era_survives_the_stub_floor`); `changes`
+      collapses `a-a-b` to `a-b` while `all` keeps it
+      (`changes_collapses_consecutive_duplicates_all_does_not`);
+      coverage sums to 1 over the unsuppressed variants and the
+      suppressed count is disclosed
+      (`coverage_sums_to_one_and_suppression_is_disclosed`). A three-way
+      overlap converging to `a+b+c` is pinned directly too
+      (`three_way_overlap_converges_to_a_plus_b_plus_c`), beyond what
+      the acceptance text itself named. A live HTTP round trip
+      (`tests/requests/tba.rs`'s `variants_round_trip`) exercises the
+      full pipeline through real segments, an unrecognised `filter`
+      (`422`), and the renormalisation property end to end: a
+      six-instance cohort where one instance's unique journey is
+      suppressed still reports the five-instance majority variant's
+      share as exactly `1.0`.
   - [ ] **T-14d — Stage anchors, delay decomposition, and anchored
     standards.** Per instance: `anchors` = first `started_at` of each
     stage in `STAGES` (`null` if never reached), `delays` = adjacent
@@ -756,11 +810,11 @@ manual check confirms it. Split tasks too big for one PR
       persists exactly what the generator returns, that a bad argument
       is refused rather than silently defaulted, and that the persisted
       rows carry the same synthetic-only markers. "Used by every T-14
-      test" is **still not true** — T-14b has since landed too, but
-      used a small hand-built fixture rather than this generator (see
-      T-14b's own scope note); this generator remains available for
-      T-14c/d/e/f/g/h/i/j to build on, not yet exercised by any of
-      them. The repo demo seed (EX-4)
+      test" is **still not true** — T-14b and T-14c have since landed
+      too, but each used a small hand-built fixture rather than this
+      generator (see their own scope notes); this generator remains
+      available for T-14d/e/f/g/h/i/j to build on, not yet exercised
+      by any of them. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

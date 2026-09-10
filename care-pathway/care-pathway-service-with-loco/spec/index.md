@@ -324,6 +324,32 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    not an elapsed-time one; HTTP surface + suppression rendering:
    [`src/controllers/tba.rs`](../src/controllers/tba.rs). Landed
    2026-09-10, spec T-14b.
+24. **Journey variants (pathway strings).** `GET
+   /api/care-pathways/{pathway}/variants?status=&min_segment_days=
+   &collapse_gap_days=&combination_window_days=
+   &min_post_combination_days=&filter=&max_path_length=` transforms
+   each instance's segment sequence through a named, defaulted, echoed
+   parameter chain (`TreatmentPatterns`-derived: drop short segments,
+   collapse small same-stage gaps, resolve overlaps into a canonical
+   `a+b`/`a+b+c` combination or a handoff to the incoming stage, drop
+   post-combination stubs, apply a `first`/`changes`/`all` repeat
+   policy, truncate) into a compact pathway string, then aggregates
+   the cohort into a frequency/coverage Pareto plus per-position
+   ("line") duration quantiles with an `overall` pseudo-line. A
+   variant below the minimum cell count (item 22) is folded into
+   `suppressed_instances`, never listed individually, and the visible
+   variants' shares are renormalised so they alone sum to `1.0`. The
+   FRFS/LRFS overlap-shape names are confirmed against
+   `TreatmentPatterns`' own CRAN documentation; what happens *below*
+   the combination window (a "handoff" attributed to the incoming
+   stage) and the combination-era exemption from the post-combination
+   stub floor are this crate's own documented choices, not reproduced
+   from source unavailable in this environment. Pure pipeline: new
+   [`src/variants.rs`](../src/variants.rs) (its own file, not folded
+   into `src/analytics.rs`, for the same size reason `src/suppression.rs`
+   got its own file); HTTP surface:
+   [`src/controllers/tba.rs`](../src/controllers/tba.rs). Landed
+   2026-09-10, spec T-14c.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

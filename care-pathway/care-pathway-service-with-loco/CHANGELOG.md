@@ -9,6 +9,62 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14c: journey variants (pathway strings) (2026-09-10)
+
+`GET /api/care-pathways/{pathway}/variants?status=&min_segment_days=
+&collapse_gap_days=&combination_window_days=&min_post_combination_days=
+&filter=&max_path_length=` — transforms each instance's segments into
+a compact pathway string through a `TreatmentPatterns`-derived,
+named/defaulted/echoed parameter chain, then aggregates the cohort
+into a frequency/coverage Pareto plus per-position duration quantiles.
+
+- New `src/variants.rs` (DB-free, pure, 12 unit tests): `Era`,
+  `eras_from_segments`, `combine_overlaps`/`decompose_pair` (the
+  FRFS/LRFS overlap resolution — the two shape names and their
+  geometric meaning confirmed against `TreatmentPatterns`' own CRAN
+  documentation via web search, not guessed), `build_variant` (the
+  full 7-step pipeline), and `summarize_variants` (the Pareto + line
+  quantiles, with the suppression floor an explicit parameter, never
+  read from the environment, so the module stays pure). Tests target
+  each acceptance bullet directly:
+  `frfs_overlap_becomes_three_intervals`/`lrfs_overlap_becomes_three_intervals`,
+  `overlap_at_or_above_the_window_combines_canonically` (`b+a ≡ a+b`),
+  `a_post_combination_stub_disappears`,
+  `changes_collapses_consecutive_duplicates_all_does_not`,
+  `coverage_sums_to_one_and_suppression_is_disclosed` — plus
+  `three_way_overlap_converges_to_a_plus_b_plus_c` and
+  `a_short_combination_era_survives_the_stub_floor`, beyond what the
+  acceptance text itself named.
+- **A design decision found while writing the request test**: a
+  combination era (its label contains `+`) is exempt from the
+  `min_post_combination_days` floor. Applying that floor uniformly
+  would delete a real (if short) `a+b` co-occurrence — the floor's
+  name is "post-combination," what is left *around* a combination,
+  not the combination block itself.
+- `src/controllers/tba.rs`: the `variants_endpoint` handler, query
+  parsing with per-field defaults, and JSON assembly echoing every
+  parameter back verbatim (IPPA's `run_sens.py` sensitivity sweep,
+  adopted as a rule — echo the parameters — rather than a dedicated
+  endpoint). No `?mode=` knob, unlike the T-14b/T-14k cohort
+  endpoints: a suppressed variant is always folded into
+  `suppressed_instances`, never listed individually.
+- `src/openapi.rs`: a new `variants_paths()` function (split out to
+  stay under the crate's line-count lint) documenting the endpoint and
+  its seven query parameters.
+- `tests/requests/tba.rs`: `variants_round_trip` — five instances
+  sharing one combined variant (`?combination_window_days=1`
+  override, confirming the params round-trip through the query
+  string), an unrecognised `filter` (`422`), and a sixth instance
+  whose unique journey gets suppressed, folded into
+  `suppressed_instances`, while the five-instance majority variant's
+  share stays exactly `1.0` — the renormalisation property proved
+  over HTTP, not just in the pure unit test.
+- Verified: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test --lib` (372, up from 360), the DB-gated suite
+  (59 request tests, up from 58), `cargo +1.96 check --all-targets`
+  (MSRV), `cargo deny check`, and `cargo bench --no-run` all clean. No
+  new dependency, no new migration.
+
 ### Added — T-14b: directly-follows process map (2026-09-10)
 
 `GET /api/care-pathways/{pathway}/process-map?level=stage|step&status=&mode=`

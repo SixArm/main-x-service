@@ -22,6 +22,7 @@ use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::suppression;
 use crate::tba;
+use crate::variants;
 
 /// Cohort reads are capped so an unbounded cohort cannot become an
 /// unbounded query (security invariant 3; spec §11).
@@ -888,6 +889,100 @@ async fn process_map(
     }))
 }
 
+/// `?min_segment_days=&collapse_gap_days=&combination_window_days=&min_post_combination_days=&filter=&max_path_length=`
+/// plus the shared cohort `status` (spec T-14c).
+#[derive(Debug, Default, serde::Deserialize)]
+pub(crate) struct VariantsQuery {
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default)]
+    min_segment_days: Option<f64>,
+    #[serde(default)]
+    collapse_gap_days: Option<f64>,
+    #[serde(default)]
+    combination_window_days: Option<f64>,
+    #[serde(default)]
+    min_post_combination_days: Option<f64>,
+    #[serde(default)]
+    filter: Option<String>,
+    #[serde(default)]
+    max_path_length: Option<usize>,
+}
+
+fn variant_params_from_query(query: &VariantsQuery) -> Result<variants::VariantParams> {
+    let filter = variants::FilterMode::parse(query.filter.as_deref()).map_err(|e| refuse(&e))?;
+    Ok(variants::VariantParams {
+        min_segment_days: query
+            .min_segment_days
+            .unwrap_or(variants::DEFAULT_MIN_SEGMENT_DAYS),
+        collapse_gap_days: query
+            .collapse_gap_days
+            .unwrap_or(variants::DEFAULT_COLLAPSE_GAP_DAYS),
+        combination_window_days: query
+            .combination_window_days
+            .unwrap_or(variants::DEFAULT_COMBINATION_WINDOW_DAYS),
+        min_post_combination_days: query
+            .min_post_combination_days
+            .unwrap_or(variants::DEFAULT_MIN_POST_COMBINATION_DAYS),
+        filter,
+        max_path_length: query
+            .max_path_length
+            .unwrap_or(variants::DEFAULT_MAX_PATH_LENGTH),
+    })
+}
+
+/// `GET /api/care-pathways/{pathway}/variants` — journey variants
+/// (pathway strings), the frequency/coverage Pareto, and per-position
+/// duration lines (spec T-14c).
+#[debug_handler]
+async fn variants_endpoint(
+    State(ctx): State<AppContext>,
+    Path(pathway): Path<String>,
+    Query(query): Query<VariantsQuery>,
+) -> Result<Response> {
+    let params = variant_params_from_query(&query)?;
+    let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
+        .await
+        .map_err(|_| Error::NotFound)?;
+    let instances = load_cohort(&ctx, template.pid, query.status.as_deref()).await?;
+    let as_of_ms = chrono::Utc::now().timestamp_millis();
+    let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
+    let mut segments_by_instance = load_segment_inputs(&ctx, &pids).await?;
+
+    let instance_variants: Vec<variants::InstanceVariant> = instances
+        .iter()
+        .map(|instance| {
+            let segments = segments_by_instance
+                .remove(&instance.pid)
+                .unwrap_or_default();
+            variants::build_variant(&segments, as_of_ms, &params)
+        })
+        .collect();
+    let report = variants::summarize_variants(&instance_variants, suppression::min_cell_count());
+
+    format::json(serde_json::json!({
+        "pathway": { "pid": template.pid, "name": template.name },
+        "instances": report.instances,
+        "suppressed_instances": report.suppressed_instances,
+        "params": {
+            "min_segment_days": params.min_segment_days,
+            "collapse_gap_days": params.collapse_gap_days,
+            "combination_window_days": params.combination_window_days,
+            "min_post_combination_days": params.min_post_combination_days,
+            "filter": params.filter.as_str(),
+            "max_path_length": params.max_path_length,
+        },
+        "note": "never a discovered model. A combination step is a canonical \
+                 alphabetical a+b (or a+b+c) join; a short overlap is a handoff, \
+                 attributed to the incoming stage instead. Variants below the \
+                 minimum cell count are folded into suppressed_instances, never \
+                 listed individually — visible variants' shares are renormalised \
+                 so they alone sum to 1.0.",
+        "variants": report.variants,
+        "lines": report.lines,
+    }))
+}
+
 /// `GET /api/instances/time-standards` — the standards catalogue
 /// (spec §7.3).
 #[debug_handler]
@@ -1005,4 +1100,5 @@ pub fn pathway_routes() -> Routes {
         .add("/{pathway}/time-analysis", get(cohort_time_analysis))
         .add("/{pathway}/constraints", get(cohort_constraints))
         .add("/{pathway}/process-map", get(process_map))
+        .add("/{pathway}/variants", get(variants_endpoint))
 }
