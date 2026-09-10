@@ -3,6 +3,7 @@
 //! flow views. Pins the contract in `spec/time-based-analysis.md` §14.3.
 
 use care_pathway_service::app::App;
+use care_pathway_service::tba::DAY_MS;
 use loco_rs::TestServer;
 use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
@@ -988,6 +989,252 @@ async fn anchored_compliance_round_trip() {
             .await
             .json();
         assert_eq!(one_sided["compliance"]["anchor_note"], "to_anchor_missing");
+    })
+    .await;
+}
+
+/// Censoring-aware cohort statistics (T-14e): `survival.time_to_close`
+/// treats every open instance as right-censored rather than mixing a
+/// running lead time in as if it had actually closed; `?discontinued=`
+/// selects whether a discontinued closure counts as the event or a
+/// censoring; `survival.time_to_anchor` reuses T-14d's own
+/// `from_anchor`/`to_anchor` pair and excludes an instance that never
+/// reached `from_anchor` entirely; and the whole `survival` block is
+/// withheld under the identical suppression decision as the
+/// percentile detail.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[allow(clippy::too_many_lines)] // five instances, three assertions each
+async fn censoring_aware_survival_round_trip() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": format!("survival pathway {}", uuid::Uuid::new_v4()),
+                "care_setting": "Outpatient",
+                "condition_codes": [{"system": "Icd10", "code": "M54"}],
+            }))
+            .await;
+        created.assert_status_ok();
+        let template: Value = created.json();
+        let pathway = template["pid"].as_str().expect("pathway pid").to_string();
+
+        let enroll_with_clock = |stop_day: Option<i64>| {
+            let request = &request;
+            let pathway = pathway.clone();
+            async move {
+                let enrolled = request
+                    .post(&format!("/api/care-pathways/{pathway}/instances"))
+                    .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+                    .await;
+                enrolled.assert_status_ok();
+                let instance: Value = enrolled.json();
+                let pid = instance["pid"].as_str().expect("instance pid").to_string();
+                request
+                    .post(&format!("/api/instances/{pid}/clock"))
+                    .json(&json!({ "event": "start", "at": day(0) }))
+                    .await
+                    .assert_status_ok();
+                if let Some(stop_day) = stop_day {
+                    request
+                        .post(&format!("/api/instances/{pid}/clock"))
+                        .json(&json!({ "event": "stop", "at": day(stop_day) }))
+                        .await
+                        .assert_status_ok();
+                }
+                pid
+            }
+        };
+
+        // A: closes (completed) at day 10 -- always an event. Closing
+        // stamps `clock_stop_at` to the real moment of closure (spec
+        // §12.3), so the explicit day-10 stop has to be set *after*
+        // `/status`, not before, or `/status` overwrites it.
+        let pid_a = enroll_with_clock(None).await;
+        request
+            .post(&format!("/api/instances/{pid_a}/status"))
+            .json(&json!({ "to": "completed", "outcome": "improved" }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_a}/clock"))
+            .json(&json!({ "event": "stop", "at": day(10) }))
+            .await
+            .assert_status_ok();
+
+        // B: closes (discontinued) at day 20 -- event or censor,
+        // depending on `?discontinued=`. Same ordering as A.
+        let pid_b = enroll_with_clock(None).await;
+        request
+            .post(&format!("/api/instances/{pid_b}/status"))
+            .json(&json!({ "to": "discontinued", "reason": "patient moved away" }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_b}/clock"))
+            .json(&json!({ "event": "stop", "at": day(20) }))
+            .await
+            .assert_status_ok();
+
+        // C: never closes -- always right-censored, whatever the
+        // real elapsed time since day 0 turns out to be.
+        let _pid_c = enroll_with_clock(None).await;
+
+        // D: reaches referral (day 0) and diagnostics (day 5) -- a
+        // 5-day time-to-anchor event.
+        let pid_d = enroll_with_clock(Some(100)).await;
+        request
+            .post(&format!("/api/instances/{pid_d}/segments"))
+            .json(&json!({
+                "label": "referred", "stage": "referral", "category": "value_adding",
+                "started_at": day(0), "ended_at": day(1),
+            }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_d}/segments"))
+            .json(&json!({
+                "label": "scanned", "stage": "diagnostics", "category": "value_adding",
+                "started_at": day(5), "ended_at": day(6),
+            }))
+            .await
+            .assert_status_ok();
+
+        // E: reaches referral but never diagnostics -- excluded from
+        // nothing (time-to-close still applies), but right-censored,
+        // relative to referral, at the clock's own day-30 stop, in
+        // time-to-anchor.
+        let pid_e = enroll_with_clock(Some(30)).await;
+        request
+            .post(&format!("/api/instances/{pid_e}/segments"))
+            .json(&json!({
+                "label": "referred", "stage": "referral", "category": "value_adding",
+                "started_at": day(0), "ended_at": day(1),
+            }))
+            .await
+            .assert_status_ok();
+
+        // ── Default `?discontinued=event`: A (completed) and B
+        // (discontinued) are both events; C, D, and E are all
+        // right-censored, because none of them ever closed via
+        // `/status` — an explicit clock stop controls *when*, not
+        // *whether*, this instance is closed.
+        let default_mode: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/time-analysis"))
+            .await
+            .json();
+        assert_eq!(default_mode["survival"]["discontinued"], "event");
+        let close = &default_mode["survival"]["time_to_close"];
+        assert_eq!(close["events"], 2, "A and B close");
+        assert_eq!(close["censored"], 3, "C, D, and E stay active");
+        let steps = close["steps"].as_array().expect("steps");
+        assert!(
+            steps
+                .iter()
+                .any(|s| s["time_ms"] == 10 * DAY_MS && s["events"] == 1),
+            "A's event at day 10: {steps:?}"
+        );
+        assert!(
+            steps
+                .iter()
+                .any(|s| s["time_ms"] == 20 * DAY_MS && s["events"] == 1),
+            "B's event at day 20 (discontinued counts as event): {steps:?}"
+        );
+
+        // ── `?discontinued=censor`: B moves from an event to a
+        // censoring, so the count of events drops by one and the
+        // count of censored rises by one; B's own time no longer
+        // shows up as an event step.
+        let censor_mode: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis?discontinued=censor"
+            ))
+            .await
+            .json();
+        assert_eq!(censor_mode["survival"]["discontinued"], "censor");
+        let close = &censor_mode["survival"]["time_to_close"];
+        assert_eq!(close["events"], 1, "only A still closes as an event");
+        assert_eq!(close["censored"], 4, "B moved from event to censored");
+        let steps = close["steps"].as_array().expect("steps");
+        assert!(
+            !steps.iter().any(|s| s["time_ms"] == 20 * DAY_MS),
+            "B no longer produces an event step: {steps:?}"
+        );
+
+        // ── An unrecognised `discontinued` value is refused, not
+        // silently defaulted.
+        assert_eq!(
+            request
+                .get(&format!(
+                    "/api/care-pathways/{pathway}/time-analysis?discontinued=nonsense"
+                ))
+                .await
+                .status_code(),
+            422
+        );
+
+        // ── time-to-anchor (referral -> diagnostics): D is a 5-day
+        // event; E is censored at day 30 (E reached referral on day 0
+        // but never diagnostics); A, B, C never reached referral at
+        // all and are excluded entirely, not assigned an arbitrary
+        // origin.
+        let anchored: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis\
+                 ?from_anchor=referral&to_anchor=diagnostics"
+            ))
+            .await
+            .json();
+        let time_to_anchor = &anchored["survival"]["time_to_anchor"];
+        assert_eq!(time_to_anchor["events"], 1, "only D reaches diagnostics");
+        assert_eq!(
+            time_to_anchor["censored"], 1,
+            "only E reached referral without diagnostics"
+        );
+        let steps = time_to_anchor["steps"].as_array().expect("steps");
+        assert!(
+            steps
+                .iter()
+                .any(|s| s["time_ms"] == 5 * DAY_MS && s["events"] == 1),
+            "D's 5-day event: {steps:?}"
+        );
+
+        // ── Naming no anchor pair at all omits time_to_anchor
+        // entirely -- it is not a null placeholder for a feature that
+        // wasn't asked for.
+        assert_eq!(default_mode["survival"]["time_to_anchor"], Value::Null);
+
+        // ── Suppression: a single-instance pathway withholds the
+        // whole survival block under the identical decision that
+        // withholds the percentile detail.
+        let solo = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": format!("solo survival pathway {}", uuid::Uuid::new_v4()),
+                "care_setting": "Outpatient",
+                "condition_codes": [{"system": "Icd10", "code": "M54"}],
+            }))
+            .await;
+        solo.assert_status_ok();
+        let solo_template: Value = solo.json();
+        let solo_pathway = solo_template["pid"].as_str().expect("pathway pid");
+        let solo_enrolled = request
+            .post(&format!("/api/care-pathways/{solo_pathway}/instances"))
+            .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+            .await;
+        solo_enrolled.assert_status_ok();
+        let solo_report: Value = request
+            .get(&format!("/api/care-pathways/{solo_pathway}/time-analysis"))
+            .await
+            .json();
+        assert_eq!(solo_report["suppressed"], true);
+        assert_eq!(
+            solo_report["survival"],
+            Value::Null,
+            "withheld, same as the percentile detail"
+        );
     })
     .await;
 }

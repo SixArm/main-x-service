@@ -73,10 +73,13 @@ pub mod suppression;
 pub mod tasks;
 /// Time-based analysis (TBA): pure computation over an instance's
 /// clock and recorded segments — the value-adding ratio, constraint
-/// ranking, cohort percentiles, queueing-theory flow, and (spec
+/// ranking, cohort percentiles, queueing-theory flow, (spec
 /// `13-tasks.md` T-14d) per-stage anchors, adjacent-pair delays, and
 /// compliance scored against a named two-stage interval instead of
-/// the whole clock.
+/// the whole clock, and (T-14e) a Kaplan–Meier survival estimator
+/// treating an open instance as right-censored rather than mixing its
+/// running lead time in as if it had already closed, plus a two-sample
+/// log-rank test ready for T-14f's cohort split to call.
 pub mod tba;
 pub mod validation;
 /// Journey variants (pathway strings): named, defaulted, echoed

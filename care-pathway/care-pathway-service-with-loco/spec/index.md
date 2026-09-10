@@ -386,6 +386,40 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    [`src/controllers/tba.rs`](../src/controllers/tba.rs) (`CohortQuery`,
    `score_compliance`, `resolve_anchor_pair`, `resolve_standard`).
    Landed 2026-09-10, spec T-14d.
+26. **Censoring-aware cohort statistics.**
+   `GET /api/care-pathways/{pathway}/time-analysis` gains a `survival`
+   block: `survival.time_to_close` is a Kaplan–Meier estimate treating
+   every open instance as right-censored at now, rather than
+   `?status=all`'s own mixing of a closed lead time with a still-running
+   one as if they were the same kind of number. `?discontinued=event`
+   (default) or `?discontinued=censor` selects whether a `discontinued`
+   closure counts as the event or a censoring, echoed as
+   `survival.discontinued`. Naming a recognised `from_anchor`/`to_anchor`
+   pair (item 25's own mechanism) adds `survival.time_to_anchor`: the
+   same estimator over the interval between those two stages, excluding
+   an instance outright when `from_anchor` was never reached (there is
+   then no time zero to measure it from) and treating an instance that
+   reached `from_anchor` but never `to_anchor` as censored at the
+   clock's own last-observed instant. `median_ms`/`p90_ms` on either
+   curve are read off the curve at survival `≤ 0.50`/`≤ 0.10`
+   respectively — matching this crate's existing nearest-rank
+   `percentile` convention exactly when there is no censoring — or
+   `null` with reason `curve_did_not_reach` when the curve never drops
+   that far. The whole `survival` block is withheld under the identical
+   suppression decision as the percentile detail (item 22), never a
+   separate one. A two-sample log-rank test (`tba::log_rank`,
+   Mantel–Haenszel form) is implemented and unit-tested but has no HTTP
+   surface: there is no cohort-splitting mechanism in this crate to hand
+   it two sides yet (spec T-14f) — it is "ready for it, not wired to
+   it", the same posture [`src/suppression.rs`](../src/suppression.rs)
+   already documents for its own still-unused 2-D breakdown primitive.
+   Pure logic in [`src/tba.rs`](../src/tba.rs) itself (`Observation`,
+   `close_observation()`, `anchor_observation()`, `KmStep`/
+   `KaplanMeier`/`kaplan_meier()`, `LogRank`/`log_rank()`, plus a
+   hand-rolled `erf`/`erfc` rather than a new statistics dependency);
+   HTTP surface: [`src/controllers/tba.rs`](../src/controllers/tba.rs)
+   (`Survival`, `resolve_discontinued()`, `survival_analysis()`).
+   Landed 2026-09-10, spec T-14e.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

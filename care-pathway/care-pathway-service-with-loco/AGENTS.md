@@ -47,7 +47,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/instances/{caseload,overdue-reviews,care-team-load}` | Derived operational views |
 | POST/GET | `/api/instances/{pid}/segments` (+ `/segments/{seg}/close`, `/clock`) | **Time-based analysis**: record a journey segment (VA / NNVA / UNVA + stage + waste), close a running one, set the pathway clock (no pause, by design) |
 | GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs, per-stage anchors + adjacent delays (T-14d); and the segment/gap wall |
-| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); ranked constraints. Both suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`) |
+| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); censoring-aware Kaplan–Meier survival for time-to-close and time-to-anchor (T-14e: `?discontinued=event\|censor`); ranked constraints. All three suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`) |
 | GET | `/api/care-pathways/{pid}/export/{event-log,journey-features}` | **Bulk export codecs** (T-14a): `?format=csv\|jsonl&status=`; `event_log` (bupaR/PM4Py shape) and `journey_features` (one row per instance); gated `Destructive`, audited as a disclosure; never a `subject_ref` or a person/actor URN |
 | GET | `/api/care-pathways/{pid}/process-map` | **Directly-follows process map** (T-14b): `?level=stage\|step&status=&mode=`; nodes/edges with instance/occurrence counts + median(+p90) gaps; self-loops kept, `start`/`end` pseudo-nodes; suppressed per node/edge (T-14k), not per cohort |
 | GET | `/api/care-pathways/{pid}/variants` | **Journey variants** (T-14c): pathway strings via a named/defaulted/echoed parameter chain (era filter/collapse/combine/filter-mode/truncate); frequency/coverage Pareto + per-position duration lines; suppressed variants folded into `suppressed_instances`, shares renormalised |
@@ -107,10 +107,10 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA. Six sub-tasks have landed — see
-`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d for each
-one's documented scope deviations from its original spec text: five of
-the six landed out of T-14's own suggested build order, since each
+analytics suite T-14 builds on TBA. Seven sub-tasks have landed — see
+`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e for
+each one's documented scope deviations from its original spec text:
+five of the seven landed out of T-14's own suggested build order, since each
 needed none of the sibling T-14 sub-tasks ahead of it to be useful
 now: **T-14a** (event-log/journey-feature bulk export codecs,
 `src/analytics.rs` + `src/controllers/exports.rs`), **T-14m** (the
@@ -139,7 +139,19 @@ other standard stays whole-clock); an unreached anchor pair counts as
 `Compliance::unreached`, a third verdict never folded into
 `within`/`breached`; and T-14a's own reserved `anchors_delays` export
 column is wired in the same change, since it is a per-instance
-property T-14c's still-unwired `variant` column is not.
+property T-14c's still-unwired `variant` column is not. **T-14e**
+(2026-09-10, also in the suggested order — right after T-14d)
+extends `src/tba.rs` again: `Observation`/`close_observation`/
+`anchor_observation`/`KaplanMeier`/`kaplan_meier` (a censoring-aware
+survival estimate over time-to-close, and — reusing T-14d's own
+`from_anchor`/`to_anchor` pair — time-to-anchor) plus `LogRank`/
+`log_rank` (a two-sample Mantel–Haenszel test, unit-tested but with no
+HTTP surface yet — there is no cohort-splitting mechanism in this
+crate to hand it two sides until T-14f). `?discontinued=event|censor`
+(default `event`) selects whether a discontinued closure counts as
+the Kaplan–Meier event or a censoring; the whole `survival` block is
+withheld under the identical suppression decision as the percentile
+detail, never a separate one.
 Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
@@ -246,8 +258,10 @@ src/
 │                          clock partition, gaps, handoffs, nearest-rank percentiles, the NHS
 │                          access-standard catalogue (each entry's own optional anchor pair,
 │                          T-14d), cohort rollup, constraint ranking, Little's Law, stage
-│                          anchors + adjacent delays + anchored compliance (T-14d). No I/O;
-│                          `as_of` is a parameter, so it is deterministic
+│                          anchors + adjacent delays + anchored compliance (T-14d), and a
+│                          censoring-aware Kaplan-Meier survival estimator + a two-sample
+│                          log-rank test (T-14e). No I/O; `as_of` is a parameter, so it is
+│                          deterministic
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── privacy.rs             field masking (provider name/id) + GDPR export envelope

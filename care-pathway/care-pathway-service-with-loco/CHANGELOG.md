@@ -9,6 +9,54 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14e: censoring-aware cohort statistics (2026-09-10)
+
+A Kaplan–Meier survival estimate over cohort time-analysis, treating
+every open instance as right-censored instead of `?status=all`'s own
+mixing of a closed lead time with a still-running one.
+
+- `src/tba.rs`: `Observation` (`time_ms`, `event`), `close_observation()`
+  (status + the `discontinued` parameter drive event vs. censor;
+  `time_ms` is `lead_time_ms` either way), `anchor_observation()`
+  (reuses T-14d's own `from_anchor`/`to_anchor` pair; `None` when
+  `from_anchor` was never reached — excluded outright, never assigned
+  an arbitrary time zero), `KmStep`/`KaplanMeier`/`kaplan_meier()` (the
+  estimator: ties grouped into one step, `median_ms`/`p90_ms` read off
+  at survival `≤ 0.50`/`≤ 0.10` — matching this crate's existing
+  nearest-rank `percentile` convention exactly when there is no
+  censoring, pinned by test — or `null` with reason
+  `curve_did_not_reach`), `LogRank`/`log_rank()` (a two-sample
+  Mantel–Haenszel test), and a hand-rolled `erf`/`erfc` (Abramowitz &
+  Stegun 7.1.26 rational approximation) rather than a new statistics
+  dependency.
+- `src/controllers/tba.rs`: `Survival`, `resolve_discontinued()`
+  (`event` default | `censor`, `422` on anything else),
+  `survival_analysis()`, wired into
+  `GET /api/care-pathways/{pathway}/time-analysis` as a new `survival`
+  block — `time_to_close` always present, `time_to_anchor` present
+  only when a recognised `from_anchor`/`to_anchor` pair resolves.
+  Withheld under the identical suppression decision as the percentile
+  detail, never a separate one.
+- **Deviation, disclosed rather than silently worked around:** the
+  log-rank test has no HTTP surface. There is no cohort-splitting
+  mechanism in this crate to hand it two real sides from a live
+  request — that is T-14f's job, not yet landed. `log_rank` is
+  implemented, documented, and unit-tested against its own literal
+  acceptance bullet with two hand-built groups; it is "ready for it,
+  not wired to it", the same posture `src/suppression.rs` already
+  states for its own still-unused 2-D breakdown primitive.
+- Tests: 12 new pure `src/tba.rs` unit tests targeting each acceptance
+  bullet directly, including a 500-seed property test (a hand-rolled
+  SplitMix64 generator, matching this crate's existing precedent
+  rather than a new `rand`/`proptest` dependency) proving the survival
+  curve is non-increasing and bounded in `[0, 1]` (`cargo test --lib`:
+  390, up from 378). A DB-gated round trip (`tests/requests/tba.rs`'s
+  `censoring_aware_survival_round_trip`) proves time-to-close under
+  both `discontinued` modes, time-to-anchor excluding an instance that
+  never reached `from_anchor`, the absent `time_to_anchor` block when
+  no anchor pair is named, the `422` on an unrecognised `discontinued`
+  value, and the suppression withholding, all against real Postgres.
+
 ### Added — T-14d: stage anchors, delay decomposition, and anchored standards (2026-09-10)
 
 Per-instance `anchors`/`delays`, and cohort compliance scored against a
