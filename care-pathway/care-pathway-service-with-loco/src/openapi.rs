@@ -33,6 +33,7 @@ fn paths() -> Value {
     merge_object(&mut paths, tba_recording_paths());
     merge_object(&mut paths, tba_analysis_paths());
     merge_object(&mut paths, export_paths());
+    merge_object(&mut paths, variants_paths());
     merge_object(&mut paths, instance_paths());
     merge_object(&mut paths, insight_paths());
     paths
@@ -462,6 +463,37 @@ fn tba_analysis_paths() -> Value {
     })
 }
 
+/// The T-14c journey-variants endpoint — its own function purely to
+/// stay under the crate's `too_many_lines` lint once added to
+/// `tba_analysis_paths`; logically part of the same TBA analysis
+/// surface.
+fn variants_paths() -> Value {
+    serde_json::json!({
+        "/api/care-pathways/{pathway}/variants": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Journey variants: pathway strings and the frequency/coverage Pareto (T-14c)",
+                "description": "Per instance, the ordered stage sequence from segments transformed by named, defaulted, echoed parameters — min_segment_days (short segments dropped), collapse_gap_days (same-stage eras separated by a small gap merge), combination_window_days (an overlap at least this long becomes a canonical alphabetical a+b step; a shorter one is a handoff), min_post_combination_days (stubs dropped), filter (first|changes|all), max_path_length. Output: the variant string, frequency, share, cumulative coverage (renormalised over the unsuppressed variants), and per-position (\"line\") duration quantiles with an overall pseudo-line. Variants below the minimum cell count (T-14k) are folded into suppressed_instances, never listed individually. Nothing is stored.",
+                "parameters": [
+                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } },
+                    { "name": "min_segment_days", "in": "query", "schema": { "type": "number", "default": 0 } },
+                    { "name": "collapse_gap_days", "in": "query", "schema": { "type": "number", "default": 30 } },
+                    { "name": "combination_window_days", "in": "query", "schema": { "type": "number", "default": 30 } },
+                    { "name": "min_post_combination_days", "in": "query", "schema": { "type": "number", "default": 30 } },
+                    { "name": "filter", "in": "query", "schema": { "type": "string", "enum": ["first", "changes", "all"], "default": "all" } },
+                    { "name": "max_path_length", "in": "query", "schema": { "type": "integer", "default": 10 } }
+                ],
+                "responses": {
+                    "200": { "description": "Variants, coverage, and duration lines" },
+                    "404": { "description": "Unknown pathway" },
+                    "422": { "description": "Unrecognised filter" }
+                }
+            }
+        }
+    })
+}
+
 /// The T-14a bulk export codecs (`src/controllers/exports.rs`) —
 /// documented here as its own function because the pre-existing
 /// `OpenAPI` doc had no entry for either endpoint at all (found rolling
@@ -862,6 +894,7 @@ mod tests {
             "/api/care-pathways/{pathway}/time-analysis",
             "/api/care-pathways/{pathway}/constraints",
             "/api/care-pathways/{pathway}/process-map",
+            "/api/care-pathways/{pathway}/variants",
         ] {
             assert!(paths[path].is_object(), "{path} is undocumented");
         }

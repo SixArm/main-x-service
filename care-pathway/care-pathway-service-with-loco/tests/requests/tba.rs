@@ -656,3 +656,134 @@ async fn process_map_round_trip() {
     })
     .await;
 }
+
+/// Journey variants (T-14c): the named parameters are echoed, an
+/// overlap above `combination_window_days` combines into a canonical
+/// alphabetical step, an unrecognised `filter` is refused, and
+/// suppression (T-14k) folds a rare variant into `suppressed_instances`
+/// while renormalising the visible variants' shares to still sum to 1.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn variants_round_trip() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": format!("variants pathway {}", uuid::Uuid::new_v4()),
+                "care_setting": "Outpatient",
+                "condition_codes": [{"system": "Icd10", "code": "M54"}],
+            }))
+            .await;
+        created.assert_status_ok();
+        let template: Value = created.json();
+        let pathway = template["pid"].as_str().expect("pathway pid").to_string();
+
+        // Five instances sharing the same overlapping triage/treatment
+        // pair — a 5-day overlap, which combines under a 1-day window.
+        for _ in 0..5 {
+            let enrolled = request
+                .post(&format!("/api/care-pathways/{pathway}/instances"))
+                .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+                .await;
+            enrolled.assert_status_ok();
+            let instance: Value = enrolled.json();
+            let pid = instance["pid"].as_str().expect("instance pid").to_string();
+            for (stage, start, end) in [("triage", 0, 10), ("treatment", 5, 15)] {
+                request
+                    .post(&format!("/api/instances/{pid}/segments"))
+                    .json(&json!({
+                        "label": stage, "stage": stage, "category": "value_adding",
+                        "started_at": day(start), "ended_at": day(end),
+                    }))
+                    .await
+                    .assert_status_ok();
+            }
+        }
+
+        let report: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/variants?combination_window_days=1"
+            ))
+            .await
+            .json();
+        assert_eq!(report["instances"], 5);
+        assert_eq!(report["suppressed_instances"], 0);
+        assert_eq!(report["params"]["combination_window_days"], 1.0);
+        assert_eq!(report["params"]["filter"], "all");
+        let visible = report["variants"].as_array().expect("variants");
+        assert_eq!(
+            visible.len(),
+            1,
+            "every instance shares one variant: {visible:?}"
+        );
+        assert_eq!(visible[0]["variant"], "treatment+triage");
+        assert_eq!(visible[0]["frequency"], 5);
+        assert_eq!(visible[0]["share"].as_f64().unwrap(), 1.0);
+        assert_eq!(visible[0]["cumulative_share"].as_f64().unwrap(), 1.0);
+        let overall_line = report["lines"]
+            .as_array()
+            .expect("lines")
+            .iter()
+            .find(|l| l["position"] == "overall")
+            .expect("overall line");
+        assert_eq!(overall_line["n"], 5);
+
+        // An unrecognised filter is refused, not silently defaulted.
+        assert_eq!(
+            request
+                .get(&format!(
+                    "/api/care-pathways/{pathway}/variants?filter=nonsense"
+                ))
+                .await
+                .status_code(),
+            422
+        );
+
+        // A sixth instance with its own, unique journey stays below the
+        // floor: its variant is suppressed, folded into
+        // suppressed_instances, and the five-instance variant's share
+        // is renormalised over the unsuppressed instances alone, so it
+        // still reads as 1.0.
+        let enrolled = request
+            .post(&format!("/api/care-pathways/{pathway}/instances"))
+            .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+            .await;
+        enrolled.assert_status_ok();
+        let sixth: Value = enrolled.json();
+        let sixth_pid = sixth["pid"].as_str().expect("instance pid").to_string();
+        request
+            .post(&format!("/api/instances/{sixth_pid}/segments"))
+            .json(&json!({
+                "label": "discharge", "stage": "discharge", "category": "value_adding",
+                "started_at": day(0), "ended_at": day(1),
+            }))
+            .await
+            .assert_status_ok();
+
+        let report: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/variants?combination_window_days=1"
+            ))
+            .await
+            .json();
+        assert_eq!(report["instances"], 6);
+        assert_eq!(
+            report["suppressed_instances"], 1,
+            "the lone discharge-only journey"
+        );
+        let visible = report["variants"].as_array().expect("variants");
+        assert_eq!(
+            visible.len(),
+            1,
+            "the rare variant is folded, not listed: {visible:?}"
+        );
+        assert_eq!(
+            visible[0]["share"].as_f64().unwrap(),
+            1.0,
+            "renormalised over the unsuppressed"
+        );
+    })
+    .await;
+}
