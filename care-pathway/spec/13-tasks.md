@@ -383,19 +383,22 @@ manual check confirms it. Split tasks too big for one PR
   T-14a → T-14l. Each sub-task is one three-part PR (spec + code +
   tests); the pure parts go in `src/tba.rs` or a sibling
   `src/analytics.rs`, DB-free and property-tested, per
-  [TBA §14](time-based-analysis.md). **T-14m landed 2026-09-09** (its
-  own generator lives in `src/data/journeys.rs`, not `src/analytics.rs`
-  — see its entry below); **T-14a landed 2026-09-01** out of the
-  suggested order, ahead of every task it lists here, because it
-  needed none of them to be useful now (see its own entry's scope
-  notes — including why it needs no suppression pass from the
-  still-open T-14k: it exports patient-level rows, which T-14a's own
-  spec text says are gated, not suppressed).
+  [TBA §14](time-based-analysis.md). **T-14a landed 2026-09-09**, then
+  **T-14m** the same day (its own generator lives in
+  `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
+  below), then **T-14k on 2026-09-10** — the first three sub-tasks
+  landed, all out of the suggested order above, because none needed
+  the tasks still ahead of it in this list to be useful now (see each
+  entry's own scope notes; T-14a's covers why it needs no suppression
+  pass from T-14k: it exports patient-level rows, which T-14a's own
+  spec text says are gated, not suppressed — T-14k's own module docs
+  confirm the same thing from the other side).
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
-    Landed 2026-09-09, ahead of the suggested order above (T-14m/T-14k/
-    T-14b–j are still unbuilt) because the two codecs need none of
-    them to produce a real, useful v1 — see the deviations noted below,
+    Landed 2026-09-09, ahead of the suggested order above — at the
+    time, T-14m and T-14k were also still unbuilt (both have since
+    landed too; T-14b–j remain open) — because the two codecs needed
+    none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
     row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
     surface + DB loading in `src/controllers/exports.rs`:
@@ -440,10 +443,12 @@ manual check confirms it. Split tasks too big for one PR
       is a **synchronous v1** that renders on the request path,
       documented as such in `src/controllers/exports.rs`'s module doc
       rather than silently presented as the full T-10 contract.
-      Suppression does **not** apply to rows (T-14k, itself unbuilt,
-      would apply to aggregates only); gating does, and is live.
+      Suppression does **not** apply to rows (T-14k, now landed,
+      applies only to aggregates, and its own module docs confirm this
+      exemption explicitly); gating does, and is live.
     - **Acceptance:** the seeded-cohort/T-14b DFG cross-check is
-      **deferred** — T-14m and T-14b do not exist yet, so there is
+      **deferred** — T-14b does not exist yet (T-14m has since landed),
+      so there is
       nothing to re-derive against. A test does assert no codec output
       ever contains a `subject_ref` or a person URN — both a DB-free
       property test in `src/analytics.rs` (`event_log_never_carries_…`,
@@ -599,21 +604,66 @@ manual check confirms it. Split tasks too big for one PR
       listed at `idle_days=60` and not at 90; an instance with an open
       segment started 5 days ago is not listed; a closed instance is
       never listed.
-  - [ ] **T-14k — Disclosure control: modes and marginals.** Generalise
-    the TBA-10 floor to every aggregate above: `min_cell_count`
-    (deployment-configurable upward only, per [TBA §17](time-based-analysis.md)),
-    modes `withhold` (default: `null` + reason) and `remove`. Two of
-    TreatmentPatterns' three modes are deliberately **not** adopted:
-    `mean` substitutes a made-up count, and `minCellCount` reports a
-    suppressed cell *as* the threshold, which reads as a count. And one
-    rule is added that TreatmentPatterns leaves to the caller: when a
-    cell in a stratified table is withheld, enough sibling cells are
-    also withheld that the value cannot be recovered by differencing
-    against a visible total (secondary suppression).
-    - **Acceptance:** property test over generated stratified outputs —
-      no withheld cell is recoverable as `total − Σ visible`; `remove`
-      and `withhold` never disagree on *which* cells are small; the
-      T-14a codecs are exempt from suppression and gated instead.
+  - [x] **T-14k — Disclosure control: modes and marginals.** Landed
+    2026-09-10. Generalises the TBA-10 floor into one shared, pure
+    module, `src/suppression.rs`: `min_cell_count()`
+    (`CARE_PATHWAY_MIN_CELL_COUNT`, deployment-configurable **upward
+    only** — a lower or garbage value falls back to the default rather
+    than weakening protection, per [TBA §17](time-based-analysis.md)),
+    modes `Mode::Withhold` (default: `null` + reason) and
+    `Mode::Remove` (drop the key), parsed from a new `?mode=` query
+    param. Two of TreatmentPatterns' three modes are deliberately
+    **not** adopted: `mean` substitutes a made-up count, and
+    `minCellCount` reports a suppressed cell *as* the threshold, which
+    reads as a count. And one rule is added that TreatmentPatterns
+    leaves to the caller: `decide()` runs **secondary suppression** —
+    whenever a declared `Partition` (a row, a column, or any other
+    group whose members sum to a published margin) is left with
+    exactly one suppressed cell, one more cell from that partition is
+    suppressed too (the smallest remaining visible one, deterministically),
+    repeated to a fixed point, so a withheld cell can never be
+    recovered as `margin − Σ(visible siblings)`.
+    - [x] `decide()`/`render()` operate on a generic `Table` (cells +
+      partitions) — no genuinely stratified 2-D breakdown exists in
+      this crate yet (that's T-14f, unbuilt), so this is built ready
+      for T-14f to consume, exactly as T-14a's codecs and T-14m's
+      generator were each built ready for their own not-yet-built
+      consumers. Proven now by 11 unit tests including a 500-seed
+      property test (`no_partition_is_ever_left_with_exactly_one_suppressed_cell`)
+      over randomly generated row × column tables — a hand-rolled
+      `SplitMix64`, the same choice and the same reason as T-14m's
+      `Rng`, not a new `proptest` dependency.
+    - [x] The **scalar** case (`is_suppressed(n)`) replaces the old
+      hardcoded `MIN_COHORT_FOR_PERCENTILES` const in
+      `cohort_time_analysis`, and — closing a real, previously-existing
+      gap — is now also applied to `cohort_constraints`, which used to
+      return unsuppressed findings at any cohort size (a finding
+      computed over one instance can describe that patient's journey
+      precisely). Both endpoints gained `?mode=`.
+    - [x] `flow_metrics.rs`'s own independent floor
+      (`CARE_PATHWAY_FLOW_METRICS_MIN_COHORT`) is **left as-is**,
+      deliberately not migrated to share this module's env var: it
+      already satisfies the same principle independently, and unifying
+      the env var name would be a breaking configuration change for
+      any deployment that has already set it — a decision, not an
+      oversight.
+    - **Acceptance:** the property test (above) proves no withheld
+      cell is recoverable as `total − Σ visible`; `decide()` is shared
+      by both render modes, so `remove` and `withhold` can never
+      disagree on *which* cells are small (also unit-tested directly,
+      `withhold_and_remove_agree_on_which_cells_are_small`); the T-14a
+      codecs are confirmed exempt — `suppression.rs`'s own module docs
+      point at `tests/requests/exports.rs`'s existing `n = 1` round
+      trip rather than duplicating that proof. A live HTTP round trip
+      (`tests/requests/tba.rs`) confirms a 1-instance cohort suppresses
+      both endpoints (with `?mode=remove` dropping the key), and that
+      a 5-instance cohort (the same one `the_flow_gauges_publish_only_what_may_be_published`
+      already builds for the flow-gauge floor) leaves both unsuppressed.
+      The `OpenAPI` doc gained the new `export_paths()` function too
+      (T-14a's endpoints had no entry at all — a gap found rolling
+      this task, closed the same way `instance_paths()`'s own doc
+      comment describes for an earlier such gap) and the new `?mode=`
+      parameter on both cohort endpoints.
   - [ ] **T-14l — Front-end analytics views** in
     `care-pathway-front-end-with-svelte`. `/time` gains the process map
     (an in-house layered SVG layout — node size = instances, edge label

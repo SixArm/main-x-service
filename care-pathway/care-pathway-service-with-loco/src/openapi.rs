@@ -32,6 +32,7 @@ fn paths() -> Value {
     merge_object(&mut paths, compliance_paths());
     merge_object(&mut paths, tba_recording_paths());
     merge_object(&mut paths, tba_analysis_paths());
+    merge_object(&mut paths, export_paths());
     merge_object(&mut paths, instance_paths());
     merge_object(&mut paths, insight_paths());
     paths
@@ -412,12 +413,13 @@ fn tba_analysis_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "Cohort time-based analysis for one pathway",
-                "description": "Nearest-rank lead-time percentiles, aggregate and median value-adding ratio, and compliance against a named standard. A cohort smaller than five withholds percentile detail, which would otherwise identify an individual journey.",
+                "description": "Nearest-rank lead-time percentiles, aggregate and median value-adding ratio, and compliance against a named standard. A cohort smaller than the deployment's minimum cell count (default five, configurable upward only) withholds percentile detail, which would otherwise identify an individual journey.",
                 "parameters": [
                     { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
                     { "name": "standard", "in": "query", "schema": { "type": "string", "example": "rtt_18_weeks" } },
                     { "name": "target_days", "in": "query", "schema": { "type": "number" } },
-                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } }
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } },
+                    { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["withhold", "remove"], "default": "withhold" }, "description": "How a suppressed cohort's detail renders: withhold (default, null + reason) or remove (drop the key)." }
                 ],
                 "responses": {
                     "200": { "description": "Cohort analysis" },
@@ -430,12 +432,62 @@ fn tba_analysis_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "Ranked constraints: where the cohort's time goes",
-                "description": "Disclosed-rule findings ordered by recoverable time. Deliberately not a composite score, and deliberately never per-clinician.",
+                "description": "Disclosed-rule findings ordered by recoverable time. Deliberately not a composite score, and deliberately never per-clinician. A cohort below the minimum cell count withholds findings, exactly as the cohort time-analysis view withholds percentiles — a finding computed over too few instances can describe one patient's journey precisely.",
                 "parameters": [
                     { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } }
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } },
+                    { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["withhold", "remove"], "default": "withhold" }, "description": "How a suppressed cohort's findings render: withhold (default, null + reason) or remove (drop the key)." }
                 ],
                 "responses": { "200": { "description": "Findings" }, "404": { "description": "Unknown pathway" } }
+            }
+        }
+    })
+}
+
+/// The T-14a bulk export codecs (`src/controllers/exports.rs`) —
+/// documented here as its own function because the pre-existing
+/// `OpenAPI` doc had no entry for either endpoint at all (found rolling
+/// T-14k; the same class of gap `instance_paths`'s own doc comment
+/// names for the instance/insight surface, closed the same way: by
+/// documenting it rather than by undocumenting what already was).
+fn export_paths() -> Value {
+    serde_json::json!({
+        "/api/care-pathways/{pathway}/export/event-log": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Bulk event-log export (T-14a)",
+                "description": "A bupaR/PM4Py-shaped event log over every instance enrolled on this pathway: case_id (the instance pid, never subject_ref), activity, lifecycle, timestamp, category, waste, resource (a segment actor's team role, never the URN), location_ref, and case attributes. Gated as a destructive action and audited as a disclosure on every call; not suppressed (T-14k) — a bulk export of patient-level rows is a bulk-export access-control question, not a small-number one.",
+                "parameters": [
+                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["csv", "jsonl"], "default": "jsonl" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } }
+                ],
+                "responses": {
+                    "200": { "description": "CSV or JSONL body" },
+                    "401": { "description": "Missing bearer token, enforcement on" },
+                    "403": { "description": "Policy denied" },
+                    "404": { "description": "Unknown pathway" },
+                    "422": { "description": "Unrecognised format" }
+                }
+            }
+        },
+        "/api/care-pathways/{pathway}/export/journey-features": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Bulk journey-feature export (T-14a)",
+                "description": "One row per instance: LT/VT/PT/%A/%VA/coverage/#HO, per-stage durations, gap count, censored (the clock is still running), and case attributes. variant/anchors_delays/conformance columns are always null pending T-14c/T-14d/T-14i. Gated and audited exactly as the event-log export; not suppressed, for the same reason.",
+                "parameters": [
+                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["csv", "jsonl"], "default": "jsonl" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } }
+                ],
+                "responses": {
+                    "200": { "description": "CSV or JSONL body" },
+                    "401": { "description": "Missing bearer token, enforcement on" },
+                    "403": { "description": "Policy denied" },
+                    "404": { "description": "Unknown pathway" },
+                    "422": { "description": "Unrecognised format" }
+                }
             }
         }
     })
@@ -802,6 +854,33 @@ mod tests {
         assert!(segment["properties"]["category"]["enum"].is_array());
         assert!(segment["properties"]["waste"]["enum"].is_array());
         assert!(segment["properties"]["stage"]["enum"].is_array());
+    }
+
+    /// The T-14a export codecs had no `OpenAPI` entry at all (found
+    /// rolling T-14k). This pins that they now do, including the new
+    /// `?mode=` parameter T-14k added to the sibling cohort endpoints.
+    #[test]
+    fn spec_documents_the_export_codecs_and_suppression_mode() {
+        let s = spec();
+        let paths = &s["paths"];
+        for path in [
+            "/api/care-pathways/{pathway}/export/event-log",
+            "/api/care-pathways/{pathway}/export/journey-features",
+        ] {
+            assert!(paths[path]["get"].is_object(), "{path} is undocumented");
+        }
+        for path in [
+            "/api/care-pathways/{pathway}/time-analysis",
+            "/api/care-pathways/{pathway}/constraints",
+        ] {
+            let params = paths[path]["get"]["parameters"]
+                .as_array()
+                .expect("parameters");
+            assert!(
+                params.iter().any(|p| p["name"] == "mode"),
+                "{path} is missing the mode parameter"
+            );
+        }
     }
 
     /// The instance layer and the registry-insight lenses were a

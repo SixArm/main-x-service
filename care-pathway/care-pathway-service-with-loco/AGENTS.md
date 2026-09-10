@@ -47,7 +47,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/instances/{caseload,overdue-reviews,care-team-load}` | Derived operational views |
 | POST/GET | `/api/instances/{pid}/segments` (+ `/segments/{seg}/close`, `/clock`) | **Time-based analysis**: record a journey segment (VA / NNVA / UNVA + stage + waste), close a running one, set the pathway clock (no pause, by design) |
 | GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs; and the segment/gap wall |
-| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard; ranked constraints |
+| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard; ranked constraints. Both suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`) |
 | GET | `/api/care-pathways/{pid}/export/{event-log,journey-features}` | **Bulk export codecs** (T-14a): `?format=csv\|jsonl&status=`; `event_log` (bupaR/PM4Py shape) and `journey_features` (one row per instance); gated `Destructive`, audited as a disclosure; never a `subject_ref` or a person/actor URN |
 | GET | `/api/instances/{flow,time-standards}` | Little's Law flow (λ/μ/ρ/κ/τ) and the access-standard catalogue |
 | GET | `/api/instances/{pid}/journey` | **Stitched journey**: follows `continues_as` across services, each leg fetched under the *caller's* credential; combined figures withheld unless every leg resolved |
@@ -105,14 +105,19 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA: **T-14a** (event-log/journey-feature
-bulk export codecs, `src/analytics.rs` + `src/controllers/exports.rs`)
-landed 2026-09-01, and **T-14m** (the seeded synthetic journey-cohort
-generator + `journeys:seed` task, `src/data/journeys.rs` +
-`src/tasks/journeys_seed.rs`) landed 2026-09-09 — both ahead of T-14's
-own suggested build order, since each needed none of the sibling T-14
-sub-tasks to be useful now; see `../spec/13-tasks.md` T-14a/T-14m for
-the documented scope deviations from each one's original spec text.
+analytics suite T-14 builds on TBA. Three sub-tasks have landed, all
+out of T-14's own suggested build order, since each needed none of the
+sibling T-14 sub-tasks ahead of it to be useful now — see
+`../spec/13-tasks.md` T-14a/T-14m/T-14k for each one's documented
+scope deviations from its original spec text: **T-14a**
+(event-log/journey-feature bulk export codecs, `src/analytics.rs` +
+`src/controllers/exports.rs`), **T-14m** (the seeded synthetic
+journey-cohort generator + `journeys:seed` task, `src/data/journeys.rs`
++ `src/tasks/journeys_seed.rs`) — both 2026-09-09 — and **T-14k**
+(disclosure control: the shared `min_cell_count`/`Mode` primitive plus
+secondary suppression of stratified marginals, `src/suppression.rs`,
+wired into `cohort_time_analysis` and, closing a real gap,
+`cohort_constraints`), 2026-09-10.
 Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
@@ -214,6 +219,7 @@ src/
 ├── analytics.rs            T-14a: pure event_log / journey_features row-shaping + CSV/JSONL codecs, DB-free
 ├── data/
 │   └── journeys.rs          T-14m: pure, DB-free synthetic journey-cohort generator (SplitMix64, deterministic)
+├── suppression.rs          T-14k: disclosure control — min_cell_count/Mode + secondary suppression of stratified marginals, DB-free
 ├── tba.rs                 pure time-based analysis: interval union/subtract, the four-bucket
 │                          clock partition, gaps, handoffs, nearest-rank percentiles, the NHS
 │                          access-standard catalogue, cohort rollup, constraint ranking,
