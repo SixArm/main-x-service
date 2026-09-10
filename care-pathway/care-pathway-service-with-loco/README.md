@@ -45,8 +45,8 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | POST | `/api/instances/{pid}/clock` | Set the pathway clock `start`/`stop` (no `pause`, by design) |
 | GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage, per-stage anchors + adjacent delays |
 | GET | `/api/instances/{pid}/timeline` | The mapped journey as an ordered wall of segments and gaps |
-| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`), plus censoring-aware Kaplan–Meier survival (`?discontinued=event\|censor`; `?mode=withhold\|remove` on suppression) |
-| GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time (`?mode=withhold\|remove` on suppression) |
+| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`), plus censoring-aware Kaplan–Meier survival (`?discontinued=event\|censor`), optionally split by a rule (`?contains=&excludes=&compare=`; `?mode=withhold\|remove` on suppression) |
+| GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time — same rule-split params as time-analysis (`?mode=withhold\|remove` on suppression) |
 | GET | `/api/instances/flow` | Queueing-theory flow (Little's Law: λ/μ/ρ/κ/τ) |
 | GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
 | GET | `/api/care-pathways/{pid}/export/event-log` | Bulk `event_log` export (`?format=csv\|jsonl`) — bupaR/PM4Py shape, never a `subject_ref` or a person/actor URN |
@@ -91,9 +91,9 @@ stratified-table primitive (`Table`/`Partition`/`decide`/`render`)
 with **secondary suppression** — when a row, a column, or any declared
 group summing to a published margin is left with exactly one
 suppressed cell, one more is suppressed too, so a withheld cell can
-never be recovered as `margin − Σ(visible siblings)`. No 2-D
-breakdown exists in this crate yet (T-14f); this primitive is ready
-for it. `event_log`/`journey_features` (T-14a above) are **exempt**,
+never be recovered as `margin − Σ(visible siblings)`. Landed unused;
+T-14f (below) is the first real caller.
+`event_log`/`journey_features` (T-14a above) are **exempt**,
 not suppressed — they are patient-level rows, gated by access control
 and audited, per the family's bulk-export contract.
 
@@ -185,15 +185,52 @@ is no time zero to measure it from. The whole `survival` block is
 withheld under the identical suppression decision as the percentile
 detail — a curve over a handful of instances is exactly as disclosive.
 A two-sample log-rank test (`tba::log_rank`, Mantel–Haenszel form) is
-implemented and unit-tested but has no HTTP surface yet — there is no
-cohort-splitting mechanism in this crate to hand it two sides (T-14f);
-it is ready for that task to call, the same "ready for it, not wired
-to it" posture [`src/suppression.rs`](./src/suppression.rs) already
-documents for its own still-unused 2-D breakdown primitive. Pure logic
-extends `src/tba.rs` itself: `Observation`, `close_observation()`,
-`anchor_observation()`, `KaplanMeier`/`kaplan_meier()`, `LogRank`/
-`log_rank()`; HTTP surface: [`src/controllers/tba.rs`](./src/controllers/tba.rs)
-(`Survival`, `survival_analysis()`).
+implemented and unit-tested but still has no HTTP surface: T-14f
+(below) has since landed the cohort-splitting mechanism this
+anticipated, but its own split payload compares sides via the
+already-computed cohort/compliance/survival figures, not a log-rank
+test between their curves — comparing the two split sides' curves
+stays a further, still-open follow-up. Pure logic extends `src/tba.rs`
+itself: `Observation`, `close_observation()`, `anchor_observation()`,
+`KaplanMeier`/`kaplan_meier()`, `LogRank`/`log_rank()`; HTTP surface:
+[`src/controllers/tba.rs`](./src/controllers/tba.rs) (`Survival`,
+`survival_analysis()`).
+
+### Rule-based cohort splits (T-14f)
+
+`GET /api/care-pathways/{pid}/time-analysis` and `.../constraints`
+gain `?contains=&excludes=&compare=`: a comma-separated list of
+`type:value` predicates — `stage`/`step`/`event`/`waste`/`outcome`/
+`setting`/`urgency` — every matched instance must satisfy
+(`contains`, AND) and none may satisfy (`excludes`, none-of).
+`compare=true` reports the complement alongside the matched side, in
+the same shape the unsplit response already carries. Absent
+`contains`/`excludes` adds no `split` key at all; naming a rule when
+the unsplit cohort is already below the suppression floor does the
+same, since splitting an already-too-small cohort would disclose
+more, not less. Each side's bare `instances` count is always
+published — this family never hides the count, only detail — but
+`suppression::decide` over a two-cell matched/complement table decides
+whether each side's *detail* renders: the first real caller of
+[`src/suppression.rs`](./src/suppression.rs)'s own stratified-table
+primitive. This closes a genuine gap: a suppressed side's additive
+sums (per-stage, per-waste) would otherwise be exactly recoverable as
+`unsplit − complement` if the complement's own sums stayed visible, so
+a lone small side recruits its sibling even when the sibling alone
+clears the floor. **Only `time-analysis` and `constraints` accept
+these params** — `process-map` and `variants` already carry their own,
+differently-shaped suppression and their own notion of "compare" would
+need its own design pass, so wiring the same contract onto them stays
+a documented follow-up. `setting:<s>` compares against the pathway's
+*lowercased* care setting (`"Outpatient"` → `setting:outpatient`).
+Pure logic: new [`src/split.rs`](./src/split.rs) (named `split`, not
+`rules` — `crate::instances` is already aliased `rules` throughout the
+controller layer): `Predicate`, `Features` (reusing the same
+`analytics::SegmentInput`/`StepInput`/`EventInput` rows T-14a's
+event-log codec already loads), `Rule`, `partition`, `split_table`;
+HTTP surface: [`src/controllers/tba.rs`](./src/controllers/tba.rs)
+(`load_features`, `resolve_rule`, `SplitPlan`/`resolve_split`,
+`split_payload`/`split_payload_constraints`).
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 

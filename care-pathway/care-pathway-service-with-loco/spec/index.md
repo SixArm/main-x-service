@@ -291,10 +291,12 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    exactly one suppressed cell, one more is suppressed too, so a
    withheld cell can never be recovered as `margin − Σ(visible
    siblings)` — proven by an 11-test suite including a 500-seed
-   property test over randomly generated tables. No stratified 2-D
-   breakdown exists in this crate yet (that's T-14f); this is built
-   ready for it, the same forward-building pattern items 20 and 21
-   above already established. `flow_metrics.rs`'s own independent
+   property test over randomly generated tables. At landing, no
+   stratified 2-D breakdown existed in this crate yet (that was
+   T-14f); this was built ready for it, the same forward-building
+   pattern items 20 and 21 above already established — and T-14f
+   (item 27) is the first real caller, confirming the pattern.
+   `flow_metrics.rs`'s own independent
    floor is deliberately left unmigrated — unifying its env var would
    be a breaking config change for an existing deployment, not merely
    a refactor. Landed 2026-09-10, spec T-14k.
@@ -408,18 +410,69 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    that far. The whole `survival` block is withheld under the identical
    suppression decision as the percentile detail (item 22), never a
    separate one. A two-sample log-rank test (`tba::log_rank`,
-   Mantel–Haenszel form) is implemented and unit-tested but has no HTTP
-   surface: there is no cohort-splitting mechanism in this crate to hand
-   it two sides yet (spec T-14f) — it is "ready for it, not wired to
-   it", the same posture [`src/suppression.rs`](../src/suppression.rs)
-   already documents for its own still-unused 2-D breakdown primitive.
-   Pure logic in [`src/tba.rs`](../src/tba.rs) itself (`Observation`,
+   Mantel–Haenszel form) is implemented and unit-tested but still has
+   no HTTP surface: T-14f (item 27) has since landed the
+   cohort-splitting mechanism this anticipated, but its own split
+   payload compares sides via the already-computed `Survival`/
+   `Compliance`/`CohortAnalysis` figures, not a log-rank test between
+   their curves, and `Survival` exposes no raw `Observation`s such a
+   call would need — comparing the two split sides' curves stays a
+   further, still-open follow-up. Pure logic in [`src/tba.rs`](../src/tba.rs)
+   itself (`Observation`,
    `close_observation()`, `anchor_observation()`, `KmStep`/
    `KaplanMeier`/`kaplan_meier()`, `LogRank`/`log_rank()`, plus a
    hand-rolled `erf`/`erfc` rather than a new statistics dependency);
    HTTP surface: [`src/controllers/tba.rs`](../src/controllers/tba.rs)
    (`Survival`, `resolve_discontinued()`, `survival_analysis()`).
    Landed 2026-09-10, spec T-14e.
+27. **Rule-based cohort splits and the paired comparison.**
+   `GET /api/care-pathways/{pathway}/time-analysis` and
+   `.../constraints` gain `?contains=&excludes=&compare=` (spec
+   T-14f): a comma-separated list of `type:value` predicates
+   (`stage`/`step`/`event`/`waste`/`outcome`/`setting`/`urgency`) that
+   every matched instance must satisfy (`contains`, AND) and none may
+   satisfy (`excludes`, none-of); `compare=true` reports the
+   complement side alongside the matched one, both in the same shape
+   the unsplit response already carries (`cohort`/`compliance`/
+   `survival` for time-analysis, `findings` for constraints). Absent
+   `contains`/`excludes` adds no `split` key at all — today's unsplit
+   behaviour, unchanged; naming a rule when the *unsplit* cohort is
+   already below the suppression floor does the same, since splitting
+   an already-too-small cohort would disclose more, not less. Each
+   side's bare `instances` count is always published (this family
+   never hides the count, only detail — item 22's own convention);
+   `suppression::decide` over a two-cell `matched`/`complement` table
+   decides whether each side's *detail* renders — the **first real
+   caller** of item 22's own `Table`/`decide` primitive, which had
+   stood ready but unused since it landed. This closes a genuine
+   disclosure gap `decide()` was built for but had never yet been
+   asked to close: a suppressed side's additive sums (`by_stage`,
+   `by_waste`) would otherwise be exactly recoverable as
+   `unsplit − complement` if the complement's own sums stayed visible,
+   so a lone small side recruits its sibling even when the sibling
+   alone clears the floor. **Scope decision:** only `time-analysis`
+   and `constraints` accept the new parameters — `process-map` and
+   `variants` already carry their own, differently-shaped suppression
+   and their own notion of "compare" would need its own design pass,
+   so wiring the same contract onto them is a documented follow-up,
+   not attempted here; `data-quality` (T-14h) does not exist yet
+   either. `setting:<s>` compares against the pathway's *lowercased*
+   care setting (`controllers::exports::care_setting_string`, reused
+   rather than duplicated) — `"Outpatient"` → `setting:outpatient` —
+   confirmed by reading the existing derivation, not guessed. Pure
+   logic in new [`src/split.rs`](../src/split.rs) (named `split`, not
+   `rules`, since `crate::instances` is already aliased `rules`
+   throughout the controller layer): `Predicate` (parses and validates
+   `type:value` against a closed vocabulary where one exists), reusing
+   [`src/analytics.rs`](../src/analytics.rs)'s `CaseContext`/
+   `SegmentInput`/`StepInput`/`EventInput` — the same rows T-14a's
+   event-log codec already loads, so there is one source of truth for
+   "what did this instance do" — `Features`, `Rule`, `partition`, and
+   `split_table`; HTTP surface:
+   [`src/controllers/tba.rs`](../src/controllers/tba.rs)
+   (`load_features`, `resolve_rule`, `SplitPlan`/`resolve_split`,
+   `split_payload`/`split_payload_constraints`). Landed 2026-09-11,
+   spec T-14f.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

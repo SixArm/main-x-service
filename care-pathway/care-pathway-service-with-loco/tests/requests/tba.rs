@@ -19,6 +19,47 @@ fn day(days: i64) -> String {
     (base + chrono::Duration::days(days)).to_rfc3339()
 }
 
+/// Enrol one instance with an explicit, fully-closed clock (so its
+/// lead time never depends on wall-clock "now") and, if `stage` is
+/// given, one value-adding segment in that stage — the fixture T-14f's
+/// round trips build cohorts out of.
+async fn closed_instance(
+    request: &TestServer,
+    pathway: &str,
+    stage: Option<&str>,
+    start_day: i64,
+    stop_day: i64,
+) -> String {
+    let enrolled = request
+        .post(&format!("/api/care-pathways/{pathway}/instances"))
+        .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+        .await;
+    enrolled.assert_status_ok();
+    let instance: Value = enrolled.json();
+    let pid = instance["pid"].as_str().expect("instance pid").to_string();
+    request
+        .post(&format!("/api/instances/{pid}/clock"))
+        .json(&json!({ "event": "start", "at": day(start_day) }))
+        .await
+        .assert_status_ok();
+    request
+        .post(&format!("/api/instances/{pid}/clock"))
+        .json(&json!({ "event": "stop", "at": day(stop_day) }))
+        .await
+        .assert_status_ok();
+    if let Some(stage) = stage {
+        request
+            .post(&format!("/api/instances/{pid}/segments"))
+            .json(&json!({
+                "label": stage, "stage": stage, "category": "value_adding",
+                "started_at": day(start_day), "ended_at": day(start_day + 1),
+            }))
+            .await
+            .assert_status_ok();
+    }
+    pid
+}
+
 /// Seed a pathway template and one enrolled instance.
 async fn seed(request: &TestServer) -> (String, String) {
     let created = request
@@ -1234,6 +1275,208 @@ async fn censoring_aware_survival_round_trip() {
             solo_report["survival"],
             Value::Null,
             "withheld, same as the percentile detail"
+        );
+    })
+    .await;
+}
+
+/// Rule-based cohort splits (T-14f): `contains=`/`compare=` on both
+/// `time-analysis` and `constraints`, the sum invariant, determinism
+/// under an identical repeated filter, no `split` key without a
+/// filter, and a `422` on a malformed predicate.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[allow(clippy::too_many_lines)] // ten instances, several endpoints, several assertions
+async fn rule_based_cohort_split_round_trip() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": format!("split pathway {}", uuid::Uuid::new_v4()),
+                "care_setting": "Outpatient",
+                "condition_codes": [{"system": "Icd10", "code": "M54"}],
+            }))
+            .await;
+        created.assert_status_ok();
+        let template: Value = created.json();
+        let pathway = template["pid"].as_str().expect("pathway pid").to_string();
+
+        // Five instances reach triage (matched); five don't
+        // (complement) — both sides individually clear the default
+        // floor of five, so nothing is suppressed here.
+        for i in 0..5 {
+            closed_instance(&request, &pathway, Some("triage"), 0, 10 + i).await;
+        }
+        for i in 0..5 {
+            closed_instance(&request, &pathway, Some("referral"), 0, 20 + i).await;
+        }
+
+        let fetch_split = || {
+            let request = &request;
+            let pathway = pathway.clone();
+            async move {
+                request
+                    .get(&format!(
+                        "/api/care-pathways/{pathway}/time-analysis\
+                         ?contains=stage:triage&compare=true"
+                    ))
+                    .await
+                    .json::<Value>()
+            }
+        };
+
+        let report = fetch_split().await;
+        assert_eq!(report["cohort"]["instances"], 10, "the unsplit cohort");
+        let split = &report["split"];
+        assert_eq!(split["rule"]["contains"], json!(["stage:triage"]));
+        assert_eq!(split["rule"]["excludes"], json!([]));
+        let matched = &split["matched"];
+        let complement = &split["complement"];
+        assert_eq!(matched["instances"], 5);
+        assert_eq!(complement["instances"], 5);
+        assert_eq!(
+            matched["instances"].as_u64().unwrap() + complement["instances"].as_u64().unwrap(),
+            report["cohort"]["instances"].as_u64().unwrap(),
+            "split + complement sizes sum to the unsplit cohort"
+        );
+        assert_eq!(matched["suppressed"], false, "5 clears the floor");
+        assert_eq!(complement["suppressed"], false);
+        assert!(matched["cohort"]["lead_time"].is_object());
+        assert!(complement["cohort"]["lead_time"].is_object());
+        assert!(matched["survival"]["time_to_close"].is_object());
+
+        // Identical filters give identical figures: the split is a
+        // pure function of the cohort and the rule, not of anything
+        // else that might vary between two otherwise-identical calls.
+        let repeat = fetch_split().await;
+        assert_eq!(
+            report["split"], repeat["split"],
+            "the same filter, called twice, must not disagree with itself"
+        );
+
+        // `constraints` splits the same way, reporting `findings` per
+        // side instead of cohort/compliance/survival.
+        let constraints: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/constraints?contains=stage:triage&compare=true"
+            ))
+            .await
+            .json();
+        assert_eq!(constraints["split"]["matched"]["instances"], 5);
+        assert_eq!(constraints["split"]["complement"]["instances"], 5);
+        assert!(constraints["split"]["matched"]["findings"].is_array());
+        assert!(constraints["split"]["complement"]["findings"].is_array());
+
+        // No `contains=`/`excludes=` at all: no `split` key, not a
+        // null placeholder — today's unsplit behaviour, unchanged.
+        let unfiltered: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/time-analysis"))
+            .await
+            .json();
+        assert!(
+            unfiltered.get("split").is_none(),
+            "absent filter adds no split key at all: {unfiltered}"
+        );
+
+        // A malformed/unrecognised predicate is refused, not silently
+        // matched against nothing.
+        assert_eq!(
+            request
+                .get(&format!(
+                    "/api/care-pathways/{pathway}/time-analysis?contains=stage:not_a_stage"
+                ))
+                .await
+                .status_code(),
+            422
+        );
+        assert_eq!(
+            request
+                .get(&format!(
+                    "/api/care-pathways/{pathway}/time-analysis?contains=sideways:x"
+                ))
+                .await
+                .status_code(),
+            422
+        );
+    })
+    .await;
+}
+
+/// Rule-based cohort splits — the T-14k cross-side suppression (T-14f):
+/// a lone small side recruits its sibling even when the sibling alone
+/// would clear the floor, because the sibling's own detail (per-stage
+/// sums) would otherwise let the small side's suppressed sums be
+/// recovered by subtraction against the published unsplit total.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn rule_based_cohort_split_suppression_round_trip() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": format!("split suppression pathway {}", uuid::Uuid::new_v4()),
+                "care_setting": "Outpatient",
+                "condition_codes": [{"system": "Icd10", "code": "M54"}],
+            }))
+            .await;
+        created.assert_status_ok();
+        let template: Value = created.json();
+        let pathway = template["pid"].as_str().expect("pathway pid").to_string();
+
+        // Two reach triage (matched, below the floor alone); six don't
+        // (complement, clears the floor alone). Eight total clears the
+        // floor, so the unsplit cohort itself is not suppressed and the
+        // split is attempted.
+        for i in 0..2 {
+            closed_instance(&request, &pathway, Some("triage"), 0, 10 + i).await;
+        }
+        for i in 0..6 {
+            closed_instance(&request, &pathway, Some("referral"), 0, 20 + i).await;
+        }
+
+        // `compare=true`: the complement would otherwise publish its
+        // own per-stage sums, letting matched's suppressed sums be
+        // recovered as `unsplit - complement` -- so both are withheld.
+        let compared: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis\
+                 ?contains=stage:triage&compare=true"
+            ))
+            .await
+            .json();
+        assert_eq!(compared["cohort"]["instances"], 8);
+        let matched = &compared["split"]["matched"];
+        let complement = &compared["split"]["complement"];
+        assert_eq!(matched["instances"], 2);
+        assert_eq!(complement["instances"], 6);
+        assert_eq!(matched["suppressed"], true, "2 is below the floor");
+        assert_eq!(
+            complement["suppressed"], true,
+            "6 clears the floor alone, but is recruited to protect matched \
+             from subtraction against the published unsplit total (T-14k)"
+        );
+        assert_eq!(matched["cohort"], Value::Null);
+        assert_eq!(complement["cohort"], Value::Null);
+
+        // Without `compare=true` the complement is never shown at
+        // all, so there is nothing to protect it from: only matched's
+        // own count governs its own suppression.
+        let solo: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis?contains=stage:triage"
+            ))
+            .await
+            .json();
+        assert_eq!(solo["split"]["matched"]["instances"], 2);
+        assert_eq!(solo["split"]["matched"]["suppressed"], true);
+        assert_eq!(
+            solo["split"]["complement"],
+            Value::Null,
+            "compare=true was not requested"
         );
     })
     .await;

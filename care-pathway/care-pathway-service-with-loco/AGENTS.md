@@ -47,7 +47,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/instances/{caseload,overdue-reviews,care-team-load}` | Derived operational views |
 | POST/GET | `/api/instances/{pid}/segments` (+ `/segments/{seg}/close`, `/clock`) | **Time-based analysis**: record a journey segment (VA / NNVA / UNVA + stage + waste), close a running one, set the pathway clock (no pause, by design) |
 | GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs, per-stage anchors + adjacent delays (T-14d); and the segment/gap wall |
-| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); censoring-aware Kaplan–Meier survival for time-to-close and time-to-anchor (T-14e: `?discontinued=event\|censor`); ranked constraints. All three suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`) |
+| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); censoring-aware Kaplan–Meier survival for time-to-close and time-to-anchor (T-14e: `?discontinued=event\|censor`); ranked constraints; both endpoints splittable by a rule (T-14f: `?contains=&excludes=&compare=` over `stage`/`step`/`event`/`waste`/`outcome`/`setting`/`urgency`). All suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`), and a rule-split's own cross-side protection reuses the same primitive |
 | GET | `/api/care-pathways/{pid}/export/{event-log,journey-features}` | **Bulk export codecs** (T-14a): `?format=csv\|jsonl&status=`; `event_log` (bupaR/PM4Py shape) and `journey_features` (one row per instance); gated `Destructive`, audited as a disclosure; never a `subject_ref` or a person/actor URN |
 | GET | `/api/care-pathways/{pid}/process-map` | **Directly-follows process map** (T-14b): `?level=stage\|step&status=&mode=`; nodes/edges with instance/occurrence counts + median(+p90) gaps; self-loops kept, `start`/`end` pseudo-nodes; suppressed per node/edge (T-14k), not per cohort |
 | GET | `/api/care-pathways/{pid}/variants` | **Journey variants** (T-14c): pathway strings via a named/defaulted/echoed parameter chain (era filter/collapse/combine/filter-mode/truncate); frequency/coverage Pareto + per-position duration lines; suppressed variants folded into `suppressed_instances`, shares renormalised |
@@ -107,10 +107,10 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA. Seven sub-tasks have landed — see
-`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e for
-each one's documented scope deviations from its original spec text:
-five of the seven landed out of T-14's own suggested build order, since each
+analytics suite T-14 builds on TBA. Eight sub-tasks have landed — see
+`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f
+for each one's documented scope deviations from its original spec
+text: three of the eight landed out of T-14's own suggested build order, since each
 needed none of the sibling T-14 sub-tasks ahead of it to be useful
 now: **T-14a** (event-log/journey-feature bulk export codecs,
 `src/analytics.rs` + `src/controllers/exports.rs`), **T-14m** (the
@@ -145,13 +145,35 @@ extends `src/tba.rs` again: `Observation`/`close_observation`/
 `anchor_observation`/`KaplanMeier`/`kaplan_meier` (a censoring-aware
 survival estimate over time-to-close, and — reusing T-14d's own
 `from_anchor`/`to_anchor` pair — time-to-anchor) plus `LogRank`/
-`log_rank` (a two-sample Mantel–Haenszel test, unit-tested but with no
-HTTP surface yet — there is no cohort-splitting mechanism in this
-crate to hand it two sides until T-14f). `?discontinued=event|censor`
+`log_rank` (a two-sample Mantel–Haenszel test, unit-tested but still
+with no HTTP surface — see T-14f below for why landing the split
+mechanism didn't change that). `?discontinued=event|censor`
 (default `event`) selects whether a discontinued closure counts as
 the Kaplan–Meier event or a censoring; the whole `survival` block is
 withheld under the identical suppression decision as the percentile
-detail, never a separate one.
+detail, never a separate one. **T-14f** (2026-09-11, also in the
+suggested order — right after T-14e) is a new file,
+[`src/split.rs`](./src/split.rs) (named `split`, not `rules`, since
+`crate::instances` is already aliased `rules` throughout the
+controller layer): `Predicate`/`Features`/`Rule`/`partition` for
+`?contains=&excludes=` (AND / none-of, over
+`stage`/`step`/`event`/`waste`/`outcome`/`setting`/`urgency`, reusing
+`analytics::SegmentInput`/`StepInput`/`EventInput` — the same rows
+T-14a's event-log codec already loads) and `split_table` — **the first
+real caller of T-14k's own `Table`/`decide` primitive**, which had
+stood ready but unused since T-14k landed. `?compare=true` reports the
+complement side alongside the matched one; a lone small side recruits
+its sibling's suppression even when the sibling alone clears the
+floor, closing a real gap where a suppressed side's per-stage/per-waste
+sums would otherwise be recoverable as `unsplit − complement`. Wired
+into `time-analysis` and `constraints` only — `process-map`/`variants`
+each have their own differently-shaped suppression and their own
+notion of "compare", so wiring the same contract onto them is a
+documented follow-up, not attempted here. `log_rank` itself is still
+not called by this change: T-14f's split compares sides via the
+already-computed cohort/compliance/survival figures, not a curve-vs-curve
+log-rank test, which would need raw `Observation`s `Survival` does not
+expose — a further, still-open follow-up beyond this change's scope.
 Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
@@ -217,8 +239,8 @@ src/
 │   ├── fhir.rs             mounted FHIR R5 PlanDefinition CRUD/search + $validate + SMART + $export
 │   ├── insights.rs         directory/coverage/variants/providers/languages registry lenses
 │   ├── instances.rs        instance lifecycle/review/urgency/team/steps/outcomes + caseload/overdue/care-team-load
-│   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views (optionally anchored, T-14d), constraints, flow, T-14b process-map, T-14c variants
-│   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs)
+│   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views (optionally anchored, T-14d; rule-splittable, T-14f), constraints (also rule-splittable), flow, T-14b process-map, T-14c variants
+│   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs; its care_setting_string helper is pub(crate), reused by tba.rs's T-14f split for setting: predicates)
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
 │   └── metrics.rs          root /metrics.prom Prometheus endpoint
 ├── compliance/
@@ -253,7 +275,8 @@ src/
 ├── analytics.rs            T-14a event_log/journey_features codecs (anchors_delays column wired by T-14d) + T-14b directly-follows process map, pure, DB-free
 ├── data/
 │   └── journeys.rs          T-14m: pure, DB-free synthetic journey-cohort generator (SplitMix64, deterministic)
-├── suppression.rs          T-14k: disclosure control — min_cell_count/Mode + secondary suppression of stratified marginals, DB-free
+├── suppression.rs          T-14k: disclosure control — min_cell_count/Mode + secondary suppression of stratified marginals, DB-free (first real caller: T-14f's split_table)
+├── split.rs                T-14f: rule-based cohort splits — Predicate/Features/Rule/partition/split_table, pure, DB-free
 ├── tba.rs                 pure time-based analysis: interval union/subtract, the four-bucket
 │                          clock partition, gaps, handoffs, nearest-rank percentiles, the NHS
 │                          access-standard catalogue (each entry's own optional anchor pair,

@@ -32,6 +32,7 @@ fn paths() -> Value {
     merge_object(&mut paths, compliance_paths());
     merge_object(&mut paths, tba_recording_paths());
     merge_object(&mut paths, tba_analysis_paths());
+    merge_object(&mut paths, constraints_paths());
     merge_object(&mut paths, export_paths());
     merge_object(&mut paths, variants_paths());
     merge_object(&mut paths, instance_paths());
@@ -414,7 +415,7 @@ fn tba_analysis_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "Cohort time-based analysis for one pathway",
-                "description": "Nearest-rank lead-time percentiles, aggregate and median value-adding ratio, compliance against a named standard, and (T-14e) two censoring-aware Kaplan-Meier survival blocks. A cohort smaller than the deployment's minimum cell count (default five, configurable upward only) withholds percentile detail and the survival blocks alike, which would otherwise identify an individual journey. `from_anchor`/`to_anchor` (T-14d) score each instance's own interval between two named stages instead of the whole clock; an instance that never reaches the pair counts as `compliance.unreached` (excluded from within/breached, but disclosed) rather than a breach. Naming only one of the pair, or a name that is not a recognised stage, falls back to the whole-clock score with `compliance.anchor_note` disclosing why, rather than silently approximating. A standard may declare its own anchor in the catalogue (`cancer_fds_28_days` scores referral -> diagnostics with no anchor query at all); an explicit query pair always overrides it, and every other standard stays whole-clock exactly as before. `survival.time_to_close` is always present: a Kaplan-Meier estimate treating every open instance as right-censored at now, rather than `?status=all`'s own mixing of a closed lead time with a still-running one as if they were the same kind of number. `survival.time_to_anchor` is present only when `from_anchor`/`to_anchor` resolve to a real pair (the same one `compliance` uses); an instance that never reached `from_anchor` is excluded from it entirely, since there is no time zero to measure from. `median_ms`/`p90_ms` on either curve are `null` with reason `curve_did_not_reach` when the curve never drops that far.",
+                "description": "Nearest-rank lead-time percentiles, aggregate and median value-adding ratio, compliance against a named standard, and (T-14e) two censoring-aware Kaplan-Meier survival blocks. A cohort smaller than the deployment's minimum cell count (default five, configurable upward only) withholds percentile detail and the survival blocks alike, which would otherwise identify an individual journey. `from_anchor`/`to_anchor` (T-14d) score each instance's own interval between two named stages instead of the whole clock; an instance that never reaches the pair counts as `compliance.unreached` (excluded from within/breached, but disclosed) rather than a breach. Naming only one of the pair, or a name that is not a recognised stage, falls back to the whole-clock score with `compliance.anchor_note` disclosing why, rather than silently approximating. A standard may declare its own anchor in the catalogue (`cancer_fds_28_days` scores referral -> diagnostics with no anchor query at all); an explicit query pair always overrides it, and every other standard stays whole-clock exactly as before. `survival.time_to_close` is always present: a Kaplan-Meier estimate treating every open instance as right-censored at now, rather than `?status=all`'s own mixing of a closed lead time with a still-running one as if they were the same kind of number. `survival.time_to_anchor` is present only when `from_anchor`/`to_anchor` resolve to a real pair (the same one `compliance` uses); an instance that never reached `from_anchor` is excluded from it entirely, since there is no time zero to measure from. `median_ms`/`p90_ms` on either curve are `null` with reason `curve_did_not_reach` when the curve never drops that far. `contains=`/`excludes=` (T-14f) split the cohort into a matched side and (with `compare=true`) its complement, each reporting the same cohort/compliance/survival shape; a side below the floor is withheld, and its sibling is withheld too when showing it would let the withheld side's per-stage/per-waste sums be recovered by subtraction against the published unsplit total (T-14k). Absent `contains=`/`excludes=`, or an unsplit cohort itself below the floor, adds no `split` key at all.",
                 "parameters": [
                     { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
                     { "name": "standard", "in": "query", "schema": { "type": "string", "example": "rtt_18_weeks" } },
@@ -423,26 +424,16 @@ fn tba_analysis_paths() -> Value {
                     { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["withhold", "remove"], "default": "withhold" }, "description": "How a suppressed cohort's detail renders: withhold (default, null + reason) or remove (drop the key)." },
                     { "name": "from_anchor", "in": "query", "schema": { "type": "string", "example": "referral" }, "description": "A stage (see time-standards) to anchor the compliance interval's start on. Requires to_anchor." },
                     { "name": "to_anchor", "in": "query", "schema": { "type": "string", "example": "diagnostics" }, "description": "The stage to anchor the compliance interval's end on. Requires from_anchor; need not be adjacent to it." },
-                    { "name": "discontinued", "in": "query", "schema": { "type": "string", "enum": ["event", "censor"], "default": "event" }, "description": "Whether a discontinued instance's closure counts as the Kaplan-Meier event or as a right-censoring (T-14e). Echoed on survival.discontinued." }
+                    { "name": "discontinued", "in": "query", "schema": { "type": "string", "enum": ["event", "censor"], "default": "event" }, "description": "Whether a discontinued instance's closure counts as the Kaplan-Meier event or as a right-censoring (T-14e). Echoed on survival.discontinued." },
+                    { "name": "contains", "in": "query", "schema": { "type": "string", "example": "stage:triage,urgency:routine" }, "description": "Comma-separated type:value predicates every matched instance must satisfy (T-14f): stage, step, event, waste, outcome, setting, urgency." },
+                    { "name": "excludes", "in": "query", "schema": { "type": "string", "example": "outcome:deceased" }, "description": "Comma-separated type:value predicates no matched instance may satisfy (T-14f)." },
+                    { "name": "compare", "in": "query", "schema": { "type": "boolean", "default": false }, "description": "Also report the complement side's figures (T-14f). Ignored when contains/excludes are both absent." }
                 ],
                 "responses": {
                     "200": { "description": "Cohort analysis" },
                     "404": { "description": "Unknown pathway" },
-                    "422": { "description": "Unknown standard, a non-positive target_days, or an unrecognised discontinued value" }
+                    "422": { "description": "Unknown standard, a non-positive target_days, an unrecognised discontinued value, or a malformed/unrecognised contains or excludes predicate" }
                 }
-            }
-        },
-        "/api/care-pathways/{pathway}/constraints": {
-            "get": {
-                "tags": ["time-based-analysis"],
-                "summary": "Ranked constraints: where the cohort's time goes",
-                "description": "Disclosed-rule findings ordered by recoverable time. Deliberately not a composite score, and deliberately never per-clinician. A cohort below the minimum cell count withholds findings, exactly as the cohort time-analysis view withholds percentiles — a finding computed over too few instances can describe one patient's journey precisely.",
-                "parameters": [
-                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } },
-                    { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["withhold", "remove"], "default": "withhold" }, "description": "How a suppressed cohort's findings render: withhold (default, null + reason) or remove (drop the key)." }
-                ],
-                "responses": { "200": { "description": "Findings" }, "404": { "description": "Unknown pathway" } }
             }
         },
         "/api/care-pathways/{pathway}/process-map": {
@@ -460,6 +451,35 @@ fn tba_analysis_paths() -> Value {
                     "200": { "description": "Nodes and edges" },
                     "404": { "description": "Unknown pathway" },
                     "422": { "description": "Unrecognised level" }
+                }
+            }
+        }
+    })
+}
+
+/// The `constraints` endpoint — its own function for the same
+/// `too_many_lines` reason `variants_paths` below has, once T-14f's
+/// `contains`/`excludes`/`compare` params were added; logically part
+/// of the same TBA analysis surface as `tba_analysis_paths`.
+fn constraints_paths() -> Value {
+    serde_json::json!({
+        "/api/care-pathways/{pathway}/constraints": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Ranked constraints: where the cohort's time goes",
+                "description": "Disclosed-rule findings ordered by recoverable time. Deliberately not a composite score, and deliberately never per-clinician. A cohort below the minimum cell count withholds findings, exactly as the cohort time-analysis view withholds percentiles — a finding computed over too few instances can describe one patient's journey precisely. `contains=`/`excludes=`/`compare=` (T-14f) split the cohort the same way the time-analysis endpoint does, reporting `findings` per side instead of cohort/compliance/survival; the same cross-side suppression protection applies.",
+                "parameters": [
+                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } },
+                    { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["withhold", "remove"], "default": "withhold" }, "description": "How a suppressed cohort's findings render: withhold (default, null + reason) or remove (drop the key)." },
+                    { "name": "contains", "in": "query", "schema": { "type": "string", "example": "stage:triage" }, "description": "Comma-separated type:value predicates every matched instance must satisfy (T-14f)." },
+                    { "name": "excludes", "in": "query", "schema": { "type": "string", "example": "outcome:deceased" }, "description": "Comma-separated type:value predicates no matched instance may satisfy (T-14f)." },
+                    { "name": "compare", "in": "query", "schema": { "type": "boolean", "default": false }, "description": "Also report the complement side's findings (T-14f)." }
+                ],
+                "responses": {
+                    "200": { "description": "Findings" },
+                    "404": { "description": "Unknown pathway" },
+                    "422": { "description": "A malformed or unrecognised contains or excludes predicate" }
                 }
             }
         }

@@ -387,32 +387,39 @@ manual check confirms it. Split tasks too big for one PR
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
   below), then **T-14k, T-14b, T-14c, T-14d, and T-14e, all on
-  2026-09-10** — seven sub-tasks landed. Three of those seven (T-14a,
-  T-14m, T-14k) were out of the suggested order above, because none
-  needed the tasks still ahead of it in this list to be useful now
-  (see each entry's own scope notes; T-14a's covers why it needs no
-  suppression pass from T-14k: it exports patient-level rows, which
-  T-14a's own spec text says are gated, not suppressed — T-14k's own
-  module docs confirm the same thing from the other side). T-14b's own
-  pure logic sits beside T-14a's in `src/analytics.rs` rather than in
-  `src/tba.rs`, matching [TBA §15](time-based-analysis.md)'s own
-  statement that a sequence analysis is not an elapsed-time one. T-14c
-  got its own new file, `src/variants.rs`, rather than adding to the
-  already-large `src/analytics.rs` — the same reasoning that gave
-  T-14k its own `src/suppression.rs` rather than folding into
-  `src/tba.rs`. The remaining **four landed in the suggested order**:
-  T-14b, T-14c, and T-14d are the "three derivations" trio in full,
-  and **T-14e followed immediately after** — its pure logic sits in
-  `src/tba.rs` itself too (not a new sibling module, same reasoning as
-  T-14d's), since `Observation`/`KaplanMeier`/`LogRank` are a fourth
-  extension of the same file rather than a genuinely separate
-  sequence-analysis shape like T-14b's/T-14c's.
+  2026-09-10, and T-14f on 2026-09-11** — eight sub-tasks landed.
+  Three of those eight (T-14a, T-14m, T-14k) were out of the suggested
+  order above, because none needed the tasks still ahead of it in
+  this list to be useful now (see each entry's own scope notes;
+  T-14a's covers why it needs no suppression pass from T-14k: it
+  exports patient-level rows, which T-14a's own spec text says are
+  gated, not suppressed — T-14k's own module docs confirm the same
+  thing from the other side). T-14b's own pure logic sits beside
+  T-14a's in `src/analytics.rs` rather than in `src/tba.rs`, matching
+  [TBA §15](time-based-analysis.md)'s own statement that a sequence
+  analysis is not an elapsed-time one. T-14c got its own new file,
+  `src/variants.rs`, rather than adding to the already-large
+  `src/analytics.rs` — the same reasoning that gave T-14k its own
+  `src/suppression.rs` rather than folding into `src/tba.rs`. The
+  remaining **five landed in the suggested order**: T-14b, T-14c, and
+  T-14d are the "three derivations" trio in full, **T-14e followed
+  immediately after** — its pure logic sits in `src/tba.rs` itself too
+  (not a new sibling module, same reasoning as T-14d's), since
+  `Observation`/`KaplanMeier`/`LogRank` are a fourth extension of the
+  same file rather than a genuinely separate sequence-analysis shape
+  like T-14b's/T-14c's — and **T-14f followed T-14e**, exactly next in
+  the list. T-14f got its own new file, `src/split.rs`, for the same
+  reason T-14c's/T-14k's own new files did (a genuinely separate
+  concern — predicate matching over a cohort, not an elapsed-time
+  computation) — and is the first real caller of T-14k's own
+  `Table`/`decide` stratified-suppression primitive, which had stood
+  ready but uncalled since T-14k landed.
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e were also still unbuilt
-    (all six have since landed too; T-14f–j remain open) — because the two
-    codecs needed
+    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f were also still
+    unbuilt (all seven have since landed too; T-14g–j remain open) —
+    because the two codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
     row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
@@ -494,8 +501,9 @@ manual check confirms it. Split tasks too big for one PR
   - [x] **T-14b — Directly-follows process map per pathway cohort.**
     Landed 2026-09-10. `GET /api/care-pathways/{pathway}/process-map
     ?level=stage|step&status=&mode=` (T-14f's own rule-based cohort
-    splits are unbuilt; `status`/`mode` are the shared cohort filters
-    that already exist): nodes (activity, instance count, occurrence
+    splits landed 2026-09-11 but were deliberately not wired onto this
+    endpoint — see T-14f's own scope note; `status`/`mode` are the
+    shared cohort filters that already existed here): nodes (activity, instance count, occurrence
     count, median duration where the activity has one) and edges
     (from, to, instance count, occurrence count, median + p90 gap in
     days) derived on read — stage level from segments in time order,
@@ -746,6 +754,15 @@ manual check confirms it. Split tasks too big for one PR
       own module docs already state for its still-unused 2-D
       breakdown primitive, quoted verbatim in T-14e's own doc comments
       so the parallel is explicit rather than merely implied.
+      **Update 2026-09-11:** T-14f landed the cohort-splitting
+      mechanism this note anticipated, but did not itself call
+      `log_rank` — its own split payload compares matched/complement
+      via the already-computed `Survival`/`Compliance`/`CohortAnalysis`
+      figures, not via a log-rank test between the two sides' curves,
+      and `Survival` does not expose the raw `Observation`s a log-rank
+      call would need. `log_rank` therefore remains unwired; comparing
+      the two split sides' survival curves is a further, still-open
+      follow-up beyond what T-14f's own acceptance text asked for.
     - **Acceptance:** KM on a fully closed cohort equals the empirical
       distribution
       (`tba::tests::kaplan_meier_matches_nearest_rank_percentile_when_fully_closed`,
@@ -768,20 +785,100 @@ manual check confirms it. Split tasks too big for one PR
       absent `time_to_anchor` block when no anchor pair is named, the
       `422` on an unrecognised `discontinued` value, and the
       suppression withholding, all against real Postgres.
-  - [ ] **T-14f — Rule-based cohort splits and the paired comparison.**
-    Every cohort endpoint (`time-analysis`, `constraints`, `variants`,
-    `process-map`, `data-quality`) accepts `contains=` / `excludes=`
-    with `stage:<s>`, `step:<name>`, `event:<kind>`, `waste:<w>`,
-    `outcome:<o>`, `setting:<s>`, `urgency:<u>`, and `compare=true`
-    returns the same figures for the complement side by side — the
-    stratified Table 1 (n, lead-time percentiles, %VA, coverage, #HO,
-    standard compliance) BNSSG built by hand with `check_rule` +
-    `group_by` and `tableone`.
+  - [x] **T-14f — Rule-based cohort splits and the paired comparison.**
+    Landed 2026-09-11. Every cohort endpoint accepts `contains=` /
+    `excludes=` with `stage:<s>`, `step:<name>`, `event:<kind>`,
+    `waste:<w>`, `outcome:<o>`, `setting:<s>`, `urgency:<u>`, and
+    `compare=true` returns the same figures for the complement side by
+    side — the stratified Table 1 (n, lead-time percentiles, %VA,
+    coverage, #HO, standard compliance) BNSSG built by hand with
+    `check_rule` + `group_by` and `tableone`. New `src/split.rs`
+    (named `split`, not `rules` — `crate::instances` is already
+    aliased `rules` throughout the controller layer, and this crate's
+    own `13-tasks.md` calls the feature "rule-based cohort splits",
+    not "rules"): `Predicate` (parses `type:value`, validating against
+    a closed vocabulary where one exists — `tba::STAGES`/`WASTES`,
+    `instances::URGENCY_LEVELS`/`OUTCOMES`/`EVENT_KINDS` — and
+    accepting any string for `step`/`setting`, which are free-form),
+    `Features` (built from the same `analytics::SegmentInput`/
+    `StepInput`/`EventInput` rows T-14a's event-log codec already
+    loads, so there is one source of truth for "what did this
+    instance do"), `Rule` (contains is AND, excludes is none-of;
+    naming neither is the identity rule), `partition`, and
+    `split_table` (the two-cell `suppression::Table` for a
+    matched/complement split — **the first real caller of T-14k's own
+    `Table`/`decide` stratified-suppression primitive**, which had
+    stood ready but unused since T-14k landed). `src/controllers/tba.rs`:
+    `load_features` (three bounded queries: segments, steps, events —
+    no team-role lookup, unlike T-14a's four-query loader, which this
+    deliberately does not reuse), `resolve_rule` (`422` on a malformed
+    or unrecognised predicate), `SplitPlan`/`resolve_split` (parses
+    the rule, partitions the cohort, decides per-side detail
+    suppression via `split_table` when `compare=true`), and
+    `split_payload`/`split_payload_constraints` (the `time-analysis`-
+    and `constraints`-shaped response blocks). Wired into
+    `GET /api/care-pathways/{pathway}/time-analysis` and
+    `.../constraints` as a new `split` key, absent entirely — never a
+    `null` placeholder — when the query names neither `contains=` nor
+    `excludes=`, or when the *unsplit* cohort is itself already below
+    the suppression floor (a breakdown of an already-too-small cohort
+    would disclose more, not less).
+    - [x] **Scope decision: `process-map` and `variants` are not
+      wired.** Only `time-analysis` and `constraints` accept
+      `contains=`/`excludes=`/`compare=`. Both remaining endpoints
+      already carry their own, differently-shaped suppression (per
+      node/edge; per variant, folded into `suppressed_instances`), and
+      "compare" would mean something structurally different for each
+      (two side-by-side process maps? two variant Paretos, each with
+      its own renormalised shares?) — fitting the same query contract
+      onto them needs its own design pass, so it is a documented
+      follow-up, not a rushed, under-thought-through fit. `data-quality`
+      (T-14h) does not exist yet either, for the same reason T-14a's
+      `anchors_delays`/`variant` columns were reserved ahead of their
+      own sibling tasks landing.
+    - [x] **The bare instance count is never withheld, only detail
+      is** — matching this family's existing scalar-suppression
+      convention (`agents/share/time-based-analysis.md` §12.2: hide
+      detail, not the count). `split.matched.instances`/
+      `split.complement.instances` are always published; `decide()`'s
+      verdict on the two-cell table governs only whether that side's
+      `cohort`/`compliance`/`survival` (or `findings`) render. This
+      still closes a real disclosure gap: those blocks carry additive
+      sums (`by_stage`, `by_waste`) that *would* let a withheld side's
+      sums be recovered as `unsplit − complement` if the complement's
+      own sums stayed visible — which is exactly the scenario
+      `suppression::decide` was built to close, applied here for the
+      first time to something other than a raw count.
+    - [x] `setting:<s>` compares against the *lowercased*
+      `care_setting` string (`controllers::exports::care_setting_string`,
+      reused rather than duplicated), not the JSON payload's original
+      casing (`"Outpatient"` → `setting:outpatient`) — the same
+      derivation `auth::care_pathway_resource_attrs` already uses
+      elsewhere in this crate. Undocumented in the acceptance text;
+      confirmed by reading the existing derivation rather than
+      guessing a casing.
     - **Acceptance:** split and complement sizes sum to the unsplit
-      cohort; identical filters on both sides give identical figures;
+      cohort, and an identical filter called twice gives identical
+      figures — both proven end to end against real Postgres
+      (`tests/requests/tba.rs`'s `rule_based_cohort_split_round_trip`,
+      10 instances, 5 matched / 5 complement, neither suppressed);
       when one side is below the floor, the other side's figures are
       also withheld wherever they could be differenced against the
-      unsplit total (T-14k).
+      unsplit total (T-14k) — proven with a lone 2-instance matched
+      side recruiting a 6-instance complement that would otherwise
+      individually clear the floor
+      (`rule_based_cohort_split_suppression_round_trip`), and *not*
+      recruited when `compare=true` is absent, since the complement is
+      then never shown at all. Pure-layer unit tests in `src/split.rs`
+      (8) cover predicate parsing (recognised types/values, and every
+      rejection: no colon, no value, unrecognised type, unrecognised
+      value against each closed vocabulary), the identity rule
+      matching everything, `contains` as AND / `excludes` as none-of,
+      the partition's sum-and-exactly-once invariant, and `split_table`
+      under all three suppression shapes (neither side small, one lone
+      small side recruiting its sibling, two sides already small
+      needing no secondary recruitment) — reusing `suppression::decide`
+      directly rather than re-implementing its property tests.
   - [ ] **T-14g — Cohort attrition record (CONSORT).** Every cohort
     response carries `attrition`: ordered steps `{label, operation,
     instances, parent}` from "enrolled on pathway" through the status
@@ -854,11 +951,15 @@ manual check confirms it. Split tasks too big for one PR
     repeated to a fixed point, so a withheld cell can never be
     recovered as `margin − Σ(visible siblings)`.
     - [x] `decide()`/`render()` operate on a generic `Table` (cells +
-      partitions) — no genuinely stratified 2-D breakdown exists in
-      this crate yet (that's T-14f, unbuilt), so this is built ready
-      for T-14f to consume, exactly as T-14a's codecs and T-14m's
-      generator were each built ready for their own not-yet-built
-      consumers. Proven now by 11 unit tests including a 500-seed
+      partitions) — at landing, no genuinely stratified 2-D breakdown
+      existed in this crate yet (that was T-14f, then unbuilt), so
+      this was built ready for T-14f to consume, exactly as T-14a's
+      codecs and T-14m's generator were each built ready for their own
+      not-yet-built consumers. **Update 2026-09-11:** T-14f landed and
+      is the first real caller — its `src/split.rs` builds a two-cell
+      `Table` (matched/complement) and calls this module's `decide()`
+      directly rather than reimplementing any of its logic. Proven at
+      landing by 11 unit tests including a 500-seed
       property test (`no_partition_is_ever_left_with_exactly_one_suppressed_cell`)
       over randomly generated row × column tables — a hand-rolled
       `SplitMix64`, the same choice and the same reason as T-14m's
@@ -950,11 +1051,11 @@ manual check confirms it. Split tasks too big for one PR
       persists exactly what the generator returns, that a bad argument
       is refused rather than silently defaulted, and that the persisted
       rows carry the same synthetic-only markers. "Used by every T-14
-      test" is **still not true** — T-14b, T-14c, T-14d and T-14e have
-      since landed too, but each used a small hand-built fixture
-      rather than this generator (see their own scope notes); this
-      generator remains available for T-14f/g/h/i/j to build on, not
-      yet exercised by any of them. The repo demo seed (EX-4)
+      test" is **still not true** — T-14b, T-14c, T-14d, T-14e and
+      T-14f have since landed too, but each used a small hand-built
+      fixture rather than this generator (see their own scope notes);
+      this generator remains available for T-14g/h/i/j to build on,
+      not yet exercised by any of them. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

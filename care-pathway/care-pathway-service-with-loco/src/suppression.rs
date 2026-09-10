@@ -15,8 +15,11 @@
 //!    aggregate read must never reveal more than the equivalent single
 //!    read."
 //! 2. **[`Table`] / [`decide`] / [`render`]** — the stratified case a
-//!    2-D breakdown needs (T-14f's rule-based cohort splits, not yet
-//!    built): a cell below the floor is a **primary** suppression, but
+//!    2-D breakdown needs. Landed unused, then actually called for
+//!    the first time by T-14f's rule-based cohort splits
+//!    (`src/split.rs`'s `split_table`, over the two-cell
+//!    matched/complement partition): a cell below the floor is a
+//!    **primary** suppression, but
 //!    a primary suppression alone can leak by arithmetic — `total −
 //!    Σ(visible siblings)` recovers a lone withheld cell exactly. This
 //!    module adds **secondary suppression**: whenever a partition

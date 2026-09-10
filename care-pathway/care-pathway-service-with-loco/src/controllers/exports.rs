@@ -112,9 +112,10 @@ fn parse_format(query: &ExportQuery) -> Result<&'static str> {
 
 /// The pathway template's `care_setting`, lowercased — the same
 /// derivation [`crate::auth::care_pathway_resource_attrs`] uses, kept
-/// local so this module never has to import the matcher's `CareSetting`
-/// enum just to `Debug`-format it.
-fn care_setting_string(pathway: &care_pathway_matcher::CarePathway) -> Option<String> {
+/// here so this module (and [`crate::controllers::tba`], which reuses
+/// it for `setting:<s>` predicates, spec T-14f) never has to import
+/// the matcher's `CareSetting` enum just to `Debug`-format it.
+pub(crate) fn care_setting_string(pathway: &care_pathway_matcher::CarePathway) -> Option<String> {
     pathway
         .care_setting
         .as_ref()
