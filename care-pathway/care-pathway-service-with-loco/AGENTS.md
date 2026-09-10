@@ -49,6 +49,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs; and the segment/gap wall |
 | GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard; ranked constraints. Both suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`) |
 | GET | `/api/care-pathways/{pid}/export/{event-log,journey-features}` | **Bulk export codecs** (T-14a): `?format=csv\|jsonl&status=`; `event_log` (bupaR/PM4Py shape) and `journey_features` (one row per instance); gated `Destructive`, audited as a disclosure; never a `subject_ref` or a person/actor URN |
+| GET | `/api/care-pathways/{pid}/process-map` | **Directly-follows process map** (T-14b): `?level=stage\|step&status=&mode=`; nodes/edges with instance/occurrence counts + median(+p90) gaps; self-loops kept, `start`/`end` pseudo-nodes; suppressed per node/edge (T-14k), not per cohort |
 | GET | `/api/instances/{flow,time-standards}` | Little's Law flow (λ/μ/ρ/κ/τ) and the access-standard catalogue |
 | GET | `/api/instances/{pid}/journey` | **Stitched journey**: follows `continues_as` across services, each leg fetched under the *caller's* credential; combined figures withheld unless every leg resolved |
 | POST/GET/DELETE | `/api/instances/{pid}/links` (+ `/{id}`) · `GET /api/instances/links` | **Cross-service journey links**: the `continues_as` edge from a pathway instance into the next episode (another instance, a `patient_flow_stay`, or a `case`); high-sensitivity governance, audited; a denial is reported as `404` so it cannot disclose the journey's existence; the bulk pull is the aggregator's reconciliation source and is a privileged read |
@@ -105,19 +106,22 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA. Three sub-tasks have landed, all
+analytics suite T-14 builds on TBA. Four sub-tasks have landed, all
 out of T-14's own suggested build order, since each needed none of the
 sibling T-14 sub-tasks ahead of it to be useful now — see
-`../spec/13-tasks.md` T-14a/T-14m/T-14k for each one's documented
+`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b for each one's documented
 scope deviations from its original spec text: **T-14a**
 (event-log/journey-feature bulk export codecs, `src/analytics.rs` +
 `src/controllers/exports.rs`), **T-14m** (the seeded synthetic
 journey-cohort generator + `journeys:seed` task, `src/data/journeys.rs`
-+ `src/tasks/journeys_seed.rs`) — both 2026-09-09 — and **T-14k**
-(disclosure control: the shared `min_cell_count`/`Mode` primitive plus
-secondary suppression of stratified marginals, `src/suppression.rs`,
-wired into `cohort_time_analysis` and, closing a real gap,
-`cohort_constraints`), 2026-09-10.
++ `src/tasks/journeys_seed.rs`) — both 2026-09-09 — and, both
+2026-09-10, **T-14k** (disclosure control: the shared
+`min_cell_count`/`Mode` primitive plus secondary suppression of
+stratified marginals, `src/suppression.rs`, wired into
+`cohort_time_analysis` and, closing a real gap, `cohort_constraints`)
+and **T-14b** (the directly-follows process map, pure graph-building
+alongside T-14a's codecs in `src/analytics.rs`, suppressed per
+node/edge via T-14k's primitive rather than per cohort).
 Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
@@ -183,7 +187,7 @@ src/
 │   ├── fhir.rs             mounted FHIR R5 PlanDefinition CRUD/search + $validate + SMART + $export
 │   ├── insights.rs         directory/coverage/variants/providers/languages registry lenses
 │   ├── instances.rs        instance lifecycle/review/urgency/team/steps/outcomes + caseload/overdue/care-team-load
-│   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views, constraints, flow
+│   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views, constraints, flow, T-14b process-map
 │   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs)
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
 │   └── metrics.rs          root /metrics.prom Prometheus endpoint
@@ -216,7 +220,7 @@ src/
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) + ABAC, both reloadable (ReloadableVerifier/ReloadablePolicy — AU-2 key/policy hot-reload)
 ├── version.rs             `Accepts-version` header negotiation middleware (agents/share/api-versioning.md)
 ├── instances.rs            pure instance lifecycle state machine (active↔on_hold→terminal)
-├── analytics.rs            T-14a: pure event_log / journey_features row-shaping + CSV/JSONL codecs, DB-free
+├── analytics.rs            T-14a event_log/journey_features codecs + T-14b directly-follows process map, pure, DB-free
 ├── data/
 │   └── journeys.rs          T-14m: pure, DB-free synthetic journey-cohort generator (SplitMix64, deterministic)
 ├── suppression.rs          T-14k: disclosure control — min_cell_count/Mode + secondary suppression of stratified marginals, DB-free

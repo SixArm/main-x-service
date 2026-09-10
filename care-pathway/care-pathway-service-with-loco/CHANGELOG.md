@@ -9,6 +9,50 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14b: directly-follows process map (2026-09-10)
+
+`GET /api/care-pathways/{pathway}/process-map?level=stage|step&status=&mode=`
+— nodes and edges derived on read from the instance layer, never a
+discovered model, for a bupaR/PM4Py/ehrapy user (or the T-14l
+front-end views, unbuilt) to consume.
+
+- `src/analytics.rs` (extended, DB-free, +7 unit tests): `ActivityStep`,
+  `process_map_sequence_from_segments`/`_from_steps` (bookended with
+  `start`/`end` pseudo-nodes; self-loops kept, never collapsed), and
+  `build_process_map` (nodes: activity, instance count, occurrence
+  count, median duration where the activity has one; edges: from, to,
+  instance count, occurrence count, median + p90 gap in days). Two
+  scope decisions from the spec text, documented rather than silent:
+  edges carry both `instance_count` and `occurrence_count` (a
+  self-loop makes them diverge, and "edge counts sum to the
+  transition count" is only literally true of the occurrence count);
+  and the gap between two activities is measured end-of-first to
+  start-of-second (reusing TBA's own "idle time between segments"
+  concept), not start-to-start, so an activity's own duration is never
+  double-counted as transition time.
+- `src/controllers/tba.rs`: the `process_map` handler, two small bulk
+  loaders (`load_segment_inputs`/`load_step_inputs`, one query each,
+  no N+1), and `render_process_map_entry` applying T-14k's
+  `is_suppressed`/`Mode` **per node/edge** — a rarely-visited activity
+  stays withheld even inside an otherwise-large, unsuppressed cohort,
+  which is a genuinely different threshold from the cohort-level
+  suppression `cohort_time_analysis`/`cohort_constraints` apply, and
+  is exercised directly by the request test rather than assumed.
+- `src/openapi.rs`: a new path entry (`level`/`status`/`mode`
+  parameters), added to both the existing coverage test and the
+  `mode`-parameter test alongside the sibling cohort endpoints.
+- `tests/requests/tba.rs`: `process_map_round_trip` — both levels, an
+  unrecognised `level` (`422`), `?mode=remove`, and the per-node-vs-
+  per-cohort suppression distinction: a 5-instance cohort where only
+  one instance ever reaches `treatment`/`review`, so those stay
+  withheld while `triage`/`consent` (visited by all five) render
+  normally in the same response.
+- Verified: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test --lib` (360, up from 353), the DB-gated suite
+  (58 request tests, up from 57), `cargo +1.96 check --all-targets`
+  (MSRV), `cargo deny check`, and `cargo bench --no-run` all clean. No
+  new dependency, no new migration.
+
 ### Added — T-14k: disclosure control, modes and marginals (2026-09-10)
 
 Generalises the small-cohort floor `cohort_time_analysis` already
