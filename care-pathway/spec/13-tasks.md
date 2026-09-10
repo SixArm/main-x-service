@@ -386,18 +386,21 @@ manual check confirms it. Split tasks too big for one PR
   [TBA §14](time-based-analysis.md). **T-14a landed 2026-09-09**, then
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
-  below), then **T-14k on 2026-09-10** — the first three sub-tasks
-  landed, all out of the suggested order above, because none needed
-  the tasks still ahead of it in this list to be useful now (see each
-  entry's own scope notes; T-14a's covers why it needs no suppression
-  pass from T-14k: it exports patient-level rows, which T-14a's own
-  spec text says are gated, not suppressed — T-14k's own module docs
-  confirm the same thing from the other side).
+  below), then **T-14k and T-14b, both on 2026-09-10** — the first
+  four sub-tasks landed, all out of the suggested order above, because
+  none needed the tasks still ahead of it in this list to be useful
+  now (see each entry's own scope notes; T-14a's covers why it needs
+  no suppression pass from T-14k: it exports patient-level rows, which
+  T-14a's own spec text says are gated, not suppressed — T-14k's own
+  module docs confirm the same thing from the other side). T-14b's own
+  pure logic sits beside T-14a's in `src/analytics.rs` rather than in
+  `src/tba.rs`, matching [TBA §15](time-based-analysis.md)'s own
+  statement that a sequence analysis is not an elapsed-time one.
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m and T-14k were also still unbuilt (both have since
-    landed too; T-14b–j remain open) — because the two codecs needed
+    time, T-14m/T-14k/T-14b were also still unbuilt (all three have
+    since landed too; T-14c–j remain open) — because the two codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
     row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
@@ -447,9 +450,12 @@ manual check confirms it. Split tasks too big for one PR
       applies only to aggregates, and its own module docs confirm this
       exemption explicitly); gating does, and is live.
     - **Acceptance:** the seeded-cohort/T-14b DFG cross-check is
-      **deferred** — T-14b does not exist yet (T-14m has since landed),
-      so there is
-      nothing to re-derive against. A test does assert no codec output
+      **still deferred**, though the reason has changed: T-14b and
+      T-14m have both since landed, so the pieces now exist, but
+      "export the event log, replay it, and diff it against
+      `process-map`'s DFG" is a real integration test nobody has
+      written yet — a follow-up, not a blocker on either sibling task.
+      A test does assert no codec output
       ever contains a `subject_ref` or a person URN — both a DB-free
       property test in `src/analytics.rs` (`event_log_never_carries_…`,
       `journey_features_never_carries_…`) and a live HTTP round-trip in
@@ -464,22 +470,55 @@ manual check confirms it. Split tasks too big for one PR
       introducing that workflow (`.snap` files, `cargo insta review`)
       for the first time was judged lower-value than an assertion that
       already gives the same drift protection.
-  - [ ] **T-14b — Directly-follows process map per pathway cohort.**
-    `GET /api/care-pathways/{pathway}/process-map?level=stage|step`
-    (+ the T-14f cohort filters): nodes (activity, instance count,
-    occurrence count, median duration where the activity has one) and
-    edges (from, to, instance count, median + p90 gap in days) derived
-    on read — stage level from segments in time order, step level from
-    completed steps in `done_on` order — with explicit `start` / `end`
-    pseudo-nodes so entry and exit variety is visible. Self-loops are
-    kept: a return to a stage is a finding. Level `step` states its own
-    caveat in the response: `done_on` is a date, so a same-day pair is
-    a 0-day edge.
-    - **Acceptance:** pure `process_map` tests — edge counts sum to the
-      transition count, median gaps match hand-computed values, a
-      cohort of one variant yields a chain; a request test on the
-      seeded cohort; nodes and edges below the floor are withheld with
-      a reason, never zeroed (T-14k).
+  - [x] **T-14b — Directly-follows process map per pathway cohort.**
+    Landed 2026-09-10. `GET /api/care-pathways/{pathway}/process-map
+    ?level=stage|step&status=&mode=` (T-14f's own rule-based cohort
+    splits are unbuilt; `status`/`mode` are the shared cohort filters
+    that already exist): nodes (activity, instance count, occurrence
+    count, median duration where the activity has one) and edges
+    (from, to, instance count, occurrence count, median + p90 gap in
+    days) derived on read — stage level from segments in time order,
+    step level from completed steps in `done_on` order — with explicit
+    `start`/`end` pseudo-nodes so entry and exit variety is visible.
+    Self-loops are kept: a return to a stage is a finding. Level
+    `step` states its own caveat in the response: `done_on` is a date,
+    so a same-day pair is a 0-day edge.
+    - [x] **Deviation from the spec text above**: edges carry both
+      `instance_count` (distinct instances with ≥1 occurrence) *and*
+      `occurrence_count` (total occurrences) — the spec text named
+      only "instance count," but a self-loop makes the two diverge,
+      and the acceptance criterion ("edge counts sum to the transition
+      count") is only literally true of `occurrence_count`. Both are
+      published rather than picking one silently.
+    - [x] The **gap** between two activities is measured from the
+      *end* of the first to the *start* of the second (reusing the
+      same "idle time between segments" concept TBA's own `Gap`
+      already computes), not start-to-start — otherwise the first
+      activity's own duration would be double-counted as part of the
+      transition's idle time. A step, a pseudo-node, and a still-open
+      segment (whose true end is unknown) each use their own start as
+      a stand-in end — the least-wrong choice available, documented
+      in `ActivityStep`'s own doc comment.
+    - [x] Suppression (T-14k) is **per node/edge**, not per cohort:
+      an activity visited by fewer than `min_cell_count` instances
+      stays withheld even once the *cohort* is well past the floor —
+      the two are genuinely different thresholds, confirmed directly
+      by the request test rather than assumed.
+    - **Acceptance:** pure `process_map` tests — edge occurrence
+      counts sum to the transition count
+      (`edge_occurrence_counts_sum_to_the_transition_count`), median
+      and p90 gaps match hand-computed values
+      (`median_and_p90_gaps_match_hand_computed_values`), a cohort of
+      one variant yields a chain (`a_cohort_of_one_variant_yields_a_chain`),
+      self-loops are kept (`self_loops_are_kept_not_collapsed`); a
+      request test (`process_map_round_trip`) exercises both levels,
+      an unrecognised `level` (`422`), `?mode=remove`, and nodes/edges
+      below the floor withheld with a reason, never zeroed, while the
+      cohort itself is large — the seeded-cohort generator (T-14m) was
+      not used for this test (a hand-built fixture was simpler for the
+      specific per-node-vs-per-cohort distinction this test needed to
+      pin), which is a scope note, not a gap: T-14m remains available
+      for a future property-style test over generated cohorts.
   - [ ] **T-14c — Journey variants (pathway strings).**
     `GET /api/care-pathways/{pathway}/variants`: per instance, the
     ordered stage sequence from segments, transformed by **named,
@@ -717,9 +756,11 @@ manual check confirms it. Split tasks too big for one PR
       persists exactly what the generator returns, that a bad argument
       is refused rather than silently defaulted, and that the persisted
       rows carry the same synthetic-only markers. "Used by every T-14
-      test" is **not yet true** — no other T-14 sub-task has landed to
-      consume it; this generator is available for T-14b/c/d/e/f/g/h/i/j
-      to build on, not yet exercised by them. The repo demo seed (EX-4)
+      test" is **still not true** — T-14b has since landed too, but
+      used a small hand-built fixture rather than this generator (see
+      T-14b's own scope note); this generator remains available for
+      T-14c/d/e/f/g/h/i/j to build on, not yet exercised by any of
+      them. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

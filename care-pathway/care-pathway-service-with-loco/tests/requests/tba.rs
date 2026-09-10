@@ -434,3 +434,225 @@ async fn the_flow_gauges_publish_only_what_may_be_published() {
     })
     .await;
 }
+
+/// The T-14b directly-follows process map: stage and step level, an
+/// unrecognised `?level=`, and the T-14k suppression it shares with
+/// the cohort views — withheld at `n = 1`, visible once the cohort
+/// clears the floor, and `?mode=remove` dropping every entry while
+/// suppressed.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn process_map_round_trip() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": format!("process-map pathway {}", uuid::Uuid::new_v4()),
+                "care_setting": "Outpatient",
+                "condition_codes": [{"system": "Icd10", "code": "M54"}],
+            }))
+            .await;
+        created.assert_status_ok();
+        let template: Value = created.json();
+        let pathway = template["pid"].as_str().expect("pathway pid").to_string();
+
+        // One rich instance: two steps declared at enrolment, and two
+        // segments (a self-loop-free triage -> treatment chain).
+        let enrolled = request
+            .post(&format!("/api/care-pathways/{pathway}/instances"))
+            .json(&json!({
+                "subject_ref": format!("person:{}", uuid::Uuid::new_v4()),
+                "steps": ["consent", "review"],
+            }))
+            .await;
+        enrolled.assert_status_ok();
+        let instance: Value = enrolled.json();
+        let pid = instance["pid"].as_str().expect("instance pid").to_string();
+
+        request
+            .post(&format!("/api/instances/{pid}/clock"))
+            .json(&json!({ "event": "start", "at": day(0) }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid}/clock"))
+            .json(&json!({ "event": "stop", "at": day(20) }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid}/segments"))
+            .json(&json!({
+                "label": "triage", "stage": "triage", "category": "value_adding",
+                "started_at": day(1), "ended_at": day(2),
+            }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid}/segments"))
+            .json(&json!({
+                "label": "treatment", "stage": "treatment", "category": "value_adding",
+                "started_at": day(5), "ended_at": day(8),
+            }))
+            .await
+            .assert_status_ok();
+
+        // ── n=1: below the floor, so every node/edge is withheld.
+        let stage_map: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/process-map"))
+            .await
+            .json();
+        assert_eq!(stage_map["level"], "stage");
+        assert_eq!(stage_map["instances"], 1);
+        let nodes = stage_map["nodes"].as_array().expect("nodes");
+        assert!(!nodes.is_empty());
+        for node in nodes {
+            assert_eq!(node["suppressed"], true, "{node}");
+            assert_eq!(node["instance_count"], Value::Null);
+        }
+        for edge in stage_map["edges"].as_array().expect("edges") {
+            assert_eq!(edge["suppressed"], true, "{edge}");
+        }
+
+        // `?mode=remove` drops every suppressed entry entirely.
+        let removed: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/process-map?mode=remove"
+            ))
+            .await
+            .json();
+        assert!(removed["nodes"].as_array().expect("nodes").is_empty());
+        assert!(removed["edges"].as_array().expect("edges").is_empty());
+
+        // An unrecognised level is refused, not silently defaulted.
+        assert_eq!(
+            request
+                .get(&format!(
+                    "/api/care-pathways/{pathway}/process-map?level=nonsense"
+                ))
+                .await
+                .status_code(),
+            422
+        );
+
+        // ── Complete both declared steps on the rich instance.
+        let detail: Value = request.get(&format!("/api/instances/{pid}")).await.json();
+        for step in detail["steps"].as_array().expect("steps") {
+            let step_pid = step["pid"].as_str().expect("step pid");
+            request
+                .post(&format!("/api/instances/{pid}/steps/{step_pid}/complete"))
+                .await
+                .assert_status_ok();
+        }
+
+        // ── Four more instances, each with a `triage` segment and a
+        // completed `consent` step — same activities as the rich
+        // instance, so `triage`/`consent` clear the per-node floor of
+        // five while `treatment`/`review` (rich-instance-only) do not.
+        // Suppression here is per node/edge, not per cohort: reaching
+        // five *instances* is not the same as reaching five *visits to
+        // this activity*, and that distinction is the point of the test.
+        for i in 0..4 {
+            let enrolled = request
+                .post(&format!("/api/care-pathways/{pathway}/instances"))
+                .json(&json!({
+                    "subject_ref": format!("person:{}", uuid::Uuid::new_v4()),
+                    "steps": ["consent"],
+                }))
+                .await;
+            enrolled.assert_status_ok();
+            let other: Value = enrolled.json();
+            let other_pid = other["pid"].as_str().expect("instance pid").to_string();
+            request
+                .post(&format!("/api/instances/{other_pid}/segments"))
+                .json(&json!({
+                    "label": "triage", "stage": "triage", "category": "value_adding",
+                    "started_at": day(1), "ended_at": day(2 + i),
+                }))
+                .await
+                .assert_status_ok();
+            let other_detail: Value = request
+                .get(&format!("/api/instances/{other_pid}"))
+                .await
+                .json();
+            let step_pid = other_detail["steps"][0]["pid"].as_str().expect("step pid");
+            request
+                .post(&format!(
+                    "/api/instances/{other_pid}/steps/{step_pid}/complete"
+                ))
+                .await
+                .assert_status_ok();
+        }
+
+        let by_activity = |nodes: &[Value], activity: &str| -> Value {
+            nodes
+                .iter()
+                .find(|n| n["activity"] == activity)
+                .unwrap_or(&Value::Null)
+                .clone()
+        };
+
+        // ── Stage level: `triage` (5 visits) is now visible; `treatment`
+        // (1 visit) stays withheld even though the cohort itself is now
+        // well above the floor.
+        let stage_map: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/process-map"))
+            .await
+            .json();
+        assert_eq!(stage_map["instances"], 5);
+        let stage_nodes = stage_map["nodes"].as_array().expect("nodes");
+        let triage = by_activity(stage_nodes, "triage");
+        assert_eq!(triage["suppressed"], false);
+        assert_eq!(triage["instance_count"], 5);
+        assert_eq!(triage["occurrence_count"], 5);
+        assert!(triage["median_duration_days"].as_f64().unwrap() > 0.0);
+        let treatment = by_activity(stage_nodes, "treatment");
+        assert_eq!(
+            treatment["suppressed"], true,
+            "only one instance ever reaches treatment"
+        );
+        assert_eq!(treatment["instance_count"], Value::Null);
+        assert_eq!(by_activity(stage_nodes, "start")["instance_count"], 5);
+        assert_eq!(by_activity(stage_nodes, "end")["instance_count"], 5);
+        let stage_edges = stage_map["edges"].as_array().expect("edges");
+        let start_to_triage = stage_edges
+            .iter()
+            .find(|e| e["from"] == "start" && e["to"] == "triage")
+            .expect("start->triage edge");
+        assert_eq!(start_to_triage["suppressed"], false);
+        assert_eq!(start_to_triage["instance_count"], 5);
+        let triage_to_treatment = stage_edges
+            .iter()
+            .find(|e| e["from"] == "triage" && e["to"] == "treatment")
+            .expect("triage->treatment edge is still listed, just withheld");
+        assert_eq!(triage_to_treatment["suppressed"], true);
+        assert_eq!(triage_to_treatment["median_gap_days"], Value::Null);
+
+        // ── Step level: `consent` (5 visits) is visible; `review` (1
+        // visit) stays withheld, same distinction as stage level.
+        let step_map: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/process-map?level=step"
+            ))
+            .await
+            .json();
+        assert_eq!(step_map["level"], "step");
+        let step_nodes = step_map["nodes"].as_array().expect("nodes");
+        let consent = by_activity(step_nodes, "consent");
+        assert_eq!(consent["suppressed"], false, "{consent}");
+        assert_eq!(consent["instance_count"], 5);
+        assert_eq!(
+            consent["median_duration_days"],
+            Value::Null,
+            "a step has no duration"
+        );
+        let review = by_activity(step_nodes, "review");
+        assert_eq!(
+            review["suppressed"], true,
+            "only the rich instance declared review"
+        );
+        assert_eq!(by_activity(step_nodes, "start")["instance_count"], 5);
+    })
+    .await;
+}

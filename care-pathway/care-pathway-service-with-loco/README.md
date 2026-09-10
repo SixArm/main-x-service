@@ -51,6 +51,7 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
 | GET | `/api/care-pathways/{pid}/export/event-log` | Bulk `event_log` export (`?format=csv\|jsonl`) — bupaR/PM4Py shape, never a `subject_ref` or a person/actor URN |
 | GET | `/api/care-pathways/{pid}/export/journey-features` | Bulk `journey_features` export (`?format=csv\|jsonl`) — one row per instance, LT/VT/PT/%A/%VA/coverage/#HO/per-stage/censored |
+| GET | `/api/care-pathways/{pid}/process-map` | Directly-follows process map (`?level=stage\|step&mode=withhold\|remove`) — nodes/edges with counts + median (+p90) gaps, never a discovered model |
 
 Every figure is derived on read — nothing is stored — and the
 denominator is always elapsed calendar time, never the sum of recorded
@@ -94,6 +95,22 @@ breakdown exists in this crate yet (T-14f); this primitive is ready
 for it. `event_log`/`journey_features` (T-14a above) are **exempt**,
 not suppressed — they are patient-level rows, gated by access control
 and audited, per the family's bulk-export contract.
+
+### Directly-follows process map (T-14b)
+
+`?level=stage` (default) derives nodes/edges from segments in time
+order; `?level=step` from completed steps in `done_on` order (a
+same-day pair is a 0-day edge — `done_on` is a date). Both are
+bookended with explicit `start`/`end` pseudo-nodes and keep self-loops
+rather than collapsing them. The gap on an edge is measured from the
+end of the first activity to the start of the second, not
+start-to-start, so an activity's own duration is never counted as
+transition time. Suppression (above) applies **per node/edge**: an
+activity visited by fewer than the floor's worth of instances stays
+withheld even inside an otherwise-large cohort. Never a discovered
+model — pure graph-building lives alongside the T-14a codecs in
+[`src/analytics.rs`](./src/analytics.rs); HTTP surface + suppression
+rendering: [`src/controllers/tba.rs`](./src/controllers/tba.rs).
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 

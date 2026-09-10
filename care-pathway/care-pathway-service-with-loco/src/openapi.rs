@@ -440,6 +440,24 @@ fn tba_analysis_paths() -> Value {
                 ],
                 "responses": { "200": { "description": "Findings" }, "404": { "description": "Unknown pathway" } }
             }
+        },
+        "/api/care-pathways/{pathway}/process-map": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Directly-follows process map for a pathway cohort (T-14b)",
+                "description": "Nodes (activity, instance/occurrence counts, median duration where the activity has one) and edges (from, to, instance/occurrence counts, median + p90 gap in days), derived on read from segments (level=stage) or completed steps (level=step) — never a discovered model. Explicit start/end pseudo-nodes make entry/exit variety visible; self-loops are kept. A node/edge below the minimum cell count is withheld (T-14k), never shown as zero.",
+                "parameters": [
+                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "level", "in": "query", "schema": { "type": "string", "enum": ["stage", "step"], "default": "stage" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } },
+                    { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["withhold", "remove"], "default": "withhold" }, "description": "How a below-floor node/edge renders: withhold (default, null + reason) or remove (drop the entry)." }
+                ],
+                "responses": {
+                    "200": { "description": "Nodes and edges" },
+                    "404": { "description": "Unknown pathway" },
+                    "422": { "description": "Unrecognised level" }
+                }
+            }
         }
     })
 }
@@ -843,6 +861,7 @@ mod tests {
             "/api/instances/time-standards",
             "/api/care-pathways/{pathway}/time-analysis",
             "/api/care-pathways/{pathway}/constraints",
+            "/api/care-pathways/{pathway}/process-map",
         ] {
             assert!(paths[path].is_object(), "{path} is undocumented");
         }
@@ -857,8 +876,9 @@ mod tests {
     }
 
     /// The T-14a export codecs had no `OpenAPI` entry at all (found
-    /// rolling T-14k). This pins that they now do, including the new
-    /// `?mode=` parameter T-14k added to the sibling cohort endpoints.
+    /// rolling T-14k). This pins that they now do, including the
+    /// `?mode=` parameter T-14k added to the sibling cohort endpoints
+    /// and to T-14b's process map, documented alongside them.
     #[test]
     fn spec_documents_the_export_codecs_and_suppression_mode() {
         let s = spec();
@@ -872,6 +892,7 @@ mod tests {
         for path in [
             "/api/care-pathways/{pathway}/time-analysis",
             "/api/care-pathways/{pathway}/constraints",
+            "/api/care-pathways/{pathway}/process-map",
         ] {
             let params = paths[path]["get"]["parameters"]
                 .as_array()

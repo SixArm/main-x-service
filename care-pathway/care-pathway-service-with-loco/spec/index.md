@@ -298,6 +298,32 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    floor is deliberately left unmigrated — unifying its env var would
    be a breaking config change for an existing deployment, not merely
    a refactor. Landed 2026-09-10, spec T-14k.
+23. **Directly-follows process map.** `GET
+   /api/care-pathways/{pathway}/process-map?level=stage|step&status=&mode=`
+   derives, on read, every activity as a node (instance count,
+   occurrence count, median duration where the activity has one) and
+   every observed transition as an edge (instance count, occurrence
+   count, median + p90 gap in days) — stage level from segments in
+   time order, step level from completed steps in `done_on` order,
+   both bookended with explicit `start`/`end` pseudo-nodes so entry
+   and exit variety is visible. Self-loops are kept, never collapsed.
+   Never a discovered model — the service ships exactly what was
+   observed, for a notebook's own miners to consume if it wants one.
+   The gap between two activities is measured end-of-first to
+   start-of-second (the same "idle time between segments" TBA's own
+   gap concept already computes), not start-to-start, so an
+   activity's own duration is never double-counted as transition
+   time. Suppression (item 22) is applied **per node/edge**, not per
+   cohort — a rarely-visited activity stays withheld even inside an
+   otherwise-large, unsuppressed cohort view, confirmed directly by
+   the request test rather than assumed. Pure graph-building lives
+   alongside the T-14a codecs in
+   [`src/analytics.rs`](../src/analytics.rs) rather than in
+   `src/tba.rs` — both derive a shape from the same segment/step
+   inputs, and the family doc is explicit that a sequence analysis is
+   not an elapsed-time one; HTTP surface + suppression rendering:
+   [`src/controllers/tba.rs`](../src/controllers/tba.rs). Landed
+   2026-09-10, spec T-14b.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

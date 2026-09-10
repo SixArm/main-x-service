@@ -14,9 +14,10 @@ use loco_rs::prelude::*;
 use sea_orm::{ActiveValue, PaginatorTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
+use crate::analytics;
 use crate::auth::MaybeAuthUser;
 use crate::instances as rules;
-use crate::models::_entities::{instance_segments, pathway_instances};
+use crate::models::_entities::{instance_segments, instance_steps, pathway_instances};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::suppression;
@@ -675,6 +676,218 @@ async fn cohort_constraints(
     format::json(body)
 }
 
+/// `?level=` + the shared cohort status/mode query (spec T-14b).
+#[derive(Debug, Default, serde::Deserialize)]
+pub(crate) struct ProcessMapQuery {
+    /// `stage` (default) | `step`.
+    #[serde(default)]
+    level: Option<String>,
+    /// `open` | `closed` | `all` (default `all`).
+    #[serde(default)]
+    status: Option<String>,
+    /// `withhold` (default) | `remove` — how a below-floor node/edge
+    /// renders (spec T-14k).
+    #[serde(default)]
+    mode: Option<String>,
+}
+
+/// Bulk-load one cohort's segments as [`analytics::SegmentInput`]s, one
+/// query, grouped by instance pid — the stage-level input to
+/// [`analytics::process_map_sequence_from_segments`].
+async fn load_segment_inputs(
+    ctx: &AppContext,
+    pids: &[Uuid],
+) -> Result<std::collections::HashMap<Uuid, Vec<analytics::SegmentInput>>> {
+    let mut map = std::collections::HashMap::new();
+    if pids.is_empty() {
+        return Ok(map);
+    }
+    let rows = instance_segments::Entity::find()
+        .filter(instance_segments::Column::InstancePid.is_in(pids.to_vec()))
+        .order_by_asc(instance_segments::Column::StartedAt)
+        .all(&ctx.db)
+        .await?;
+    for row in &rows {
+        map.entry(row.instance_pid)
+            .or_insert_with(Vec::new)
+            .push(analytics::SegmentInput {
+                stage: row.stage.clone(),
+                category: row.category.clone(),
+                waste: row.waste.clone(),
+                start_ms: ms(row.started_at),
+                end_ms: row.ended_at.map(ms),
+                actor_ref: row.actor_ref.clone(),
+                location_ref: row.location_ref.clone(),
+            });
+    }
+    Ok(map)
+}
+
+/// Bulk-load one cohort's steps as [`analytics::StepInput`]s, one
+/// query, grouped by instance pid — the step-level input to
+/// [`analytics::process_map_sequence_from_steps`].
+async fn load_step_inputs(
+    ctx: &AppContext,
+    pids: &[Uuid],
+) -> Result<std::collections::HashMap<Uuid, Vec<analytics::StepInput>>> {
+    let mut map = std::collections::HashMap::new();
+    if pids.is_empty() {
+        return Ok(map);
+    }
+    let rows = instance_steps::Entity::find()
+        .filter(instance_steps::Column::InstancePid.is_in(pids.to_vec()))
+        .order_by_asc(instance_steps::Column::Position)
+        .all(&ctx.db)
+        .await?;
+    for row in &rows {
+        map.entry(row.instance_pid)
+            .or_insert_with(Vec::new)
+            .push(analytics::StepInput {
+                label: row.label.clone(),
+                done_at_ms: row.done_on.map(date_ms),
+            });
+    }
+    Ok(map)
+}
+
+/// Build every instance's bookended activity sequence at the requested
+/// level, in one bulk load (no N+1).
+async fn cohort_sequences(
+    ctx: &AppContext,
+    instances: &[pathway_instances::Model],
+    level: &str,
+    as_of_ms: i64,
+) -> Result<Vec<Vec<analytics::ActivityStep>>> {
+    let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
+    if level == "step" {
+        let mut by_instance = load_step_inputs(ctx, &pids).await?;
+        Ok(instances
+            .iter()
+            .map(|instance| {
+                let clock = resolve_clock(instance, as_of_ms);
+                let steps = by_instance.remove(&instance.pid).unwrap_or_default();
+                analytics::process_map_sequence_from_steps(clock.start_ms, clock.stop_ms, &steps)
+            })
+            .collect())
+    } else {
+        let mut by_instance = load_segment_inputs(ctx, &pids).await?;
+        Ok(instances
+            .iter()
+            .map(|instance| {
+                let clock = resolve_clock(instance, as_of_ms);
+                let segments = by_instance.remove(&instance.pid).unwrap_or_default();
+                analytics::process_map_sequence_from_segments(
+                    clock.start_ms,
+                    clock.stop_ms,
+                    &segments,
+                )
+            })
+            .collect())
+    }
+}
+
+/// Render one node/edge, applying the small-number floor (spec T-14k):
+/// below it, `Mode::Withhold` nulls the counts/duration and carries a
+/// reason; `Mode::Remove` omits the entry entirely. Never a silent
+/// zero either way.
+fn render_process_map_entry<T: serde::Serialize>(
+    value: &T,
+    instance_count: usize,
+    null_keys: &[&str],
+    mode: suppression::Mode,
+) -> Option<serde_json::Value> {
+    let suppressed = suppression::is_suppressed(instance_count);
+    if suppressed && mode == suppression::Mode::Remove {
+        return None;
+    }
+    let mut rendered = serde_json::to_value(value).unwrap_or_else(|_| serde_json::json!({}));
+    if let Some(map) = rendered.as_object_mut() {
+        if suppressed {
+            for key in null_keys {
+                map.insert((*key).to_string(), serde_json::Value::Null);
+            }
+            map.insert(
+                "suppression_note".to_string(),
+                serde_json::json!(suppression::SUPPRESSED_REASON),
+            );
+        }
+        map.insert("suppressed".to_string(), serde_json::json!(suppressed));
+    }
+    Some(rendered)
+}
+
+/// `GET /api/care-pathways/{pathway}/process-map` — the directly-follows
+/// process map (spec T-14b). Never a discovered model: nodes and edges
+/// are exactly the observed activities and transitions.
+#[debug_handler]
+async fn process_map(
+    State(ctx): State<AppContext>,
+    Path(pathway): Path<String>,
+    Query(query): Query<ProcessMapQuery>,
+) -> Result<Response> {
+    let level = match query.level.as_deref() {
+        None | Some("stage") => "stage",
+        Some("step") => "step",
+        Some(other) => {
+            return Err(refuse(&format!(
+                "level must be \"stage\" or \"step\", got \"{other}\""
+            )));
+        }
+    };
+    let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
+        .await
+        .map_err(|_| Error::NotFound)?;
+    let instances = load_cohort(&ctx, template.pid, query.status.as_deref()).await?;
+    let as_of_ms = chrono::Utc::now().timestamp_millis();
+    let sequences = cohort_sequences(&ctx, &instances, level, as_of_ms).await?;
+    let map = analytics::build_process_map(&sequences);
+
+    let mode = suppression::Mode::parse(query.mode.as_deref());
+    let nodes: Vec<serde_json::Value> = map
+        .nodes
+        .iter()
+        .filter_map(|node| {
+            render_process_map_entry(
+                node,
+                node.instance_count,
+                &["instance_count", "occurrence_count", "median_duration_days"],
+                mode,
+            )
+        })
+        .collect();
+    let edges: Vec<serde_json::Value> = map
+        .edges
+        .iter()
+        .filter_map(|edge| {
+            render_process_map_entry(
+                edge,
+                edge.instance_count,
+                &[
+                    "instance_count",
+                    "occurrence_count",
+                    "median_gap_days",
+                    "p90_gap_days",
+                ],
+                mode,
+            )
+        })
+        .collect();
+
+    format::json(serde_json::json!({
+        "pathway": { "pid": template.pid, "name": template.name },
+        "level": level,
+        "instances": instances.len(),
+        "note": "directly-follows only — never a discovered model. Self-loops are \
+                 kept: a return to a stage/step is a finding. `start`/`end` \
+                 pseudo-nodes make entry/exit variety visible. At `level=step`, \
+                 `done_on` is a date, so a same-day pair is a 0-day edge. Nodes \
+                 and edges below the minimum cell count are withheld (T-14k), \
+                 never shown as zero.",
+        "nodes": nodes,
+        "edges": edges,
+    }))
+}
+
 /// `GET /api/instances/time-standards` — the standards catalogue
 /// (spec §7.3).
 #[debug_handler]
@@ -791,4 +1004,5 @@ pub fn pathway_routes() -> Routes {
         .prefix("/api/care-pathways")
         .add("/{pathway}/time-analysis", get(cohort_time_analysis))
         .add("/{pathway}/constraints", get(cohort_constraints))
+        .add("/{pathway}/process-map", get(process_map))
 }
