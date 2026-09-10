@@ -386,26 +386,32 @@ manual check confirms it. Split tasks too big for one PR
   [TBA §14](time-based-analysis.md). **T-14a landed 2026-09-09**, then
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
-  below), then **T-14k, T-14b, and T-14c, all on 2026-09-10** — five
-  sub-tasks landed, all out of the suggested order above, because
-  none needed the tasks still ahead of it in this list to be useful
-  now (see each entry's own scope notes; T-14a's covers why it needs
-  no suppression pass from T-14k: it exports patient-level rows, which
-  T-14a's own spec text says are gated, not suppressed — T-14k's own
-  module docs confirm the same thing from the other side). T-14b's own
-  pure logic sits beside T-14a's in `src/analytics.rs` rather than in
-  `src/tba.rs`, matching [TBA §15](time-based-analysis.md)'s own
-  statement that a sequence analysis is not an elapsed-time one. T-14c
-  got its own new file, `src/variants.rs`, rather than adding to the
-  already-large `src/analytics.rs` — the same reasoning that gave
-  T-14k its own `src/suppression.rs` rather than folding into
-  `src/tba.rs`.
+  below), then **T-14k, T-14b, T-14c, and T-14d, all on 2026-09-10** —
+  six sub-tasks landed. The first four of those six (T-14a, T-14m,
+  T-14k) were out of the suggested order above, because none needed
+  the tasks still ahead of it in this list to be useful now (see each
+  entry's own scope notes; T-14a's covers why it needs no suppression
+  pass from T-14k: it exports patient-level rows, which T-14a's own
+  spec text says are gated, not suppressed — T-14k's own module docs
+  confirm the same thing from the other side). T-14b's own pure logic
+  sits beside T-14a's in `src/analytics.rs` rather than in `src/tba.rs`,
+  matching [TBA §15](time-based-analysis.md)'s own statement that a
+  sequence analysis is not an elapsed-time one. T-14c got its own new
+  file, `src/variants.rs`, rather than adding to the already-large
+  `src/analytics.rs` — the same reasoning that gave T-14k its own
+  `src/suppression.rs` rather than folding into `src/tba.rs`. **T-14d
+  landed in the suggested order** — the third of the "three
+  derivations" trio, right after T-14b and T-14c — its pure logic sits
+  in `src/tba.rs` itself (not a new sibling module), since
+  `StageAnchor`/`Delay`/`anchored_compliance` extend the same
+  `InstanceAnalysis`/`Standard`/`Compliance` types already there,
+  unlike T-14b's/T-14c's genuinely separate sequence-analysis shapes.
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b/T-14c were also still unbuilt (all four
-    have since landed too, each also out of order; T-14d–j remain
-    open) — because the two codecs needed
+    time, T-14m/T-14k/T-14b/T-14c/T-14d were also still unbuilt (all
+    five have since landed too; T-14e–j remain open) — because the two
+    codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
     row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
@@ -430,12 +436,21 @@ manual check confirms it. Split tasks too big for one PR
       a `censored` flag (`clock.running` — the one part of T-14e
       buildable without that task's own Kaplan–Meier machinery).
       Anchors + delays (T-14d), variant string (T-14c), and conformance
-      (T-14i) are present as columns (`anchors_delays`, `variant`,
-      `conformance`) but always `null` — those three sibling tasks are
-      not yet built, so there is nothing to compute yet; this is a
-      documented gap (each field's doc comment names the task that
+      (T-14i) were present as columns (`anchors_delays`, `variant`,
+      `conformance`) but always `null` at landing — those three sibling
+      tasks were not yet built, so there was nothing to compute yet;
+      documented as a gap (each field's doc comment names the task that
       fills it), not a silently-empty string, and no other T-14a work
-      is blocked on landing them first.
+      was blocked on landing them first. **Updated 2026-09-10, in
+      T-14d's own change:** `anchors_delays` is now wired —
+      `journey_feature_row` computes it straight from the same
+      `tba::InstanceAnalysis` this row already builds from (one JSON
+      cell, `{"anchors": […], "delays": […]}`), since T-14d's data is a
+      per-instance property with no cohort context needed. `variant`
+      (T-14c, landed 2026-09-10 but genuinely needs the whole cohort's
+      pipeline — not derivable from one instance in isolation) and
+      `conformance` (T-14i, not yet built) stay `null`, for the reason
+      their own doc comments now state.
     - [x] Both are **patient-level ⇒ non-shareable**, gated as
       `Action::Destructive` (mirroring the `continues_as` bulk-pull
       precedent, [cross-service-linking.md §10.2](../../agents/share/cross-service-linking.md))
@@ -594,27 +609,97 @@ manual check confirms it. Split tasks too big for one PR
       six-instance cohort where one instance's unique journey is
       suppressed still reports the five-instance majority variant's
       share as exactly `1.0`.
-  - [ ] **T-14d — Stage anchors, delay decomposition, and anchored
-    standards.** Per instance: `anchors` = first `started_at` of each
-    stage in `STAGES` (`null` if never reached), `delays` = adjacent
-    differences in stage order (IPPA's waiting → evaluating → detecting
-    → treating, in our vocabulary). The standards catalogue gains
-    `from_anchor` / `to_anchor` (default clock start → clock stop, i.e.
-    today's behaviour), so `cancer_fds_28` can score referral →
-    `diagnostics` rather than the whole clock. Cohort compliance uses
-    the anchored interval when both anchors are present and reports
-    `unreached` as a **third verdict** — never compliant, never a
-    breach, disclosed as a count. A standard whose anchor the `STAGES`
+  - [x] **T-14d — Stage anchors, delay decomposition, and anchored
+    standards.** Landed 2026-09-10, in the suggested order — see the
+    "Suggested order" paragraph above. Per instance: `anchors` = first
+    `started_at` of each stage in `STAGES` (`null` if never reached),
+    `delays` = adjacent differences in stage order (IPPA's waiting →
+    evaluating → detecting → treating, in our vocabulary), both
+    computed in `tba::analyze` and carried as new
+    `InstanceAnalysis::anchors`/`::delays` fields (`src/tba.rs`:
+    `StageAnchor`, `anchors()`, `Delay`, `delays()`). The standards
+    catalogue gains `from_anchor` / `to_anchor` (default `None`/`None`,
+    i.e. today's whole-clock behaviour), so `cancer_fds_28_days` can
+    score referral → `diagnostics` rather than the whole clock. Cohort
+    compliance uses the anchored interval when both anchors are
+    present and reports `unreached` as a **third verdict** — never
+    compliant, never a breach, disclosed as a count
+    (`tba::anchored_compliance`). A standard whose anchor the `STAGES`
     vocabulary cannot express stays whole-clock with an `anchor_note`
     saying so, rather than approximating. Resolves the "segment
     templates" lean in [TBA §17](time-based-analysis.md) only as far as
     anchors go; per-template target durations remain that open question.
+    - [x] `GET /api/care-pathways/{pathway}/time-analysis` gains
+      `?from_anchor=&to_anchor=` (`src/controllers/tba.rs`:
+      `CohortQuery`, `score_compliance`, `resolve_anchor_pair`,
+      `resolve_standard`). Precedence, most to least specific: (1) an
+      explicit, valid query pair always wins, even over a standard's
+      own declared anchor; (2) naming neither falls through to the
+      requested standard's own `from_anchor`/`to_anchor` — this is the
+      mechanism that makes `?standard=cancer_fds_28_days` alone (no
+      anchor query at all) score anchored; (3) neither the query nor
+      the standard declaring one leaves whole-clock — today's
+      behaviour — untouched, which is every catalogue entry except
+      `cancer_fds_28_days`. An explicit-but-invalid query pair (only
+      one side given, or a name that is not a `STAGES` value) never
+      silently reverts to a standard's own anchor: it always falls all
+      the way to whole-clock, with the fallback disclosed on
+      `compliance.anchor_note` rather than approximated in silence —
+      **not the vaguer "a standard whose anchor `STAGES` cannot
+      express" case this section's own prose above describes**,
+      because every anchor in this system is a `STAGES` name by
+      construction; the disclosed-fallback mechanism is real, the
+      motivating scenario for it turned out to be query-side error
+      rather than catalogue-side inexpressibility. This wiring —
+      the standard-declared-default and the override precedence — is
+      a deliberate scope decision beyond the acceptance text's literal
+      "the default anchors reproduce today's figures exactly": the
+      wording there is about the default for every standard that
+      declares *no* anchor (the regression pin below), not a
+      prohibition on any standard declaring one, and the acceptance
+      example itself names `cancer_fds_28` as scoring anchored.
+    - [x] **Deviation from the acceptance text's literal reading:**
+      only `cancer_fds_28_days` — the standard the acceptance example
+      itself names — declares a real `from_anchor`/`to_anchor` pair in
+      the catalogue. The other five (`rtt_18_weeks`, `cancer_31_days`,
+      `cancer_62_days`, `diagnostics_6_weeks`, `ae_4_hours`) stay
+      `None`/`None`, unchanged. Every one of those five's clinical
+      definition is genuinely a whole-journey or decision-to-treatment
+      measure, not a named two-stage interval this vocabulary can
+      express faithfully; declaring an anchor pair for them would have
+      been a guess this change chose not to make, matching this
+      whole T-14 sprint's "verify, don't infer" discipline.
+    - [x] T-14a's own reserved `journey_features` export column
+      `anchors_delays` (`src/analytics.rs`) is wired in this change too
+      — a JSON-encoded `{"anchors": […], "delays": […]}` cell, computed
+      straight from the same `InstanceAnalysis` `journey_feature_row`
+      already builds from, since T-14d's data is a per-instance
+      property with no cohort context needed (unlike `variant`, T-14c,
+      which stays `null` — a per-instance variant string genuinely
+      needs the whole cohort's pipeline). Beyond this task's own literal
+      scope, but the column existed for exactly this and no other T-14a
+      work depended on leaving it unwired.
+    - [x] **Known gap, out of scope for this change:** anchored
+      compliance is not separately suppression-gated — a cohort below
+      the minimum cell count still returns a real `compliance` figure
+      (anchored or whole-clock alike) while `lead_time` is withheld.
+      This is a pre-existing gap in `cohort_time_analysis` (it applies
+      identically to the whole-clock `compliance` figure today), not
+      something T-14d introduced or is required to close.
     - **Acceptance:** a journey whose referral → diagnostics interval is
       20 days inside a 100-day clock is compliant on a 28-day
-      referral-to-diagnostics standard and unaffected on `rtt_18_weeks`;
-      an instance that never reaches `diagnostics` is `unreached`,
-      excluded from numerator and denominator, and counted; the default
-      anchors reproduce today's figures exactly (regression pin).
+      referral-to-diagnostics standard and unaffected on `rtt_18_weeks`
+      (`tba::tests::anchored_compliance_scores_the_interval_and_reports_unreached`,
+      and end to end via
+      `tests/requests/tba.rs`'s `anchored_compliance_round_trip`); an
+      instance that never reaches `diagnostics` is `unreached`,
+      excluded from numerator and denominator, and counted (same
+      tests); the default anchors reproduce today's figures exactly —
+      pinned for the five catalogue entries that declare no anchor
+      (`tba::tests::the_standards_catalogue_is_well_formed`) — and the
+      DB-gated test additionally proves `cancer_fds_28_days` scores
+      anchored with no anchor query at all, and that an explicit query
+      pair overrides even that standard's own declared anchor.
   - [ ] **T-14e — Censoring-aware cohort statistics.** Today
     `?status=all` mixes closed lead times with open instances' running
     lead time, which understates the eventual distribution (the
@@ -788,9 +873,12 @@ manual check confirms it. Split tasks too big for one PR
       `steps_out_of_order`, `segment_clipped_by_clock`,
       `coverage_below_floor`) — `src/data/journeys.rs`'s
       `DEFECT_CODES`. The eighth, "anchors unreached", needs T-14d's
-      stage-anchor configuration, which does not exist yet; deferred
-      with a documented reason in `DEFECT_CODES`'s own doc comment, not
-      silently dropped.
+      stage-anchor configuration, which has since landed (2026-09-10);
+      wiring this generator's eighth defect code onto it is a follow-up,
+      not done in T-14d's own change (T-14d used a small hand-built
+      fixture instead, matching T-14b's/T-14c's precedent — see T-14d's
+      own scope notes below), still deferred here, with a documented
+      reason in `DEFECT_CODES`'s own doc comment, not silently dropped.
     - [x] The pseudo-random source is a hand-rolled `SplitMix64`
       (`src/data/journeys.rs`'s private `Rng`), not the `rand` crate:
       reproducibility across `rand` versions is not part of that
@@ -810,11 +898,11 @@ manual check confirms it. Split tasks too big for one PR
       persists exactly what the generator returns, that a bad argument
       is refused rather than silently defaulted, and that the persisted
       rows carry the same synthetic-only markers. "Used by every T-14
-      test" is **still not true** — T-14b and T-14c have since landed
-      too, but each used a small hand-built fixture rather than this
-      generator (see their own scope notes); this generator remains
-      available for T-14d/e/f/g/h/i/j to build on, not yet exercised
-      by any of them. The repo demo seed (EX-4)
+      test" is **still not true** — T-14b, T-14c and T-14d have since
+      landed too, but each used a small hand-built fixture rather than
+      this generator (see their own scope notes); this generator
+      remains available for T-14e/f/g/h/i/j to build on, not yet
+      exercised by any of them. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

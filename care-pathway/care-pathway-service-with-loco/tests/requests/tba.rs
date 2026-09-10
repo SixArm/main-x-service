@@ -787,3 +787,207 @@ async fn variants_round_trip() {
     })
     .await;
 }
+
+/// Stage anchors, delay decomposition, and anchored standards (T-14d):
+/// a `?from_anchor=&to_anchor=` pair scores each instance's own
+/// referral -> diagnostics interval rather than the whole clock; an
+/// instance that never reaches the `to_anchor` counts as `unreached`
+/// (a third verdict, excluded from `within`/`breached` but disclosed);
+/// naming `cancer_fds_28_days` alone scores the same anchored interval
+/// automatically, from its own catalogue-declared anchor, with no
+/// anchor query at all; an explicit query anchor pair overrides even a
+/// standard's own declared anchor; an unrecognised or one-sided anchor
+/// pair falls back to the ordinary whole-clock score with a disclosed
+/// `anchor_note`; and the whole-clock `rtt_18_weeks` standard is
+/// unaffected throughout.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn anchored_compliance_round_trip() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": format!("anchors pathway {}", uuid::Uuid::new_v4()),
+                "care_setting": "Outpatient",
+                "condition_codes": [{"system": "Icd10", "code": "M54"}],
+            }))
+            .await;
+        created.assert_status_ok();
+        let template: Value = created.json();
+        let pathway = template["pid"].as_str().expect("pathway pid").to_string();
+
+        // Instance A: referral on day 0, diagnostics on day 20 — a
+        // 20-day referral -> diagnostics interval, inside a 100-day clock.
+        let enrolled_a = request
+            .post(&format!("/api/care-pathways/{pathway}/instances"))
+            .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+            .await;
+        enrolled_a.assert_status_ok();
+        let a: Value = enrolled_a.json();
+        let pid_a = a["pid"].as_str().expect("instance pid").to_string();
+        request
+            .post(&format!("/api/instances/{pid_a}/clock"))
+            .json(&json!({ "event": "start", "at": day(0) }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_a}/clock"))
+            .json(&json!({ "event": "stop", "at": day(100) }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_a}/segments"))
+            .json(&json!({
+                "label": "referred", "stage": "referral", "category": "value_adding",
+                "started_at": day(0), "ended_at": day(1),
+            }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_a}/segments"))
+            .json(&json!({
+                "label": "scanned", "stage": "diagnostics", "category": "value_adding",
+                "started_at": day(20), "ended_at": day(21),
+            }))
+            .await
+            .assert_status_ok();
+
+        // Instance B: referred, but never reaches diagnostics.
+        let enrolled_b = request
+            .post(&format!("/api/care-pathways/{pathway}/instances"))
+            .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+            .await;
+        enrolled_b.assert_status_ok();
+        let b: Value = enrolled_b.json();
+        let pid_b = b["pid"].as_str().expect("instance pid").to_string();
+        request
+            .post(&format!("/api/instances/{pid_b}/clock"))
+            .json(&json!({ "event": "start", "at": day(0) }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_b}/clock"))
+            .json(&json!({ "event": "stop", "at": day(100) }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_b}/segments"))
+            .json(&json!({
+                "label": "referred", "stage": "referral", "category": "value_adding",
+                "started_at": day(0), "ended_at": day(1),
+            }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{pid_b}/segments"))
+            .json(&json!({
+                "label": "triaged", "stage": "triage", "category": "value_adding",
+                "started_at": day(3), "ended_at": day(4),
+            }))
+            .await
+            .assert_status_ok();
+
+        // ── Anchored: referral -> diagnostics, 28-day threshold.
+        // Instance A (20 days) is within; instance B never reaches
+        // diagnostics, so it is `unreached`, not `breached`.
+        let anchored: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis\
+                 ?from_anchor=referral&to_anchor=diagnostics&target_days=28"
+            ))
+            .await
+            .json();
+        let compliance = &anchored["compliance"];
+        assert_eq!(compliance["within"], 1);
+        assert_eq!(compliance["breached"], 0);
+        assert_eq!(
+            compliance["unreached"], 1,
+            "excluded from within/breached, but disclosed"
+        );
+        assert_eq!(compliance["anchor_note"], Value::Null);
+
+        // ── The whole-clock rtt_18_weeks standard, no anchor named:
+        // both instances sit well inside 100 days against a 126-day
+        // threshold, and `unreached` never applies to a whole-clock score.
+        let whole_clock: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis?standard=rtt_18_weeks"
+            ))
+            .await
+            .json();
+        let compliance = &whole_clock["compliance"];
+        assert_eq!(compliance["within"], 2);
+        assert_eq!(compliance["breached"], 0);
+        assert_eq!(compliance["unreached"], 0);
+        assert_eq!(compliance["anchor_note"], Value::Null);
+
+        // ── `cancer_fds_28_days` declares its own referral ->
+        // diagnostics anchor in the catalogue (T-14d), so naming just
+        // the standard — no `from_anchor`/`to_anchor` in the query at
+        // all — scores the same anchored interval automatically.
+        let catalogue_anchored: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis?standard=cancer_fds_28_days"
+            ))
+            .await
+            .json();
+        let compliance = &catalogue_anchored["compliance"];
+        assert_eq!(compliance["standard"], "cancer_fds_28_days");
+        assert_eq!(compliance["within"], 1);
+        assert_eq!(compliance["breached"], 0);
+        assert_eq!(
+            compliance["unreached"], 1,
+            "instance B never reaches diagnostics, via the catalogue's own anchor"
+        );
+        assert_eq!(compliance["anchor_note"], Value::Null);
+
+        // ── An explicit query anchor pair overrides even a standard's
+        // own declared anchor: referral -> triage instead of ->
+        // diagnostics swaps which instance is within/unreached, while
+        // cancer_fds_28_days's own 28-day threshold still applies.
+        let overridden: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis\
+                 ?standard=cancer_fds_28_days&from_anchor=referral&to_anchor=triage"
+            ))
+            .await
+            .json();
+        let compliance = &overridden["compliance"];
+        assert_eq!(compliance["standard"], "cancer_fds_28_days");
+        assert_eq!(
+            compliance["within"], 1,
+            "instance B reaches triage on day 3; instance A never does"
+        );
+        assert_eq!(compliance["unreached"], 1);
+
+        // ── An unrecognised `to_anchor` falls back to the whole-clock
+        // score, with the fallback disclosed rather than silent.
+        let unrecognised: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis\
+                 ?from_anchor=referral&to_anchor=not_a_stage&target_days=28"
+            ))
+            .await
+            .json();
+        let compliance = &unrecognised["compliance"];
+        assert_eq!(compliance["anchor_note"], "unknown_to_anchor");
+        assert_eq!(
+            compliance["unreached"], 0,
+            "fell back to the whole-clock score, which has no unreached"
+        );
+
+        // ── A one-sided anchor pair (only `from_anchor` given) is the
+        // same disclosed fallback, not a hard error.
+        let one_sided: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis\
+                 ?from_anchor=referral&target_days=28"
+            ))
+            .await
+            .json();
+        assert_eq!(one_sided["compliance"]["anchor_note"], "to_anchor_missing");
+    })
+    .await;
+}

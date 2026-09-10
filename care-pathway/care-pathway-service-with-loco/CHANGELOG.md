@@ -9,6 +9,79 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14d: stage anchors, delay decomposition, and anchored standards (2026-09-10)
+
+Per-instance `anchors`/`delays`, and cohort compliance scored against a
+named two-stage interval instead of the whole clock.
+
+- `src/tba.rs`: `StageAnchor` (`stage`, `first_started_at_ms`),
+  `anchors(segments)` (first-reached timestamp per `STAGES` value,
+  `None` if never reached), `Delay` (`from_stage`, `to_stage`,
+  `delay_ms`, `reason`), `delays(anchors)` (adjacent-pair differences,
+  clamped at zero, with `reason` `from_stage_unreached` /
+  `to_stage_unreached` when either side is unreached),
+  `anchor_interval(anchors, from, to)` (an arbitrary, not-necessarily-
+  adjacent named pair — `referral` to `treatment` is as valid as
+  `referral` to `triage`). `InstanceAnalysis` gains `anchors`/`delays`
+  fields, computed in `analyze()`. `Standard` gains
+  `from_anchor`/`to_anchor: Option<&'static str>` (every entry stays
+  `None`/`None` except `cancer_fds_28_days`, which now declares
+  `referral`→`diagnostics` — the one standard whose own clinical
+  definition names a two-stage interval, per its own citation note).
+  `Compliance` gains `unreached: usize` (a **third verdict** — never
+  compliant, never a breach, excluded from `within`/`breached` but
+  always counted) and `anchor_note: Option<String>`. New
+  `anchored_compliance(intervals_ms, …)`, `compliance()`'s
+  generalisation over `&[Option<i64>]`.
+- `src/controllers/tba.rs`: `CohortQuery` gains `from_anchor`/
+  `to_anchor`. `score_compliance` dispatches with this precedence,
+  most to least specific: (1) an explicit, valid query pair always
+  wins, even over a standard's own declared anchor; (2) naming neither
+  falls through to the requested standard's own anchor pair if it
+  declares one (`?standard=cancer_fds_28_days` alone now scores
+  anchored, with no anchor query at all); (3) neither the query nor
+  the standard declaring one leaves whole-clock — today's behaviour —
+  untouched, which is every standard except `cancer_fds_28_days`. A
+  query pair that fails validation (only one side given, or a name
+  that is not a `STAGES` value) never silently reverts to a standard's
+  own anchor — it always falls all the way to whole-clock, with
+  `compliance.anchor_note` disclosing why rather than approximating.
+- `src/analytics.rs`: T-14a's own reserved `journey_features` export
+  column `anchors_delays` is wired in this change — a JSON-encoded
+  `{"anchors": …, "delays": …}` cell, computed straight from the same
+  `InstanceAnalysis` `journey_feature_row` already builds from, since
+  this is a per-instance property with no cohort context needed
+  (unlike T-14c's `variant` column, which needs the whole cohort's
+  pipeline and stays `null`). Beyond this task's own literal scope,
+  but the column existed for exactly this.
+- Tests: 6 new pure `src/tba.rs` unit tests targeting each acceptance
+  bullet directly — `anchors_report_first_reached_per_stage_null_if_never_reached`,
+  `anchors_take_the_earliest_segment_when_a_stage_is_revisited`,
+  `delays_report_adjacent_pair_differences_with_a_reason_when_unreached`,
+  `delays_never_go_negative_even_if_a_later_stage_starts_first`,
+  `anchor_interval_spans_non_adjacent_stages_and_clamps_out_of_order`,
+  `anchored_compliance_scores_the_interval_and_reports_unreached` (the
+  literal 20-day-inside-100-day acceptance example) — plus an extended
+  `the_standards_catalogue_is_well_formed` pinning that only
+  `cancer_fds_28_days` declares an anchor and every other entry is
+  unchanged, and an extended `journey_feature_row_derives_from_the_analysis`
+  in `src/analytics.rs` pinning the wired `anchors_delays` cell
+  (`cargo test --lib`: 378, up from 372). A DB-gated round
+  trip (`tests/requests/tba.rs`'s `anchored_compliance_round_trip`)
+  proves an explicit `?from_anchor=&to_anchor=` pair, the
+  `cancer_fds_28_days` catalogue-driven default, an explicit pair
+  overriding that default, and the disclosed fallback on an
+  unrecognised or one-sided pair, all against real Postgres.
+- **Deviation from the acceptance text's literal reading:** only
+  `cancer_fds_28_days` declares a real anchor pair; the other five
+  standards stay `None`/`None`. Each of those five is genuinely a
+  whole-journey or decision-to-treatment measure, not a named
+  two-stage interval this vocabulary can express faithfully —
+  declaring one for them would have been a guess, not a verified fact.
+- **Known gap, out of scope:** anchored compliance is not separately
+  suppression-gated (a pre-existing gap shared with the whole-clock
+  compliance figure, not introduced by this change).
+
 ### Added — T-14c: journey variants (pathway strings) (2026-09-10)
 
 `GET /api/care-pathways/{pathway}/variants?status=&min_segment_days=

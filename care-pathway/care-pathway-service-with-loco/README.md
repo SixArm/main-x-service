@@ -43,9 +43,9 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | POST/GET | `/api/instances/{pid}/segments` | Record / list a journey's VA / NNVA / UNVA segments |
 | POST | `/api/instances/{pid}/segments/{seg}/close` | Close a running segment |
 | POST | `/api/instances/{pid}/clock` | Set the pathway clock `start`/`stop` (no `pause`, by design) |
-| GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage |
+| GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage, per-stage anchors + adjacent delays |
 | GET | `/api/instances/{pid}/timeline` | The mapped journey as an ordered wall of segments and gaps |
-| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard (`?mode=withhold\|remove` on suppression) |
+| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`; `?mode=withhold\|remove` on suppression) |
 | GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time (`?mode=withhold\|remove` on suppression) |
 | GET | `/api/instances/flow` | Queueing-theory flow (Little's Law: λ/μ/ρ/κ/τ) |
 | GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
@@ -130,6 +130,36 @@ individually; visible shares are renormalised to sum to `1.0`) plus
 per-position ("line") duration quantiles with an `overall` pseudo-line.
 Nothing is stored. Pure pipeline:
 [`src/variants.rs`](./src/variants.rs); HTTP surface:
+[`src/controllers/tba.rs`](./src/controllers/tba.rs).
+
+### Stage anchors, delay decomposition, and anchored standards (T-14d)
+
+Every instance's per-instance time-analysis now also carries `anchors`
+(each stage's first `started_at`, `null` if never reached) and `delays`
+(adjacent-pair differences, clamped at zero, each with a `reason` when
+either side is unreached). Cohort compliance
+(`/api/care-pathways/{pid}/time-analysis`) can score an interval
+between two named stages instead of the whole clock —
+`?from_anchor=&to_anchor=` — with an unreached pair counted as
+`compliance.unreached`, a **third verdict**: never compliant, never a
+breach, always disclosed. Precedence, most to least specific: an
+explicit query pair always wins, even over a standard's own declared
+anchor; naming neither falls through to the requested standard's own
+anchor pair if it declares one — `cancer_fds_28_days` is the one
+catalogue entry that does (referral → diagnostics; every other
+standard stays whole-clock, unchanged); naming neither the query nor
+finding one on the standard leaves whole-clock behaviour untouched. An
+explicit pair that fails validation (only one side given, or a name
+that is not a recognised stage) never silently falls back to a
+standard's own anchor — it always reverts to whole-clock, with
+`compliance.anchor_note` disclosing why rather than approximating.
+T-14a's `journey_features` export column `anchors_delays` is wired in
+this change too (a per-instance JSON cell, no cohort context needed).
+Pure logic extends `src/tba.rs` itself — `StageAnchor`, `anchors()`,
+`Delay`, `delays()`, `anchor_interval()`, `anchored_compliance()` —
+rather than a new sibling module, since it extends the
+`InstanceAnalysis`/`Standard`/`Compliance` types already there; HTTP
+surface + precedence logic:
 [`src/controllers/tba.rs`](./src/controllers/tba.rs).
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))

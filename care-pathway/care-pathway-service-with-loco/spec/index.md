@@ -350,6 +350,42 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    got its own file); HTTP surface:
    [`src/controllers/tba.rs`](../src/controllers/tba.rs). Landed
    2026-09-10, spec T-14c.
+25. **Stage anchors, delay decomposition, and anchored standards.**
+   Per instance, `tba::analyze` now also computes `anchors` (each
+   `STAGES` value's first `started_at`, `null` if never reached) and
+   `delays` (adjacent-pair differences, clamped at zero, each carrying
+   a `reason` when either side is unreached) —
+   `InstanceAnalysis::anchors`/`::delays`, surfaced on
+   `GET /api/instances/{pid}/time-analysis` alongside the existing
+   fields. The standards catalogue (item — see `tba::STANDARDS`) gains
+   `from_anchor`/`to_anchor`; every entry keeps `None`/`None` (today's
+   whole-clock behaviour) except `cancer_fds_28_days`, which declares
+   `referral`→`diagnostics` — the one standard whose own clinical
+   definition names a two-stage interval rather than the whole
+   journey. `GET /api/care-pathways/{pathway}/time-analysis` gains
+   `?from_anchor=&to_anchor=`: an explicit, valid pair always wins,
+   even over a standard's own declared anchor; naming neither falls
+   through to the requested standard's own anchor pair if it has one
+   (so `?standard=cancer_fds_28_days` alone scores anchored); an
+   invalid pair (one-sided, or a name that is not a `STAGES` value)
+   never silently reverts to a standard's own anchor — it falls all
+   the way to whole-clock, disclosed on `compliance.anchor_note`
+   rather than approximated. An anchored score treats an unreached
+   pair as `Compliance::unreached` — a **third verdict**, excluded
+   from `within`/`breached` but always counted, never folded into
+   either. T-14a's own reserved `journey_features` export column
+   `anchors_delays` is wired in the same change (a JSON-encoded
+   `{"anchors": …, "delays": …}` cell) — a per-instance property, so
+   no cohort context is needed, unlike T-14c's still-unwired `variant`
+   column. Pure logic sits in [`src/tba.rs`](../src/tba.rs) itself
+   (`StageAnchor`, `anchors()`, `Delay`, `delays()`,
+   `anchor_interval()`, `anchored_compliance()`) rather than a new
+   sibling module, since it extends the `InstanceAnalysis`/
+   `Standard`/`Compliance` types already there; HTTP surface +
+   precedence logic:
+   [`src/controllers/tba.rs`](../src/controllers/tba.rs) (`CohortQuery`,
+   `score_compliance`, `resolve_anchor_pair`, `resolve_standard`).
+   Landed 2026-09-10, spec T-14d.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

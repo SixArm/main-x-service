@@ -478,6 +478,21 @@ pub(crate) struct CohortQuery {
     /// [`suppression::Mode::parse`].
     #[serde(default)]
     mode: Option<String>,
+    /// A named stage (a [`tba::STAGES`] value) to anchor the compliance
+    /// interval's start on (spec T-14d). Requires `to_anchor`; an
+    /// unrecognised or one-sided pair falls back to the ordinary
+    /// whole-clock lead time with a disclosed
+    /// `compliance.anchor_note`, rather than approximating a scoring
+    /// that wasn't actually requested.
+    #[serde(default)]
+    from_anchor: Option<String>,
+    /// The stage to anchor the compliance interval's end on (spec
+    /// T-14d). Requires `from_anchor`; see its doc for the fallback
+    /// rule. Not required to be adjacent to `from_anchor` in
+    /// [`tba::STAGES`] — `referral` to `treatment` is as valid as
+    /// `referral` to `triage`.
+    #[serde(default)]
+    to_anchor: Option<String>,
 }
 
 /// Load a pathway's instances, filtered by the query's status lens.
@@ -536,16 +551,32 @@ pub(crate) async fn analyze_cohort(
         .collect())
 }
 
-/// Resolve the requested standard or explicit target into a compliance
-/// score over the cohort's lead times.
-fn score_compliance(lead_times: &[i64], query: &CohortQuery) -> Result<Option<tba::Compliance>> {
-    if let Some(id) = query.standard.as_deref() {
-        let standard = tba::standard(id).ok_or_else(|| {
-            refuse(&format!(
-                "unknown standard `{id}` (standards: {:?})",
-                tba::STANDARDS.iter().map(|s| s.id).collect::<Vec<_>>()
-            ))
-        })?;
+/// Look up the query's named standard, `422`-refusing an unrecognised
+/// id. `None` when the query names no standard at all (the
+/// `target_days` path).
+fn resolve_standard(query: &CohortQuery) -> Result<Option<&'static tba::Standard>> {
+    query
+        .standard
+        .as_deref()
+        .map(|id| {
+            tba::standard(id).ok_or_else(|| {
+                refuse(&format!(
+                    "unknown standard `{id}` (standards: {:?})",
+                    tba::STANDARDS.iter().map(|s| s.id).collect::<Vec<_>>()
+                ))
+            })
+        })
+        .transpose()
+}
+
+/// Score a plain (whole-clock) lead-time sample against an already
+/// resolved standard, or `query.target_days`.
+fn score_whole_clock(
+    lead_times: &[i64],
+    query: &CohortQuery,
+    standard: Option<&'static tba::Standard>,
+) -> Result<Option<tba::Compliance>> {
+    if let Some(standard) = standard {
         return Ok(Some(tba::compliance(
             lead_times,
             standard.id,
@@ -572,6 +603,116 @@ fn score_compliance(lead_times: &[i64], query: &CohortQuery) -> Result<Option<tb
     Ok(None)
 }
 
+/// Score a per-instance anchored-interval sample (spec T-14d) against
+/// an already resolved standard, or `query.target_days` — an unreached
+/// anchor pair (`None`) counts against
+/// [`tba::Compliance::unreached`] rather than a breach.
+fn score_anchored(
+    intervals_ms: &[Option<i64>],
+    query: &CohortQuery,
+    standard: Option<&'static tba::Standard>,
+) -> Result<Option<tba::Compliance>> {
+    if let Some(standard) = standard {
+        return Ok(Some(tba::anchored_compliance(
+            intervals_ms,
+            standard.id,
+            standard.threshold_ms,
+            Some(standard.target_ratio),
+            Some(standard.as_of),
+        )));
+    }
+    if let Some(days) = query.target_days {
+        if !days.is_finite() || days <= 0.0 {
+            return Err(refuse("target_days must be a positive number"));
+        }
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        // bounded by the finiteness + positivity check above
+        let threshold_ms = (days * tba::DAY_MS as f64) as i64;
+        return Ok(Some(tba::anchored_compliance(
+            intervals_ms,
+            "custom",
+            threshold_ms,
+            None,
+            None,
+        )));
+    }
+    Ok(None)
+}
+
+/// Validate the query's `from_anchor`/`to_anchor` pair against
+/// [`tba::STAGES`] (spec T-14d). `Ok(Some((from, to)))` when both are
+/// given and recognised; `Ok(None)` when neither is given (nothing to
+/// override — the caller falls through to whatever the requested
+/// standard itself declares, or whole-clock); `Err(reason)` — never a
+/// hard failure — when exactly one is given, or either name is not a
+/// recognised stage, so the caller falls all the way back to the
+/// whole-clock figure with a disclosed reason rather than
+/// approximating a scoring it didn't actually ask for.
+fn resolve_anchor_pair(
+    query: &CohortQuery,
+) -> std::result::Result<Option<(&str, &str)>, &'static str> {
+    match (query.from_anchor.as_deref(), query.to_anchor.as_deref()) {
+        (None, None) => Ok(None),
+        (Some(from), Some(to)) => {
+            if !tba::STAGES.contains(&from) {
+                Err("unknown_from_anchor")
+            } else if !tba::STAGES.contains(&to) {
+                Err("unknown_to_anchor")
+            } else {
+                Ok(Some((from, to)))
+            }
+        }
+        (Some(_), None) => Err("to_anchor_missing"),
+        (None, Some(_)) => Err("from_anchor_missing"),
+    }
+}
+
+/// Score the cohort's compliance (spec T-14d). Precedence, most to
+/// least specific: (1) an explicit, valid `?from_anchor=&to_anchor=`
+/// pair always wins, even over a standard's own declared anchor, so a
+/// caller can be more specific than the catalogue; (2) naming neither
+/// falls through to the requested standard's own `from_anchor`/
+/// `to_anchor` — e.g. `cancer_fds_28_days` scores referral ->
+/// diagnostics without the caller asking for it explicitly; (3)
+/// neither the query nor the standard declaring one leaves the
+/// whole-clock path — today's behaviour — untouched, which is every
+/// other catalogue entry. An explicit pair that fails validation (only
+/// one side given, or an unrecognised stage name) never silently
+/// reverts to the standard's own anchor: it always falls all the way
+/// to whole-clock, with `compliance.anchor_note` disclosing why.
+fn score_compliance(
+    analyses: &[tba::InstanceAnalysis],
+    query: &CohortQuery,
+) -> Result<Option<tba::Compliance>> {
+    let standard = resolve_standard(query)?;
+    let lead_times = || analyses.iter().map(|a| a.lead_time_ms).collect::<Vec<_>>();
+    let anchored = |from: &str, to: &str| -> Vec<Option<i64>> {
+        analyses
+            .iter()
+            .map(|a| tba::anchor_interval(&a.anchors, from, to))
+            .collect()
+    };
+
+    match resolve_anchor_pair(query) {
+        Ok(Some((from, to))) => score_anchored(&anchored(from, to), query, standard),
+        Ok(None) => {
+            if let Some(s) = standard
+                && let (Some(from), Some(to)) = (s.from_anchor, s.to_anchor)
+            {
+                return score_anchored(&anchored(from, to), query, standard);
+            }
+            score_whole_clock(&lead_times(), query, standard)
+        }
+        Err(reason) => {
+            let mut compliance = score_whole_clock(&lead_times(), query, standard)?;
+            if let Some(c) = compliance.as_mut() {
+                c.anchor_note = Some(reason.to_string());
+            }
+            Ok(compliance)
+        }
+    }
+}
+
 /// `GET /api/care-pathways/{pathway}/time-analysis` — the cohort view
 /// (spec §7).
 #[debug_handler]
@@ -588,8 +729,7 @@ async fn cohort_time_analysis(
     let instances = load_cohort(&ctx, template.pid, query.status.as_deref()).await?;
     let analyses = analyze_cohort(&ctx, &instances, as_of_ms).await?;
     let summary = tba::cohort(&analyses);
-    let lead_times: Vec<i64> = analyses.iter().map(|a| a.lead_time_ms).collect();
-    let compliance = score_compliance(&lead_times, &query)?;
+    let compliance = score_compliance(&analyses, &query)?;
 
     // Small-number suppression (spec §12.2, generalised T-14k): below
     // the deployment's cell-count floor the percentile detail would
