@@ -66,6 +66,10 @@ pub mod relay;
 /// Tantivy full-text search: index schema, engine, and query surface.
 pub mod search;
 pub mod streaming;
+/// Disclosure control: the deployment-configurable cell-count floor,
+/// `Withhold`/`Remove` rendering, and secondary suppression of
+/// marginals for a stratified table (spec `13-tasks.md` T-14k).
+pub mod suppression;
 pub mod tasks;
 /// Time-based analysis (TBA): pure computation over an instance's
 /// clock and recorded segments — the value-adding ratio, constraint

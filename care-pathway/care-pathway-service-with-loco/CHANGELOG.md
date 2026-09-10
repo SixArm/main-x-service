@@ -9,6 +9,63 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14k: disclosure control, modes and marginals (2026-09-10)
+
+Generalises the small-cohort floor `cohort_time_analysis` already
+applied (TBA-10) into one shared, deployment-configurable module, and
+closes a real gap: `cohort_constraints` previously returned findings
+unsuppressed at **any** cohort size.
+
+- New `src/suppression.rs` (DB-free, pure, 11 unit tests):
+  - `min_cell_count()` / `CARE_PATHWAY_MIN_CELL_COUNT` — the floor,
+    default 5, **raisable only** (a lower or garbage env value falls
+    back to the default rather than weakening protection).
+  - `is_suppressed(n)` — the scalar case both cohort endpoints use.
+  - `Mode::Withhold` (default: `null` + reason) and `Mode::Remove`
+    (drop the key), parsed from a new `?mode=` query param on both
+    endpoints.
+  - `Table` / `Partition` / `decide()` / `render()` — a generic
+    stratified-table primitive with **secondary suppression**: when a
+    declared partition (a row, a column, or any group summing to a
+    published margin) is left with exactly one suppressed cell, one
+    more (the smallest remaining visible one) is suppressed too,
+    repeated to a fixed point, so a withheld cell can never be
+    recovered as `margin − Σ(visible siblings)`. Proven by a 500-seed
+    property test over randomly generated row × column tables — a
+    hand-rolled `SplitMix64`, not a new `proptest` dependency, same
+    choice as T-14m's generator and for the same reason. No genuinely
+    stratified 2-D breakdown exists in this crate yet (that's T-14f,
+    unbuilt); this is built ready for it.
+- `src/controllers/tba.rs`: `cohort_time_analysis` now uses the shared
+  `is_suppressed`/`Mode` instead of the old hardcoded
+  `MIN_COHORT_FOR_PERCENTILES` const; `cohort_constraints` gains the
+  same suppression it never had — a cohort below the floor now
+  withholds `findings` (a finding computed over one instance can
+  describe that patient's journey precisely). Both report
+  `suppressed` and honour `?mode=`.
+- `src/openapi.rs`: a new `export_paths()` function documents T-14a's
+  two export endpoints, which had **no** `OpenAPI` entry at all (found
+  rolling this task) — the same class of gap `instance_paths()`'s own
+  doc comment already names for an earlier instance, closed the same
+  way. Both cohort endpoints' entries gained the `mode` parameter.
+- `tests/requests/tba.rs`: updated the existing round trip for the new
+  (correct) `cohort_constraints` suppression at `n = 1`, added
+  `?mode=remove` coverage for both endpoints, and — reusing the
+  5-instance cohort `the_flow_gauges_publish_only_what_may_be_published`
+  already builds for its own floor — confirmed both endpoints stop
+  suppressing once the cohort clears it.
+- `flow_metrics.rs`'s own independent floor
+  (`CARE_PATHWAY_FLOW_METRICS_MIN_COHORT`) is deliberately **not**
+  migrated to this module: it already satisfies the same principle
+  independently, and unifying the env var would be a breaking
+  configuration change for a deployment that already set it.
+- Verified: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test --lib` (353, up from 341), the DB-gated suite
+  (57 request tests, unchanged count — this task edits existing tests
+  rather than adding new ones at that layer), `cargo +1.96 check
+  --all-targets` (MSRV), `cargo deny check`, and `cargo bench --no-run`
+  all clean. No new dependency, no new migration.
+
 ### Added — T-14m: seeded synthetic journey cohorts (2026-09-09)
 
 A new `journeys:seed` CLI task and its pure generator, so the T-14

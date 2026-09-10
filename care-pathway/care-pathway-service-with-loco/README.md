@@ -45,8 +45,8 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | POST | `/api/instances/{pid}/clock` | Set the pathway clock `start`/`stop` (no `pause`, by design) |
 | GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage |
 | GET | `/api/instances/{pid}/timeline` | The mapped journey as an ordered wall of segments and gaps |
-| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard |
-| GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time |
+| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard (`?mode=withhold\|remove` on suppression) |
+| GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time (`?mode=withhold\|remove` on suppression) |
 | GET | `/api/instances/flow` | Queueing-theory flow (Little's Law: λ/μ/ρ/κ/τ) |
 | GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
 | GET | `/api/care-pathways/{pid}/export/event-log` | Bulk `event_log` export (`?format=csv\|jsonl`) — bupaR/PM4Py shape, never a `subject_ref` or a person/actor URN |
@@ -75,6 +75,25 @@ UUID, so this data can never be mistaken for a real patient's. The
 same seed always produces the same cohort. Pure generator:
 [`src/data/journeys.rs`](./src/data/journeys.rs); task:
 [`src/tasks/journeys_seed.rs`](./src/tasks/journeys_seed.rs).
+
+### Disclosure control (T-14k)
+
+A shared, deployment-configurable cell-count floor
+(`CARE_PATHWAY_MIN_CELL_COUNT`, default 5, **raisable only** — a lower
+or garbage value falls back to the default rather than weakening
+protection) governs both cohort endpoints above: `?mode=withhold`
+(default: `null` + a reason) or `?mode=remove` (drop the key
+entirely). Beyond that scalar case,
+[`src/suppression.rs`](./src/suppression.rs) also provides a generic
+stratified-table primitive (`Table`/`Partition`/`decide`/`render`)
+with **secondary suppression** — when a row, a column, or any declared
+group summing to a published margin is left with exactly one
+suppressed cell, one more is suppressed too, so a withheld cell can
+never be recovered as `margin − Σ(visible siblings)`. No 2-D
+breakdown exists in this crate yet (T-14f); this primitive is ready
+for it. `event_log`/`journey_features` (T-14a above) are **exempt**,
+not suppressed — they are patient-level rows, gated by access control
+and audited, per the family's bulk-export contract.
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 

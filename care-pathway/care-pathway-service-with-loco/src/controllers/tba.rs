@@ -19,6 +19,7 @@ use crate::instances as rules;
 use crate::models::_entities::{instance_segments, pathway_instances};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
+use crate::suppression;
 use crate::tba;
 
 /// Cohort reads are capped so an unbounded cohort cannot become an
@@ -31,10 +32,6 @@ const MAX_SEGMENTS: u64 = 5000;
 /// The window default for flow analysis (spec §9, §17 — arbitrary, and
 /// documented as such).
 const DEFAULT_WINDOW_DAYS: i64 = 90;
-
-/// The smallest cohort whose percentile detail is disclosed. Below it a
-/// percentile isolates an individual patient by arithmetic (spec §12.2).
-const MIN_COHORT_FOR_PERCENTILES: usize = 5;
 
 /// `422` with a reason.
 fn refuse(reason: &str) -> Error {
@@ -474,6 +471,11 @@ pub(crate) struct CohortQuery {
     /// `open` | `closed` | `all` (default `all`).
     #[serde(default)]
     status: Option<String>,
+    /// `withhold` (default) | `remove` — how a suppressed cohort's
+    /// detail renders (spec T-14k). Parsed via
+    /// [`suppression::Mode::parse`].
+    #[serde(default)]
+    mode: Option<String>,
 }
 
 /// Load a pathway's instances, filtered by the query's status lens.
@@ -587,13 +589,25 @@ async fn cohort_time_analysis(
     let lead_times: Vec<i64> = analyses.iter().map(|a| a.lead_time_ms).collect();
     let compliance = score_compliance(&lead_times, &query)?;
 
-    // Small-number suppression (spec §12.2): below the threshold the
-    // percentile detail would isolate an individual patient, so the
-    // counts and the ranking are returned without it.
-    let suppressed = summary.instances > 0 && summary.instances < MIN_COHORT_FOR_PERCENTILES;
+    // Small-number suppression (spec §12.2, generalised T-14k): below
+    // the deployment's cell-count floor the percentile detail would
+    // isolate an individual patient, so the counts and the ranking are
+    // returned without it. `?mode=remove` drops the key entirely
+    // instead of nulling it; either way the *decision* is the same
+    // (`suppression::is_suppressed`), so the two can never disagree on
+    // whether this cohort is small.
+    let suppressed = suppression::is_suppressed(summary.instances);
+    let mode = suppression::Mode::parse(query.mode.as_deref());
     let mut body = serde_json::to_value(&summary).unwrap_or_else(|_| serde_json::json!({}));
     if suppressed && let Some(map) = body.as_object_mut() {
-        map.insert("lead_time".to_string(), serde_json::Value::Null);
+        match mode {
+            suppression::Mode::Withhold => {
+                map.insert("lead_time".to_string(), serde_json::Value::Null);
+            }
+            suppression::Mode::Remove => {
+                map.remove("lead_time");
+            }
+        }
     }
 
     format::json(serde_json::json!({
@@ -605,10 +619,7 @@ async fn cohort_time_analysis(
                  is itself the finding — `concentrated` means the waste sits in \
                  a minority of journeys.",
         "suppressed": suppressed,
-        "suppression_note": suppressed.then(|| format!(
-            "fewer than {MIN_COHORT_FOR_PERCENTILES} instances: percentile \
-             detail withheld because it would identify an individual journey"
-        )),
+        "suppression_note": suppressed.then_some(suppression::SUPPRESSED_REASON),
         "cohort": body,
         "compliance": compliance,
     }))
@@ -631,15 +642,37 @@ async fn cohort_constraints(
     let analyses = analyze_cohort(&ctx, &instances, as_of_ms).await?;
     let summary = tba::cohort(&analyses);
     let findings = tba::constraints(&analyses, &summary);
-    format::json(serde_json::json!({
+
+    // Small-number suppression (spec T-14k): a constraint finding
+    // names a rule and a threshold computed over the whole cohort, so
+    // at a low `n` it can describe one patient's journey precisely —
+    // the same disclosure risk `cohort_time_analysis`'s percentiles
+    // carry, closed here for the first time (this endpoint previously
+    // returned `findings` unsuppressed at any cohort size).
+    let suppressed = suppression::is_suppressed(summary.instances);
+    let mode = suppression::Mode::parse(query.mode.as_deref());
+    let mut body = serde_json::json!({
         "as_of": now,
         "pathway": { "pid": template.pid, "name": template.name },
         "note": "findings ordered by recoverable time; each names the rule that \
                  produced it and the threshold that fired. Deliberately not a \
                  composite score, and deliberately never per-clinician.",
         "instances": summary.instances,
+        "suppressed": suppressed,
+        "suppression_note": suppressed.then_some(suppression::SUPPRESSED_REASON),
         "findings": findings,
-    }))
+    });
+    if suppressed && let Some(map) = body.as_object_mut() {
+        match mode {
+            suppression::Mode::Withhold => {
+                map.insert("findings".to_string(), serde_json::Value::Null);
+            }
+            suppression::Mode::Remove => {
+                map.remove("findings");
+            }
+        }
+    }
+    format::json(body)
 }
 
 /// `GET /api/instances/time-standards` — the standards catalogue

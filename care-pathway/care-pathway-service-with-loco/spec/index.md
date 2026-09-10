@@ -276,6 +276,28 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    task: [`src/tasks/journeys_seed.rs`](../src/tasks/journeys_seed.rs).
    Landed 2026-09-09, spec T-14m. "Used by every T-14 test" is not yet
    true — no sibling T-14 sub-task has landed to consume it yet.
+22. **Disclosure control: modes and marginals.** A shared,
+   deployment-configurable cell-count floor
+   (`CARE_PATHWAY_MIN_CELL_COUNT`, default 5, raisable only) and two
+   rendering modes — `?mode=withhold` (default: `null` + reason) and
+   `?mode=remove` (drop the key) — replace the ad-hoc floor
+   `cohort_time_analysis` used to hardcode, and close a real gap in
+   `cohort_constraints`, which previously returned findings
+   unsuppressed at any cohort size. Both now report `suppressed` and
+   honour `?mode=`. Beyond the scalar case, `src/suppression.rs` adds a
+   generic stratified `Table`/`Partition`/`decide`/`render` primitive
+   with **secondary suppression** — when a partition (a row, a column,
+   or any declared group summing to a published margin) is left with
+   exactly one suppressed cell, one more is suppressed too, so a
+   withheld cell can never be recovered as `margin − Σ(visible
+   siblings)` — proven by an 11-test suite including a 500-seed
+   property test over randomly generated tables. No stratified 2-D
+   breakdown exists in this crate yet (that's T-14f); this is built
+   ready for it, the same forward-building pattern items 20 and 21
+   above already established. `flow_metrics.rs`'s own independent
+   floor is deliberately left unmigrated — unifying its env var would
+   be a breaking config change for an existing deployment, not merely
+   a refactor. Landed 2026-09-10, spec T-14k.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

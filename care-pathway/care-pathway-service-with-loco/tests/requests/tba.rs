@@ -231,6 +231,22 @@ async fn time_based_analysis_round_trip() {
         assert_eq!(cohort["compliance"]["standard"], "rtt_18_weeks");
         assert_eq!(cohort["compliance"]["within"], 1, "100 days is under 126");
         assert_eq!(cohort["compliance"]["threshold_days"], 126.0);
+        assert_eq!(
+            cohort["suppression_note"],
+            "withheld: fewer than the minimum cell count"
+        );
+
+        // `?mode=remove` drops the key entirely instead of nulling it.
+        let removed_cohort: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis?mode=remove"
+            ))
+            .await
+            .json();
+        assert!(
+            removed_cohort["cohort"].get("lead_time").is_none(),
+            "remove mode drops the key"
+        );
 
         assert_eq!(
             request
@@ -243,21 +259,39 @@ async fn time_based_analysis_round_trip() {
             "unknown standard is refused, not ignored"
         );
 
-        // ── Constraints name their rule and rank by recoverable time.
+        // ── Constraints: this cohort is one instance too, so the
+        // findings (which would otherwise describe this one patient's
+        // journey precisely) are withheld the same way the cohort
+        // view's percentiles are — a real fix, not a design choice this
+        // test merely observes (spec T-14k; this endpoint previously
+        // returned `findings` unsuppressed at any cohort size). The
+        // ordering/naming logic itself is proven DB-free in
+        // `src/tba.rs`'s `constraints_rank_by_recoverable_time_and_name_their_rule`.
         let constraints: Value = request
             .get(&format!("/api/care-pathways/{pathway}/constraints"))
             .await
             .json();
-        let findings = constraints["findings"].as_array().expect("findings");
-        assert!(!findings.is_empty());
-        assert!(findings.iter().any(|f| f["rule"] == "longest_gap"));
-        let recoverable: Vec<i64> = findings
-            .iter()
-            .map(|f| f["recoverable_ms"].as_i64().unwrap_or(0))
-            .collect();
+        assert_eq!(constraints["instances"], 1);
+        assert_eq!(
+            constraints["suppressed"], true,
+            "n=1 identifies the patient"
+        );
+        assert_eq!(constraints["findings"], Value::Null);
+
+        // `?mode=remove` drops the key entirely instead of nulling it.
+        let removed: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/constraints?mode=remove"
+            ))
+            .await
+            .json();
         assert!(
-            recoverable.windows(2).all(|w| w[0] >= w[1]),
-            "ordered by recoverable time: {recoverable:?}"
+            removed.get("findings").is_none(),
+            "remove mode drops the key"
+        );
+        assert_eq!(
+            removed["suppressed"], true,
+            "still reported, just not the value"
         );
 
         // ── Flow: Little's Law over the window.
@@ -361,6 +395,24 @@ async fn the_flow_gauges_publish_only_what_may_be_published() {
             .find(|row| row.pathway_pid == pathway)
             .expect("the pathway is exported once its cohort clears the floor");
         assert_eq!(row.instances, 5);
+
+        // The same floor, generalised (spec T-14k): once this cohort
+        // reaches 5, both TBA cohort endpoints stop suppressing too —
+        // one shared decision (`suppression::is_suppressed`), not two
+        // floors that could drift apart.
+        let cohort: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/time-analysis"))
+            .await
+            .json();
+        assert_eq!(cohort["suppressed"], false);
+        assert!(!cohort["cohort"]["lead_time"].is_null());
+
+        let constraints: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/constraints"))
+            .await
+            .json();
+        assert_eq!(constraints["suppressed"], false);
+        assert!(constraints["findings"].is_array());
 
         // The gauges carry it, labelled by pid — never by name, which a
         // rename would fork.
