@@ -17,9 +17,12 @@ use uuid::Uuid;
 use crate::analytics;
 use crate::auth::MaybeAuthUser;
 use crate::instances as rules;
-use crate::models::_entities::{instance_segments, instance_steps, pathway_instances};
+use crate::models::_entities::{
+    instance_events, instance_segments, instance_steps, pathway_instances,
+};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
+use crate::split;
 use crate::suppression;
 use crate::tba;
 use crate::variants;
@@ -499,6 +502,22 @@ pub(crate) struct CohortQuery {
     /// (`survival.discontinued`) rather than silently applied.
     #[serde(default)]
     discontinued: Option<String>,
+    /// A comma-separated list of `type:value` predicates every
+    /// matched instance must satisfy (spec T-14f); see
+    /// [`rules::Predicate`] for the closed-where-possible vocabulary.
+    /// Absent (with `excludes`) reproduces today's unsplit cohort.
+    #[serde(default)]
+    contains: Option<String>,
+    /// A comma-separated list of `type:value` predicates no matched
+    /// instance may satisfy (spec T-14f).
+    #[serde(default)]
+    excludes: Option<String>,
+    /// Return the complement side's figures too, alongside the
+    /// matched side (spec T-14f). Ignored (no `split` block at all)
+    /// when `contains`/`excludes` are both absent — there is nothing
+    /// to compare.
+    #[serde(default)]
+    compare: Option<bool>,
 }
 
 /// Load a pathway's instances, filtered by the query's status lens.
@@ -555,6 +574,336 @@ pub(crate) async fn analyze_cohort(
             tba::analyze(resolve_clock(instance, as_of_ms), segments, as_of_ms)
         })
         .collect())
+}
+
+/// Bulk-load each instance's [`split::Features`] for a rule-based
+/// cohort split (spec T-14f), in the same order as `instances` — one
+/// bounded query per source (segments, steps, events), no team-role
+/// lookup (unlike [`crate::controllers::exports::load_event_log_inputs`],
+/// which this deliberately does not reuse: rule matching needs no
+/// actor/location data, only the same source rows).
+async fn load_features(
+    ctx: &AppContext,
+    template: &PathwayModel,
+    instances: &[pathway_instances::Model],
+) -> Result<Vec<split::Features>> {
+    if instances.is_empty() {
+        return Ok(Vec::new());
+    }
+    let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
+
+    let segment_rows = instance_segments::Entity::find()
+        .filter(instance_segments::Column::InstancePid.is_in(pids.clone()))
+        .all(&ctx.db)
+        .await?;
+    let mut segments: std::collections::HashMap<Uuid, Vec<analytics::SegmentInput>> =
+        std::collections::HashMap::new();
+    for row in &segment_rows {
+        segments
+            .entry(row.instance_pid)
+            .or_default()
+            .push(analytics::SegmentInput {
+                stage: row.stage.clone(),
+                category: row.category.clone(),
+                waste: row.waste.clone(),
+                start_ms: ms(row.started_at),
+                end_ms: row.ended_at.map(ms),
+                actor_ref: row.actor_ref.clone(),
+                location_ref: row.location_ref.clone(),
+            });
+    }
+
+    let step_rows = instance_steps::Entity::find()
+        .filter(instance_steps::Column::InstancePid.is_in(pids.clone()))
+        .all(&ctx.db)
+        .await?;
+    let mut steps: std::collections::HashMap<Uuid, Vec<analytics::StepInput>> =
+        std::collections::HashMap::new();
+    for row in &step_rows {
+        steps
+            .entry(row.instance_pid)
+            .or_default()
+            .push(analytics::StepInput {
+                label: row.label.clone(),
+                done_at_ms: row.done_on.map(date_ms),
+            });
+    }
+
+    let event_rows = instance_events::Entity::find()
+        .filter(instance_events::Column::InstancePid.is_in(pids))
+        .all(&ctx.db)
+        .await?;
+    let mut events: std::collections::HashMap<Uuid, Vec<analytics::EventInput>> =
+        std::collections::HashMap::new();
+    for row in &event_rows {
+        events
+            .entry(row.instance_pid)
+            .or_default()
+            .push(analytics::EventInput {
+                kind: row.kind.clone(),
+                occurred_at_ms: ms(row.occurred_at),
+            });
+    }
+
+    let pathway_dto = template.to_pathway()?;
+    let care_setting = super::exports::care_setting_string(&pathway_dto);
+
+    Ok(instances
+        .iter()
+        .map(|instance| {
+            let case_ctx = analytics::CaseContext {
+                case_id: instance.pid.to_string(),
+                pathway_pid: template.pid.to_string(),
+                care_setting: care_setting.clone(),
+                urgency: instance.urgency.clone(),
+                status: instance.status.clone(),
+                outcome: instance.outcome.clone(),
+            };
+            split::features_of(
+                &case_ctx,
+                segments
+                    .get(&instance.pid)
+                    .map_or::<&[analytics::SegmentInput], _>(&[], Vec::as_slice),
+                steps
+                    .get(&instance.pid)
+                    .map_or::<&[analytics::StepInput], _>(&[], Vec::as_slice),
+                events
+                    .get(&instance.pid)
+                    .map_or::<&[analytics::EventInput], _>(&[], Vec::as_slice),
+            )
+        })
+        .collect())
+}
+
+/// Parse the query's `contains=`/`excludes=` into a [`split::Rule`],
+/// `422`-refusing a malformed or unrecognised predicate rather than
+/// silently matching nothing (spec T-14f).
+fn resolve_rule(query: &CohortQuery) -> Result<split::Rule> {
+    split::Rule::parse(query.contains.as_deref(), query.excludes.as_deref())
+        .map_err(|reason| refuse(&reason))
+}
+
+/// A resolved rule-based cohort split (spec T-14f): each side's own
+/// `instances`/`analyses` slice, and whether each side's *detail*
+/// should render — decided once from [`split::split_table`] so
+/// `time-analysis` and `constraints` can never disagree on which side
+/// is protected.
+struct SplitPlan {
+    compare: bool,
+    matched_instances: Vec<pathway_instances::Model>,
+    matched_analyses: Vec<tba::InstanceAnalysis>,
+    matched_detail_suppressed: bool,
+    complement_instances: Vec<pathway_instances::Model>,
+    complement_analyses: Vec<tba::InstanceAnalysis>,
+    complement_detail_suppressed: bool,
+}
+
+/// Build the split plan for one cohort request (spec T-14f), or
+/// `None` when there is nothing to split: the query names neither
+/// `contains=` nor `excludes=` (the identity rule — today's unsplit
+/// response, unchanged), or the *unsplit* cohort is already below the
+/// suppression floor, in which case a breakdown of an already-too-small
+/// cohort would disclose more, not less, so it is skipped rather than
+/// attempted.
+async fn resolve_split(
+    ctx: &AppContext,
+    template: &PathwayModel,
+    instances: &[pathway_instances::Model],
+    analyses: &[tba::InstanceAnalysis],
+    unsplit_suppressed: bool,
+    query: &CohortQuery,
+) -> Result<Option<SplitPlan>> {
+    let rule = resolve_rule(query)?;
+    if rule.is_identity() || unsplit_suppressed {
+        return Ok(None);
+    }
+    let features = load_features(ctx, template, instances).await?;
+    let (matched_idx, complement_idx) = split::partition(&rule, &features);
+    let pick = |indices: &[usize]| -> (Vec<pathway_instances::Model>, Vec<tba::InstanceAnalysis>) {
+        indices
+            .iter()
+            .map(|&i| (instances[i].clone(), analyses[i].clone()))
+            .unzip()
+    };
+    let (matched_instances, matched_analyses) = pick(&matched_idx);
+    let (complement_instances, complement_analyses) = pick(&complement_idx);
+
+    let compare = query.compare.unwrap_or(false);
+    let (matched_detail_suppressed, complement_detail_suppressed) = if compare {
+        // The complement is about to be shown too, so a suppressed
+        // matched side's sums (by_stage, by_waste, …) would be exactly
+        // `unsplit - complement` unless the complement's detail is
+        // withheld as well (spec T-14k) — decide() applies that
+        // recruitment automatically over the two published counts.
+        let table = split::split_table(matched_instances.len(), complement_instances.len());
+        let suppressed = suppression::decide(&table, suppression::min_cell_count());
+        (suppressed.contains(&0), suppressed.contains(&1))
+    } else {
+        // The complement is never shown at all, so there is nothing
+        // to difference against — only the matched side's own count
+        // governs its own detail.
+        (suppression::is_suppressed(matched_instances.len()), false)
+    };
+
+    Ok(Some(SplitPlan {
+        compare,
+        matched_instances,
+        matched_analyses,
+        matched_detail_suppressed,
+        complement_instances,
+        complement_analyses,
+        complement_detail_suppressed,
+    }))
+}
+
+/// One split side's `time-analysis`-shaped payload: the same
+/// `cohort`/`compliance`/`survival` blocks the unsplit response
+/// already carries, or all three withheld together when this side's
+/// own detail is suppressed.
+fn split_side_payload(
+    instances: &[pathway_instances::Model],
+    analyses: &[tba::InstanceAnalysis],
+    detail_suppressed: bool,
+    mode: suppression::Mode,
+    query: &CohortQuery,
+) -> Result<serde_json::Value> {
+    let n = instances.len();
+    if !detail_suppressed {
+        let summary = tba::cohort(analyses);
+        let compliance = score_compliance(analyses, query)?;
+        let survival = survival_analysis(instances, analyses, query)?;
+        return Ok(serde_json::json!({
+            "instances": n,
+            "suppressed": false,
+            "suppression_note": serde_json::Value::Null,
+            "cohort": summary,
+            "compliance": compliance,
+            "survival": survival,
+        }));
+    }
+    let mut value = serde_json::json!({
+        "instances": n,
+        "suppressed": true,
+        "suppression_note": suppression::SUPPRESSED_REASON,
+        "cohort": serde_json::Value::Null,
+        "compliance": serde_json::Value::Null,
+        "survival": serde_json::Value::Null,
+    });
+    if mode == suppression::Mode::Remove
+        && let Some(map) = value.as_object_mut()
+    {
+        map.remove("cohort");
+        map.remove("compliance");
+        map.remove("survival");
+    }
+    Ok(value)
+}
+
+/// The `type:value` tokens in a raw `contains=`/`excludes=` value, for
+/// echoing back verbatim (each token already validated during
+/// [`resolve_rule`], so this is display only, not a second parse).
+fn echo_tokens(raw: Option<&str>) -> Vec<&str> {
+    raw.map(|raw| {
+        raw.split(',')
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .collect()
+    })
+    .unwrap_or_default()
+}
+
+/// The whole `split` block for a `time-analysis` response (spec
+/// T-14f): the rule echoed back, the matched side's payload, and the
+/// complement's alongside it only when `?compare=true`.
+fn split_payload(
+    plan: &SplitPlan,
+    mode: suppression::Mode,
+    query: &CohortQuery,
+) -> Result<serde_json::Value> {
+    let matched = split_side_payload(
+        &plan.matched_instances,
+        &plan.matched_analyses,
+        plan.matched_detail_suppressed,
+        mode,
+        query,
+    )?;
+    let complement = if plan.compare {
+        Some(split_side_payload(
+            &plan.complement_instances,
+            &plan.complement_analyses,
+            plan.complement_detail_suppressed,
+            mode,
+            query,
+        )?)
+    } else {
+        None
+    };
+    Ok(serde_json::json!({
+        "rule": {
+            "contains": echo_tokens(query.contains.as_deref()),
+            "excludes": echo_tokens(query.excludes.as_deref()),
+        },
+        "matched": matched,
+        "complement": complement,
+    }))
+}
+
+/// One split side's `constraints`-shaped payload: the same `findings`
+/// block the unsplit response already carries, or withheld when this
+/// side's own detail is suppressed. Infallible, unlike
+/// [`split_side_payload`] — findings need no standard lookup.
+fn split_side_findings(
+    analyses: &[tba::InstanceAnalysis],
+    detail_suppressed: bool,
+    mode: suppression::Mode,
+) -> serde_json::Value {
+    let n = analyses.len();
+    if !detail_suppressed {
+        let summary = tba::cohort(analyses);
+        let findings = tba::constraints(analyses, &summary);
+        return serde_json::json!({
+            "instances": n,
+            "suppressed": false,
+            "suppression_note": serde_json::Value::Null,
+            "findings": findings,
+        });
+    }
+    let mut value = serde_json::json!({
+        "instances": n,
+        "suppressed": true,
+        "suppression_note": suppression::SUPPRESSED_REASON,
+        "findings": serde_json::Value::Null,
+    });
+    if mode == suppression::Mode::Remove
+        && let Some(map) = value.as_object_mut()
+    {
+        map.remove("findings");
+    }
+    value
+}
+
+/// The whole `split` block for a `constraints` response (spec T-14f).
+fn split_payload_constraints(
+    plan: &SplitPlan,
+    mode: suppression::Mode,
+    query: &CohortQuery,
+) -> serde_json::Value {
+    let matched = split_side_findings(&plan.matched_analyses, plan.matched_detail_suppressed, mode);
+    let complement = plan.compare.then(|| {
+        split_side_findings(
+            &plan.complement_analyses,
+            plan.complement_detail_suppressed,
+            mode,
+        )
+    });
+    serde_json::json!({
+        "rule": {
+            "contains": echo_tokens(query.contains.as_deref()),
+            "excludes": echo_tokens(query.excludes.as_deref()),
+        },
+        "matched": matched,
+        "complement": complement,
+    })
 }
 
 /// Look up the query's named standard, `422`-refusing an unrecognised
@@ -858,6 +1207,17 @@ async fn cohort_time_analysis(
             }
         }
     }
+
+    // Rule-based cohort split (spec T-14f): absent unless the query
+    // names `contains=`/`excludes=` and the unsplit cohort itself
+    // clears the floor (see resolve_split's own doc for why).
+    if let Some(plan) =
+        resolve_split(&ctx, &template, &instances, &analyses, suppressed, &query).await?
+        && let Some(map) = response.as_object_mut()
+    {
+        map.insert("split".to_string(), split_payload(&plan, mode, &query)?);
+    }
+
     format::json(response)
 }
 
@@ -908,6 +1268,19 @@ async fn cohort_constraints(
             }
         }
     }
+
+    // Rule-based cohort split (spec T-14f) — same precondition and
+    // suppression decision as `cohort_time_analysis`'s own split.
+    if let Some(plan) =
+        resolve_split(&ctx, &template, &instances, &analyses, suppressed, &query).await?
+        && let Some(map) = body.as_object_mut()
+    {
+        map.insert(
+            "split".to_string(),
+            split_payload_constraints(&plan, mode, &query),
+        );
+    }
+
     format::json(body)
 }
 

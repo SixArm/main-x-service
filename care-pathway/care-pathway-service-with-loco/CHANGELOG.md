@@ -9,6 +9,76 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14f: rule-based cohort splits and the paired comparison (2026-09-11)
+
+`?contains=`/`?excludes=`/`?compare=` on cohort `time-analysis` and
+`constraints`: split a cohort by a predicate rule and, optionally,
+report the complement alongside it, in the same shape the unsplit
+response already carries.
+
+- New `src/split.rs` (named `split`, not `rules` — `crate::instances`
+  is already aliased `rules` throughout the controller layer):
+  `Predicate` (parses `type:value`, validating against a closed
+  vocabulary where one exists — `tba::STAGES`/`WASTES`,
+  `instances::URGENCY_LEVELS`/`OUTCOMES`/`EVENT_KINDS` — and accepting
+  any string for `step`/`setting`, which are free-form), `Features`
+  (built from the same `analytics::SegmentInput`/`StepInput`/
+  `EventInput` rows T-14a's event-log codec already loads), `Rule`
+  (`contains` is AND, `excludes` is none-of; naming neither is the
+  identity rule), `partition`, and `split_table` — **the first real
+  caller of T-14k's own `suppression::Table`/`decide` primitive**,
+  which had stood ready but unused since T-14k landed.
+- `src/controllers/tba.rs`: `load_features` (three bounded queries:
+  segments, steps, events — no team-role lookup, unlike T-14a's
+  four-query loader), `resolve_rule` (`422` on a malformed or
+  unrecognised predicate), `SplitPlan`/`resolve_split` (partitions the
+  cohort; decides per-side detail suppression via `split_table` when
+  `compare=true`), `split_payload`/`split_payload_constraints`. Wired
+  into `GET /api/care-pathways/{pathway}/time-analysis` and
+  `.../constraints` as a new `split` key — absent entirely, never a
+  `null` placeholder, when the query names neither `contains=` nor
+  `excludes=`, or when the *unsplit* cohort is itself already below
+  the suppression floor.
+- **The bare instance count is never withheld, only detail is**
+  (matching this family's existing scalar-suppression convention).
+  `split.matched.instances`/`split.complement.instances` are always
+  published; `decide()`'s verdict on the two-cell table governs only
+  whether that side's `cohort`/`compliance`/`survival` (or `findings`)
+  render. This still closes a real gap: those blocks carry additive
+  sums (`by_stage`, `by_waste`) that would let a withheld side's sums
+  be recovered as `unsplit − complement` if the complement's own sums
+  stayed visible otherwise.
+- **Deviation, disclosed:** only `time-analysis` and `constraints`
+  accept the new parameters. `process-map` and `variants` already
+  carry their own, differently-shaped suppression (per node/edge; per
+  variant) and their own notion of "compare" would need its own design
+  pass, so wiring the same contract onto them is a documented
+  follow-up, not attempted here. `data-quality` (T-14h) does not exist
+  yet either.
+- `setting:<s>` compares against the pathway's *lowercased* care
+  setting (`controllers::exports::care_setting_string`, made
+  `pub(crate)` and reused rather than duplicated) —
+  `"Outpatient"` → `setting:outpatient` — confirmed by reading the
+  existing derivation, not guessed.
+- Tests: 8 new pure `src/split.rs` unit tests (predicate
+  parsing/rejection against each closed vocabulary, the identity rule,
+  contains-is-AND/excludes-is-none-of, the partition's
+  sum-and-exactly-once invariant, and `split_table` under all three
+  suppression shapes, reusing `suppression::decide` directly rather
+  than re-testing its own property tests) (`cargo test --lib`: 398, up
+  from 390). Two DB-gated round trips
+  (`tests/requests/tba.rs`'s `rule_based_cohort_split_round_trip` and
+  `_suppression_round_trip`) prove the sum invariant, determinism
+  under a repeated identical filter, no `split` key without a filter,
+  a `422` on a malformed predicate, and — the core T-14k scenario — a
+  lone 2-instance matched side recruiting a 6-instance complement that
+  would otherwise individually clear the floor, all against real
+  Postgres.
+- Verified clean: `cargo fmt --check`, `cargo clippy --all-targets --
+  -D warnings`, `cargo test --lib`, the DB-gated suite, `cargo +1.96
+  check --all-targets` (MSRV), `cargo deny check`, `cargo bench
+  --no-run`.
+
 ### Added — T-14e: censoring-aware cohort statistics (2026-09-10)
 
 A Kaplan–Meier survival estimate over cohort time-analysis, treating
