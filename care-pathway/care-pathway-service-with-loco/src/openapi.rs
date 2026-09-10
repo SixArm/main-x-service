@@ -377,7 +377,7 @@ fn tba_analysis_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "Per-instance time-based analysis",
-                "description": "Lead time, value time, process time, touch time, the value-adding ratio, and coverage. The denominator is elapsed calendar time, never the sum of recorded activity, so unrecorded time counts as non-value-adding; coverage_ratio and confidence say how much of the journey was mapped at all.",
+                "description": "Lead time, value time, process time, touch time, the value-adding ratio, and coverage. The denominator is elapsed calendar time, never the sum of recorded activity, so unrecorded time counts as non-value-adding; coverage_ratio and confidence say how much of the journey was mapped at all. `anchors` (T-14d) is this instance's first-reached timestamp per stage (null if never reached); `delays` is the elapsed time between each adjacent pair of stages, with a `reason` when either side was never reached.",
                 "parameters": [instance_pid],
                 "responses": { "200": { "description": "Analysis" }, "404": { "description": "Unknown instance" } }
             }
@@ -406,7 +406,7 @@ fn tba_analysis_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "The access-standard catalogue and segment vocabularies",
-                "description": "NHS access standards with thresholds, operational targets, authority and citation date; plus the closed stage / category / waste vocabularies. Reference data, not an assertion that a pathway is subject to any of them.",
+                "description": "NHS access standards with thresholds, operational targets, authority and citation date, and (T-14d) an optional from_anchor/to_anchor pair naming the two stages the standard actually measures between (null/null for a whole-clock standard); plus the closed stage / category / waste vocabularies. Reference data, not an assertion that a pathway is subject to any of them.",
                 "responses": { "200": { "description": "Standards" } }
             }
         },
@@ -414,13 +414,15 @@ fn tba_analysis_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "Cohort time-based analysis for one pathway",
-                "description": "Nearest-rank lead-time percentiles, aggregate and median value-adding ratio, and compliance against a named standard. A cohort smaller than the deployment's minimum cell count (default five, configurable upward only) withholds percentile detail, which would otherwise identify an individual journey.",
+                "description": "Nearest-rank lead-time percentiles, aggregate and median value-adding ratio, and compliance against a named standard. A cohort smaller than the deployment's minimum cell count (default five, configurable upward only) withholds percentile detail, which would otherwise identify an individual journey. `from_anchor`/`to_anchor` (T-14d) score each instance's own interval between two named stages instead of the whole clock; an instance that never reaches the pair counts as `compliance.unreached` (excluded from within/breached, but disclosed) rather than a breach. Naming only one of the pair, or a name that is not a recognised stage, falls back to the whole-clock score with `compliance.anchor_note` disclosing why, rather than silently approximating. A standard may declare its own anchor in the catalogue (`cancer_fds_28_days` scores referral -> diagnostics with no anchor query at all); an explicit query pair always overrides it, and every other standard stays whole-clock exactly as before.",
                 "parameters": [
                     { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
                     { "name": "standard", "in": "query", "schema": { "type": "string", "example": "rtt_18_weeks" } },
                     { "name": "target_days", "in": "query", "schema": { "type": "number" } },
                     { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } },
-                    { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["withhold", "remove"], "default": "withhold" }, "description": "How a suppressed cohort's detail renders: withhold (default, null + reason) or remove (drop the key)." }
+                    { "name": "mode", "in": "query", "schema": { "type": "string", "enum": ["withhold", "remove"], "default": "withhold" }, "description": "How a suppressed cohort's detail renders: withhold (default, null + reason) or remove (drop the key)." },
+                    { "name": "from_anchor", "in": "query", "schema": { "type": "string", "example": "referral" }, "description": "A stage (see time-standards) to anchor the compliance interval's start on. Requires to_anchor." },
+                    { "name": "to_anchor", "in": "query", "schema": { "type": "string", "example": "diagnostics" }, "description": "The stage to anchor the compliance interval's end on. Requires from_anchor; need not be adjacent to it." }
                 ],
                 "responses": {
                     "200": { "description": "Cohort analysis" },
@@ -525,7 +527,7 @@ fn export_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "Bulk journey-feature export (T-14a)",
-                "description": "One row per instance: LT/VT/PT/%A/%VA/coverage/#HO, per-stage durations, gap count, censored (the clock is still running), and case attributes. variant/anchors_delays/conformance columns are always null pending T-14c/T-14d/T-14i. Gated and audited exactly as the event-log export; not suppressed, for the same reason.",
+                "description": "One row per instance: LT/VT/PT/%A/%VA/coverage/#HO, per-stage durations, gap count, censored (the clock is still running), and case attributes. anchors_delays (T-14d) is a JSON-encoded {anchors, delays} cell derived from the same instance analysis; variant/conformance columns are still always null pending T-14c's/T-14i's own row-wiring. Gated and audited exactly as the event-log export; not suppressed, for the same reason.",
                 "parameters": [
                     { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
                     { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["csv", "jsonl"], "default": "jsonl" } },

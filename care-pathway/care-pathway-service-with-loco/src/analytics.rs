@@ -14,11 +14,17 @@
 //! conventions (`case_id`, `activity_id`, `lifecycle_id`, `timestamp`,
 //! `resource_id`) that this module's column names deliberately echo.
 //!
-//! Three sibling tasks this module's acceptance criterion cites are not
-//! yet built — T-14c (journey variants), T-14d (anchors/delays), T-14i
-//! (conformance) — so [`JourneyFeatureRow`] carries their columns as
-//! `None` with a documented reason rather than silently omitting them or
-//! blocking this task on theirs (see each field's doc comment).
+//! Three sibling tasks this module's acceptance criterion cites were not
+//! yet built when this module landed — T-14c (journey variants), T-14d
+//! (anchors/delays), T-14i (conformance) — so [`JourneyFeatureRow`]
+//! reserved their columns from day one, `None` with a documented reason
+//! rather than silently omitting them or blocking this task on theirs
+//! (see each field's doc comment). T-14d has since landed and is wired:
+//! `anchors_delays` is computed straight from the same
+//! `tba::InstanceAnalysis` this row already builds from — no per-row
+//! cohort context needed, unlike `variant` (T-14c, landed but still
+//! unwired — a variant string needs the whole cohort's pipeline, not
+//! one instance in isolation) and `conformance` (T-14i, not yet built).
 //!
 //! **Directly-follows process map** (spec T-14b) — [`ActivityStep`],
 //! [`build_process_map`] — lives here too, alongside the event-log
@@ -208,8 +214,14 @@ pub struct JourneyFeatureRow {
     /// documented gap, not a silently-empty string — until that task
     /// lands a variant string to carry here.
     pub variant: Option<String>,
-    /// T-14d (stage anchors and delay decomposition) is not yet built.
-    /// Always `None`, for the same reason as `variant`.
+    /// This instance's stage anchors and adjacent-pair delays (T-14d),
+    /// JSON-encoded in one cell (`{"anchors": […], "delays": […]}`) per
+    /// the family's CSV nested-value convention
+    /// (`agents/share/bulk-import-export.md` §5) — `Some` for every row,
+    /// since [`tba::anchors`]/[`tba::delays`] always return one entry
+    /// per [`tba::STAGES`]/adjacent pair, `None` values and all.
+    /// `None` only if the JSON encoding itself somehow fails, which no
+    /// value these types can hold is expected to trigger.
     pub anchors_delays: Option<String>,
     /// T-14i (conformance to the enrolled template) is not yet built.
     /// Always `None`, for the same reason as `variant`.
@@ -368,7 +380,11 @@ pub fn journey_feature_row(
         censored: analysis.clock.running,
         by_stage_ms,
         variant: None,
-        anchors_delays: None,
+        anchors_delays: serde_json::to_string(&serde_json::json!({
+            "anchors": analysis.anchors,
+            "delays": analysis.delays,
+        }))
+        .ok(),
         conformance: None,
     }
 }
@@ -992,9 +1008,9 @@ mod tests {
     }
 
     /// `journey_feature_row` builds directly from an `InstanceAnalysis`,
-    /// carries `censored` from `clock.running`, and defers the
-    /// not-yet-built T-14c/d/i columns as `None` rather than omitting or
-    /// fabricating them.
+    /// carries `censored` from `clock.running`, defers the still-unwired
+    /// T-14c/i columns as `None` rather than omitting or fabricating
+    /// them, and (T-14d) wires `anchors_delays` from the same analysis.
     #[test]
     fn journey_feature_row_derives_from_the_analysis() {
         let ctx = ctx();
@@ -1010,9 +1026,27 @@ mod tests {
             None,
             "no segment in this stage"
         );
-        assert_eq!(row.variant, None);
-        assert_eq!(row.anchors_delays, None);
-        assert_eq!(row.conformance, None);
+        assert_eq!(row.variant, None, "T-14c is landed but not yet wired here");
+        assert_eq!(row.conformance, None, "T-14i is not yet built");
+        let anchors_delays: serde_json::Value =
+            serde_json::from_str(row.anchors_delays.as_deref().expect("T-14d is wired"))
+                .expect("valid JSON");
+        assert_eq!(
+            anchors_delays["anchors"]
+                .as_array()
+                .expect("anchors array")
+                .len(),
+            tba::STAGES.len(),
+            "one anchor per STAGES entry, reached or not"
+        );
+        assert_eq!(
+            anchors_delays["delays"]
+                .as_array()
+                .expect("delays array")
+                .len(),
+            tba::STAGES.len() - 1,
+            "one delay per adjacent STAGES pair"
+        );
     }
 
     /// Every `tba::STAGES` entry gets its own CSV column, in order, even

@@ -473,6 +473,13 @@ pub struct InstanceAnalysis {
     pub gaps: Vec<Gap>,
     /// Why the analysis is null, when the clock is unmeasurable.
     pub reason: Option<String>,
+    /// First-reached timestamp per `STAGES` entry (spec T-14d), from
+    /// the *raw* segments, not clipped to the clock window — an anchor
+    /// names when the patient reached that stage, whether or not the
+    /// clock had started yet.
+    pub anchors: Vec<StageAnchor>,
+    /// Adjacent-pair delays derived from `anchors` (spec T-14d).
+    pub delays: Vec<Delay>,
 }
 
 /// Milliseconds as days, rounded to three places for display.
@@ -480,6 +487,98 @@ pub struct InstanceAnalysis {
 #[allow(clippy::cast_precision_loss)] // display only
 pub fn as_days(ms: i64) -> f64 {
     (ms as f64 / DAY_MS as f64 * 1000.0).round() / 1000.0
+}
+
+/// One stage's first-reached timestamp (spec T-14d).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct StageAnchor {
+    /// One of [`STAGES`].
+    pub stage: String,
+    /// The earliest `start_ms` recorded for this stage, from the raw
+    /// segments (not clipped to the clock); `None` if the stage was
+    /// never recorded at all.
+    pub first_started_at_ms: Option<i64>,
+}
+
+/// First `started_at` of each [`STAGES`] entry, in stage-vocabulary
+/// order — spec T-14d.
+#[must_use]
+pub fn anchors(segments: &[Segment]) -> Vec<StageAnchor> {
+    STAGES
+        .iter()
+        .map(|stage| StageAnchor {
+            stage: (*stage).to_string(),
+            first_started_at_ms: segments
+                .iter()
+                .filter(|segment| segment.stage == *stage)
+                .map(|segment| segment.start_ms)
+                .min(),
+        })
+        .collect()
+}
+
+/// The delay between one adjacent pair of stages (spec T-14d): IPPA's
+/// waiting → evaluating → detecting → treating, in this crate's own
+/// `STAGES` vocabulary.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Delay {
+    /// The earlier stage.
+    pub from_stage: String,
+    /// The later stage.
+    pub to_stage: String,
+    /// `to`'s anchor minus `from`'s anchor, when both are present.
+    pub delay_ms: Option<i64>,
+    /// Why `delay_ms` is `None` — which anchor is unreached.
+    pub reason: Option<&'static str>,
+}
+
+/// Every adjacent-pair delay implied by an already-built anchor list
+/// (spec T-14d) — `STAGES.len() - 1` entries, in stage-vocabulary
+/// order.
+#[must_use]
+pub fn delays(anchors: &[StageAnchor]) -> Vec<Delay> {
+    anchors
+        .windows(2)
+        .map(|pair| {
+            let (from, to) = (&pair[0], &pair[1]);
+            let delay_ms = match (from.first_started_at_ms, to.first_started_at_ms) {
+                (Some(f), Some(t)) => Some((t - f).max(0)),
+                _ => None,
+            };
+            let reason = delay_ms.is_none().then(|| {
+                if from.first_started_at_ms.is_none() {
+                    "from_stage_unreached"
+                } else {
+                    "to_stage_unreached"
+                }
+            });
+            Delay {
+                from_stage: from.stage.clone(),
+                to_stage: to.stage.clone(),
+                delay_ms,
+                reason,
+            }
+        })
+        .collect()
+}
+
+/// The elapsed time between two named stage anchors — not necessarily
+/// adjacent in [`STAGES`] (e.g. `referral` to `treatment`, skipping
+/// `triage`/`diagnostics`), unlike [`delays`], which only ever reports
+/// adjacent pairs. `None` if either stage was never reached. Clamped at
+/// zero so an out-of-order pair (the `to_stage` anchored earlier than the
+/// `from_stage`) reads as "no delay", never as a negative duration.
+#[must_use]
+pub fn anchor_interval(anchors: &[StageAnchor], from_stage: &str, to_stage: &str) -> Option<i64> {
+    let from_ms = anchors
+        .iter()
+        .find(|a| a.stage == from_stage)?
+        .first_started_at_ms?;
+    let to_ms = anchors
+        .iter()
+        .find(|a| a.stage == to_stage)?
+        .first_started_at_ms?;
+    Some((to_ms - from_ms).max(0))
 }
 
 /// Analyse one instance (spec §6).
@@ -545,6 +644,9 @@ pub fn analyze(clock: Clock, segments: &[Segment], as_of_ms: i64) -> InstanceAna
     let mut gaps_ranked = gaps;
     gaps_ranked.sort_by_key(|g| std::cmp::Reverse(g.duration_ms));
 
+    let stage_anchors = anchors(segments);
+    let stage_delays = delays(&stage_anchors);
+
     InstanceAnalysis {
         clock,
         lead_time_ms: lead,
@@ -567,6 +669,8 @@ pub fn analyze(clock: Clock, segments: &[Segment], as_of_ms: i64) -> InstanceAna
         gaps: gaps_ranked,
         reason: (!clock.is_measurable())
             .then(|| "clock stop is at or before clock start; no ratio is defined".to_string()),
+        anchors: stage_anchors,
+        delays: stage_delays,
     }
 }
 
@@ -864,6 +968,15 @@ pub struct Standard {
     pub as_of: &'static str,
     /// Anything a reader needs in order not to misapply it.
     pub note: &'static str,
+    /// The anchor the threshold is measured *from* (spec T-14d) — one
+    /// of [`STAGES`], or `None` for whole-clock (today's behaviour,
+    /// and every catalogue entry's own default: adding this mechanism
+    /// must not change any existing entry's default scoring, a
+    /// regression pin the request test proves).
+    pub from_anchor: Option<&'static str>,
+    /// The anchor the threshold is measured *to*. `None` for
+    /// whole-clock. Present iff `from_anchor` is.
+    pub to_anchor: Option<&'static str>,
 }
 
 /// The catalogue of named standards (spec §7.3). Reference data with a
@@ -879,6 +992,8 @@ pub const STANDARDS: &[Standard] = &[
         as_of: "2026-08",
         note: "18 weeks. The clock stops at first definitive treatment, not at \
                a diagnostic or an outpatient appointment.",
+        from_anchor: None,
+        to_anchor: None,
     },
     Standard {
         id: "cancer_fds_28_days",
@@ -889,6 +1004,11 @@ pub const STANDARDS: &[Standard] = &[
         as_of: "2026-08",
         note: "Diagnosis given or cancer ruled out within 28 days of referral. \
                Target rose from 75% to 80% in March 2026.",
+        // T-14d's own literal acceptance example: this standard names
+        // referral -> diagnostics, not the whole clock, so it is the
+        // one catalogue entry that declares a real anchor pair.
+        from_anchor: Some("referral"),
+        to_anchor: Some("diagnostics"),
     },
     Standard {
         id: "cancer_31_days",
@@ -898,6 +1018,8 @@ pub const STANDARDS: &[Standard] = &[
         authority: "NHS England",
         as_of: "2026-08",
         note: "Measured from the decision to treat, not from referral.",
+        from_anchor: None,
+        to_anchor: None,
     },
     Standard {
         id: "cancer_62_days",
@@ -908,6 +1030,8 @@ pub const STANDARDS: &[Standard] = &[
         as_of: "2026-08",
         note: "An interim 70% operational target has been used in planning \
                guidance while recovery continues.",
+        from_anchor: None,
+        to_anchor: None,
     },
     Standard {
         id: "diagnostics_6_weeks",
@@ -918,6 +1042,8 @@ pub const STANDARDS: &[Standard] = &[
         as_of: "2026-08",
         note: "Expressed nationally as the share waiting *over* 6 weeks \
                (1% by 2028/29); inverted here for comparability.",
+        from_anchor: None,
+        to_anchor: None,
     },
     Standard {
         id: "ae_4_hours",
@@ -928,6 +1054,8 @@ pub const STANDARDS: &[Standard] = &[
         as_of: "2026-08",
         note: "85% by 2028/29, via 82% by March 2027. Hours, not days — which \
                is why every duration here is reported in milliseconds.",
+        from_anchor: None,
+        to_anchor: None,
     },
 ];
 
@@ -958,6 +1086,16 @@ pub struct Compliance {
     pub target_met: Option<bool>,
     /// When the threshold was last checked against its authority.
     pub as_of: Option<&'static str>,
+    /// Instances excluded from `within`/`breached` because the
+    /// anchored interval they would be scored on was never reached
+    /// (spec T-14d) — a **third verdict**, never compliant, never a
+    /// breach, disclosed as a count rather than silently dropped. `0`
+    /// for a whole-clock score, where nothing can be "unreached".
+    pub unreached: usize,
+    /// Set when a declared anchor names something [`STAGES`] cannot
+    /// express: the score fell back to whole-clock rather than
+    /// approximating, and this says why.
+    pub anchor_note: Option<String>,
 }
 
 /// Score a set of lead times against a threshold.
@@ -989,7 +1127,37 @@ pub fn compliance(
             _ => None,
         },
         as_of,
+        unreached: 0,
+        anchor_note: None,
     }
+}
+
+/// Score a cohort against a threshold over **anchored** intervals
+/// (spec T-14d) — the generalisation of [`compliance`] that adds the
+/// third verdict: an instance whose interval is `None` (either anchor
+/// unreached) is excluded from `within`/`breached`/`achieved_ratio`
+/// entirely and counted in the result's `unreached` field instead, never
+/// folded into `breached` (that would score "never got there" the
+/// same as "got there too slowly", which is a different finding).
+///
+/// Reduces to plain [`compliance`] when every interval is `Some` (the
+/// whole-clock case has no unreachable anchor to report).
+#[must_use]
+pub fn anchored_compliance(
+    intervals_ms: &[Option<i64>],
+    label: &str,
+    threshold_ms: i64,
+    target_ratio: Option<f64>,
+    as_of: Option<&'static str>,
+) -> Compliance {
+    let reached: Vec<i64> = intervals_ms
+        .iter()
+        .filter_map(|interval| *interval)
+        .collect();
+    let unreached = intervals_ms.len() - reached.len();
+    let mut result = compliance(&reached, label, threshold_ms, target_ratio, as_of);
+    result.unreached = unreached;
+    result
 }
 
 /// The cohort analysis (spec §7).
@@ -1893,7 +2061,44 @@ mod tests {
                 s.id
             );
             assert!(!s.as_of.is_empty(), "{} must carry a citation date", s.id);
+            // an anchor pair is both-or-neither: a one-sided declaration
+            // in the catalogue itself (unlike a malformed query) would
+            // be a bug in this file, not a caller error.
+            assert_eq!(
+                s.from_anchor.is_some(),
+                s.to_anchor.is_some(),
+                "{}: from_anchor/to_anchor must be both-or-neither",
+                s.id
+            );
+            // a declared anchor must name a real STAGES value.
+            for anchor in [s.from_anchor, s.to_anchor].into_iter().flatten() {
+                assert!(
+                    STAGES.contains(&anchor),
+                    "{}: `{anchor}` is not a STAGES value",
+                    s.id
+                );
+            }
         }
+        // T-14d regression pin: adding the anchor mechanism changes
+        // scoring only for the one standard that opts into it — every
+        // other catalogue entry stays whole-clock, exactly as before.
+        for s in STANDARDS {
+            let expect_anchored = s.id == "cancer_fds_28_days";
+            assert_eq!(
+                s.from_anchor.is_some(),
+                expect_anchored,
+                "{}: unexpected anchor declaration",
+                s.id
+            );
+        }
+        assert_eq!(
+            standard("cancer_fds_28_days").unwrap().from_anchor,
+            Some("referral")
+        );
+        assert_eq!(
+            standard("cancer_fds_28_days").unwrap().to_anchor,
+            Some("diagnostics")
+        );
         let rtt = standard("rtt_18_weeks").expect("rtt");
         assert_eq!(rtt.threshold_ms, 126 * DAY_MS, "18 weeks");
         let ae = standard("ae_4_hours").expect("ae");
@@ -1916,6 +2121,200 @@ mod tests {
         let empty = compliance(&[], "rtt_18_weeks", 126 * DAY_MS, Some(0.92), None);
         assert_eq!(empty.achieved_ratio, None);
         assert_eq!(empty.target_met, None, "no target verdict on no data");
+    }
+
+    // -- T-14d: stage anchors, delay decomposition, anchored standards ---
+
+    #[test]
+    fn anchors_report_first_reached_per_stage_null_if_never_reached() {
+        let segments = vec![
+            seg("referred", "referral", CATEGORY_VALUE_ADDING, 0, 2),
+            seg("triaged", "triage", CATEGORY_VALUE_ADDING, 2, 5),
+            seg("treated", "treatment", CATEGORY_VALUE_ADDING, 5, 10),
+        ];
+        let found = anchors(&segments);
+        let at = |stage: &str| {
+            found
+                .iter()
+                .find(|a| a.stage == stage)
+                .unwrap()
+                .first_started_at_ms
+        };
+        assert_eq!(at("referral"), Some(T0));
+        assert_eq!(at("triage"), Some(T0 + 2 * DAY_MS));
+        assert_eq!(at("treatment"), Some(T0 + 5 * DAY_MS));
+        assert_eq!(at("diagnostics"), None, "never visited");
+        assert_eq!(at("follow_up"), None);
+        assert_eq!(at("discharge"), None);
+        // every STAGES entry appears exactly once, in STAGES order.
+        assert_eq!(found.len(), STAGES.len());
+        for (a, stage) in found.iter().zip(STAGES.iter()) {
+            assert_eq!(a.stage, *stage);
+        }
+    }
+
+    #[test]
+    fn anchors_take_the_earliest_segment_when_a_stage_is_revisited() {
+        let segments = vec![
+            seg("relapse", "treatment", CATEGORY_VALUE_ADDING, 10, 12),
+            seg("first_treatment", "treatment", CATEGORY_VALUE_ADDING, 5, 8),
+        ];
+        let found = anchors(&segments);
+        let treatment = found.iter().find(|a| a.stage == "treatment").unwrap();
+        assert_eq!(
+            treatment.first_started_at_ms,
+            Some(T0 + 5 * DAY_MS),
+            "the earliest start wins, regardless of input order"
+        );
+    }
+
+    #[test]
+    fn delays_report_adjacent_pair_differences_with_a_reason_when_unreached() {
+        let segments = vec![
+            seg("referred", "referral", CATEGORY_VALUE_ADDING, 0, 1),
+            seg("triaged", "triage", CATEGORY_VALUE_ADDING, 3, 4),
+            // no diagnostics segment at all
+            seg("treated", "treatment", CATEGORY_VALUE_ADDING, 20, 25),
+        ];
+        let found = delays(&anchors(&segments));
+        let between = |from: &str, to: &str| {
+            found
+                .iter()
+                .find(|d| d.from_stage == from && d.to_stage == to)
+                .unwrap()
+        };
+
+        let referral_triage = between("referral", "triage");
+        assert_eq!(referral_triage.delay_ms, Some(3 * DAY_MS));
+        assert_eq!(referral_triage.reason, None, "both anchors reached");
+
+        let triage_diagnostics = between("triage", "diagnostics");
+        assert_eq!(triage_diagnostics.delay_ms, None);
+        assert_eq!(
+            triage_diagnostics.reason,
+            Some("to_stage_unreached"),
+            "diagnostics was never reached"
+        );
+
+        let diagnostics_treatment = between("diagnostics", "treatment");
+        assert_eq!(diagnostics_treatment.delay_ms, None);
+        assert_eq!(
+            diagnostics_treatment.reason,
+            Some("from_stage_unreached"),
+            "diagnostics (the from side) was never reached"
+        );
+
+        // adjacent pairs only: STAGES.len() stages ⇒ STAGES.len() - 1 delays.
+        assert_eq!(found.len(), STAGES.len() - 1);
+    }
+
+    #[test]
+    fn delays_never_go_negative_even_if_a_later_stage_starts_first() {
+        // an out-of-order journey (e.g. re-triage after treatment starts):
+        // the delay is clamped at zero rather than reported as negative.
+        let segments = vec![
+            seg("treated", "treatment", CATEGORY_VALUE_ADDING, 0, 5),
+            seg("triaged", "triage", CATEGORY_VALUE_ADDING, 10, 11),
+        ];
+        let found = delays(&anchors(&segments));
+        let triage_diagnostics = found
+            .iter()
+            .find(|d| d.from_stage == "triage" && d.to_stage == "diagnostics")
+            .unwrap();
+        assert_eq!(triage_diagnostics.delay_ms, None, "diagnostics unreached");
+
+        let referral_triage = found
+            .iter()
+            .find(|d| d.from_stage == "referral" && d.to_stage == "triage")
+            .unwrap();
+        assert_eq!(referral_triage.delay_ms, None, "referral unreached");
+    }
+
+    #[test]
+    fn anchor_interval_spans_non_adjacent_stages_and_clamps_out_of_order() {
+        let segments = vec![
+            seg("referred", "referral", CATEGORY_VALUE_ADDING, 0, 1),
+            seg("triaged", "triage", CATEGORY_VALUE_ADDING, 2, 3),
+            seg("scanned", "diagnostics", CATEGORY_VALUE_ADDING, 5, 6),
+            seg("treated", "treatment", CATEGORY_VALUE_ADDING, 12, 20),
+        ];
+        let found = anchors(&segments);
+
+        // referral -> treatment skips triage and diagnostics entirely;
+        // anchor_interval is not limited to adjacent STAGES pairs.
+        assert_eq!(
+            anchor_interval(&found, "referral", "treatment"),
+            Some(12 * DAY_MS)
+        );
+
+        // an out-of-order pair (the "to" stage anchored earlier than the
+        // "from" stage) clamps to zero rather than going negative.
+        assert_eq!(anchor_interval(&found, "treatment", "referral"), Some(0));
+
+        // an unrecognised stage name, or one never reached, is None.
+        assert_eq!(anchor_interval(&found, "referral", "not_a_stage"), None);
+        assert_eq!(anchor_interval(&found, "referral", "discharge"), None);
+    }
+
+    #[test]
+    fn anchored_compliance_scores_the_interval_and_reports_unreached() {
+        // The literal T-14d acceptance example: a referral -> diagnostics
+        // interval of 20 days, inside a 100-day clock, is compliant on a
+        // 28-day referral-to-diagnostics standard.
+        let compliant_instance = vec![
+            seg("referred", "referral", CATEGORY_VALUE_ADDING, 0, 1),
+            seg("scanned", "diagnostics", CATEGORY_VALUE_ADDING, 20, 21),
+        ];
+        let compliant_anchors = anchors(&compliant_instance);
+        let compliant_interval = anchor_interval(&compliant_anchors, "referral", "diagnostics");
+        assert_eq!(compliant_interval, Some(20 * DAY_MS));
+
+        // An instance that never reaches diagnostics at all.
+        let unreached_instance = vec![
+            seg("referred", "referral", CATEGORY_VALUE_ADDING, 0, 1),
+            seg("triaged", "triage", CATEGORY_VALUE_ADDING, 3, 4),
+        ];
+        let unreached_anchors = anchors(&unreached_instance);
+        let unreached_interval = anchor_interval(&unreached_anchors, "referral", "diagnostics");
+        assert_eq!(unreached_interval, None, "diagnostics never reached");
+
+        let intervals = [compliant_interval, unreached_interval];
+        let scored = anchored_compliance(
+            &intervals,
+            "referral_to_diagnostics_28_days",
+            28 * DAY_MS,
+            Some(1.0),
+            Some("2026-09-10"),
+        );
+        assert_eq!(scored.within, 1);
+        assert_eq!(scored.breached, 0);
+        assert_eq!(
+            scored.unreached, 1,
+            "excluded from numerator and denominator, but counted"
+        );
+        assert_eq!(
+            scored.achieved_ratio,
+            Some(1.0),
+            "1 of 1 *reached* instances met it"
+        );
+
+        // The whole-clock rtt_18_weeks standard is unaffected: both
+        // instances sit well inside a 100-day clock against a 126-day
+        // threshold, using the ordinary (non-anchored) compliance() path.
+        let whole_clock_leads = [100 * DAY_MS, 100 * DAY_MS];
+        let whole_clock = compliance(
+            &whole_clock_leads,
+            "rtt_18_weeks",
+            126 * DAY_MS,
+            Some(0.92),
+            Some("2026-08"),
+        );
+        assert_eq!(whole_clock.within, 2);
+        assert_eq!(whole_clock.breached, 0);
+        assert_eq!(
+            whole_clock.unreached, 0,
+            "the whole-clock path never reports unreached"
+        );
     }
 
     // -- cohort -----------------------------------------------------------
