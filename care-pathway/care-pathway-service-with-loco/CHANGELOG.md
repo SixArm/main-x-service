@@ -9,6 +9,72 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14g: cohort attrition record (CONSORT) (2026-09-11)
+
+`attrition` on cohort `time-analysis` and `constraints`: a CONSORT-style
+ordered trail of `{label, operation, instances, parent}` steps
+explaining the denominator inside the response, rather than in a log.
+
+- `src/tba.rs`: `AttritionStep`, `ATTRITION_STEP_LABELS` (the closed,
+  ordered six-label vocabulary — `enrolled_on_pathway`,
+  `status_filter`, `window`, `degenerate_clock`, `coverage_floor`,
+  `suppression`), `ATTRITION_RULE_PARENT` (`rule_filter` forks from
+  `coverage_floor`, making it `suppression`'s sibling, not its child),
+  `attrition_trail()` (the base six steps over already-computed
+  counts — no I/O), and `attrition_rule_branch()` (the
+  `rule_filter`/`matched`/`complement` fork, appended when a T-14f
+  split is active).
+- `src/controllers/tba.rs`: `cohort_query()` (extracted from
+  `load_cohort` so a *counting* query and the *loading* query can
+  never silently diverge), `attrition_counts()` (two unbounded
+  `COUNT` queries — deliberately not `instances.len()`, which is
+  capped at `MAX_COHORT_INSTANCES` and would understate the true
+  population on a large pathway), `build_attrition()`, wired into
+  both endpoints.
+- **Deviation, disclosed rather than silently invented:** `window`,
+  `degenerate_clock`, and `coverage_floor` are steps this crate has no
+  exclusion logic for yet, and this task adds none. `window`: no
+  date-window parameter exists on these endpoints. `coverage_floor`:
+  no coverage-based exclusion exists — a genuine open design question
+  left to T-14h, which already lists it as one of its own reportable
+  codes, rather than invented here as a side effect of a reporting
+  task. `degenerate_clock` **discloses** the count of instances whose
+  clock is not strictly forward (`tba::analyze`'s own `reason:
+  Some(_)` case) **without excluding them** — they stay in
+  `cohort`/`compliance`/`survival` exactly as they always have, so
+  this task changes no existing figure, only what is now visible
+  about a real, pre-existing gap (such an instance was silently
+  contributing a fabricated `0`-day lead time to the percentile
+  distribution). All three steps report `instances` unchanged from
+  the step before them.
+- **Deferred, not attempted:** "category sets frozen at step 0"
+  (padding `by_stage`/`by_waste` with zero-count entries for a
+  category present in the wider pool but absent from a narrower split
+  side) is real spec text but untested by this task's own three
+  acceptance bullets, and is a nontrivial change to `tba::cohort`'s
+  existing category emission that deserves its own review rather than
+  riding along with this task.
+- Tests: 7 new pure `src/tba.rs` unit tests targeting each acceptance
+  bullet directly — enumerating every declared step label and
+  asserting each appears (with no undeclared extras), the parent
+  chain, a step that excludes nobody still appearing (for all three
+  currently-inert steps), the degenerate-clock count disclosed without
+  excluding anyone, the suppression step's wording tracking the
+  floor, the rule branch forking `matched`/`complement` from the same
+  `rule_filter` parent, and the last step's instances matching the
+  analysed n for both the unsplit trail and each rule-branch leaf
+  independently (`cargo test --lib`: 405, up from 398). A DB-gated
+  round trip (`tests/requests/tba.rs`'s `cohort_attrition_round_trip`)
+  proves a real `?status=` count change (6 enrolled, 3 after an
+  `open`/`closed` filter), a real degenerate-clock instance
+  (deliberately future-dated then closed) disclosed by count without
+  being excluded, and the rule-branch's `matched`/`complement` leaves
+  matching `split`'s own counts exactly, all against real Postgres.
+- Verified clean: `cargo fmt --check`, `cargo clippy --all-targets --
+  -D warnings`, `cargo test --lib`, the DB-gated suite, `cargo +1.96
+  check --all-targets` (MSRV), `cargo deny check`, `cargo bench
+  --no-run`.
+
 ### Added — T-14f: rule-based cohort splits and the paired comparison (2026-09-11)
 
 `?contains=`/`?excludes=`/`?compare=` on cohort `time-analysis` and

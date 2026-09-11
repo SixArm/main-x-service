@@ -45,8 +45,8 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | POST | `/api/instances/{pid}/clock` | Set the pathway clock `start`/`stop` (no `pause`, by design) |
 | GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage, per-stage anchors + adjacent delays |
 | GET | `/api/instances/{pid}/timeline` | The mapped journey as an ordered wall of segments and gaps |
-| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`), plus censoring-aware Kaplan–Meier survival (`?discontinued=event\|censor`), optionally split by a rule (`?contains=&excludes=&compare=`; `?mode=withhold\|remove` on suppression) |
-| GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time — same rule-split params as time-analysis (`?mode=withhold\|remove` on suppression) |
+| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`), plus censoring-aware Kaplan–Meier survival (`?discontinued=event\|censor`), optionally split by a rule (`?contains=&excludes=&compare=`; `?mode=withhold\|remove` on suppression), plus a CONSORT-style `attrition` trail on every response |
+| GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time — same rule-split params and `attrition` trail as time-analysis (`?mode=withhold\|remove` on suppression) |
 | GET | `/api/instances/flow` | Queueing-theory flow (Little's Law: λ/μ/ρ/κ/τ) |
 | GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
 | GET | `/api/care-pathways/{pid}/export/event-log` | Bulk `event_log` export (`?format=csv\|jsonl`) — bupaR/PM4Py shape, never a `subject_ref` or a person/actor URN |
@@ -231,6 +231,28 @@ event-log codec already loads), `Rule`, `partition`, `split_table`;
 HTTP surface: [`src/controllers/tba.rs`](./src/controllers/tba.rs)
 (`load_features`, `resolve_rule`, `SplitPlan`/`resolve_split`,
 `split_payload`/`split_payload_constraints`).
+
+### Cohort attrition record (T-14g)
+
+`time-analysis` and `constraints` both gain `attrition`: an ordered
+array of `{label, operation, instances, parent}` steps —
+`enrolled_on_pathway`, `status_filter`, `window`, `degenerate_clock`,
+`coverage_floor`, `suppression`, plus `rule_filter`/`matched`/
+`complement` when a rule-based split (T-14f) is active — explaining
+the denominator inside the response rather than in a log. `parent`
+(an index into the same array) lets `matched`/`complement` both fork
+from the same `rule_filter` parent. `window` and `coverage_floor` are
+honestly disclosed rather than invented: no date-window parameter or
+coverage-based exclusion exists on these endpoints yet, so both report
+zero exclusions. `degenerate_clock` discloses the count of instances
+whose clock is not strictly forward **without excluding them** — they
+stay in `cohort`/`compliance`/`survival` exactly as they always have,
+so this feature changes no existing figure, only what is now visible
+about it. Pure logic extends `src/tba.rs` itself: `AttritionStep`,
+`ATTRITION_STEP_LABELS`, `ATTRITION_RULE_PARENT`, `attrition_trail()`,
+`attrition_rule_branch()`; HTTP surface:
+[`src/controllers/tba.rs`](./src/controllers/tba.rs) (`cohort_query()`,
+`attrition_counts()`, `build_attrition()`).
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 

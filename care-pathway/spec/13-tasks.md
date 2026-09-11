@@ -387,8 +387,8 @@ manual check confirms it. Split tasks too big for one PR
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
   below), then **T-14k, T-14b, T-14c, T-14d, and T-14e, all on
-  2026-09-10, and T-14f on 2026-09-11** — eight sub-tasks landed.
-  Three of those eight (T-14a, T-14m, T-14k) were out of the suggested
+  2026-09-10, and T-14f and T-14g both on 2026-09-11** — nine
+  sub-tasks landed. Three of those nine (T-14a, T-14m, T-14k) were out of the suggested
   order above, because none needed the tasks still ahead of it in
   this list to be useful now (see each entry's own scope notes;
   T-14a's covers why it needs no suppression pass from T-14k: it
@@ -401,7 +401,7 @@ manual check confirms it. Split tasks too big for one PR
   `src/variants.rs`, rather than adding to the already-large
   `src/analytics.rs` — the same reasoning that gave T-14k its own
   `src/suppression.rs` rather than folding into `src/tba.rs`. The
-  remaining **five landed in the suggested order**: T-14b, T-14c, and
+  remaining **six landed in the suggested order**: T-14b, T-14c, and
   T-14d are the "three derivations" trio in full, **T-14e followed
   immediately after** — its pure logic sits in `src/tba.rs` itself too
   (not a new sibling module, same reasoning as T-14d's), since
@@ -413,13 +413,18 @@ manual check confirms it. Split tasks too big for one PR
   concern — predicate matching over a cohort, not an elapsed-time
   computation) — and is the first real caller of T-14k's own
   `Table`/`decide` stratified-suppression primitive, which had stood
-  ready but uncalled since T-14k landed.
+  ready but uncalled since T-14k landed. **T-14g followed T-14f**,
+  again exactly next in the list — its own pure logic (`AttritionStep`,
+  `attrition_trail`, `attrition_rule_branch`) extends `src/tba.rs`
+  itself rather than a new sibling module, since a CONSORT step record
+  is a small, mechanical data structure, not a genuinely separate
+  algorithm the way T-14c's/T-14f's own new files were.
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f were also still
-    unbuilt (all seven have since landed too; T-14g–j remain open) —
-    because the two codecs needed
+    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g were also
+    still unbuilt (all eight have since landed too; T-14h–j remain
+    open) — because the two codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
     row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
@@ -879,19 +884,85 @@ manual check confirms it. Split tasks too big for one PR
       small side recruiting its sibling, two sides already small
       needing no secondary recruitment) — reusing `suppression::decide`
       directly rather than re-implementing its property tests.
-  - [ ] **T-14g — Cohort attrition record (CONSORT).** Every cohort
-    response carries `attrition`: ordered steps `{label, operation,
-    instances, parent}` from "enrolled on pathway" through the status
-    filter, window, rule filters, degenerate-clock exclusion, coverage
-    floor, and suppression, so the denominator is explained inside the
-    response rather than in a log. `parent` gives the branching a
-    `compare` needs. Category sets used by any composition table are
-    frozen at step 0 (ehrapy's rule), so a later step cannot invent a
-    stratum — or silently lose one.
+  - [x] **T-14g — Cohort attrition record (CONSORT).** Landed
+    2026-09-11, in the suggested order, right after T-14f — and the
+    same query contract this task shares with T-14f narrows to the
+    same two endpoints for the same reason. `time-analysis` and
+    `constraints` now both carry `attrition`: ordered steps `{label,
+    operation, instances, parent}` from `enrolled_on_pathway` through
+    `status_filter`, `window`, `degenerate_clock`, `coverage_floor`,
+    and `suppression`, so the denominator is explained inside the
+    response rather than in a log. `parent` (an index into the same
+    array) is what lets a rule-based split's `matched`/`complement`
+    steps both fork from the same `rule_filter` parent — the branching
+    a `compare` needs — rather than forcing one linear list to choose
+    between the two sides. `src/tba.rs`: `AttritionStep`,
+    `ATTRITION_STEP_LABELS` (the closed, ordered six-label vocabulary),
+    `ATTRITION_RULE_PARENT` (`rule_filter` forks from `coverage_floor`,
+    making it `suppression`'s sibling, not its child — a rule-based
+    split narrows a different axis than suppression does, and neither
+    should wait on the other), `attrition_trail()` (the base six
+    steps, over already-computed counts — no I/O), and
+    `attrition_rule_branch()` (the three-step fork, appended when a
+    split is active). `src/controllers/tba.rs`: `cohort_query()`
+    (extracted from `load_cohort` so a *counting* query used for
+    attrition and the *loading* query used for the cohort itself can
+    never silently diverge), `attrition_counts()` (two unbounded
+    `COUNT` queries — deliberately not `instances.len()`, which is
+    capped at `MAX_COHORT_INSTANCES` and would understate the true
+    population on a pathway large enough to hit that cap), and
+    `build_attrition()`, wired into both endpoints right after the
+    existing suppression/split logic.
+    - [x] **Deviation, disclosed rather than silently invented:**
+      `window`, `degenerate_clock`, and `coverage_floor` are steps
+      this crate has no exclusion logic for yet, and this task does
+      not add any — it only makes their absence visible. `window`:
+      no date-window query parameter exists on these endpoints at
+      all. `coverage_floor`: no coverage-based exclusion exists either
+      — deciding what threshold would exclude an instance is a
+      genuine open design question better resolved by T-14h (which
+      already lists "coverage below the floor" as one of *its own*
+      reportable codes) than invented here as a side effect of a
+      reporting task. `degenerate_clock` is the one exception worth
+      naming precisely: a degenerate-clock instance
+      (`tba::analyze`'s own `reason: Some(_)` case — `clock.stop_ms`
+      not strictly after `clock.start_ms`) is **disclosed, not
+      excluded** — it stays in `cohort`/`compliance`/`survival`
+      exactly as it always has (a real, pre-existing data-quality gap:
+      such an instance contributes a fabricated `0`-day lead time to
+      the percentile distribution), so this task changes no existing
+      figure. All three steps report `instances` unchanged from the
+      step before them, proving the acceptance text's own "a step
+      that excluded nobody still appears" for exactly the three steps
+      that currently have nothing to exclude.
+    - [x] **Deferred, not attempted:** "category sets used by any
+      composition table are frozen at step 0" (`by_stage`/`by_waste`
+      padded with zero-count entries for a category present in the
+      wider pool but absent from a narrower split side) is real, but
+      is not tested by this task's own three acceptance bullets and
+      is a nontrivial change to `tba::cohort`'s existing category
+      emission — reviewed on its own rather than smuggled in as a
+      side effect of building the attrition record.
     - **Acceptance:** the last step's `instances` equals the analysed
-      n; a test enumerates every exclusion reason in the code and
-      asserts each has a step; a step that excluded nobody still
-      appears (an empty cell is a finding).
+      n — proven for the unsplit trail's own leaf (`suppression`) and
+      independently for each rule-branch leaf (`matched`/`complement`)
+      (`tba::tests::the_last_steps_instances_equal_the_analysed_n`,
+      and end to end via `tests/requests/tba.rs`'s
+      `cohort_attrition_round_trip`); a test enumerates every
+      declared step label and asserts each has a step, with no
+      undeclared extras either
+      (`every_declared_attrition_step_label_actually_appears`); a step
+      that excluded nobody still appears
+      (`a_step_that_excludes_nobody_still_appears`, for `window`,
+      `degenerate_clock`, and `coverage_floor`). The DB-gated round
+      trip additionally proves a real `?status=` count change (6
+      enrolled, 3 after an `open`/`closed` filter), a real
+      (deliberately future-dated-then-closed) degenerate-clock
+      instance disclosed by count without being excluded, the
+      `suppression` step's wording tracking whether the floor was
+      actually cleared, and the rule-branch's `matched`/`complement`
+      leaves matching `split`'s own counts exactly — all against real
+      Postgres.
   - [ ] **T-14h — Journey data-quality and missingness report.**
     `GET /api/care-pathways/{pathway}/data-quality`: per cohort, the
     share of instances with no segments, an open segment past closure,
@@ -1051,11 +1122,11 @@ manual check confirms it. Split tasks too big for one PR
       persists exactly what the generator returns, that a bad argument
       is refused rather than silently defaulted, and that the persisted
       rows carry the same synthetic-only markers. "Used by every T-14
-      test" is **still not true** — T-14b, T-14c, T-14d, T-14e and
-      T-14f have since landed too, but each used a small hand-built
-      fixture rather than this generator (see their own scope notes);
-      this generator remains available for T-14g/h/i/j to build on,
-      not yet exercised by any of them. The repo demo seed (EX-4)
+      test" is **still not true** — T-14b, T-14c, T-14d, T-14e, T-14f
+      and T-14g have since landed too, but each used a small
+      hand-built fixture rather than this generator (see their own
+      scope notes); this generator remains available for T-14h/i/j to
+      build on, not yet exercised by any of them. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

@@ -473,6 +473,39 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    (`load_features`, `resolve_rule`, `SplitPlan`/`resolve_split`,
    `split_payload`/`split_payload_constraints`). Landed 2026-09-11,
    spec T-14f.
+28. **Cohort attrition record (CONSORT).**
+   `time-analysis` and `constraints` both gain `attrition` (spec
+   T-14g): an ordered array of `{label, operation, instances,
+   parent}` steps — `enrolled_on_pathway`, `status_filter`, `window`,
+   `degenerate_clock`, `coverage_floor`, `suppression`, plus
+   `rule_filter`/`matched`/`complement` when item 27's split is
+   active — explaining the denominator inside the response rather
+   than in a log. `parent` (an index into the same array) is what
+   lets `matched`/`complement` both fork from the same `rule_filter`
+   parent. Three steps are honestly disclosed rather than invented:
+   `window` (no date-window parameter exists on these endpoints) and
+   `coverage_floor` (no coverage-based exclusion exists — a genuine
+   open design question left to T-14h, which already lists it as its
+   own reportable code) both report zero exclusions; `degenerate_clock`
+   discloses the count of instances whose clock is not strictly
+   forward (`tba::analyze`'s own `reason: Some(_)` case) **without
+   excluding them** — they stay in `cohort`/`compliance`/`survival`
+   exactly as they always have, so this item changes no existing
+   figure, only what is now visible about it. "Category sets frozen
+   at step 0" (padding a composition table's categories consistently
+   across split sides) is a further, separate concern this item does
+   not attempt — untested by its own three acceptance bullets, and a
+   real change to `tba::cohort`'s existing category emission that
+   deserves its own review. Pure logic in [`src/tba.rs`](../src/tba.rs)
+   itself (`AttritionStep`, `ATTRITION_STEP_LABELS`,
+   `ATTRITION_RULE_PARENT`, `attrition_trail()`,
+   `attrition_rule_branch()`) rather than a new sibling module, since
+   a CONSORT step record is mechanical bookkeeping, not a genuinely
+   separate algorithm; HTTP surface:
+   [`src/controllers/tba.rs`](../src/controllers/tba.rs)
+   (`cohort_query()` — extracted from `load_cohort` so a *counting*
+   query and the *loading* query can never diverge — `attrition_counts()`,
+   `build_attrition()`). Landed 2026-09-11, spec T-14g.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

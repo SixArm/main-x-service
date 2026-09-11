@@ -520,16 +520,18 @@ pub(crate) struct CohortQuery {
     compare: Option<bool>,
 }
 
-/// Load a pathway's instances, filtered by the query's status lens.
-pub(crate) async fn load_cohort(
-    ctx: &AppContext,
+/// The `pathway_instances` filter [`load_cohort`] and the attrition
+/// record's own counts (spec T-14g) both build from, so a query used
+/// to *load* the cohort and a query used to *count* it (unbounded by
+/// [`MAX_COHORT_INSTANCES`]) can never silently diverge.
+fn cohort_query(
     pathway_pid: Uuid,
     status: Option<&str>,
-) -> Result<Vec<pathway_instances::Model>> {
-    let mut query = pathway_instances::Entity::find()
+) -> sea_orm::Select<pathway_instances::Entity> {
+    let query = pathway_instances::Entity::find()
         .filter(pathway_instances::Column::PathwayPid.eq(pathway_pid))
         .filter(pathway_instances::Column::DeletedAt.is_null());
-    query = match status {
+    match status {
         Some("open") => {
             query.filter(pathway_instances::Column::Status.is_in(["active", "on_hold"]))
         }
@@ -537,8 +539,70 @@ pub(crate) async fn load_cohort(
             query.filter(pathway_instances::Column::Status.is_in(["completed", "discontinued"]))
         }
         _ => query,
-    };
-    Ok(query.limit(MAX_COHORT_INSTANCES).all(&ctx.db).await?)
+    }
+}
+
+/// Load a pathway's instances, filtered by the query's status lens.
+pub(crate) async fn load_cohort(
+    ctx: &AppContext,
+    pathway_pid: Uuid,
+    status: Option<&str>,
+) -> Result<Vec<pathway_instances::Model>> {
+    Ok(cohort_query(pathway_pid, status)
+        .limit(MAX_COHORT_INSTANCES)
+        .all(&ctx.db)
+        .await?)
+}
+
+/// Build the full attrition array for one cohort response (spec
+/// T-14g): the base six-step trail, plus the rule-based-split branch
+/// (spec T-14f) when `plan` was resolved.
+async fn build_attrition(
+    ctx: &AppContext,
+    template: &PathwayModel,
+    query: &CohortQuery,
+    analyses: &[tba::InstanceAnalysis],
+    suppressed: bool,
+    plan: Option<&SplitPlan>,
+) -> Result<Vec<tba::AttritionStep>> {
+    let (enrolled, after_status) =
+        attrition_counts(ctx, template.pid, query.status.as_deref()).await?;
+    let degenerate = analyses.iter().filter(|a| a.reason.is_some()).count();
+    let status_label = query.status.as_deref().unwrap_or("all");
+    let mut trail =
+        tba::attrition_trail(enrolled, after_status, status_label, degenerate, suppressed);
+    if let Some(plan) = plan {
+        let rule_description = format!(
+            "contains={} excludes={}",
+            query.contains.as_deref().unwrap_or(""),
+            query.excludes.as_deref().unwrap_or(""),
+        );
+        trail.extend(tba::attrition_rule_branch(
+            &rule_description,
+            plan.matched_instances.len(),
+            plan.complement_instances.len(),
+        ));
+    }
+    Ok(trail)
+}
+
+/// The two counts [`tba::attrition_trail`]'s first two steps need:
+/// every non-deleted instance ever enrolled on this pathway, and how
+/// many remain after the query's status lens — both **unbounded**
+/// `COUNT` queries, not `instances.len()`, since the latter is capped
+/// at [`MAX_COHORT_INSTANCES`] and would silently understate the true
+/// population on a pathway large enough to hit that cap (spec T-14g).
+async fn attrition_counts(
+    ctx: &AppContext,
+    pathway_pid: Uuid,
+    status: Option<&str>,
+) -> Result<(usize, usize)> {
+    let enrolled = cohort_query(pathway_pid, None).count(&ctx.db).await?;
+    let after_status = cohort_query(pathway_pid, status).count(&ctx.db).await?;
+    Ok((
+        usize::try_from(enrolled).unwrap_or(usize::MAX),
+        usize::try_from(after_status).unwrap_or(usize::MAX),
+    ))
 }
 
 /// Analyse a whole cohort in two bounded queries (no N+1): one for the
@@ -1211,11 +1275,29 @@ async fn cohort_time_analysis(
     // Rule-based cohort split (spec T-14f): absent unless the query
     // names `contains=`/`excludes=` and the unsplit cohort itself
     // clears the floor (see resolve_split's own doc for why).
-    if let Some(plan) =
-        resolve_split(&ctx, &template, &instances, &analyses, suppressed, &query).await?
+    let plan = resolve_split(&ctx, &template, &instances, &analyses, suppressed, &query).await?;
+    if let Some(plan) = &plan
         && let Some(map) = response.as_object_mut()
     {
-        map.insert("split".to_string(), split_payload(&plan, mode, &query)?);
+        map.insert("split".to_string(), split_payload(plan, mode, &query)?);
+    }
+
+    // Cohort attrition record (spec T-14g): the denominator explained
+    // inside the response, not merely stated.
+    let attrition = build_attrition(
+        &ctx,
+        &template,
+        &query,
+        &analyses,
+        suppressed,
+        plan.as_ref(),
+    )
+    .await?;
+    if let Some(map) = response.as_object_mut() {
+        map.insert(
+            "attrition".to_string(),
+            serde_json::to_value(&attrition).unwrap_or(serde_json::Value::Null),
+        );
     }
 
     format::json(response)
@@ -1271,13 +1353,31 @@ async fn cohort_constraints(
 
     // Rule-based cohort split (spec T-14f) — same precondition and
     // suppression decision as `cohort_time_analysis`'s own split.
-    if let Some(plan) =
-        resolve_split(&ctx, &template, &instances, &analyses, suppressed, &query).await?
+    let plan = resolve_split(&ctx, &template, &instances, &analyses, suppressed, &query).await?;
+    if let Some(plan) = &plan
         && let Some(map) = body.as_object_mut()
     {
         map.insert(
             "split".to_string(),
-            split_payload_constraints(&plan, mode, &query),
+            split_payload_constraints(plan, mode, &query),
+        );
+    }
+
+    // Cohort attrition record (spec T-14g) — same trail as
+    // `cohort_time_analysis`'s own.
+    let attrition = build_attrition(
+        &ctx,
+        &template,
+        &query,
+        &analyses,
+        suppressed,
+        plan.as_ref(),
+    )
+    .await?;
+    if let Some(map) = body.as_object_mut() {
+        map.insert(
+            "attrition".to_string(),
+            serde_json::to_value(&attrition).unwrap_or(serde_json::Value::Null),
         );
     }
 

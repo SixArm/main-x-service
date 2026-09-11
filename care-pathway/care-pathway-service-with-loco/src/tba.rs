@@ -1476,6 +1476,176 @@ fn erf(x: f64) -> f64 {
     sign * (1.0 - poly * t * (-x * x).exp())
 }
 
+// -- T-14g: cohort attrition record (CONSORT) --------------------------
+
+/// The closed, ordered set of labels every cohort's base attrition
+/// trail carries (spec T-14g), before any rule-based split (T-14f) —
+/// `attrition_trail` always produces exactly these, in this order, so
+/// a test can enumerate this vocabulary and assert each one has a
+/// step, rather than trusting the builder not to have silently
+/// dropped one.
+pub const ATTRITION_STEP_LABELS: &[&str] = &[
+    "enrolled_on_pathway",
+    "status_filter",
+    "window",
+    "degenerate_clock",
+    "coverage_floor",
+    "suppression",
+];
+
+/// The index of `"coverage_floor"` in a base [`attrition_trail`] — the
+/// step [`attrition_rule_branch`]'s own first step (`"rule_filter"`)
+/// forks from, making it a sibling of `"suppression"` rather than a
+/// prerequisite for it: a rule-based split narrows a *different* axis
+/// than suppression does, and neither should have to wait on the
+/// other.
+pub const ATTRITION_RULE_PARENT: usize = 4;
+
+/// One step of a cohort's CONSORT-style attrition record (spec
+/// T-14g): the instance count immediately after this step's own
+/// operation, and which earlier step (by index into the same `Vec`)
+/// it narrows from. `parent` is `None` only for the root
+/// (`"enrolled_on_pathway"`) — every other step has exactly one, which
+/// is what lets [`attrition_rule_branch`]'s `"matched"`/`"complement"`
+/// steps both point back at the same `"rule_filter"` parent instead of
+/// forcing a single linear list to choose between them.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct AttritionStep {
+    /// One of [`ATTRITION_STEP_LABELS`], or `"rule_filter"` /
+    /// `"matched"` / `"complement"` from [`attrition_rule_branch`].
+    pub label: &'static str,
+    /// A human-readable account of what this step actually did (or,
+    /// for a step with nothing yet to do, why not) — the denominator
+    /// explained in the response, not merely stated.
+    pub operation: String,
+    /// Instances remaining after this step. Never reduced by a step
+    /// that only *discloses* a count without excluding anyone — see
+    /// `degenerate_clock`'s and `coverage_floor`'s own doc text on
+    /// [`attrition_trail`].
+    pub instances: usize,
+    /// The index of the step this one narrows from; `None` for the
+    /// root only.
+    pub parent: Option<usize>,
+}
+
+/// Build the base six-step attrition trail every cohort response
+/// carries (spec T-14g), regardless of whether a rule-based split is
+/// also active. Every step is a plain record over already-computed
+/// counts — no I/O, no DB access — so a caller supplies each count
+/// itself; this function's only job is to name and order the steps
+/// consistently, per [`ATTRITION_STEP_LABELS`].
+///
+/// Three steps are honestly disclosed rather than silently omitted,
+/// because no such filter exists in this crate yet: `"window"` (no
+/// date-window parameter exists on this endpoint), `"coverage_floor"`
+/// (no coverage-based exclusion is implemented — that is T-14h's own
+/// concern, not invented here as a side effect of this task), and
+/// `"degenerate_clock"`, which is *disclosed but not enforced* — a
+/// degenerate-clock instance (`analyze`'s own `reason: Some(_)` case)
+/// stays **included** in `cohort`/`compliance`/`survival` exactly as
+/// it always has, so this task changes no existing figure; the step
+/// exists so the count of such instances, previously invisible, is
+/// now named in the response rather than silently absorbed into a
+/// `0`-day lead time. All three report `instances` unchanged from the
+/// step before them — "a step that excluded nobody still appears" is
+/// this function's own literal acceptance bullet, proven for exactly
+/// these three.
+#[must_use]
+pub fn attrition_trail(
+    enrolled_on_pathway: usize,
+    after_status_filter: usize,
+    status_label: &str,
+    degenerate_clock_count: usize,
+    suppressed: bool,
+) -> Vec<AttritionStep> {
+    vec![
+        AttritionStep {
+            label: "enrolled_on_pathway",
+            operation: "every non-deleted instance ever enrolled on this pathway".to_string(),
+            instances: enrolled_on_pathway,
+            parent: None,
+        },
+        AttritionStep {
+            label: "status_filter",
+            operation: format!("status = {status_label}"),
+            instances: after_status_filter,
+            parent: Some(0),
+        },
+        AttritionStep {
+            label: "window",
+            operation: "no date-window filter exists on this endpoint yet".to_string(),
+            instances: after_status_filter,
+            parent: Some(1),
+        },
+        AttritionStep {
+            label: "degenerate_clock",
+            operation: if degenerate_clock_count == 0 {
+                "no degenerate-clock instances".to_string()
+            } else {
+                format!(
+                    "{degenerate_clock_count} instance(s) have a degenerate clock \
+                     (stop not strictly after start) and are included, not \
+                     excluded — see T-14h"
+                )
+            },
+            instances: after_status_filter,
+            parent: Some(2),
+        },
+        AttritionStep {
+            label: "coverage_floor",
+            operation: "no coverage-floor exclusion is implemented in this crate yet".to_string(),
+            instances: after_status_filter,
+            parent: Some(3),
+        },
+        AttritionStep {
+            label: "suppression",
+            operation: if suppressed {
+                "withheld: below the minimum cell count".to_string()
+            } else {
+                "cleared the minimum cell count".to_string()
+            },
+            instances: after_status_filter,
+            parent: Some(4),
+        },
+    ]
+}
+
+/// Append the rule-based-split branch (spec T-14f) to an already-built
+/// [`attrition_trail`]: `"rule_filter"` (a sibling of `"suppression"`,
+/// both forking from [`ATTRITION_RULE_PARENT`]) naming the predicate,
+/// then its two children `"matched"`/`"complement"`. `n_matched` +
+/// `n_complement` always equals the pool the rule was applied to —
+/// this function does not itself enforce that; it only records
+/// whatever the caller already partitioned.
+#[must_use]
+pub fn attrition_rule_branch(
+    rule_description: &str,
+    n_matched: usize,
+    n_complement: usize,
+) -> Vec<AttritionStep> {
+    let rule_filter_index = ATTRITION_STEP_LABELS.len(); // this step's own index, once appended
+    vec![
+        AttritionStep {
+            label: "rule_filter",
+            operation: rule_description.to_string(),
+            instances: n_matched + n_complement,
+            parent: Some(ATTRITION_RULE_PARENT),
+        },
+        AttritionStep {
+            label: "matched",
+            operation: "satisfies the rule".to_string(),
+            instances: n_matched,
+            parent: Some(rule_filter_index),
+        },
+        AttritionStep {
+            label: "complement",
+            operation: "does not satisfy the rule".to_string(),
+            instances: n_complement,
+            parent: Some(rule_filter_index),
+        },
+    ]
+}
+
 /// The cohort analysis (spec §7).
 #[derive(Clone, Debug, Serialize)]
 pub struct CohortAnalysis {
@@ -2936,6 +3106,123 @@ mod tests {
             result.p_value, None,
             "nothing to test: never fabricate a p-value"
         );
+    }
+
+    // -- T-14g: cohort attrition record (CONSORT) --------------------------
+
+    /// The literal T-14g acceptance bullet: a test enumerates every
+    /// declared exclusion-reason label and asserts each has a step —
+    /// not a step short, not an undeclared extra one either.
+    #[test]
+    fn every_declared_attrition_step_label_actually_appears() {
+        let trail = attrition_trail(10, 10, "all", 0, false);
+        let labels: Vec<&str> = trail.iter().map(|s| s.label).collect();
+        for expected in ATTRITION_STEP_LABELS {
+            assert!(labels.contains(expected), "missing step: {expected}");
+        }
+        assert_eq!(
+            labels.len(),
+            ATTRITION_STEP_LABELS.len(),
+            "no undeclared extra steps either: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn attrition_trail_orders_steps_and_chains_parents_correctly() {
+        let trail = attrition_trail(12, 9, "open", 0, false);
+        assert_eq!(trail[0].label, "enrolled_on_pathway");
+        assert_eq!(trail[0].instances, 12);
+        assert_eq!(trail[0].parent, None);
+        assert_eq!(trail[1].label, "status_filter");
+        assert_eq!(trail[1].instances, 9);
+        assert_eq!(trail[1].parent, Some(0));
+        assert!(trail[1].operation.contains("open"));
+        for (index, step) in trail.iter().enumerate().skip(2) {
+            assert_eq!(step.parent, Some(index - 1), "{step:?}");
+        }
+    }
+
+    /// The literal T-14g acceptance bullet: a step that excludes
+    /// nobody still appears, with its count unchanged from the step
+    /// before it — proven for all three steps this crate has no
+    /// exclusion logic for yet.
+    #[test]
+    fn a_step_that_excludes_nobody_still_appears() {
+        let trail = attrition_trail(7, 7, "all", 0, false);
+        for label in ["window", "degenerate_clock", "coverage_floor"] {
+            let step = trail.iter().find(|s| s.label == label).unwrap();
+            assert_eq!(step.instances, 7, "{label} excludes nobody: {step:?}");
+        }
+    }
+
+    #[test]
+    fn degenerate_clock_step_discloses_the_count_without_excluding_it() {
+        let trail = attrition_trail(7, 7, "all", 3, false);
+        let step = trail
+            .iter()
+            .find(|s| s.label == "degenerate_clock")
+            .unwrap();
+        assert_eq!(step.instances, 7, "disclosed, not excluded: {step:?}");
+        assert!(
+            step.operation.contains('3'),
+            "the count is named in the operation: {step:?}"
+        );
+    }
+
+    #[test]
+    fn suppression_step_reflects_whether_the_floor_was_cleared() {
+        let cleared = attrition_trail(6, 6, "all", 0, false);
+        let cleared_step = cleared.last().unwrap();
+        assert_eq!(cleared_step.label, "suppression");
+        assert_eq!(cleared_step.instances, 6, "never reduces the count either");
+        assert!(cleared_step.operation.contains("cleared"));
+
+        let withheld = attrition_trail(3, 3, "all", 0, true);
+        let withheld_step = withheld.last().unwrap();
+        assert_eq!(withheld_step.instances, 3);
+        assert!(withheld_step.operation.contains("withheld"));
+    }
+
+    #[test]
+    fn attrition_rule_branch_forks_matched_and_complement_from_the_same_parent() {
+        let mut trail = attrition_trail(10, 10, "all", 0, false);
+        trail.extend(attrition_rule_branch("contains=stage:triage", 4, 6));
+
+        let rule_filter = &trail[ATTRITION_STEP_LABELS.len()];
+        assert_eq!(rule_filter.label, "rule_filter");
+        assert_eq!(rule_filter.parent, Some(ATTRITION_RULE_PARENT));
+        assert_eq!(
+            trail[ATTRITION_RULE_PARENT].label, "coverage_floor",
+            "rule_filter is coverage_floor's sibling, not suppression's child"
+        );
+
+        let matched = trail.iter().find(|s| s.label == "matched").unwrap();
+        let complement = trail.iter().find(|s| s.label == "complement").unwrap();
+        assert_eq!(matched.parent, Some(ATTRITION_STEP_LABELS.len()));
+        assert_eq!(
+            complement.parent, matched.parent,
+            "both fork from rule_filter"
+        );
+        assert_eq!(matched.instances, 4);
+        assert_eq!(complement.instances, 6);
+    }
+
+    /// The literal T-14g acceptance bullet: the last step's instances
+    /// equals the analysed n — checked for the unsplit trail's own
+    /// leaf and for each rule-branch leaf independently.
+    #[test]
+    fn the_last_steps_instances_equal_the_analysed_n() {
+        let analysed_n = 10;
+        let mut trail = attrition_trail(analysed_n, analysed_n, "all", 0, false);
+        assert_eq!(trail.last().unwrap().instances, analysed_n);
+
+        let (n_matched, n_complement) = (4, 6);
+        trail.extend(attrition_rule_branch("x", n_matched, n_complement));
+        let matched = trail.iter().find(|s| s.label == "matched").unwrap();
+        let complement = trail.iter().find(|s| s.label == "complement").unwrap();
+        assert_eq!(matched.instances, n_matched);
+        assert_eq!(complement.instances, n_complement);
+        assert_eq!(matched.instances + complement.instances, analysed_n);
     }
 
     // -- cohort -----------------------------------------------------------
