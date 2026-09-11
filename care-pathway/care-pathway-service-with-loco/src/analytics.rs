@@ -19,12 +19,14 @@
 //! (anchors/delays), T-14i (conformance) — so [`JourneyFeatureRow`]
 //! reserved their columns from day one, `None` with a documented reason
 //! rather than silently omitting them or blocking this task on theirs
-//! (see each field's doc comment). T-14d has since landed and is wired:
-//! `anchors_delays` is computed straight from the same
-//! `tba::InstanceAnalysis` this row already builds from — no per-row
-//! cohort context needed, unlike `variant` (T-14c, landed but still
-//! unwired — a variant string needs the whole cohort's pipeline, not
-//! one instance in isolation) and `conformance` (T-14i, not yet built).
+//! (see each field's doc comment). T-14d and T-14i have since landed
+//! and are wired: `anchors_delays` is computed straight from the same
+//! `tba::InstanceAnalysis` this row already builds from, and
+//! `conformance` from a [`conformance::Conformance`] the caller
+//! computes the same way — neither needs per-row cohort context,
+//! unlike `variant` (T-14c, landed but still unwired — a variant
+//! string needs the whole cohort's pipeline, not one instance in
+//! isolation).
 //!
 //! **Directly-follows process map** (spec T-14b) — [`ActivityStep`],
 //! [`build_process_map`] — lives here too, alongside the event-log
@@ -42,6 +44,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 
+use crate::conformance;
 use crate::tba;
 
 /// Everything about one pathway instance except its raw segment / step /
@@ -223,8 +226,14 @@ pub struct JourneyFeatureRow {
     /// `None` only if the JSON encoding itself somehow fails, which no
     /// value these types can hold is expected to trigger.
     pub anchors_delays: Option<String>,
-    /// T-14i (conformance to the enrolled template) is not yet built.
-    /// Always `None`, for the same reason as `variant`.
+    /// This instance's conformance to its enrolled template (T-14i),
+    /// JSON-encoded in one cell (`{"ratio": …, "declared_pairs": …,
+    /// "pairs_in_order": …, "escalation_events": …}`) per the family's
+    /// CSV nested-value convention. `Some` for every row — a per-pair
+    /// verdict breakdown lives at the dedicated
+    /// `/api/instances/{pid}/time-analysis` endpoint, not repeated
+    /// here; this cell carries only the scalar summary a feature table
+    /// needs. `None` only if the JSON encoding itself somehow fails.
     pub conformance: Option<String>,
 }
 
@@ -344,11 +353,13 @@ pub fn event_log_rows(
 }
 
 /// Build the `journey_features` row for one instance directly from its
-/// [`tba::InstanceAnalysis`] (spec T-14a).
+/// [`tba::InstanceAnalysis`] and its [`conformance::Conformance`]
+/// (spec T-14a; the latter's own scalar summary wired by T-14i).
 #[must_use]
 pub fn journey_feature_row(
     ctx: &CaseContext,
     analysis: &tba::InstanceAnalysis,
+    conformance: &conformance::Conformance,
 ) -> JourneyFeatureRow {
     let by_stage_ms = analysis
         .by_stage
@@ -385,7 +396,13 @@ pub fn journey_feature_row(
             "delays": analysis.delays,
         }))
         .ok(),
-        conformance: None,
+        conformance: serde_json::to_string(&serde_json::json!({
+            "ratio": conformance.ratio,
+            "declared_pairs": conformance.declared_pairs,
+            "pairs_in_order": conformance.pairs_in_order,
+            "escalation_events": conformance.escalation_events,
+        }))
+        .ok(),
     }
 }
 
@@ -1007,15 +1024,35 @@ mod tests {
         tba::analyze(clock, &segments, 10 * tba::DAY_MS)
     }
 
+    /// A fully-conformant two-step sample, matching `sample_analysis`'s
+    /// role for the conformance parameter.
+    fn sample_conformance() -> conformance::Conformance {
+        conformance::conformance(
+            vec![
+                conformance::StepRecord {
+                    position: 0,
+                    done_on_ms: Some(0),
+                },
+                conformance::StepRecord {
+                    position: 1,
+                    done_on_ms: Some(tba::DAY_MS),
+                },
+            ],
+            None,
+            0,
+        )
+    }
+
     /// `journey_feature_row` builds directly from an `InstanceAnalysis`,
     /// carries `censored` from `clock.running`, defers the still-unwired
-    /// T-14c/i columns as `None` rather than omitting or fabricating
-    /// them, and (T-14d) wires `anchors_delays` from the same analysis.
+    /// T-14c column as `None` rather than omitting or fabricating it,
+    /// and wires `anchors_delays` (T-14d) and `conformance` (T-14i)
+    /// from the same analysis / conformance value.
     #[test]
     fn journey_feature_row_derives_from_the_analysis() {
         let ctx = ctx();
         let analysis = sample_analysis();
-        let row = journey_feature_row(&ctx, &analysis);
+        let row = journey_feature_row(&ctx, &analysis, &sample_conformance());
         assert_eq!(row.case_id, ctx.case_id);
         assert_eq!(row.lead_time_ms, analysis.lead_time_ms);
         assert_eq!(row.segments, analysis.segments);
@@ -1027,7 +1064,13 @@ mod tests {
             "no segment in this stage"
         );
         assert_eq!(row.variant, None, "T-14c is landed but not yet wired here");
-        assert_eq!(row.conformance, None, "T-14i is not yet built");
+        let conformance: serde_json::Value =
+            serde_json::from_str(row.conformance.as_deref().expect("T-14i is wired"))
+                .expect("valid JSON");
+        assert!((conformance["ratio"].as_f64().unwrap() - 1.0).abs() < 1e-9);
+        assert_eq!(conformance["declared_pairs"], 1);
+        assert_eq!(conformance["pairs_in_order"], 1);
+        assert_eq!(conformance["escalation_events"], 0);
         let anchors_delays: serde_json::Value =
             serde_json::from_str(row.anchors_delays.as_deref().expect("T-14d is wired"))
                 .expect("valid JSON");
@@ -1055,7 +1098,7 @@ mod tests {
     #[test]
     fn journey_features_csv_has_one_column_per_stage() {
         let ctx = ctx();
-        let row = journey_feature_row(&ctx, &sample_analysis());
+        let row = journey_feature_row(&ctx, &sample_analysis(), &sample_conformance());
         let csv = journey_features_csv(&[row]);
         let header = csv.lines().next().unwrap();
         for stage in tba::STAGES {
@@ -1105,7 +1148,7 @@ mod tests {
     #[test]
     fn journey_features_never_carries_a_person_urn_or_subject_ref() {
         let ctx = ctx();
-        let row = journey_feature_row(&ctx, &sample_analysis());
+        let row = journey_feature_row(&ctx, &sample_analysis(), &sample_conformance());
         let csv = journey_features_csv(std::slice::from_ref(&row));
         let jsonl = journey_features_jsonl(&[row]);
         for haystack in [csv.as_str(), jsonl.as_str()] {

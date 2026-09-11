@@ -387,8 +387,9 @@ manual check confirms it. Split tasks too big for one PR
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
   below), then **T-14k, T-14b, T-14c, T-14d, and T-14e, all on
-  2026-09-10, and T-14f, T-14g, and T-14h all on 2026-09-11** — ten
-  sub-tasks landed. Three of those ten (T-14a, T-14m, T-14k) were out of the suggested
+  2026-09-10, and T-14f, T-14g, T-14h, and T-14i all on 2026-09-11** —
+  eleven sub-tasks landed. Three of those eleven (T-14a, T-14m, T-14k)
+  were out of the suggested
   order above, because none needed the tasks still ahead of it in
   this list to be useful now (see each entry's own scope notes;
   T-14a's covers why it needs no suppression pass from T-14k: it
@@ -401,7 +402,7 @@ manual check confirms it. Split tasks too big for one PR
   `src/variants.rs`, rather than adding to the already-large
   `src/analytics.rs` — the same reasoning that gave T-14k its own
   `src/suppression.rs` rather than folding into `src/tba.rs`. The
-  remaining **seven landed in the suggested order**: T-14b, T-14c, and
+  remaining **eight landed in the suggested order**: T-14b, T-14c, and
   T-14d are the "three derivations" trio in full, **T-14e followed
   immediately after** — its pure logic sits in `src/tba.rs` itself too
   (not a new sibling module, same reasoning as T-14d's), since
@@ -425,12 +426,20 @@ manual check confirms it. Split tasks too big for one PR
   elapsed-time computation), and is the **first task to actually
   exercise T-14m's generator** end to end rather than a hand-built
   fixture — see its own entry and T-14m's updated one for the two real
-  generator bugs that exercise turned up and this task fixed.
+  generator bugs that exercise turned up and this task fixed. **T-14i
+  followed T-14h**, again exactly next — it got its own new file,
+  `src/conformance.rs`, for the same reason T-14b's/T-14c's/T-14f's/
+  T-14h's own new files did (sequence-order comparison, not an
+  elapsed-time computation). Unlike T-14h, it does **not** exercise
+  T-14m's generator: `journeys:seed` has no defect exercising step
+  order at all, so its own DB-gated round trip builds instances
+  directly instead (see its own entry's note on backdating fields the
+  live HTTP API cannot backdate).
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h were also
-    still unbuilt (all nine have since landed too; T-14i/T-14j remain
+    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i were
+    also still unbuilt (all ten have since landed too; T-14j remains
     open) — because the two codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
@@ -468,9 +477,17 @@ manual check confirms it. Split tasks too big for one PR
       cell, `{"anchors": […], "delays": […]}`), since T-14d's data is a
       per-instance property with no cohort context needed. `variant`
       (T-14c, landed 2026-09-10 but genuinely needs the whole cohort's
-      pipeline — not derivable from one instance in isolation) and
-      `conformance` (T-14i, not yet built) stay `null`, for the reason
-      their own doc comments now state.
+      pipeline — not derivable from one instance in isolation) stays
+      `null`, for the reason its own doc comment now states.
+      **Updated 2026-09-11, in T-14i's own change:** `conformance` is
+      now wired too — a compact scalar summary
+      (`{"ratio": …, "declared_pairs": …, "pairs_in_order": …,
+      "escalation_events": …}`), not the per-pair verdict breakdown
+      the dedicated `/time-analysis` endpoint carries, since a feature
+      table row wants a summary, not a repeated diagnostic detail.
+      `journey_feature_row` gained a third parameter
+      (`&conformance::Conformance`) for it, the same per-instance,
+      no-cohort-context shape `anchors_delays` already established.
     - [x] Both are **patient-level ⇒ non-shareable**, gated as
       `Action::Destructive` (mirroring the `continues_as` bulk-pull
       precedent, [cross-service-linking.md §10.2](../../agents/share/cross-service-linking.md))
@@ -1088,7 +1105,8 @@ manual check confirms it. Split tasks too big for one PR
       unit tests in `src/data_quality.rs` (15) cover every detector in
       isolation, the entropy function's boundary and peak values, and
       the report's own row/share/`anchor_note` shape.
-  - [ ] **T-14i — Conformance to the enrolled template.** Per
+  - [x] **T-14i — Conformance to the enrolled template.** Landed
+    2026-09-11, in the suggested order, right after T-14h. Per
     instance, the steps copied at enrolment (`instance_steps.position`)
     against their completion order (`done_on`): skipped steps, adjacent
     declared pairs completed out of order, steps completed after
@@ -1096,11 +1114,78 @@ manual check confirms it. Split tasks too big for one PR
     `pairs_in_order / declared_pairs` shipped with both numbers; cohort
     share fully conformant. Against the template only — never a
     discovered model — and with no penalty for extra events: a journey
-    may need more than its template foresaw.
+    may need more than its template foresaw. A new file,
+    `src/conformance.rs` (not a further `src/tba.rs` extension —
+    a genuinely separate concern, sequence-order comparison rather than
+    an elapsed-time computation, the same reasoning T-14b's/T-14c's/
+    T-14f's/T-14h's own new files followed): `StepRecord` (position +
+    `done_on` in epoch ms; `done` is not carried separately, since the
+    step-completion handler always sets `done`/`done_on` together),
+    `PairVerdict` (`in_order`/`inverted`/`skipped`, one per adjacent
+    declared pair), `conformance()` (the per-instance score),
+    `CohortConformance`/`cohort_conformance()` (the cohort rollup).
+    HTTP surface, `src/controllers/tba.rs`: `load_step_records`/
+    `count_escalation_events` (per-instance) and
+    `load_conformance_inputs` (cohort, bulk, no N+1 — the same shape
+    `analyze_cohort`/`data_quality::load_dq_inputs` already use), wired
+    into `GET /api/instances/{pid}/time-analysis` (a new `conformance`
+    key) and `GET /api/care-pathways/{pathway}/time-analysis` (a new
+    `conformance` cohort-share key, withheld under the identical
+    suppression decision `survival`/`split` already use — never a
+    separate one). Also closes T-14a's own reserved `conformance`
+    journey-feature export column (`src/analytics.rs`'s
+    `journey_feature_row`, which T-14d's `anchors_delays` had already
+    shown the pattern for): a compact JSON scalar summary, not the
+    per-pair breakdown the dedicated endpoint carries.
+    - [x] **`declared_pairs` is a fixed structural count, not reduced
+      by skips.** A pair with either endpoint undone verdicts
+      `skipped`, contributing to neither `pairs_in_order` (so it still
+      lowers the ratio, same as a genuine inversion would) nor to a
+      separate "not applicable" bucket — it is simply reported under
+      its own name so a UI (and this task's own acceptance text) never
+      mistakes a skip for an inversion. `ratio` is `None` only when
+      `declared_pairs == 0` (fewer than two declared steps at all);
+      a skipped-but-multi-step instance still gets a real (possibly
+      `0.0`) ratio.
+    - [x] **Cohort share denominator excludes no-pair instances,
+      not zero-pair ones.** `CohortConformance.with_ratio` counts only
+      instances whose own `ratio` is defined; an instance with fewer
+      than two declared steps has nothing to be conformant *about*, so
+      it is excluded from the share's denominator rather than silently
+      counted as either conformant or not (mirroring how `compliance`
+      excludes `unreached` from `within`/`breached` rather than
+      counting it as a breach).
+    - [x] **Not wired into `cohort_constraints`.** Template conformance
+      is not a recoverable-time constraint finding, unlike the ranked
+      findings that endpoint reports — a documented scope decision, not
+      an omission (pinned by `cohort_conformance_share_round_trip`'s
+      own assertion that `constraints` carries no `conformance` key).
+    - [x] **The DB-gated round trip stamps `done_on`/`closed_on`
+      directly on the model, bypassing the HTTP layer for exactly
+      those two fields.** `POST .../steps/{step}/complete` and the
+      status-transition-to-terminal path both always stamp
+      `Utc::now().date_naive()`/today — day-resolution, so two calls
+      within one fast test run land on the same date and cannot
+      exercise a genuine inversion or a same-day-vs-later-day closure
+      comparison. `tests/requests/conformance.rs` therefore builds
+      each instance through the real enrolment/segment/event
+      endpoints and only backdates the two fields the API itself
+      cannot backdate — the same precedent
+      `tests/requests/journeys_seed.rs`/`compliance.rs` already set.
     - **Acceptance:** completing steps in template order scores 1.0
       with zero inversions; reverse order scores 0; a skipped step is
       reported as skipped, not as an inversion; an instance with one
-      declared step reports `null` (no pairs) with the reason.
+      declared step reports `null` (no pairs) with the reason — all
+      four proven end to end against real Postgres
+      (`conformance_round_trip`), plus escalation events carried
+      without affecting the ratio and a step flagged as completed
+      after closure. The cohort share
+      (`cohort_conformance_share_round_trip`) clears the default
+      suppression floor at exactly five instances (three fully
+      conformant, two not) and confirms `constraints` carries no
+      `conformance` key. Pure unit tests in `src/conformance.rs` (14)
+      cover every branch directly, including ties, empty/one-step
+      cohorts, and the cohort rollup's `None`/empty edge cases.
   - [ ] **T-14j — Stalled journeys (aging WIP).**
     `GET /api/instances/stalled?idle_days=N` (default 60, echoed):
     open instances whose last recorded activity — latest of segment
@@ -1257,7 +1342,13 @@ manual check confirms it. Split tasks too big for one PR
       actually exercise this generator end to end
       (`tests/requests/data_quality.rs`), rather than a hand-built
       fixture — see that entry's own notes for the two real generator
-      bugs that exercise turned up. T-14i/T-14j remain not yet built. The repo demo seed (EX-4)
+      bugs that exercise turned up. **Update 2026-09-11 (T-14i):**
+      T-14i has since landed too, but its own
+      `tests/requests/conformance.rs` builds instances directly through
+      the enrolment/step/event endpoints rather than this generator —
+      `journeys:seed` has no defect code exercising step order at all,
+      so there was nothing here for it to reuse. T-14j remains not yet
+      built. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

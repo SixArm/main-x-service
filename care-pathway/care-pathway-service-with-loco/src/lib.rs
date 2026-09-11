@@ -36,6 +36,13 @@ pub mod auth;
 /// Bulk operations: durable `bulk_jobs` state and artifact storage.
 pub mod bulk;
 pub mod compliance;
+/// Conformance to the enrolled template: per instance, declared step
+/// order (`instance_steps.position`) against completion order
+/// (`done_on`) -- skipped steps, adjacent-pair inversions, steps
+/// completed after closure, `escalation` events -- plus a cohort
+/// fully-conformant share (spec `13-tasks.md` T-14i). Against the
+/// template only, never a discovered model.
+pub mod conformance;
 pub mod controllers;
 pub mod data;
 /// Journey data-quality and missingness report: eight closed-vocabulary
