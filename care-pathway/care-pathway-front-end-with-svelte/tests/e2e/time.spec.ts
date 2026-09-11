@@ -69,6 +69,169 @@ const COHORT = {
     target_met: false,
     as_of: "2026-08",
   },
+  attrition: [
+    {
+      label: "enrolled_on_pathway",
+      operation: "all instances",
+      instances: 22,
+      parent: null,
+    },
+    {
+      label: "status_filter",
+      operation: "no status filter given",
+      instances: 22,
+      parent: 0,
+    },
+    {
+      label: "window",
+      operation: "no date-window parameter given",
+      instances: 22,
+      parent: 1,
+    },
+    {
+      label: "degenerate_clock",
+      operation: "0 instances have a non-forward clock",
+      instances: 22,
+      parent: 2,
+    },
+    {
+      label: "coverage_floor",
+      operation: "no coverage floor exists yet",
+      instances: 22,
+      parent: 3,
+    },
+    {
+      label: "suppression",
+      operation: "22 clears the minimum cell count",
+      instances: 22,
+      parent: 4,
+    },
+  ],
+};
+
+/** The directly-follows process map — one node deliberately below the
+ * minimum cell count, to prove a withheld cell is visibly labelled. */
+const PROCESS_MAP = {
+  pathway: { pid: PATHWAY, name: "Suspected stroke" },
+  level: "stage",
+  instances: 22,
+  note: "directly-follows only — never a discovered model",
+  nodes: [
+    {
+      activity: "start",
+      instance_count: 22,
+      occurrence_count: 22,
+      median_duration_days: null,
+      suppressed: false,
+    },
+    {
+      activity: "referral",
+      instance_count: 22,
+      occurrence_count: 22,
+      median_duration_days: 1,
+      suppressed: false,
+    },
+    {
+      activity: "triage",
+      instance_count: 22,
+      occurrence_count: 22,
+      median_duration_days: 2,
+      suppressed: false,
+    },
+    {
+      activity: "rare_pathway",
+      instance_count: 0,
+      occurrence_count: 0,
+      median_duration_days: null,
+      suppressed: true,
+      suppression_note: "withheld: fewer than the minimum cell count",
+    },
+    {
+      activity: "end",
+      instance_count: 22,
+      occurrence_count: 22,
+      median_duration_days: null,
+      suppressed: false,
+    },
+  ],
+  edges: [
+    {
+      from: "start",
+      to: "referral",
+      instance_count: 22,
+      occurrence_count: 22,
+      median_gap_days: 0,
+      p90_gap_days: 0,
+      suppressed: false,
+    },
+    {
+      from: "referral",
+      to: "triage",
+      instance_count: 22,
+      occurrence_count: 22,
+      median_gap_days: 3,
+      p90_gap_days: 5,
+      suppressed: false,
+    },
+    {
+      from: "triage",
+      to: "end",
+      instance_count: 22,
+      occurrence_count: 22,
+      median_gap_days: 40,
+      p90_gap_days: 90,
+      suppressed: false,
+    },
+  ],
+};
+
+const VARIANTS = {
+  pathway: { pid: PATHWAY, name: "Suspected stroke" },
+  instances: 22,
+  suppressed_instances: 2,
+  params: {
+    min_segment_days: 1,
+    collapse_gap_days: 1,
+    combination_window_days: 3,
+    min_post_combination_days: 1,
+    filter: "all",
+    max_path_length: 10,
+  },
+  note: "never a discovered model",
+  variants: [
+    {
+      variant: "referral-triage-treatment",
+      frequency: 14,
+      share: 0.7,
+      cumulative_share: 0.7,
+    },
+    {
+      variant: "referral-triage-discharge",
+      frequency: 6,
+      share: 0.3,
+      cumulative_share: 1.0,
+    },
+  ],
+  lines: [
+    { position: "1", n: 20, median_days: 1, p90_days: 2 },
+    { position: "2", n: 20, median_days: 3, p90_days: 6 },
+  ],
+};
+
+const STALLED = {
+  as_of: "2026-08-23T12:00:00Z",
+  idle_days: 60,
+  note: "open instances whose last recorded activity is strictly older than idle_days",
+  stalled: [
+    {
+      pid: "66666666-6666-4666-8666-666666666666",
+      subject_ref: "person:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      urgency: "routine",
+      last_activity_at_ms: T0,
+      last_activity_source: "segment_end",
+      idle_days: 65,
+    },
+  ],
 };
 
 const CONSTRAINTS = {
@@ -92,6 +255,44 @@ const CONSTRAINTS = {
         "the longest single stretch in which nothing was recorded: 44.0 days",
       recoverable_ms: 44 * DAY,
       recoverable_days: 44,
+    },
+  ],
+  attrition: [
+    {
+      label: "enrolled_on_pathway",
+      operation: "all instances",
+      instances: 22,
+      parent: null,
+    },
+    {
+      label: "status_filter",
+      operation: "no status filter given",
+      instances: 22,
+      parent: 0,
+    },
+    {
+      label: "window",
+      operation: "no date-window parameter given",
+      instances: 22,
+      parent: 1,
+    },
+    {
+      label: "degenerate_clock",
+      operation: "0 instances have a non-forward clock",
+      instances: 22,
+      parent: 2,
+    },
+    {
+      label: "coverage_floor",
+      operation: "no coverage floor exists yet",
+      instances: 22,
+      parent: 3,
+    },
+    {
+      label: "suppression",
+      operation: "22 clears the minimum cell count",
+      instances: 22,
+      parent: 4,
     },
   ],
 };
@@ -312,6 +513,40 @@ async function stubTime(page: Page) {
     if (path === `/api/instances/${INSTANCE}/timeline`) return json(TIMELINE);
     if (path === `/api/instances/${INSTANCE}/time-analysis`)
       return json(ANALYSIS);
+    if (path === `/api/care-pathways/${PATHWAY}/process-map`)
+      return json(PROCESS_MAP);
+    if (path === `/api/care-pathways/${PATHWAY}/variants`)
+      return json(VARIANTS);
+    if (path === "/api/instances/stalled") return json(STALLED);
+    if (path === `/api/care-pathways/${PATHWAY}/export/event-log`) {
+      const rows = [
+        {
+          case_id: "a",
+          activity: "stage:referral",
+          lifecycle: "start",
+          timestamp: "2026-01-01T00:00:00Z",
+          category: "value_adding",
+        },
+        {
+          case_id: "a",
+          activity: "stage:triage",
+          lifecycle: "start",
+          timestamp: "2026-01-02T00:00:00Z",
+          category: "value_adding",
+        },
+        {
+          case_id: "b",
+          activity: "stage:referral",
+          lifecycle: "start",
+          timestamp: "2026-01-03T00:00:00Z",
+          category: "value_adding",
+        },
+      ];
+      return route.fulfill({
+        body: rows.map((row) => JSON.stringify(row)).join("\n"),
+        contentType: "application/x-ndjson",
+      });
+    }
     return route.fulfill({
       status: 404,
       json: { error: "unhandled in stub", path },
@@ -393,5 +628,90 @@ test.describe("time-based analysis", () => {
     await expect(bands).toHaveCount(4);
     await bands.first().focus();
     await expect(page.getByRole("status")).toContainText("First consultation");
+  });
+});
+
+// T-14l: the process map, journey-variant sunburst/Sankey, the
+// attrition flowchart, and the stalled list, plus the withheld-cell
+// rendering a suppressed process-map node exercises directly.
+test.describe("T-14 analytics views", () => {
+  test("renders the process map, with a suppressed node visibly withheld", async ({
+    page,
+  }) => {
+    await stubTime(page);
+    await page.goto("/time");
+
+    const map = page.getByTestId("process-map");
+    await expect(map).toBeVisible();
+    await expect(map).toContainText("referral");
+    await expect(map).toContainText("triage");
+
+    // The suppressed node's count is never blank — it names itself.
+    await expect(map).toContainText(
+      "withheld: fewer than the minimum cell count",
+    );
+  });
+
+  test("renders the variants sunburst, Sankey, and per-position duration lines", async ({
+    page,
+  }) => {
+    await stubTime(page);
+    await page.goto("/time");
+
+    await expect(page.getByTestId("variants-sunburst")).toBeVisible();
+    await expect(page.getByTestId("variants-sankey")).toBeVisible();
+    await expect(page.getByTestId("variants-suppressed")).toContainText(
+      "2 instances",
+    );
+
+    const lines = page.getByTestId("variant-lines");
+    await expect(lines).toContainText("1");
+    await expect(lines).toContainText("2");
+  });
+
+  test("loads the dotted chart only after an explicit action, never on page load", async ({
+    page,
+  }) => {
+    await stubTime(page);
+    let eventLogRequested = false;
+    // `fallback()`, not `continue()`: this route was registered *after*
+    // `stubTime`'s, so falling back hands the request to that earlier
+    // handler (which fulfils it with the stub body) instead of letting
+    // it escape to the real network.
+    await page.route(`**/export/event-log**`, async (route) => {
+      eventLogRequested = true;
+      await route.fallback();
+    });
+    await page.goto("/time");
+    await expect(page.getByTestId("variants-sunburst")).toBeVisible();
+    expect(eventLogRequested).toBe(false);
+
+    await page.getByRole("button", { name: "Load dotted chart" }).click();
+    await expect(page.getByTestId("dotted-chart")).toBeVisible();
+    expect(eventLogRequested).toBe(true);
+  });
+
+  test("renders the attrition flowchart and the CONSORT step labels", async ({
+    page,
+  }) => {
+    await stubTime(page);
+    await page.goto("/time");
+
+    const attrition = page.getByTestId("attrition-flowchart");
+    await expect(attrition).toBeVisible();
+    await expect(attrition).toContainText("enrolled_on_pathway");
+    await expect(attrition).toContainText("suppression");
+  });
+
+  test("lists a stalled journey with its idle days and last-activity source", async ({
+    page,
+  }) => {
+    await stubTime(page);
+    await page.goto("/time");
+
+    const stalledList = page.getByTestId("stalled-list");
+    await expect(stalledList).toBeVisible();
+    await expect(stalledList).toContainText("65");
+    await expect(stalledList).toContainText("segment_end");
   });
 });

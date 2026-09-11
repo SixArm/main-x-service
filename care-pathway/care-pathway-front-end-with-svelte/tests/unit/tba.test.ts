@@ -104,6 +104,74 @@ describe("TbaRepository paths", () => {
     await tba.timeline("a/b?c");
     expect(calls[0]?.url).toBe("http://svc/api/instances/a%2Fb%3Fc/timeline");
   });
+
+  it("maps the T-14 analytics endpoints (process map, variants, stalled)", async () => {
+    const { tba, calls } = recording();
+    await tba.processMap("p1");
+    await tba.processMap("p1", { level: "step", status: "open" });
+    await tba.variants("p1");
+    await tba.variants("p1", "closed");
+    await tba.stalled();
+    await tba.stalled(90);
+
+    expect(calls.map((c) => c.url)).toEqual([
+      "http://svc/api/care-pathways/p1/process-map",
+      "http://svc/api/care-pathways/p1/process-map?level=step&status=open",
+      "http://svc/api/care-pathways/p1/variants",
+      "http://svc/api/care-pathways/p1/variants?status=closed",
+      "http://svc/api/instances/stalled",
+      "http://svc/api/instances/stalled?idle_days=90",
+    ]);
+  });
+
+  it("adds a split key's parameters to cohort() and constraints() only when given", async () => {
+    const { tba, calls } = recording();
+    await tba.cohort("p1", {
+      contains: "stage:triage",
+      excludes: "outcome:deceased",
+      compare: true,
+    });
+    await tba.constraints("p1", "open", { contains: "urgency:urgent" });
+    await tba.cohort("p1");
+
+    expect(calls[0]?.url).toBe(
+      "http://svc/api/care-pathways/p1/time-analysis?contains=stage%3Atriage&excludes=outcome%3Adeceased&compare=true",
+    );
+    expect(calls[1]?.url).toBe(
+      "http://svc/api/care-pathways/p1/constraints?status=open&contains=urgency%3Aurgent",
+    );
+    expect(calls[2]?.url).toBe("http://svc/api/care-pathways/p1/time-analysis");
+  });
+
+  it("fetches and parses the event-log JSONL export for the dotted chart", async () => {
+    const calls: { url: string }[] = [];
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      calls.push({ url: String(input) });
+      const body = [
+        JSON.stringify({
+          case_id: "a",
+          activity: "stage:triage",
+          timestamp: "2026-01-01T00:00:00Z",
+        }),
+        JSON.stringify({
+          case_id: "b",
+          activity: "stage:referral",
+          timestamp: "2026-01-02T00:00:00Z",
+        }),
+      ].join("\n");
+      return new Response(body, { status: 200 });
+    }) as unknown as typeof fetch;
+    const tba = new TbaRepository(
+      new ApiClient({ baseUrl: "http://svc", fetch: fetchFn }),
+    );
+
+    const rows = await tba.eventLog("p1");
+    expect(calls[0]?.url).toBe(
+      "http://svc/api/care-pathways/p1/export/event-log?format=jsonl",
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.case_id).toBe("a");
+  });
 });
 
 describe("presentation helpers", () => {

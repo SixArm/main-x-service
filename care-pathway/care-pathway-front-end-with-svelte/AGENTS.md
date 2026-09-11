@@ -38,10 +38,11 @@ src/
 │   ├── api/
 │   │   ├── client.ts             lean fetch wrapper (+ ApiError); no browser-held bearer — the BFF proxy injects the PASETO server-side
 │   │   ├── types.ts              CarePathway + ConditionCode + CodeSystem + CareSetting + IdentifierScheme + PathwayIdentifier + PathwayRef + ScoredRef + MergeResult + AuditEntry + PathwayEvent + PathwayInstance/InstanceStatus/Urgency/InstanceDetail + the five insight response types
-│   │   ├── tba.ts                TbaRepository (timeline / instance + cohort analysis / constraints / standards / flow / segment + clock recording) + the presentation helpers
+│   │   ├── tba.ts                TbaRepository (timeline / instance + cohort analysis / constraints / standards / flow / segment + clock recording / process map / variants / stalled / event-log export) + the presentation helpers
 │   │   └── care-pathways.ts      CarePathwayRepository (CRUD + search + checkDuplicates + merge + audit + recentEvents + insights{Directory,Coverage,Variants,Providers,Languages} + listInstances + getInstance + setInstanceStatus + caseload)
 │   ├── server/                   BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (CARE_PATHWAY_API_URL / AUTH_API_URL)
-│   └── components/CarePathwayForm.svelte · JourneyTimeline.svelte (the timeline wall)
+│   ├── analytics-transforms.ts   T-14l: pure layout/graph transforms over the T-14 analytics payloads — layoutProcessMap (BFS-ranked layered layout), sunburstFromVariants/sunburstArcs + sankeyFromVariants (both terminating at a synthetic Stopped node), layoutAttrition, dottedChartPoints, withheldLabel — no DOM, no fetch
+│   └── components/CarePathwayForm.svelte · JourneyTimeline.svelte (the timeline wall) · ProcessMapView.svelte · VariantsSunburst.svelte · VariantsSankey.svelte · AttritionFlowchart.svelte · CompareView.svelte · StalledList.svelte · DottedChart.svelte (T-14l, all plain SVG — no new graph/charting dependency)
 └── routes/
     ├── +layout.svelte / +layout.ts / +layout.server.ts   nav + session panel
     ├── +page.svelte              registry grid (SVAR DataGrid + FilterBar); rows link to /{pid}
@@ -54,7 +55,7 @@ src/
     ├── board/+page.svelte        instance Kanban (one pathway; drag = POST /api/instances/{pid}/status) + a "Record a segment" panel (segment/clock recording, CPFE-T3)
     ├── gantt/+page.svelte        instance timeline Gantt (one pathway; enrolled_on → next_review/closed/today)
     ├── sequence/+page.svelte     intervention-sequence Gantt (a pathway template's interventions)
-    └── time/+page.svelte         time-based analysis: cohort ratio + NHS access-standard score + constraints + Little's Law, and one journey's timeline wall
+    └── time/+page.svelte         time-based analysis: cohort ratio + NHS access-standard score + constraints + Little's Law, one journey's timeline wall, plus (T-14l) the process map, variants sunburst/Sankey/dotted chart, the attrition flowchart, the rule-split filter + compare view, and the stalled-journeys list
 ```
 
 ## API consumption
@@ -76,10 +77,13 @@ src/
 | Instance detail | `GET /api/instances/{pid}` → `{instance,steps,team,events,measures}` |
 | Instance status move | `POST /api/instances/{pid}/status` (body `{to}`) |
 | Caseload (board context) | `GET /api/instances/caseload` |
-| Time-based analysis — cohort (`/time`) | `GET /api/care-pathways/{pid}/time-analysis?standard=` · `GET /api/care-pathways/{pid}/constraints` |
+| Time-based analysis — cohort (`/time`) | `GET /api/care-pathways/{pid}/time-analysis?standard=&contains=&excludes=&compare=` · `GET /api/care-pathways/{pid}/constraints` (same filter params) |
 | Time-based analysis — journey (`/time`) | `GET /api/instances/{pid}/timeline` · `GET /api/instances/{pid}/time-analysis` |
 | Access-standard catalogue + flow | `GET /api/instances/time-standards` · `GET /api/instances/flow?window_days=&pathway=` |
 | Segment / clock recording (`/board` "Record a segment" panel, CPFE-T3) | `POST /api/instances/{pid}/segments` · `POST /api/instances/{pid}/clock` |
+| Process map / variants (`/time`, T-14l) | `GET /api/care-pathways/{pid}/process-map` · `GET /api/care-pathways/{pid}/variants` |
+| Stalled journeys (`/time`, T-14l) | `GET /api/instances/stalled?idle_days=` |
+| Dotted chart (`/time`, T-14l — opt-in "Load dotted chart" button only, never on mount) | `GET /api/care-pathways/{pid}/export/event-log?format=jsonl` |
 
 ## Commands
 

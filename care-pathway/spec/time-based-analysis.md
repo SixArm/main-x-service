@@ -740,7 +740,9 @@ The live queue for this cross-cutting section. Entity-wide tasks live in
 
 **Extensions landed via [§13 T-14](13-tasks.md)** (triaged 2026-09-03
 from IPPA-py, the NHS BNSSG process-mining study, TreatmentPatterns, and
-ehrapy; all twelve sub-tasks complete as of 2026-09-11 — see each
+ehrapy; all thirteen sub-tasks complete as of 2026-09-11, including
+T-14l's front-end views in the sibling
+`care-pathway-front-end-with-svelte` crate — see each
 task's own entry for landed dates and scope decisions): stage anchors +
 anchored standards (T-14d, which also settles the anchor half of the
 "segment templates" question in §17), censoring-aware cohort statistics

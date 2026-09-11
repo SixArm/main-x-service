@@ -9,6 +9,56 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — front-end analytics views (CPFE-T6 / spec `13-tasks.md` T-14l)
+
+`/time` gains the directly-follows **process map**, journey-variant
+**sunburst** and **Sankey** diagrams (both terminated by a synthetic
+`Stopped` node), a process-mining **dotted chart**, the CONSORT
+**attrition flowchart**, a `contains=`/`excludes=`/`compare=` **filter**
+and its two-column **compare** view, and the **stalled-journeys** list.
+A withheld cell (a suppressed process-map node/edge, a suppressed
+compare side) is always visibly labelled, never blank.
+
+- New pure module `src/lib/analytics-transforms.ts` (no DOM, no
+  fetch): `layoutProcessMap` (BFS-ranked layered layout off the `start`
+  pseudo-node; self-loops/back-edges flagged for a curved render
+  rather than re-lowering a rank), `sunburstFromVariants`/`sunburstArcs`
+  and `sankeyFromVariants` (both terminating every path at a synthetic
+  `Stopped` node), `layoutAttrition`, `dottedChartPoints`,
+  `withheldLabel`. 16 new vitest tests.
+- New components (all plain SVG — no new graph/charting dependency):
+  `ProcessMapView`, `VariantsSunburst`, `VariantsSankey`,
+  `AttritionFlowchart`, `CompareView`, `StalledList`, `DottedChart`.
+- `src/lib/api/tba.ts`: `ProcessMapResponse`/`VariantsReport`/`Stalled`/
+  `EventLogRow`/`AttritionStep`/`Split`/`SplitFindings` types;
+  `processMap()`/`variants()`/`stalled()`/`eventLog()` methods;
+  `cohort()`/`constraints()` extended with `SplitOptions`. 3 new
+  vitest tests. `src/lib/api/client.ts` gained `ApiClient.getText()` —
+  a raw, unparsed-body `GET`, since the JSONL event-log export is not
+  JSON.
+- **Scope decision:** the dotted chart is built from the bulk
+  `event_log` export, which the service gates `Destructive` and audits
+  as a disclosure on every call — so it loads only behind an explicit
+  "Load dotted chart" button, never on page mount.
+- **Scope decision:** new `time.*` i18n keys were added across all 13
+  locales for this task's own new UI text — a deliberate departure
+  from CPFE-T3's stated "literal English … matching `/time`'s existing
+  precedent" call, because this task's acceptance text explicitly asks
+  for i18n coverage. The pre-existing `/time` content is not
+  retrofitted with `t()` calls.
+- New Playwright cases in `tests/e2e/time.spec.ts` (5 tests): a
+  suppressed process-map node renders "withheld: fewer than the
+  minimum cell count", never blank; the sunburst/Sankey/duration lines
+  render; the dotted chart is proven **not** requested until the load
+  button is clicked; the attrition flowchart renders every CONSORT
+  step label; the stalled list shows idle days + last-activity source.
+  Found and fixed a real bug while writing the dotted-chart test:
+  `route.fallback()`, not `route.continue()`, is required when a route
+  handler registered after the stub's own handler wants to fall
+  through to it rather than hit the real network.
+- Verified: `pnpm run check` (0 errors), `pnpm test` (83 passed),
+  `pnpm test:e2e` (15 passed), `pnpm run lint` (no new violations).
+
 ### Added — wired the segment/clock recording UI on `/board` (CPFE-T3)
 
 `TbaRepository.recordSegment`/`.setClock` already existed, but no page

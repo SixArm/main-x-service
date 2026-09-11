@@ -108,8 +108,12 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA. All twelve sub-tasks have landed —
-T-14 is complete. See
+analytics suite T-14 builds on TBA. All twelve of this crate's own
+backend sub-tasks have landed. T-14 also has a thirteenth,
+front-end-only sub-task, T-14l, in the sibling
+`care-pathway-front-end-with-svelte` crate — out of this crate's own
+scope, but also landed (2026-09-11), so T-14 is complete across both
+crates. See
 `../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i/T-14j
 for each one's documented scope deviations from its original spec
 text: three landed out of T-14's own suggested build order, since each
