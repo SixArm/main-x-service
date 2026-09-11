@@ -34,6 +34,7 @@ fn paths() -> Value {
     merge_object(&mut paths, tba_analysis_paths());
     merge_object(&mut paths, constraints_paths());
     merge_object(&mut paths, export_paths());
+    merge_object(&mut paths, data_quality_paths());
     merge_object(&mut paths, variants_paths());
     merge_object(&mut paths, instance_paths());
     merge_object(&mut paths, insight_paths());
@@ -560,6 +561,31 @@ fn export_paths() -> Value {
                     "403": { "description": "Policy denied" },
                     "404": { "description": "Unknown pathway" },
                     "422": { "description": "Unrecognised format" }
+                }
+            }
+        }
+    })
+}
+
+/// The journey data-quality and missingness report (spec T-14h) —
+/// its own function alongside `export_paths`/`variants_paths`/
+/// `constraints_paths`, all part of the same TBA analysis surface.
+fn data_quality_paths() -> Value {
+    serde_json::json!({
+        "/api/care-pathways/{pathway}/data-quality": {
+            "get": {
+                "tags": ["time-based-analysis"],
+                "summary": "Journey data-quality and missingness report (T-14h)",
+                "description": "Eight closed-vocabulary defect codes (matching data::journeys::DEFECT_CODES name for name) as counts/shares over the cohort -- no_segments, open_segment_past_closure, terminal_without_clock_stop, step_done_before_enrolled, steps_out_of_order, segment_clipped_by_clock, coverage_below_floor, anchors_unreached -- plus per-stage missingness percentage and binary entropy (bits). The report is the finding; it never imputes. Every code row is always present, even at zero -- an empty cell is itself a finding, never an omitted row. anchors_unreached only evaluates with a from_anchor/to_anchor pair (T-14d's own mechanism); an invalid or one-sided pair falls back to \"not evaluated\" with a disclosed anchor_note rather than a 422 or a silent guess. Gated like the sibling cohort views (time-analysis/constraints), not like the bulk exports -- an aggregate count report, not a pull of instance rows.",
+                "parameters": [
+                    { "name": "pathway", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "closed", "all"] } },
+                    { "name": "from_anchor", "in": "query", "schema": { "type": "string", "example": "referral" }, "description": "A stage to anchor the anchors_unreached interval's start on. Requires to_anchor." },
+                    { "name": "to_anchor", "in": "query", "schema": { "type": "string", "example": "diagnostics" }, "description": "The stage to anchor the anchors_unreached interval's end on. Requires from_anchor." }
+                ],
+                "responses": {
+                    "200": { "description": "Data-quality report" },
+                    "404": { "description": "Unknown pathway" }
                 }
             }
         }

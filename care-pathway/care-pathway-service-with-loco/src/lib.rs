@@ -38,6 +38,11 @@ pub mod bulk;
 pub mod compliance;
 pub mod controllers;
 pub mod data;
+/// Journey data-quality and missingness report: eight closed-vocabulary
+/// defect codes (matching `data::journeys::DEFECT_CODES` name for
+/// name) plus per-stage missingness percentage and entropy (spec
+/// `13-tasks.md` T-14h). Never imputes — the report is the finding.
+pub mod data_quality;
 /// HL7 FHIR R5 interop: the `PlanDefinition` resource + envelope wire
 /// types, and search-parameter parsing for the mounted `/fhir` endpoints.
 pub mod fhir;

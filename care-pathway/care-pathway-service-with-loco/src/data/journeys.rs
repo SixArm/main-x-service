@@ -27,9 +27,9 @@
 //! A clean (no defect requested) instance satisfies every
 //! `spec/time-based-analysis.md` §5.1 segment invariant by
 //! construction. [`DEFECT_CODES`] injects exactly one violation per
-//! requested code, for T-14h's still-unbuilt data-quality report to
-//! test against once it lands — see that constant's own doc comment
-//! for the one T-14h code this generator cannot yet produce.
+//! requested code, and every code is now exercised end to end by
+//! T-14h's data-quality report (`src/data_quality.rs`,
+//! `tests/requests/data_quality.rs`).
 
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 
@@ -50,13 +50,15 @@ pub const ACTOR_PREFIX: [u8; 4] = [0xfa, 0xca, 0xde, 0x51];
 pub const LOCATION_PREFIX: [u8; 4] = [0xfa, 0xca, 0xde, 0x52];
 
 /// The closed vocabulary of injectable defects, one instance per
-/// requested code (spec T-14m, extending T-14h's still-unbuilt report).
-/// Each name matches the condition T-14h's own spec text lists.
+/// requested code (spec T-14m, consumed by T-14h's data-quality
+/// report). Each name matches the condition T-14h's own spec text
+/// lists.
 ///
-/// T-14h's spec text lists an eighth code, "anchors unreached" — not
-/// included here because it needs T-14d's stage-anchor configuration,
-/// which does not exist yet. Adding it is a follow-up once T-14d lands,
-/// not a silent omission.
+/// The eighth code, `anchors_unreached`, needed T-14d's stage-anchor
+/// configuration, which had not landed when this list was first
+/// written; it has since landed, and this entry with it (2026-09-11,
+/// T-14h) — see [`apply_defect`]'s own match arm for exactly what it
+/// injects (a referral reached, diagnostics never reached).
 pub const DEFECT_CODES: &[&str] = &[
     "no_segments",
     "open_segment_past_closure",
@@ -65,6 +67,7 @@ pub const DEFECT_CODES: &[&str] = &[
     "steps_out_of_order",
     "segment_clipped_by_clock",
     "coverage_below_floor",
+    "anchors_unreached",
 ];
 
 /// The fixed reference date every seeded cohort's `enrolled_on` spread
@@ -493,8 +496,30 @@ fn placeholder_segment(instance: &GeneratedInstance) -> GeneratedSegment {
     }
 }
 
+/// If this instance closed (so the controller's `resolve_clock` would
+/// use `clock_stop_at`, which `resolve_closure` always sets alongside
+/// `closed_on`), widen it to at least `floor` —
+/// never shrink it. An instance that stayed open needs no change:
+/// `resolve_clock` falls back to `as_of`, which is always comfortably
+/// past any 2026-anchored `floor`.
+///
+/// Without this, a defect arm that replaces `segments` with a single
+/// short, controlled interval can still be clipped by the *original*
+/// (unrelated) random clock this instance's un-mutated closure left
+/// behind — the base cohort's shortest possible segment is 15 minutes
+/// with a zero-length gap, comfortably under this function's 2-hour
+/// floor, so the failure is not rare (found via a seeded run, not
+/// inspection: `segment_clipped_by_clock` fired on two instances
+/// instead of one).
+fn widen_clock_stop_past(instance: &mut GeneratedInstance, floor: DateTime<Utc>) {
+    if instance.closed_on.is_some() {
+        instance.clock_stop_at = Some(instance.clock_stop_at.map_or(floor, |s| s.max(floor)));
+    }
+}
+
 /// Mutate an otherwise-clean instance to introduce exactly the named
 /// [`DEFECT_CODES`] condition, and nothing else.
+#[allow(clippy::too_many_lines)] // one match arm per DEFECT_CODES entry, each self-contained
 fn apply_defect(instance: &mut GeneratedInstance, code: &str) {
     match code {
         "no_segments" => instance.segments.clear(),
@@ -516,9 +541,38 @@ fn apply_defect(instance: &mut GeneratedInstance, code: &str) {
             }
         }
         "terminal_without_clock_stop" => {
+            // `has_terminal_without_clock_stop`'s primary scenario
+            // (its own doc comment) is `stop_source` falling back to
+            // `closed_on`, not the rarer double-missingness case of
+            // falling all the way back to `as_of` -- so `closed_on`
+            // is set to the journey's own natural close point (last
+            // segment activity, or enrolment if there is none) rather
+            // than cleared too. Clearing both left `resolve_clock`
+            // with nothing but `as_of`, giving this instance a clock
+            // that ran to the real wall-clock "now" against its
+            // short, unrelated segments -- which incidentally also
+            // tripped `coverage_below_floor` on every seed tried.
+            // `closed_on` is day-resolution: `resolve_clock` reads it
+            // as midnight of that date. Using the last segment's own
+            // *day* would resolve to a midnight at or before that
+            // segment's own time-of-day, clipping it -- so the date
+            // is always the day *after* the last segment activity
+            // (midnight of the next day is later than any time on the
+            // day before it, regardless of gap sizes), never the
+            // segments' own last day.
+            let natural_close = instance
+                .segments
+                .iter()
+                .filter_map(|s| s.ended_at.or(Some(s.started_at)))
+                .max()
+                .unwrap_or(
+                    instance
+                        .clock_start_at
+                        .unwrap_or_else(|| midnight(instance.enrolled_on)),
+                );
             instance.status = "completed".to_string();
             instance.outcome = Some((*rules::OUTCOMES.first().unwrap_or(&"other")).to_string());
-            instance.closed_on = None;
+            instance.closed_on = Some(natural_close.date_naive() + Duration::days(1));
             instance.clock_stop_at = None;
         }
         "step_done_before_enrolled" => {
@@ -572,6 +626,23 @@ fn apply_defect(instance: &mut GeneratedInstance, code: &str) {
                 actor_ref: None,
                 location_ref: None,
             }];
+            widen_clock_stop_past(instance, start + Duration::hours(2));
+        }
+        "anchors_unreached" => {
+            let start = instance
+                .clock_start_at
+                .unwrap_or_else(|| midnight(instance.enrolled_on));
+            instance.segments = vec![GeneratedSegment {
+                label: "referred".to_string(),
+                stage: "referral".to_string(),
+                category: tba::CATEGORY_VALUE_ADDING.to_string(),
+                waste: None,
+                started_at: start,
+                ended_at: Some(start + Duration::hours(1)),
+                actor_ref: None,
+                location_ref: None,
+            }];
+            widen_clock_stop_past(instance, start + Duration::hours(2));
         }
         other => {
             unreachable!("generate_cohort validates codes before calling apply_defect: {other}")
@@ -747,7 +818,10 @@ mod tests {
                 }
                 "terminal_without_clock_stop" => {
                     assert!(rules::is_terminal(&instance.status));
-                    assert!(instance.closed_on.is_none());
+                    // `closed_on` is set (the intended primary
+                    // scenario, its "closed_on" resolve_clock
+                    // fallback) -- only `clock_stop_at` is missing.
+                    assert!(instance.closed_on.is_some());
                     assert!(instance.clock_stop_at.is_none());
                 }
                 "step_done_before_enrolled" => {
@@ -766,6 +840,14 @@ mod tests {
                     let segment = &instance.segments[0];
                     let span = segment.ended_at.expect("closed") - segment.started_at;
                     assert!(span <= Duration::hours(1));
+                }
+                "anchors_unreached" => {
+                    assert_eq!(instance.segments.len(), 1);
+                    assert_eq!(instance.segments[0].stage, "referral");
+                    assert!(
+                        instance.segments.iter().all(|s| s.stage != "diagnostics"),
+                        "diagnostics must never be reached"
+                    );
                 }
                 other => panic!("unexercised defect code: {other}"),
             }

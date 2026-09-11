@@ -387,8 +387,8 @@ manual check confirms it. Split tasks too big for one PR
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
   below), then **T-14k, T-14b, T-14c, T-14d, and T-14e, all on
-  2026-09-10, and T-14f and T-14g both on 2026-09-11** — nine
-  sub-tasks landed. Three of those nine (T-14a, T-14m, T-14k) were out of the suggested
+  2026-09-10, and T-14f, T-14g, and T-14h all on 2026-09-11** — ten
+  sub-tasks landed. Three of those ten (T-14a, T-14m, T-14k) were out of the suggested
   order above, because none needed the tasks still ahead of it in
   this list to be useful now (see each entry's own scope notes;
   T-14a's covers why it needs no suppression pass from T-14k: it
@@ -401,7 +401,7 @@ manual check confirms it. Split tasks too big for one PR
   `src/variants.rs`, rather than adding to the already-large
   `src/analytics.rs` — the same reasoning that gave T-14k its own
   `src/suppression.rs` rather than folding into `src/tba.rs`. The
-  remaining **six landed in the suggested order**: T-14b, T-14c, and
+  remaining **seven landed in the suggested order**: T-14b, T-14c, and
   T-14d are the "three derivations" trio in full, **T-14e followed
   immediately after** — its pure logic sits in `src/tba.rs` itself too
   (not a new sibling module, same reasoning as T-14d's), since
@@ -418,12 +418,19 @@ manual check confirms it. Split tasks too big for one PR
   `attrition_trail`, `attrition_rule_branch`) extends `src/tba.rs`
   itself rather than a new sibling module, since a CONSORT step record
   is a small, mechanical data structure, not a genuinely separate
-  algorithm the way T-14c's/T-14f's own new files were.
+  algorithm the way T-14c's/T-14f's own new files were. **T-14h
+  followed T-14g**, again exactly next — it got its own new file,
+  `src/data_quality.rs`, for the same reason T-14c's/T-14f's/T-14k's
+  own new files did (detectors over already-computed figures, not an
+  elapsed-time computation), and is the **first task to actually
+  exercise T-14m's generator** end to end rather than a hand-built
+  fixture — see its own entry and T-14m's updated one for the two real
+  generator bugs that exercise turned up and this task fixed.
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g were also
-    still unbuilt (all eight have since landed too; T-14h–j remain
+    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h were also
+    still unbuilt (all nine have since landed too; T-14i/T-14j remain
     open) — because the two codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
@@ -840,7 +847,11 @@ manual check confirms it. Split tasks too big for one PR
       follow-up, not a rushed, under-thought-through fit. `data-quality`
       (T-14h) does not exist yet either, for the same reason T-14a's
       `anchors_delays`/`variant` columns were reserved ahead of their
-      own sibling tasks landing.
+      own sibling tasks landing. **Update 2026-09-11:** T-14h has since
+      landed the same day, and does not accept `contains=`/`excludes=`/
+      `compare=` either — it is a per-instance detector aggregate, not
+      a cohort split, and the same "needs its own design pass" applies
+      to it too, not merely "does not exist".
     - [x] **The bare instance count is never withheld, only detail
       is** — matching this family's existing scalar-suppression
       convention (`agents/share/time-based-analysis.md` §12.2: hide
@@ -923,7 +934,14 @@ manual check confirms it. Split tasks too big for one PR
       genuine open design question better resolved by T-14h (which
       already lists "coverage below the floor" as one of *its own*
       reportable codes) than invented here as a side effect of a
-      reporting task. `degenerate_clock` is the one exception worth
+      reporting task. **Update 2026-09-11:** T-14h has since landed
+      (the same day) and reports `coverage_below_floor`, but this
+      `attrition` step's own `coverage_floor` gap is still open — T-14h
+      *discloses* the count, exactly as this step's own `window` and
+      `degenerate_clock` siblings disclose theirs, and never excludes
+      an instance from `cohort`/`compliance`/`survival` on that basis.
+      "What threshold would exclude" is a different, still-unmade
+      decision from "what threshold is worth naming". `degenerate_clock` is the one exception worth
       naming precisely: a degenerate-clock instance
       (`tba::analyze`'s own `reason: Some(_)` case — `clock.stop_ms`
       not strictly after `clock.start_ms`) is **disclosed, not
@@ -963,19 +981,113 @@ manual check confirms it. Split tasks too big for one PR
       actually cleared, and the rule-branch's `matched`/`complement`
       leaves matching `split`'s own counts exactly — all against real
       Postgres.
-  - [ ] **T-14h — Journey data-quality and missingness report.**
+  - [x] **T-14h — Journey data-quality and missingness report.**
+    Landed 2026-09-11, in the suggested order, right after T-14g.
     `GET /api/care-pathways/{pathway}/data-quality`: per cohort, the
     share of instances with no segments, an open segment past closure,
     a terminal status with no clock stop, `done_on` before
     `enrolled_on`, out-of-order step completion, segments clipped by the
     clock, coverage below the floor, and anchors unreached — each a
     code in a closed vocabulary (BNSSG's `bad_date` 1–5, generalised);
-    plus per-stage and per-field missingness percentage and entropy of
-    missingness across instances. The report is the finding; it never
-    imputes (see the triage table).
+    plus per-stage missingness percentage and entropy of missingness
+    across instances. The report is the finding; it never imputes (see
+    the triage table). A new pure module, `src/data_quality.rs` (not a
+    further `src/tba.rs` extension, unlike T-14d/e/g — this is a
+    genuinely separate concern, detectors over already-computed
+    figures, not an elapsed-time computation, the same reasoning
+    T-14c's/T-14f's/T-14k's own new files followed): `DQ_CODES` (the
+    closed eight-entry vocabulary, name-for-name matching T-14m's own
+    `DEFECT_CODES`), eight `has_*` detector functions, one per code,
+    each reusing an already-resolved fact (`tba::Clock`, `tba::clip`,
+    the cohort's own `coverage_ratio`, T-14d's `StageAnchor`s) rather
+    than re-deriving it; `binary_entropy_bits` (Shannon entropy of a
+    per-stage present/absent Bernoulli variable, peaking at 1 bit at
+    p=0.5); and `build_report`, folding every instance's detector
+    results into per-code `{code, instances, share}` rows plus a
+    per-stage `missingness` array. `src/controllers/data_quality.rs`:
+    `GET /api/care-pathways/{pathway}/data-quality`
+    (`?status=&from_anchor=&to_anchor=`), gated like the sibling
+    cohort views (no record-level ABAC, the blanket guard only — this
+    is an aggregate count report, not a bulk pull of instance rows).
+    - [x] **Scope decision: per-stage missingness only, not
+      per-field.** The spec text names "per-field missingness" with no
+      field list, and inventing one would be exactly the kind of
+      unstated assumption this crate's own discipline refuses — the
+      closed `tba::STAGES` vocabulary already exists and is what every
+      other T-14 aggregate reports against, so missingness is reported
+      per stage, not per an invented field set. A per-field pass is a
+      documented follow-up if a concrete field list is ever named.
+    - [x] **`anchor_note` consolidates one decision, not two.** T-14d's
+      own `resolve_anchor_pair(query)` was refactored to a
+      `pub(crate) fn resolve_anchor_pair_raw` taking the raw
+      `Option<&str>` pair directly, so both `controllers::tba` and this
+      new controller share the one parser. `build_report` takes that
+      function's full `Result<Option<(&str,&str)>, &'static str>`
+      as its anchor-pair parameter (not a plain `Option`, and not a
+      second top-level HTTP field) — the one value already
+      distinguishing "no pair requested" from "a pair was requested but
+      did not parse", so `anchors_unreached`'s own "not evaluated"
+      disclosure and the report-level `anchor_note` are one field, not
+      two that could disagree.
+    - [x] **Two real generator bugs found and fixed while building the
+      DB-gated test, not this crate's own bug.** T-14m's generator
+      (`src/data/journeys.rs`) had never been exercised end to end
+      before this task (see its own entry's update above); running it
+      for real surfaced two defect-construction gaps a hand-built
+      fixture had never hit: (1) `coverage_below_floor`'s and
+      `anchors_unreached`'s injected one-hour segment could itself be
+      clipped by the *base* clean instance's own random, untouched
+      clock, since the shortest possible base segment is 15 minutes
+      with a zero-length gap — fixed by a new `widen_clock_stop_past`
+      helper that widens (never shrinks) a closed instance's
+      `clock_stop_at` to comfortably contain the injected segment,
+      regardless of what the pre-defect instance's clock happened to
+      be. (2) `terminal_without_clock_stop` cleared `closed_on`
+      alongside `clock_stop_at`, which is the *rarer* double-missingness
+      case `has_terminal_without_clock_stop`'s own doc comment already
+      named, not its primary scenario — the "as of now" clock fallback
+      this produced incidentally tripped `coverage_below_floor` on
+      every seed tried; fixed by setting `closed_on` to the day after
+      the journey's own last segment activity (day-resolution, so
+      pushed a full day past — not merely past — the last segment, to
+      avoid the very "midnight before the segment's own time-of-day"
+      trap this same fix could otherwise have reintroduced).
+    - [x] **`segment_clipped_by_clock` and `open_segment_past_closure`
+      genuinely overlap, and that is correct, not a residual bug.** An
+      open segment on a terminal instance is clipped once its
+      effective end is bounded by "as of now" rather than the clock's
+      own stop — exactly `has_segment_clipped_by_clock`'s own stated
+      rule, applied to a real case rather than a constructed one. The
+      two codes are not defined to be mutually exclusive, so the
+      dedicated `open_segment_past_closure` instance legitimately
+      fires both; this is disclosed in the test's own comments rather
+      than forced apart.
+    - [x] **The acceptance text's "each code exactly once per defect"
+      is verified per defect, not across one shared eight-defect
+      cohort.** A combined-cohort test was tried first and abandoned:
+      several defects are, by construction, *also* low-coverage or
+      clock-clipped journeys (a short journey against a multi-hour
+      gap-bearing clock window commonly clears under
+      `coverage_below_floor`'s threshold whether or not that is the
+      defect actually requested), which no fixed seed can reliably
+      avoid across every code at once without depending on incidental
+      non-overlap the generator makes no promise about. Each code is
+      instead checked against its own one-instance cohort (fresh
+      pathway, `n=0`, `defects=[code]`), which is what actually pins
+      "exactly once" without that dependency.
     - **Acceptance:** a seeded cohort with injected defects (T-14m)
-      reports each code exactly once per defect; a clean cohort reports
-      every code at zero, rows present.
+      reports each code exactly once per defect — proven per defect in
+      isolation (`each_dq_code_fires_exactly_once_on_a_seeded_cohort`);
+      a clean cohort reports every code at zero, rows present
+      (`a_clean_cohort_reports_every_code_at_zero_with_rows_present`,
+      also proving a malformed anchor pair carries its own reason and
+      an absent one reads as "not evaluated", never a silent zero); an
+      empty pathway still returns every row, with no share to divide by
+      rather than a misleading `0.0`
+      (`an_empty_pathway_reports_every_row_with_no_instances`). Pure
+      unit tests in `src/data_quality.rs` (15) cover every detector in
+      isolation, the entropy function's boundary and peak values, and
+      the report's own row/share/`anchor_note` shape.
   - [ ] **T-14i — Conformance to the enrolled template.** Per
     instance, the steps copied at enrolment (`instance_steps.position`)
     against their completion order (`done_on`): skipped steps, adjacent
@@ -1103,6 +1215,22 @@ manual check confirms it. Split tasks too big for one PR
       fixture instead, matching T-14b's/T-14c's precedent — see T-14d's
       own scope notes below), still deferred here, with a documented
       reason in `DEFECT_CODES`'s own doc comment, not silently dropped.
+      **Update 2026-09-11 (T-14h):** the eighth code, `anchors_unreached`,
+      is now in `DEFECT_CODES` too — all eight land. T-14h's own build
+      found and fixed two real generator bugs this "seven of eight"
+      state had never been tested against: an open segment on a
+      terminal instance is *also* clipped by `has_segment_clipped_by_clock`
+      once its effective end is bounded by "as of now" (a genuine,
+      disclosed overlap between two codes, not a bug — kept); and
+      `terminal_without_clock_stop` originally cleared `closed_on` as
+      well as `clock_stop_at`, which fell all the way back to an
+      `as_of`-bounded clock spanning to the real wall-clock "now" and
+      incidentally tripped `coverage_below_floor` on every seed tried —
+      fixed by setting `closed_on` to the day after the journey's own
+      last segment activity (its actually-intended `resolve_clock`
+      fallback), never cleared alongside `clock_stop_at`. Both fixes are
+      in `src/data/journeys.rs`'s `apply_defect`/`widen_clock_stop_past`,
+      pinned by this crate's own pure and DB-gated tests, not T-14h's.
     - [x] The pseudo-random source is a hand-rolled `SplitMix64`
       (`src/data/journeys.rs`'s private `Rng`), not the `rand` crate:
       reproducibility across `rand` versions is not part of that
@@ -1125,8 +1253,11 @@ manual check confirms it. Split tasks too big for one PR
       test" is **still not true** — T-14b, T-14c, T-14d, T-14e, T-14f
       and T-14g have since landed too, but each used a small
       hand-built fixture rather than this generator (see their own
-      scope notes); this generator remains available for T-14h/i/j to
-      build on, not yet exercised by any of them. The repo demo seed (EX-4)
+      scope notes). **Update 2026-09-11 (T-14h):** T-14h is the first to
+      actually exercise this generator end to end
+      (`tests/requests/data_quality.rs`), rather than a hand-built
+      fixture — see that entry's own notes for the two real generator
+      bugs that exercise turned up. T-14i/T-14j remain not yet built. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

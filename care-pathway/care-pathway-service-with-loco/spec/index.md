@@ -456,7 +456,9 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    and their own notion of "compare" would need its own design pass,
    so wiring the same contract onto them is a documented follow-up,
    not attempted here; `data-quality` (T-14h) does not exist yet
-   either. `setting:<s>` compares against the pathway's *lowercased*
+   either (item 29, since landed the same day, does not accept these
+   params either — it is a per-instance detector aggregate, not a
+   cohort split). `setting:<s>` compares against the pathway's *lowercased*
    care setting (`controllers::exports::care_setting_string`, reused
    rather than duplicated) — `"Outpatient"` → `setting:outpatient` —
    confirmed by reading the existing derivation, not guessed. Pure
@@ -506,6 +508,59 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    (`cohort_query()` — extracted from `load_cohort` so a *counting*
    query and the *loading* query can never diverge — `attrition_counts()`,
    `build_attrition()`). Landed 2026-09-11, spec T-14g.
+29. **Journey data-quality and missingness report.**
+   `GET /api/care-pathways/{pathway}/data-quality` (spec T-14h,
+   `?status=&from_anchor=&to_anchor=`): per cohort, the share of
+   instances with no segments, an open segment past closure, a
+   terminal status with no clock stop, `done_on` before `enrolled_on`,
+   out-of-order step completion, segments clipped by the clock,
+   coverage below the floor, and anchors unreached — eight codes in a
+   closed vocabulary (BNSSG's `bad_date` 1–5, generalised) — plus
+   per-stage missingness percentage and entropy across instances. The
+   report is the finding; it never imputes. **Scope decision:**
+   per-**stage** missingness only (the closed `tba::STAGES`
+   vocabulary), not per-field — the spec text names no field list, and
+   inventing one would be an unstated assumption this crate's own
+   discipline refuses. Pure logic in new
+   [`src/data_quality.rs`](../src/data_quality.rs) (not a further
+   `src/tba.rs` extension — a genuinely separate concern, the same
+   reasoning item 27's/T-14c's/T-14k's own new files followed):
+   `DQ_CODES` (matching T-14m's `DEFECT_CODES` name-for-name), eight
+   `has_*` detectors reusing already-resolved facts (`tba::Clock`,
+   `tba::clip`, the cohort's own coverage ratio, item 25's
+   `StageAnchor`s), `binary_entropy_bits` (Shannon entropy of a
+   per-stage present/absent Bernoulli variable), and `build_report`.
+   `anchor_note` reuses item 25's own anchor-pair parser
+   (`resolve_anchor_pair_raw`, extracted from `resolve_anchor_pair` so
+   both controllers share one parser) and consolidates "no pair
+   requested" vs. "a pair was requested but did not parse" into the
+   one field `anchors_unreached`'s own disclosure needs, never a
+   second top-level key. HTTP surface:
+   [`src/controllers/data_quality.rs`](../src/controllers/data_quality.rs),
+   gated like the sibling cohort views — no record-level ABAC, the
+   blanket guard only, since this is an aggregate count report rather
+   than a bulk pull of instance rows. This is the **first task to
+   actually exercise T-14m's generator** end to end rather than a
+   hand-built fixture, and doing so found and fixed two real generator
+   bugs in [`src/data/journeys.rs`](../src/data/journeys.rs): a
+   defect's own injected segment could itself be clipped by the base
+   instance's untouched random clock (fixed by a new
+   `widen_clock_stop_past` helper), and `terminal_without_clock_stop`
+   cleared `closed_on` alongside `clock_stop_at`, landing on the rarer
+   double-missingness "as of now" clock fallback rather than its
+   primary "closed_on" one, which incidentally tripped
+   `coverage_below_floor` on every seed tried (fixed by setting
+   `closed_on` to the day after the journey's own last segment
+   activity). Two codes genuinely overlap by design, not by residual
+   bug: `open_segment_past_closure`'s dedicated instance also fires
+   `segment_clipped_by_clock`, since an open segment's effective end is
+   bounded by "as of now" once the instance is terminal — exactly that
+   detector's own stated rule. The acceptance text's "each code
+   exactly once per defect" is accordingly verified **per defect in
+   isolation** (a fresh one-instance cohort per code), not across one
+   shared eight-defect cohort — several defects are, by construction,
+   also low-coverage or clock-clipped journeys, which no fixed seed can
+   reliably keep apart at once. Landed 2026-09-11, spec T-14h.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

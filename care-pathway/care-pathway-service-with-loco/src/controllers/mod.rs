@@ -4,6 +4,10 @@ pub mod care_pathways;
 /// Compliance-evidence endpoints (`/api/compliance*`): posture, SBOM, and
 /// audit-chain verification.
 pub mod compliance;
+/// Journey data-quality and missingness report (spec `13-tasks.md`
+/// T-14h). See [`crate::data_quality`] for the pure detectors this
+/// module only loads data for and renders.
+pub mod data_quality;
 pub mod docs;
 /// Bulk `event_log` / `journey_features` export codecs over the
 /// instance layer (spec `13-tasks.md` T-14a). See [`crate::analytics`]

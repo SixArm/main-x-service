@@ -51,6 +51,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/care-pathways/{pid}/export/{event-log,journey-features}` | **Bulk export codecs** (T-14a): `?format=csv\|jsonl&status=`; `event_log` (bupaR/PM4Py shape) and `journey_features` (one row per instance); gated `Destructive`, audited as a disclosure; never a `subject_ref` or a person/actor URN |
 | GET | `/api/care-pathways/{pid}/process-map` | **Directly-follows process map** (T-14b): `?level=stage\|step&status=&mode=`; nodes/edges with instance/occurrence counts + median(+p90) gaps; self-loops kept, `start`/`end` pseudo-nodes; suppressed per node/edge (T-14k), not per cohort |
 | GET | `/api/care-pathways/{pid}/variants` | **Journey variants** (T-14c): pathway strings via a named/defaulted/echoed parameter chain (era filter/collapse/combine/filter-mode/truncate); frequency/coverage Pareto + per-position duration lines; suppressed variants folded into `suppressed_instances`, shares renormalised |
+| GET | `/api/care-pathways/{pid}/data-quality` | **Journey data-quality and missingness report** (T-14h): `?status=&from_anchor=&to_anchor=`; eight-code closed vocabulary (no segments / open segment past closure / terminal without clock stop / step done before enrolled / steps out of order / segment clipped by clock / coverage below floor / anchors unreached) plus per-stage missingness + entropy; the report is the finding, it never imputes |
 | GET | `/api/instances/{flow,time-standards}` | Little's Law flow (λ/μ/ρ/κ/τ) and the access-standard catalogue |
 | GET | `/api/instances/{pid}/journey` | **Stitched journey**: follows `continues_as` across services, each leg fetched under the *caller's* credential; combined figures withheld unless every leg resolved |
 | POST/GET/DELETE | `/api/instances/{pid}/links` (+ `/{id}`) · `GET /api/instances/links` | **Cross-service journey links**: the `continues_as` edge from a pathway instance into the next episode (another instance, a `patient_flow_stay`, or a `case`); high-sensitivity governance, audited; a denial is reported as `404` so it cannot disclose the journey's existence; the bulk pull is the aggregator's reconciliation source and is a privileged read |
@@ -107,10 +108,10 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA. Nine sub-tasks have landed — see
-`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g
+analytics suite T-14 builds on TBA. Ten sub-tasks have landed — see
+`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h
 for each one's documented scope deviations from its original spec
-text: three of the nine landed out of T-14's own suggested build order, since each
+text: three of the ten landed out of T-14's own suggested build order, since each
 needed none of the sibling T-14 sub-tasks ahead of it to be useful
 now: **T-14a** (event-log/journey-feature bulk export codecs,
 `src/analytics.rs` + `src/controllers/exports.rs`), **T-14m** (the
@@ -191,6 +192,40 @@ count of instances whose clock is not strictly forward
 **without excluding them** — they stay in
 `cohort`/`compliance`/`survival` exactly as they always have, so this
 task changes no existing figure, only what is now visible about it.
+**T-14h** (also 2026-09-11, again next in the suggested order) is a
+new file, `src/data_quality.rs` (not a further `src/tba.rs`
+extension — detectors over already-computed figures, not an
+elapsed-time computation, the same reasoning T-14c's/T-14f's/T-14k's
+own new files followed): `DQ_CODES` (an eight-entry closed vocabulary
+matching T-14m's `DEFECT_CODES` name-for-name), eight `has_*`
+detectors, `binary_entropy_bits` (Shannon entropy of a per-stage
+present/absent Bernoulli variable), and `build_report`. HTTP surface:
+`GET /api/care-pathways/{pid}/data-quality`
+(`src/controllers/data_quality.rs`, `?status=&from_anchor=&to_anchor=`),
+gated like the sibling cohort views — no record-level ABAC, the
+blanket guard only. Missingness is reported **per stage** only, not
+per field: the spec text names no field list, and inventing one would
+be exactly the kind of unstated assumption this crate's discipline
+refuses. This is the **first task to actually exercise T-14m's
+generator** end to end rather than a hand-built fixture, and doing so
+found and fixed two real generator bugs in `src/data/journeys.rs`: a
+defect's own injected segment could itself be clipped by the base
+instance's untouched random clock (`widen_clock_stop_past`), and
+`terminal_without_clock_stop` cleared `closed_on` alongside
+`clock_stop_at`, landing on the rarer double-missingness "as of now"
+clock fallback rather than its primary "closed_on" one — which
+incidentally tripped `coverage_below_floor` on every seed tried,
+fixed by setting `closed_on` to the day after the journey's own last
+segment activity. `open_segment_past_closure`'s dedicated instance
+genuinely also fires `segment_clipped_by_clock` by design, not by
+residual bug: an open segment on a terminal instance is clipped once
+its effective end is bounded by "as of now" — exactly
+`has_segment_clipped_by_clock`'s own stated rule. Accordingly, the
+acceptance text's "each code exactly once per defect" is verified
+per defect in an isolated one-instance cohort, not across one shared
+eight-defect cohort, since several defects are, by construction, also
+low-coverage or clock-clipped journeys that no fixed seed can reliably
+keep apart at once.
 Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
@@ -258,6 +293,7 @@ src/
 │   ├── instances.rs        instance lifecycle/review/urgency/team/steps/outcomes + caseload/overdue/care-team-load
 │   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views (optionally anchored, T-14d; rule-splittable, T-14f), constraints (also rule-splittable), flow, T-14b process-map, T-14c variants
 │   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs; its care_setting_string helper is pub(crate), reused by tba.rs's T-14f split for setting: predicates)
+│   ├── data_quality.rs      T-14h: journey data-quality and missingness report HTTP surface (loads segments/steps, reuses tba.rs's resolve_anchor_pair_raw; pure detectors are in src/data_quality.rs)
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
 │   └── metrics.rs          root /metrics.prom Prometheus endpoint
 ├── compliance/
@@ -292,6 +328,7 @@ src/
 ├── analytics.rs            T-14a event_log/journey_features codecs (anchors_delays column wired by T-14d) + T-14b directly-follows process map, pure, DB-free
 ├── data/
 │   └── journeys.rs          T-14m: pure, DB-free synthetic journey-cohort generator (SplitMix64, deterministic)
+├── data_quality.rs         T-14h: journey data-quality and missingness detectors (DQ_CODES, has_*, binary_entropy_bits, build_report), pure, DB-free
 ├── suppression.rs          T-14k: disclosure control — min_cell_count/Mode + secondary suppression of stratified marginals, DB-free (first real caller: T-14f's split_table)
 ├── split.rs                T-14f: rule-based cohort splits — Predicate/Features/Rule/partition/split_table, pure, DB-free
 ├── tba.rs                 pure time-based analysis: interval union/subtract, the four-bucket

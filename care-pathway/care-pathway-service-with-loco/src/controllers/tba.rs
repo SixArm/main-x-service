@@ -61,14 +61,16 @@ async fn find_instance(ctx: &AppContext, raw: &str) -> Result<pathway_instances:
         .ok_or(Error::NotFound)
 }
 
-/// Epoch milliseconds of a stored timestamp.
-fn ms(at: chrono::DateTime<chrono::FixedOffset>) -> i64 {
+/// Epoch milliseconds of a stored timestamp. `pub(crate)`, reused by
+/// [`crate::controllers::data_quality`].
+pub(crate) fn ms(at: chrono::DateTime<chrono::FixedOffset>) -> i64 {
     at.timestamp_millis()
 }
 
 /// A date at midnight UTC, in epoch milliseconds — the day-resolution
 /// fallback for an instance predating the clock columns (spec §5.2).
-fn date_ms(date: chrono::NaiveDate) -> i64 {
+/// `pub(crate)`, reused by [`crate::controllers::data_quality`].
+pub(crate) fn date_ms(date: chrono::NaiveDate) -> i64 {
     date.and_hms_opt(0, 0, 0)
         .map_or(0, |dt| dt.and_utc().timestamp_millis())
 }
@@ -110,8 +112,11 @@ async fn load_segments(
         .await?)
 }
 
-/// Stored row → the pure analysis input.
-fn to_segment(row: &instance_segments::Model) -> tba::Segment {
+/// Stored row → the pure analysis input. `pub(crate)` so
+/// [`crate::controllers::data_quality`] (spec T-14h) can build the
+/// same [`tba::Segment`] shape its own detectors need without a
+/// second, drifting conversion.
+pub(crate) fn to_segment(row: &instance_segments::Model) -> tba::Segment {
     tba::Segment {
         label: row.label.clone(),
         stage: row.stage.clone(),
@@ -1070,7 +1075,20 @@ fn score_anchored(
 fn resolve_anchor_pair(
     query: &CohortQuery,
 ) -> std::result::Result<Option<(&str, &str)>, &'static str> {
-    match (query.from_anchor.as_deref(), query.to_anchor.as_deref()) {
+    resolve_anchor_pair_raw(query.from_anchor.as_deref(), query.to_anchor.as_deref())
+}
+
+/// The actual validation [`resolve_anchor_pair`] runs, over the two
+/// raw query values directly rather than the whole [`CohortQuery`] —
+/// so [`crate::controllers::data_quality`]'s own `?from_anchor=&to_anchor=`
+/// (spec T-14h's `anchors_unreached` code, reusing this exact
+/// mechanism) can validate identically without depending on
+/// `CohortQuery`'s unrelated fields.
+pub(crate) fn resolve_anchor_pair_raw<'q>(
+    from_anchor: Option<&'q str>,
+    to_anchor: Option<&'q str>,
+) -> std::result::Result<Option<(&'q str, &'q str)>, &'static str> {
+    match (from_anchor, to_anchor) {
         (None, None) => Ok(None),
         (Some(from), Some(to)) => {
             if !tba::STAGES.contains(&from) {
