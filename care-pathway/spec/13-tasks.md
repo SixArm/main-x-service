@@ -387,9 +387,14 @@ manual check confirms it. Split tasks too big for one PR
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
   below), then **T-14k, T-14b, T-14c, T-14d, and T-14e, all on
-  2026-09-10, and T-14f, T-14g, T-14h, T-14i, and T-14j all on
-  2026-09-11** — **all twelve sub-tasks landed; T-14 is complete.**
-  Three of those twelve (T-14a, T-14m, T-14k)
+  2026-09-10, and T-14f, T-14g, T-14h, T-14i, T-14j, and T-14l all on
+  2026-09-11** — **all thirteen sub-tasks (T-14a through T-14m) have
+  now landed; T-14 is complete.** (An earlier version of this note said
+  "all twelve … T-14 is complete" right after T-14j — miscounting,
+  since T-14a/b/c/d/e/f/g/h/i/j/k/m is twelve names, not thirteen, and
+  omits T-14l, the front-end sub-task in a different crate, which had
+  not landed yet. Corrected here now that it has.)
+  Three of those thirteen (T-14a, T-14m, T-14k)
   were out of the suggested
   order above, because none needed the tasks still ahead of it in
   this list to be useful now (see each entry's own scope notes;
@@ -436,7 +441,11 @@ manual check confirms it. Split tasks too big for one PR
   order at all, so its own DB-gated round trip builds instances
   directly instead (see its own entry's note on backdating fields the
   live HTTP API cannot backdate). **T-14j followed T-14i**, again
-  exactly next — the last of the twelve. Unlike every other sub-task
+  exactly next — the last of the eleven *backend* sub-tasks (an
+  earlier note here called it "the last of the twelve", written before
+  T-14l — the twelfth, front-end-only sub-task, in a different crate —
+  had landed; T-14l followed on 2026-09-11 too, closing T-14 in full).
+  Unlike every other sub-task
   from T-14b on, it extends `src/instances.rs` (the crate's existing
   pure instance-lifecycle module) rather than adding a new sibling
   file: a "latest of several optional timestamps, past a threshold"
@@ -447,9 +456,9 @@ manual check confirms it. Split tasks too big for one PR
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i/T-14j
-    were also still unbuilt (all eleven have since landed too — every
-    T-14 sub-task is now complete) — because the two codecs needed
+    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i/T-14j/T-14l
+    were also still unbuilt (all twelve have since landed too — every
+    T-14 sub-task is now complete, as of T-14l on 2026-09-11) — because the two codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
     row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
@@ -1321,8 +1330,10 @@ manual check confirms it. Split tasks too big for one PR
       this task, closed the same way `instance_paths()`'s own doc
       comment describes for an earlier such gap) and the new `?mode=`
       parameter on both cohort endpoints.
-  - [ ] **T-14l — Front-end analytics views** in
-    `care-pathway-front-end-with-svelte`. `/time` gains the process map
+  - [x] **T-14l — Front-end analytics views** in
+    `care-pathway-front-end-with-svelte`. Landed 2026-09-11, the last
+    of the twelve T-14 sub-tasks (backend and front-end alike). `/time`
+    gains the process map
     (an in-house layered SVG layout — node size = instances, edge label
     = median days — rather than a new graph dependency), the variants
     sunburst and Sankey with a `Stopped` terminal node, a dotted chart
@@ -1330,9 +1341,35 @@ manual check confirms it. Split tasks too big for one PR
     `compare` two-column view, and the stalled list; filters bound to
     the T-14f parameters; suppressed cells rendered as "withheld
     (n < 5)", never blank. Theme-aware, i18n keys in every locale file.
+    New pure module `src/lib/analytics-transforms.ts` (BFS-ranked
+    layered layout, sunburst/Sankey transforms, an attrition tree
+    layout, dotted-chart points — no DOM, no fetch) plus seven new
+    plain-SVG components; `src/lib/api/tba.ts` gained the process-map/
+    variants/stalled/event-log client methods and the `Split`/
+    `AttritionStep` types, `cohort()`/`constraints()` extended with
+    `contains=`/`excludes=`/`compare=`. See the front-end's own
+    `spec/index.md` §6 items 14–15 and CPFE-T6 for the full account,
+    including two scope decisions: the dotted chart (built from the
+    `Destructive`-gated, audited bulk `event_log` export) loads only
+    behind an explicit button, never on page mount; and the withheld-
+    cell fallback text matches this bullet's own literal "withheld
+    (n < 5)" wording, but a real suppressed cell always carries the
+    service's own fuller `suppression_note`
+    ("withheld: fewer than the minimum cell count"), which the
+    front-end prefers whenever it is present.
     - **Acceptance:** vitest units for the sunburst / Sankey transforms
       from a variants payload and the DFG layout; Playwright smoke with
-      the API stubbed; a withheld cell is visibly labelled.
+      the API stubbed; a withheld cell is visibly labelled. Proven end
+      to end: `tests/unit/analytics-transforms.test.ts` (16 tests,
+      including the sunburst's prefix-aggregation and angular-partition
+      invariants, the Sankey's position-qualified nodes, and the DFG
+      layout's BFS ranking + self-loop/back-edge flagging + unreachable-
+      node placement) and 3 new `tests/unit/tba.test.ts` cases, plus 5
+      new Playwright cases in `tests/e2e/time.spec.ts` — including one
+      that found and fixed a real test-authoring bug along the way
+      (`route.fallback()`, not `route.continue()`, is needed for a
+      route registered after another stub handler to fall through to
+      it rather than escape to the real network).
   - [x] **T-14m — Seeded synthetic journey cohorts.** Landed 2026-09-09.
     A pure, DB-free generator in `src/data/journeys.rs` plus a loco
     task, `journeys:seed` (`pathway`, `n`, `seed`, `open_share`,
@@ -1410,8 +1447,12 @@ manual check confirms it. Split tasks too big for one PR
       `tests/requests/stalled.rs`'s fixtures directly rather than via
       this generator, for the same reason — a stalled journey needs a
       deliberately old `enrolled_on`/segment timestamp, not one of
-      this generator's own defect shapes. Every T-14 sub-task is now
-      complete. The repo demo seed (EX-4)
+      this generator's own defect shapes. **Update 2026-09-11 (T-14l):**
+      T-14l has since landed too — the front-end sub-task, in
+      `care-pathway-front-end-with-svelte`, which has no reason to use
+      this backend generator at all (its own Playwright tests stub the
+      API directly). Every T-14 sub-task is now genuinely complete.
+      The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

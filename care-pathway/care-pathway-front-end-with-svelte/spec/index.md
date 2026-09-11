@@ -132,6 +132,44 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
     template's own `interventions` as ordered bars on an **ordinal**
     axis — explicitly a sequence view, not a schedule (the model carries
     order only, no per-step duration or date).
+14. Time-based analysis (`/time`, landed 2026-08-23 as TBA-8, never
+    previously given its own numbered item here — backfilled now
+    alongside item 15 below): a selected pathway's cohort measured
+    against elapsed calendar time (value-adding ratio, lead-time
+    percentiles, NHS access-standard compliance, ranked constraint
+    findings, Little's Law flow) plus one enrolled journey drawn to
+    scale on the timeline wall (`JourneyTimeline.svelte`). A cohort
+    below the service's minimum cell count has its percentile detail
+    withheld, shown as a stated suppression, never as missing data.
+15. Time-based analysis, T-14 extensions (spec `13-tasks.md` T-14l,
+    landed 2026-09-11): `/time` gains the directly-follows **process
+    map** (an in-house layered SVG layout — node size proportional to
+    `instance_count`, edge label the median gap in days — rather than a
+    new graph dependency), journey-variant **sunburst** and **Sankey**
+    diagrams (both terminated by a synthetic `Stopped` node — a diagram
+    convention, not a value the service sends), a process-mining
+    **dotted chart** (one row per case, one dot per activity, coloured
+    by stage), the CONSORT **attrition flowchart**, the `contains=`/
+    `excludes=`/`compare=` **filter** and its two-column **compare**
+    view, and the **stalled-journeys** list. A withheld cell (process-
+    map node/edge, a suppressed compare side) is always visibly
+    labelled, never blank. **Scope decision:** the dotted chart is
+    built from the bulk `event_log` export
+    (`GET .../export/event-log?format=jsonl`), which the service gates
+    as `Destructive` and audits as a disclosure on every call — an
+    appropriate control for a genuine bulk pull, not something a
+    passive dashboard view should trigger silently. It is therefore
+    loaded only behind an explicit "Load dotted chart" button, never on
+    page mount alongside the page's other, lighter aggregate reads.
+    **Scope decision:** new i18n keys (`time.*`) were added for this
+    item's own new UI text, across all 13 locales — a deliberate
+    departure from CPFE-T3's own stated precedent ("literal English
+    labels … matching `/time`'s existing precedent for this data-heavy
+    TBA area"), because this task's own acceptance text explicitly
+    requires "i18n keys in every locale file". The pre-existing `/time`
+    content (item 14) is not retrofitted with `t()` calls — that
+    remains the documented, disclosed gap CPFE-T3 already named, not
+    something this item silently expands scope to fix.
 
 ## 7. Non-functional requirements
 
@@ -175,6 +213,8 @@ fields (incl. `in_language` as "Languages").
 | `/insights` (5 lenses) | `GET /api/care-pathways/insights/{directory,coverage,variants,providers,languages}` |
 | `/board` instance move | `POST /api/instances/{pid}/status` (`{to}`) |
 | `/gantt` | `GET /api/care-pathways/{pid}/instances` |
+| `/time` cohort + journey (item 14, TBA-8) | `GET /api/care-pathways/{pid}/time-analysis?standard=`, `.../constraints`, `GET /api/instances/time-standards`, `GET /api/instances/flow?window_days=&pathway=`, `GET /api/instances/{pid}/timeline`, `.../time-analysis` |
+| `/time` T-14 extensions (item 15, T-14l) | `GET /api/care-pathways/{pid}/process-map`, `.../variants`, `GET /api/instances/stalled?idle_days=`; `?contains=&excludes=&compare=` added to the cohort/journey row's `time-analysis`/`constraints` calls; `GET .../export/event-log?format=jsonl` (dotted chart, opt-in only — see item 15's own scope decision) |
 | — (unwired, §6.1/§13) | `GET /api/care-pathways/search?q=`, `GET /api/care-pathways/events/recent` |
 | — (repository only, not wired to a route) | `GET /api/instances/{pid}` (`InstanceDetail`), `GET /api/instances/caseload` |
 
@@ -341,6 +381,58 @@ for any access/audit requirements.
 - [x] **CPFE-T5: `/verify` crashed with a raw 500 when the authentication service was unreachable.** *(resolved 2026-09-06.)* `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch, token)` with no `try`/`catch`. A network-level failure (the authentication service unreachable, timed out, connection reset) makes `fetch` throw rather than resolve — uncaught, that propagated out of `load` and SvelteKit rendered its generic 500 error page instead of this route's own friendly UI. The same bug class was found and fixed first in `place-front-end-with-svelte` (T-26) and `thing-front-end-with-svelte` (T-23); ported here.
   - **Resolved.** A `try`/`catch` around the call, a new `"serviceUnavailable"` error variant, and its message in `+page.svelte`.
   - **Acceptance:** `tests/unit/verify.test.ts` (new) unit-tests the `load` function directly — pinning `missingToken`, the new `serviceUnavailable` (fetch rejects), and `invalidToken` (non-ok response) branches — verified to fail with the `try`/`catch` reverted and pass with it restored. Three-part change: spec (here) + code + test.
+
+- [x] **CPFE-T6: T-14l — front-end analytics views (spec `13-tasks.md`
+  T-14l), landed 2026-09-11.** `/time` gains the process map, the
+  variants sunburst/Sankey, the dotted chart, the attrition flowchart,
+  the `contains=`/`excludes=`/`compare=` filter and its compare view,
+  and the stalled-journeys list — see §6 items 14 (backfilled) and 15
+  for the full description and this task's own scope decisions
+  (dotted-chart opt-in loading; new `time.*` i18n keys as a deliberate
+  departure from CPFE-T3's literal-English precedent).
+  - New pure module, `src/lib/analytics-transforms.ts` (no DOM, no
+    fetch): `layoutProcessMap` (BFS-ranked layered layout off the
+    `start` pseudo-node; self-loops and back-edges flagged for a
+    curved render rather than re-lowering a rank), `sunburstFromVariants`
+    / `sunburstArcs` and `sankeyFromVariants` (both terminating every
+    path at a synthetic `Stopped` node), `layoutAttrition` (a
+    `parent`-indexed tree layout), `dottedChartPoints` (first-occurrence
+    case rows, `stage:`-prefixed activities coloured, others neutral),
+    `withheldLabel`.
+  - New components: `ProcessMapView`, `VariantsSunburst`,
+    `VariantsSankey`, `AttritionFlowchart`, `CompareView`,
+    `StalledList`, `DottedChart.svelte` (all `src/lib/components/`).
+  - `src/lib/api/tba.ts`: `ProcessMapResponse`/`VariantsReport`/
+    `Stalled`/`EventLogRow`/`AttritionStep`/`Split`/`SplitFindings`
+    types; `processMap()`/`variants()`/`stalled()`/`eventLog()` methods;
+    `cohort()`/`constraints()` extended with `SplitOptions`
+    (`contains`/`excludes`/`compare`). `src/lib/api/client.ts` gained
+    `ApiClient.getText()` (a raw, unparsed-body `GET`, for the JSONL
+    export `eventLog()` needs — every other method assumes a JSON
+    body).
+  - **Acceptance:** vitest units for the sunburst/Sankey transforms
+    (aggregation across shared prefixes, the angular-partition
+    invariant, position-qualified nodes) and the DFG layout (BFS
+    ranking, self-loop/back-edge flagging, an unreachable node placed
+    rather than dropped) — `tests/unit/analytics-transforms.test.ts`
+    (16 tests) — plus path-mapping/split-parameter/JSONL-parsing tests
+    in `tests/unit/tba.test.ts` (3 new). Playwright smoke
+    (`tests/e2e/time.spec.ts`, API stubbed, 5 new tests): the process
+    map renders with a suppressed node's count visibly reading
+    "withheld: fewer than the minimum cell count" (never blank); the
+    sunburst/Sankey/duration-lines render from a variants stub; the
+    dotted chart is provably **not** requested until the "Load dotted
+    chart" button is clicked (`route.fallback()`, not `route.continue()`
+    — a real bug this task's own test run found and fixed, since
+    `continue()` on a route registered after the stub's own handler
+    bypasses that handler and hits the real network); the attrition
+    flowchart renders every CONSORT step label; the stalled list shows
+    the idle-days count and last-activity source. All 15 e2e tests
+    (10 pre-existing — 3 in `time.spec.ts`, 7 in `smoke.spec.ts` — plus
+    this task's 5 new in `time.spec.ts`) pass together, confirming no
+    regression from the new mount-time fetches (`stubTime`'s route
+    table extended with `process-map`/`variants`/`stalled`/`event-log`
+    entries).
 
 ## 14. Implementation status
 

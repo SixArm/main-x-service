@@ -88,7 +88,6 @@ export interface Page<T> {
   offset: number;
 }
 
-
 /**
  * Lean JSON `fetch` wrapper for the loco.rs care-pathway service.
  *
@@ -142,6 +141,39 @@ export class ApiClient {
    */
   delete<T = void>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("DELETE", path, opts);
+  }
+
+  /**
+   * `GET` and resolve the **raw response text**, unparsed — for a
+   * non-JSON body such as a JSONL/CSV bulk export. Still throws
+   * {@link ApiError} on a non-2xx response.
+   *
+   * @param path - Path under the base URL.
+   * @param opts - Optional per-request options.
+   */
+  async getText(path: string, opts: RequestOptions = {}): Promise<string> {
+    const headers: Record<string, string> = {
+      accept: "application/x-ndjson, text/csv, text/plain, */*",
+      ...opts.headers,
+    };
+    if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+    const url = new URL(
+      path.startsWith("/") ? path.slice(1) : path,
+      `${this.baseUrl}/`,
+    ).toString();
+    const response = await this.fetchFn(url, {
+      method: "GET",
+      headers,
+      signal: opts.signal,
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new ApiError(
+        response.status,
+        text.slice(0, 200) || `HTTP ${response.status}`,
+      );
+    }
+    return text;
   }
 
   /**

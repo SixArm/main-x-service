@@ -619,8 +619,10 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
     `?idle_days=` falls back to the default on zero/negative/
     unparseable input, matching pagination's own convention, rather
     than erroring like `target_days` does. Landed 2026-09-11, spec
-    T-14j — the last of the T-14 pathway analytics suite; every
-    sub-task is now complete.
+    T-14j — the last of this crate's own twelve backend T-14 sub-tasks.
+    (T-14 also has a thirteenth, front-end-only sub-task, T-14l, in the
+    sibling `care-pathway-front-end-with-svelte` crate; it landed the
+    same day, closing T-14 in full across both crates.)
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

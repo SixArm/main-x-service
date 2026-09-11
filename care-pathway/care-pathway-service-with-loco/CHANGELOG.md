@@ -18,9 +18,13 @@ most-idle first, each row naming its last-activity source. Complements
 `overdue-reviews` (a due date) with an observed-silence test. The
 timeout is retroactive (idle-since is the activity time itself, not
 when the silence was noticed, per IPPA's `Process.time_out`). Never
-grouped by actor. **This is the last T-14 sub-task — the pathway
-analytics suite is now complete (T-14a through T-14m, twelve
-sub-tasks).**
+grouped by actor. **This is the last of this crate's own twelve
+backend T-14 sub-tasks** (T-14a through T-14m). *Correction, added
+2026-09-11 alongside T-14l:* T-14 also has a thirteenth, front-end-only
+sub-task, T-14l, in the sibling `care-pathway-front-end-with-svelte`
+crate, out of this crate's own scope — this entry originally claimed
+"the pathway analytics suite is now complete", which was premature; it
+became true only once T-14l landed too, the same day.
 
 - `src/instances.rs` (extended, not a new sibling file — a small
   extension of the crate's existing pure instance-lifecycle module,

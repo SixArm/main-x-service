@@ -240,6 +240,55 @@ export interface Compliance {
   as_of: string | null;
 }
 
+/**
+ * One step of a CONSORT-style cohort attrition trail (spec T-14g): the
+ * ordered pipeline every cohort figure's denominator passed through.
+ * `parent` is an index into the same array — `null` only for the root
+ * — so a rule split's `matched`/`complement` steps can both fork from
+ * the same `rule_filter` parent rather than forcing one linear list.
+ */
+export interface AttritionStep {
+  label: string;
+  operation: string;
+  instances: number;
+  parent: number | null;
+}
+
+/** One side of a rule-based cohort split (spec T-14f) — the same
+ * `cohort`/`compliance` shape the unsplit response already carries,
+ * or withheld under this side's own suppression decision. */
+export interface SplitSide {
+  instances: number;
+  suppressed: boolean;
+  suppression_note: string | null;
+  cohort: CohortAnalysis | null;
+  compliance: Compliance | null;
+}
+
+/** One side of a rule-based cohort split for `constraints` (spec
+ * T-14f) — `findings`, not `cohort`/`compliance`. */
+export interface SplitSideFindings {
+  instances: number;
+  suppressed: boolean;
+  suppression_note: string | null;
+  findings: Finding[] | null;
+}
+
+/** `time-analysis`'s `split` key (spec T-14f), absent entirely unless
+ * `contains=`/`excludes=` was asked for. */
+export interface Split {
+  rule: { contains: string[]; excludes: string[] };
+  matched: SplitSide;
+  complement: SplitSide | null;
+}
+
+/** `constraints`'s own `split` key — same rule, `findings`-shaped sides. */
+export interface SplitFindings {
+  rule: { contains: string[]; excludes: string[] };
+  matched: SplitSideFindings;
+  complement: SplitSideFindings | null;
+}
+
 /** `GET /api/care-pathways/{pathway}/time-analysis` */
 export interface CohortTimeAnalysis {
   as_of: string;
@@ -250,6 +299,10 @@ export interface CohortTimeAnalysis {
   suppression_note: string | null;
   cohort: CohortAnalysis;
   compliance: Compliance | null;
+  /** Absent unless `contains=`/`excludes=` was asked for (T-14f). */
+  split?: Split;
+  /** The CONSORT attrition trail (T-14g) — always present. */
+  attrition: AttritionStep[];
 }
 
 /** One disclosed constraint finding. */
@@ -268,6 +321,10 @@ export interface Constraints {
   note: string;
   instances: number;
   findings: Finding[];
+  /** Absent unless `contains=`/`excludes=` was asked for (T-14f). */
+  split?: SplitFindings;
+  /** The CONSORT attrition trail (T-14g) — always present. */
+  attrition: AttritionStep[];
 }
 
 /** A named access standard: a threshold on lead time plus its target. */
@@ -346,6 +403,133 @@ export interface SegmentPayload {
   note?: string | null;
 }
 
+/** One node of a directly-follows process map (spec T-14b): an
+ * activity plus its cohort-wide counts, or `null`ed detail when
+ * `suppressed` (T-14k) — the count itself is never withheld. */
+export interface ProcessMapNode {
+  /** A stage name, a step label, or the `start`/`end` pseudo-nodes. */
+  activity: string;
+  instance_count: number;
+  occurrence_count: number;
+  median_duration_days: number | null;
+  suppressed?: boolean;
+  suppression_note?: string | null;
+}
+
+/** One edge of a process map: a directly-follows transition. */
+export interface ProcessMapEdge {
+  from: string;
+  to: string;
+  instance_count: number;
+  occurrence_count: number;
+  median_gap_days: number;
+  p90_gap_days: number;
+  suppressed?: boolean;
+  suppression_note?: string | null;
+}
+
+/** `GET /api/care-pathways/{pathway}/process-map` */
+export interface ProcessMapResponse {
+  pathway: { pid: string; name: string };
+  level: "stage" | "step";
+  instances: number;
+  note: string;
+  nodes: ProcessMapNode[];
+  edges: ProcessMapEdge[];
+}
+
+/** One row of the variants frequency/coverage Pareto (spec T-14c). */
+export interface VariantSummary {
+  /** The pathway string, stages joined by `-` (e.g. `referral-triage`). */
+  variant: string;
+  frequency: number;
+  /** Renormalised over the *visible* (unsuppressed) variants only. */
+  share: number;
+  cumulative_share: number;
+}
+
+/** One per-position (or `"overall"`) duration line. */
+export interface LineStat {
+  position: string;
+  n: number;
+  median_days: number;
+  p90_days: number;
+}
+
+/** `GET /api/care-pathways/{pathway}/variants` */
+export interface VariantsReport {
+  pathway: { pid: string; name: string };
+  instances: number;
+  /** Folded out of `variants` for a below-floor variant frequency —
+   * disclosed as a count, never as which variants they were. */
+  suppressed_instances: number;
+  params: {
+    min_segment_days: number;
+    collapse_gap_days: number;
+    combination_window_days: number;
+    min_post_combination_days: number;
+    filter: string;
+    max_path_length: number;
+  };
+  note: string;
+  variants: VariantSummary[];
+  lines: LineStat[];
+}
+
+/** One row of `GET /api/instances/stalled` (spec T-14j). */
+export interface StalledInstance {
+  pid: string;
+  subject_ref: string;
+  urgency: string;
+  last_activity_at_ms: number;
+  last_activity_source: string;
+  idle_days: number;
+}
+
+/** `GET /api/instances/stalled?idle_days=` */
+export interface Stalled {
+  as_of: string;
+  idle_days: number;
+  note: string;
+  stalled: StalledInstance[];
+}
+
+/** One row of the `event_log` export (spec T-14a), the shape a
+ * dotted chart is built from (spec T-14l). Never a `subject_ref` or a
+ * person/actor URN — the export codec excludes both unconditionally. */
+export interface EventLogRow {
+  case_id: string;
+  activity: string;
+  lifecycle: string;
+  timestamp: string;
+  category: string | null;
+  waste: string | null;
+  resource: string | null;
+  location_ref: string | null;
+  pathway_pid: string;
+  care_setting: string | null;
+  urgency: string;
+  status: string;
+  outcome: string | null;
+}
+
+/** `?contains=&excludes=&compare=` — the rule-based split parameters
+ * shared by `cohort()`/`constraints()` (spec T-14f). */
+export interface SplitOptions {
+  contains?: string;
+  excludes?: string;
+  compare?: boolean;
+}
+
+function appendSplitParams(
+  query: URLSearchParams,
+  options: SplitOptions,
+): void {
+  if (options.contains) query.set("contains", options.contains);
+  if (options.excludes) query.set("excludes", options.excludes);
+  if (options.compare) query.set("compare", "true");
+}
+
 // ---- client ----
 
 /** Typed access to the care-pathway time-based-analysis endpoints. */
@@ -400,26 +584,47 @@ export class TbaRepository {
     );
   }
 
-  /** `GET /api/care-pathways/{pathway}/time-analysis`. */
+  /**
+   * `GET /api/care-pathways/{pathway}/time-analysis`. `contains`/
+   * `excludes`/`compare` (spec T-14f) add a `split` key to the
+   * response, absent unless at least one is given.
+   */
   cohort(
     pathwayPid: string,
-    options: { standard?: string; targetDays?: number; status?: string } = {},
+    options: {
+      standard?: string;
+      targetDays?: number;
+      status?: string;
+    } & SplitOptions = {},
   ): Promise<CohortTimeAnalysis> {
     const query = new URLSearchParams();
     if (options.standard) query.set("standard", options.standard);
     if (options.targetDays !== undefined)
       query.set("target_days", String(options.targetDays));
     if (options.status) query.set("status", options.status);
+    appendSplitParams(query, options);
     const suffix = query.size > 0 ? `?${query}` : "";
     return this.http.get<CohortTimeAnalysis>(
       `/api/care-pathways/${encodeURIComponent(pathwayPid)}/time-analysis${suffix}`,
     );
   }
 
-  /** `GET /api/care-pathways/{pathway}/constraints`. */
-  constraints(pathwayPid: string, status?: string): Promise<Constraints> {
+  /**
+   * `GET /api/care-pathways/{pathway}/constraints`. `split` (spec
+   * T-14f) adds a `split` key to the response, same rule as
+   * {@link cohort}'s own.
+   */
+  constraints(
+    pathwayPid: string,
+    status?: string,
+    split: SplitOptions = {},
+  ): Promise<Constraints> {
+    const query = new URLSearchParams();
+    if (status) query.set("status", status);
+    appendSplitParams(query, split);
+    const suffix = query.size > 0 ? `?${query}` : "";
     return this.http.get<Constraints>(
-      `/api/care-pathways/${encodeURIComponent(pathwayPid)}/constraints${status ? `?status=${status}` : ""}`,
+      `/api/care-pathways/${encodeURIComponent(pathwayPid)}/constraints${suffix}`,
     );
   }
 
@@ -435,6 +640,69 @@ export class TbaRepository {
     if (pathway) query.set("pathway", pathway);
     const suffix = query.size > 0 ? `?${query}` : "";
     return this.http.get<Flow>(`/api/instances/flow${suffix}`);
+  }
+
+  /**
+   * `GET /api/care-pathways/{pathway}/process-map` — the directly-
+   * follows process map (spec T-14b). Never a discovered model.
+   */
+  processMap(
+    pathwayPid: string,
+    options: { level?: "stage" | "step"; status?: string } = {},
+  ): Promise<ProcessMapResponse> {
+    const query = new URLSearchParams();
+    if (options.level) query.set("level", options.level);
+    if (options.status) query.set("status", options.status);
+    const suffix = query.size > 0 ? `?${query}` : "";
+    return this.http.get<ProcessMapResponse>(
+      `/api/care-pathways/${encodeURIComponent(pathwayPid)}/process-map${suffix}`,
+    );
+  }
+
+  /**
+   * `GET /api/care-pathways/{pathway}/variants` — journey variants
+   * (spec T-14c): the frequency/coverage Pareto plus per-position
+   * duration lines.
+   */
+  variants(pathwayPid: string, status?: string): Promise<VariantsReport> {
+    return this.http.get<VariantsReport>(
+      `/api/care-pathways/${encodeURIComponent(pathwayPid)}/variants${status ? `?status=${status}` : ""}`,
+    );
+  }
+
+  /**
+   * `GET /api/instances/stalled?idle_days=` — aging WIP (spec T-14j).
+   * Not pathway-scoped: every open instance across every pathway.
+   */
+  stalled(idleDays?: number): Promise<Stalled> {
+    return this.http.get<Stalled>(
+      `/api/instances/stalled${idleDays !== undefined ? `?idle_days=${idleDays}` : ""}`,
+    );
+  }
+
+  /**
+   * `GET /api/care-pathways/{pathway}/export/event-log?format=jsonl` —
+   * the bulk event-log export (spec T-14a), parsed into rows.
+   *
+   * **Not called on page load.** This is a `Destructive`-gated, bulk,
+   * case-level pull, audited by the service as a disclosure every
+   * time it is called — an appropriate control for a genuine bulk
+   * export, not something a passive dashboard view should trigger
+   * silently. The dotted chart (spec T-14l) that consumes this is
+   * therefore behind an explicit "load" action in the UI, never
+   * fetched alongside the page's other, lighter-weight aggregate
+   * reads.
+   */
+  async eventLog(pathwayPid: string, status?: string): Promise<EventLogRow[]> {
+    const query = new URLSearchParams({ format: "jsonl" });
+    if (status) query.set("status", status);
+    const text = await this.http.getText(
+      `/api/care-pathways/${encodeURIComponent(pathwayPid)}/export/event-log?${query}`,
+    );
+    return text
+      .split("\n")
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line) as EventLogRow);
   }
 }
 
