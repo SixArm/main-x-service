@@ -9,6 +9,81 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14h: journey data-quality and missingness report (2026-09-11)
+
+`GET /api/care-pathways/{pid}/data-quality`
+(`?status=&from_anchor=&to_anchor=`): per cohort, the share of
+instances with no segments, an open segment past closure, a terminal
+status with no clock stop, `done_on` before `enrolled_on`,
+out-of-order step completion, segments clipped by the clock, coverage
+below the floor, and anchors unreached — eight codes in a closed
+vocabulary (BNSSG's `bad_date` 1–5, generalised) — plus per-stage
+missingness percentage and entropy across instances. The report is
+the finding; it never imputes.
+
+- `src/data_quality.rs` (new, pure, DB-free): `DQ_CODES` (matching
+  T-14m's `DEFECT_CODES` name-for-name), eight `has_*` detectors
+  reusing already-resolved facts (`tba::Clock`, `tba::clip`, the
+  cohort's own coverage ratio, T-14d's `StageAnchor`s) rather than
+  re-deriving them, `binary_entropy_bits` (Shannon entropy of a
+  per-stage present/absent Bernoulli variable, peaking at 1 bit at
+  p=0.5), and `build_report`.
+- `src/controllers/data_quality.rs` (new): the HTTP surface, gated
+  like the sibling cohort views (no record-level ABAC, the blanket
+  guard only — an aggregate count report, not a bulk pull of instance
+  rows). Reuses T-14d's anchor-pair parser, refactored to
+  `resolve_anchor_pair_raw` so both controllers share one parser;
+  `build_report` takes that function's full
+  `Result<Option<(&str,&str)>, &'static str>` directly, consolidating
+  "no pair requested" vs. "a pair was requested but did not parse"
+  into the one `anchor_note` field rather than a second top-level key.
+- **Scope decision:** missingness is reported per **stage** only (the
+  closed `tba::STAGES` vocabulary), not per field — the spec text
+  names no field list, and inventing one would be an unstated
+  assumption this crate's discipline refuses.
+- **Two real generator bugs found and fixed**, not this crate's own:
+  T-14m's generator (`src/data/journeys.rs`) had never been exercised
+  end to end before this task; doing so for real surfaced (1) a
+  defect's own injected one-hour segment could itself be clipped by
+  the *base* clean instance's untouched random clock, since the
+  shortest possible base segment is 15 minutes with a zero-length gap
+  — fixed by a new `widen_clock_stop_past` helper that widens (never
+  shrinks) a closed instance's `clock_stop_at` to comfortably contain
+  the injected segment; and (2) `terminal_without_clock_stop` cleared
+  `closed_on` alongside `clock_stop_at`, landing on the rarer
+  double-missingness "as of now" clock fallback rather than its
+  primary "closed_on" one — which incidentally tripped
+  `coverage_below_floor` on every seed tried — fixed by setting
+  `closed_on` to the day after the journey's own last segment activity
+  (day-resolution, so a full day past, not merely past, to avoid
+  reintroducing a "midnight before the segment's own time-of-day" trap).
+- **`segment_clipped_by_clock` and `open_segment_past_closure`
+  genuinely overlap by design, not by residual bug:** an open segment
+  on a terminal instance is clipped once its effective end is bounded
+  by "as of now" rather than the clock's own stop — exactly
+  `has_segment_clipped_by_clock`'s own stated rule, applied to a real
+  case. The dedicated `open_segment_past_closure` instance legitimately
+  fires both codes.
+- **The acceptance text's "each code exactly once per defect" is
+  verified per defect in isolation**, not across one shared
+  eight-defect cohort: several defects are, by construction, also
+  low-coverage or clock-clipped journeys, which no fixed seed can
+  reliably keep apart across every code at once. Each code's own test
+  builds a fresh one-instance cohort (`n=0`, `defects=[code]`).
+- **Acceptance:** proven end to end against real Postgres
+  (`tests/requests/data_quality.rs`) — this is the **first T-14 task
+  to actually exercise T-14m's generator** (`journeys:seed`) rather
+  than a hand-built fixture. Pure unit tests in `src/data_quality.rs`
+  (15) cover every detector in isolation, the entropy function's
+  boundary and peak values, and the report's own row/share/
+  `anchor_note` shape.
+- Verified: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test --lib` (23 new/changed tests across
+  `data_quality`/`data::journeys`, all passing), `cargo test --
+  --ignored` against a real Postgres (67 passed, including 3 new),
+  `cargo +1.96 check --all-targets` (MSRV), `cargo deny check`,
+  `cargo bench --no-run`.
+
 ### Added — T-14g: cohort attrition record (CONSORT) (2026-09-11)
 
 `attrition` on cohort `time-analysis` and `constraints`: a CONSORT-style
@@ -120,7 +195,9 @@ response already carries.
   variant) and their own notion of "compare" would need its own design
   pass, so wiring the same contract onto them is a documented
   follow-up, not attempted here. `data-quality` (T-14h) does not exist
-  yet either.
+  yet either (since landed the same day, and does not accept these
+  params either — a per-instance detector aggregate, not a cohort
+  split).
 - `setting:<s>` compares against the pathway's *lowercased* care
   setting (`controllers::exports::care_setting_string`, made
   `pub(crate)` and reused rather than duplicated) —

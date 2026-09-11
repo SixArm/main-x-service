@@ -2,6 +2,7 @@
 
 mod care_pathways;
 mod compliance;
+mod data_quality;
 mod event_outbox;
 mod exports;
 mod fhir;

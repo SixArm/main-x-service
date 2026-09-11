@@ -53,6 +53,7 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | GET | `/api/care-pathways/{pid}/export/journey-features` | Bulk `journey_features` export (`?format=csv\|jsonl`) — one row per instance, LT/VT/PT/%A/%VA/coverage/#HO/per-stage/censored |
 | GET | `/api/care-pathways/{pid}/process-map` | Directly-follows process map (`?level=stage\|step&mode=withhold\|remove`) — nodes/edges with counts + median (+p90) gaps, never a discovered model |
 | GET | `/api/care-pathways/{pid}/variants` | Journey variants — pathway strings, frequency/coverage Pareto, per-position duration lines (named, defaulted, echoed transform parameters) |
+| GET | `/api/care-pathways/{pid}/data-quality` | Journey data-quality and missingness report (`?status=&from_anchor=&to_anchor=`) — eight-code closed vocabulary (no segments / open segment past closure / terminal without clock stop / step done before enrolled / steps out of order / segment clipped by clock / coverage below floor / anchors unreached) plus per-stage missingness + entropy; the report is the finding, it never imputes |
 
 Every figure is derived on read — nothing is stored — and the
 denominator is always elapsed calendar time, never the sum of recorded
@@ -253,6 +254,33 @@ about it. Pure logic extends `src/tba.rs` itself: `AttritionStep`,
 `attrition_rule_branch()`; HTTP surface:
 [`src/controllers/tba.rs`](./src/controllers/tba.rs) (`cohort_query()`,
 `attrition_counts()`, `build_attrition()`).
+
+### Journey data-quality and missingness report (T-14h)
+
+`GET /api/care-pathways/{pid}/data-quality`
+(`?status=&from_anchor=&to_anchor=`): per cohort, the share of
+instances with no segments, an open segment past closure, a terminal
+status with no clock stop, `done_on` before `enrolled_on`,
+out-of-order step completion, segments clipped by the clock, coverage
+below the floor, and anchors unreached — eight codes in a closed
+vocabulary (BNSSG's `bad_date` 1–5, generalised) — plus per-**stage**
+missingness percentage and entropy across instances (per-field is a
+documented follow-up: the spec text names no field list). The report
+is the finding; it never imputes. Two codes genuinely overlap by
+design: an open segment on a terminal instance is also clipped once
+its effective end is bounded by "as of now" rather than the clock's
+own stop, so `open_segment_past_closure`'s dedicated instance
+legitimately also fires `segment_clipped_by_clock`. Pure logic in new
+[`src/data_quality.rs`](./src/data_quality.rs) (not a further
+`src/tba.rs` extension — detectors, not an elapsed-time computation):
+`DQ_CODES` (matching T-14m's `DEFECT_CODES` name-for-name), eight
+`has_*` detectors, `binary_entropy_bits`, `build_report`; HTTP surface:
+[`src/controllers/data_quality.rs`](./src/controllers/data_quality.rs).
+This is the first task to actually exercise T-14m's generator end to
+end rather than a hand-built fixture, which found and fixed two real
+generator bugs in
+[`src/data/journeys.rs`](./src/data/journeys.rs) — see that file's
+`widen_clock_stop_past` and `terminal_without_clock_stop` match arm.
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 

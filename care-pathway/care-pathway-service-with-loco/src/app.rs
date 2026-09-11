@@ -174,6 +174,7 @@ impl Hooks for App {
             .add_route(controllers::tba::pathway_routes())
             .add_route(controllers::instances::pathway_routes())
             .add_route(controllers::exports::routes())
+            .add_route(controllers::data_quality::routes())
             .add_route(controllers::links::routes())
             .add_route(controllers::tba::routes())
             .add_route(controllers::instances::routes())
