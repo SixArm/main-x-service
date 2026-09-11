@@ -11,6 +11,7 @@ mod insights;
 mod instances;
 mod journeys_seed;
 mod links;
+mod stalled;
 mod tba;
 
 use std::sync::Once;

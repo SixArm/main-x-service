@@ -738,13 +738,15 @@ The live queue for this cross-cutting section. Entity-wide tasks live in
 | **TBA-10** | Small-number suppression on cohort percentiles (§12.2) — **done** with TBA-7 | §14.3 |
 | **TBA-11** | Prometheus gauges for cohort %VA and p90 lead time per pathway — **done 2026-08-23** (`src/flow_metrics.rs`, default-off) | §14.1, §14.3 |
 
-**Extensions queued in [§13 T-14](13-tasks.md)** (2026-09-03, triaged
+**Extensions landed via [§13 T-14](13-tasks.md)** (triaged 2026-09-03
 from IPPA-py, the NHS BNSSG process-mining study, TreatmentPatterns, and
-ehrapy): stage anchors + anchored standards (T-14d, which also settles
-the anchor half of the "segment templates" question in §17),
-censoring-aware cohort statistics (T-14e — today's `?status=all` mixes
-running and completed lead times), rule-based cohort splits (T-14f), a
-CONSORT attrition record on every cohort response (T-14g), a
+ehrapy; all twelve sub-tasks complete as of 2026-09-11 — see each
+task's own entry for landed dates and scope decisions): stage anchors +
+anchored standards (T-14d, which also settles the anchor half of the
+"segment templates" question in §17), censoring-aware cohort statistics
+(T-14e — `?status=all` used to mix running and completed lead times as
+if they were the same kind of number), rule-based cohort splits
+(T-14f), a CONSORT attrition record on every cohort response (T-14g), a
 data-quality report (T-14h), stalled journeys (T-14j), and the
 generalised suppression rule with secondary suppression of marginals
 (T-14k). The directly-follows map, journey variants, and template

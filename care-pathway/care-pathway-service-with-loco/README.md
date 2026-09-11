@@ -309,6 +309,23 @@ Also wires T-14a's own reserved `conformance` journey-feature export
 column (a compact scalar summary, not the per-pair breakdown the
 dedicated endpoint carries).
 
+### Stalled journeys — aging WIP (T-14j)
+
+`GET /api/instances/stalled?idle_days=N` (default 60, echoed): open
+instances whose last recorded activity — latest of segment start/end,
+step `done_on`, or event `occurred_at` (a recorded review is an event
+too) — is older than N days, sorted most-idle first, each row naming
+its last-activity source. Complements `overdue-reviews` (a due date)
+with an observed-silence test; retroactive, per IPPA's own
+`Process.time_out`: idle-since is the activity time itself, never when
+the silence was noticed. Never grouped by actor; a closed instance is
+never listed. Extends [`src/instances.rs`](./src/instances.rs) (the
+crate's existing pure instance-lifecycle module, not a new sibling
+file): `ACTIVITY_SOURCES`, `LastActivity`, `last_activity()`
+(falls back to `enrolled_on`), `is_stalled()`. `?idle_days=` falls back
+to the default on zero/negative/unparseable input, the same convention
+pagination already uses.
+
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 
 | Method | Path | Purpose |

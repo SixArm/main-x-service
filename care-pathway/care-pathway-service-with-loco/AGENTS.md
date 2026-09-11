@@ -44,7 +44,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/care-pathways/insights/{directory,coverage,variants,providers,languages}` | Registry lenses: setting/specialty facets, condition-coverage gaps, cross-provider variants, provider directory, language coverage |
 | POST/GET | `/api/care-pathways/{pid}/instances` · `/{pid}/cohort` | Enrol a `person:` URN on a pathway; the chronic cohort view |
 | — | `/api/instances/{pid}` (+ `/status` `/review` `/urgency` `/team` `/events` `/steps/{s}/complete`) | Instance lifecycle, review cadence, urgency, care team, steps |
-| GET | `/api/instances/{caseload,overdue-reviews,care-team-load}` | Derived operational views |
+| GET | `/api/instances/{caseload,overdue-reviews,stalled,care-team-load}` | Derived operational views; `stalled` (T-14j): `?idle_days=` (default 60), aging-WIP journeys by last recorded activity |
 | POST/GET | `/api/instances/{pid}/segments` (+ `/segments/{seg}/close`, `/clock`) | **Time-based analysis**: record a journey segment (VA / NNVA / UNVA + stage + waste), close a running one, set the pathway clock (no pause, by design) |
 | GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs, per-stage anchors + adjacent delays (T-14d), conformance to the enrolled template (T-14i); and the segment/gap wall |
 | GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); censoring-aware Kaplan–Meier survival for time-to-close and time-to-anchor (T-14e: `?discontinued=event\|censor`); ranked constraints; both endpoints splittable by a rule (T-14f: `?contains=&excludes=&compare=` over `stage`/`step`/`event`/`waste`/`outcome`/`setting`/`urgency`); both also carry a CONSORT-style `attrition` trail (T-14g) explaining the denominator; `time-analysis` also carries a template-conformance fully-conformant cohort share (T-14i, not `constraints` — a documented scope decision). All suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`), and a rule-split's own cross-side protection reuses the same primitive |
@@ -108,10 +108,11 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA. Eleven sub-tasks have landed — see
-`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i
+analytics suite T-14 builds on TBA. All twelve sub-tasks have landed —
+T-14 is complete. See
+`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i/T-14j
 for each one's documented scope deviations from its original spec
-text: three of the ten landed out of T-14's own suggested build order, since each
+text: three landed out of T-14's own suggested build order, since each
 needed none of the sibling T-14 sub-tasks ahead of it to be useful
 now: **T-14a** (event-log/journey-feature bulk export codecs,
 `src/analytics.rs` + `src/controllers/exports.rs`), **T-14m** (the
@@ -256,6 +257,31 @@ journey-feature export column (`src/analytics.rs`'s
 `journey_feature_row`, a third parameter alongside the analysis,
 matching T-14d's `anchors_delays` precedent) — a compact scalar
 summary, not the per-pair breakdown the dedicated endpoint carries.
+**T-14j** (also 2026-09-11, again next in the suggested order — the
+last of the twelve) extends `src/instances.rs` itself, not a new
+sibling file (a "latest of several optional timestamps, past a
+threshold" fold is a small extension of that module's own remit, not
+a genuinely separate algorithm the way T-14b's/T-14c's/T-14f's/
+T-14h's/T-14i's own new files were): `ACTIVITY_SOURCES`
+(five-entry closed vocabulary), `LastActivity`, `last_activity()`
+(folds segment start/end, step `done_on`, and event `occurred_at`
+into the single most recent, falling back to `enrolled_on` — the
+floor every instance has from the moment it exists), `is_stalled()`.
+HTTP surface, `src/controllers/instances.rs`: `load_last_activity_inputs`
+(bulk, three bounded queries, no N+1) and `stalled()`, wired at
+`GET /api/instances/stalled?idle_days=N` (default 60, echoed;
+`?idle_days=` falls back to the default on zero/negative/unparseable
+input, matching pagination's own convention rather than erroring like
+`target_days` does). **Scope decision:** a recorded review is not a
+sixth, separate source — `POST .../review` already emits an
+`instance_events` row (`kind: "review"`), covered by the generic
+`event` source. Like T-14i, its own DB-gated round trip
+(`tests/requests/stalled.rs`) builds fixtures directly rather than via
+T-14m's generator, and backdates `enrolled_on` directly on the model —
+the one field none of the activity-recording endpoints can set to
+anything but "now"/"today", which would otherwise make a freshly
+enrolled instance's own floor mask a deliberately old segment's
+staleness. Every T-14 sub-task is now complete.
 Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
@@ -354,7 +380,7 @@ src/
 ├── metrics.rs             process-wide Prometheus registry (CRUD/merge counters + http_requests_total)
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) + ABAC, both reloadable (ReloadableVerifier/ReloadablePolicy — AU-2 key/policy hot-reload)
 ├── version.rs             `Accepts-version` header negotiation middleware (agents/share/api-versioning.md)
-├── instances.rs            pure instance lifecycle state machine (active↔on_hold→terminal)
+├── instances.rs            pure instance lifecycle state machine (active↔on_hold→terminal) + T-14j stalled-journey detection (ACTIVITY_SOURCES/LastActivity/last_activity()/is_stalled())
 ├── analytics.rs            T-14a event_log/journey_features codecs (anchors_delays column wired by T-14d, conformance column wired by T-14i) + T-14b directly-follows process map, pure, DB-free
 ├── data/
 │   └── journeys.rs          T-14m: pure, DB-free synthetic journey-cohort generator (SplitMix64, deterministic)

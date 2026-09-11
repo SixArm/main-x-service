@@ -14,7 +14,8 @@ use uuid::Uuid;
 use crate::auth::MaybeAuthUser;
 use crate::instances as rules;
 use crate::models::_entities::{
-    instance_events, instance_measures, instance_steps, instance_team, pathway_instances,
+    instance_events, instance_measures, instance_segments, instance_steps, instance_team,
+    pathway_instances,
 };
 use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
@@ -25,6 +26,19 @@ fn refuse(reason: &str) -> Error {
         axum::http::StatusCode::UNPROCESSABLE_ENTITY,
         ErrorDetail::new("unprocessable_entity", reason),
     )
+}
+
+/// Epoch milliseconds of a stored timestamp (spec T-14j; the same
+/// small local helper `controllers::exports`/`controllers::tba` each
+/// keep their own copy of rather than sharing one across modules).
+fn ms(at: chrono::DateTime<chrono::FixedOffset>) -> i64 {
+    at.timestamp_millis()
+}
+
+/// A date at midnight UTC, in epoch milliseconds.
+fn date_ms(date: chrono::NaiveDate) -> i64 {
+    date.and_hms_opt(0, 0, 0)
+        .map_or(0, |dt| dt.and_utc().timestamp_millis())
 }
 
 /// Parse a pid or 404.
@@ -597,6 +611,160 @@ async fn overdue_reviews(State(ctx): State<AppContext>) -> Result<Response> {
     }))
 }
 
+/// `?idle_days=` (spec T-14j). Zero, negative, or unparseable falls
+/// back to the default — the same "a tuning knob never errors"
+/// convention pagination's `?limit=`/`?offset=` already uses, since
+/// an idle-day threshold is a lens setting, not a business promise
+/// like `target_days` on the standards endpoint.
+#[derive(Debug, Default, serde::Deserialize)]
+struct StalledQuery {
+    #[serde(default)]
+    idle_days: Option<i64>,
+}
+
+const DEFAULT_IDLE_DAYS: i64 = 60;
+
+/// One instance's running latest-per-source accumulator, folded into a
+/// [`rules::LastActivity`] once every source has been scanned.
+#[derive(Debug, Default, Clone, Copy)]
+struct LatestBySource {
+    segment_start: Option<i64>,
+    segment_end: Option<i64>,
+    step_done: Option<i64>,
+    event: Option<i64>,
+}
+
+/// Bulk-load every candidate instance's latest segment start/end, step
+/// completion, and event occurrence, in three bounded queries (no
+/// N+1), grouped by instance pid — the same shape every other cohort
+/// loader in this crate uses.
+async fn load_last_activity_inputs(
+    ctx: &AppContext,
+    pids: &[Uuid],
+) -> Result<std::collections::HashMap<Uuid, rules::LastActivity>> {
+    let mut latest: std::collections::HashMap<Uuid, LatestBySource> =
+        std::collections::HashMap::new();
+    if pids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let segment_rows = instance_segments::Entity::find()
+        .filter(instance_segments::Column::InstancePid.is_in(pids.to_vec()))
+        .all(&ctx.db)
+        .await?;
+    for row in &segment_rows {
+        let entry = latest.entry(row.instance_pid).or_default();
+        entry.segment_start = Some(
+            entry
+                .segment_start
+                .unwrap_or(i64::MIN)
+                .max(ms(row.started_at)),
+        );
+        if let Some(ended_at) = row.ended_at {
+            entry.segment_end = Some(entry.segment_end.unwrap_or(i64::MIN).max(ms(ended_at)));
+        }
+    }
+
+    let step_rows = instance_steps::Entity::find()
+        .filter(instance_steps::Column::InstancePid.is_in(pids.to_vec()))
+        .all(&ctx.db)
+        .await?;
+    for row in &step_rows {
+        if let Some(done_on) = row.done_on {
+            let entry = latest.entry(row.instance_pid).or_default();
+            entry.step_done = Some(entry.step_done.unwrap_or(i64::MIN).max(date_ms(done_on)));
+        }
+    }
+
+    let event_rows = instance_events::Entity::find()
+        .filter(instance_events::Column::InstancePid.is_in(pids.to_vec()))
+        .all(&ctx.db)
+        .await?;
+    for row in &event_rows {
+        let entry = latest.entry(row.instance_pid).or_default();
+        entry.event = Some(entry.event.unwrap_or(i64::MIN).max(ms(row.occurred_at)));
+    }
+
+    Ok(latest
+        .into_iter()
+        .map(|(pid, by_source)| {
+            (
+                pid,
+                rules::last_activity(
+                    0,
+                    by_source.segment_start,
+                    by_source.segment_end,
+                    by_source.step_done,
+                    by_source.event,
+                ),
+            )
+        })
+        .collect())
+}
+
+/// `GET /api/instances/stalled?idle_days=N` (spec T-14j, default 60,
+/// echoed) — open instances whose last recorded activity is older than
+/// `idle_days`, sorted most-idle first, each row naming its
+/// last-activity source. Complements `overdue-reviews` (a due date)
+/// with an observed-silence test; the timeout is retroactive
+/// (idle-since is the last activity time itself, per
+/// [`rules::is_stalled`]'s own doc). Never grouped by actor.
+#[debug_handler]
+async fn stalled(
+    State(ctx): State<AppContext>,
+    Query(query): Query<StalledQuery>,
+) -> Result<Response> {
+    let idle_days = query
+        .idle_days
+        .filter(|&d| d > 0)
+        .unwrap_or(DEFAULT_IDLE_DAYS);
+    let as_of = chrono::Utc::now();
+    let as_of_ms = as_of.timestamp_millis();
+
+    let instances = pathway_instances::Entity::find()
+        .filter(pathway_instances::Column::DeletedAt.is_null())
+        .filter(pathway_instances::Column::Status.is_in(["active", "on_hold"]))
+        .all(&ctx.db)
+        .await?;
+    let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
+    let by_pid = load_last_activity_inputs(&ctx, &pids).await?;
+
+    let mut rows: Vec<(i64, serde_json::Value)> = instances
+        .iter()
+        .filter_map(|instance| {
+            let activity = by_pid.get(&instance.pid).copied().unwrap_or_else(|| {
+                rules::last_activity(date_ms(instance.enrolled_on), None, None, None, None)
+            });
+            let idle_ms = as_of_ms.saturating_sub(activity.at_ms);
+            rules::is_stalled(activity.at_ms, as_of_ms, idle_days).then(|| {
+                (
+                    idle_ms,
+                    serde_json::json!({
+                        "pid": instance.pid,
+                        "subject_ref": instance.subject_ref,
+                        "urgency": instance.urgency,
+                        "last_activity_at_ms": activity.at_ms,
+                        "last_activity_source": activity.source,
+                        "idle_days": idle_ms / 86_400_000,
+                    }),
+                )
+            })
+        })
+        .collect();
+    rows.sort_by_key(|(idle_ms, _)| std::cmp::Reverse(*idle_ms));
+
+    format::json(serde_json::json!({
+        "as_of": as_of,
+        "idle_days": idle_days,
+        "note": "open instances (active + on_hold) whose last recorded activity \
+                 -- latest of segment start/end, step done_on, or event \
+                 occurred_at (a recorded review is an event too) -- is strictly \
+                 older than idle_days; idle-since is the activity time itself, \
+                 never when the silence was noticed. Never grouped by actor.",
+        "stalled": rows.into_iter().map(|(_, v)| v).collect::<Vec<_>>(),
+    }))
+}
+
 /// `GET /api/care-pathways/{pathway}/cohort` — the chronic cohort on
 /// one pathway: instance counts by status + urgency, and step
 /// completion across the active cohort.
@@ -832,6 +1000,7 @@ pub fn routes() -> Routes {
         .prefix("/api/instances")
         .add("/caseload", get(caseload))
         .add("/overdue-reviews", get(overdue_reviews))
+        .add("/stalled", get(stalled))
         .add("/care-team-load", get(care_team_load))
         .add("/{pid}", get(get_instance))
         .add("/{pid}/status", post(set_status))
