@@ -46,8 +46,8 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | — | `/api/instances/{pid}` (+ `/status` `/review` `/urgency` `/team` `/events` `/steps/{s}/complete`) | Instance lifecycle, review cadence, urgency, care team, steps |
 | GET | `/api/instances/{caseload,overdue-reviews,care-team-load}` | Derived operational views |
 | POST/GET | `/api/instances/{pid}/segments` (+ `/segments/{seg}/close`, `/clock`) | **Time-based analysis**: record a journey segment (VA / NNVA / UNVA + stage + waste), close a running one, set the pathway clock (no pause, by design) |
-| GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs, per-stage anchors + adjacent delays (T-14d); and the segment/gap wall |
-| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); censoring-aware Kaplan–Meier survival for time-to-close and time-to-anchor (T-14e: `?discontinued=event\|censor`); ranked constraints; both endpoints splittable by a rule (T-14f: `?contains=&excludes=&compare=` over `stage`/`step`/`event`/`waste`/`outcome`/`setting`/`urgency`); both also carry a CONSORT-style `attrition` trail (T-14g) explaining the denominator. All suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`), and a rule-split's own cross-side protection reuses the same primitive |
+| GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs, per-stage anchors + adjacent delays (T-14d), conformance to the enrolled template (T-14i); and the segment/gap wall |
+| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); censoring-aware Kaplan–Meier survival for time-to-close and time-to-anchor (T-14e: `?discontinued=event\|censor`); ranked constraints; both endpoints splittable by a rule (T-14f: `?contains=&excludes=&compare=` over `stage`/`step`/`event`/`waste`/`outcome`/`setting`/`urgency`); both also carry a CONSORT-style `attrition` trail (T-14g) explaining the denominator; `time-analysis` also carries a template-conformance fully-conformant cohort share (T-14i, not `constraints` — a documented scope decision). All suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`), and a rule-split's own cross-side protection reuses the same primitive |
 | GET | `/api/care-pathways/{pid}/export/{event-log,journey-features}` | **Bulk export codecs** (T-14a): `?format=csv\|jsonl&status=`; `event_log` (bupaR/PM4Py shape) and `journey_features` (one row per instance); gated `Destructive`, audited as a disclosure; never a `subject_ref` or a person/actor URN |
 | GET | `/api/care-pathways/{pid}/process-map` | **Directly-follows process map** (T-14b): `?level=stage\|step&status=&mode=`; nodes/edges with instance/occurrence counts + median(+p90) gaps; self-loops kept, `start`/`end` pseudo-nodes; suppressed per node/edge (T-14k), not per cohort |
 | GET | `/api/care-pathways/{pid}/variants` | **Journey variants** (T-14c): pathway strings via a named/defaulted/echoed parameter chain (era filter/collapse/combine/filter-mode/truncate); frequency/coverage Pareto + per-position duration lines; suppressed variants folded into `suppressed_instances`, shares renormalised |
@@ -108,8 +108,8 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA. Ten sub-tasks have landed — see
-`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h
+analytics suite T-14 builds on TBA. Eleven sub-tasks have landed — see
+`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i
 for each one's documented scope deviations from its original spec
 text: three of the ten landed out of T-14's own suggested build order, since each
 needed none of the sibling T-14 sub-tasks ahead of it to be useful
@@ -226,6 +226,36 @@ per defect in an isolated one-instance cohort, not across one shared
 eight-defect cohort, since several defects are, by construction, also
 low-coverage or clock-clipped journeys that no fixed seed can reliably
 keep apart at once.
+**T-14i** (also 2026-09-11, again next in the suggested order) is a
+new file, `src/conformance.rs` (a genuinely separate concern from
+`src/tba.rs`, the same reasoning T-14b's/T-14c's/T-14f's/T-14h's own
+new files followed — sequence-order comparison, not an elapsed-time
+computation): `StepRecord`, `PairVerdict`
+(`in_order`/`inverted`/`skipped` — a pair with either endpoint undone
+verdicts `skipped`, but still counts against the fixed structural
+`declared_pairs` denominator, same as a genuine inversion would),
+`conformance()`, `CohortConformance`/`cohort_conformance()` (excludes
+instances with fewer than two declared steps from its own denominator
+rather than counting them either way). HTTP surface,
+`src/controllers/tba.rs`: `load_step_records`/`count_escalation_events`
+(per instance) and `load_conformance_inputs` (cohort, bulk, no N+1),
+wired into `GET /api/instances/{pid}/time-analysis` (a new
+`conformance` key) and `GET /api/care-pathways/{pid}/time-analysis` (a
+new cohort `conformance` share, withheld under the identical
+suppression decision `survival`/`split` already use) — **not**
+`cohort_constraints`, since template conformance is not a
+recoverable-time constraint finding. Unlike T-14h, this task does
+**not** exercise T-14m's generator: `journeys:seed` has no defect
+exercising step order at all, so `tests/requests/conformance.rs`
+builds each instance through the real enrolment/step/event endpoints
+and only backdates `done_on`/`closed_on` directly on the model — the
+one pair of fields those endpoints always stamp at "now"/"today",
+which would otherwise make every within-test-run completion order
+indistinguishable. Also wires T-14a's own reserved `conformance`
+journey-feature export column (`src/analytics.rs`'s
+`journey_feature_row`, a third parameter alongside the analysis,
+matching T-14d's `anchors_delays` precedent) — a compact scalar
+summary, not the per-pair breakdown the dedicated endpoint carries.
 Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
@@ -291,8 +321,8 @@ src/
 │   ├── fhir.rs             mounted FHIR R5 PlanDefinition CRUD/search + $validate + SMART + $export
 │   ├── insights.rs         directory/coverage/variants/providers/languages registry lenses
 │   ├── instances.rs        instance lifecycle/review/urgency/team/steps/outcomes + caseload/overdue/care-team-load
-│   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views (optionally anchored, T-14d; rule-splittable, T-14f), constraints (also rule-splittable), flow, T-14b process-map, T-14c variants
-│   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs; its care_setting_string helper is pub(crate), reused by tba.rs's T-14f split for setting: predicates)
+│   ├── tba.rs              time-based analysis: segment + clock recording, per-instance and cohort views (optionally anchored, T-14d; rule-splittable, T-14f), constraints (also rule-splittable), flow, T-14b process-map, T-14c variants, T-14i conformance loaders (load_step_records/count_escalation_events/load_conformance_inputs, pub(crate), reused by controllers/exports.rs)
+│   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs; its care_setting_string helper is pub(crate), reused by tba.rs's T-14f split for setting: predicates; wires T-14i's conformance column via tba.rs's load_conformance_inputs)
 │   ├── data_quality.rs      T-14h: journey data-quality and missingness report HTTP surface (loads segments/steps, reuses tba.rs's resolve_anchor_pair_raw; pure detectors are in src/data_quality.rs)
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
 │   └── metrics.rs          root /metrics.prom Prometheus endpoint
@@ -325,10 +355,11 @@ src/
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) + ABAC, both reloadable (ReloadableVerifier/ReloadablePolicy — AU-2 key/policy hot-reload)
 ├── version.rs             `Accepts-version` header negotiation middleware (agents/share/api-versioning.md)
 ├── instances.rs            pure instance lifecycle state machine (active↔on_hold→terminal)
-├── analytics.rs            T-14a event_log/journey_features codecs (anchors_delays column wired by T-14d) + T-14b directly-follows process map, pure, DB-free
+├── analytics.rs            T-14a event_log/journey_features codecs (anchors_delays column wired by T-14d, conformance column wired by T-14i) + T-14b directly-follows process map, pure, DB-free
 ├── data/
 │   └── journeys.rs          T-14m: pure, DB-free synthetic journey-cohort generator (SplitMix64, deterministic)
 ├── data_quality.rs         T-14h: journey data-quality and missingness detectors (DQ_CODES, has_*, binary_entropy_bits, build_report), pure, DB-free
+├── conformance.rs          T-14i: conformance to the enrolled template — StepRecord/PairVerdict/conformance()/CohortConformance/cohort_conformance(), pure, DB-free
 ├── suppression.rs          T-14k: disclosure control — min_cell_count/Mode + secondary suppression of stratified marginals, DB-free (first real caller: T-14f's split_table)
 ├── split.rs                T-14f: rule-based cohort splits — Predicate/Features/Rule/partition/split_table, pure, DB-free
 ├── tba.rs                 pure time-based analysis: interval union/subtract, the four-bucket
@@ -339,7 +370,8 @@ src/
 │                          censoring-aware Kaplan-Meier survival estimator + a two-sample
 │                          log-rank test (T-14e), and a CONSORT-style cohort attrition
 │                          record (T-14g). No I/O; `as_of` is a parameter, so it is
-│                          deterministic
+│                          deterministic. `src/controllers/tba.rs` (not this file) adds
+│                          conformance-to-template loaders (T-14i, `src/conformance.rs`)
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── privacy.rs             field masking (provider name/id) + GDPR export envelope

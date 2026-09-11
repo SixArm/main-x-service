@@ -43,9 +43,9 @@ response headers (defaults reproduce the old hard caps of 100/50).
 | POST/GET | `/api/instances/{pid}/segments` | Record / list a journey's VA / NNVA / UNVA segments |
 | POST | `/api/instances/{pid}/segments/{seg}/close` | Close a running segment |
 | POST | `/api/instances/{pid}/clock` | Set the pathway clock `start`/`stop` (no `pause`, by design) |
-| GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage, per-stage anchors + adjacent delays |
+| GET | `/api/instances/{pid}/time-analysis` | Per-instance TBA: lead time, value-adding ratio, coverage, per-stage anchors + adjacent delays, plus conformance to the enrolled template (declared-step-order ratio, per-pair verdicts, skipped/after-closure positions, escalation events) |
 | GET | `/api/instances/{pid}/timeline` | The mapped journey as an ordered wall of segments and gaps |
-| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`), plus censoring-aware Kaplan–Meier survival (`?discontinued=event\|censor`), optionally split by a rule (`?contains=&excludes=&compare=`; `?mode=withhold\|remove` on suppression), plus a CONSORT-style `attrition` trail on every response |
+| GET | `/api/care-pathways/{pid}/time-analysis` | Cohort TBA: nearest-rank lead-time percentiles vs. an NHS access standard, optionally anchored (`?from_anchor=&to_anchor=`), plus censoring-aware Kaplan–Meier survival (`?discontinued=event\|censor`), optionally split by a rule (`?contains=&excludes=&compare=`; `?mode=withhold\|remove` on suppression), a CONSORT-style `attrition` trail, and a template-conformance fully-conformant share on every response |
 | GET | `/api/care-pathways/{pid}/constraints` | Ranked constraint findings, by recoverable time — same rule-split params and `attrition` trail as time-analysis (`?mode=withhold\|remove` on suppression) |
 | GET | `/api/instances/flow` | Queueing-theory flow (Little's Law: λ/μ/ρ/κ/τ) |
 | GET | `/api/instances/time-standards` | The NHS access-standard catalogue + segment vocabularies |
@@ -281,6 +281,33 @@ end rather than a hand-built fixture, which found and fixed two real
 generator bugs in
 [`src/data/journeys.rs`](./src/data/journeys.rs) — see that file's
 `widen_clock_stop_past` and `terminal_without_clock_stop` match arm.
+
+### Conformance to the enrolled template (T-14i)
+
+Per instance, the steps copied at enrolment (`instance_steps.position`)
+against their completion order (`done_on`): skipped steps, adjacent
+declared pairs completed out of order, steps completed after closure,
+and `escalation` events; a labelled ratio `pairs_in_order /
+declared_pairs` with both numbers; a cohort share of fully-conformant
+instances. Against the template only — never a discovered model — and
+with no penalty for extra events: a journey may need more than its
+template foresaw. `declared_pairs` is a fixed structural count (not
+reduced by skips): a pair with either endpoint undone verdicts
+`skipped` rather than `inverted`, but still counts against the ratio,
+same as a genuine inversion would. New file, pure and DB-free:
+[`src/conformance.rs`](./src/conformance.rs) (a genuinely separate
+concern from `src/tba.rs` — sequence-order comparison, not an
+elapsed-time computation): `StepRecord`, `PairVerdict`
+(`in_order`/`inverted`/`skipped`), `conformance()`,
+`CohortConformance`/`cohort_conformance()`. Wired into
+`GET /api/instances/{pid}/time-analysis` (a new `conformance` key) and
+`GET /api/care-pathways/{pid}/time-analysis` (a cohort `conformance`
+share, withheld under the identical suppression decision
+`survival`/`split` already use) — **not** `constraints`, since
+template conformance is not a recoverable-time constraint finding.
+Also wires T-14a's own reserved `conformance` journey-feature export
+column (a compact scalar summary, not the per-pair breakdown the
+dedicated endpoint carries).
 
 ### Cross-service journey links ([spec §6.19](./spec/index.md))
 

@@ -41,7 +41,8 @@ use uuid::Uuid;
 use crate::analytics::{self, CaseContext, EventInput, SegmentInput, StepInput};
 use crate::auth::MaybeAuthUser;
 use crate::compliance::disclosure::{self, AccessContext};
-use crate::controllers::tba::{analyze_cohort, load_cohort};
+use crate::conformance;
+use crate::controllers::tba::{analyze_cohort, load_cohort, load_conformance_inputs};
 use crate::models::_entities::{instance_events, instance_segments, instance_steps, instance_team};
 use crate::models::care_pathways::Model as PathwayModel;
 
@@ -313,6 +314,12 @@ async fn export_journey_features(
     let analyses = analyze_cohort(&ctx, &instances, now).await?;
     let care_setting = care_setting_string(&pathway_dto);
 
+    // T-14i's own scalar conformance summary, wired into the same
+    // reserved column T-14a left `null` for it.
+    let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
+    let (step_map, escalation_map) = load_conformance_inputs(&ctx, &pids).await?;
+    let empty_steps: Vec<conformance::StepRecord> = Vec::new();
+
     let rows: Vec<analytics::JourneyFeatureRow> = instances
         .iter()
         .zip(analyses.iter())
@@ -325,7 +332,11 @@ async fn export_journey_features(
                 status: instance.status.clone(),
                 outcome: instance.outcome.clone(),
             };
-            analytics::journey_feature_row(&case_ctx, analysis)
+            let steps = step_map.get(&instance.pid).unwrap_or(&empty_steps).clone();
+            let escalations = escalation_map.get(&instance.pid).copied().unwrap_or(0);
+            let closed_on_ms = instance.closed_on.map(date_ms);
+            let conform = conformance::conformance(steps, closed_on_ms, escalations);
+            analytics::journey_feature_row(&case_ctx, analysis, &conform)
         })
         .collect();
 

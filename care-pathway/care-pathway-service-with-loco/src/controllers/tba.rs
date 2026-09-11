@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use crate::analytics;
 use crate::auth::MaybeAuthUser;
+use crate::conformance;
 use crate::instances as rules;
 use crate::models::_entities::{
     instance_events, instance_segments, instance_steps, pathway_instances,
@@ -110,6 +111,87 @@ async fn load_segments(
         .limit(MAX_SEGMENTS)
         .all(&ctx.db)
         .await?)
+}
+
+/// Load one instance's declared steps as [`conformance::StepRecord`]s,
+/// in position order (spec T-14i).
+async fn load_step_records(
+    ctx: &AppContext,
+    instance_pid: Uuid,
+) -> Result<Vec<conformance::StepRecord>> {
+    let rows = instance_steps::Entity::find()
+        .filter(instance_steps::Column::InstancePid.eq(instance_pid))
+        .order_by_asc(instance_steps::Column::Position)
+        .all(&ctx.db)
+        .await?;
+    Ok(rows
+        .iter()
+        .map(|row| conformance::StepRecord {
+            position: row.position,
+            done_on_ms: row.done_on.map(date_ms),
+        })
+        .collect())
+}
+
+/// Count one instance's `escalation`-kind events (spec T-14i) —
+/// carried alongside the conformance ratio, never folded into it.
+async fn count_escalation_events(ctx: &AppContext, instance_pid: Uuid) -> Result<usize> {
+    let count = instance_events::Entity::find()
+        .filter(instance_events::Column::InstancePid.eq(instance_pid))
+        .filter(instance_events::Column::Kind.eq("escalation"))
+        .count(&ctx.db)
+        .await?;
+    Ok(usize::try_from(count).unwrap_or(usize::MAX))
+}
+
+/// Bulk-load every cohort instance's step records and escalation-event
+/// count (spec T-14i), in two bounded queries, grouped by instance
+/// pid — the same no-N+1 shape [`analyze_cohort`] and
+/// [`crate::controllers::data_quality::load_dq_inputs`] already use.
+/// `pub(crate)` so [`crate::controllers::exports`] can wire its own
+/// reserved `conformance` journey-feature column without a second,
+/// drifting loader.
+pub(crate) async fn load_conformance_inputs(
+    ctx: &AppContext,
+    pids: &[Uuid],
+) -> Result<(
+    std::collections::HashMap<Uuid, Vec<conformance::StepRecord>>,
+    std::collections::HashMap<Uuid, usize>,
+)> {
+    if pids.is_empty() {
+        return Ok((
+            std::collections::HashMap::new(),
+            std::collections::HashMap::new(),
+        ));
+    }
+    let step_rows = instance_steps::Entity::find()
+        .filter(instance_steps::Column::InstancePid.is_in(pids.to_vec()))
+        .order_by_asc(instance_steps::Column::Position)
+        .all(&ctx.db)
+        .await?;
+    let mut steps: std::collections::HashMap<Uuid, Vec<conformance::StepRecord>> =
+        std::collections::HashMap::new();
+    for row in &step_rows {
+        steps
+            .entry(row.instance_pid)
+            .or_default()
+            .push(conformance::StepRecord {
+                position: row.position,
+                done_on_ms: row.done_on.map(date_ms),
+            });
+    }
+
+    let event_rows = instance_events::Entity::find()
+        .filter(instance_events::Column::InstancePid.is_in(pids.to_vec()))
+        .filter(instance_events::Column::Kind.eq("escalation"))
+        .all(&ctx.db)
+        .await?;
+    let mut escalations: std::collections::HashMap<Uuid, usize> = std::collections::HashMap::new();
+    for row in &event_rows {
+        *escalations.entry(row.instance_pid).or_insert(0) += 1;
+    }
+
+    Ok((steps, escalations))
 }
 
 /// Stored row → the pure analysis input. `pub(crate)` so
@@ -377,6 +459,15 @@ async fn instance_time_analysis(
     let now = chrono::Utc::now();
     let instance = find_instance(&ctx, &raw).await?;
     let analysis = analyze_instance(&ctx, &instance, now.timestamp_millis()).await?;
+
+    // Conformance to the enrolled template (spec T-14i): declared step
+    // order against completion order, against this instance's own
+    // template only, never a discovered model.
+    let step_records = load_step_records(&ctx, instance.pid).await?;
+    let escalations = count_escalation_events(&ctx, instance.pid).await?;
+    let closed_on_ms = instance.closed_on.map(date_ms);
+    let conform = conformance::conformance(step_records, closed_on_ms, escalations);
+
     format::json(serde_json::json!({
         "as_of": now,
         "instance": { "pid": instance.pid, "status": instance.status },
@@ -386,8 +477,13 @@ async fn instance_time_analysis(
                  journey was mapped at all. by_category partitions the clock \
                  (the four sum to lead time); by_stage may overlap, so its \
                  shares need not. touch_time_ms is the raw sum and may exceed \
-                 lead time when care was concurrent.",
+                 lead time when care was concurrent. conformance scores \
+                 declared step order against completion order against this \
+                 instance's own template only, never a discovered model; \
+                 escalation_events is disclosed alongside the ratio, never \
+                 subtracted from it.",
         "analysis": analysis,
+        "conformance": conform,
     }))
 }
 
@@ -1316,6 +1412,45 @@ async fn cohort_time_analysis(
             "attrition".to_string(),
             serde_json::to_value(&attrition).unwrap_or(serde_json::Value::Null),
         );
+    }
+
+    // Conformance to the enrolled template (spec T-14i): the cohort's
+    // fully-conformant share, over the same instances the rest of this
+    // response already scored. Not wired into `cohort_constraints` —
+    // template conformance is not a recoverable-time constraint
+    // finding, unlike the other cohort blocks above.
+    let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
+    let (step_map, escalation_map) = load_conformance_inputs(&ctx, &pids).await?;
+    let empty_steps: Vec<conformance::StepRecord> = Vec::new();
+    let ratios: Vec<Option<f64>> = instances
+        .iter()
+        .map(|instance| {
+            let steps = step_map.get(&instance.pid).unwrap_or(&empty_steps).clone();
+            let escalations = escalation_map.get(&instance.pid).copied().unwrap_or(0);
+            let closed_on_ms = instance.closed_on.map(date_ms);
+            conformance::conformance(steps, closed_on_ms, escalations).ratio
+        })
+        .collect();
+    let cohort_conform = conformance::cohort_conformance(&ratios);
+    if let Some(map) = response.as_object_mut() {
+        map.insert(
+            "conformance".to_string(),
+            serde_json::to_value(&cohort_conform).unwrap_or(serde_json::Value::Null),
+        );
+    }
+    // Same suppression decision as `survival`/`split` above — a
+    // fully-conformant share over a handful of instances names one
+    // patient's own compliance as precisely as the percentile detail
+    // does.
+    if suppressed && let Some(map) = response.as_object_mut() {
+        match mode {
+            suppression::Mode::Withhold => {
+                map.insert("conformance".to_string(), serde_json::Value::Null);
+            }
+            suppression::Mode::Remove => {
+                map.remove("conformance");
+            }
+        }
     }
 
     format::json(response)

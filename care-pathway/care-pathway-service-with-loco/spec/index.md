@@ -254,8 +254,10 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    async job/artifact-store contract remains unbuilt; see the module's
    own doc comment and the entity-level
    [`13-tasks.md`](../../spec/13-tasks.md) T-14a for the full scope
-   note (no `masking_profile` knob; three feature columns deferred to
-   still-unbuilt sibling tasks). Landed 2026-09-09.
+   note (no `masking_profile` knob; three feature columns reserved
+   ahead of their sibling tasks — anchors_delays and conformance are
+   now wired, item 25's/30's own entries; `variant` still awaits
+   T-14c's whole-cohort pipeline). Landed 2026-09-09.
 21. **Seeded synthetic journey cohorts.** `cargo loco task
    journeys:seed pathway:<pid> [n:] [seed:] [open_share:] [defects:]`
    generates and persists a deterministic cohort of pathway instances
@@ -561,6 +563,39 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    shared eight-defect cohort — several defects are, by construction,
    also low-coverage or clock-clipped journeys, which no fixed seed can
    reliably keep apart at once. Landed 2026-09-11, spec T-14h.
+30. **Conformance to the enrolled template.**
+    Per instance, the steps copied at enrolment
+    (`instance_steps.position`) against their completion order
+    (`done_on`, spec T-14i): skipped steps, adjacent declared pairs
+    completed out of order, steps completed after closure, and
+    `escalation` events; a labelled ratio `pairs_in_order /
+    declared_pairs` with both numbers; a cohort share of fully
+    conformant instances. Against the template only — never a
+    discovered model — and with no penalty for extra events. New
+    file, [`src/conformance.rs`](../src/conformance.rs) (a genuinely
+    separate concern from `src/tba.rs`, matching item 23's/24's/27's/
+    29's own reasoning): `StepRecord`, `PairVerdict`
+    (`in_order`/`inverted`/`skipped` — a pair with either endpoint
+    undone is `skipped`, never counted as an inversion, but still
+    contributes to the fixed structural `declared_pairs` denominator,
+    same as a genuine inversion would), `conformance()`,
+    `CohortConformance`/`cohort_conformance()` (the cohort rollup,
+    excluding instances with fewer than two declared steps from its
+    own denominator rather than counting them either way). HTTP
+    surface: [`src/controllers/tba.rs`](../src/controllers/tba.rs)
+    (`load_step_records`/`count_escalation_events` per instance,
+    `load_conformance_inputs` for the cohort, bulk, no N+1), wired into
+    `GET /api/instances/{pid}/time-analysis` and
+    `GET /api/care-pathways/{pathway}/time-analysis` (the cohort
+    share, withheld under the identical suppression decision
+    `survival`/`split` already use). **Not wired into
+    `cohort_constraints`** — template conformance is not a
+    recoverable-time constraint finding. Also wires T-14a's own
+    reserved `conformance` journey-feature export column
+    (`src/analytics.rs`'s `journey_feature_row`, matching item 25's
+    `anchors_delays` precedent) — a compact scalar summary, not the
+    per-pair breakdown the dedicated endpoint carries. Landed
+    2026-09-11, spec T-14i.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

@@ -9,6 +9,63 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14i: conformance to the enrolled template (2026-09-11)
+
+Per instance, the steps copied at enrolment (`instance_steps.position`)
+against their completion order (`done_on`): skipped steps, adjacent
+declared pairs completed out of order, steps completed after closure,
+and `escalation` events; a labelled ratio `pairs_in_order /
+declared_pairs` with both numbers; a cohort share of fully-conformant
+instances. Against the template only — never a discovered model — and
+with no penalty for extra events.
+
+- `src/conformance.rs` (new, pure, DB-free): `StepRecord`,
+  `PairVerdict` (`in_order`/`inverted`/`skipped` — a pair with either
+  endpoint undone verdicts `skipped`, never an inversion, but still
+  counts against the fixed structural `declared_pairs` denominator,
+  same as a genuine inversion would), `conformance()`,
+  `CohortConformance`/`cohort_conformance()` (excludes instances with
+  fewer than two declared steps from its own denominator rather than
+  counting them either way). 14 unit tests.
+- `src/controllers/tba.rs`: `load_step_records`/
+  `count_escalation_events` (per instance) and
+  `load_conformance_inputs` (cohort, bulk, no N+1), wired into
+  `GET /api/instances/{pid}/time-analysis` (a new `conformance` key)
+  and `GET /api/care-pathways/{pid}/time-analysis` (a new cohort
+  `conformance` share, withheld under the identical suppression
+  decision `survival`/`split` already use). **Not** wired into
+  `cohort_constraints` — template conformance is not a
+  recoverable-time constraint finding.
+- Also wires T-14a's own reserved `conformance` journey-feature export
+  column (`src/analytics.rs`'s `journey_feature_row`, a compact scalar
+  summary — `{"ratio": …, "declared_pairs": …, "pairs_in_order": …,
+  "escalation_events": …}` — not the per-pair breakdown the dedicated
+  endpoint carries).
+- **The DB-gated round trip backdates `done_on`/`closed_on` directly
+  on the model.** Both HTTP endpoints that would set these
+  (`.../steps/{step}/complete`, the status-transition-to-terminal
+  path) always stamp `Utc::now().date_naive()`/today — day-resolution,
+  so two calls in one fast test run land on the same date and cannot
+  exercise a genuine inversion. `tests/requests/conformance.rs`
+  therefore builds each instance through the real
+  enrolment/step/event endpoints and only backdates the two fields
+  the API itself cannot backdate — the same precedent
+  `tests/requests/journeys_seed.rs`/`compliance.rs` already set.
+- **Acceptance:** completing steps in template order scores 1.0 with
+  zero inversions; reverse order scores 0; a skipped step is reported
+  as skipped, not as an inversion; an instance with one declared step
+  reports `null` (no pairs) with the reason — all proven end to end
+  against real Postgres (`conformance_round_trip`), plus escalation
+  events and after-closure flagging. The cohort share
+  (`cohort_conformance_share_round_trip`) clears the default
+  suppression floor at exactly five instances and confirms
+  `constraints` carries no `conformance` key.
+- Verified: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test --lib` (434 passed), `cargo test --
+  --ignored` against a real Postgres (69 passed, including 2 new),
+  `cargo +1.96 check --all-targets` (MSRV), `cargo deny check`,
+  `cargo bench --no-run`.
+
 ### Added — T-14h: journey data-quality and missingness report (2026-09-11)
 
 `GET /api/care-pathways/{pid}/data-quality`
