@@ -1481,3 +1481,261 @@ async fn rule_based_cohort_split_suppression_round_trip() {
     })
     .await;
 }
+
+/// The cohort attrition record (T-14g): the base six-step trail on
+/// both `time-analysis` and `constraints`, a real `?status=` count
+/// change, a real (accidental, same-day) degenerate clock disclosed
+/// without being excluded, the suppression step tracking the floor,
+/// and the rule-branch's matched/complement counts matching the
+/// `split` block's own.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[allow(clippy::too_many_lines)] // six instances, three status views, several assertions
+async fn cohort_attrition_round_trip() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({
+                "name": format!("attrition pathway {}", uuid::Uuid::new_v4()),
+                "care_setting": "Outpatient",
+                "condition_codes": [{"system": "Icd10", "code": "M54"}],
+            }))
+            .await;
+        created.assert_status_ok();
+        let template: Value = created.json();
+        let pathway = template["pid"].as_str().expect("pathway pid").to_string();
+
+        // Plain enrolment, no explicit clock at all -- so it resolves
+        // to `enrolled_on`'s midnight for a start, exactly like
+        // `seed()` (this file's own default) leaves it.
+        let enroll = |stage: Option<&'static str>| {
+            let request = &request;
+            let pathway = pathway.clone();
+            async move {
+                let enrolled = request
+                    .post(&format!("/api/care-pathways/{pathway}/instances"))
+                    .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+                    .await;
+                enrolled.assert_status_ok();
+                let instance: Value = enrolled.json();
+                let pid = instance["pid"].as_str().expect("instance pid").to_string();
+                if let Some(stage) = stage {
+                    request
+                        .post(&format!("/api/instances/{pid}/segments"))
+                        .json(&json!({
+                            "label": stage, "stage": stage, "category": "value_adding",
+                            "started_at": day(0), "ended_at": day(1),
+                        }))
+                        .await
+                        .assert_status_ok();
+                }
+                pid
+            }
+        };
+
+        // One degenerate-clock instance: an explicit clock start far
+        // in the future, then closed -- closing always stamps
+        // `clock_stop_at` to the real moment of closure (spec §12.3),
+        // which now lands *before* the future start, so
+        // `is_measurable()` is false without any special-casing.
+        let degenerate_pid = enroll(None).await;
+        request
+            .post(&format!("/api/instances/{degenerate_pid}/clock"))
+            .json(&json!({ "event": "start", "at": day(1000) }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/instances/{degenerate_pid}/status"))
+            .json(&json!({ "to": "completed", "outcome": "improved" }))
+            .await
+            .assert_status_ok();
+
+        // Two ordinary closed instances: no explicit clock, so
+        // closing alone gives a real (non-degenerate) elapsed time --
+        // `clock_stop_at` (closure, real "now") is always after
+        // `enrolled_on`'s own midnight.
+        for _ in 0..2 {
+            let pid = enroll(None).await;
+            request
+                .post(&format!("/api/instances/{pid}/status"))
+                .json(&json!({ "to": "completed", "outcome": "improved" }))
+                .await
+                .assert_status_ok();
+        }
+
+        // Three open instances (status stays `active`, the default);
+        // two of the three reach `triage`, for the rule branch below.
+        for i in 0..3 {
+            let stage = if i < 2 { Some("triage") } else { None };
+            enroll(stage).await;
+        }
+
+        // ── `?status=all` (default): 6 enrolled, 6 after the status
+        // filter (a no-op at `all`), 1 degenerate (disclosed, not
+        // excluded), and the cohort clears the floor.
+        let all: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/time-analysis"))
+            .await
+            .json();
+        assert_eq!(all["cohort"]["instances"], 6);
+        let attrition = all["attrition"].as_array().expect("attrition");
+        let step = |label: &str| -> &Value {
+            attrition
+                .iter()
+                .find(|s| s["label"] == label)
+                .unwrap_or_else(|| panic!("missing step {label}: {attrition:?}"))
+        };
+        assert_eq!(step("enrolled_on_pathway")["instances"], 6);
+        assert_eq!(step("enrolled_on_pathway")["parent"], Value::Null);
+        assert_eq!(step("status_filter")["instances"], 6);
+        assert_eq!(step("status_filter")["parent"], 0);
+        assert_eq!(
+            step("window")["instances"],
+            6,
+            "excludes nobody, still appears"
+        );
+        let degenerate_step = step("degenerate_clock");
+        assert_eq!(degenerate_step["instances"], 6, "disclosed, not excluded");
+        assert!(
+            degenerate_step["operation"].as_str().unwrap().contains('1'),
+            "{degenerate_step}"
+        );
+        assert_eq!(step("coverage_floor")["instances"], 6);
+        let suppression_step = step("suppression");
+        assert_eq!(
+            suppression_step["instances"], 6,
+            "the last unsplit step equals the analysed n"
+        );
+        assert!(
+            suppression_step["operation"]
+                .as_str()
+                .unwrap()
+                .contains("cleared"),
+            "6 clears the floor: {suppression_step}"
+        );
+
+        // ── `?status=open`: still 6 enrolled on the pathway, but only
+        // 3 after the status filter -- below the floor.
+        let open: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis?status=open"
+            ))
+            .await
+            .json();
+        let open_attrition = open["attrition"].as_array().expect("attrition");
+        let open_step = |label: &str| -> &Value {
+            open_attrition
+                .iter()
+                .find(|s| s["label"] == label)
+                .unwrap_or_else(|| panic!("missing step {label}: {open_attrition:?}"))
+        };
+        assert_eq!(open_step("enrolled_on_pathway")["instances"], 6);
+        assert_eq!(open_step("status_filter")["instances"], 3);
+        assert_eq!(
+            open_step("degenerate_clock")["instances"],
+            3,
+            "no degenerate ones are open"
+        );
+        assert!(
+            open_step("suppression")["operation"]
+                .as_str()
+                .unwrap()
+                .contains("withheld"),
+            "3 is below the floor: {:?}",
+            open_step("suppression")
+        );
+
+        // ── `?status=closed`: 3 after the status filter (the
+        // degenerate one plus the two ordinary closed ones), still
+        // below the floor, and the degenerate count is now 1 of 3.
+        let closed: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis?status=closed"
+            ))
+            .await
+            .json();
+        let closed_attrition = closed["attrition"].as_array().expect("attrition");
+        let closed_step = |label: &str| -> &Value {
+            closed_attrition
+                .iter()
+                .find(|s| s["label"] == label)
+                .unwrap_or_else(|| panic!("missing step {label}: {closed_attrition:?}"))
+        };
+        assert_eq!(closed_step("status_filter")["instances"], 3);
+        assert_eq!(closed_step("degenerate_clock")["instances"], 3);
+        assert!(
+            closed_step("degenerate_clock")["operation"]
+                .as_str()
+                .unwrap()
+                .contains('1')
+        );
+
+        // ── Rule branch: `contains=stage:triage&compare=true` on the
+        // full (status=all) cohort splits 6 into 2 matched / 4
+        // complement; the attrition leaves match `split`'s own counts
+        // exactly.
+        let ruled: Value = request
+            .get(&format!(
+                "/api/care-pathways/{pathway}/time-analysis\
+                 ?contains=stage:triage&compare=true"
+            ))
+            .await
+            .json();
+        assert_eq!(ruled["split"]["matched"]["instances"], 2);
+        assert_eq!(ruled["split"]["complement"]["instances"], 4);
+        let ruled_attrition = ruled["attrition"].as_array().expect("attrition");
+        let matched_step = ruled_attrition
+            .iter()
+            .find(|s| s["label"] == "matched")
+            .expect("matched step");
+        let complement_step = ruled_attrition
+            .iter()
+            .find(|s| s["label"] == "complement")
+            .expect("complement step");
+        assert_eq!(matched_step["instances"], 2);
+        assert_eq!(complement_step["instances"], 4);
+        assert_eq!(
+            matched_step["instances"].as_u64().unwrap()
+                + complement_step["instances"].as_u64().unwrap(),
+            6,
+            "the rule branch's own leaves sum back to the analysed n"
+        );
+        let rule_filter_step = ruled_attrition
+            .iter()
+            .find(|s| s["label"] == "rule_filter")
+            .expect("rule_filter step");
+        let coverage_floor_index = ruled_attrition
+            .iter()
+            .position(|s| s["label"] == "coverage_floor")
+            .expect("coverage_floor step");
+        assert_eq!(
+            rule_filter_step["parent"].as_u64().unwrap() as usize,
+            coverage_floor_index,
+            "rule_filter forks from coverage_floor, not suppression"
+        );
+        let rule_filter_index = ruled_attrition
+            .iter()
+            .position(|s| s["label"] == "rule_filter")
+            .unwrap();
+        assert_eq!(
+            matched_step["parent"].as_u64().unwrap() as usize,
+            rule_filter_index
+        );
+        assert_eq!(complement_step["parent"], matched_step["parent"]);
+
+        // ── `constraints` carries the identical trail shape.
+        let constraints: Value = request
+            .get(&format!("/api/care-pathways/{pathway}/constraints"))
+            .await
+            .json();
+        let constraints_attrition = constraints["attrition"].as_array().expect("attrition");
+        assert!(
+            constraints_attrition
+                .iter()
+                .any(|s| s["label"] == "enrolled_on_pathway" && s["instances"] == 6)
+        );
+    })
+    .await;
+}

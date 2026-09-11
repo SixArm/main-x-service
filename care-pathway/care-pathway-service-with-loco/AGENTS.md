@@ -47,7 +47,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api/instances/{caseload,overdue-reviews,care-team-load}` | Derived operational views |
 | POST/GET | `/api/instances/{pid}/segments` (+ `/segments/{seg}/close`, `/clock`) | **Time-based analysis**: record a journey segment (VA / NNVA / UNVA + stage + waste), close a running one, set the pathway clock (no pause, by design) |
 | GET | `/api/instances/{pid}/{time-analysis,timeline}` | Per-journey TBA: value-adding ratio, coverage, gaps, handoffs, per-stage anchors + adjacent delays (T-14d); and the segment/gap wall |
-| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); censoring-aware Kaplan–Meier survival for time-to-close and time-to-anchor (T-14e: `?discontinued=event\|censor`); ranked constraints; both endpoints splittable by a rule (T-14f: `?contains=&excludes=&compare=` over `stage`/`step`/`event`/`waste`/`outcome`/`setting`/`urgency`). All suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`), and a rule-split's own cross-side protection reuses the same primitive |
+| GET | `/api/care-pathways/{pid}/{time-analysis,constraints}` | Cohort TBA: nearest-rank lead-time percentiles vs an NHS access standard, optionally anchored between two named stages (T-14d: `?from_anchor=&to_anchor=`, or automatic from a standard's own declared anchor, e.g. `cancer_fds_28_days`); censoring-aware Kaplan–Meier survival for time-to-close and time-to-anchor (T-14e: `?discontinued=event\|censor`); ranked constraints; both endpoints splittable by a rule (T-14f: `?contains=&excludes=&compare=` over `stage`/`step`/`event`/`waste`/`outcome`/`setting`/`urgency`); both also carry a CONSORT-style `attrition` trail (T-14g) explaining the denominator. All suppress below `min_cell_count` (T-14k; `?mode=withhold\|remove`), and a rule-split's own cross-side protection reuses the same primitive |
 | GET | `/api/care-pathways/{pid}/export/{event-log,journey-features}` | **Bulk export codecs** (T-14a): `?format=csv\|jsonl&status=`; `event_log` (bupaR/PM4Py shape) and `journey_features` (one row per instance); gated `Destructive`, audited as a disclosure; never a `subject_ref` or a person/actor URN |
 | GET | `/api/care-pathways/{pid}/process-map` | **Directly-follows process map** (T-14b): `?level=stage\|step&status=&mode=`; nodes/edges with instance/occurrence counts + median(+p90) gaps; self-loops kept, `start`/`end` pseudo-nodes; suppressed per node/edge (T-14k), not per cohort |
 | GET | `/api/care-pathways/{pid}/variants` | **Journey variants** (T-14c): pathway strings via a named/defaulted/echoed parameter chain (era filter/collapse/combine/filter-mode/truncate); frequency/coverage Pareto + per-position duration lines; suppressed variants folded into `suppressed_instances`, shares renormalised |
@@ -107,10 +107,10 @@ links** (`continues_as`; `src/journey.rs` + `src/controllers/links.rs`,
 spec §6.19) landed 2026-08-23 through 2026-08-27 — see the API surface
 table above and `agents/share/time-based-analysis.md` /
 `../../spec/time-based-analysis.md` for the full contract. The pathway
-analytics suite T-14 builds on TBA. Eight sub-tasks have landed — see
-`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f
+analytics suite T-14 builds on TBA. Nine sub-tasks have landed — see
+`../spec/13-tasks.md` T-14a/T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g
 for each one's documented scope deviations from its original spec
-text: three of the eight landed out of T-14's own suggested build order, since each
+text: three of the nine landed out of T-14's own suggested build order, since each
 needed none of the sibling T-14 sub-tasks ahead of it to be useful
 now: **T-14a** (event-log/journey-feature bulk export codecs,
 `src/analytics.rs` + `src/controllers/exports.rs`), **T-14m** (the
@@ -174,6 +174,23 @@ not called by this change: T-14f's split compares sides via the
 already-computed cohort/compliance/survival figures, not a curve-vs-curve
 log-rank test, which would need raw `Observation`s `Survival` does not
 expose — a further, still-open follow-up beyond this change's scope.
+**T-14g** (also 2026-09-11, again next in the suggested order) extends
+`src/tba.rs` once more, not a new sibling module (a CONSORT step
+record is mechanical bookkeeping, not a genuinely separate algorithm):
+`AttritionStep`/`ATTRITION_STEP_LABELS`/`ATTRITION_RULE_PARENT`/
+`attrition_trail()`/`attrition_rule_branch()`. Both `time-analysis`
+and `constraints` gain an `attrition` key — the ordered pipeline steps
+(`enrolled_on_pathway` → `status_filter` → `window` →
+`degenerate_clock` → `coverage_floor` → `suppression`, plus
+`rule_filter`/`matched`/`complement` when T-14f's split is active)
+explaining the denominator inside the response. `window` and
+`coverage_floor` are honestly disclosed, not invented: no such filter
+exists in this crate yet, so both report zero exclusions.
+`degenerate_clock` is the one exception worth naming: it discloses the
+count of instances whose clock is not strictly forward
+**without excluding them** — they stay in
+`cohort`/`compliance`/`survival` exactly as they always have, so this
+task changes no existing figure, only what is now visible about it.
 Deferred (spec §13): instance-layer
 masking/authz for `subject_ref`, terminology-server code-existence
 checks, and the native
@@ -283,7 +300,8 @@ src/
 │                          T-14d), cohort rollup, constraint ranking, Little's Law, stage
 │                          anchors + adjacent delays + anchored compliance (T-14d), and a
 │                          censoring-aware Kaplan-Meier survival estimator + a two-sample
-│                          log-rank test (T-14e). No I/O; `as_of` is a parameter, so it is
+│                          log-rank test (T-14e), and a CONSORT-style cohort attrition
+│                          record (T-14g). No I/O; `as_of` is a parameter, so it is
 │                          deterministic
 ├── merge.rs               pure record-merge logic (merge_pathways)
 ├── openapi.rs             hand-written OpenAPI 3 document
