@@ -387,8 +387,9 @@ manual check confirms it. Split tasks too big for one PR
   **T-14m** the same day (its own generator lives in
   `src/data/journeys.rs`, not `src/analytics.rs` — see its entry
   below), then **T-14k, T-14b, T-14c, T-14d, and T-14e, all on
-  2026-09-10, and T-14f, T-14g, T-14h, and T-14i all on 2026-09-11** —
-  eleven sub-tasks landed. Three of those eleven (T-14a, T-14m, T-14k)
+  2026-09-10, and T-14f, T-14g, T-14h, T-14i, and T-14j all on
+  2026-09-11** — **all twelve sub-tasks landed; T-14 is complete.**
+  Three of those twelve (T-14a, T-14m, T-14k)
   were out of the suggested
   order above, because none needed the tasks still ahead of it in
   this list to be useful now (see each entry's own scope notes;
@@ -402,7 +403,7 @@ manual check confirms it. Split tasks too big for one PR
   `src/variants.rs`, rather than adding to the already-large
   `src/analytics.rs` — the same reasoning that gave T-14k its own
   `src/suppression.rs` rather than folding into `src/tba.rs`. The
-  remaining **eight landed in the suggested order**: T-14b, T-14c, and
+  remaining **nine landed in the suggested order**: T-14b, T-14c, and
   T-14d are the "three derivations" trio in full, **T-14e followed
   immediately after** — its pure logic sits in `src/tba.rs` itself too
   (not a new sibling module, same reasoning as T-14d's), since
@@ -434,13 +435,21 @@ manual check confirms it. Split tasks too big for one PR
   T-14m's generator: `journeys:seed` has no defect exercising step
   order at all, so its own DB-gated round trip builds instances
   directly instead (see its own entry's note on backdating fields the
-  live HTTP API cannot backdate).
+  live HTTP API cannot backdate). **T-14j followed T-14i**, again
+  exactly next — the last of the twelve. Unlike every other sub-task
+  from T-14b on, it extends `src/instances.rs` (the crate's existing
+  pure instance-lifecycle module) rather than adding a new sibling
+  file: a "latest of several optional timestamps, past a threshold"
+  fold is a small extension of that module's own remit, not a
+  genuinely separate algorithm. Like T-14i, its own DB-gated round
+  trip builds fixtures directly rather than via T-14m's generator, for
+  the same reason.
 
   - [x] **T-14a — Event-log and journey-feature export codecs.**
     Landed 2026-09-09, ahead of the suggested order above — at the
-    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i were
-    also still unbuilt (all ten have since landed too; T-14j remains
-    open) — because the two codecs needed
+    time, T-14m/T-14k/T-14b/T-14c/T-14d/T-14e/T-14f/T-14g/T-14h/T-14i/T-14j
+    were also still unbuilt (all eleven have since landed too — every
+    T-14 sub-task is now complete) — because the two codecs needed
     none of them to produce a real, useful v1 — see the deviations noted below,
     each an explicit scope decision rather than a silent gap. Pure
     row-shaping in `src/analytics.rs` (DB-free, unit-tested); the HTTP
@@ -1186,7 +1195,8 @@ manual check confirms it. Split tasks too big for one PR
       `conformance` key. Pure unit tests in `src/conformance.rs` (14)
       cover every branch directly, including ties, empty/one-step
       cohorts, and the cohort rollup's `None`/empty edge cases.
-  - [ ] **T-14j — Stalled journeys (aging WIP).**
+  - [x] **T-14j — Stalled journeys (aging WIP).** Landed 2026-09-11,
+    in the suggested order, right after T-14i.
     `GET /api/instances/stalled?idle_days=N` (default 60, echoed):
     open instances whose last recorded activity — latest of segment
     start / end, step `done_on`, event `occurred_at`, review — is older
@@ -1195,10 +1205,58 @@ manual check confirms it. Split tasks too big for one PR
     observed-silence test. The timeout is retroactive, as IPPA's
     `Process.time_out` is: idle-since is the last activity time, not
     the time the silence was noticed. Never grouped by actor.
+    Pure logic extends [`src/instances.rs`](../src/instances.rs) (the
+    crate's existing pure instance-lifecycle module, not a new sibling
+    file — a "latest of several optional timestamps, past a threshold"
+    fold is a small extension of that module's own remit, not a
+    genuinely separate algorithm the way T-14b's/T-14c's/T-14f's/
+    T-14h's/T-14i's own new files were): `ACTIVITY_SOURCES` (the
+    closed five-entry vocabulary), `LastActivity`, `last_activity()`
+    (folds every source into the single most recent, falling back to
+    `enrolled_on` — the floor every instance has from the moment it
+    exists, so a brand-new instance is never "stalled since forever"),
+    `is_stalled()` (strictly-older-than, `idle_days` clamped to
+    non-negative). HTTP surface,
+    `src/controllers/instances.rs`: `load_last_activity_inputs`
+    (cohort, bulk, three bounded queries — segments, steps, events —
+    no N+1, the same shape every other cohort loader in this crate
+    uses), `stalled()`, wired at `GET /api/instances/stalled`.
+    - [x] **Scope decision: `review` is not a fifth, separate source.**
+      The spec text lists it alongside segment/step/event as if it
+      were its own signal, but `POST .../review` already records an
+      `instance_events` row (`kind: "review"`) — treating it as a
+      sixth data point to track would be a second, redundant path to
+      the same fact rather than a genuinely distinct one, so it is
+      covered by `event` without further ceremony.
+    - [x] **`?idle_days=` falls back to the default rather than
+      erroring** on zero, negative, or unparseable input — the same
+      "a tuning knob never errors" convention pagination's
+      `?limit=`/`?offset=` already uses, since an idle-day threshold
+      is a lens setting, not a business promise like `target_days` on
+      the standards endpoint (which does reject a non-positive value).
+    - [x] **The DB-gated round trip backdates `enrolled_on` directly
+      on the model**, the one field none of the endpoints that record
+      activity can set to anything but "now"/"today" — a freshly
+      enrolled instance's own floor would otherwise be more recent
+      than a deliberately old segment, which is not a scenario real
+      usage can produce (enrolment always precedes recorded activity)
+      but is exactly what an un-backdated test fixture would
+      accidentally construct. Segment timestamps themselves needed no
+      such bypass: `POST .../segments` already accepts an explicit
+      `started_at`/`ended_at`, the same mechanism
+      `tests/requests/tba.rs`'s own `closed_instance` helper relies on.
     - **Acceptance:** an instance whose last event was 61 days ago is
       listed at `idle_days=60` and not at 90; an instance with an open
       segment started 5 days ago is not listed; a closed instance is
-      never listed.
+      never listed — all proven end to end against real Postgres
+      (`tests/requests/stalled.rs`'s `stalled_round_trip`), which also
+      pins the default `idle_days=60` echo and that each row names its
+      `last_activity_source`. Pure unit tests in `src/instances.rs`
+      (6 new, alongside the 2 pre-existing) cover the same four
+      conditions directly, plus the multi-source fold picking the true
+      latest, the fresh-instance fallback to `enrolled_on`, the
+      exactly-at-the-threshold boundary, and negative-`idle_days`
+      clamping.
   - [x] **T-14k — Disclosure control: modes and marginals.** Landed
     2026-09-10. Generalises the TBA-10 floor into one shared, pure
     module, `src/suppression.rs`: `min_cell_count()`
@@ -1347,8 +1405,13 @@ manual check confirms it. Split tasks too big for one PR
       `tests/requests/conformance.rs` builds instances directly through
       the enrolment/step/event endpoints rather than this generator —
       `journeys:seed` has no defect code exercising step order at all,
-      so there was nothing here for it to reuse. T-14j remains not yet
-      built. The repo demo seed (EX-4)
+      so there was nothing here for it to reuse. **Update 2026-09-11
+      (T-14j):** T-14j has since landed too, and likewise builds
+      `tests/requests/stalled.rs`'s fixtures directly rather than via
+      this generator, for the same reason — a stalled journey needs a
+      deliberately old `enrolled_on`/segment timestamp, not one of
+      this generator's own defect shapes. Every T-14 sub-task is now
+      complete. The repo demo seed (EX-4)
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).

@@ -732,8 +732,10 @@ fn instance_action_paths() -> Value {
 }
 
 /// The `{pid}`-scoped instance record paths (team, events, measures,
-/// step completion) plus the derived, unparameterised views (caseload,
-/// overdue reviews, care-team load).
+/// step completion) plus the derived views (caseload, overdue
+/// reviews, stalled journeys, care-team load) — all but `stalled`
+/// unparameterised.
+#[allow(clippy::too_many_lines)] // one JSON literal per documented path
 fn instance_record_and_view_paths() -> Value {
     let instance_pid = instance_pid_param();
     json!({
@@ -816,6 +818,17 @@ fn instance_record_and_view_paths() -> Value {
                 "tags": ["instances"],
                 "summary": "Open instances whose next_review_on has passed (or is unset) — the chronic review register",
                 "responses": { "200": { "description": "Overdue reviews, most overdue first" } }
+            }
+        },
+        "/api/instances/stalled": {
+            "get": {
+                "tags": ["instances"],
+                "summary": "Stalled journeys (aging WIP, T-14j)",
+                "description": "Open instances (active + on_hold) whose last recorded activity -- latest of segment start/end, step done_on, or event occurred_at (a recorded review is an event too, kind=review) -- is strictly older than idle_days, sorted most-idle first, each row naming its last-activity source. Complements overdue-reviews (a due date) with an observed-silence test. The timeout is retroactive: idle-since is the activity time itself, never when the silence happened to be noticed. Never grouped by actor. A closed instance is never listed.",
+                "parameters": [
+                    { "name": "idle_days", "in": "query", "schema": { "type": "integer", "default": 60, "minimum": 1 }, "description": "Zero, negative, or unparseable falls back to the default." }
+                ],
+                "responses": { "200": { "description": "Stalled instances, most idle first, with idle_days echoed" } }
             }
         },
         "/api/instances/care-team-load": {
@@ -1008,6 +1021,7 @@ mod tests {
             "/api/instances/{pid}/steps/{step}/complete",
             "/api/instances/caseload",
             "/api/instances/overdue-reviews",
+            "/api/instances/stalled",
             "/api/instances/care-team-load",
             "/api/care-pathways/insights/directory",
             "/api/care-pathways/insights/coverage",

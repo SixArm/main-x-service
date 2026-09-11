@@ -596,6 +596,31 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
     `anchors_delays` precedent) — a compact scalar summary, not the
     per-pair breakdown the dedicated endpoint carries. Landed
     2026-09-11, spec T-14i.
+31. **Stalled journeys (aging WIP).**
+    `GET /api/instances/stalled?idle_days=N` (spec T-14j, default 60,
+    echoed): open instances whose last recorded activity — latest of
+    segment start/end, step `done_on`, or event `occurred_at` — is
+    older than N days, sorted most-idle first, each row naming its
+    last-activity source. Complements `overdue-reviews` (a due date)
+    with an observed-silence test; retroactive (idle-since is the
+    activity time itself, not when the silence was noticed, per
+    IPPA's `Process.time_out`). Never grouped by actor. **Scope
+    decision:** a recorded review is not a sixth, separate source —
+    `POST .../review` already emits an `instance_events` row
+    (`kind: "review"`), covered by the generic event source. Extends
+    [`src/instances.rs`](../src/instances.rs) (the crate's existing
+    pure instance-lifecycle module, not a new sibling file — this is
+    a small extension of that module's own remit, not a genuinely
+    separate algorithm): `ACTIVITY_SOURCES`, `LastActivity`,
+    `last_activity()` (falls back to `enrolled_on`, the floor every
+    instance has from the moment it exists), `is_stalled()`. HTTP
+    surface: [`src/controllers/instances.rs`](../src/controllers/instances.rs)
+    (`load_last_activity_inputs`, bulk, no N+1; `stalled()`).
+    `?idle_days=` falls back to the default on zero/negative/
+    unparseable input, matching pagination's own convention, rather
+    than erroring like `target_days` does. Landed 2026-09-11, spec
+    T-14j — the last of the T-14 pathway analytics suite; every
+    sub-task is now complete.
 
 ### 6.20 Rule: a denied journey-link request is `404`, not `403`
 

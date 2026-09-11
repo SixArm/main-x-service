@@ -9,6 +9,58 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-14j: stalled journeys (aging WIP) (2026-09-11)
+
+`GET /api/instances/stalled?idle_days=N` (default 60, echoed): open
+instances whose last recorded activity — latest of segment start/end,
+step `done_on`, or event `occurred_at` — is older than N days, sorted
+most-idle first, each row naming its last-activity source. Complements
+`overdue-reviews` (a due date) with an observed-silence test. The
+timeout is retroactive (idle-since is the activity time itself, not
+when the silence was noticed, per IPPA's `Process.time_out`). Never
+grouped by actor. **This is the last T-14 sub-task — the pathway
+analytics suite is now complete (T-14a through T-14m, twelve
+sub-tasks).**
+
+- `src/instances.rs` (extended, not a new sibling file — a small
+  extension of the crate's existing pure instance-lifecycle module,
+  not a genuinely separate algorithm): `ACTIVITY_SOURCES` (the closed
+  five-entry vocabulary), `LastActivity`, `last_activity()` (folds
+  every source into the single most recent, falling back to
+  `enrolled_on` — the floor every instance has from the moment it
+  exists, so a brand-new instance is never "stalled since forever"),
+  `is_stalled()`. 6 new unit tests.
+- `src/controllers/instances.rs`: `load_last_activity_inputs` (bulk,
+  three bounded queries — segments, steps, events — no N+1) and
+  `stalled()`, wired at `GET /api/instances/stalled`.
+- **Scope decision:** a recorded review is not a sixth, separate
+  source — `POST .../review` already emits an `instance_events` row
+  (`kind: "review"`), covered by the generic `event` source.
+- **`?idle_days=` falls back to the default** on zero, negative, or
+  unparseable input — the same "a tuning knob never errors" convention
+  pagination's `?limit=`/`?offset=` already uses, rather than erroring
+  like `target_days` does on the standards endpoint.
+- **The DB-gated round trip backdates `enrolled_on` directly on the
+  model** — the one field none of the activity-recording endpoints
+  can set to anything but "now"/"today", which would otherwise make a
+  freshly-enrolled instance's own floor mask a deliberately old
+  segment's staleness (not a scenario real usage can produce, since
+  enrolment always precedes recorded activity). Segment timestamps
+  themselves needed no such bypass: `POST .../segments` already
+  accepts an explicit `started_at`/`ended_at`.
+- **Acceptance:** an instance whose last event was 61 days ago is
+  listed at `idle_days=60` and not at 90; an instance with an open
+  segment started 5 days ago is not listed; a closed instance is
+  never listed — all proven end to end against real Postgres
+  (`tests/requests/stalled.rs`'s `stalled_round_trip`), which also
+  pins the default `idle_days=60` echo and the per-row
+  `last_activity_source`.
+- Verified: `cargo fmt --check`, `cargo clippy --all-targets -- -D
+  warnings`, `cargo test --lib` (440 passed), `cargo test --
+  --ignored` against a real Postgres (70 passed, including 1 new),
+  `cargo +1.96 check --all-targets` (MSRV), `cargo deny check`,
+  `cargo bench --no-run`.
+
 ### Added — T-14i: conformance to the enrolled template (2026-09-11)
 
 Per instance, the steps copied at enrolment (`instance_steps.position`)
