@@ -19,6 +19,7 @@ SvelteKit 2 · Svelte 5 (runes) · SVAR DataGrid/Kanban/Gantt/Filter · Lily Des
 | `/gantt` | Instance timeline Gantt for one pathway |
 | `/sequence` | Intervention sequence Gantt (SVAR) — the selected pathway's interventions as ordered bars on an **ordinal** axis (a sequence view, not a schedule; the model carries order only, no durations or dates) |
 | `/time` | Time-based analysis: cohort ratio + NHS access-standard score + constraints + Little's Law, one journey's timeline wall, and (T-14l) the directly-follows process map, journey-variant sunburst/Sankey/dotted chart, the CONSORT attrition flowchart, a `contains=`/`excludes=`/`compare=` rule-split filter, and the stalled-journeys list — all drawn as plain in-house SVG, no new graph/charting dependency |
+| `/bulk` | Native bulk import/export (CPFE-T7): submit a JSONL/CSV/TSV import or a filtered export as a background job, poll it to completion, and browse recent jobs (server-side `kind`/`status` filter) |
 | `/signin` | Magic-link sign-in (BFF flow against the auth service) |
 | `/verify` | Magic-link verification landing page |
 

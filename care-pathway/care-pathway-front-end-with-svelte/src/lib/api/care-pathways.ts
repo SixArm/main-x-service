@@ -1,10 +1,15 @@
 // Resource-bound wrapper over ApiClient for the care-pathway endpoints.
 
 import { API_BASE_URL } from "$lib/config";
+import { dryRunFormValue } from "$lib/bulk";
+import type { BulkImportFormat } from "$lib/bulk";
 import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
 import type {
   AuditEntry,
+  BulkExportRequest,
+  BulkJobAccepted,
+  BulkJobView,
   CarePathway,
   CoverageInsight,
   DirectoryInsight,
@@ -254,10 +259,7 @@ export class CarePathwayRepository {
    * @param to - The target {@link InstanceStatus}.
    * @returns The updated instance.
    */
-  setInstanceStatus(
-    pid: string,
-    to: InstanceStatus,
-  ): Promise<PathwayInstance> {
+  setInstanceStatus(pid: string, to: InstanceStatus): Promise<PathwayInstance> {
     return this.http.post<PathwayInstance>(
       `/api/instances/${encodeURIComponent(pid)}/status`,
       { body: { to } },
@@ -270,5 +272,107 @@ export class CarePathwayRepository {
    */
   caseload(): Promise<unknown> {
     return this.http.get<unknown>("/api/instances/caseload");
+  }
+
+  // -- Native bulk import / export (T-10) ---------------------------------
+
+  /**
+   * Submit a bulk import: upload the file as `multipart/form-data` and get
+   * back the id of the enqueued job to poll.
+   *
+   * The body is a `FormData`, which {@link ApiClient} passes through
+   * without JSON-serializing and without forcing a `content-type` (so
+   * `fetch` can set the multipart boundary).
+   *
+   * @param file - The JSONL/CSV/TSV file the operator chose.
+   * @param options - Format (defaults to `jsonl` server-side), dry-run
+   *   preview flag, and an optional `Idempotency-Key` so a retried submit
+   *   resolves to the original job (SEC-B9) rather than importing twice.
+   * @throws {ApiError} 400 for a bad/unsupported upload, 413 when the file
+   *   exceeds the service's 64 MiB import cap.
+   */
+  importPathways(
+    file: File,
+    options: {
+      format?: BulkImportFormat;
+      dryRun?: boolean;
+      idempotencyKey?: string;
+    } = {},
+  ): Promise<BulkJobAccepted> {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    if (options.format) form.append("format", options.format);
+    // Always sent, so the request states the operator's choice rather than
+    // relying on an absent field meaning false.
+    form.append("dry_run", dryRunFormValue(options.dryRun ?? false));
+    return this.http.post<BulkJobAccepted>("/api/care-pathways/import", {
+      body: form,
+      headers: options.idempotencyKey
+        ? { "idempotency-key": options.idempotencyKey }
+        : undefined,
+    });
+  }
+
+  /**
+   * Submit a bulk export and get back the id of the enqueued job.
+   *
+   * @param request - Format, optional filter, and masking profile.
+   * @param idempotencyKey - Optional key deduping a retried submit.
+   * @throws {ApiError} 400 for an unsupported format/profile; 401 or 403
+   *   when `masking_profile: "full"` is requested without elevated
+   *   authorisation.
+   */
+  exportPathways(
+    request: BulkExportRequest = {},
+    idempotencyKey?: string,
+  ): Promise<BulkJobAccepted> {
+    return this.http.post<BulkJobAccepted>("/api/care-pathways/export", {
+      body: request,
+      headers: idempotencyKey
+        ? { "idempotency-key": idempotencyKey }
+        : undefined,
+    });
+  }
+
+  /**
+   * Status and row counts for one import job.
+   *
+   * @throws {ApiError} 404 once the job has passed its retention TTL, or
+   *   if it belongs to another actor — the service deliberately does not
+   *   distinguish the two.
+   */
+  getImportJob(id: string): Promise<BulkJobView> {
+    return this.http.get<BulkJobView>(
+      `/api/care-pathways/import/${encodeURIComponent(id)}`,
+    );
+  }
+
+  /** Status and row counts for one export job. Same 404 semantics. */
+  getExportJob(id: string): Promise<BulkJobView> {
+    return this.http.get<BulkJobView>(
+      `/api/care-pathways/export/${encodeURIComponent(id)}`,
+    );
+  }
+
+  /**
+   * Recent bulk jobs, newest first. Unlike person's/organization's own
+   * bulk-jobs endpoint, this service's supports server-side `kind`/
+   * `status` filtering directly, so this passes them through rather than
+   * filtering the returned array client-side.
+   *
+   * @param options - Optional `kind`/`status` filter and a row `limit`
+   *   (service default 50, capped at 500).
+   */
+  listBulkJobs(
+    options: { kind?: string; status?: string; limit?: number } = {},
+  ): Promise<BulkJobView[]> {
+    const query = new URLSearchParams();
+    if (options.kind) query.set("kind", options.kind);
+    if (options.status) query.set("status", options.status);
+    if (options.limit !== undefined) query.set("limit", String(options.limit));
+    const suffix = query.toString();
+    return this.http.get<BulkJobView[]>(
+      `/api/care-pathways/bulk-jobs${suffix ? `?${suffix}` : ""}`,
+    );
   }
 }
