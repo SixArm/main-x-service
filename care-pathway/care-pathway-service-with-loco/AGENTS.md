@@ -39,6 +39,13 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | POST | `/api/care-pathways/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
 | GET | `/api/care-pathways/merges/recent` | Merge-history records |
 | GET | `/api/care-pathways/whoami` | Verified bearer-token claims (`401` without one) |
+| POST | `/api/care-pathways/import` | **Native bulk import** (§13 T-10): multipart JSONL/CSV/TSV upload → `202 {job_id}`; destructive under ABAC |
+| GET | `/api/care-pathways/import/{id}` | Import job status + counts + `errors_url` |
+| POST | `/api/care-pathways/export` | **Native bulk export**: `{format, q, limit, offset, masking_profile, include_soft_deleted}` → `202 {job_id}`; the unmasked `full` profile is destructive under ABAC |
+| GET | `/api/care-pathways/export/{id}` | Export job status + `download_url` |
+| GET | `/api/care-pathways/bulk-jobs` | Recent bulk jobs (native + FHIR Bulk Data — one shared table), newest first; `?kind=&status=` |
+| GET | `/api/care-pathways/review-queue` | Stored duplicate-review queue: pairs a keyless bulk-import row queues (`provenance=import`) |
+| POST | `/api/care-pathways/review-queue/{id}/decision` | Decide a pending review item (`confirmed`/`rejected`; first-writer-wins) |
 | GET | `/api/care-pathways/audit/recent` · `/{pid}/audit` | Audit-log query |
 | GET | `/api/care-pathways/events/recent` | In-memory event stream |
 | GET | `/api/care-pathways/insights/{directory,coverage,variants,providers,languages}` | Registry lenses: setting/specialty facets, condition-coverage gaps, cross-provider variants, provider directory, language coverage |
@@ -286,10 +293,52 @@ the one field none of the activity-recording endpoints can set to
 anything but "now"/"today", which would otherwise make a freshly
 enrolled instance's own floor mask a deliberately old segment's
 staleness. Every T-14 sub-task is now complete.
-Deferred (spec §13): instance-layer
-masking/authz for `subject_ref`, terminology-server code-existence
-checks, and the native
-(non-FHIR) bulk import/export API. The published key set
+
+**Native (non-FHIR) bulk import/export** (spec §13 T-10, landed
+2026-09-12) reuses the existing `bulk_jobs` table and `ArtifactStore`
+(`src/bulk/`) FHIR Bulk Data `$export` already carried — one table
+serving both, distinguished by `format` (`ndjson` for FHIR;
+`jsonl`/`csv`/`tsv` for native), rather than a second migration.
+Stable key (`src/bulk/stable_key.rs`): a **deterministic identifier**
+(DOI / Wikidata / `GuidelineId` / URI / UUID, tried in that declared
+order) → the **provider-scoped `(provider_id, pathway_code)`** pair →
+the explicit `pid`. A keyless row runs the same search-blocked
+`MatchingEngine::match_care_pathways` duplicate detection
+`check-duplicates` uses and — above `Confidence::Medium`'s 0.7 lower
+bound — is still **created** (never silently dropped) *and* queued in
+a newly added `review_queue` table (`provenance = "import"`; this
+crate had none — case's own BLK-5 precedent, not organization's, since
+case also started from zero). Every written row goes through
+`streaming::create_and_emit`/`update_and_emit`, so a bulk-imported
+pathway gets the same event/audit/search-index side effects as one
+created interactively. Export defaults to `crate::privacy::mask_pathway`
+(masked); the unmasked `full` profile is `Destructive` under ABAC.
+Every export is audited (SEC-B8: the audit write gates delivery — a
+failed audit write fails the job rather than silently handing back an
+unaudited export), even a zero-row one. Three disclosed scope
+decisions, each documented in `src/bulk/`'s own module docs: **(1)**
+the row's `active` (soft-delete) column round-trips on export but is
+never applied on import — there is no bulk reactivate/deactivate
+operation; **(2)** `in_language` (`Vec<String>`) is JSON-encoded like
+every other array column even though crate spec §9.4's prose groups it
+with the "one column each" scalars — read as "one column, whose cell
+happens to hold JSON" rather than a contradiction; **(3)** the per-row
+upsert is not SEC-B3 advisory-lock-protected, matching
+organization's/case's own documented BLK-5 gap for the identical
+reason (`streaming::create_and_emit`/`update_and_emit` open their own
+internal transaction, hard-coded to `&DatabaseConnection`). Scope is
+**JSONL + CSV + TSV** (no Parquet) — this crate's existing
+`ArtifactStore` already supports S3 (unlike organization's/case's
+local-only BLK-5 rollout), so native bulk inherits that for free. DB-gated
+round trip: `tests/requests/bulk.rs` (idempotent re-import by each
+stable-key tier, CSV/JSONL round-trip, keyless dedupe-to-review, masked
+vs. full export, zero-row export still audited, `include_soft_deleted`
+rejection, unsupported-format `400`, `bulk-jobs` listing).
+
+Still deferred (spec §13): instance-layer masking/authz for
+`subject_ref`, and terminology-server code-existence checks.
+
+The published key set
 is fetched over HTTP once at boot when `CARE_PATHWAY_PASETO_KEYS_URL` is
 set (fetched set wins; warn + env fallback via
 `CARE_PATHWAY_PASETO_KEYS` otherwise — the service always boots), **and
@@ -355,6 +404,7 @@ src/
 │   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs; its care_setting_string helper is pub(crate), reused by tba.rs's T-14f split for setting: predicates; wires T-14i's conformance column via tba.rs's load_conformance_inputs)
 │   ├── data_quality.rs      T-14h: journey data-quality and missingness report HTTP surface (loads segments/steps, reuses tba.rs's resolve_anchor_pair_raw; pure detectors are in src/data_quality.rs)
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
+│   ├── review_queue.rs      T-10: GET review-queue + POST review-queue/{id}/decision (list/decide crate::models::review_queue rows)
 │   └── metrics.rs          root /metrics.prom Prometheus endpoint
 ├── compliance/
 │   ├── mod.rs              posture assembly, data-protection declarations, safety class
@@ -371,9 +421,17 @@ src/
 │   ├── profile.rs           family-local StructureDefinition profile + terminology validation
 │   ├── resources.rs         resource structs, OperationOutcome, Bundle
 │   └── search.rs             FHIR search-param parsing → searchset Bundle
-├── bulk/
-│   ├── mod.rs               durable bulk_jobs table + artifact store, shared by FHIR $export (native bulk import/export is future work)
-│   └── store.rs              ArtifactStore trait + local-filesystem dev backend
+├── bulk/                    T-10: native bulk import/export, sharing the bulk_jobs table + ArtifactStore FHIR $export already used
+│   ├── mod.rs               BulkKind/BulkFormat/MaskingProfile + shared constants (MAX_IMPORT_BYTES/ROWS, IMPORT_REVIEW_THRESHOLD)
+│   ├── columns.rs            the wire "bulk row" shape (pid + active + every CarePathway field) + CSV column set
+│   ├── csv.rs                 CSV/TSV codec (§9.4 flattening)
+│   ├── jsonl.rs               JSONL codec (lossless reference)
+│   ├── stable_key.rs          identifier → provider+pathway_code → pid priority chain
+│   ├── error_report.rs        the per-row import error report
+│   ├── pipeline.rs            process_import_job/process_export_job — the testable core
+│   ├── worker.rs               the loco BackgroundWorker draining native bulk_jobs rows
+│   ├── handlers.rs             POST/GET import, POST/GET export, GET bulk-jobs
+│   └── store.rs              ArtifactStore trait + local-filesystem/S3 backends (shared with FHIR $export)
 ├── workers/
 │   └── bulk_export.rs        bg_pg worker materialising FHIR $export NDJSON off the request path
 ├── tasks/
@@ -417,10 +475,11 @@ src/
 │   ├── audit_logs.rs      audit-trail record/query helpers (chains under pg_advisory_xact_lock)
 │   ├── merge_records.rs   merge-history record/query helpers
 │   ├── event_outbox.rs    durable-bus Phase 2: OutboxInsert::from_envelope mapping + enqueue (tx-generic) + relay poll/ack
-│   ├── bulk_jobs.rs        queued→running→terminal FHIR $export job lifecycle
+│   ├── bulk_jobs.rs        queued→running→terminal job lifecycle, shared by FHIR $export and native bulk import/export (submit/submit_with_ttl, set_input_url, finish_import, complete, fail)
+│   ├── review_queue.rs      T-10: the duplicate-review queue (raw SQL, no SeaORM entity) — upsert/list/decide
 │   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox,bulk_jobs,pathway_instances,instance_steps,instance_team,instance_events,instance_measures,instance_segments}.rs  SeaORM entities
 ├── observability.rs       structured logging + real OpenTelemetry OTLP export (PRO-H12 slice 5 — see below)
-migration/src/            …care_pathways, …audit_logs, …merge_records, …event_outbox, …instances (m20260720_…), …outcomes, …compliance (m20260725_000007), …record_integrity, …bulk_jobs
+migration/src/            …care_pathways, …audit_logs, …merge_records, …event_outbox, …instances (m20260720_…), …outcomes, …compliance (m20260725_000007), …record_integrity, …bulk_jobs, …review_queue (m20260912_000016)
 config/                   development/production/test yaml
 compose.fluvio.yaml        opt-in local Fluvio broker (`fluvio` feature, BUS-3; not part of CI)
 Dockerfile.fluvio-cli       support image for compose.fluvio.yaml's sc-setup step

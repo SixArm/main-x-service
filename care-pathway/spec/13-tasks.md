@@ -237,36 +237,66 @@ manual check confirms it. Split tasks too big for one PR
     terminology-server existence checks stay deferred.
   - **Acceptance:** Swagger UI serves the seven endpoints; malformed
     code test returns `422`. *(Validation leg met; Swagger leg open.)*
-- [ ] **T-10 — Bulk import / export.**
-  See §9.4, §10.4 and
+- [x] **T-10 — Bulk import / export.** **Done, 2026-09-12** (`src/bulk/`
+  in `care-pathway-service-with-loco`). See §9.4, §10.4 and
   [bulk import/export](../../agents/share/bulk-import-export.md).
-  - [ ] Migration creating the `bulk_jobs` table (shared doc §3 schema,
-    with the `UNIQUE (entity, kind, idempotency_key)` key).
-  - [ ] The five endpoints (§9.4): `POST`/`GET`
+  - [x] Reused the **existing** `bulk_jobs` table (shared doc §3 schema,
+    `UNIQUE (entity, kind, idempotency_key)`) — already migrated for
+    FHIR Bulk Data `$export`; no second migration. `format` distinguishes
+    a native-bulk row (`jsonl`/`csv`/`tsv`) from an FHIR one (`ndjson`).
+  - [x] The five endpoints (§9.4): `POST`/`GET`
     `/api/care-pathways/import`, `POST`/`GET`
-    `/api/care-pathways/export`, `GET /api/care-pathways/bulk-jobs`.
-  - [ ] `bg_pg` worker draining jobs `queued → running →
-    completed | completed_with_errors | failed`, with progress updates.
-  - [ ] JSONL (lossless reference) + CSV (flattening per §9.4: every
-    repeated / nested field a JSON-in-cell) codecs; Parquet
-    **export-only**, feature-gated.
-  - [ ] Per-row pipeline reusing the single-create validators
-    (`src/validation.rs`: ICD/SNOMED code formats, identifier shapes,
-    BCP-47) + matcher + review queue: upsert by stable key (deterministic
-    scheme-scoped identifier, `(provider_id, pathway_code)`, or `pid`,
-    §9.4); keyless / unmatched rows → duplicate detection → review queue
-    with `provenance = import`; events + audit not bypassed.
-  - [ ] Downloadable per-row error report
-    (`row_number, source_line, field, code, message`); one bad row never
+    `/api/care-pathways/export`, `GET /api/care-pathways/bulk-jobs`
+    (filterable by `kind`/`status`).
+  - [x] loco `worker`-queue `BackgroundWorker` draining jobs `queued →
+    running → completed | completed_with_errors | failed`.
+  - [x] JSONL (lossless reference) + CSV/TSV (flattening per §9.4: every
+    repeated / nested field a JSON-in-cell) codecs. Parquet is **not
+    built** — a deliberate scope narrowing matching organization's and
+    case's own BLK-5 rollouts, since nothing in this task's own
+    dependency chain needed it.
+  - [x] Per-row pipeline reusing the single-create validators
+    (`src/validation.rs`) + matcher + review queue: upsert by stable key
+    (a deterministic identifier — DOI/Wikidata/`GuidelineId`/URI/UUID,
+    tried in that declared order — then `(provider_id, pathway_code)`,
+    then `pid`, §9.4); keyless / unmatched rows → duplicate detection →
+    review queue with `provenance = import`; events + audit not
+    bypassed. This crate had **no** `review_queue` table before this
+    task — added fresh (case's own BLK-5 precedent, not organization's,
+    since case also started from zero), with `provenance` in its
+    initial shape.
+  - [x] Downloadable per-row error report
+    (`row_number, field, code, message`); one bad row never
     aborts the load; counts reconcile
     (`rows_total = created + upserted + to_review + errored`).
-  - [ ] Export masking + audit: `masking_profile` (masked default, full
-    gated), `include_soft_deleted` gated, every export audited (even
-    zero-row).
-  - **Acceptance:** integration tests cover idempotent re-import (same
-    file re-upserts to the same state), the per-row error report, a
-    keyless dedupe-to-review row (`provenance = import`), masked vs full
-    export, and that a zero-row export still writes an audit record.
+  - [x] Export masking + audit: `masking_profile` (masked default, full
+    gated), `include_soft_deleted` gated (rejected as not-yet-supported,
+    same as organization's/case's own posture), every export audited
+    (even zero-row, gating delivery per SEC-B8).
+  - **Disclosed scope decisions** (full rationale in `src/bulk/`'s own
+    module docs): the `active` (soft-delete) column round-trips on
+    export but is never applied on import (no bulk
+    reactivate/deactivate operation exists); `in_language`
+    (`Vec<String>`) is JSON-encoded like every other array column even
+    though §9.4's prose lists it among the "one column each" scalars —
+    read as "still one column, whose cell holds JSON" rather than a
+    contradiction; the per-row upsert is not SEC-B3
+    advisory-lock-protected, matching organization's/case's own
+    documented BLK-5 gap for the identical structural reason
+    (`streaming::create_and_emit`/`update_and_emit` open their own
+    internal transaction, hard-coded to `&DatabaseConnection`). This
+    crate's existing `ArtifactStore` (`src/bulk/store.rs`) already
+    supported S3 before this task (built for FHIR Bulk Data), so native
+    bulk inherits it for free — unlike organization's/case's own
+    local-filesystem-only BLK-5 rollouts.
+  - **Acceptance:** integration tests (`tests/requests/bulk.rs`, 9,
+    DB-gated) cover idempotent re-import at both stable-key tiers (same
+    file re-upserts to the same state), CSV/JSONL round-trip, the
+    per-row error report, a keyless dedupe-to-review row (`provenance =
+    import`), masked vs full export, a zero-row export still writing an
+    audit record, `include_soft_deleted` rejection, an unsupported
+    format token returning `400`, and the `bulk-jobs` listing
+    (kind-filtered).
 
 - [x] **T-11 — Extended regulatory frameworks (§12.4).** HIPAA
   read/disclosure auditing + tamper-evident history; GDPR/EHDS erasure

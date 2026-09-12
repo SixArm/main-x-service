@@ -29,6 +29,13 @@ specific condition over a defined episode.
 | GET | `/api/care-pathways/audit/recent` · `/{pid}/audit` | Audit-log query |
 | GET | `/api/care-pathways/events/recent` | In-memory event stream |
 | GET | `/api/care-pathways/whoami` | Verified bearer-token claims (`401` without one) |
+| POST | `/api/care-pathways/import` | Native bulk import: multipart JSONL/CSV/TSV upload → `202 {job_id}`; destructive under ABAC |
+| GET | `/api/care-pathways/import/{id}` | Import job status + counts + `errors_url` |
+| POST | `/api/care-pathways/export` | Native bulk export: `{format, q, limit, offset, masking_profile, include_soft_deleted}` → `202 {job_id}` |
+| GET | `/api/care-pathways/export/{id}` | Export job status + `download_url` |
+| GET | `/api/care-pathways/bulk-jobs` | Recent bulk jobs (native + FHIR Bulk Data), newest first; filter `?kind=&status=` |
+| GET | `/api/care-pathways/review-queue` | Stored duplicate-review queue (written by keyless bulk-import rows, `provenance=import`) |
+| POST | `/api/care-pathways/review-queue/{id}/decision` | Decide a pending review item (`confirmed`/`rejected`) |
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root path, public under auth enforcement) |
 
@@ -520,10 +527,26 @@ and `CARE_PATHWAY_INTEGRITY_MAC_KEY` — see
 for the order. See [spec §12](./spec/index.md) — including §12.5, which
 states the limits plainly.
 
+**Native bulk import/export** (§13 T-10, `src/bulk/`) is implemented:
+async, job-based JSONL/CSV/TSV import + export on the loco `worker`
+queue, reusing the same `bulk_jobs` table and `ArtifactStore`
+(local/S3) the FHIR Bulk Data `$export` operation already used. Stable
+key: a deterministic identifier (DOI/Wikidata/`GuidelineId`/URI/UUID) →
+the provider-scoped `(provider_id, pathway_code)` pair → explicit
+`pid`; a keyless row runs the same search-blocked duplicate detection
+`check-duplicates` uses and queues a likely match in a newly added
+`review_queue` table (`provenance="import"`), never silently dropping
+the row. Export defaults to the masked view
+(`crate::privacy::mask_pathway`); the unmasked `full` profile is
+destructive under ABAC. Every export is audited, gating delivery.
+Known, disclosed limits: `active` (soft-delete state) round-trips on
+export but is never applied on import; `include_soft_deleted=true` is
+rejected as not-yet-supported; the per-row upsert is not SEC-B3
+advisory-lock-protected (matching organization's/case's own BLK-5 gap).
+
 Deferred (see [spec §13](./spec/index.md)): instance-layer
 privacy/authz for `pathway_instances.subject_ref`, terminology-server
-code-existence checks, the native (non-FHIR)
-bulk import/export API, and the remaining compliance follow-ups in T-15
+code-existence checks, and the remaining compliance follow-ups in T-15
 (lifting `compliance/` to the repo root once a second crate adopts it,
 an Inferno-style `/fhir` conformance run). Token issuance is
 provided by the central

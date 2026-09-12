@@ -10,3 +10,5 @@ pub mod care_pathways;
 pub mod entity_links;
 pub mod event_outbox;
 pub mod merge_records;
+/// The duplicate-review queue (§13 T-10) — raw SQL, no `SeaORM` entity.
+pub mod review_queue;

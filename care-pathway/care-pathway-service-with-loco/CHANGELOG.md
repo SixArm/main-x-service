@@ -9,6 +9,76 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — T-10: native (non-FHIR) bulk import/export API (2026-09-12)
+
+`src/bulk/` — async, job-based bulk import + export over the
+`bulk_jobs` table this crate already carried for FHIR Bulk Data
+`$export` (no second migration): `POST`/`GET /api/care-pathways/import`,
+`POST`/`GET /api/care-pathways/export`, `GET
+/api/care-pathways/bulk-jobs` (filterable by `kind`/`status`), drained
+by a loco `worker`-queue `BackgroundWorker`. JSONL (lossless reference)
++ CSV/TSV codecs (no Parquet — a deliberate narrowing matching
+organization's/case's own BLK-5 rollout). Stable-key upsert
+(`src/bulk/stable_key.rs`): a deterministic identifier
+(DOI/Wikidata/`GuidelineId`/URI/UUID, tried in that order) → the
+provider-scoped `(provider_id, pathway_code)` pair → `pid`. A keyless
+row runs the same search-blocked matcher duplicate detection
+`check-duplicates` uses and — above `Confidence::Medium`'s 0.7 bound —
+is still created (never silently dropped) and queued in a **newly
+added** `review_queue` table (this crate had none; `provenance =
+"import"`, case's own BLK-5 precedent). Every written row goes through
+`streaming::create_and_emit`/`update_and_emit`, so it gets the same
+event/audit/search-index side effects as one created interactively.
+Export defaults to `crate::privacy::mask_pathway` (masked); the
+unmasked `full` profile is `Destructive` under ABAC. Every export is
+audited, gating delivery even for a zero-row export (SEC-B8).
+
+- `src/bulk/{mod,columns,csv,jsonl,stable_key,error_report,pipeline,worker,handlers}.rs`
+  (new) — the codecs, the pipeline, the worker, and the REST handlers.
+  `src/bulk/store.rs` (existing, unchanged) already supported local
+  filesystem + S3, so native bulk inherits both for free — unlike
+  organization's/case's own local-only BLK-5 rollouts.
+- `src/models/bulk_jobs.rs` (extended): `status::COMPLETED_WITH_ERRORS`;
+  `submit` now delegates to a new `submit_with_ttl` (adds a caller-chosen
+  retention window and reports whether an idempotency-key lookup reused
+  an existing job — FHIR's own 15-minute `JOB_TTL_SECS` submit path is
+  unchanged); `set_input_url`, `finish_import`; `recent` gained
+  `kind`/`status` filters.
+- `src/models/review_queue.rs` (new) + `migration/…_review_queue.rs`
+  (new) — the stored duplicate-review queue, `provenance` from day one
+  (mirrors case's own BLK-5, not organization's, since case also had no
+  pre-existing table to migrate around).
+- `src/controllers/review_queue.rs` (new) — `GET
+  /api/care-pathways/review-queue` + `POST
+  /api/care-pathways/review-queue/{id}/decision`.
+- `Cargo.toml`: added the `csv` dependency; corrected the `axum-test`
+  dev-dependency pin from a stale, unused `"21.1"` to `"17.3"` (the
+  exact version loco-rs 1.1.0 depends on internally,
+  `loco_rs::TestServer`) — the two had silently diverged into duplicate
+  copies of the same crate, found while wiring this task's own
+  multipart-upload request tests.
+- Three disclosed scope decisions (full rationale in `src/bulk/`'s own
+  module docs, `spec/13-tasks.md` T-10, and this crate's `spec/index.md`):
+  the `active` (soft-delete) column round-trips on export but is never
+  applied on import; `in_language` is JSON-encoded like every other
+  array column (entity spec §9.4 groups it with the "one column each"
+  scalars in prose, but a list value still needs JSON-in-cell to
+  round-trip — read as "still one column" rather than a contradiction);
+  the per-row upsert is not SEC-B3 advisory-lock-protected, the
+  identical structural gap organization's and case's own BLK-5 rollouts
+  documented.
+- Tests: `tests/requests/bulk.rs` (new, 9, DB-gated) — idempotent
+  re-import at both stable-key tiers, CSV/JSONL round-trip, keyless
+  dedupe-to-review, masked vs full export, zero-row export still
+  audited, `include_soft_deleted` rejection, unsupported-format `400`,
+  `bulk-jobs` listing. `src/openapi.rs` gained the seven new paths +
+  a pinning test. `cargo test --lib` (483), `cargo test -- --ignored`
+  against a real Postgres (79, including the 9 new), `cargo fmt --check`,
+  `cargo clippy --all-targets -- -D warnings`, `cargo deny check`,
+  `cargo bench --no-run`, and the MSRV check (`cargo +1.96 check
+  --all-targets`) all clean; the `migration/` sub-crate's own
+  fmt/clippy/test pass too.
+
 ### Added — T-14j: stalled journeys (aging WIP) (2026-09-11)
 
 `GET /api/instances/stalled?idle_days=N` (default 60, echoed): open
