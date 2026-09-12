@@ -22,7 +22,11 @@ export interface ClientOptions {
 
 /** Per-request options for the {@link ApiClient} verb methods. */
 export interface RequestOptions {
-  /** JSON request body; serialized with `JSON.stringify` when present. */
+  /**
+   * Request body. JSON-serialized when present, **except** a `FormData`
+   * body (a multipart upload — the native bulk import's file field),
+   * which is passed through untouched; see {@link isFormDataBody}.
+   */
   body?: unknown;
   /**
    * Per-call bearer token override. A string forces that token; an
@@ -66,6 +70,29 @@ export class ApiError extends Error {
   get isBadRequest(): boolean {
     return this.status === 400;
   }
+  /**
+   * `true` when the response was `404 Not Found` — for a bulk job, this
+   * covers both an unknown id and one past its retention TTL; the
+   * service deliberately does not distinguish the two.
+   */
+  get isNotFound(): boolean {
+    return this.status === 404;
+  }
+}
+
+/**
+ * Whether a request body is `FormData` and must therefore bypass JSON
+ * serialization (a multipart upload).
+ *
+ * Guards on `typeof FormData` before the `instanceof`, since the global
+ * is absent in some non-browser runtimes and a bare `instanceof` would
+ * throw there rather than answering "no".
+ *
+ * @param body - The caller-supplied request body.
+ * @returns `true` when the body is a `FormData` instance.
+ */
+export function isFormDataBody(body: unknown): body is FormData {
+  return typeof FormData !== "undefined" && body instanceof FormData;
 }
 
 /** A `limit` / `offset` window to request. */
@@ -255,9 +282,23 @@ export class ApiClient {
       headers.authorization = `Bearer ${opts.token}`;
     }
 
+    const multipart = isFormDataBody(opts.body);
+    if (multipart) {
+      // `fetch` must set `content-type` itself here, because only it
+      // knows the boundary token it generates. Leaving the default
+      // `application/json` in place would produce a body the service
+      // cannot parse (`400 bad_multipart`). Strip every casing, since a
+      // per-request `headers` entry may have supplied its own.
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === "content-type") delete headers[key];
+      }
+    }
+
     const init: RequestInit = { method, headers, signal: opts.signal };
     if (opts.body !== undefined) {
-      init.body = JSON.stringify(opts.body);
+      init.body = multipart
+        ? (opts.body as FormData)
+        : JSON.stringify(opts.body);
     }
 
     // Resolve `path` as a *relative* reference against the base (its

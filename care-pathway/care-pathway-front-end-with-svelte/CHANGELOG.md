@@ -9,6 +9,59 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — native bulk import/export UI (CPFE-T7 / service spec `13-tasks.md` T-10)
+
+New `/bulk` route: submit a JSONL/CSV/TSV import (multipart file
+upload + format + a dry-run checkbox) or a filtered export (format +
+query + limit + a masked/full masking-profile picker), each returning
+`202 {job_id}`; the page polls the job's status endpoint (1.5 s) until
+it reaches a terminal state, showing the row-count breakdown as it
+fills in. A recent-jobs table lists both kinds, filterable **server-side**
+by `kind`/`status` (this service's `bulk-jobs` endpoint supports that
+directly, unlike person's own client-side-only equivalent). Every
+submit carries a fresh `Idempotency-Key` (SEC-B9).
+
+Ported and adapted from person-front-end-with-svelte's own bulk page
+(the only sibling front-end with one — organization's and case's own
+backends have carried a bulk API since BLK-5, 2026-08-03, but neither
+front-end has a UI for it yet).
+
+- `src/lib/api/client.ts`: `isFormDataBody` + multipart support in
+  `ApiClient`'s request pipeline (a `FormData` body bypasses JSON
+  serialization and the client strips any `content-type` it set, so
+  `fetch` can supply the multipart boundary itself); a new
+  `ApiError.isNotFound` getter.
+- `src/lib/bulk.ts` (new) — pure client-side rules: `BULK_FORMATS`/
+  `BULK_IMPORT_FORMATS` (the same three-format list for both — this
+  service's native formats are symmetric, unlike person's
+  Parquet-is-export-only split), `MASKING_PROFILES`,
+  `BULK_JOB_STATUSES`/`isTerminalStatus`, `dryRunFormValue`,
+  `progressPercent`, `POLL_INTERVAL_MS`.
+- `src/lib/api/types.ts`: `BulkJobView`, `BulkJobAccepted`,
+  `BulkExportRequest`.
+- `src/lib/api/care-pathways.ts`: `importPathways`, `exportPathways`,
+  `getImportJob`, `getExportJob`, `listBulkJobs` (the last passes
+  `kind`/`status` as query params, unlike person's limit-only
+  equivalent).
+- `src/routes/bulk/{+page.ts,+page.svelte}` (new) + a `nav.bulk` layout
+  link.
+- Three disclosed scope decisions (mirroring person's own bulk page):
+  `download_url`/`errors_url` render as plain `<code>` text, never a
+  link (opaque artifact-store references the service exposes no
+  endpoint to fetch); `include_soft_deleted` is not offered at all (the
+  endpoint accepts it but the worker rejects it); the duplicate review
+  queue a keyless import row feeds has no UI here — this page only
+  submits and monitors bulk jobs.
+- i18n: 66 new keys (`nav.bulk` + 65 `bulk.*`) across all 13 locales;
+  `JSONL`/`CSV`/`TSV` kept untranslated (technical abbreviations,
+  matching this file's own precedent for `Sunburst`/`Sankey`).
+- Tests: `tests/unit/bulk.test.ts` (14, ported/adapted from person's)
+  + `tests/e2e/bulk.spec.ts` (3, new). `pnpm run check` (0/0), `pnpm
+  test` (97 passed), `pnpm run test:e2e` (18 passed), `pnpm run build`
+  all clean; `pnpm run lint` clean on every file this change touched
+  (one pre-existing, unrelated drift in `svar-filter-augment.d.ts` is
+  untouched by this change).
+
 ### Added — front-end analytics views (CPFE-T6 / spec `13-tasks.md` T-14l)
 
 `/time` gains the directly-follows **process map**, journey-variant

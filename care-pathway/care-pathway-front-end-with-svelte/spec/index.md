@@ -48,6 +48,8 @@ Clinical informaticians and pathway authors.
 /board       instance Kanban (one pathway; drag = status move)
 /gantt       instance timeline Gantt (one pathway)
 /sequence    intervention-sequence Gantt (one pathway template)
+/time        time-based analysis (cohort + journey + T-14 analytics views)
+/bulk        native bulk import/export (CPFE-T7)
 ```
 
 ### Layout shell & navigation
@@ -170,6 +172,32 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
     content (item 14) is not retrofitted with `t()` calls — that
     remains the documented, disclosed gap CPFE-T3 already named, not
     something this item silently expands scope to fix.
+16. Native bulk import/export (`/bulk`, CPFE-T7, landed 2026-09-12,
+    mirroring the service's own §13 T-10): submit a **JSONL/CSV/TSV**
+    import (`multipart/form-data` file upload + format + a `dry_run`
+    checkbox) or an **export** (format + optional full-text query/limit
+    + a `masked`/`full` masking-profile picker), each returning `202
+    {job_id}`; the page then polls the job status endpoint (1.5 s) until
+    it reaches a terminal state (`completed` / `completed_with_errors` /
+    `failed`), showing the row-count breakdown as it fills in. A
+    **recent-jobs** table lists both kinds, filterable server-side by
+    `kind`/`status` — this service's `bulk-jobs` endpoint supports that
+    directly, unlike person's own (client-side-only) equivalent. Every
+    submit carries a fresh `Idempotency-Key` (SEC-B9), so a retry never
+    double-submits. **Scope decisions**, mirroring person's own bulk
+    page (the reference implementation copied for this): `download_url`/
+    `errors_url` are rendered as plain `<code>` text, never a clickable
+    link — they are opaque artifact-store references (`file://…`/
+    `s3://…`) the service exposes no endpoint to fetch the bytes of;
+    `include_soft_deleted` is not offered at all (the endpoint accepts
+    it but the worker rejects it, so offering it would accept a job
+    doomed to fail); and the duplicate **review queue** a keyless import
+    row feeds (`GET`/`POST .../review-queue`) has no UI here — this page
+    only submits and monitors bulk jobs, a narrower scope than the full
+    T-10 backend surface, left as a documented follow-up rather than an
+    oversight. Unlike person's picker (Parquet is export-only there),
+    care-pathway's native formats are symmetric, so the same three-format
+    list (`jsonl`/`csv`/`tsv`) is offered for both import and export.
 
 ## 7. Non-functional requirements
 
@@ -215,6 +243,7 @@ fields (incl. `in_language` as "Languages").
 | `/gantt` | `GET /api/care-pathways/{pid}/instances` |
 | `/time` cohort + journey (item 14, TBA-8) | `GET /api/care-pathways/{pid}/time-analysis?standard=`, `.../constraints`, `GET /api/instances/time-standards`, `GET /api/instances/flow?window_days=&pathway=`, `GET /api/instances/{pid}/timeline`, `.../time-analysis` |
 | `/time` T-14 extensions (item 15, T-14l) | `GET /api/care-pathways/{pid}/process-map`, `.../variants`, `GET /api/instances/stalled?idle_days=`; `?contains=&excludes=&compare=` added to the cohort/journey row's `time-analysis`/`constraints` calls; `GET .../export/event-log?format=jsonl` (dotted chart, opt-in only — see item 15's own scope decision) |
+| `/bulk` (item 16, CPFE-T7) | `POST /api/care-pathways/import` (multipart), `GET .../import/{id}`, `POST /api/care-pathways/export`, `GET .../export/{id}`, `GET /api/care-pathways/bulk-jobs?kind=&status=` |
 | — (unwired, §6.1/§13) | `GET /api/care-pathways/search?q=`, `GET /api/care-pathways/events/recent` |
 | — (repository only, not wired to a route) | `GET /api/instances/{pid}` (`InstanceDetail`), `GET /api/instances/caseload` |
 
@@ -382,6 +411,41 @@ for any access/audit requirements.
   - **Resolved.** A `try`/`catch` around the call, a new `"serviceUnavailable"` error variant, and its message in `+page.svelte`.
   - **Acceptance:** `tests/unit/verify.test.ts` (new) unit-tests the `load` function directly — pinning `missingToken`, the new `serviceUnavailable` (fetch rejects), and `invalidToken` (non-ok response) branches — verified to fail with the `try`/`catch` reverted and pass with it restored. Three-part change: spec (here) + code + test.
 
+- [x] **CPFE-T7: native bulk import/export UI (`/bulk`), mirroring
+  service spec `13-tasks.md` T-10, landed 2026-09-12.** See §6 item 16
+  for the full description, endpoints, and scope decisions.
+  - `src/lib/bulk.ts` (new, no DOM/fetch — pure, ported from person's
+    own file of the same name and adapted): `BULK_FORMATS`/
+    `BULK_IMPORT_FORMATS` (`jsonl`/`csv`/`tsv`, symmetric — unlike
+    person's Parquet-is-export-only split), `MASKING_PROFILES`,
+    `BULK_JOB_STATUSES`/`TERMINAL_BULK_JOB_STATUSES`/`isTerminalStatus`,
+    `dryRunFormValue`, `progressPercent`, `POLL_INTERVAL_MS`.
+  - `src/lib/api/client.ts`: `isFormDataBody` + multipart handling in
+    `ApiClient`'s request pipeline (a `FormData` body bypasses JSON
+    serialization and the client strips any `content-type` it set so
+    `fetch` can supply the multipart boundary itself); a new
+    `ApiError.isNotFound` getter (`status === 404`), for parity with the
+    existing `isUnauthorized`/`isBadRequest`.
+  - `src/lib/api/types.ts`: `BulkJobView`, `BulkJobAccepted`,
+    `BulkExportRequest`.
+  - `src/lib/api/care-pathways.ts`: `importPathways` (multipart POST),
+    `exportPathways` (JSON POST), `getImportJob`/`getExportJob`,
+    `listBulkJobs` — the last passes `kind`/`status` as query params
+    (this service supports server-side filtering; person's own
+    equivalent does not, so its front-end filters client-side instead).
+  - `src/routes/bulk/{+page.ts,+page.svelte}` (new) + a `nav.bulk` link
+    in `+layout.svelte`. No page-visit auth guard (`+page.server.ts`) —
+    this crate carries none of person's PRO-H10 guard pattern on any
+    route yet (CPFE-T1 tracks adding it generally), so this page follows
+    the existing local convention rather than introducing a new one
+    unilaterally.
+  - Tests: `tests/unit/bulk.test.ts` (14, ported/adapted from person's)
+    + `tests/e2e/bulk.spec.ts` (3, new — submit-import/dry-run-guard,
+    submit-export/opaque-reference-not-a-link, and the server-side
+    kind-filter contract). i18n: 66 new keys (`nav.bulk` + 65 `bulk.*`)
+    across all 13 locales — `JSONL`/`CSV`/`TSV` kept untranslated
+    (technical abbreviations, matching this file's own precedent for
+    `Sunburst`/`Sankey`).
 - [x] **CPFE-T6: T-14l — front-end analytics views (spec `13-tasks.md`
   T-14l), landed 2026-09-11.** `/time` gains the process map, the
   variants sunburst/Sankey, the dotted chart, the attrition flowchart,
@@ -436,20 +500,27 @@ for any access/audit requirements.
 
 ## 14. Implementation status
 
-Done: all nine routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`,
-`/insights`, `/board`, `/gantt`, `/sequence`, `/signin`+`/verify`); lean
-client; repository (CRUD + `checkDuplicates` + `merge` + `audit` + the
-five `insights*` lenses + `listInstances`/`getInstance`/
-`setInstanceStatus`/`caseload`, plus the unwired `search()` and
-`recentEvents()` — §6.1/§13); SVAR **DataGrid + FilterBar** registry,
-**Kanban** instance board, **Gantt** instance timeline +
-intervention-sequence Gantt, and the `/insights` lenses; detail-page
-instances section, merge-duplicate action, and audit-trail toggle; BFF
-auth (`src/lib/server/` session cookie + magic-link + session→PASETO
-exchange, `/signin` + `/verify` routes, `/api/proxy` bearer injection —
-the browser holds no token); form (incl. condition codes + identifiers
-editors); SPA config. `pnpm run check` clean; production build
-succeeds.
+Done: all eleven routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`,
+`/insights`, `/board`, `/gantt`, `/sequence`, `/time`, `/bulk`,
+`/signin`+`/verify`); lean client; repository (CRUD +
+`checkDuplicates` + `merge` + `audit` + the five `insights*` lenses +
+`listInstances`/`getInstance`/`setInstanceStatus`/`caseload` +
+time-based-analysis/T-14 analytics reads + the native bulk
+import/export methods (`importPathways`/`exportPathways`/
+`getImportJob`/`getExportJob`/`listBulkJobs`, CPFE-T7), plus the
+unwired `search()` and `recentEvents()` — §6.1/§13); SVAR **DataGrid +
+FilterBar** registry, **Kanban** instance board, **Gantt** instance
+timeline + intervention-sequence Gantt, and the `/insights` lenses;
+detail-page instances section, merge-duplicate action, and audit-trail
+toggle; the `/time` cohort/journey view plus its T-14 analytics
+extensions (process map, variants sunburst/Sankey, dotted chart,
+attrition flowchart, rule-split compare view, stalled-journeys list);
+the `/bulk` native import/export job submit-and-monitor UI (CPFE-T7);
+BFF auth (`src/lib/server/` session cookie + magic-link +
+session→PASETO exchange, `/signin` + `/verify` routes, `/api/proxy`
+bearer injection — the browser holds no token); form (incl. condition
+codes + identifiers editors); SPA config. `pnpm run check` clean;
+production build succeeds.
 
 ## 15. Roadmap
 
