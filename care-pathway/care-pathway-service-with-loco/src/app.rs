@@ -26,7 +26,7 @@ use std::sync::OnceLock;
 
 #[allow(unused_imports)]
 use crate::{
-    auth, controllers,
+    auth, bulk, controllers,
     models::_entities::{audit_logs, care_pathways, merge_records},
     observability::{self, Telemetry, TelemetryConfig},
     tasks,
@@ -178,6 +178,12 @@ impl Hooks for App {
             .add_route(controllers::links::routes())
             .add_route(controllers::tba::routes())
             .add_route(controllers::instances::routes())
+            // Native bulk import/export (§13 T-10) + the review-queue
+            // surface it feeds: mounted before care_pathways::routes()
+            // so their literal paths (/import, /export, /bulk-jobs,
+            // /review-queue) register ahead of the /{pid} capture.
+            .add_route(bulk::handlers::routes())
+            .add_route(controllers::review_queue::routes())
             .add_route(controllers::care_pathways::routes())
             .add_route(controllers::fhir::routes())
             .add_route(controllers::compliance::routes())
@@ -234,14 +240,18 @@ impl Hooks for App {
             .layer(axum::middleware::from_fn(observability::trace_mw)))
     }
 
-    /// Register background workers with the queue — currently just
-    /// [`BulkExportWorker`].
+    /// Register background workers with the queue: [`BulkExportWorker`]
+    /// (FHIR Bulk Data `$export`) and [`bulk::worker::BulkJobWorker`]
+    /// (the native bulk import/export API, §13 T-10).
     ///
     /// # Errors
     ///
     /// Propagates queue-registration errors.
     async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
         queue.register(BulkExportWorker::build(ctx)).await?;
+        queue
+            .register(bulk::worker::BulkJobWorker::build(ctx))
+            .await?;
         Ok(())
     }
 

@@ -96,6 +96,10 @@ care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }
 # key-set fetch (`CARE_PATHWAY_PASETO_KEYS_URL`; see src/auth.rs).
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
 
+# CSV/TSV codec for the native bulk import/export API (§13 T-10;
+# src/bulk/csv.rs). Same version as organization's/case's own BLK-5.
+csv = "1"
+
 # S3-compatible artifact storage for bulk jobs (optional).
 #
 # The maintained AWS SDK rather than hand-rolled SigV4 signing: signing is
@@ -162,9 +166,16 @@ loco-rs = { workspace = true, features = ["testing"] }
 # prove a code path never touches the database (src/compliance/disclosure.rs).
 sea-orm = { version = "2.0", features = ["mock"] }
 # The `TestServer` loco's testing harness hands to a request test. Named
-# explicitly so the compliance request tests can factor out helpers that
-# take one (loco re-exports the harness, not the type).
-axum-test = { version = "21.1" }
+# explicitly so request tests can factor out helpers that take one (loco
+# re-exports the type, `loco_rs::TestServer`, but not the `multipart`
+# module the native-bulk import tests need — `src/bulk/handlers.rs`'s
+# multipart upload). Pinned to the exact version loco-rs 1.1.0 depends on
+# internally (matching organization-service's own pin) so this crate
+# does not carry two incompatible copies of `axum-test` at once — an
+# unrelated stale "21.1" pin here duplicated the crate until this fix;
+# `loco_rs::TestServer` and this dependency's own `TestServer` must name
+# the same type for a helper to accept either interchangeably.
+axum-test = { version = "17.3" }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }

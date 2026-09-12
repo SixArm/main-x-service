@@ -1,5 +1,6 @@
 //! Request-level (HTTP) integration tests, grouped by controller.
 
+mod bulk;
 mod care_pathways;
 mod compliance;
 mod conformance;

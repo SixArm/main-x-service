@@ -320,7 +320,22 @@ adds one section + a §13 task declaring only what differs:
    **JSONL + CSV only** (no Parquet), **local-filesystem-only**
    `ArtifactStore` (no S3 yet — the trait is async in both so a future S3
    backend needs no signature change), and export audit gates delivery
-   (SEC-B8) exactly as person's does.
+   (SEC-B8) exactly as person's does. **Care-pathway** (done 2026-09-12,
+   §13 T-10) landed third, reusing the **existing** `bulk_jobs` table
+   (already migrated for its own FHIR Bulk Data `$export`, so — unlike
+   organization's and case's clean-slate rollouts — no migration was
+   needed at all here) and its existing `ArtifactStore`, which — per §12
+   below — was itself built as the family's local+S3 reference, so this
+   crate is the first native-bulk rollout to get S3 for free rather than
+   local-only. Stable key is a **three**-tier chain (a deterministic
+   identifier → the provider-scoped `(provider_id, pathway_code)` pair
+   → `pid`), one tier more than organization's or case's two; like case,
+   it had no `review_queue` table and added one fresh with `provenance`
+   from day one. JSONL + **CSV + TSV** (the family's other TSV adopter is
+   organization; case is CSV-only). Carries the identical documented
+   SEC-B3 per-row-upsert gap organization's and case's rollouts do, for
+   the same structural reason (`streaming::create_and_emit`/
+   `update_and_emit` are not `ConnectionTrait`-generic).
 
 ## 12. Open questions
 

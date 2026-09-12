@@ -21,6 +21,11 @@ pub mod instances;
 /// Cross-service journey links (`entity_links` write side).
 pub mod links;
 pub mod metrics;
+/// The stored duplicate-review queue (§13 T-10): list + decide. Rows are
+/// written by the native bulk-import pipeline (`crate::bulk::pipeline`,
+/// `provenance = "import"`); this module is the operator-facing surface
+/// over `crate::models::review_queue`.
+pub mod review_queue;
 /// Time-based analysis: segment + clock recording, and the derived
 /// per-instance, cohort, constraint and flow views.
 pub mod tba;

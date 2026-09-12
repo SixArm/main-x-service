@@ -36,8 +36,9 @@ and
 Deferred (§13):
 instance-layer masking/authz for `pathway_instances.subject_ref` (the
 patient-identifying linkage — see §16),
-terminology-server code-existence checks, gRPC, and the native
-(non-FHIR) bulk import/export API (§13). The PASETO key-set refresh loop
+terminology-server code-existence checks, and gRPC. The native
+(non-FHIR) bulk import/export API (§13 T-10) is **done** (2026-09-12,
+`src/bulk/`). The PASETO key-set refresh loop
 and ABAC policy hot-reload are **done** (§9/§13, 2026-08-01) — a rotated
 key or an edited policy reaches a running process without a restart.
 Also done: keyed HMAC integrity MACs and external-witness chain
@@ -152,22 +153,25 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    `DELETE /fhir/$export-status/{id}` to cancel. `/fhir/metadata` and
    `/fhir/.well-known/smart-configuration` are **public** under blanket
    enforcement (discovery must precede the credential).
-15. Bulk import/export (deferred, §13) — async, job-based, on the loco
-   `bg_pg` worker: `POST`/`GET /api/care-pathways/import`,
-   `POST`/`GET /api/care-pathways/export`,
+15. Bulk import/export (§13 T-10) — **Done**, 2026-09-12 — async,
+   job-based, on the loco `worker` queue: `POST`/`GET
+   /api/care-pathways/import`, `POST`/`GET /api/care-pathways/export`,
    `GET /api/care-pathways/bulk-jobs`. The uniform family contract
    (execution model, five endpoints, JSONL/CSV/Parquet codecs,
    upsert-by-stable-key + dedupe-to-review, per-row error report, export
    masking + audit) is fixed in
-   [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md).
-   Care-pathway-specific bits — stable upsert keys (a deterministic
+   [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md);
+   this crate's rollout is JSONL/CSV/TSV (no Parquet). Care-pathway-specific
+   bits — stable upsert keys (a deterministic
    scheme-scoped identifier the matcher short-circuits on /
    `(provider_id, pathway_code)`, same-provider only / `pid`); CSV
    flattening with every repeated/nested field a JSON-in-cell; clinical
    reference data (no patient-level data), masked-by-default export, still
    audited — are declared in the entity spec
    [§9.4](../../spec/09-api-surface.md) and
-   [§10.4](../../spec/10-persistence.md).
+   [§10.4](../../spec/10-persistence.md), and implemented in `src/bulk/`
+   (§13 T-10 has the full landing detail, including three disclosed
+   scope decisions).
 16. `GET /api/care-pathways/{pid}/masked` — the **masked view**:
    `provider_name` and `provider_id` masked to their tail; every clinical
    field (`name`, `condition_codes`, `interventions`, `keywords`,
@@ -249,9 +253,11 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    and actor URN, not merely never-constructed. Pure row-shaping:
    [`src/analytics.rs`](../src/analytics.rs); HTTP surface + loading:
    [`src/controllers/exports.rs`](../src/controllers/exports.rs). This
-   is a **synchronous v1**, not the native (non-FHIR) bulk
-   import/export API the "Deferred" note above still names — that
-   async job/artifact-store contract remains unbuilt; see the module's
+   is a **synchronous v1**, distinct from the native (non-FHIR) async
+   job/artifact-store bulk import/export API (§13 T-10, `src/bulk/`,
+   landed separately 2026-09-12) — the two remain separate surfaces by
+   design (this one is a read-only, per-pathway analytics extract; T-10
+   is the generic CRUD-level import/export contract); see the module's
    own doc comment and the entity-level
    [`13-tasks.md`](../../spec/13-tasks.md) T-14a for the full scope
    note (no `masking_profile` knob; three feature columns reserved
@@ -1478,26 +1484,48 @@ the evidence bundle.
     (§16). Tests: local ephemeral-port HTTP listener serving the test
     key set (fetched verifier accepts a token signed by that key) +
     fast-failing URL fallback (no panic) + no-URL env path (§11).
-- [ ] Bulk import/export — `bulk_jobs` migration (shared doc §3 schema,
-  `UNIQUE (entity, kind, idempotency_key)`); the five endpoints
-  (§6.13: `POST`/`GET /api/care-pathways/import`,
-  `POST`/`GET /api/care-pathways/export`,
-  `GET /api/care-pathways/bulk-jobs`); `bg_pg` worker draining
-  `queued → running → completed | completed_with_errors | failed`;
-  JSONL/CSV/Parquet codecs (CSV flattening per entity spec §9.4 —
-  every repeated/nested field a JSON-in-cell; Parquet export-only,
-  feature-gated); per-row pipeline reusing `src/validation.rs` +
-  the matcher + the review queue (upsert by a deterministic scheme-scoped
-  identifier / `(provider_id, pathway_code)` / `pid`; keyless rows →
-  duplicate detection → review queue, `provenance = import`; events +
-  audit not bypassed); downloadable per-row error report
-  (`row_number, source_line, field, code, message`); export masking
-  (`masking_profile`, masked default) + `include_soft_deleted` gating +
-  per-export audit (even zero-row). Uniform contract:
-  [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md);
-  entity-level detail: entity spec §9.4 / §10.4 / §13 T-10. Tests:
-  idempotent re-import, per-row error report, keyless dedupe-to-review,
-  masked vs full export, zero-row export still audited.
+- [x] Bulk import/export — **Done** (2026-09-12, `src/bulk/`). Reuses the
+  existing `bulk_jobs` migration/table (already created for FHIR Bulk
+  Data `$export`; no second migration) plus the five endpoints (§6.13:
+  `POST`/`GET /api/care-pathways/import`, `POST`/`GET
+  /api/care-pathways/export`, `GET /api/care-pathways/bulk-jobs`, all
+  in `src/bulk/handlers.rs`) and a loco `worker`-queue
+  `BackgroundWorker` (`src/bulk/worker.rs`) draining
+  `queued → running → completed | completed_with_errors | failed`
+  (`bulk_jobs::Model::finish_import`, new). **JSONL + CSV + TSV** codecs
+  (`src/bulk/{jsonl,csv}.rs`; no Parquet — a deliberate, documented scope
+  narrowing matching organization's/case's own BLK-5, since neither of
+  this rollout's dependencies needed it). Per-row pipeline
+  (`src/bulk/pipeline.rs`) reusing `src/validation.rs::problems` + the
+  embedded matcher + a newly added `review_queue` table (this crate had
+  none — case's own BLK-5 precedent, not organization's, since case also
+  started from zero) — stable-keyed upsert
+  (`src/bulk/stable_key.rs`: a deterministic identifier
+  DOI/Wikidata/`GuidelineId`/URI/UUID, tried in that declared order → the
+  provider-scoped `(provider_id, pathway_code)` pair → `pid`); keyless
+  rows → duplicate detection (search-blocked `MatchingEngine`, the same
+  path `check-duplicates` uses) → review queue, `provenance = import`;
+  events + audit not bypassed (every written row goes through
+  `streaming::create_and_emit`/`update_and_emit`). Downloadable per-row
+  error report (`row_number, field, code, message`,
+  `src/bulk/error_report.rs`). Export masking
+  (`masking_profile`, masked default via `crate::privacy::mask_pathway`)
+  + `include_soft_deleted` gating (rejected as not-yet-supported) +
+  per-export audit gating delivery, even zero-row (SEC-B8). Uniform
+  contract: [`agents/share/bulk-import-export.md`](../../../agents/share/bulk-import-export.md);
+  entity-level detail: entity spec §9.4 / §10.4 / §13 T-10. Three
+  disclosed scope decisions (full rationale in `src/bulk/`'s own module
+  docs): the row's `active` column round-trips on export but is never
+  applied on import; `in_language` is JSON-encoded like every other
+  array column, read against entity spec §9.4's grouping it with
+  "scalars" as "still one column, whose cell holds JSON" rather than a
+  contradiction; the per-row upsert is not SEC-B3 advisory-lock-protected
+  (matching organization's/case's own documented gap, same underlying
+  reason). Tests (`tests/requests/bulk.rs`, 9, DB-gated): idempotent
+  re-import (both stable-key tiers), CSV/JSONL round-trip, per-row error
+  report, keyless dedupe-to-review, masked vs full export, zero-row
+  export still audited, `include_soft_deleted` rejection,
+  unsupported-format `400`, `bulk-jobs` listing (kind-filtered).
 - [x] **FHIR R5 API** (`PlanDefinition`) — **Done** (`src/fhir/{mod,resources,search}.rs`
   + mounted `src/controllers/fhir.rs`, `routes()` in `app.rs`; 15 DB-free tests,
   `cargo test --lib` + `cargo clippy --lib` clean). Gaps: the DTO has no `status`
@@ -1956,10 +1984,12 @@ and the durable event bus's real `FluvioSink` broker
 sink (BUS-3, 2026-08-03; §13) — all three bus phases are now done. Time-based
 analysis (§6.18, §13 T-13 2026-08-23) and the cross-service `continues_as`
 journey edge + stitched journeys + flow gauges (§6.19, §13
-2026-08-24 through 2026-08-27, `0.2.0`) have also since landed. Next
-(deferred, §13): instance-layer privacy for
-`pathway_instances.subject_ref` (§16), and the
-native (non-FHIR) bulk import/export API.
+2026-08-24 through 2026-08-27, `0.2.0`) have also since landed. The
+pathway analytics suite (§13 T-14, T-14a through T-14m plus the
+front-end-only T-14l) and the native (non-FHIR) bulk import/export API
+(§13 T-10, 2026-09-12) have since landed too. Next (deferred, §13):
+instance-layer privacy for `pathway_instances.subject_ref` (§16), and
+terminology-server code-existence checks.
 
 ## 16. Open questions
 

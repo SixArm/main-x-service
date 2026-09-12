@@ -30,6 +30,7 @@ fn paths() -> Value {
     let mut paths = crud_paths();
     merge_object(&mut paths, aux_paths());
     merge_object(&mut paths, compliance_paths());
+    merge_object(&mut paths, bulk_paths());
     merge_object(&mut paths, tba_recording_paths());
     merge_object(&mut paths, tba_analysis_paths());
     merge_object(&mut paths, constraints_paths());
@@ -227,6 +228,86 @@ fn compliance_paths() -> Value {
                         "400": { "description": "pid is not a UUID" },
                         "403": { "description": "Valid credential, but the policy denies a destructive action" }
                     }
+                }
+            }
+    })
+}
+
+/// The native bulk import/export paths (crate spec §9.4/§13 T-10) + the
+/// duplicate-review queue they feed
+/// (`agents/share/bulk-import-export.md`). Distinct from the T-14a
+/// synchronous `event_log`/`journey_features` export in
+/// [`export_paths`] and from the FHIR Bulk Data `$export` operation
+/// (`/fhir/$export`, undocumented here — see `src/controllers/fhir.rs`).
+fn bulk_paths() -> Value {
+    json!({
+            "/api/care-pathways/import": {
+                "post": {
+                    "tags": ["bulk"],
+                    "summary": "Submit an async bulk import job",
+                    "description": "multipart/form-data: a 'file' field (JSONL/CSV/TSV, selected by the 'format' field, default jsonl), an optional 'dry_run' field. Stable-keyed upsert (deterministic identifier -> provider-scoped pathway code -> pid); a keyless row runs duplicate detection and queues a likely duplicate on the review queue rather than dropping it. Destructive under ABAC.",
+                    "security": [{ "bearer": [] }],
+                    "responses": { "202": { "description": "Job accepted" }, "413": { "description": "Upload exceeds the byte cap" } }
+                }
+            },
+            "/api/care-pathways/import/{id}": {
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "get": {
+                    "tags": ["bulk"],
+                    "summary": "Import job status: counts + errors_url",
+                    "responses": { "200": { "description": "Job status" }, "404": { "description": "Unknown, foreign-kind, or expired job id" } }
+                }
+            },
+            "/api/care-pathways/export": {
+                "post": {
+                    "tags": ["bulk"],
+                    "summary": "Submit an async bulk export job",
+                    "description": "Body: {format, q, limit, offset, masking_profile, include_soft_deleted}. Defaults to the masked view (jsonl); the unmasked 'full' masking_profile is privileged (destructive under ABAC). include_soft_deleted is not yet supported.",
+                    "requestBody": { "required": false, "content": { "application/json": { "schema": { "type": "object" } } } },
+                    "responses": { "202": { "description": "Job accepted" }, "403": { "description": "full/soft-deleted requested without elevated authorisation" } }
+                }
+            },
+            "/api/care-pathways/export/{id}": {
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "get": {
+                    "tags": ["bulk"],
+                    "summary": "Export job status: download_url once complete",
+                    "responses": { "200": { "description": "Job status" }, "404": { "description": "Unknown, foreign-kind, or expired job id" } }
+                }
+            },
+            "/api/care-pathways/bulk-jobs": {
+                "get": {
+                    "tags": ["bulk"],
+                    "summary": "List recent bulk jobs (newest first)",
+                    "description": "Lists both native-bulk and FHIR Bulk Data $export jobs (they share one bulk_jobs table); filter with ?kind= and/or ?status=.",
+                    "parameters": [
+                        { "name": "kind", "in": "query", "required": false, "schema": { "type": "string", "enum": ["import", "export"] } },
+                        { "name": "status", "in": "query", "required": false, "schema": { "type": "string" } },
+                        { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 50, "maximum": 500 } }
+                    ],
+                    "responses": { "200": { "description": "Recent jobs" } }
+                }
+            },
+            "/api/care-pathways/review-queue": {
+                "get": {
+                    "tags": ["bulk"],
+                    "summary": "List the stored duplicate-review queue",
+                    "description": "Written by the bulk-import pipeline (provenance = import) when a keyless row matches a likely duplicate. Newest first.",
+                    "parameters": [
+                        { "name": "status", "in": "query", "required": false, "schema": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] } },
+                        { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 100, "maximum": 500 } }
+                    ],
+                    "responses": { "200": { "description": "Review queue items" }, "422": { "description": "Unknown status token" } }
+                }
+            },
+            "/api/care-pathways/review-queue/{id}/decision": {
+                "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+                "post": {
+                    "tags": ["bulk"],
+                    "summary": "Decide one pending review item",
+                    "description": "Body: {status: confirmed|rejected}. First-writer-wins: only a pending item can be decided.",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "status": { "type": "string", "enum": ["confirmed", "rejected"] } } } } } },
+                    "responses": { "200": { "description": "Decided item" }, "404": { "description": "Unknown id" }, "422": { "description": "Item is not pending" } }
                 }
             }
     })
@@ -936,6 +1017,21 @@ mod tests {
         assert!(paths["/api/compliance/audit/verify"]["get"].is_object());
         assert!(paths["/api/care-pathways/{pid}/audit/disclosures"]["get"].is_object());
         assert!(paths["/api/care-pathways/{pid}/erase"]["post"].is_object());
+    }
+
+    /// The native bulk import/export surface (§13 T-10) and the
+    /// duplicate-review queue it feeds are documented.
+    #[test]
+    fn spec_documents_the_native_bulk_import_export_surface() {
+        let s = spec();
+        let paths = &s["paths"];
+        assert!(paths["/api/care-pathways/import"]["post"].is_object());
+        assert!(paths["/api/care-pathways/import/{id}"]["get"].is_object());
+        assert!(paths["/api/care-pathways/export"]["post"].is_object());
+        assert!(paths["/api/care-pathways/export/{id}"]["get"].is_object());
+        assert!(paths["/api/care-pathways/bulk-jobs"]["get"].is_object());
+        assert!(paths["/api/care-pathways/review-queue"]["get"].is_object());
+        assert!(paths["/api/care-pathways/review-queue/{id}/decision"]["post"].is_object());
     }
 
     /// The erasure endpoint's documentation must say it is irreversible

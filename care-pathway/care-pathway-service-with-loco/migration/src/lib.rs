@@ -32,6 +32,7 @@ mod m20260727_000012_drop_blake3;
 mod m20260727_000013_integrity_mac;
 mod m20260823_000014_time_based_analysis;
 mod m20260824_000015_entity_links;
+mod m20260912_000016_review_queue;
 
 /// The migration runner this crate exposes to loco / `sea-orm-migration`.
 pub struct Migrator;
@@ -58,6 +59,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260727_000013_integrity_mac::Migration),
             Box::new(m20260823_000014_time_based_analysis::Migration),
             Box::new(m20260824_000015_entity_links::Migration),
+            Box::new(m20260912_000016_review_queue::Migration),
             // inject-above (do not remove this comment)
         ]
     }

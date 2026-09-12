@@ -167,7 +167,7 @@ case, and portfolio each provide:
 | Boundary normalization (phone/address) | ✅ | ✅ | ✅ | – | ✅ | – | – | – | – | – |
 | Record-level ABAC + masking obligations | ✅ | ✅ | – | – | – | – | ✅ | ✅ | ✅ | ✅ |
 | Cross-service links (`entity_links` write-side) | ✅ | ✅ | – | – | – | – | – | ✅ | ✅ | – |
-| Bulk import/export³ | ✅ | – | – | – | – | – | ✅ | – | ✅ | – |
+| Bulk import/export³ | ✅ | – | – | – | – | – | ✅ | ✅ | ✅ | – |
 | Time-based analysis⁵ | – | – | – | – | – | – | – | ✅ | – | ✅ |
 
 > The consumer application **patient-flow** also participates, though
@@ -198,7 +198,17 @@ SEC-B3 advisory-lock-protected (a documented, narrow TOCTOU gap — see
 its own spec §10.7); case's bulk export reuses its existing inline
 `mask_case` redaction rather than a dedicated privacy module, so the
 case ✗ in the privacy-masking row above does not mean its bulk export
-is unmasked. ⁴ `FluvioSink` — the durable
+is unmasked. **Care-pathway landed third** (2026-09-12, §13 T-10),
+reusing the `bulk_jobs` table + `ArtifactStore` it already carried for
+FHIR Bulk Data `$export` — the first native-bulk rollout to inherit
+**S3** rather than local-only, since that store was itself built as the
+family's local+S3 reference (see the shared doc's §12). Scoped to
+**JSONL + CSV + TSV** (still no Parquet); stable key is a three-tier
+chain (a deterministic identifier → provider-scoped `(provider_id,
+pathway_code)` → `pid`); it too had no `review_queue` table and added
+one fresh (`provenance` from day one, case's precedent); it carries the
+same documented SEC-B3 per-row-upsert gap organization's and case's
+rollouts do, for the identical structural reason. ⁴ `FluvioSink` — the durable
 bus's real-broker relay sink,
 alongside the always-available no-broker `LoggingSink` — is behind each
 crate's own `fluvio` Cargo feature (off by default) and gated further
