@@ -205,6 +205,7 @@
     { href: "/sequence", key: "nav.sequence" as const },
     { href: "/time", key: "nav.time" as const },
     { href: "/bulk", key: "nav.bulk" as const },
+    { href: "/review-queue", key: "nav.reviewQueue" as const },
   ];
 </script>
 

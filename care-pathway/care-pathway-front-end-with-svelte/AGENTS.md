@@ -3,9 +3,10 @@
 Operator UI for the [Care Pathway Service](../care-pathway-service-with-loco):
 care-pathway CRUD + matching + merge + audit trail + registry insights +
 instance tracking (Kanban board / Gantt) + time-based analysis + native
-bulk import/export (CPFE-T7) + cookie-session / BFF auth (PASETO). Name
-search and a recent-activity view exist as repository methods but are
-not wired to any route — see spec §6.1/§13.
+bulk import/export (CPFE-T7) + the duplicate review queue it feeds
+(CPFE-T8) + cookie-session / BFF auth (PASETO). Name search and a
+recent-activity view exist as repository methods but are not wired to
+any route — see spec §6.1/§13.
 
 > Read [`spec/index.md`](./spec/index.md) first — the living spec.
 
@@ -38,9 +39,9 @@ src/
 │   ├── config.ts                 API_BASE_URL → same-origin BFF proxy (/api/proxy)
 │   ├── api/
 │   │   ├── client.ts             lean fetch wrapper (+ ApiError, incl. isNotFound); no browser-held bearer — the BFF proxy injects the PASETO server-side; isFormDataBody lets a multipart body (CPFE-T7 import) bypass JSON serialization
-│   │   ├── types.ts              CarePathway + ConditionCode + CodeSystem + CareSetting + IdentifierScheme + PathwayIdentifier + PathwayRef + ScoredRef + MergeResult + AuditEntry + PathwayEvent + PathwayInstance/InstanceStatus/Urgency/InstanceDetail + the five insight response types + BulkJobView/BulkJobAccepted/BulkExportRequest (CPFE-T7)
+│   │   ├── types.ts              CarePathway + ConditionCode + CodeSystem + CareSetting + IdentifierScheme + PathwayIdentifier + PathwayRef + ScoredRef + MergeResult + AuditEntry + PathwayEvent + PathwayInstance/InstanceStatus/Urgency/InstanceDetail + the five insight response types + BulkJobView/BulkJobAccepted/BulkExportRequest (CPFE-T7) + ReviewQueueItem/ReviewQueueStatus/ReviewQueueListResponse (CPFE-T8)
 │   │   ├── tba.ts                TbaRepository (timeline / instance + cohort analysis / constraints / standards / flow / segment + clock recording / process map / variants / stalled / event-log export) + the presentation helpers
-│   │   └── care-pathways.ts      CarePathwayRepository (CRUD + search + checkDuplicates + merge + audit + recentEvents + insights{Directory,Coverage,Variants,Providers,Languages} + listInstances + getInstance + setInstanceStatus + caseload + importPathways/exportPathways/getImportJob/getExportJob/listBulkJobs, CPFE-T7)
+│   │   └── care-pathways.ts      CarePathwayRepository (CRUD + search + checkDuplicates + merge + audit + recentEvents + insights{Directory,Coverage,Variants,Providers,Languages} + listInstances + getInstance + setInstanceStatus + caseload + importPathways/exportPathways/getImportJob/getExportJob/listBulkJobs, CPFE-T7 + listReviewQueue/decideReview, CPFE-T8)
 │   ├── server/                   BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (CARE_PATHWAY_API_URL / AUTH_API_URL)
 │   ├── analytics-transforms.ts   T-14l: pure layout/graph transforms over the T-14 analytics payloads — layoutProcessMap (BFS-ranked layered layout), sunburstFromVariants/sunburstArcs + sankeyFromVariants (both terminating at a synthetic Stopped node), layoutAttrition, dottedChartPoints, withheldLabel — no DOM, no fetch
 │   ├── bulk.ts                   CPFE-T7: pure client-side rules for the native bulk surface, ported from person's own file of the same name — BULK_FORMATS/BULK_IMPORT_FORMATS (symmetric, unlike person's Parquet split), MASKING_PROFILES, BULK_JOB_STATUSES/isTerminalStatus, dryRunFormValue, progressPercent, POLL_INTERVAL_MS — no DOM, no fetch
@@ -58,7 +59,8 @@ src/
     ├── gantt/+page.svelte        instance timeline Gantt (one pathway; enrolled_on → next_review/closed/today)
     ├── sequence/+page.svelte     intervention-sequence Gantt (a pathway template's interventions)
     ├── time/+page.svelte         time-based analysis: cohort ratio + NHS access-standard score + constraints + Little's Law, one journey's timeline wall, plus (T-14l) the process map, variants sunburst/Sankey/dotted chart, the attrition flowchart, the rule-split filter + compare view, and the stalled-journeys list
-    └── bulk/+page.svelte         CPFE-T7: native bulk import/export — submit + poll an import/export job, browse recent jobs (server-side kind/status filter)
+    ├── bulk/+page.svelte         CPFE-T7: native bulk import/export — submit + poll an import/export job, browse recent jobs (server-side kind/status filter)
+    └── review-queue/+page.svelte CPFE-T8: duplicate review queue — list + confirm/reject a keyless bulk-import row's candidate pair (each side links to its own /[pid]; no merge trigger — that stays a manual detail-page action)
 ```
 
 ## API consumption
@@ -90,6 +92,8 @@ src/
 | Native bulk import (`/bulk`, CPFE-T7) | `POST /api/care-pathways/import` (multipart: file + format + dry_run) · `GET /api/care-pathways/import/{id}` (polled) |
 | Native bulk export (`/bulk`, CPFE-T7) | `POST /api/care-pathways/export` (`{format, q, limit, masking_profile}`) · `GET /api/care-pathways/export/{id}` (polled) |
 | Recent bulk jobs (`/bulk`, CPFE-T7) | `GET /api/care-pathways/bulk-jobs?kind=&status=` |
+| Review queue list (`/review-queue`, CPFE-T8) | `GET /api/care-pathways/review-queue?status=` |
+| Review queue decision (`/review-queue`, CPFE-T8) | `POST /api/care-pathways/review-queue/{id}/decision` (`{status: confirmed\|rejected}`) |
 
 ## Commands
 

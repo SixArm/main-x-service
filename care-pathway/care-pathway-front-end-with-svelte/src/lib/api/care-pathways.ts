@@ -21,6 +21,9 @@ import type {
   PathwayInstance,
   PathwayRef,
   ProvidersInsight,
+  ReviewQueueItem,
+  ReviewQueueListResponse,
+  ReviewQueueStatus,
   ScoredRef,
   VariantsInsight,
 } from "./types";
@@ -373,6 +376,53 @@ export class CarePathwayRepository {
     const suffix = query.toString();
     return this.http.get<BulkJobView[]>(
       `/api/care-pathways/bulk-jobs${suffix ? `?${suffix}` : ""}`,
+    );
+  }
+
+  // -- Duplicate review queue (T-10) ---------------------------------------
+
+  /**
+   * List the stored duplicate-review queue, newest first.
+   *
+   * Written only by the native bulk-import pipeline today (`provenance =
+   * "import"`): a keyless import row whose best duplicate candidate
+   * scores ≥ 0.7.
+   *
+   * @param options - Optional status filter and row `limit` (service
+   *   default 100, capped at 500).
+   * @throws {ApiError} 422 for an unrecognised `status` token.
+   */
+  listReviewQueue(
+    options: { status?: ReviewQueueStatus; limit?: number } = {},
+  ): Promise<ReviewQueueListResponse> {
+    const query = new URLSearchParams();
+    if (options.status) query.set("status", options.status);
+    if (options.limit !== undefined) query.set("limit", String(options.limit));
+    const suffix = query.toString();
+    return this.http.get<ReviewQueueListResponse>(
+      `/api/care-pathways/review-queue${suffix ? `?${suffix}` : ""}`,
+    );
+  }
+
+  /**
+   * Decide one `pending` review item.
+   *
+   * @param id - The review-item id (not a pathway pid).
+   * @param status - The verdict: `confirmed` (ready for merge — the
+   *   operator still performs the merge separately, via `merge()`) or
+   *   `rejected` (not a duplicate).
+   * @returns The decided item.
+   * @throws {ApiError} 404 for an unknown id; 422 when the item is not
+   *   `pending` (first-writer-wins: a concurrent decision may have
+   *   already resolved it).
+   */
+  decideReview(
+    id: string,
+    status: "confirmed" | "rejected",
+  ): Promise<ReviewQueueItem> {
+    return this.http.post<ReviewQueueItem>(
+      `/api/care-pathways/review-queue/${encodeURIComponent(id)}/decision`,
+      { body: { status } },
     );
   }
 }
