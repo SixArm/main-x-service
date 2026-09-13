@@ -50,6 +50,7 @@ Clinical informaticians and pathway authors.
 /sequence    intervention-sequence Gantt (one pathway template)
 /time        time-based analysis (cohort + journey + T-14 analytics views)
 /bulk        native bulk import/export (CPFE-T7)
+/review-queue duplicate review queue: list + confirm/reject (CPFE-T8)
 ```
 
 ### Layout shell & navigation
@@ -198,6 +199,25 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
     oversight. Unlike person's picker (Parquet is export-only there),
     care-pathway's native formats are symmetric, so the same three-format
     list (`jsonl`/`csv`/`tsv`) is offered for both import and export.
+17. Duplicate review queue (`/review-queue`, CPFE-T8, landed
+    2026-09-13, service spec §13 T-10): lists the stored candidate pairs
+    a keyless bulk-import row queued (`provenance = "import"` — the only
+    writer today; there is no batch `deduplicate` scan of its own),
+    filterable server-side by status (pending/confirmed/rejected/
+    automerged — the last never actually occurs, this service has no
+    auto-merge path). Each pathway in a pending pair is a link to its own
+    `/[pid]` detail page (so an operator can actually see what is being
+    compared, not just its opaque id); pending rows offer **Confirm
+    duplicate** / **Reject** actions, first-writer-wins (a `422` from a
+    concurrent decision surfaces as an inline per-row message, not a
+    page-level error). **Scope decision:** confirming a pair does
+    **not** trigger a merge — it only marks the pair decided, matching
+    the service's own scope (`POST .../decision` never calls `/merge`).
+    Performing the actual merge stays a manual follow-up from either
+    pathway's own detail page (the existing "Merge into this record"
+    action, §6 item 7), because that is where the operator picks which
+    side survives — a choice this list has no basis to make on their
+    behalf.
 
 ## 7. Non-functional requirements
 
@@ -244,6 +264,7 @@ fields (incl. `in_language` as "Languages").
 | `/time` cohort + journey (item 14, TBA-8) | `GET /api/care-pathways/{pid}/time-analysis?standard=`, `.../constraints`, `GET /api/instances/time-standards`, `GET /api/instances/flow?window_days=&pathway=`, `GET /api/instances/{pid}/timeline`, `.../time-analysis` |
 | `/time` T-14 extensions (item 15, T-14l) | `GET /api/care-pathways/{pid}/process-map`, `.../variants`, `GET /api/instances/stalled?idle_days=`; `?contains=&excludes=&compare=` added to the cohort/journey row's `time-analysis`/`constraints` calls; `GET .../export/event-log?format=jsonl` (dotted chart, opt-in only — see item 15's own scope decision) |
 | `/bulk` (item 16, CPFE-T7) | `POST /api/care-pathways/import` (multipart), `GET .../import/{id}`, `POST /api/care-pathways/export`, `GET .../export/{id}`, `GET /api/care-pathways/bulk-jobs?kind=&status=` |
+| `/review-queue` (item 17, CPFE-T8) | `GET /api/care-pathways/review-queue?status=` · `POST /api/care-pathways/review-queue/{id}/decision` (`{status: confirmed\|rejected}`) |
 | — (unwired, §6.1/§13) | `GET /api/care-pathways/search?q=`, `GET /api/care-pathways/events/recent` |
 | — (repository only, not wired to a route) | `GET /api/instances/{pid}` (`InstanceDetail`), `GET /api/instances/caseload` |
 
@@ -411,6 +432,29 @@ for any access/audit requirements.
   - **Resolved.** A `try`/`catch` around the call, a new `"serviceUnavailable"` error variant, and its message in `+page.svelte`.
   - **Acceptance:** `tests/unit/verify.test.ts` (new) unit-tests the `load` function directly — pinning `missingToken`, the new `serviceUnavailable` (fetch rejects), and `invalidToken` (non-ok response) branches — verified to fail with the `try`/`catch` reverted and pass with it restored. Three-part change: spec (here) + code + test.
 
+- [x] **CPFE-T8: duplicate review-queue UI (`/review-queue`), mirroring
+  service spec `13-tasks.md` T-10, landed 2026-09-13.** See §6 item 17
+  for the full description and its own scope decision (no merge
+  trigger).
+  - `src/lib/api/types.ts`: `ReviewQueueStatus`, `ReviewQueueItem`,
+    `ReviewQueueListResponse`.
+  - `src/lib/api/care-pathways.ts`: `listReviewQueue` (status/limit
+    query params, server-side filtered) and `decideReview` (JSON POST
+    to the item-scoped decision path).
+  - `src/routes/review-queue/{+page.ts,+page.svelte}` (new) + a
+    `nav.reviewQueue` layout link. Each side of a pending pair is a
+    real link to its own `/[pid]` detail page; a decision's per-row
+    submitting state and any `422` (first-writer-wins conflict) or
+    `404` (swept) error stay scoped to that one row, never a
+    page-level banner.
+  - Tests: `tests/unit/review-queue.test.ts` (3, new — list query
+    params, decision POST body/path, 422 conflict surfaces as an
+    `ApiError`) + `tests/e2e/review-queue.spec.ts` (2, new — a pending
+    pair links to both pathways, and confirming one records the
+    reviewer and drops it out of the default "Pending" filter).
+  - i18n: 21 new keys (`nav.reviewQueue` + 20 `reviewQueue.*`) across
+    all 13 locales; reuses three existing `bulk.jobs.*` keys
+    (`all`/`refresh`/`loading`) rather than duplicating them.
 - [x] **CPFE-T7: native bulk import/export UI (`/bulk`), mirroring
   service spec `13-tasks.md` T-10, landed 2026-09-12.** See §6 item 16
   for the full description, endpoints, and scope decisions.
@@ -500,22 +544,24 @@ for any access/audit requirements.
 
 ## 14. Implementation status
 
-Done: all eleven routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`,
+Done: all twelve routes (`/`, `/new`, `/[pid]`, `/[pid]/edit`,
 `/insights`, `/board`, `/gantt`, `/sequence`, `/time`, `/bulk`,
-`/signin`+`/verify`); lean client; repository (CRUD +
+`/review-queue`, `/signin`+`/verify`); lean client; repository (CRUD +
 `checkDuplicates` + `merge` + `audit` + the five `insights*` lenses +
 `listInstances`/`getInstance`/`setInstanceStatus`/`caseload` +
 time-based-analysis/T-14 analytics reads + the native bulk
 import/export methods (`importPathways`/`exportPathways`/
-`getImportJob`/`getExportJob`/`listBulkJobs`, CPFE-T7), plus the
-unwired `search()` and `recentEvents()` — §6.1/§13); SVAR **DataGrid +
-FilterBar** registry, **Kanban** instance board, **Gantt** instance
+`getImportJob`/`getExportJob`/`listBulkJobs`, CPFE-T7) + the duplicate
+review-queue methods (`listReviewQueue`/`decideReview`, CPFE-T8), plus
+the unwired `search()` and `recentEvents()` — §6.1/§13); SVAR **DataGrid
++ FilterBar** registry, **Kanban** instance board, **Gantt** instance
 timeline + intervention-sequence Gantt, and the `/insights` lenses;
 detail-page instances section, merge-duplicate action, and audit-trail
 toggle; the `/time` cohort/journey view plus its T-14 analytics
 extensions (process map, variants sunburst/Sankey, dotted chart,
 attrition flowchart, rule-split compare view, stalled-journeys list);
 the `/bulk` native import/export job submit-and-monitor UI (CPFE-T7);
+the `/review-queue` duplicate-pair list + confirm/reject UI (CPFE-T8);
 BFF auth (`src/lib/server/` session cookie + magic-link +
 session→PASETO exchange, `/signin` + `/verify` routes, `/api/proxy`
 bearer injection — the browser holds no token); form (incl. condition

@@ -9,6 +9,38 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — duplicate review-queue UI (CPFE-T8 / service spec `13-tasks.md` T-10)
+
+New `/review-queue` route: lists the stored candidate pairs a keyless
+bulk-import row queued (`provenance = "import"`), filterable
+server-side by status. Each side of a pending pair links to its own
+`/[pid]` detail page; pending rows offer **Confirm duplicate** /
+**Reject**, with a per-row submitting state and inline error (a `422`
+first-writer-wins conflict, or a `404` if the row was swept), never a
+page-level banner for one stale row.
+
+Confirming a pair does **not** trigger a merge — that stays a manual
+step from either pathway's own detail page (the existing
+"Merge into this record" action), because that page is where the
+operator picks which side survives.
+
+- `src/lib/api/types.ts`: `ReviewQueueStatus`, `ReviewQueueItem`,
+  `ReviewQueueListResponse`.
+- `src/lib/api/care-pathways.ts`: `listReviewQueue` (status/limit query
+  params, server-side filtered) and `decideReview` (JSON POST to the
+  item-scoped decision path).
+- `src/routes/review-queue/{+page.ts,+page.svelte}` (new) + a
+  `nav.reviewQueue` layout link.
+- i18n: 21 new keys (`nav.reviewQueue` + 20 `reviewQueue.*`) across all
+  13 locales; reuses three existing `bulk.jobs.*` keys
+  (`all`/`refresh`/`loading`) rather than duplicating them.
+- Tests: `tests/unit/review-queue.test.ts` (3, new) + `tests/e2e/
+  review-queue.spec.ts` (2, new). `pnpm run check` (0/0), `pnpm test`
+  (100 passed), `pnpm run test:e2e` (20 passed), `pnpm run build` all
+  clean; `pnpm run lint` clean on every file this change touched (the
+  one pre-existing, unrelated drift in `svar-filter-augment.d.ts`
+  remains untouched).
+
 ### Added — native bulk import/export UI (CPFE-T7 / service spec `13-tasks.md` T-10)
 
 New `/bulk` route: submit a JSONL/CSV/TSV import (multipart file

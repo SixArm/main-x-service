@@ -404,3 +404,60 @@ export interface BulkExportRequest {
    */
   include_soft_deleted?: boolean;
 }
+
+// ─── Duplicate review queue (T-10) ─────────────────────────────────────
+
+/**
+ * Review disposition of one queued duplicate pair, mirroring the Rust
+ * `ReviewStatus` (`src/controllers/review_queue.rs`). `automerged` is
+ * present for wire parity with the sibling entities — this service has
+ * no auto-merge path, so it never actually appears.
+ */
+export type ReviewQueueStatus =
+  | "pending"
+  | "confirmed"
+  | "rejected"
+  | "automerged";
+
+/**
+ * One stored review-queue item, mirroring the Rust `ReviewQueueItem`.
+ * Only the bulk-import pipeline writes this queue today (a keyless row
+ * whose best duplicate candidate scores ≥ 0.7): `provenance` is
+ * therefore always `"import"` in practice, though the wire type (and
+ * the shared family vocabulary) allows `"operator"` /
+ * `"matcher_suggested"` too.
+ */
+export interface ReviewQueueItem {
+  /** Stable review-item id (survives re-scans); the decision path param. */
+  id: string;
+  /** First care pathway in the candidate pair (public id). */
+  pathway_id_a: string;
+  /** Second care pathway in the candidate pair (public id). */
+  pathway_id_b: string;
+  /** Overall match score for the pair, in `[0, 1]`. */
+  match_score: number;
+  /** Confidence band label (the matcher's `Confidence`, lowercased). */
+  match_quality: string;
+  /** How the pair was detected (e.g. `"import_duplicate_detection"`). */
+  detection_method: string;
+  /** Per-component score breakdown, as stored at detection time. */
+  score_breakdown?: unknown;
+  /** Current review state. */
+  status: ReviewQueueStatus;
+  /** How the pair was first surfaced (`operator` / `import` / `matcher_suggested`). */
+  provenance: string;
+  /** Reviewer identity recorded by the decision endpoint, if decided. */
+  reviewed_by: string | null;
+  /** ISO-8601 timestamp of when the pair was first queued. */
+  created_at: string;
+  /** ISO-8601 timestamp of the decision, if decided. */
+  reviewed_at: string | null;
+}
+
+/** `GET /api/care-pathways/review-queue` response envelope. */
+export interface ReviewQueueListResponse {
+  /** The stored review-queue items (newest first). */
+  items: ReviewQueueItem[];
+  /** Number of items returned (this page, not a grand total). */
+  total: number;
+}
