@@ -1765,25 +1765,43 @@ the evidence bundle.
   domain having a distinct label and `Domain::ALL` covering every
   variant.
 
-- [ ] **CP-T1 (M) Batch `/deduplicate` + persisted `review_queue`.**
-  Unlike person/worker/place/thing/organization
+- [x] **CP-T1 (M) Batch `/deduplicate` + persisted `review_queue`.**
+  **Done, 2026-09-13.** Unlike person/worker/place/thing/organization
   (`agents/share/match-search-merge.md`: "Review queue persisted... —
-  person / worker / place / thing / organization"), this crate has only
-  real-time `check-duplicates`; there is no batch scan endpoint and no
-  stored review queue at all. `auth::DESTRUCTIVE_POST_SUFFIXES` already
-  reserves `/deduplicate` as a destructive action "ahead of the
-  dedup-scan... features", confirming this was planned but never
-  built. *(Verified: `grep -n '"/check-duplicates"\|"/deduplicate"\|"/review-queue"'
-  src/controllers/care_pathways.rs` shows only `/check-duplicates`
-  routed; no `review_queue` table/migration/model exists.)* Three-part
-  change: a `review_queue` migration (mirroring case-service's, which
-  also started from zero — `provenance` column from day one), `POST
-  /deduplicate` (pairwise scan persisting candidates), `GET
-  /review-queue` (`?status=&limit=`), `POST /review-queue/{id}/decision`.
-  **Acceptance:** DB-gated round-trip (scan → list → decide → `422` on
-  re-decide → `404` unknown) green; the front-end's `/review` route (a
-  Kanban already exists for the *service's* stored review model in the
-  sibling crates) can be pointed at it in a follow-up.
+  person / worker / place / thing / organization"), this crate had only
+  real-time `check-duplicates`; there was no batch scan endpoint. The
+  `review_queue` table, its model, and the `GET /review-queue` +
+  `POST /review-queue/{id}/decision` endpoints were **already built** by
+  §13 T-10 (the native bulk import/export API, `src/controllers/
+  review_queue.rs`) as its own writer (`provenance = "import"`), so this
+  task's actual remaining scope was the one still-missing piece:
+  **`POST /api/care-pathways/deduplicate`**
+  (`crate::controllers::review_queue::deduplicate`) — a pairwise
+  batch scan (upper-triangular, capped at
+  [`CHECK_DUPLICATES_SCAN_CAP`](../src/controllers/care_pathways.rs)
+  = 1000 active rows, the same constant `check-duplicates` used before
+  §13 T-6 moved it onto search-blocking — reused here for its
+  originally-intended purpose rather than left dead) persisting hits
+  with `provenance = "operator"` via the *same* `review_queue::upsert`
+  primitive T-10's bulk-import writer already used (normalized-pair
+  upsert: a re-scan refreshes scores without disturbing a pair a human
+  already decided). Mounted under `/api/care-pathways` alongside the
+  T-10 review-queue routes, ahead of the `/{pid}` capture. Does not
+  merge anything — confirming a pair is a separate, manual step (decide,
+  then the pathway's own `POST /merge`), matching organization's/case's
+  own scope. **Acceptance:** DB-gated round-trip
+  (`tests/requests/review_queue.rs`, 2 tests) — scan finds and persists
+  a certain-match pair (`provenance = operator`,
+  `detection_method = batch_deduplication`), a re-scan upserts the same
+  row rather than duplicating it, deciding it `confirmed` succeeds,
+  deciding it again is `422` (first-writer-wins), deciding an unknown id
+  is `404`; a second test pins that an unrelated pair below the
+  matcher's threshold is never queued. The front-end's `/review-queue`
+  route (CPFE-T8, landed 2026-09-13 — see the front-end crate's own
+  spec) already renders whatever this endpoint writes, since both
+  writers share one table and one wire shape; no front-end follow-up is
+  needed to point it at `/deduplicate` specifically, since the queue
+  view does not care which writer produced a row.
 
 - [x] **CP-T2 (M) Extend record-level ABAC to `list`, `search`, and
   `check-duplicates`.** *(resolved 2026-09-05.)* Only the single-record

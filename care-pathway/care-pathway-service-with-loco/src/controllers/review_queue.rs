@@ -1,24 +1,31 @@
 //! The stored duplicate-**review queue** (§13 T-10, the native bulk
-//! import/export API): `GET /api/care-pathways/review-queue` +
-//! `POST /api/care-pathways/review-queue/{id}/decision`.
+//! import/export API; CP-T1, the batch scan): `POST
+//! /api/care-pathways/deduplicate`, `GET
+//! /api/care-pathways/review-queue`, `POST
+//! /api/care-pathways/review-queue/{id}/decision`.
 //!
 //! Every sibling entity that has a review queue
 //! (person / worker / place / thing / organization,
 //! `agents/share/match-search-merge.md` "Review queue"; case added its
-//! own during its own BLK-5) exposes these two endpoints; this closes the
-//! same gap for care-pathway. Today the only writer of this queue is the
-//! bulk-import pipeline (`crate::bulk::pipeline::create_and_queue_for_review`,
-//! `provenance = "import"`) — care-pathway has no batch `deduplicate`
-//! scan of its own to route into it too (unlike case's own reference).
+//! own during its own BLK-5) exposes these endpoints; this closes the
+//! same gap for care-pathway. Two writers feed the queue: the bulk-import
+//! pipeline (`crate::bulk::pipeline::create_and_queue_for_review`,
+//! `provenance = "import"`) and, since CP-T1, [`deduplicate`]'s own
+//! pairwise batch scan (`provenance = "operator"`) — the same
+//! stored-pair-upsert primitive either way, so a re-scan refreshes scores
+//! without disturbing a pair a human already decided.
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use care_pathway_matcher::{MatchConfig, MatchingEngine};
 use loco_rs::controller::ErrorDetail;
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::MaybeAuthUser;
+use crate::controllers::care_pathways::CHECK_DUPLICATES_SCAN_CAP;
 use crate::models::audit_logs::Model as AuditModel;
+use crate::models::care_pathways::Model as PathwayModel;
 
 /// Review disposition of one queued duplicate pair, in the family's
 /// lowercase wire tokens (matching person/worker/place/thing/organization
@@ -103,6 +110,102 @@ fn review_row_to_item(row: &crate::models::review_queue::ReviewQueueRow) -> Revi
         created_at: row.created_at,
         reviewed_at: row.reviewed_at,
     }
+}
+
+/// Request body for the batch-scan endpoint; every field optional.
+#[derive(Debug, Default, Deserialize)]
+struct BatchDeduplicationRequest {
+    /// Optional score threshold overriding the matcher's own `is_match`
+    /// verdict: without one, the matcher's own boundary decides; with
+    /// one, `score >= threshold` does.
+    #[serde(default)]
+    threshold: Option<f64>,
+}
+
+/// Response for the batch scan, in the family's report shape.
+#[derive(Debug, Serialize)]
+struct BatchDeduplicationResponse {
+    /// Number of care pathways scanned.
+    pathways_scanned: usize,
+    /// Number of duplicate pairs found (stored rows reported).
+    duplicates_found: usize,
+    /// Auto-merged count (always 0 — no auto-merge path here).
+    auto_merged: usize,
+    /// Number of stored pairs currently `pending` review.
+    queued_for_review: usize,
+    /// The stored candidate pairs (stable ids across re-scans).
+    review_items: Vec<ReviewQueueItem>,
+}
+
+/// Batch-scan every active care pathway for likely duplicates.
+///
+/// `POST /api/care-pathways/deduplicate` (a destructive-classed POST
+/// under ABAC, like merge and import —
+/// `crate::auth::DESTRUCTIVE_POST_SUFFIXES`). Loads up to
+/// [`CHECK_DUPLICATES_SCAN_CAP`] active rows, scores each unordered pair
+/// once (upper triangle), and **persists** hits in the stored
+/// `review_queue` (normalized-pair upsert: re-scans refresh scores,
+/// decided rows keep their decision, ids stay stable). The response
+/// reports the STORED rows. Does not merge anything — confirming a pair
+/// is a separate, manual step (`POST .../review-queue/{id}/decision`
+/// then the pathway's own `POST /merge`).
+///
+/// # Errors
+///
+/// Propagates DB query, payload-parse, and review-queue-write errors.
+async fn deduplicate(
+    State(ctx): State<AppContext>,
+    axum::Json(req): axum::Json<BatchDeduplicationRequest>,
+) -> Result<Response> {
+    let engine = MatchingEngine::new(MatchConfig::default());
+    let rows = PathwayModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
+    if rows.len() as u64 == CHECK_DUPLICATES_SCAN_CAP {
+        tracing::warn!(
+            cap = CHECK_DUPLICATES_SCAN_CAP,
+            "deduplicate scan hit the row cap; pairs beyond the cap are \
+             silently missed. Batch dedup is inherently a bulk scan; run \
+             it more often, or narrow the corpus."
+        );
+    }
+    let pathways: Vec<(uuid::Uuid, care_pathway_matcher::CarePathway)> = rows
+        .iter()
+        .map(|row| Ok((row.pid, row.to_pathway()?)))
+        .collect::<Result<_>>()?;
+
+    let mut new_items = Vec::new();
+    // Upper-triangular pair iteration: j starts at i+1 so each unordered
+    // pair is scored once and no record is compared with itself.
+    for i in 0..pathways.len() {
+        for j in (i + 1)..pathways.len() {
+            let r = engine.match_care_pathways(&pathways[i].1, &pathways[j].1);
+            let is_dup = req.threshold.map_or(r.is_match, |t| r.score >= t);
+            if is_dup {
+                new_items.push(crate::models::review_queue::NewReviewItem {
+                    record_id_a: pathways[i].0,
+                    record_id_b: pathways[j].0,
+                    match_score: r.score,
+                    match_quality: format!("{:?}", r.confidence).to_lowercase(),
+                    detection_method: "batch_deduplication".to_string(),
+                    score_breakdown: serde_json::to_value(&r.breakdown).ok(),
+                    status: review_status_token(ReviewStatus::Pending).to_string(),
+                    provenance: "operator".to_string(),
+                });
+            }
+        }
+    }
+    let stored = crate::models::review_queue::upsert(&ctx.db, &new_items).await?;
+    let review_items: Vec<ReviewQueueItem> = stored.iter().map(review_row_to_item).collect();
+    let queued_for_review = review_items
+        .iter()
+        .filter(|i| i.status == ReviewStatus::Pending)
+        .count();
+    format::json(BatchDeduplicationResponse {
+        pathways_scanned: pathways.len(),
+        duplicates_found: review_items.len(),
+        auto_merged: 0,
+        queued_for_review,
+        review_items,
+    })
 }
 
 /// Query parameters for the review-queue list endpoint.
@@ -227,6 +330,7 @@ async fn review_decision(
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/care-pathways")
+        .add("/deduplicate", post(deduplicate))
         .add("/review-queue", get(get_review_queue))
         .add("/review-queue/{id}/decision", post(review_decision))
 }
