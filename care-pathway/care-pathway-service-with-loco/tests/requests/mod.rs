@@ -12,6 +12,7 @@ mod insights;
 mod instances;
 mod journeys_seed;
 mod links;
+mod review_queue;
 mod stalled;
 mod tba;
 

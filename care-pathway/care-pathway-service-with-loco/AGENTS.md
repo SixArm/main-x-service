@@ -36,6 +36,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
 | POST | `/api/care-pathways/match` | Rank a `{query, candidates}` set |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways |
+| POST | `/api/care-pathways/deduplicate` | **Batch scan** (CP-T1): pairwise-score up to `CHECK_DUPLICATES_SCAN_CAP` active rows, persist hits to the review queue (`provenance=operator`); destructive under ABAC |
 | POST | `/api/care-pathways/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
 | GET | `/api/care-pathways/merges/recent` | Merge-history records |
 | GET | `/api/care-pathways/whoami` | Verified bearer-token claims (`401` without one) |
@@ -335,6 +336,24 @@ stable-key tier, CSV/JSONL round-trip, keyless dedupe-to-review, masked
 vs. full export, zero-row export still audited, `include_soft_deleted`
 rejection, unsupported-format `400`, `bulk-jobs` listing).
 
+**CP-T1 (batch `/deduplicate`, landed 2026-09-13)** closes the one
+remaining piece of the `review_queue` story T-10 left standing: a
+pairwise batch scan over up to `CHECK_DUPLICATES_SCAN_CAP` (1000)
+active rows, persisting hits into the *same* stored `review_queue`
+T-10's bulk-import pipeline already writes to — `provenance = operator`
+for a scan hit vs. `provenance = import` for a keyless bulk-import row,
+both routed through the identical `review_queue::upsert` primitive
+(`src/controllers/review_queue.rs::deduplicate`). `check-duplicates`'s
+own scan cap (`CHECK_DUPLICATES_SCAN_CAP`, dead since spec §13 T-6
+moved that endpoint onto search-blocking) is reused here for its
+originally-intended purpose rather than left as inert historical
+scaffolding. Mirrors organization's/case's own `/deduplicate`
+implementation; does not merge anything (confirming a pair is a
+separate, manual step). DB-gated round trip:
+`tests/requests/review_queue.rs` (scan → list → confirm → `422` on
+re-decide → `404` unknown; an unrelated pair below threshold is never
+queued).
+
 Still deferred (spec §13): instance-layer masking/authz for
 `subject_ref`, and terminology-server code-existence checks.
 
@@ -404,7 +423,7 @@ src/
 │   ├── exports.rs           T-14a: event_log / journey_features bulk export HTTP surface (loads + renders; pure shaping is in src/analytics.rs; its care_setting_string helper is pub(crate), reused by tba.rs's T-14f split for setting: predicates; wires T-14i's conformance column via tba.rs's load_conformance_inputs)
 │   ├── data_quality.rs      T-14h: journey data-quality and missingness report HTTP surface (loads segments/steps, reuses tba.rs's resolve_anchor_pair_raw; pure detectors are in src/data_quality.rs)
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
-│   ├── review_queue.rs      T-10: GET review-queue + POST review-queue/{id}/decision (list/decide crate::models::review_queue rows)
+│   ├── review_queue.rs      T-10 + CP-T1: POST deduplicate (batch pairwise scan, provenance=operator) + GET review-queue + POST review-queue/{id}/decision (list/decide crate::models::review_queue rows; the bulk-import pipeline is the other writer, provenance=import)
 │   └── metrics.rs          root /metrics.prom Prometheus endpoint
 ├── compliance/
 │   ├── mod.rs              posture assembly, data-protection declarations, safety class

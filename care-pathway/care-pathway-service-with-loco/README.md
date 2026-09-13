@@ -24,6 +24,7 @@ specific condition over a defined episode.
 | GET | `/api/care-pathways/search?q=` | Tantivy full-text search (`?fuzzy=true`, `?phonetic=true`); paginated |
 | POST | `/api/care-pathways/match` | Rank `{query, candidates}` |
 | POST | `/api/care-pathways/check-duplicates` | Match query vs stored pathways |
+| POST | `/api/care-pathways/deduplicate` | Batch pairwise scan, persisting candidates to the review queue (`provenance=operator`) |
 | POST | `/api/care-pathways/merge` | Merge a duplicate into a survivor |
 | GET | `/api/care-pathways/merges/recent` | Merge-history records |
 | GET | `/api/care-pathways/audit/recent` · `/{pid}/audit` | Audit-log query |

@@ -9,6 +9,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — CP-T1: batch `/deduplicate` scan (2026-09-13)
+
+`POST /api/care-pathways/deduplicate` — the one piece of the
+`review_queue` story T-10 left standing. Pairwise-scores up to
+`CHECK_DUPLICATES_SCAN_CAP` (1000) active rows (upper-triangular, no
+self-comparison) and persists hits into the *same* stored
+`review_queue` T-10's bulk-import pipeline already writes to, via the
+identical `review_queue::upsert` primitive — `provenance = "operator"`
+for a scan hit vs. `provenance = "import"` for a keyless bulk-import
+row. A re-scan upserts the same row (refreshing its score) rather than
+duplicating it; a decided pair keeps its decision. Does not merge
+anything — confirming a pair is a separate, manual step (decide, then
+the pathway's own `POST /merge`), matching organization's/case's own
+`/deduplicate` scope.
+
+- `src/controllers/review_queue.rs` (extended): `deduplicate` handler +
+  `BatchDeduplicationRequest`/`BatchDeduplicationResponse`, mounted at
+  `POST /api/care-pathways/deduplicate` (already classified
+  `Destructive` under ABAC — `auth::DESTRUCTIVE_POST_SUFFIXES` already
+  named it, confirming this was planned but never built until now).
+- `src/controllers/care_pathways.rs`: `CHECK_DUPLICATES_SCAN_CAP`'s doc
+  comment corrected — it had been dead since `check-duplicates` moved
+  onto search-blocking (spec §13 T-6), and is now genuinely read by the
+  batch scan it was originally sized for.
+- Tests: `tests/requests/review_queue.rs` (new, 2, DB-gated) — the full
+  scan → list → decide → `422` (already-decided) → `404` (unknown)
+  round trip, plus a pin that an unrelated pair below the matcher's
+  threshold is never queued. `cargo test --lib` (484), `cargo test --
+  --ignored` against a real Postgres (81, including the 2 new), `cargo
+  fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo deny
+  check`, `cargo bench --no-run`, and the MSRV check
+  (`cargo +1.96 check --all-targets`) all clean.
+
 ### Added — T-10: native (non-FHIR) bulk import/export API (2026-09-12)
 
 `src/bulk/` — async, job-based bulk import + export over the

@@ -27,9 +27,12 @@ use crate::streaming;
 ///
 /// `check-duplicates` no longer scans at all — it blocks on the search
 /// index instead (see [`check_duplicates`] and
-/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`]). This constant is kept only
-/// because a unit test pins its historical value; it is not read by
-/// any handler.
+/// [`CHECK_DUPLICATES_CANDIDATE_LIMIT`]). The constant lives on as the
+/// **batch** scan cap: `POST /api/care-pathways/deduplicate` (spec §13
+/// CP-T1, `crate::controllers::review_queue::deduplicate`) loads up to
+/// this many active rows and scores every unordered pair once — a
+/// genuine in-memory scan is exactly what that endpoint is for, unlike
+/// `check-duplicates`.
 pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 
 /// Maximum number of **blocked candidates** `check-duplicates` scores a
