@@ -203,7 +203,7 @@ serial_test = "3.5"
 # Testing
 assertables = "10"
 tokio-test = "0.4"
-mockall = "0.13"
+mockall = "0.15"
 tempfile = "3.27"
 proptest = "1.11"
 
