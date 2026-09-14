@@ -199,7 +199,7 @@ fluvio = ["dep:fluvio"]
 # Serialises the DB-gated audit-chain tests: they each truncate
 # `audit_log`, so running them concurrently would have one test wipe
 # another's chain mid-append.
-serial_test = "3.5"
+serial_test = "4.0"
 # Testing
 assertables = "10"
 tokio-test = "0.4"
