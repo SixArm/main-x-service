@@ -16,7 +16,8 @@
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
-    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
+    import PickerBar from "lily-design-system-svelte-picker-bar";
+    import type { ShareTarget } from "lily-design-system-svelte-share-picker";
 
     // Full set of selectable Lily/DaisyUI-style themes shown in the picker,
     // including NHS-specific themes for healthcare deployments.
@@ -120,13 +121,14 @@
             "United Kingdom National Health Service Wales for Practitioners",
     };
 
-    import {
-        SharePicker,
-        type ShareTarget,
-    } from "lily-design-system-svelte-share-picker";
-    import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
     import { enhance } from "$app/forms";
-    import { i18n, isRtl, t } from "$lib/i18n.svelte.js";
+    import {
+        i18n,
+        isRtl,
+        t,
+        LOCALES,
+        LOCALE_LABELS,
+    } from "$lib/i18n.svelte.js";
     import { browser } from "$app/environment";
     import type { LayoutData } from "./$types";
 
@@ -154,16 +156,23 @@
     // <title> without SharePicker having to read the DOM).
     const SHARE_TARGETS: ShareTarget[] = [
         {
+            id: "email",
+            label: "Email",
+            href: (url, title) =>
+                `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
+            newTab: false,
+        },
+        {
             id: "linkedin",
             label: "LinkedIn",
             href: (url) =>
                 `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
         },
         {
-            id: "mastodon",
-            label: "Mastodon",
+            id: "reddit",
+            label: "Reddit",
             href: (url, title) =>
-                `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
         },
         {
             id: "bluesky",
@@ -172,10 +181,10 @@
                 `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
         },
         {
-            id: "reddit",
-            label: "Reddit",
+            id: "mastodon",
+            label: "Mastodon",
             href: (url, title) =>
-                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+                `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
         },
     ];
 
@@ -215,7 +224,7 @@
     // SSR / non-browser test runs). RTL locales (ar, ur) flip to "rtl".
     $effect(() => {
         if (!browser) return;
-        document.documentElement.lang = i18n.locale;
+        document.documentElement.lang = i18n.locale.replace("_", "-");
         document.documentElement.dir = isRtl(i18n.locale) ? "rtl" : "ltr";
     });
 </script>
@@ -253,27 +262,39 @@
                 {/each}
             </ul>
             <div class="chrome">
-                <ThemePicker
-                    label={t("chrome.theme")}
+                <PickerBar
+                    labels={{
+                        theme: t("chrome.theme"),
+                        locale: t("chrome.language"),
+                        textSize: t("chrome.text_size"),
+                        share: t("chrome.share"),
+                    }}
                     themesUrl="/assets/themes/"
                     themes={THEMES}
-                    themeLabels={THEME_LABELS}
-                    storageKey="lily-theme"
-                />
-                <TextSizePicker
-                    label={t("chrome.text_size")}
+                    themeProps={{
+                        themeLabels: THEME_LABELS,
+                        storageKey: "lily-theme",
+                    }}
+                    locales={[...LOCALES]}
+                    localeProps={{
+                        value: i18n.locale,
+                        localeLabels: LOCALE_LABELS,
+                        applyDir: false,
+                        onChange: (code: string) => i18n.set(code),
+                    }}
                     sizes={SIZES}
-                    sizeLabels={SIZE_LABELS}
-                    defaultValue="medium"
-                    storageKey="lily-text-size"
-                />
-                <SharePicker
-                    label={t("chrome.share")}
-                    title={pageTitle}
-                    targets={SHARE_TARGETS}
-                    copyLabel={t("share.copy_link")}
-                    copiedLabel={t("share.copied")}
-                    copyFailedLabel={t("share.copy_failed")}
+                    textSizeProps={{
+                        sizeLabels: SIZE_LABELS,
+                        defaultValue: "medium",
+                        storageKey: "lily-text-size",
+                    }}
+                    shareTargets={SHARE_TARGETS}
+                    shareProps={{
+                        title: pageTitle,
+                        copyLabel: t("share.copy_link"),
+                        copiedLabel: t("share.copied"),
+                        copyFailedLabel: t("share.copy_failed"),
+                    }}
                 />
             </div>
             <section class="session" aria-label="Session">
@@ -400,7 +421,14 @@
         align-items: stretch;
         gap: 0.75rem;
     }
+    .chrome :global(.picker-bar) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
     .chrome :global(.theme-picker-button),
+    .chrome :global(.locale-picker-button),
     .chrome :global(.text-size-picker-button),
     .chrome :global(.share-picker-button) {
         padding: 0.375rem 0.5rem;
