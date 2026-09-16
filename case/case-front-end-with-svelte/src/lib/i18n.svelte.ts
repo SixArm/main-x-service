@@ -6,8 +6,11 @@
 // / common terms reuse the family's established translations so this app
 // stays consistent with its siblings.
 //
-// Supported locales: English (`en`, the source of truth) plus Welsh
-// (`cy`, for the public-sector Welsh-language duty), Spanish (`es`),
+// Supported locales: English (`en`, the source of truth) plus American
+// English (`en_US`, identical content today — a distinct endonym for the
+// locale picker rather than a spelling divergence, since `en`'s own copy
+// is already American-spelled), Welsh (`cy`, for the public-sector
+// Welsh-language duty), Spanish (`es`),
 // French (`fr`), German (`de`), Arabic (`ar`, RTL), Russian (`ru`),
 // Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese
 // (`pt`), Indonesian (`id`), and Urdu (`ur`, RTL). An unknown key/locale
@@ -23,6 +26,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -46,6 +50,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -92,6 +97,173 @@ export const LOCALE_KEY = "mxi.case.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.board": "Board",
+    // Layout / chrome
+    "brand.name": "Main X · Cases",
+    "nav.toggle": "Toggle navigation",
+    "nav.cases": "Cases",
+    "nav.newCase": "New case",
+    "chrome.language": "Language",
+    "chrome.share": "Share",
+    "chrome.textSize": "Text size",
+    "share.copyLink": "Copy link",
+    "share.linkCopied": "Link copied",
+    "share.copyFailed": "Could not copy — copy it from the address bar",
+    "chrome.theme": "Theme",
+    // Session
+    "session.title": "Session",
+    "session.tokenAttached": "Token attached.",
+    "session.clearToken": "Clear token",
+    "session.noToken": "No token.",
+    "session.signIn": "Sign in",
+    "session.pasteToken": "Paste a token",
+    "session.accessToken": "Access token",
+    "session.pastePlaceholder": "Paste access token",
+    "session.useToken": "Use token",
+    "session.hint": "From the authentication-service (magic-link sign-in).",
+    // Cases list
+    "list.title": "Cases",
+    "list.new": "New case",
+    "list.loading": "Loading…",
+    "list.empty": "No cases yet.",
+    "list.createOne": "Create one",
+    "list.loadFailed": "Failed to load cases",
+    // Case detail
+    "detail.loading": "Loading…",
+    "detail.notFound": "Not found",
+    "detail.caseType": "Case type:",
+    "detail.status": "Status:",
+    "detail.priority": "Priority:",
+    "detail.agency": "Agency:",
+    "detail.caseNumber": "Case number:",
+    "detail.opened": "Opened:",
+    "detail.subjects": "Subjects:",
+    "detail.identifiers": "Identifiers:",
+    "detail.keywords": "Keywords:",
+    "detail.id": "ID:",
+    "detail.edit": "Edit",
+    "detail.checkDuplicates": "Check duplicates",
+    "detail.checking": "Checking…",
+    "detail.checkFailed": "Check failed",
+    "detail.delete": "Delete",
+    "detail.potentialDuplicates": "Potential duplicates",
+    "detail.noneAboveThreshold": "None above the match threshold.",
+    // New case
+    "new.title": "New case",
+    "new.create": "Create",
+    // Edit case
+    "edit.title": "Edit case",
+    "edit.loading": "Loading…",
+    "edit.notFound": "Not found",
+    "edit.saveChanges": "Save changes",
+    // Case form
+    "form.title": "Title",
+    "form.caseType": "Case type",
+    "form.status": "Status",
+    "form.priority": "Priority",
+    "form.caseNumber": "Case number",
+    "form.openedDate": "Opened date",
+    "form.agencyId": "Agency id",
+    "form.agencyName": "Agency name",
+    "form.alternateTitles": "Alternate titles",
+    "form.subjects": "Subjects",
+    "form.keywords": "Keywords",
+    "form.sameAs": "Same-as URLs",
+    "form.languages": "Languages",
+    "form.commaSeparated": "(comma-separated)",
+    "form.commaSeparatedIso": "(comma-separated ISO 639-1)",
+    "form.identifiers": "Identifiers",
+    "form.valuePlaceholder": "value",
+    "form.remove": "Remove",
+    "form.addIdentifier": "+ Add identifier",
+    "form.empty": "—",
+    "form.save": "Save",
+    "form.saving": "Saving…",
+    "form.titleRequired": "Title is required.",
+    "form.customLabel": "Custom label",
+    "form.customLabelRequired": "A custom label is required.",
+    "form.saveFailed": "Save failed",
+    // Merge
+    "nav.merge": "Merge",
+    "merge.title": "Merge cases",
+    "merge.mainId": "Main case id",
+    "merge.mainIdHint": "The surviving case — it keeps its id.",
+    "merge.dupId": "Duplicate case id",
+    "merge.dupIdHint": "Folded into the main case, then soft-deleted.",
+    "merge.reason": "Reason",
+    "merge.reasonHint": "Optional; recorded in the merge history.",
+    "merge.reasonPlaceholder": "Confirmed duplicate of the same case",
+    "merge.loadPreview": "Load preview",
+    "merge.merging": "Merging…",
+    "merge.merge": "Merge",
+    "merge.bothIdsRequired": "Both case ids are required.",
+    "merge.mustDiffer": "The main and duplicate ids must differ.",
+    "merge.preview": "Preview",
+    "merge.main": "Main",
+    "merge.duplicate": "Duplicate",
+    "merge.completed": "Merge completed",
+    "merge.viewMain": "View the main case",
+    "merge.confirm":
+      "Merge case {dup} into case {main}? The duplicate is soft-deleted.",
+    "merge.recent": "Recent merges",
+    "merge.recentEmpty": "No merges recorded yet.",
+    "merge.recentFailed": "Failed to load recent merges",
+    "merge.mergedAt": "Merged at",
+    "merge.actor": "Actor",
+    // Cross-service links (subject_of)
+    "links.title": "Subject of this case",
+    "links.note":
+      "Records the person this case is about. The assertion is as sensitive as the case itself: reading and writing it takes the same authorisation, and every change is audited.",
+    "links.loading": "Loading…",
+    "links.empty": "No subject recorded yet.",
+    "links.loadFailed": "Failed to load the subjects of this case",
+    "links.person": "Person",
+    "links.personHint": "The person's reference, in the form person:<uuid>.",
+    "links.confidence": "Confidence",
+    "links.confidenceHint":
+      "Optional; 0 to 1. Leave blank for an outright assertion.",
+    "links.provenance": "Provenance",
+    "links.provenanceHint": "Optional; defaults to “operator”.",
+    "links.validFrom": "Valid from",
+    "links.validTo": "Valid to",
+    "links.validity": "Validity",
+    "links.addTitle": "Record a subject",
+    "links.record": "Record subject",
+    "links.recording": "Recording…",
+    "links.withdraw": "Withdraw",
+    "links.withdrawing": "Withdrawing…",
+    "links.withdrawConfirm":
+      "Withdraw the assertion that {ref} is the subject of this case? The withdrawal is recorded and audited.",
+    "links.recordFailed": "Could not record the subject",
+    "links.withdrawFailed": "Could not withdraw the link",
+    "links.invalidPersonRef":
+      "Enter a person reference of the form person:<uuid>.",
+    "links.confidenceRange": "Confidence must be between 0 and 1.",
+    // Search
+    "search.placeholder": "Search…",
+    "search.submit": "Search",
+    "search.fuzzy": "Fuzzy",
+    "search.phonetic": "Phonetic",
+    "search.failed": "Search failed",
+    "detail.viewAudit": "View audit trail",
+    // Nav / audit / recent activity
+    "nav.audit": "Activity",
+    "audit.title": "Audit trail",
+    "audit.backToCase": "Back to case",
+    "audit.loading": "Loading…",
+    "audit.noEntries": "No audit entries yet.",
+    "audit.by": "by",
+    "audit.payload": "Details",
+    "audit.loadFailed": "Failed to load the audit trail",
+    "activity.title": "Recent activity",
+    "activity.recentAudit": "Recent audit entries",
+    "activity.recentEvents": "Recent events",
+    "activity.loading": "Loading…",
+    "activity.loadFailed": "Failed to load recent activity",
+    "activity.noAuditEntries": "No audit entries yet.",
+    "activity.noEvents": "No events yet.",
+  },
+  en_US: {
     "nav.board": "Board",
     // Layout / chrome
     "brand.name": "Main X · Cases",
@@ -2177,7 +2349,17 @@ export const STRINGS_BY_LOCALE: Record<
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;
