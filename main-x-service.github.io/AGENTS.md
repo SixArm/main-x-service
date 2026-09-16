@@ -45,15 +45,30 @@ subproject's own API — that stays in that subproject's own `spec/`.
   root layout) — no BFF, no sessions, no forms. It uses only
   `lily-design-system-svelte-theme-picker` from the family's Lily
   dependency set (no locale/share/text-size pickers — this isn't an
-  operator front-end with per-user preferences to persist).
+  operator front-end with per-user preferences to persist), and — unlike
+  those front-ends — no `lily-design-system-svelte-picker-bar` either,
+  precisely because it needs only the one picker.
 - `.github/workflows/deploy.yml` lives **inside this subproject** on
   purpose: it does nothing while nested in the monorepo (GitHub Actions
   only reads a repo's *root* `.github/workflows/`), and becomes the live
   Pages-deploy workflow the moment `git subtree split` makes this
   directory the root of its own repo.
-- Keep `static/assets/themes` as a symlink to the shared
-  `lilydesignsystem/lily-design-system/themes` checkout (same convention
-  as every operator front-end) — do not vendor a copy.
+- `lily-design-system-svelte-theme-picker` is a registry dependency
+  (`^0.1.1`), **not** a `file:` path onto the sibling `lilydesignsystem`
+  checkout — a `file:` path here would be doubly wrong: it makes
+  `pnpm install` impossible on any CI runner (the same reason every
+  operator front-end switched, `agents/share/svelte-front-end-stack.md`),
+  *and* its relative depth is only ever correct while this directory is
+  nested inside the monorepo — `git subtree split` promotes it to a
+  repo root one level shallower, breaking the path outright. Same
+  reasoning applies to `static/assets/themes`: it is a **vendored copy**
+  (45 real `.css` files, not a symlink) so the exported sibling repo —
+  which `git subtree split --prefix=main-x-service.github.io` derives
+  from *only this directory's* history — carries its own theme
+  stylesheets rather than a dangling reference to something outside the
+  subtree entirely. Re-copy from `vendor/lily-design-system-themes/` at
+  the monorepo root (or straight from the Lily checkout) if themes
+  change; don't hand-edit the vendored files.
 
 ## Publishing (see the spec for the full contract)
 
