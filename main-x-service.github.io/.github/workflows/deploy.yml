@@ -32,7 +32,13 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          # Pinned exact, not a floating major — see main-x-service's
+          # agents/share/svelte-front-end-stack.md §6: a newer pnpm 11.x
+          # enforces a minimumReleaseAge supply-chain policy that
+          # rejected a just-published Lily package on the front-end CI
+          # stage's first real run. 11.0.8 predates that policy and is
+          # what this repo tests every front-end against.
+          version: 11.0.8
 
       - name: Install Node.js
         uses: actions/setup-node@v4

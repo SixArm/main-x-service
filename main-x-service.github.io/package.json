@@ -15,7 +15,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "lily-design-system-svelte-theme-picker": "file:../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker"
+    "lily-design-system-svelte-theme-picker": "^0.1.1"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",
@@ -30,7 +30,7 @@
     "type": "git",
     "url": "git+https://github.com/SixArm/main-x-service.github.io.git"
   },
-  "homepage": "https://sixarm.github.io/main-x-service.github.io/",
+  "homepage": "https://main-x-service.github.io/",
   "bugs": {
     "url": "https://github.com/SixArm/main-x-service/issues"
   }
