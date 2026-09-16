@@ -18,6 +18,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -57,6 +58,7 @@ export function isRtl(locale: string): boolean {
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -87,6 +89,217 @@ export const LOCALE_KEY = "mxi.thing.locale";
 // going through the `en`-fallback path of `translate`.
 export const STRINGS = {
   en: {
+    "auth.sessionExpired": "Your session has expired. Redirecting to sign in…",
+    "auth.accessDenied": "You don't have permission to do that.",
+    "nav.review": "Review",
+    "review.run": "Run scan",
+    "review.intro":
+      "Candidate duplicate pairs from the batch scan. Drag a pending card, or open a pair to compare both records side by side before deciding.",
+    "review.gap.provenance":
+      "This service records how each pair was detected but not a separate provenance value.",
+    "review.loading": "Loading the review queue…",
+    "review.empty": "No review items for this filter.",
+    "review.filter.status": "Status",
+    "review.filter.statusAll": "All",
+    "review.filter.limit": "Page size",
+    "review.filter.limitHint":
+      "The service returns at most 500 items and offers no paging beyond this.",
+    "review.status.pending": "Pending",
+    "review.status.confirmed": "Confirmed",
+    "review.status.rejected": "Rejected",
+    "review.status.automerged": "Auto-merged",
+    "review.board.title": "Board",
+    "review.list.title": "Queue",
+    "review.col.pair": "Pair",
+    "review.col.score": "Score",
+    "review.col.quality": "Quality",
+    "review.col.method": "Detection method",
+    "review.col.status": "Status",
+    "review.col.actions": "Actions",
+    "review.compare.open": "Compare",
+    "review.compare.title": "Compare the pair",
+    "review.compare.close": "Close",
+    "review.compare.loading": "Loading both records…",
+    "review.compare.field": "Field",
+    "review.compare.a": "Record A",
+    "review.compare.b": "Record B",
+    "review.compare.none": "Not recorded",
+    "review.compare.partial":
+      "One record could not be loaded — it may have been merged away or deleted.",
+    "review.field.score": "Match score",
+    "review.field.quality": "Match quality",
+    "review.field.method": "Detection method",
+    "review.field.status": "Status",
+    "review.breakdown.title": "Score breakdown",
+    "review.breakdown.none": "No score breakdown was recorded for this pair.",
+    "review.breakdown.component": "Component",
+    "review.breakdown.weight": "Weight",
+    "review.breakdown.score": "Score",
+    "review.decide.confirm": "Confirm duplicate",
+    "review.decide.reject": "Reject",
+    "review.decide.deciding": "Saving…",
+    "review.decide.locked":
+      "Already decided — only pending items can be decided.",
+    "review.merge.title": "Merge this pair",
+    "review.merge.note":
+      "Confirming records the verdict only; it does not merge. Choose which record survives.",
+    "review.merge.keepA": "Keep A, merge B into it",
+    "review.merge.keepB": "Keep B, merge A into it",
+    // Layout / chrome
+    "brand.name": "Thing",
+    "brand.tagline": "Main X Index",
+    "nav.dashboard": "Dashboard",
+    "nav.things": "Things",
+    "nav.newThing": "New thing",
+    "nav.matchCheck": "Match check",
+    "nav.merge": "Merge",
+    "nav.toggle": "Toggle navigation",
+    "chrome.theme": "Theme",
+    "chrome.language": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    // Dashboard
+    "dashboard.title": "Dashboard",
+    "dashboard.service": "Service:",
+    "dashboard.recentActivity": "Recent activity",
+    "dashboard.noRecent": "No recent audit entries.",
+    // Things list
+    "things.title": "Things",
+    "things.new": "New thing",
+    "things.searchPlaceholder": "Search by name, identifier…",
+    "things.fuzzy": "Fuzzy",
+    "things.phonetic": "Phonetic (Soundex)",
+    "things.maskSensitive": "Mask sensitive",
+    "things.previousPage": "Previous",
+    "things.nextPage": "Next",
+    "things.pageRange": "{from}–{to} of {total}",
+    "things.loading": "Loading…",
+    "things.recordCount": "{count} record",
+    "things.recordCountPlural": "{count} records",
+    // Search box
+    "search.action": "Search",
+    // Grid headers
+    "grid.id": "ID",
+    "grid.name": "Name",
+    "grid.type": "Type (schema.org)",
+    "grid.primaryId": "Primary identifier",
+    "grid.url": "URL",
+    // Thing detail
+    "detail.loading": "Loading…",
+    "detail.edit": "Edit",
+    "detail.audit": "Audit",
+    "detail.delete": "Delete",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
+    "detail.showMasked": "Show masked",
+    "detail.showFull": "Show full",
+    "detail.maskedNotice":
+      "Showing the masked view — some fields are redacted.",
+    "detail.confirmDelete":
+      "Soft-delete this thing? This cannot be undone via the UI.",
+    "detail.identity": "Identity",
+    "detail.id": "ID",
+    "detail.additionalType": "Additional type",
+    "detail.description": "Description",
+    "detail.disambiguating": "Disambiguating",
+    "detail.url": "URL",
+    "detail.owner": "Owner",
+    "detail.mainEntityOfPage": "Main entity of page",
+    "detail.identifiers": "Identifiers",
+    "detail.alternateNames": "Alternate names",
+    "detail.sameAs": "Same-as (authoritative URLs)",
+    "detail.images": "Images",
+    "detail.customPrefix": "Custom: ",
+    // Audit log
+    "audit.title": "Audit log",
+    "audit.backToThing": "Back to thing",
+    "audit.loading": "Loading…",
+    "audit.none": "No audit entries.",
+    "audit.by": "by",
+    "audit.payload": "Payload",
+    // Edit
+    "edit.title": "Edit thing",
+    "edit.cancel": "Cancel",
+    "edit.loading": "Loading…",
+    "edit.submitLabel": "Save changes",
+    // New
+    "new.title": "New thing",
+    "new.submitLabel": "Create",
+    "new.possibleDuplicates": "Possible duplicates",
+    "new.duplicatesDetected":
+      "Duplicates detected ({count}) — review below before resubmitting.",
+    // Match check
+    "match.title": "Match check",
+    "match.name": "Name",
+    "match.threshold": "Threshold",
+    "match.thresholdHint": "0.0 – 1.0",
+    "match.description": "Description",
+    "match.url": "URL",
+    "match.sameAs": "Same-as URLs",
+    "match.sameAsHint": "One per line",
+    "match.identifiers": "Identifiers",
+    "match.matching": "Matching…",
+    "match.findMatches": "Find matches",
+    // Merge
+    "merge.title": "Merge things",
+    "merge.mainId": "Main thing ID",
+    "merge.mainIdHint": "The surviving record",
+    "merge.dupId": "Duplicate thing ID",
+    "merge.dupIdHint": "Will be soft-deleted",
+    "merge.reason": "Reason",
+    "merge.reasonHint": "Recorded in the merge audit trail",
+    "merge.reasonPlaceholder": "Confirmed duplicate",
+    "merge.loadPreview": "Load preview",
+    "merge.merging": "Merging…",
+    "merge.merge": "Merge",
+    "merge.preview": "Preview",
+    "merge.main": "Main",
+    "merge.duplicate": "Duplicate",
+    "merge.completed": "Merge completed",
+    "merge.recordCreated": "Merge record {id} created at {at}.",
+    "merge.viewMain": "View merged main thing",
+    "merge.confirm":
+      "Merge {dup}… into {main}…?\nThis soft-deletes the duplicate.",
+    // Match results
+    "results.title": "Match results",
+    "results.noCandidates": "No candidates.",
+    "results.scoreBreakdown": "Score breakdown",
+    "results.nameScore": "name",
+    "results.identifierScore": "identifier",
+    "results.descriptionScore": "description",
+    "results.urlScore": "URL",
+    "results.sameAsScore": "same-as",
+    "results.phoneticMatch": "phonetic match",
+    "results.deterministicMatch": "deterministic (DOI/ISBN/…)",
+    // Thing form
+    "form.name": "Name",
+    "form.additionalType": "Additional type",
+    "form.additionalTypeHint": "schema.org subtype URL",
+    "form.description": "Description",
+    "form.disambiguating": "Disambiguating description",
+    "form.disambiguatingHint": "Short distinguishing detail",
+    "form.url": "URL",
+    "form.owner": "Owner",
+    "form.alternateNames": "Alternate names",
+    "form.alternateNamesHint": "One per line",
+    "form.sameAs": "Same-as URLs",
+    "form.sameAsHint": "Wikidata, Wikipedia, etc. — one per line",
+    "form.identifiers": "Identifiers",
+    "form.saving": "Saving…",
+    "form.reset": "Reset",
+    // Identifier input
+    "identifier.type": "Type",
+    "identifier.customOption": "Custom…",
+    "identifier.customLabel": "Custom label",
+    "identifier.value": "Value",
+    "identifier.url": "URL",
+    "identifier.remove": "Delete",
+    "identifier.add": "+ Add identifier",
+  },
+  en_US: {
     "auth.sessionExpired": "Your session has expired. Redirecting to sign in…",
     "auth.accessDenied": "You don't have permission to do that.",
     "nav.review": "Review",
@@ -2689,7 +2902,17 @@ export const STRING_KEYS = Object.keys(STRINGS.en) as StringKey[];
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;

@@ -1,7 +1,7 @@
 <!--
   Root layout — the app shell wrapping every route: a top navigation bar with the
-  brand, primary nav, and Lily theme/text-size/share pickers, plus the routed
-  page content rendered via `children`. Imports global app.css.
+  brand, primary nav, and the Lily PickerBar — theme/locale/text-size/share,
+  plus the routed page content rendered via `children`. Imports global app.css.
 
   $props:
     - children: Snippet — the active route's rendered output.
@@ -15,7 +15,8 @@
     import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
-    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
+    import PickerBar from "lily-design-system-svelte-picker-bar";
+    import type { ShareTarget } from "lily-design-system-svelte-share-picker";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
@@ -117,13 +118,15 @@
             "United Kingdom National Health Service Wales for Practitioners",
     };
 
-    import {
-        SharePicker,
-        type ShareTarget,
-    } from "lily-design-system-svelte-share-picker";
-    import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
     import { browser } from "$app/environment";
-    import { i18n, t, isRtl, type StringKey } from "$lib/i18n.svelte.js";
+    import {
+        i18n,
+        t,
+        isRtl,
+        LOCALES,
+        LOCALE_LABELS,
+        type StringKey,
+    } from "$lib/i18n.svelte.js";
 
     // Text sizes offered by the Lily TextSizePicker. Applied as
     // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
@@ -145,16 +148,23 @@
     // <title> without SharePicker having to read the DOM).
     const SHARE_TARGETS: ShareTarget[] = [
         {
+            id: "email",
+            label: "Email",
+            href: (url, title) =>
+                `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
+            newTab: false,
+        },
+        {
             id: "linkedin",
             label: "LinkedIn",
             href: (url) =>
                 `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
         },
         {
-            id: "mastodon",
-            label: "Mastodon",
+            id: "reddit",
+            label: "Reddit",
             href: (url, title) =>
-                `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
         },
         {
             id: "bluesky",
@@ -163,10 +173,10 @@
                 `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
         },
         {
-            id: "reddit",
-            label: "Reddit",
+            id: "mastodon",
+            label: "Mastodon",
             href: (url, title) =>
-                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+                `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
         },
     ];
 
@@ -191,10 +201,14 @@
     let menuOpen = $state(false);
 
     // Reflect the active locale onto <html lang> and <html dir> (guarded for
-    // SSR). RTL locales (ar / ur) flip the document direction to "rtl".
+    // SSR). `lang` must read BCP 47 hyphenated form ("en-US"), but
+    // `i18n.locale` uses an underscore for a region subtag ("en_US") — this
+    // must agree with what PickerBar's LocalePicker itself writes via its
+    // own `bcp47LocaleTag`, since both write the same attribute. RTL
+    // locales (ar / ur) flip the document direction to "rtl".
     $effect(() => {
         if (browser) {
-            document.documentElement.lang = i18n.locale;
+            document.documentElement.lang = i18n.locale.replace("_", "-");
             document.documentElement.dir = isRtl(i18n.locale) ? "rtl" : "ltr";
         }
     });
@@ -244,27 +258,39 @@
                 {/each}
             </ul>
             <div class="chrome">
-                <ThemePicker
-                    label={t("chrome.theme")}
+                <PickerBar
+                    labels={{
+                        theme: t("chrome.theme"),
+                        locale: t("chrome.language"),
+                        textSize: t("chrome.textSize"),
+                        share: t("chrome.share"),
+                    }}
                     themesUrl="/assets/themes/"
                     themes={THEMES}
-                    themeLabels={THEME_LABELS}
-                    storageKey="lily-theme"
-                />
-                <TextSizePicker
-                    label={t("chrome.textSize")}
+                    themeProps={{
+                        themeLabels: THEME_LABELS,
+                        storageKey: "lily-theme",
+                    }}
+                    locales={[...LOCALES]}
+                    localeProps={{
+                        value: i18n.locale,
+                        localeLabels: LOCALE_LABELS,
+                        applyDir: false,
+                        onChange: (code: string) => i18n.set(code),
+                    }}
                     sizes={SIZES}
-                    sizeLabels={SIZE_LABELS}
-                    defaultValue="medium"
-                    storageKey="lily-text-size"
-                />
-                <SharePicker
-                    label={t("chrome.share")}
-                    title={pageTitle}
-                    targets={SHARE_TARGETS}
-                    copyLabel={t("share.copy_link")}
-                    copiedLabel={t("share.copied")}
-                    copyFailedLabel={t("share.copy_failed")}
+                    textSizeProps={{
+                        sizeLabels: SIZE_LABELS,
+                        defaultValue: "medium",
+                        storageKey: "lily-text-size",
+                    }}
+                    shareTargets={SHARE_TARGETS}
+                    shareProps={{
+                        title: pageTitle,
+                        copyLabel: t("share.copy_link"),
+                        copiedLabel: t("share.copied"),
+                        copyFailedLabel: t("share.copy_failed"),
+                    }}
                 />
                 <section class="session" aria-label="Session">
                     <div class="session-title">Session</div>
@@ -392,7 +418,14 @@
         align-items: stretch;
         gap: 0.75rem;
     }
+    .chrome :global(.picker-bar) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
     .chrome :global(.theme-picker-button),
+    .chrome :global(.locale-picker-button),
     .chrome :global(.text-size-picker-button),
     .chrome :global(.share-picker-button) {
         padding: 0.375rem 0.5rem;

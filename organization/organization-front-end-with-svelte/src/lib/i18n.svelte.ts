@@ -4,14 +4,17 @@
 // library: the surface is small and we keep the front-end dependency-light
 // (drift across the family front-ends is accepted, see AGENTS.md).
 //
-// Supported locales: English (`en`, the source of truth) plus Welsh
-// (`cy`, for the public-sector Welsh-language duty), Spanish (`es`),
-// French (`fr`), German (`de`), Arabic (`ar`, RTL), Russian (`ru`),
-// Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese
-// (`pt`), Indonesian (`id`), and Urdu (`ur`, RTL). An unknown key/locale
-// falls back to `en`, then to the key string itself. The chosen locale
-// persists to localStorage and drives the UI strings, `<html lang>`, and
-// `<html dir>` (right-to-left for `ar` / `ur`).
+// Supported locales: English (`en`, the source of truth) plus American
+// English (`en_US`, identical content today — a distinct endonym for the
+// locale picker rather than a spelling divergence, since `en`'s own copy
+// is already American-spelled), Welsh (`cy`, for the public-sector
+// Welsh-language duty), Spanish (`es`), French (`fr`), German (`de`),
+// Arabic (`ar`, RTL), Russian (`ru`), Hindi (`hi`), Mandarin Chinese
+// (`zh`), Bengali (`bn`), Portuguese (`pt`), Indonesian (`id`), and Urdu
+// (`ur`, RTL). An unknown key/locale falls back to `en`, then to the key
+// string itself. The chosen locale persists to localStorage and drives
+// the UI strings, `<html lang>`, and `<html dir>` (right-to-left for
+// `ar` / `ur`).
 
 import { browser } from "$app/environment";
 
@@ -21,6 +24,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -44,6 +48,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -90,6 +95,191 @@ export const LOCALE_KEY = "mxi.organization.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.review": "Review",
+    "review.run": "Run scan",
+    // Layout / chrome
+    "brand.name": "Main X · Organizations",
+    "nav.toggle": "Toggle navigation",
+    "nav.organizations": "Organizations",
+    "nav.newOrganization": "New organization",
+    "chrome.language": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    "chrome.theme": "Theme",
+    // Session panel
+    "session.title": "Session",
+    "session.signedIn": "Signed in (token attached)",
+    "session.signOut": "Sign out",
+    "session.signIn": "Sign in",
+    "session.pasteToken": "Paste a token",
+    "session.accessToken": "Access token",
+    "session.pastePlaceholder": "Paste bearer token",
+    "session.useToken": "Use token",
+    // List page
+    "list.title": "Organizations",
+    "list.new": "New organization",
+    "list.loading": "Loading…",
+    "list.empty": "No organizations yet.",
+    "list.createOne": "Create one",
+    // Detail page
+    "detail.organization": "Organization",
+    "detail.loading": "Loading…",
+    "detail.notFound": "Not found",
+    "detail.legalName": "Legal name:",
+    "detail.url": "URL:",
+    "detail.jurisdiction": "Jurisdiction:",
+    "detail.founded": "Founded:",
+    "detail.identifiers": "Identifiers:",
+    "detail.keywords": "Keywords:",
+    "detail.id": "ID:",
+    "detail.edit": "Edit",
+    "detail.checkDuplicates": "Check duplicates",
+    "detail.checking": "Checking…",
+    "detail.delete": "Delete",
+    "detail.showMasked": "Show masked",
+    "detail.showFull": "Show full",
+    "detail.maskedNotice":
+      "Showing the masked view — some fields are redacted.",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
+    "detail.showAudit": "Show audit trail",
+    "detail.hideAudit": "Hide audit trail",
+    "detail.auditTrail": "Audit trail",
+    "detail.loadingAudit": "Loading audit trail…",
+    "detail.noAuditEntries": "No audit entries.",
+    "detail.auditLoadFailed": "Audit load failed",
+    "detail.checkFailed": "Check failed",
+    "detail.potentialDuplicates": "Potential duplicates",
+    "detail.noneAboveThreshold": "None above the match threshold.",
+    // New page
+    "new.title": "New organization",
+    "new.create": "Create",
+    // Edit page
+    "edit.title": "Edit organization",
+    "edit.organizationFallback": "organization",
+    "edit.loading": "Loading…",
+    "edit.notFound": "Not found",
+    "edit.saveChanges": "Save changes",
+    // Form
+    "form.save": "Save",
+    "form.saving": "Saving…",
+    "form.nameRequired": "Name is required.",
+    "form.saveFailed": "Save failed",
+    "form.name": "Name",
+    "form.legalName": "Legal name",
+    "form.url": "Website URL",
+    "form.jurisdiction": "Jurisdiction (ISO 3166)",
+    "form.foundingDate": "Founding date",
+    "form.alternateNames": "Alternate names",
+    "form.commaSeparated": "(comma-separated)",
+    "form.keywords": "Keywords",
+    "form.sameAs": "Same-as URLs",
+    "form.address": "Address",
+    "form.street": "Street",
+    "form.locality": "Locality",
+    "form.region": "Region",
+    "form.postalCode": "Postal code",
+    "form.country": "Country",
+    "form.identifiers": "Identifiers",
+    "form.value": "value",
+    "form.remove": "Remove",
+    "form.addIdentifier": "+ Add identifier",
+    // Merge page
+    "nav.merge": "Merge",
+    "merge.title": "Merge organizations",
+    "merge.mainId": "Main organization ID",
+    "merge.mainIdHint": "The record that survives the merge.",
+    "merge.dupId": "Duplicate organization ID",
+    "merge.dupIdHint": "The record folded in and soft-deleted.",
+    "merge.reason": "Reason",
+    "merge.reasonHint": "Optional; kept in the merge history.",
+    "merge.reasonPlaceholder": "Same company, duplicate registration",
+    "merge.loadPreview": "Load preview",
+    "merge.merging": "Merging…",
+    "merge.merge": "Merge",
+    "merge.bothIdsRequired": "Both IDs are required.",
+    "merge.mustDiffer": "The main and duplicate IDs must differ.",
+    "merge.preview": "Preview",
+    "merge.main": "Main",
+    "merge.duplicate": "Duplicate",
+    "merge.completed": "Merge completed",
+    "merge.completedDetail": "{dup} was merged into {main}.",
+    "merge.viewMain": "View the main organization",
+    "merge.recent": "Recent merges",
+    "merge.recentEmpty": "No merges recorded yet.",
+    "merge.recentRefresh": "Refresh",
+    "merge.colMergedAt": "Merged at",
+    "merge.colReason": "Reason",
+    "merge.colActor": "Actor",
+    "merge.confirm":
+      "Merge {dup} into {main}? The duplicate will be soft-deleted.",
+    "review.intro":
+      "The stored duplicate-candidate queue from batch scans. Review each pair and confirm or reject it.",
+    "review.filter.status": "Status",
+    "review.filter.statusAll": "All statuses",
+    "review.filter.limit": "Page size",
+    "review.filter.limitHint":
+      "There is no page offset — only the newest matching items up to this limit are shown.",
+    "review.board.title": "Board",
+    "review.list.title": "Queue",
+    "review.empty": "The review queue is empty.",
+    "review.loading": "Loading…",
+    "review.col.pair": "Pair",
+    "review.col.score": "Score",
+    "review.col.quality": "Quality",
+    "review.col.provenance": "Source",
+    "review.col.status": "Status",
+    "review.col.actions": "Actions",
+    "review.compare.open": "Compare",
+    "review.compare.title": "Comparison",
+    "review.compare.close": "Close",
+    "review.compare.loading": "Loading both records…",
+    "review.compare.partial":
+      "One record could not be loaded (it may have been deleted); showing what is available.",
+    "review.compare.field": "Field",
+    "review.compare.a": "A",
+    "review.compare.b": "B",
+    "review.compare.none": "Not recorded",
+    "review.field.score": "Score:",
+    "review.field.quality": "Quality:",
+    "review.field.method": "Detection method:",
+    "review.field.provenance": "Source:",
+    "review.field.status": "Status:",
+    "review.field.legalName": "Legal name",
+    "review.breakdown.title": "Score breakdown",
+    "review.breakdown.loading": "Scoring the pair…",
+    "review.breakdown.none": "No score breakdown is available.",
+    "review.breakdown.component": "Component",
+    "review.breakdown.weight": "Weight",
+    "review.breakdown.score": "Score",
+    "review.decide.confirm": "Confirm duplicate",
+    "review.decide.reject": "Reject",
+    "review.decide.deciding": "Recording…",
+    "review.decide.locked":
+      "This item was already decided and cannot be changed here.",
+    "review.merge.title": "Merge",
+    "review.merge.note":
+      "Confirming does not merge the records — choose which one survives.",
+    "review.merge.keepA": "Merge, keep A",
+    "review.merge.keepB": "Merge, keep B",
+    "review.status.pending": "Pending",
+    "review.status.confirmed": "Confirmed",
+    "review.status.rejected": "Rejected",
+    "review.status.automerged": "Auto-merged",
+    "review.provenance.operator": "Operator",
+    "review.provenance.import": "Import",
+    "review.provenance.matcherSuggested": "Matcher-suggested",
+    "review.component.name": "Name",
+    "review.component.address": "Address",
+    "review.component.url": "URL",
+    "review.component.jurisdiction": "Jurisdiction",
+    "review.component.foundingDate": "Founding date",
+    "review.component.keywords": "Keywords",
+  },
+  en_US: {
     "nav.review": "Review",
     "review.run": "Run scan",
     // Layout / chrome
@@ -2420,7 +2610,17 @@ export const STRINGS_BY_LOCALE: Record<
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;

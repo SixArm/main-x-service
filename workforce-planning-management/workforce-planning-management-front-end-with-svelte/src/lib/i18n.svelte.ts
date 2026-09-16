@@ -11,6 +11,7 @@ import { browser } from "$app/environment";
 /** Locales the UI is translated into. */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -34,6 +35,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -76,6 +78,124 @@ export const LEGACY_LOCALE_KEY = "mxi.hcm.locale";
 // Every translatable UI string, keyed by a stable dotted key.
 const STRINGS = {
   en: {
+    "nav.wellbeing": "Wellbeing",
+    "nav.privacy": "Privacy",
+    "pr.retention": "Retention",
+    "pr.horizon": "Horizon (days)",
+    "pr.pastHorizon": "Soft-deleted past horizon",
+    "pr.candidates": "Expired-consent candidates",
+    "pr.sweep": "Run sweep",
+    "pr.swept": "rows deleted",
+    "emp.erase": "Erase (anonymise)",
+    "wb.kind.health": "Health",
+    "wb.kind.benefit": "Benefit",
+    "wb.conversion": "Enrolled after prompt",
+    "wb.pulse": "Pulse survey",
+    "wb.pulseThanks": "Thanks — your anonymous response was recorded",
+    "wb.pulseSuppressed": "Hidden below 5 responses",
+    "wb.pulseMean": "Average",
+    "wb.pulseResponses": "responses",
+    "ap.title": "360° appraisals",
+    "ap.new": "New 360",
+    "ap.nominate": "Nominate",
+    "ap.start": "Start collecting",
+    "ap.share": "Share report",
+    "ap.respond": "Respond",
+    "ap.report": "Report",
+    "ap.withheld": "Withheld below 3 responses",
+    "ap.requests": "My 360 requests",
+    "emp.subjectAccess": "Download my data",
+    "emp.notifications": "Notifications",
+    "notif.markRead": "Mark read",
+    "erg.title": "Ergonomic assessments",
+    "adj.title": "Reasonable adjustments",
+    "adj.note": "Practical note (optional)",
+    "adj.new": "Ask for a change",
+    "adj.hint":
+      "You do not need a diagnosis to ask. Explain the barrier, how it affects your work, and what change would reduce it.",
+    "adj.barrier": "What barrier do you face?",
+    "adj.impact": "How does it affect your work?",
+    "adj.change": "What change would reduce it?",
+    "adj.agree": "Agree",
+    "adj.decline": "Decline",
+    "adj.inPlace": "In place",
+    "erg.new": "New assessment",
+    "erg.workstation": "Workstation",
+    "erg.ok": "OK",
+    "erg.issue": "Issue",
+    "erg.complete": "Complete",
+    "erg.issues": "Ergonomic issues",
+    "wb.prompts": "Health entitlements",
+    "wb.reminder": "Reminder",
+    "wb.noPrompts": "No prompts right now",
+    "wb.info": "More info",
+    "wb.booked": "I've booked it",
+    "wb.done": "Done",
+    "wb.declined": "No thanks",
+    "wb.dismissed": "Dismiss",
+    "wb.rules": "Entitlement rules",
+    "wb.uptake": "Uptake",
+    "nav.learning": "Learning",
+    "nav.mentorship": "Mentorship",
+    "brand.name": "Main X · WPM",
+    "nav.dashboard": "Dashboard",
+    "nav.employees": "Employees",
+    "nav.orgChart": "Org chart",
+    "nav.requisitions": "Vacancies",
+    "nav.workforce": "Workforce",
+    "nav.development": "Development",
+    "nav.payroll": "Payroll",
+    "nav.benchmarks": "Benchmarks",
+    "nav.signin": "Sign in",
+    "chrome.language": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    "common.loading": "Loading…",
+    "common.error": "Failed to load",
+    "common.status": "Status",
+    "common.department": "Department",
+    "common.jobTitle": "Job title",
+    "common.name": "Name",
+    "common.actions": "Actions",
+    "common.days": "days",
+    "common.masked": "Hidden",
+    "dash.title": "HR dashboard",
+    "dash.activeEmployees": "Active employees",
+    "dash.openRequisitions": "Open vacancies",
+    "dash.pendingLeave": "Pending leave",
+    "dash.successionGaps": "Succession gaps",
+    "emp.number": "Employee no.",
+    "emp.salary": "Salary",
+    "emp.profile": "Profile",
+    "emp.onboarding": "Onboarding",
+    "emp.balances": "Leave balances",
+    "emp.payslips": "Payslips",
+    "emp.reviews": "Reviews",
+    "emp.training": "Training",
+    "req.applications": "Applications",
+    "req.headcount": "Headcount",
+    "wf.leaveRequests": "Leave requests",
+    "wf.approve": "Approve",
+    "wf.reject": "Reject",
+    "wf.rota": "Rota",
+    "wf.workingTime": "Working time",
+    "wf.over48": "Over 48h average",
+    "wf.restBreach": "Rest gap under 11h",
+    "wf.allClear": "No working-time flags",
+    "dev.cycles": "Review cycles",
+    "dev.succession": "Succession plans",
+    "dev.expiring": "Expiring certificates",
+    "pay.calculate": "Calculate",
+    "pay.pay": "Mark paid",
+    "pay.gross": "Gross",
+    "pay.net": "Net",
+    "pay.deductions": "Deductions",
+    "bench.flag": "Flag",
+  },
+  en_US: {
     "nav.wellbeing": "Wellbeing",
     "nav.privacy": "Privacy",
     "pr.retention": "Retention",
@@ -1629,9 +1749,20 @@ export const STRINGS_BY_LOCALE: Record<
 > = STRINGS;
 
 // Normalise raw input to a supported locale, or null if unsupported.
+// Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;

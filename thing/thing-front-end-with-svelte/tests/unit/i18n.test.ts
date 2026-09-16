@@ -10,10 +10,12 @@ vi.mock("$app/environment", () => ({ browser: false }));
 import {
     LOCALES,
     DEFAULT_LOCALE,
+    LOCALE_LABELS,
     STRINGS,
     STRING_KEYS,
     translate,
     isRtl,
+    i18n,
     type StringKey,
     type Locale,
 } from "../../src/lib/i18n.svelte";
@@ -64,14 +66,27 @@ describe("i18n catalog", () => {
         }
     });
 
-    // The full thirteen-locale set is present after the i18n extension.
-    it("supports all thirteen locales", () => {
-        expect(LOCALES).toHaveLength(13);
+    // The full fourteen-locale set is present after the PickerBar
+    // consolidation added `en_US`.
+    it("supports all fourteen locales", () => {
+        expect(LOCALES).toHaveLength(14);
         for (const code of [
-            "en", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
+            "en", "en_US", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
         ]) {
             expect(LOCALES).toContain(code as Locale);
         }
+        expect(LOCALE_LABELS.en_US).toBe("English (United States)");
+    });
+
+    // `en_US`/`en-US` must resolve to the distinct `en_US` locale rather
+    // than silently collapsing to `en`'s primary subtag.
+    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+        i18n.set("en_US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en-US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en");
+        expect(i18n.locale).toBe("en");
     });
 
     // Spot-check two of the newly added locales against the shared glossary.

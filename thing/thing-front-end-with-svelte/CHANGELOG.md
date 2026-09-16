@@ -9,6 +9,43 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-of-page chrome (theme, text-size, share pickers) previously
+wired `ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This restores a locale picker to the chrome, which this project had
+never carried: `PickerBar` bundles all four unconditionally with no
+way to omit one. Wired with `applyDir={false}` and
+`onChange={(code) => i18n.set(code)}`, since this app's own
+`i18n.svelte.ts` store already reflects `lang`/`dir` onto `<html>`.
+`chrome.language` — an existing i18n key across all locales that had
+never been wired to a control — is now the `PickerBar` locale label.
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon (previously LinkedIn /
+Mastodon / Bluesky / Reddit, with no Email); the Mastodon target now
+points at `mastodonshare.com` instead of `mastodon.social/share` (a
+generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
+Also added `en_US` ("English (United States)") to
+`src/lib/i18n.svelte.ts`'s `LOCALES`/`LOCALE_LABELS`/`STRINGS` (a
+duplicate of `en`'s copy — `en`'s own strings were already
+American-spelled, so this is a distinct locale-picker entry, not a
+spelling fork) and taught `normaliseLocale` to match a region variant
+like `en_US`/`en-US` exactly before falling back to stripping to its
+primary subtag (previously `en_US` would have silently collapsed to
+`en`, since only the primary subtag was ever checked).
+`tests/unit/i18n.test.ts` updated: locale count bumped to fourteen,
+plus a new test pinning `en_US`/`en-US` normalisation.
+
 ### Added — `/things` lists the real collection instead of faking it with `q="*"` (T-31)
 
 The service's own T-15 landed a real `GET /api/things` collection-list

@@ -9,6 +9,7 @@ import {
   LOCALES,
   STRING_KEYS,
   STRINGS_BY_LOCALE,
+  i18n,
   isRtl,
   translate,
 } from "../../src/lib/i18n.svelte";
@@ -42,6 +43,15 @@ describe("i18n", () => {
     expect(isRtl("ar")).toBe(true);
     expect(isRtl("ur")).toBe(true);
     expect(isRtl("en")).toBe(false);
+  });
+
+  it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+    i18n.set("en_US");
+    expect(i18n.locale).toBe("en_US");
+    i18n.set("en-US");
+    expect(i18n.locale).toBe("en_US");
+    i18n.set("en");
+    expect(i18n.locale).toBe("en");
   });
 });
 

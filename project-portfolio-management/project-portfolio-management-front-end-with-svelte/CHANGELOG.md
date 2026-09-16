@@ -9,6 +9,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-bar chrome (theme, text-size, share pickers) previously wired
+`ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This restores a locale picker to the chrome, since `PickerBar` bundles
+all four unconditionally with no way to omit one. Wired with
+`applyDir={false}` and `onChange={(code) => i18n.set(code)}`, since
+this app's own `i18n.svelte.ts` store already reflects `lang`/`dir`
+onto `<html>`; the `<html lang>` effect now hyphenates the locale
+(`i18n.locale.replace("_", "-")`) to stay valid BCP47, agreeing with
+what `LocalePicker` itself writes via its own `bcp47LocaleTag`.
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon; the Mastodon target
+now points at `mastodonshare.com` instead of `mastodon.social/share`
+(a generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
+Also added `en_US` ("English (United States)") to
+`src/lib/i18n.svelte.ts`'s `LOCALES`/`LOCALE_LABELS`/`STRINGS` (a
+verbatim duplicate of `en`'s copy) and taught `normaliseLocale` to
+match a region variant like `en_US`/`en-US` exactly before falling
+back to stripping to its primary subtag (previously `en_US` would have
+silently collapsed to `en`, since only the primary subtag was ever
+checked).
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (FE-5)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

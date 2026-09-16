@@ -31,9 +31,19 @@
     padding-bottom: var(--nhs-space-2);
 }
 
-/* Lily ThemePicker / TextSizePicker / SharePicker each render a headless
-   disclosure button; style the shared root class as a normal NHS button
-   so all three sit consistently in the utility row. */
+/* The Lily PickerBar renders no styling of its own beyond a `.picker-bar`
+   root wrapper; the four pickers it composes (ThemePicker, LocalePicker,
+   TextSizePicker, SharePicker) each render a headless disclosure button.
+   Lay the bar out as a row… */
+.utility-row .picker-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--nhs-space-2);
+}
+
+/* …and style each picker's own shared root class as a normal NHS button
+   so all four sit consistently in the utility row. */
 .utility-row-picker {
     font-size: var(--nhs-font-size-16, 1rem);
     line-height: 1.4;

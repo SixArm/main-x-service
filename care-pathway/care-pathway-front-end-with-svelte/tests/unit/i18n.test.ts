@@ -11,12 +11,14 @@ import {
     LOCALE_LABELS,
     isRtl,
     translate,
+    i18n,
 } from "../../src/lib/i18n.svelte";
 
 describe("i18n catalog", () => {
-    it("supports exactly the 13 family locales", () => {
+    it("supports exactly the 14 family locales", () => {
         expect([...LOCALES]).toEqual([
             "en",
+            "en_US",
             "cy",
             "es",
             "fr",
@@ -32,7 +34,7 @@ describe("i18n catalog", () => {
         ]);
     });
 
-    it("has full coverage: every key in all 13 locales", () => {
+    it("has full coverage: every key in all 14 locales", () => {
         expect(STRING_KEYS.length).toBeGreaterThan(0);
         for (const locale of LOCALES) {
             const table = STRINGS_BY_LOCALE[locale];
@@ -67,5 +69,15 @@ describe("i18n catalog", () => {
     it("falls back to English for a missing target translation", () => {
         // An unknown locale falls back to the English table.
         expect(translate("list.title", "xx" as never)).toBe(translate("list.title", "en"));
+    });
+
+    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+        expect(i18n.set !== undefined).toBe(true);
+        i18n.set("en_US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en-US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en");
+        expect(i18n.locale).toBe("en");
     });
 });

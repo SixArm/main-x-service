@@ -1,10 +1,9 @@
 <script lang="ts">
   import "../app.css";
   import { page } from "$app/state";
-  import { i18n, isRtl, t } from "$lib/i18n.svelte";
-  import { ThemePicker } from "lily-design-system-svelte-theme-picker";
-  import { SharePicker, type ShareTarget } from "lily-design-system-svelte-share-picker";
-  import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
+  import { i18n, isRtl, t, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte";
+  import PickerBar from "lily-design-system-svelte-picker-bar";
+  import type { ShareTarget } from "lily-design-system-svelte-share-picker";
 
   let { children } = $props();
 
@@ -50,16 +49,23 @@
   // <title> without SharePicker having to read the DOM).
   const SHARE_TARGETS: ShareTarget[] = [
     {
+      id: "email",
+      label: "Email",
+      href: (url, title) =>
+        `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
+      newTab: false,
+    },
+    {
       id: "linkedin",
       label: "LinkedIn",
       href: (url) =>
         `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
     },
     {
-      id: "mastodon",
-      label: "Mastodon",
+      id: "reddit",
+      label: "Reddit",
       href: (url, title) =>
-        `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+        `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
     },
     {
       id: "bluesky",
@@ -68,10 +74,10 @@
         `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
     },
     {
-      id: "reddit",
-      label: "Reddit",
+      id: "mastodon",
+      label: "Mastodon",
       href: (url, title) =>
-        `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+        `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
     },
   ];
 
@@ -83,19 +89,22 @@
   // back to the brand name for the rare route that sets none.
   const pageTitle = $derived(page.data?.title ?? t("brand.name"));
 
-  // The app sets `lang`/`dir` itself rather than letting a locale picker
-  // do it: the effect below is the single owner of `<html lang>`/`dir`.
-  // There is no locale-switcher UI in the chrome (the Lily locale picker
-  // was removed in favour of share-picker/text-size-picker); the stored
-  // locale (or the browser's preferred language) is read on boot by
-  // `$lib/i18n.svelte.ts`.
+  // Reflect the active locale onto <html> so the document language and
+  // writing direction track the UI: `lang` for the locale (hyphenated
+  // per BCP 47 — `i18n.locale` uses an underscore for a region subtag,
+  // e.g. "en_US", but `lang` must read "en-US"; this must agree with
+  // what PickerBar's LocalePicker itself writes via its own
+  // `bcp47LocaleTag`, since both write the same attribute), `dir` = rtl
+  // for Arabic/Urdu else ltr. The effect below is the single owner of
+  // `<html lang>`/`dir` — PickerBar's LocalePicker is wired with
+  // `applyDir={false}` below so it does not also try to own `dir`.
   //
   // Note the package names: Lily renamed these helpers `*-select` →
   // `*-picker`. The sibling front-ends still reference the old paths,
   // which no longer exist — copy-adapting one of them today gets an
   // install failure, not a working app.
   $effect(() => {
-    document.documentElement.lang = i18n.locale;
+    document.documentElement.lang = i18n.locale.replace("_", "-");
     document.documentElement.dir = isRtl(i18n.locale) ? "rtl" : "ltr";
   });
 </script>
@@ -110,26 +119,36 @@
   <a href="/insights">{t("nav.insights")}</a>
   <a href="/settings">{t("nav.settings")}</a>
   <span class="spacer"></span>
-  <ThemePicker
-    label={t("chrome.theme")}
+  <PickerBar
+    labels={{
+      theme: t("chrome.theme"),
+      locale: t("chrome.language"),
+      textSize: t("nav.text_size"),
+      share: t("nav.share"),
+    }}
     themesUrl="/assets/themes/"
     themes={THEMES}
-    storageKey="mxi.cms.theme"
-  />
-  <TextSizePicker
-    label={t("nav.text_size")}
+    themeProps={{ storageKey: "mxi.cms.theme" }}
+    locales={[...LOCALES]}
+    localeProps={{
+      value: i18n.locale,
+      localeLabels: LOCALE_LABELS,
+      applyDir: false,
+      onChange: (code: string) => i18n.set(code),
+    }}
     sizes={SIZES}
-    sizeLabels={SIZE_LABELS}
-    defaultValue="medium"
-    storageKey="lily-text-size"
-  />
-  <SharePicker
-    label={t("nav.share")}
-    title={pageTitle}
-    targets={SHARE_TARGETS}
-    copyLabel={t("share.copy_link")}
-    copiedLabel={t("share.copied")}
-    copyFailedLabel={t("share.copy_failed")}
+    textSizeProps={{
+      sizeLabels: SIZE_LABELS,
+      defaultValue: "medium",
+      storageKey: "lily-text-size",
+    }}
+    shareTargets={SHARE_TARGETS}
+    shareProps={{
+      title: pageTitle,
+      copyLabel: t("share.copy_link"),
+      copiedLabel: t("share.copied"),
+      copyFailedLabel: t("share.copy_failed"),
+    }}
   />
   <a href="/signin">{t("nav.signin")}</a>
 </nav>
@@ -142,10 +161,17 @@
   .spacer {
     flex: 1;
   }
+  nav.top :global(.picker-bar) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
   /* The Lily pickers render a button plus a listbox, not a `<select>`
      — the older front-ends' `:global(select)` rules are left over from
      the `*Select` components these replaced and match nothing. */
   nav.top :global(.theme-picker-button),
+  nav.top :global(.locale-picker-button),
   nav.top :global(.text-size-picker-button),
   nav.top :global(.share-picker-button) {
     font: inherit;

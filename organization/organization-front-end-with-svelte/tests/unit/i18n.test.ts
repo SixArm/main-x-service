@@ -12,13 +12,15 @@ import {
     DEFAULT_LOCALE,
     translate,
     isRtl,
+    i18n,
     type Locale,
 } from "../../src/lib/i18n.svelte";
 
 describe("i18n catalog", () => {
-    it("supports exactly the 13 required locales", () => {
+    it("supports exactly the 14 required locales", () => {
         expect([...LOCALES]).toEqual([
             "en",
+            "en_US",
             "cy",
             "es",
             "fr",
@@ -32,6 +34,7 @@ describe("i18n catalog", () => {
             "id",
             "ur",
         ]);
+        expect(LOCALES.length).toBe(14);
     });
 
     it("has a human-readable label for every locale", () => {
@@ -81,5 +84,14 @@ describe("i18n catalog", () => {
                 expect(isRtl(locale)).toBe(false);
             }
         }
+    });
+
+    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+        i18n.set("en_US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en-US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en");
+        expect(i18n.locale).toBe("en");
     });
 });
