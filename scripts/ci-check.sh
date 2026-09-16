@@ -377,16 +377,21 @@ if [[ "${STAGE}" == "docs" ]]; then
   # someone simply types the old spelling into a new link.
   # Two files are excluded because they must spell the forbidden form in
   # order to forbid it: this checker and the spec that defines the rule.
-  # `vendor/` is excluded on different grounds: it holds verbatim,
-  # unedited third-party content (agents/share/svelte-front-end-stack.md
-  # §8) kept byte-identical to its upstream source for re-sync, not this
-  # repo's own writing — an upstream comment naming *its own* project's
-  # `AGENTS/` convention is not a claim about a path in this repository.
-  # Excluding anything else would be a hole rather than a base case.
+  # `vendor/` and `main-x-service.github.io/static/assets/themes/` are
+  # excluded on different grounds: both hold verbatim, unedited
+  # third-party content (agents/share/svelte-front-end-stack.md §8; the
+  # latter is a second, self-contained vendored copy the GitHub Pages
+  # subproject needs so it survives `git subtree split` — see its own
+  # spec/index.md §5/§6) kept byte-identical to its upstream source for
+  # re-sync, not this repo's own writing — an upstream comment naming
+  # *its own* project's `AGENTS/` convention is not a claim about a path
+  # in this repository. Excluding anything else would be a hole rather
+  # than a base case.
   bad_refs="$(git grep -lI 'AGENTS/' -- . \
       ':(exclude)scripts/ci-check.sh' \
       ':(exclude)spec/agents-directory-name-is-lowercase/index.md' \
-      ':(exclude)vendor/**' || true)"
+      ':(exclude)vendor/**' \
+      ':(exclude)main-x-service.github.io/static/assets/themes/**' || true)"
   if [[ -n "${bad_refs}" ]]; then
     echo "  files referencing an uppercase AGENTS/ directory:" >&2
     printf '    %s\n' ${bad_refs} >&2
