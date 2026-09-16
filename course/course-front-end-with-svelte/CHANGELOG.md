@@ -9,6 +9,42 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-of-page chrome (theme, text-size, share pickers) previously
+wired `ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This restores a locale picker to the chrome: it was removed some time
+ago in favour of share/text-size (see the stale comment previously in
+`src/lib/i18n.svelte.ts`), and `PickerBar` bundles all four
+unconditionally with no way to omit one. Wired with `applyDir={false}`
+and `onChange={(code) => i18n.set(code)}`, since this app's own
+`i18n.svelte.ts` store already reflects `lang`/`dir` onto `<html>`.
+The locale label reuses this project's existing `chrome.language` key
+(already translated in every locale — course never had person's
+`nav.language` naming).
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon; the Mastodon target
+now points at `mastodonshare.com` instead of `mastodon.social/share`
+(a generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
+Also added `en_US` ("English (United States)") to `src/lib/i18n.svelte.ts`'s
+`LOCALES`/`LOCALE_LABELS`/`STRINGS` (a duplicate of `en`'s copy — `en`'s
+own strings were already American-spelled, so this is a distinct
+locale-picker entry, not a spelling fork) and taught `normaliseLocale`
+to match a region variant like `en_US`/`en-US` exactly before falling
+back to stripping to its primary subtag (previously `en_US` would have
+silently collapsed to `en`, since only the primary subtag was ever
+checked).
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (T-35)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,
