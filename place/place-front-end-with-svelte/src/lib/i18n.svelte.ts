@@ -4,14 +4,16 @@
 // surface is tiny and we keep the front-end dependency-light (drift is
 // accepted family-wide; this mirrors the auth front-end's i18n store).
 //
-// Supported locales: English (`en`, source of truth) + Welsh (`cy`),
-// Spanish (`es`), French (`fr`), German (`de`), Arabic (`ar`, RTL),
-// Russian (`ru`), Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`),
-// Portuguese (`pt`), Indonesian (`id`), Urdu (`ur`, RTL). Unknown
-// key/locale falls back to `en`. The chosen locale persists to
-// localStorage. There is no locale-switcher UI in the chrome (Lily's
-// LocalePicker was removed in favour of share-picker/text-size-picker);
-// `i18n.set()` remains available for a future route/query-param switch.
+// Supported locales: English (`en`, the source of truth) plus American
+// English (`en_US`, identical content today — a distinct endonym for the
+// locale picker rather than a spelling divergence, since `en`'s own copy
+// is already American-spelled), Welsh (`cy`), Spanish (`es`), French
+// (`fr`), German (`de`), Arabic (`ar`, RTL), Russian (`ru`), Hindi (`hi`),
+// Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese (`pt`), Indonesian
+// (`id`), and Urdu (`ur`, RTL). Unknown key/locale falls back to `en`.
+// The chosen locale persists to localStorage. The chrome's `PickerBar`
+// bundles a locale picker alongside theme/text-size/share; `i18n.set()`
+// is its `onChange` handler.
 
 import { browser } from "$app/environment";
 
@@ -21,6 +23,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -59,6 +62,7 @@ export function isRtl(locale: string): boolean {
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -81,6 +85,236 @@ const LOCALE_KEY = "mxi.place.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.review": "Review",
+    "review.run": "Run scan",
+    "review.intro":
+      "Candidate duplicate pairs from the batch scan. Drag a pending card, or open a pair to compare both records side by side before deciding.",
+    "review.loading": "Loading the review queue…",
+    "review.empty": "No review items for this filter.",
+    "review.filter.status": "Status",
+    "review.filter.statusAll": "All",
+    "review.filter.limit": "Page size",
+    "review.filter.limitHint":
+      "The service returns at most 500 items and offers no paging beyond this.",
+    "review.status.pending": "Pending",
+    "review.status.confirmed": "Confirmed",
+    "review.status.rejected": "Rejected",
+    "review.status.automerged": "Auto-merged",
+    "review.board.title": "Board",
+    "review.list.title": "Queue",
+    "review.col.pair": "Pair",
+    "review.col.score": "Score",
+    "review.col.quality": "Quality",
+    "review.col.method": "Method",
+    "review.col.status": "Status",
+    "review.col.actions": "Actions",
+    "review.compare.open": "Compare",
+    "review.compare.title": "Compare the pair",
+    "review.compare.close": "Close",
+    "review.compare.loading": "Loading both records…",
+    "review.compare.field": "Field",
+    "review.compare.a": "Record A",
+    "review.compare.b": "Record B",
+    "review.compare.none": "Not recorded",
+    "review.compare.partial":
+      "One record could not be loaded — it may have been merged away or deleted.",
+    "review.field.score": "Match score",
+    "review.field.quality": "Match quality",
+    "review.field.method": "Detection method",
+    "review.field.status": "Status",
+    "review.breakdown.title": "Score breakdown",
+    "review.breakdown.none": "No score breakdown was recorded for this pair.",
+    "review.breakdown.component": "Component",
+    "review.breakdown.weight": "Weight",
+    "review.breakdown.score": "Score",
+    "review.component.name": "Name",
+    "review.component.geo": "Geo proximity",
+    "review.component.address": "Address",
+    "review.component.placeType": "Place type",
+    "review.component.identifier": "Identifier",
+    "review.decide.confirm": "Confirm duplicate",
+    "review.decide.reject": "Reject",
+    "review.decide.deciding": "Saving…",
+    "review.decide.locked":
+      "Already decided — only pending items can be decided.",
+    "review.merge.title": "Merge this pair",
+    "review.merge.note":
+      "Confirming records the verdict only; it does not merge. Choose which record survives.",
+    "review.merge.keepA": "Keep A, merge B into it",
+    "review.merge.keepB": "Keep B, merge A into it",
+    // Layout / chrome
+    "brand.tagline": "Main X Index",
+    "nav.toggle": "Toggle navigation",
+    "nav.dashboard": "Dashboard",
+    "nav.places": "Places",
+    "nav.newPlace": "New place",
+    "nav.matchCheck": "Match check",
+    "nav.merge": "Merge",
+    "chrome.theme": "Theme",
+    "chrome.language": "Language",
+    "chrome.share": "Share",
+    "chrome.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    // Dashboard
+    "dashboard.title": "Dashboard",
+    "dashboard.service": "Service:",
+    "dashboard.recentActivity": "Recent activity",
+    "dashboard.noRecent": "No recent audit entries.",
+    // Places index
+    "places.title": "Places",
+    "places.new": "New place",
+    "places.searchPlaceholder": "Search by name, locality, identifier…",
+    "places.fuzzy": "Fuzzy",
+    "places.phonetic": "Phonetic (Soundex)",
+    "places.maskSensitive": "Mask sensitive fields",
+    "places.loading": "Loading…",
+    "places.countOne": "place",
+    "places.countMany": "places",
+    // New place
+    "new.title": "New place",
+    "new.create": "Create",
+    "new.possibleDuplicates": "Possible duplicates",
+    "new.duplicatesDetected":
+      "Duplicates detected ({count}) — review below before resubmitting.",
+    // Match check
+    "match.title": "Match check",
+    "match.name": "Name",
+    "match.threshold": "Threshold",
+    "match.thresholdHint": "0.0 – 1.0",
+    "match.includeGeo": "Include geo coordinates",
+    "match.matching": "Matching…",
+    "match.findMatches": "Find matches",
+    // Merge
+    "merge.title": "Merge places",
+    "merge.mainId": "Main place ID",
+    "merge.mainIdHint": "The surviving record",
+    "merge.duplicateId": "Duplicate place ID",
+    "merge.duplicateIdHint": "Will be soft-deleted",
+    "merge.reason": "Reason",
+    "merge.reasonHint": "Recorded in the merge audit trail",
+    "merge.reasonPlaceholder": "Confirmed duplicate",
+    "merge.loadPreview": "Load preview",
+    "merge.merging": "Merging…",
+    "merge.merge": "Merge",
+    "merge.bothIdsRequired": "Both IDs required",
+    "merge.mustDiffer": "Main and duplicate must differ",
+    "merge.confirm":
+      "Merge {duplicate}… into {main}…?\nThis soft-deletes the duplicate.",
+    "merge.preview": "Preview",
+    "merge.previewMain": "Main",
+    "merge.previewDuplicate": "Duplicate",
+    "merge.completed": "Merge completed",
+    "merge.recordCreated": "Merge record {id} created at {at}.",
+    "merge.viewMain": "View merged main place",
+    // Place detail
+    "detail.loading": "Loading…",
+    "detail.edit": "Edit",
+    "detail.audit": "Audit",
+    "detail.delete": "Delete",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
+    "detail.showMasked": "Show masked",
+    "detail.showFull": "Show full",
+    "detail.maskedNotice":
+      "Showing the masked view — some fields are redacted.",
+    "detail.confirmDelete":
+      "Soft-delete this place? This cannot be undone via the UI.",
+    "detail.identity": "Identity",
+    "detail.id": "ID",
+    "detail.alternateName": "Alternate name",
+    "detail.type": "Type",
+    "detail.typeOther": "Other: {value}",
+    "detail.description": "Description",
+    "detail.url": "URL",
+    "detail.telephone": "Telephone",
+    "detail.gln": "GLN",
+    "detail.branchCode": "Branch code",
+    "detail.address": "Address",
+    "detail.geo": "Geo coordinates",
+    "detail.latitude_as_decimal_degrees": "Latitude",
+    "detail.longitude_as_decimal_degrees": "Longitude",
+    "detail.elevation_as_decimal_metres": "Elevation",
+    "detail.identifiers": "Identifiers",
+    "detail.identifierCustom": "Custom: {value}",
+    "detail.openingHours": "Opening hours",
+    "detail.amenities": "Amenities",
+    // Edit place
+    "edit.title": "Edit place",
+    "edit.cancel": "Cancel",
+    "edit.loading": "Loading…",
+    "edit.saveChanges": "Save changes",
+    // Audit log
+    "auditLog.title": "Audit log",
+    "auditLog.backToPlace": "Back to person",
+    "auditLog.loading": "Loading…",
+    "auditLog.none": "No audit entries.",
+    "auditLog.by": "by {user}",
+    "auditLog.payload": "Payload",
+    // PlaceForm
+    "form.name": "Name",
+    "form.required": "Required",
+    "form.alternateName": "Alternate name",
+    "form.placeType": "Place type",
+    "form.none": "—",
+    "form.description": "Description",
+    "form.telephone": "Telephone",
+    "form.website": "Website",
+    "form.gln": "GLN",
+    "form.glnHint": "13-digit Global Location Number",
+    "form.glnInvalid": "GLN must be 13 digits",
+    "form.address": "Address",
+    "form.includeAddress": "Include address",
+    "form.geo": "Geo coordinates",
+    "form.includeCoords": "Include coords",
+    "form.saving": "Saving…",
+    "form.save": "Save",
+    "form.reset": "Reset",
+    "form.latRange": "-90 to 90",
+    "form.lonRange": "-180 to 180",
+    // PostalAddressInput
+    "address.street": "Street",
+    "address.cityLocality": "City / locality",
+    "address.regionState": "Region / state",
+    "address.postalCode": "Postal code",
+    "address.country": "Country",
+    "address.countryHint": "ISO 3166 alpha-2",
+    // GeoCoordinatesInput
+    "geo.latitude_as_decimal_degrees": "Latitude",
+    "geo.latitudeHint": "-90 to 90",
+    "geo.longitude_as_decimal_degrees": "Longitude",
+    "geo.longitudeHint": "-180 to 180",
+    "geo.elevation_as_decimal_metres": "Elevation (m)",
+    // SearchBox
+    "search.placeholder": "Search…",
+    "search.submit": "Search",
+    // MatchResultsList
+    "matchResults.title": "Match results",
+    "matchResults.noCandidates": "No candidates.",
+    "matchResults.scoreBreakdown": "Score breakdown",
+    "matchResults.nameScore": "name",
+    "matchResults.geoScore": "geo",
+    "matchResults.addressScore": "address",
+    "matchResults.identifierScore": "identifier",
+    "matchResults.phoneticMatch": "phonetic match",
+    "matchResults.deterministicMatch": "deterministic (GLN)",
+    "matchResults.typeOther": "Other: {value}",
+    // PlaceGrid
+    "grid.id": "ID",
+    "grid.name": "Name",
+    "grid.type": "Type",
+    "grid.city": "City",
+    "grid.country": "Country",
+    "grid.latLon": "Lat / Lon",
+    "grid.typeOther": "Other: {value}",
+    // Session (BFF)
+    "session.title": "Session",
+    "session.signedIn": "Signed in",
+    "session.signIn": "Sign in",
+    "session.signOut": "Sign out",
+  },
+  en_US: {
     "nav.review": "Review",
     "review.run": "Run scan",
     "review.intro":
@@ -2908,8 +3142,17 @@ export const STRINGS_FOR_TEST: Record<Locale, Record<string, string>> = STRINGS;
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  // Take the primary subtag before any `-`/`_`, lowercased.
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;
