@@ -4,12 +4,15 @@
 // surface is small and we keep the front-end dependency-light (drift
 // between front-ends is accepted family-wide).
 //
-// Supported locales: English (`en`, the source of truth) plus Welsh
-// (`cy`, for the public-sector Welsh-language duty), Spanish (`es`),
-// French (`fr`), German (`de`), Arabic (`ar`, RTL), Russian (`ru`),
-// Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese
-// (`pt`), Indonesian (`id`), and Urdu (`ur`, RTL). An unknown key/locale
-// falls back to `en`. The chosen locale persists to localStorage.
+// Supported locales: English (`en`, the source of truth) plus American
+// English (`en_US`, identical content today — a distinct endonym for the
+// locale picker rather than a spelling divergence, since `en`'s own copy
+// is already American-spelled), Welsh (`cy`, for the public-sector
+// Welsh-language duty), Spanish (`es`), French (`fr`), German (`de`),
+// Arabic (`ar`, RTL), Russian (`ru`), Hindi (`hi`), Mandarin Chinese
+// (`zh`), Bengali (`bn`), Portuguese (`pt`), Indonesian (`id`), and Urdu
+// (`ur`, RTL). An unknown key/locale falls back to `en`. The chosen
+// locale persists to localStorage.
 
 import { browser } from "$app/environment";
 
@@ -19,6 +22,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -57,6 +61,7 @@ export function isRtl(locale: Locale): boolean {
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -72,9 +77,10 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 };
 
 /**
- * localStorage key under which the chosen UI locale is persisted. There is
- * no locale-switcher UI in the chrome (Lily's locale-picker was removed in
- * favour of share-picker/text-size-picker); this key is what
+ * localStorage key under which the chosen UI locale is persisted. The
+ * chrome's `PickerBar` locale picker calls {@link i18n}'s `set` on
+ * change (its own `applyDir={false}`, since this store already reflects
+ * `lang`/`dir` onto `<html>` — see `+layout.svelte`); this key is what
  * {@link readStoredLocale} reads on boot, so a locale set by other means
  * (e.g. a query param a future route handles) still sticks across visits.
  */
@@ -85,6 +91,339 @@ export const LOCALE_KEY = "mxi.person.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.expiry": "Expiries",
+    "nav.review": "Review",
+    "review.run": "Run scan",
+    "review.intro":
+      "Candidate duplicate pairs from the batch scan and from bulk imports. Drag a pending card, or open a pair to compare both records side by side before deciding.",
+    "review.loading": "Loading the review queue…",
+    "review.empty": "No review items for this filter.",
+    "review.filter.status": "Status",
+    "review.filter.statusAll": "All",
+    "review.filter.limit": "Page size",
+    "review.filter.limitHint":
+      "The service returns at most 500 items and offers no paging beyond this.",
+    "review.status.pending": "Pending",
+    "review.status.confirmed": "Confirmed",
+    "review.status.rejected": "Rejected",
+    "review.status.automerged": "Auto-merged",
+    "review.board.title": "Board",
+    "review.list.title": "Queue",
+    "review.col.pair": "Pair",
+    "review.col.score": "Score",
+    "review.col.quality": "Quality",
+    "review.col.provenance": "Source",
+    "review.col.status": "Status",
+    "review.col.actions": "Actions",
+    "review.compare.open": "Compare",
+    "review.compare.title": "Compare the pair",
+    "review.compare.close": "Close",
+    "review.compare.loading": "Loading both records…",
+    "review.compare.field": "Field",
+    "review.compare.a": "Record A",
+    "review.compare.b": "Record B",
+    "review.compare.none": "Not recorded",
+    "review.compare.partial":
+      "One record could not be loaded — it may have been merged away or deleted.",
+    "review.field.score": "Match score",
+    "review.field.quality": "Match quality",
+    "review.field.method": "Detection method",
+    "review.field.provenance": "Source",
+    "review.field.status": "Status",
+    "review.field.contact": "Primary contact",
+    "review.provenance.operator": "Operator scan",
+    "review.provenance.import": "Bulk import",
+    "review.provenance.matcherSuggested": "Matcher suggestion",
+    "review.breakdown.title": "Score breakdown",
+    "review.breakdown.none": "No score breakdown was recorded for this pair.",
+    "review.breakdown.component": "Component",
+    "review.breakdown.weight": "Weight",
+    "review.breakdown.score": "Score",
+    "review.component.name": "Name",
+    "review.component.birthDate": "Birth date",
+    "review.component.gender": "Gender",
+    "review.component.address": "Address",
+    "review.component.identifier": "Identifier",
+    "review.component.taxId": "Tax ID",
+    "review.component.document": "Document",
+    "review.decide.confirm": "Confirm duplicate",
+    "review.decide.reject": "Reject",
+    "review.decide.deciding": "Saving…",
+    "review.decide.locked":
+      "Already decided — only pending items can be decided.",
+    "review.merge.title": "Merge this pair",
+    "review.merge.note":
+      "Confirming records the verdict only; it does not merge. Choose which record survives.",
+    "review.merge.keepA": "Keep A, merge B into it",
+    "review.merge.keepB": "Keep B, merge A into it",
+    // Layout / nav chrome
+    brand: "Person",
+    "brand.tagline": "Main X Index",
+    "nav.toggle": "Toggle navigation",
+    "nav.dashboard": "Dashboard",
+    "nav.persons": "Persons",
+    "nav.new": "New person",
+    "nav.match": "Match check",
+    "nav.merge": "Merge",
+    "nav.theme": "Theme",
+    "nav.language": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    // Dashboard
+    "dashboard.head.title": "Dashboard · Person Service",
+    "dashboard.title": "Dashboard",
+    "dashboard.serviceStatus": "Service:",
+    "dashboard.recentActivity": "Recent activity",
+    "dashboard.noRecent": "No recent audit entries.",
+    // Persons list
+    "persons.head.title": "Persons · Person Service",
+    "persons.title": "Persons",
+    "persons.new": "New person",
+    "persons.searchPlaceholder": "Search by name, identifier…",
+    "persons.fuzzy": "Fuzzy",
+    "persons.phonetic": "Phonetic (Soundex)",
+    "persons.loading": "Loading…",
+    "persons.recordCount.one": "record",
+    "persons.recordCount.other": "records",
+    // Grid columns
+    "grid.id": "ID",
+    "grid.family": "Family",
+    "grid.given": "Given",
+    "grid.dob": "DOB",
+    "grid.gender": "Gender",
+    "grid.active": "Active",
+    "grid.yes": "yes",
+    "grid.no": "no",
+    // Search box
+    "search.submit": "Search",
+    "search.placeholder": "Search…",
+    // New person
+    "new.head.title": "New person · Person Service",
+    "new.title": "New person",
+    "new.create": "Create",
+    "new.possibleDuplicates": "Possible duplicates",
+    "new.duplicatesDetected.prefix": "Duplicates detected (",
+    "new.duplicatesDetected.suffix": ") — review below before resubmitting.",
+    // Match check
+    "match.head.title": "Match check · Person Service",
+    "match.title": "Match check",
+    "match.family": "Family",
+    "match.given": "Given",
+    "match.givenHint": "Space-separated",
+    "match.birthDate": "Birth date",
+    "match.gender": "Gender",
+    "match.taxId": "Tax ID",
+    "match.threshold": "Threshold",
+    "match.thresholdHint": "0.0 – 1.0",
+    "match.matching": "Matching…",
+    "match.find": "Find matches",
+    // Merge
+    "merge.head.title": "Merge persons · Person Service",
+    "merge.title": "Merge persons",
+    "merge.mainId": "Main person ID",
+    "merge.mainIdHint": "The surviving record",
+    "merge.dupId": "Duplicate person ID",
+    "merge.dupIdHint": "Will be soft-deleted",
+    "merge.reason": "Reason",
+    "merge.reasonHint": "Recorded in the merge audit trail",
+    "merge.reasonPlaceholder": "Confirmed duplicate",
+    "merge.loadPreview": "Load preview",
+    "merge.merging": "Merging…",
+    "merge.merge": "Merge",
+    "merge.bothIdsRequired": "Both IDs required",
+    "merge.mustDiffer": "Main and duplicate must differ",
+    "merge.preview": "Preview",
+    "merge.main": "Main",
+    "merge.duplicate": "Duplicate",
+    "merge.completed": "Merge completed",
+    "merge.recordPrefix": "Merge record",
+    "merge.recordCreatedAt": "created at",
+    "merge.viewMain": "View merged main person",
+    "merge.noRecord": "—",
+    "merge.noDob": "no DOB",
+    // confirm() message is assembled at the call site from parts:
+    "merge.confirm.prefix": "Merge ",
+    "merge.confirm.into": " into ",
+    "merge.confirm.suffix": "?\nThis soft-deletes the duplicate.",
+    // Person detail
+    "detail.head.title.prefix": "Person",
+    "detail.loading": "Loading…",
+    "detail.edit": "Edit",
+    "detail.audit": "Audit",
+    "detail.delete": "Delete",
+    "detail.showMasked": "Show masked",
+    "detail.showFull": "Show full",
+    "detail.maskedNotice":
+      "Showing the masked view — some fields are redacted.",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
+    "detail.identity": "Identity",
+    "detail.id": "ID",
+    "detail.active": "Active",
+    "detail.yes": "Yes",
+    "detail.no": "No",
+    "detail.gender": "Gender",
+    "detail.birthDate": "Birth date",
+    "detail.taxId": "Tax ID",
+    "detail.deceased": "Deceased",
+    "detail.deceasedYes": "yes",
+    "detail.deceasedNo": "no",
+    "detail.identifiers": "Identifiers",
+    "detail.addresses": "Addresses",
+    "detail.telecom": "Telecom",
+    "detail.emergencyContacts": "Emergency contacts",
+    "detail.primary": "primary",
+    "detail.confirmDelete":
+      "Soft-delete this person? This cannot be undone via the UI.",
+    // Edit person
+    "edit.head.title.prefix": "Edit person · ",
+    "edit.title": "Edit person",
+    "edit.cancel": "Cancel",
+    "edit.loading": "Loading…",
+    "edit.save": "Save changes",
+    // Audit
+    "audit.head.title.prefix": "Audit · ",
+    "audit.title": "Audit log",
+    "audit.back": "Back to person",
+    "audit.loading": "Loading…",
+    "audit.noEntries": "No audit entries.",
+    "audit.by": "by",
+    "audit.payload": "Payload",
+    "audit.loadMore": "Load more",
+    "audit.loadingMore": "Loading more…",
+    // PersonForm
+    "form.birthDate": "Birth date",
+    "form.gender": "Gender",
+    "form.taxId": "Tax ID",
+    "form.taxIdHint": "SSN, CPF, TIN",
+    "form.saving": "Saving…",
+    "form.save": "Save",
+    "form.reset": "Reset",
+    "form.required": "Required",
+    "form.atLeastOneGiven": "At least one given name",
+    "form.futureBirthDate": "Birth date cannot be in the future",
+    // HumanNameInput
+    "name.family": "Family name",
+    "name.given": "Given names",
+    "name.givenHint": "Space-separated",
+    // MatchResultsList
+    "matchResults.title": "Match results",
+    "matchResults.noCandidates": "No candidates.",
+    "matchResults.dob": "DOB",
+    "matchResults.breakdown": "Score breakdown",
+    // LinksPanel (cross-service entity links)
+    "links.title": "Cross-service links",
+    "links.loading": "Loading links…",
+    "links.empty": "No cross-service links yet.",
+    "links.assertHeading": "Assert a link",
+    "links.kind": "Link kind",
+    "links.kind.sameIdentity": "Same identity (→ worker)",
+    "links.kind.worksAt": "Works at (→ organization)",
+    "links.kind.memberOf": "Member of (→ organization)",
+    "links.toRef": "Target reference",
+    "links.toRefHint": "The other service's record, as type:uuid",
+    "links.role": "Role",
+    "links.confidence": "Confidence",
+    "links.confidenceHint": "0.00–1.00",
+    "links.provenance": "Provenance",
+    "links.provenanceHint": "Defaults to operator",
+    "links.validFrom": "Valid from",
+    "links.validTo": "Valid to",
+    "links.submit": "Assert link",
+    "links.submitting": "Linking…",
+    "links.withdraw": "Withdraw",
+    "links.withdrawing": "Withdrawing…",
+    "links.confirmWithdraw":
+      "Withdraw this link? The assertion is removed from the cross-service graph.",
+    "links.error.required": "A target reference is required.",
+    "links.error.malformedRef":
+      "A reference looks like type:uuid, for example worker:0c4f1e2a-0000-4000-8000-000000000000.",
+    "links.error.wrongType.prefix": "This link kind requires a target of type ",
+    "links.error.wrongType.suffix": ".",
+    // Bulk import / export (FE-3)
+    "nav.bulk": "Bulk",
+    "bulk.head.title": "Bulk import/export · Person Service",
+    "bulk.title": "Bulk import / export",
+    "bulk.intro":
+      "Load records from a file, or extract a filtered set. Both run as background jobs; this page polls until they finish.",
+    "bulk.import.title": "Import",
+    "bulk.import.file": "File",
+    "bulk.import.fileHint": "JSONL (lossless) or CSV. Maximum 64 MiB.",
+    "bulk.import.format": "Format",
+    "bulk.import.formatHint":
+      "JSONL round-trips every field; CSV flattens nested values.",
+    "bulk.import.dryRun": "Dry run (validate only)",
+    "bulk.import.dryRunHint":
+      "Parse, validate and classify every row without writing anything.",
+    "bulk.import.submit": "Start import",
+    "bulk.import.submitting": "Uploading…",
+    "bulk.import.fileRequired": "Choose a file to import.",
+    "bulk.import.dryRunNotice":
+      "Preview only — no records were created or changed.",
+    "bulk.export.title": "Export",
+    "bulk.export.format": "Format",
+    "bulk.export.formatHint": "JSONL is the lossless reference format.",
+    "bulk.export.parquetNote":
+      "Parquet is an optional build feature; the job fails if this service was built without it.",
+    "bulk.export.query": "Query (optional)",
+    "bulk.export.queryHint":
+      "Family-name search scoping the export; leave blank for everything.",
+    "bulk.export.limit": "Limit (optional)",
+    "bulk.export.limitHint": "Maximum records to write.",
+    "bulk.export.masking": "Masking profile",
+    "bulk.export.maskingHint":
+      "Full (unmasked) output requires elevated privileges and may be refused.",
+    "bulk.export.submit": "Start export",
+    "bulk.export.submitting": "Submitting…",
+    "bulk.format.jsonl": "JSONL",
+    "bulk.format.csv": "CSV",
+    "bulk.format.parquet": "Parquet",
+    "bulk.masking.masked": "Masked",
+    "bulk.masking.full": "Full (unmasked)",
+    "bulk.job.title": "Job",
+    "bulk.job.id": "Job ID",
+    "bulk.job.status": "Status",
+    "bulk.job.progress": "Progress",
+    "bulk.job.rowsTotal": "Rows total",
+    "bulk.job.rowsProcessed": "Processed",
+    "bulk.job.rowsCreated": "Created",
+    "bulk.job.rowsUpserted": "Upserted",
+    "bulk.job.rowsToReview": "To review",
+    "bulk.job.rowsErrored": "Errored",
+    "bulk.job.submittedAt": "Submitted",
+    "bulk.job.polling": "Polling for updates…",
+    "bulk.job.unknownTotal": "Counting…",
+    "bulk.status.queued": "Queued",
+    "bulk.status.running": "Running",
+    "bulk.status.completed": "Completed",
+    "bulk.status.completedWithErrors": "Completed with errors",
+    "bulk.status.failed": "Failed",
+    "bulk.kind.import": "Import",
+    "bulk.kind.export": "Export",
+    "bulk.artifact.output": "Output reference",
+    "bulk.artifact.errors": "Error report reference",
+    "bulk.artifact.note":
+      "Not downloadable from the browser yet — ask an operator to retrieve it from the service host. Tracked in tasks.md FE-3.",
+    "bulk.jobs.title": "Recent bulk jobs",
+    "bulk.jobs.refresh": "Refresh",
+    "bulk.jobs.loading": "Loading…",
+    "bulk.jobs.empty": "No bulk jobs yet.",
+    "bulk.jobs.orderNote": "Most recent first.",
+    "bulk.jobs.filterKind": "Kind",
+    "bulk.jobs.filterStatus": "Status",
+    "bulk.jobs.all": "All",
+    "bulk.jobs.col.id": "ID",
+    "bulk.jobs.col.kind": "Kind",
+    "bulk.jobs.col.format": "Format",
+    "bulk.jobs.col.status": "Status",
+    "bulk.jobs.col.rows": "Rows (processed / total)",
+    "bulk.error.expired":
+      "This job is no longer available — it may have passed its retention window.",
+  },
+  en_US: {
     "nav.expiry": "Expiries",
     "nav.review": "Review",
     "review.run": "Run scan",
@@ -4259,8 +4598,17 @@ export type StringKey = keyof (typeof STRINGS)["en"];
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  // Take the primary subtag before any `-`/`_`, lowercased.
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;
