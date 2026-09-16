@@ -235,6 +235,30 @@ Two at once want the same port, so move one:
 `DB_SUITES_FORCE=1` runs it anyway, which is how a crate gets **observed**
 green before being added to that allowlist.
 
+### Front-end CI
+
+The sixteen SvelteKit front-ends (`tasks.md` WEB-2) run in a parallel
+`front-end` stage — [`scripts/ci-front-ends.sh`](scripts/ci-front-ends.sh)
+discovers them (same change-aware shape as `ci-crates.sh`), and both CI
+files run, per project: `pnpm install --frozen-lockfile`, `pnpm run
+check`, `pnpm exec vitest run`, `pnpm run build`, `pnpm run lint`, and —
+for a project enrolled in
+[`ci/front-end-e2e-suites.txt`](ci/front-end-e2e-suites.txt) — its
+Playwright suite. That file is an **allowlist**, the same philosophy as
+`ci/db-suites.txt`: a front-end joins it once its e2e suite has been
+**observed** green with no live backend running, never added on the
+assumption that it will pass — most of these suites expect a live Rust
+service and seeded data this job does not provide (`case-folder` needs
+its own live service and is the reference example of why this is an
+allowlist, not a denylist).
+
+This became possible once every front-end's six Lily Design System
+packages switched from a `file:` path onto a sibling checkout (which no
+CI runner has) to a published npm registry version — see
+[`agents/share/svelte-front-end-stack.md`](agents/share/svelte-front-end-stack.md)
+for that decision. Before it, `pnpm install` could not succeed on any
+CI runner, so no front-end code was ever actually exercised by a check.
+
 ## AI agent guidance
 
 - [`llms.txt`](llms.txt) / [`llms.json`](llms.json) — a curated,

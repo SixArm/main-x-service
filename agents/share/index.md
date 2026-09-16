@@ -84,4 +84,5 @@ Per-crate `spec.md`:
 | [security.md](security.md)                                       | Security audit summary, cross-cutting invariants, the `<ENTITY>_REQUIRE_AUTH` activation gate, secret-handling, threat model |
 | [rust-loco-stack.md](rust-loco-stack.md)                         | Stack for Rust, Loco (database, search, …)             |
 | [loco.md](loco.md)                                               | Loco framework (backend-only conventions)              |
+| [svelte-front-end-stack.md](svelte-front-end-stack.md)           | Front-end Lily package distribution: registry versions vs `file:`, `pnpm link` for local dev against an in-flight Lily change |
 | [configuration.md](configuration.md)                             | Complete environment-variable reference — every `<ENTITY>_*`, `LINK_GRAPH_*`, `TOKEN_*`/`AUTH_*` variable, default, effect, governing doc |
