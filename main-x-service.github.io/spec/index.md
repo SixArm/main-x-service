@@ -77,9 +77,7 @@ git@github.com:SixArm/main-x-service.github.io.git` per checkout.
 - [x] `.github/workflows/deploy.yml`, pinned to Node 26 per
       `spec/node-current-version/index.md`.
 - [x] Create the `SixArm/main-x-service.github.io` GitHub repository and
-      perform the first `git subtree split` + push. Domain decided
-      (PRO-H14): a dedicated org-level site at `main-x-service.github.io`,
-      not a `sixarm.github.io/main-x-service/` project page.
+      perform the first `git subtree split` + push.
       Prerequisite fixed first: both `lily-design-system-svelte-theme-picker`
       (`file:` → `^0.1.1`) and `static/assets/themes` (symlink → a vendored
       copy) were resolving correctly only while this directory was nested
@@ -93,11 +91,17 @@ git@github.com:SixArm/main-x-service.github.io.git` per checkout.
       exercised the exported form before.
 - [x] Confirm the actual GitHub Pages URL / custom domain (if any) once
       the sibling repo exists, and update `homepage` in `package.json`
-      and the footer links accordingly. `homepage` corrected to
-      `https://main-x-service.github.io/` (was stale from an earlier,
-      not-yet-decided project-page assumption); the two in-page mentions
-      of `main-x-service.github.io/` were already the bare subproject
-      name, not a URL, so needed no change.
+      and the footer links accordingly. The bare `https://
+      main-x-service.github.io/` URL floated as an option before the
+      repo existed turned out not to be obtainable under the `SixArm`
+      org — GitHub Pages only serves that top-level form for a repo
+      named `<owner>.github.io` where `<owner>` genuinely is the
+      account name, and the account here is `SixArm`, not
+      `main-x-service`. The live, confirmed URL is
+      `https://sixarm.github.io/main-x-service.github.io/`, and that is
+      what `homepage` and both generated `llms` files now say. The two
+      in-page mentions of `main-x-service.github.io/` were already the
+      bare subproject name, not a URL, so needed no change.
 - [x] Website-appropriate `static/llms.txt` / `static/llms.json`
       (`spec/llms-json-and-llms-txt/index.md` §"Repo checkout vs.
       published site"). Generated from the root `llms.json`'s same 102

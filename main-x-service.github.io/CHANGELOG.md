@@ -23,8 +23,11 @@ attempt, since nothing had exercised the exported form before.
 
 Also fixed `pnpm-workspace.yaml`'s unedited `esbuild: set this to true
 or false` template line (the same defect WEB-3 fixed family-wide,
-missed here), `package.json`'s `homepage` (was a stale project-page
-URL from before the domain decision; now `https://main-x-service.github.io/`),
+missed here), `package.json`'s `homepage` (now the confirmed live URL,
+`https://sixarm.github.io/main-x-service.github.io/` — a bare
+`main-x-service.github.io` isn't obtainable under the `SixArm` org;
+GitHub Pages only serves that top-level form for a repo named
+`<owner>.github.io` where `<owner>` genuinely is the account name),
 and pinned `deploy.yml`'s `pnpm/action-setup` to `11.0.8` exact rather
 than a floating `9`.
 

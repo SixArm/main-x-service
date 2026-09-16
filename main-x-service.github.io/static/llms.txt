@@ -6,10 +6,10 @@ Each crate is self-contained (own REST API, own persistence, own matching algori
 
 ## This site
 
-- [Home](https://main-x-service.github.io/): Elevator pitch and at-a-glance facts about the Main X Index
-- [Architecture](https://main-x-service.github.io/architecture/): Layered request flow, the two internal service shapes, cross-cutting subsystems
-- [Subprojects](https://main-x-service.github.io/subprojects/): The full family index (services, matchers, libraries, front-ends, consumer apps, cross-cutting services), each linking to its GitHub source
-- [About](https://main-x-service.github.io/about/): What this site is, spec-driven development, AI-assisted development, license
+- [Home](https://sixarm.github.io/main-x-service.github.io/): Elevator pitch and at-a-glance facts about the Main X Index
+- [Architecture](https://sixarm.github.io/main-x-service.github.io/architecture/): Layered request flow, the two internal service shapes, cross-cutting subsystems
+- [Subprojects](https://sixarm.github.io/main-x-service.github.io/subprojects/): The full family index (services, matchers, libraries, front-ends, consumer apps, cross-cutting services), each linking to its GitHub source
+- [About](https://sixarm.github.io/main-x-service.github.io/about/): What this site is, spec-driven development, AI-assisted development, license
 
 ## Start here
 
