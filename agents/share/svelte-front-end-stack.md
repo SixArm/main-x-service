@@ -1,5 +1,10 @@
 # Svelte front-end stack — Lily package distribution
 
+> **Scope note.** This doc covers the Lily **npm packages** (the picker
+> components). The Lily **theme stylesheets** each front-end's
+> `static/assets/themes` serves are a separate, narrower problem with
+> its own fix — see §8.
+
 How the sixteen SvelteKit front-ends consume the Lily Design System's
 Svelte packages, and why. This is a design decision document
 (`tasks.md` WEB-2) — it fixes the answer, so no front-end re-litigates
@@ -136,3 +141,35 @@ resolved to until someone runs `pnpm update` for that package. This is
 the normal npm-ecosystem answer (a caret range, not a pin, so patch/minor
 bumps flow in on the next install), and is deliberately left to
 ordinary dependency-update hygiene rather than a bespoke sync job.
+
+## 8. The theme stylesheets — vendored, not published
+
+Every front-end's `static/assets/themes` was **also** a symlink onto
+the sibling checkout (`../../../../../../lilydesignsystem/
+lily-design-system/themes`) — the exact same class of problem §1–§3
+solved for the picker packages, missed on the first pass because it
+surfaces differently: not a failed `pnpm install`, but `svelte-kit
+sync` throwing `ENOENT: no such file or directory, stat '…/static/
+assets/themes'` on a runner with no dangling symlink target to resolve
+(found running the `front-end` CI stage's first real PR, WEB-2).
+
+There is no `lily-design-system-themes` npm package to switch to —
+these are plain CSS files, not a Svelte component. The fix is
+`vendor/lily-design-system-themes/` at this repo's root: one vendored
+copy of the 45 theme stylesheets, and every front-end's
+`static/assets/themes` symlink now points **in-repo** at it instead of
+out to the sibling checkout. `project-portfolio-management-front-end-
+with-svelte` already had its own real (non-symlinked, if stale) copy
+under its own `static/assets/themes` predating this — left untouched
+rather than folded in, since it already worked and touching a green
+project to chase consistency risked the opposite.
+
+This is a vendored **snapshot**, not a live link: a theme added or
+edited upstream needs a manual re-copy (`vendor/
+lily-design-system-themes/README.md` has the command). One vendored
+copy shared by fifteen front-ends, not fifteen copies — the same
+`entity-ref`/`integrity-mac` reasoning as elsewhere in this family: a
+single directory a human resyncs is a much smaller drift surface than
+one per project. Publishing a real npm package is the better answer if
+this ever needs to change often; record that decision here if it
+happens.
