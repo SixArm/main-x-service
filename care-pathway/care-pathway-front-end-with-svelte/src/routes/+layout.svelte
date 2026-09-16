@@ -18,13 +18,9 @@
   import { enhance } from "$app/forms";
   import type { Snippet } from "svelte";
   import type { LayoutData } from "./$types";
-  import { i18n, t, isRtl } from "$lib/i18n.svelte";
-  import { ThemePicker } from "lily-design-system-svelte-theme-picker";
-  import {
-    SharePicker,
-    type ShareTarget,
-  } from "lily-design-system-svelte-share-picker";
-  import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
+  import { i18n, t, isRtl, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte";
+  import PickerBar from "lily-design-system-svelte-picker-bar";
+  import type { ShareTarget } from "lily-design-system-svelte-share-picker";
 
   // Lily theme catalogue offered in the theme select (incl.
   // NHS England/Scotland/Wales patient & practitioner themes). Each slug
@@ -146,16 +142,23 @@
   // <title> without SharePicker having to read the DOM).
   const SHARE_TARGETS: ShareTarget[] = [
     {
+      id: "email",
+      label: "Email",
+      href: (url, title) =>
+        `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
+      newTab: false,
+    },
+    {
       id: "linkedin",
       label: "LinkedIn",
       href: (url) =>
         `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
     },
     {
-      id: "mastodon",
-      label: "Mastodon",
+      id: "reddit",
+      label: "Reddit",
       href: (url, title) =>
-        `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+        `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
     },
     {
       id: "bluesky",
@@ -164,10 +167,10 @@
         `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
     },
     {
-      id: "reddit",
-      label: "Reddit",
+      id: "mastodon",
+      label: "Mastodon",
       href: (url, title) =>
-        `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+        `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
     },
   ];
 
@@ -188,10 +191,14 @@
 
   // The i18n store is the single source of truth for the locale: this
   // effect mirrors it onto `<html lang>` / `<html dir>` (RTL for ar/ur).
-  // SSR-guarded — only touches the document in the browser.
+  // SSR-guarded — only touches the document in the browser. `lang` is
+  // hyphenated per BCP 47 (`i18n.locale` uses an underscore for a region
+  // subtag, e.g. "en_US", but `lang` must read "en-US"; this must agree
+  // with what PickerBar's LocalePicker itself writes via its own
+  // `bcp47LocaleTag`, since both write the same attribute).
   $effect(() => {
     if (!browser) return;
-    document.documentElement.lang = i18n.locale;
+    document.documentElement.lang = i18n.locale.replace("_", "-");
     document.documentElement.dir = isRtl(i18n.locale) ? "rtl" : "ltr";
   });
 
@@ -238,33 +245,43 @@
           </li>
         {/each}
       </ul>
-      <!-- Theme / text-size / share chrome toolbar. Theme switcher:
-                 Lily ThemePicker swaps the active theme stylesheet (from
-                 static/assets/themes/<slug>.css) and persists the choice.
-                 The app's design tokens bridge onto the theme's `--color-*`
-                 tokens in app.css, so this restyles the whole UI. -->
+      <!-- Theme / locale / text-size / share chrome toolbar, composed by
+                 Lily's PickerBar. Theme switcher: swaps the active theme
+                 stylesheet (from static/assets/themes/<slug>.css) and
+                 persists the choice. The app's design tokens bridge onto the
+                 theme's `--color-*` tokens in app.css, so this restyles the
+                 whole UI. -->
       <div class="chrome">
-        <ThemePicker
-          label={t("chrome.theme")}
+        <PickerBar
+          labels={{
+            theme: t("chrome.theme"),
+            locale: t("chrome.language"),
+            textSize: t("chrome.textSize"),
+            share: t("chrome.share"),
+          }}
           themesUrl="/assets/themes/"
           themes={THEMES}
-          themeLabels={THEME_LABELS}
-          storageKey="lily-theme"
-        />
-        <TextSizePicker
-          label={t("chrome.textSize")}
+          themeProps={{ themeLabels: THEME_LABELS, storageKey: "lily-theme" }}
+          locales={[...LOCALES]}
+          localeProps={{
+            value: i18n.locale,
+            localeLabels: LOCALE_LABELS,
+            applyDir: false,
+            onChange: (code: string) => i18n.set(code),
+          }}
           sizes={SIZES}
-          sizeLabels={SIZE_LABELS}
-          defaultValue="medium"
-          storageKey="lily-text-size"
-        />
-        <SharePicker
-          label={t("chrome.share")}
-          title={pageTitle}
-          targets={SHARE_TARGETS}
-          copyLabel={t("share.copyLink")}
-          copiedLabel={t("share.linkCopied")}
-          copyFailedLabel={t("share.copyFailed")}
+          textSizeProps={{
+            sizeLabels: SIZE_LABELS,
+            defaultValue: "medium",
+            storageKey: "lily-text-size",
+          }}
+          shareTargets={SHARE_TARGETS}
+          shareProps={{
+            title: pageTitle,
+            copyLabel: t("share.copyLink"),
+            copiedLabel: t("share.linkCopied"),
+            copyFailedLabel: t("share.copyFailed"),
+          }}
         />
       </div>
       <!--
@@ -430,10 +447,17 @@
     text-decoration: none;
     font-weight: 600;
   }
-  /* Theme / text-size / share pickers sit in the dropdown panel like the
-       other chrome controls. */
+  .chrome :global(.picker-bar) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  /* Theme / locale / text-size / share pickers sit in the dropdown panel
+       like the other chrome controls. */
   .chrome :global(.theme-picker),
   .chrome :global(.theme-picker-button),
+  .chrome :global(.locale-picker-button),
   .chrome :global(.text-size-picker-button),
   .chrome :global(.share-picker-button) {
     font: inherit;
