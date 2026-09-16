@@ -9,6 +9,46 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-of-page chrome (theme, text-size, share pickers) previously
+wired `ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This restores a locale picker to the chrome (this project's own
+`AGENTS.md` had described a `LocalePicker` in the layout even though
+none was actually wired — that was stale, not a live feature); `Picker
+Bar` bundles all four unconditionally with no way to omit one. Wired
+with `applyDir={false}` and `onChange={(code) => i18n.set(code)}`,
+since this app's own `i18n.svelte.ts` store already reflects
+`lang`/`dir` onto `<html>`. The locale label reuses the existing
+`chrome.language` i18n key (already present in all 14 locale tables)
+rather than inventing a new one.
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon; the Mastodon target
+now points at `mastodonshare.com` instead of `mastodon.social/share`
+(a generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
+Also added `en_US` ("English (United States)") to
+`src/lib/i18n.svelte.ts`'s `LOCALES`/`LOCALE_LABELS`/`STRINGS` (a
+duplicate of `en`'s copy — `en`'s own strings were already
+American-spelled, so this is a distinct locale-picker entry, not a
+spelling fork) and taught `normaliseLocale` to match a region variant
+like `en_US`/`en-US` exactly before falling back to stripping the
+primary subtag (which previously would have collapsed `en_US` to
+`en`). `document.documentElement.lang` is now set from
+`i18n.locale.replace("_", "-")` so `en_US` writes the valid BCP47
+`lang="en-US"`. `tests/unit/i18n.test.ts` bumped to 14 locales and
+gained a `normaliseLocale` regression test. `pnpm test` 97/97 (was
+96); `pnpm run check` 0 errors; `pnpm run build` clean.
+
 ### Added — inline LEI/DUNS/GLN/VAT format hints on the create/edit form (ORGFE-T4)
 
 The service validates LEI/GLN/DUNS/VAT check digits server-side
