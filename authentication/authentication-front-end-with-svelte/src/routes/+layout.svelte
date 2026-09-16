@@ -1,7 +1,7 @@
 <!--
   Root layout for the auth SPA: a top navigation bar (brand, hamburger,
-  nav, theme/text-size/share pickers, signed-in badge) wrapping the
-  routed page content.
+  nav, the Lily PickerBar — theme/locale/text-size/share, signed-in
+  badge) wrapping the routed page content.
 
   Props:
   - `children`: Snippet — the active route, rendered via {@render children()}.
@@ -9,21 +9,20 @@
   State / reactivity:
   - reads `page.url.pathname` (reactive) to mark the active nav link;
   - reads `i18n.locale` / `t(...)` so the whole chrome re-renders on a
-    locale switch (there is no locale-switcher UI in the chrome — the
-    stored locale is read on boot; see `$lib/i18n.svelte.ts`);
-  - reads `page.data.title` for SharePicker's share title;
+    locale switch — including PickerBar's own locale picker, which calls
+    `i18n.set(code)` on change (see `$lib/i18n.svelte.ts`);
+  - reads `page.data.title` for the share picker's share title;
   - reads `session.*` so the signed-in badge appears/disappears live.
 -->
 <script lang="ts">
     import "../app.css";
     import { browser } from "$app/environment";
     import { page } from "$app/state";
-    import { i18n, t, isRtl, type StringKey } from "$lib/i18n.svelte";
+    import { i18n, t, isRtl, LOCALES, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
-    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
-    import { SharePicker, type ShareTarget } from "lily-design-system-svelte-share-picker";
-    import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
+    import PickerBar from "lily-design-system-svelte-picker-bar";
+    import type { ShareTarget } from "lily-design-system-svelte-share-picker";
 
     // Lily theme catalogue offered in the theme select (incl.
     // NHS England/Scotland/Wales patient & practitioner themes). Each slug
@@ -86,16 +85,23 @@
     // <title> without SharePicker having to read the DOM).
     const SHARE_TARGETS: ShareTarget[] = [
         {
+            id: "email",
+            label: "Email",
+            href: (url, title) =>
+                `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
+            newTab: false,
+        },
+        {
             id: "linkedin",
             label: "LinkedIn",
             href: (url) =>
                 `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
         },
         {
-            id: "mastodon",
-            label: "Mastodon",
+            id: "reddit",
+            label: "Reddit",
             href: (url, title) =>
-                `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
         },
         {
             id: "bluesky",
@@ -104,10 +110,10 @@
                 `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
         },
         {
-            id: "reddit",
-            label: "Reddit",
+            id: "mastodon",
+            label: "Mastodon",
             href: (url, title) =>
-                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+                `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
         },
     ];
 
@@ -129,7 +135,7 @@
     $effect(() => {
         const locale = i18n.locale;
         if (!browser || typeof document === "undefined") return;
-        document.documentElement.lang = locale;
+        document.documentElement.lang = locale.replace("_", "-");
         document.documentElement.dir = isRtl(locale) ? "rtl" : "ltr";
     });
 
@@ -173,27 +179,39 @@
                 {/each}
             </ul>
             <div class="chrome">
-                <ThemePicker
-                    label={t("nav.theme")}
+                <PickerBar
+                    labels={{
+                        theme: t("nav.theme"),
+                        locale: t("nav.locale"),
+                        textSize: t("nav.text_size"),
+                        share: t("nav.share"),
+                    }}
                     themesUrl="/assets/themes/"
                     themes={THEMES}
-                    themeLabels={THEME_LABELS}
-                    storageKey="lily-theme"
-                />
-                <TextSizePicker
-                    label={t("nav.text_size")}
+                    themeProps={{
+                        themeLabels: THEME_LABELS,
+                        storageKey: "lily-theme",
+                    }}
+                    locales={[...LOCALES]}
+                    localeProps={{
+                        value: i18n.locale,
+                        localeLabels: LOCALE_LABELS,
+                        applyDir: false,
+                        onChange: (code: string) => i18n.set(code),
+                    }}
                     sizes={SIZES}
-                    sizeLabels={SIZE_LABELS}
-                    defaultValue="medium"
-                    storageKey="lily-text-size"
-                />
-                <SharePicker
-                    label={t("nav.share")}
-                    title={pageTitle}
-                    targets={SHARE_TARGETS}
-                    copyLabel={t("share.copy_link")}
-                    copiedLabel={t("share.copied")}
-                    copyFailedLabel={t("share.copy_failed")}
+                    textSizeProps={{
+                        sizeLabels: SIZE_LABELS,
+                        defaultValue: "medium",
+                        storageKey: "lily-text-size",
+                    }}
+                    shareTargets={SHARE_TARGETS}
+                    shareProps={{
+                        title: pageTitle,
+                        copyLabel: t("share.copy_link"),
+                        copiedLabel: t("share.copied"),
+                        copyFailedLabel: t("share.copy_failed"),
+                    }}
                 />
                 <!-- Signed-in badge: shown only when a session is present
                      (resolved server-side from the httpOnly cookie). -->
@@ -306,7 +324,14 @@
         align-items: stretch;
         gap: 0.75rem;
     }
+    .chrome :global(.picker-bar) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
     .chrome :global(.theme-picker-button),
+    .chrome :global(.locale-picker-button),
     .chrome :global(.text-size-picker-button),
     .chrome :global(.share-picker-button) {
         padding: 0.375rem 0.5rem;
