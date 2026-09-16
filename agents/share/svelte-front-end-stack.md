@@ -113,7 +113,21 @@ pnpm unlink lily-design-system-svelte-theme-picker   # restore the registry vers
    `ci.yml` and `.woodpecker.yml` (`tasks.md` WEB-2), which this
    change is the prerequisite for.
 
-## 6. Open question
+## 6. CI's pnpm version is pinned exact, not a floating major
+
+`pnpm/action-setup` / `corepack prepare` name `11.0.8` exactly, not a
+floating `11`. A newer 11.x enforces a `minimumReleaseAge` supply-chain
+policy — `pnpm install --frozen-lockfile` refuses a lockfile entry
+published within roughly the last 24 hours — which rejected
+`lily-design-system-svelte-picker-bar@0.1.0` on the very PR that first
+enrolled it, published only hours earlier. The policy itself is
+reasonable (it defends against a just-compromised or typosquatted
+package being picked up immediately); the fix is a stable, tested pnpm
+version rather than reaching for `--trust-lockfile` or disabling the
+policy outright to work around a default this repo has not evaluated.
+Bump the pin deliberately, not incidentally via a floating major.
+
+## 7. Open question
 
 **Keeping registry versions current.** Nothing today automatically
 bumps a front-end's Lily version when the packages publish a new

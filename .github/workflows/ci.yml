@@ -117,7 +117,15 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          # Pinned exact, not a floating major: a newer 11.x enforces a
+          # `minimumReleaseAge` supply-chain policy (rejects a lockfile
+          # entry published within the last 24h) that 11.0.8 predates —
+          # found when this rejected lily-design-system-svelte-picker-bar
+          # on the PR that first added it, hours after publishing. The
+          # policy is reasonable in general; the fix here is a stable,
+          # tested pnpm version rather than working around a new default
+          # this repo hasn't evaluated yet.
+          version: 11.0.8
       - uses: actions/setup-node@v5
         with:
           node-version: 26

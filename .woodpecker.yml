@@ -63,7 +63,11 @@ steps:
     image: 'node:26-bookworm'
     commands:
       - apt-get update && apt-get install -y --no-install-recommends git
-      - corepack enable && corepack prepare pnpm@11 --activate
+      # Pinned exact (matching the GitHub pipeline's pnpm/action-setup),
+      # not a floating major — see ci.yml's identical comment: a newer
+      # 11.x enforces a `minimumReleaseAge` supply-chain policy that
+      # 11.0.8 predates.
+      - corepack enable && corepack prepare pnpm@11.0.8 --activate
       - '[ -z "${CI_COMMIT_PULL_REQUEST}" ] || git fetch --no-tags origin "${CI_COMMIT_TARGET_BRANCH}"'
       - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - |
