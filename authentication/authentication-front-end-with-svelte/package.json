@@ -9,12 +9,12 @@
   "description": "SvelteKit front-end for the Authentication Service (Main X Index): passwordless magic-link sign up / sign in / sign out.",
   "license": "MIT OR Apache-2.0",
   "dependencies": {
-    "lily-design-system-svelte-headless": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless",
-    "lily-design-system-svelte-locale-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-locale-picker",
-    "lily-design-system-svelte-picker-bar": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-picker-bar",
-    "lily-design-system-svelte-share-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-share-picker",
-    "lily-design-system-svelte-text-size-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-text-size-picker",
-    "lily-design-system-svelte-theme-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker"
+    "lily-design-system-svelte-headless": "^0.3.1",
+    "lily-design-system-svelte-locale-picker": "^0.1.1",
+    "lily-design-system-svelte-picker-bar": "^0.1.0",
+    "lily-design-system-svelte-share-picker": "^0.1.1",
+    "lily-design-system-svelte-text-size-picker": "^0.1.1",
+    "lily-design-system-svelte-theme-picker": "^0.1.1"
   },
   "scripts": {
     "dev": "vite dev",

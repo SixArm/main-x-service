@@ -7980,7 +7980,7 @@ green as it sits; these finish it)**
   five. Place untouched (PRO-H10 never reached it; 7/7 already). The
   5 / 11 roll-out question is **still open** and moves to WEB-2's
   scope: decide it when the CI stage makes the answer testable.
-- [ ] **WEB-2 (L)** A **front-end CI stage**. `scripts/ci-front-ends.sh`
+- [x] **WEB-2 (L)** A **front-end CI stage**. `scripts/ci-front-ends.sh`
   discovering `*/*-front-end-with-svelte/package.json` (the shape
   `ci-crates.sh` already has), and a `front-end` job in **both** CI
   files that runs, per project: `pnpm install --frozen-lockfile`,
@@ -7997,6 +7997,44 @@ green as it sits; these finish it)**
   a front-end PR's green checks are Rust checks and say nothing about
   the diff — worth a sentence in `AGENTS.md` so nobody reads 168 green
   as verification. Depends: WEB-1 (or the stage is born red), WEB-3.
+  **Done 2026-09-16.** The blocker resolved itself rather than needing
+  a publish: checked against the npm registry, every one of the six
+  Lily packages this family uses was **already published** and at the
+  exact version the sibling checkout has (`agents/share/
+  svelte-front-end-stack.md`, the decided-once doc this row asked for)
+  — headless 0.3.1, theme/locale/text-size/share-picker 0.1.1,
+  picker-bar 0.1.0. All sixteen front-ends' six Lily `file:` deps
+  switched to `^`-pinned registry versions and every lockfile
+  regenerated **incrementally** (`git checkout -- pnpm-lock.yaml` +
+  `pnpm install`, never a full `rm -rf node_modules pnpm-lock.yaml`) —
+  the first attempt did the latter, which silently re-resolved every
+  *other* semver-ranged dependency too (an unrelated `@svar-ui/
+  svelte-filter` minor bump broke patient-flow's `svelte-check` this
+  way) and was reverted in favour of the minimal diff: 77 lines per
+  lockfile, only the six Lily entries, confirmed by grep. `scripts/
+  ci-front-ends.sh` mirrors `ci-crates.sh`'s change-aware shape (no
+  path-dependency graph needed — front-ends don't depend on each
+  other). The `front-end` matrix job/step landed in both `ci.yml` and
+  `.woodpecker.yml`, byte-identical commands.
+  e2e is `ci/front-end-e2e-suites.txt`, the same allowlist philosophy
+  as `ci/db-suites.txt`: 15 of 16 front-ends were **observed** green
+  (`CI=1`, isolated, no live backend) and enrolled; `case-folder` is
+  the one genuine exception — its own `playwright.config.ts` and
+  `global-setup.ts` assume a live `case-folder-service-with-rust` +
+  seed data, out of scope for a job with no backend to offer it.
+  Getting an honest "observed green" out of sixteen suites run
+  back-to-back on one shared machine surfaced two false negatives
+  worth recording (both documented in the allowlist file itself, for
+  whoever enrols a seventeenth front-end): `reuseExistingServer`
+  silently reusing a *different* project's still-running preview
+  server from an earlier run (fixed with `CI=1`, which forces a fresh
+  server and fails loudly on a port collision instead of reusing one),
+  and different front-ends pinning different `@playwright/test`
+  versions, so installing one project's deps could prune a Chromium
+  revision a sibling project's suite still needed from the shared
+  local browser cache (fixed by reinstalling the browser immediately
+  before each suite — a purely local artefact, since each real CI job
+  gets its own fresh container).
 - [x] **WEB-3 (S)** **Lockfile drift sweep.** `pnpm-lock.yaml` in
   **eleven** front-ends still carries the stale
   `lily-design-system-svelte-headless` entry with no peer-resolved

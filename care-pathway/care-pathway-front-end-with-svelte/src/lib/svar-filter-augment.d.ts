@@ -10,11 +10,11 @@
 import "@svar-ui/svelte-filter";
 
 declare module "@svar-ui/svelte-filter" {
-    /**
-     * Compile a FilterBar / FilterBuilder rule tree into an array
-     * transform: returns a function that filters a row array.
-     */
-    export function createArrayFilter<T = Record<string, unknown>>(
-        rules: unknown,
-    ): (rows: T[]) => T[];
+  /**
+   * Compile a FilterBar / FilterBuilder rule tree into an array
+   * transform: returns a function that filters a row array.
+   */
+  export function createArrayFilter<T = Record<string, unknown>>(
+    rules: unknown,
+  ): (rows: T[]) => T[];
 }

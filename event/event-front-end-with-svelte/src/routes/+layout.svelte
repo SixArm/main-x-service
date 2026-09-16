@@ -32,7 +32,13 @@
     import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
-    import { i18n, isRtl, t, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte.js";
+    import {
+        i18n,
+        isRtl,
+        t,
+        LOCALES,
+        LOCALE_LABELS,
+    } from "$lib/i18n.svelte.js";
     import PickerBar from "lily-design-system-svelte-picker-bar";
     import type { ShareTarget } from "lily-design-system-svelte-share-picker";
 

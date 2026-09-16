@@ -1,0 +1,58 @@
+# Front-ends whose Playwright e2e suite runs in the `front-end` CI stage
+# (tasks.md WEB-2).
+#
+# An **allowlist, not a denylist**, on purpose — same philosophy as
+# ci/db-suites.txt: a front-end is added once its suite has been
+# **observed** green with no live backend running, so this stage starts
+# green and stays meaningful. A denylist would have made the first run
+# red and trained everyone to ignore it.
+#
+# Format: one front-end path per line (as printed by
+# scripts/ci-front-ends.sh). Blank lines and `#` comments ignored.
+#
+# --- verified green, 2026-09-16 (CI=1, no live backend, isolated) -----
+authentication/authentication-front-end-with-svelte
+care-pathway/care-pathway-front-end-with-svelte
+case/case-front-end-with-svelte
+contact-relationship-management/contact-relationship-management-front-end-with-svelte
+content-management-system/content-management-system-front-end-with-svelte
+course/course-front-end-with-svelte
+event/event-front-end-with-svelte
+organization/organization-front-end-with-svelte
+patient-flow/patient-flow-front-end-with-svelte
+person/person-front-end-with-svelte
+place/place-front-end-with-svelte
+project-portfolio-management/project-portfolio-management-front-end-with-svelte
+thing/thing-front-end-with-svelte
+worker/worker-front-end-with-svelte
+workforce-planning-management/workforce-planning-management-front-end-with-svelte
+#
+# --- not enrolled ------------------------------------------------------
+#
+# case-folder/case-folder-front-end-with-svelte — its playwright.config.ts
+# assumes a live Loco JSON API on http://localhost:5150 with the seed
+# task already run (`global-setup.ts` pings /healthz and verifies seed
+# state before any test runs, so a misconfigured environment fails fast
+# rather than producing a wall of stale assertions). This stage has no
+# backend to offer it. Enrol once a dedicated job stands up
+# case-folder-service-with-rust + Postgres + seed data alongside it —
+# out of scope for this stage's install/check/vitest/build/lint/e2e
+# shape, which assumes a front-end can be fully verified standalone.
+#
+# A note on how these fifteen were actually verified, for whoever adds
+# the sixteenth: running every front-end's e2e suite back-to-back on one
+# machine surfaced two false negatives that were not real defects —
+# (1) Playwright's `reuseExistingServer` (true off CI) silently reusing
+# a *different* project's still-running preview server left over from an
+# earlier, unrelated run, so a later suite exercised the wrong app
+# entirely; fixed by setting `CI=1` (which forces a fresh server and
+# fails loudly on a port collision instead of reusing one) and killing
+# any stray preview server between runs. (2) different front-ends pin
+# different `@playwright/test` versions, and installing one project's
+# dependencies can prune a Chromium revision another project's suite
+# still needs from the shared `~/Library/Caches/ms-playwright` cache;
+# fixed by running `pnpm exec playwright install chromium` immediately
+# before each project's own suite, exactly as the CI steps in
+# `.github/workflows/ci.yml` / `.woodpecker.yml` already do per job
+# (each CI job gets its own fresh container, so this is a purely local,
+# shared-cache artefact — it would not reproduce there).

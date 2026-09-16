@@ -121,7 +121,13 @@
     };
 
     import { browser } from "$app/environment";
-    import { i18n, isRtl, t, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte.js";
+    import {
+        i18n,
+        isRtl,
+        t,
+        LOCALES,
+        LOCALE_LABELS,
+    } from "$lib/i18n.svelte.js";
 
     // Text sizes offered by the Lily TextSizePicker. Applied as
     // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
