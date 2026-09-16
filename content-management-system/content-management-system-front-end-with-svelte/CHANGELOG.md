@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-of-page chrome (theme, text-size, share pickers) previously
+wired `ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`src/routes/+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This adds a locale picker to the chrome for the first time in this
+project: `PickerBar` bundles all four unconditionally, with no way to
+omit one. Wired with `applyDir={false}` and
+`onChange={(code) => i18n.set(code)}`, since this app's own
+`src/lib/i18n.svelte.ts` store already reflects `lang`/`dir` onto
+`<html>`. The theme picker keeps its existing `storageKey`
+(`mxi.cms.theme`, moved into `themeProps`) and its slug-to-label
+auto-titlecasing (no `themeLabels` override existed before, and none
+was added).
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon; the Mastodon target
+now points at `mastodonshare.com` instead of `mastodon.social/share`
+(a generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
+Also added `en_US` ("English (United States)") to
+`src/lib/i18n.svelte.ts`'s `LOCALES`/`LOCALE_LABELS`/`STRINGS` (a
+duplicate of `en`'s copy — `en`'s own strings were already
+American-spelled, so this is a distinct locale-picker entry, not a
+spelling fork) and taught `normaliseLocale` to match a region variant
+like `en_US`/`en-US` exactly before falling back to stripping to its
+primary subtag (previously `en_US` would have silently collapsed to
+`en`, since the exact-match branch compared a lowercased input against
+the un-lowercased `LOCALES` entries and so never actually matched a
+mixed-case code). `tests/unit/i18n.test.ts` bumped its locale count to
+fourteen, excludes `en_US` from the "actually translates" parity check
+(it is a deliberate verbatim duplicate, not a translation gap), and
+adds a case pinning `en_US`/`en-US`/`EN_US` all resolving to `en_US`
+while `en` stays `en`.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (CMS-T27)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,
