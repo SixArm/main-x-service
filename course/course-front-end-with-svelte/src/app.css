@@ -34,16 +34,27 @@
 
 /* Lily TextSizePicker: attribute-based (`data-text-size` on <html>,
    mirroring ThemePicker's `data-theme`), scaling the root font size so
-   every `rem`-based measurement in the app follows. "medium" is the
-   unscaled default and carries no rule. */
-:root[data-text-size="small"] {
+   every `rem`-based measurement in the app follows. Lily's default
+   seven-step scale (PickerBar's DEFAULT_SIZES) is used unmodified,
+   largest-to-smallest; "normal" is the unscaled default and carries no
+   rule. */
+:root[data-text-size="smallest"] {
+  font-size: 75%;
+}
+:root[data-text-size="smaller"] {
   font-size: 87.5%;
+}
+:root[data-text-size="small"] {
+  font-size: 93.75%;
 }
 :root[data-text-size="large"] {
   font-size: 112.5%;
 }
-:root[data-text-size="x-large"] {
+:root[data-text-size="larger"] {
   font-size: 125%;
+}
+:root[data-text-size="largest"] {
+  font-size: 150%;
 }
 
 body {
