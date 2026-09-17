@@ -7042,7 +7042,7 @@ crate above.
   fetch. Two crates independently re-run standalone afterward
   (`person-service-with-loco`, `project-portfolio-management-matcher`)
   as an extra spot-check, both green.
-- [ ] **PRO-H14 (M)** **Publish `main-x-service.github.io`.**
+- [x] **PRO-H14 (M)** **Publish `main-x-service.github.io`.**
   *(Premise corrected 2026-09-07: the scaffold below now exists — see
   `main-x-service.github.io/` in this monorepo and
   `spec/monorepo-github-pages/index.md` — recovered and merged from a
@@ -7077,6 +7077,33 @@ crate above.
   outward-facing, effectively irreversible action; confirm the domain
   with the maintainer before either the `static/llms.*` files (their
   `url` values depend on it) or the publish step.
+  **Done 2026-09-17.** Domain confirmed with the maintainer: a
+  dedicated repo, `SixArm/main-x-service.github.io` — but the premise
+  that naming it that way yields a bare `https://main-x-service.github.io/`
+  was wrong and corrected mid-rollout: GitHub Pages only serves that
+  top-level `<name>.github.io` form when the **owner account itself**
+  is named `<name>`; the owner here is `SixArm`, so the real, confirmed
+  live URL is `https://sixarm.github.io/main-x-service.github.io/`.
+  Both `static/llms.txt`/`static/llms.json` generated (the root
+  `llms.json`'s same entries, every `url` rewritten to its GitHub
+  source since this site renders only four overview routes, plus a new
+  "This site" section for those routes) — same script derives both
+  files from one JSON so they can't drift from each other. Publish
+  step needed two prerequisite fixes neither WEB-2 nor the original
+  scaffold had caught: `lily-design-system-svelte-theme-picker` was
+  still a `file:` path onto the sibling checkout (switched to the
+  registry version, `agents/share/svelte-front-end-stack.md`), and
+  `static/assets/themes` was a symlink onto that same checkout (now a
+  vendored copy) — both resolved correctly only while nested inside
+  the monorepo, one directory level deeper than where `git subtree
+  split` promotes this directory to, so both would have silently
+  broken on the very first real export. Repo created, `git subtree
+  push` run, Pages enabled (`build_type=workflow`, matching
+  `deploy.yml`'s `actions/deploy-pages` usage). Live site verified with
+  a real browser: renders, no console errors, all four Lily pickers
+  present (picker-bar landed on top separately — see the sibling
+  `spec/lily-design-system-svelte-with-picker-bar/index.md` work),
+  45 theme options with the UK/US group last.
 
 ### PRO-P — per-family targeted fixes
 
