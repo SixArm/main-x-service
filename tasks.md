@@ -7708,11 +7708,14 @@ green as it sits; these finish it)**
 > which is the single source of truth for them. Only the consequences
 > that cross a subproject boundary are listed here.
 
-- [ ] **PA-1 (L)** care-pathway **T-14a … T-14m** — the entity-level
+- [x] **PA-1 (L)** care-pathway **T-14a … T-14m** — the entity-level
   queue. Tracked there, not here; this row exists so the family plan
   shows the work. Suggested order and the pure-function / property-test
-  discipline are stated in T-14.
-- [ ] **PA-2 (S)** Record the two disclosure rules the triage settled
+  discipline are stated in T-14. **Done 2026-09-17** — confirmed via
+  [`care-pathway/spec/13-tasks.md`](care-pathway/spec/13-tasks.md) that
+  all thirteen T-14 sub-tasks (T-14a through T-14m) landed 2026-09-09
+  through 2026-09-11; no further work needed here.
+- [x] **PA-2 (S)** Record the two disclosure rules the triage settled
   in the family contract,
   [`agents/share/time-based-analysis.md`](agents/share/time-based-analysis.md)
   §8, so portfolio and patient-flow inherit them rather than re-decide:
@@ -7722,6 +7725,9 @@ green as it sits; these finish it)**
   **secondary suppression** of sibling cells is required wherever a
   withheld cell could be recovered by differencing against a visible
   total. Depends: care-pathway T-14k (the reference implementation).
+  **Done 2026-09-17** — both rules written into §8 as a new subsection,
+  citing care-pathway's `src/suppression.rs` (`decide()`/`render()`,
+  `is_suppressed()`) as the reference implementation to copy.
 - [x] **PA-3 (S)** Adopt the CONSORT attrition record (care-pathway
   T-14g's `{label, operation, n, parent}` shape) on the other two TBA
   surfaces — portfolio's cross-plan rollup and patient-flow's
@@ -7750,21 +7756,29 @@ green as it sits; these finish it)**
   different cohort shape than a linear status/window screen. See
   `project-portfolio-management/spec/time-based-analysis.md` §7.5/§15/
   §16 for the full account.
-- [ ] **PA-4 (S)** Add `event_log` and `journey_features` as named
+- [x] **PA-4 (S)** Add `event_log` and `journey_features` as named
   export codecs to
   [`agents/share/bulk-import-export.md`](agents/share/bulk-import-export.md)
   §5, with the rule TreatmentPatterns enforces by splitting `export()`
   from `exportPatientLevel()`: a per-journey row is **patient-level and
   non-shareable** — gated by masking profile and audited, never
   suppressed as if it were an aggregate. Depends: care-pathway T-14a.
-- [ ] **PA-5 (S)** Open question to settle family-wide, not
+  **Done 2026-09-17** — written as new §5.1, naming both codecs, the
+  role-not-identifier `resource` rule for `event_log`, and the
+  destructive-action-not-read gating (mirroring `continues_as`) rather
+  than a suppression pass, since a patient-level row has no cell to
+  suppress.
+- [x] **PA-5 (S)** Open question to settle family-wide, not
   per-service: where a fairness slice by demographic attributes is
   computed at all (care-pathway [OQ-7](care-pathway/spec/16-open-questions.md)).
   The lean there is "in the caller's secure processing environment over
   the exported features, not in the registry"; if that is the family
   answer, write it into
   [`agents/share/privacy.md`](agents/share/privacy.md) so case and
-  patient-flow do not each re-open it.
+  patient-flow do not each re-open it. **Done 2026-09-17** — adopted the
+  lean as the family answer and wrote it into `privacy.md` as a new
+  subsection, pointing at `journey_features` (PA-4) as the intended
+  export path for such a join.
 
 ## Phase 10 — PPM evaluation-criteria triage (2026-09-03)
 

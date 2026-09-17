@@ -147,6 +147,42 @@ GET    /api/<plural>/bulk-jobs      list (filter by kind/status); GET .../{id} f
   dependency (`arrow`/`parquet`), **feature-gated** and **export-first** in v1
   (import is roadmap, §12).
 
+### 5.1 Named export codecs — `event_log` and `journey_features`
+
+Beyond the entity's own wire-shaped rows (§4's generic export), a crate
+that carries [time-based analysis](time-based-analysis.md) offers two
+additional **named, export-only** codecs, each CSV **and** JSONL, care-
+pathway's T-14a being the reference (repo `tasks.md` PA-4):
+
+- **`event_log`** — one row per activity instance: a case/activity/
+  timestamp/lifecycle/resource shape (the process-mining literature's
+  event-log convention), `lifecycle` distinguishing `start`/`complete`
+  where an activity has duration. `resource` is a **role**, never an
+  actor's raw identifier or `EntityRef` — the codec must not produce a
+  re-identifiable actor reference in the first place, not rely on a
+  masking pass to strip one afterwards.
+- **`journey_features`** — one row per cohort member: the derived
+  per-journey figures (value-adding ratio, per-stage durations, gap
+  count, a `censored` flag for a still-running clock, …) that a fairness
+  or survival analysis would otherwise have to re-derive from raw
+  segments.
+
+**Both are patient-level and non-shareable — never treated as an
+aggregate.** This is the rule TreatmentPatterns enforces by splitting
+`export()` (population-level, shareable) from `exportPatientLevel()`
+(gated separately): a per-journey row names one subject's timeline, so
+it carries none of §8's aggregate-suppression machinery (there is no
+cell to suppress — withholding would mean refusing the whole row) and
+instead is gated **as a disclosure**, not a read: `Action::Destructive`
+(mirroring the `continues_as` bulk-pull precedent,
+[cross-service-linking.md §10.2](cross-service-linking.md)) rather than
+`Action::Read`, and every call is audited as a disclosure. A crate with
+no masking-profile mechanism of its own (care-pathway's `event_log` has
+none) satisfies this by construction — never emitting a raw actor
+reference — rather than by a profile knob; a crate that does carry
+masking profiles gates these codecs by profile in addition to the
+destructive-action check, not instead of it.
+
 ## 6. Import semantics
 
 Per row, in the worker:

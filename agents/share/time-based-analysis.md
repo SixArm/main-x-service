@@ -340,6 +340,33 @@ metrics adoption applies the same suppression, plus a **series cap**
 the monitoring down is worse than no metric). Neither bound may be
 silent: export the suppressed and dropped counts alongside.
 
+**The two disclosure rules, settled family-wide.** care-pathway's T-14k
+(`src/suppression.rs`) triaged TreatmentPatterns' three cell-suppression
+modes and kept one shape; the two rules below are that decision, stated
+here so portfolio and patient-flow inherit them rather than re-decide
+(repo `tasks.md` PA-2):
+
+1. **A suppressed cell is withheld with a reason, or removed — never
+   "censored up".** TreatmentPatterns' `minCellCount` mode reports a
+   suppressed cell *as* the threshold value, which reads as a real
+   count; its `mean` mode substitutes a made-up figure. Neither is
+   adopted. The only two modes are `Withhold` (the default: `null` plus
+   a sibling reason, per the null-figure convention in §9) and `Remove`
+   (drop the key entirely).
+2. **Secondary suppression is required wherever a withheld cell could
+   be recovered by differencing against a visible total.** Whenever a
+   declared partition — a row, a column, or any other group whose
+   members sum to a published margin — is left with exactly one
+   suppressed cell, one more cell from that partition is suppressed too
+   (the smallest remaining visible one, deterministically), repeated to
+   a fixed point. Without this, `margin − Σ(visible siblings)` recovers
+   the one number the primary suppression was meant to hide.
+
+care-pathway's `src/suppression.rs` (`decide()`/`render()` over a
+generic `Table` of cells + partitions, `is_suppressed(n)` for the scalar
+case) is the reference implementation; a crate adopting these rules
+should copy its shape rather than reinvent it.
+
 ## 9. Response conventions
 
 - Durations in **milliseconds** (`*_ms`) plus a rounded `*_days` for
