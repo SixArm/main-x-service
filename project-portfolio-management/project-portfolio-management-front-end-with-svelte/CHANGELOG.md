@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
+
+Removed the hand-maintained `THEMES`/`THEME_LABELS` (39 slugs — a subset
+of Lily's own 45, missing `adobe-spectrum`, `mozilla-protocol`, and the
+UK/US government themes) and `SIZES`/`SIZE_LABELS` (a custom 4-step
+`small`/`medium`/`large`/`x-large` scale) arrays from `+layout.svelte`.
+`PickerBar` now gets no `themes`/`sizes` prop at all, so it uses its own
+`DEFAULT_THEMES` (45, alphabetical, UK/US government themes grouped at
+the end) and `DEFAULT_SIZES` (the 7-step `largest`…`smallest` scale)
+directly — a superset of what was offered before, not a behavioural
+narrowing.
+
+`src/app.css`'s `[data-text-size]` rules rewritten for the new 7-step
+scale (was 3 rules for `small`/`large`/`x-large`; the custom scale's
+`medium` default is now Lily's `normal`, still unscaled).
+
 ### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
 
 The top-bar chrome (theme, text-size, share pickers) previously wired
