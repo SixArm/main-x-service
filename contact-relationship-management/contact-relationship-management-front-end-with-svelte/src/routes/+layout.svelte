@@ -17,17 +17,6 @@
   // render with no `data` prop.
   const pageTitle = $derived(page.data?.title ?? t("brand.name"));
 
-  // Text sizes offered by the Lily TextSizePicker. Applied as
-  // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
-  // `data-theme`); see app.css for the corresponding font-size scale.
-  const SIZES = ["small", "medium", "large", "x-large"];
-  const SIZE_LABELS: Record<string, string> = {
-    small: "Small",
-    medium: "Medium",
-    large: "Large",
-    "x-large": "Extra large",
-  };
-
   // Share destinations for the Lily SharePicker. Lily ships no
   // third-party URLs — each `href` builder is ours. `url`/`title` are
   // supplied by SharePicker at share time (current page URL; the leaf
@@ -66,29 +55,6 @@
     },
   ];
 
-  // Lily theme catalogue offered in the theme select (DaisyUI-style
-  // slugs plus government/NHS design-system themes). Each slug has a
-  // stylesheet at `static/assets/themes/<slug>.css` (a symlink to the
-  // shared design-system themes) that ThemePicker swaps in; labels are
-  // title-cased from the slug by the component.
-  const THEMES = [
-    "abyss", "acid", "adobe-spectrum", "aqua", "autumn", "black",
-    "bumblebee", "business", "caramellatte", "cmyk", "coffee",
-    "corporate", "cupcake", "cyberpunk", "dark", "dim", "dracula",
-    "emerald", "fantasy", "forest", "garden", "halloween", "lemonade",
-    "light", "lofi", "luxury", "mozilla-protocol", "night", "nord",
-    "pastel", "retro", "silk", "sunset", "synthwave",
-    "united-kingdom-government-digital-service",
-    "united-kingdom-national-health-service-england-for-patients",
-    "united-kingdom-national-health-service-england-for-practitioners",
-    "united-kingdom-national-health-service-scotland-for-patients",
-    "united-kingdom-national-health-service-scotland-for-practitioners",
-    "united-kingdom-national-health-service-wales-for-patients",
-    "united-kingdom-national-health-service-wales-for-practitioners",
-    "united-states-web-design-system", "valentine", "winter", "wireframe",
-  ];
-
-
   $effect(() => {
     // `lang` must read as BCP 47 (hyphenated); `i18n.locale` uses an
     // underscore for a region subtag (e.g. "en_US") — this must agree
@@ -123,7 +89,6 @@
         share: t("nav.share"),
       }}
       themesUrl="/assets/themes/"
-      themes={THEMES}
       themeProps={{ storageKey: "mxi.crm.theme" }}
       locales={[...LOCALES]}
       localeProps={{
@@ -132,10 +97,7 @@
         applyDir: false,
         onChange: (code: string) => i18n.set(code),
       }}
-      sizes={SIZES}
       textSizeProps={{
-        sizeLabels: SIZE_LABELS,
-        defaultValue: "medium",
         storageKey: "mxi.crm.text-size",
       }}
       shareTargets={SHARE_TARGETS}
