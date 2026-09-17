@@ -17,22 +17,22 @@
       "items": [
         {
           "title": "Home",
-          "url": "https://main-x-service.github.io/",
+          "url": "https://sixarm.github.io/main-x-service.github.io/",
           "description": "Elevator pitch and at-a-glance facts about the Main X Index"
         },
         {
           "title": "Architecture",
-          "url": "https://main-x-service.github.io/architecture/",
+          "url": "https://sixarm.github.io/main-x-service.github.io/architecture/",
           "description": "Layered request flow, the two internal service shapes, cross-cutting subsystems"
         },
         {
           "title": "Subprojects",
-          "url": "https://main-x-service.github.io/subprojects/",
+          "url": "https://sixarm.github.io/main-x-service.github.io/subprojects/",
           "description": "The full family index (services, matchers, libraries, front-ends, consumer apps, cross-cutting services), each linking to its GitHub source"
         },
         {
           "title": "About",
-          "url": "https://main-x-service.github.io/about/",
+          "url": "https://sixarm.github.io/main-x-service.github.io/about/",
           "description": "What this site is, spec-driven development, AI-assisted development, license"
         }
       ]
