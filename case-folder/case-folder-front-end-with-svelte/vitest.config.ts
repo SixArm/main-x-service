@@ -26,14 +26,14 @@ export default defineConfig({
             // PickerBar (theme/locale/text-size/share pickers as one row) has
             // a default export, like the individual theme-picker it replaced,
             // so it routes straight through StubComponent.svelte.
-            'lily-design-system-svelte-picker-bar': fileURLToPath(new URL('./src/lib/test-support/StubComponent.svelte', import.meta.url)),
+            '@lilydesignsystem/svelte-picker-bar': fileURLToPath(new URL('./src/lib/test-support/StubComponent.svelte', import.meta.url)),
             // The real share-picker package exports its component as a
             // *named* export (SharePicker), unlike picker-bar's default
             // export — so it routes through a thin re-export shim rather
             // than StubComponent.svelte directly. Only its `ShareTarget`
             // type is imported by +layout.svelte at this point, but the
             // alias is kept so a value import would still resolve safely.
-            'lily-design-system-svelte-share-picker': fileURLToPath(new URL('./src/lib/test-support/StubSharePicker.ts', import.meta.url))
+            '@lilydesignsystem/svelte-share-picker': fileURLToPath(new URL('./src/lib/test-support/StubSharePicker.ts', import.meta.url))
         },
         ...(process.env.VITEST ? { conditions: ['browser'] } : {})
     }

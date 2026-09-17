@@ -1,8 +1,8 @@
 <script lang="ts">
   import "../app.css";
   import { page } from "$app/state";
-  import PickerBar from "lily-design-system-svelte-picker-bar";
-  import type { ShareTarget } from "lily-design-system-svelte-share-picker";
+  import PickerBar from "@lilydesignsystem/svelte-picker-bar";
+  import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
   let { children } = $props();
 

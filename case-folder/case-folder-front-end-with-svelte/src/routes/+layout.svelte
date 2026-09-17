@@ -32,8 +32,8 @@
     import Footer from '$lib/components/Footer/Footer.svelte';
     import NavigationMenu from '$lib/components/NavigationMenu/NavigationMenu.svelte';
 
-    import PickerBar from 'lily-design-system-svelte-picker-bar';
-    import type { ShareTarget } from 'lily-design-system-svelte-share-picker';
+    import PickerBar from '@lilydesignsystem/svelte-picker-bar';
+    import type { ShareTarget } from '@lilydesignsystem/svelte-share-picker';
 
     import { cache } from '$lib/store/cache.svelte';
     import { api } from '$lib/api/client';

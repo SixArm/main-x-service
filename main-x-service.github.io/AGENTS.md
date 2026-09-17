@@ -43,18 +43,20 @@ subproject's own API — that stays in that subproject's own `spec/`.
   are re-exported.
 - This is a **static, unauthenticated** site (`prerender = true` at the
   root layout) — no BFF, no sessions, no forms. It uses only
-  `lily-design-system-svelte-theme-picker` from the family's Lily
+  `@lilydesignsystem/svelte-theme-picker` from the family's Lily
   dependency set (no locale/share/text-size pickers — this isn't an
   operator front-end with per-user preferences to persist), and — unlike
-  those front-ends — no `lily-design-system-svelte-picker-bar` either,
+  those front-ends — no `@lilydesignsystem/svelte-picker-bar` either,
   precisely because it needs only the one picker.
 - `.github/workflows/deploy.yml` lives **inside this subproject** on
   purpose: it does nothing while nested in the monorepo (GitHub Actions
   only reads a repo's *root* `.github/workflows/`), and becomes the live
   Pages-deploy workflow the moment `git subtree split` makes this
   directory the root of its own repo.
-- `lily-design-system-svelte-theme-picker` is a registry dependency
-  (`^0.1.1`), **not** a `file:` path onto the sibling `lilydesignsystem`
+- `@lilydesignsystem/svelte-theme-picker` is a registry dependency
+  (`^0.1.0`, under the `@lilydesignsystem` npm org scope — not the
+  earlier unscoped `lily-design-system-svelte-theme-picker`), **not** a
+  `file:` path onto the sibling `lilydesignsystem`
   checkout — a `file:` path here would be doubly wrong: it makes
   `pnpm install` impossible on any CI runner (the same reason every
   operator front-end switched, `agents/share/svelte-front-end-stack.md`),

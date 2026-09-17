@@ -91,9 +91,11 @@ component to add styles; extend the CSS instead.
 
 ### 8a. Lily packages come from the npm registry, not the sibling repo
 
-All six `lily-design-system-svelte-*` packages this app uses (`headless`,
+All six `@lilydesignsystem/svelte-*` packages this app uses (`headless`,
 `theme-picker`, `locale-picker`, `text-size-picker`, `share-picker`,
-`picker-bar`) are ordinary **`^`-pinned npm registry dependencies** in
+`picker-bar` — under the `@lilydesignsystem` npm org scope, not the
+earlier unscoped `lily-design-system-svelte-*` names) are ordinary
+**`^`-pinned npm registry dependencies** in
 `package.json` — not `file:` paths onto the sibling
 `~/git/lilydesignsystem/lily-design-system/` checkout. `npm install`
 (really `pnpm install`, family-wide) resolves them like any other

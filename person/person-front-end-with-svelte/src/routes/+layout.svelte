@@ -15,8 +15,8 @@
     import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
-    import PickerBar from "lily-design-system-svelte-picker-bar";
-    import type { ShareTarget } from "lily-design-system-svelte-share-picker";
+    import PickerBar from "@lilydesignsystem/svelte-picker-bar";
+    import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
     // Theme ids offered by the Lily ThemePicker (DaisyUI themes plus the
     // bespoke NHS England/Scotland/Wales patient & practitioner themes).
@@ -197,7 +197,7 @@
 
     // Lily headless example — uncomment after `pnpm install` resolves the
     // file: dependency to use Lily's accessibility-primitive Button:
-    // import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
+    // import Button from "@lilydesignsystem/svelte-headless/src/lib/components/Button/Button.svelte";
 
     // `data.signedIn` is resolved server-side from the httpOnly session
     // cookie (`+layout.server.ts`).

@@ -51,37 +51,49 @@ WEB-2) — there was nothing for `pnpm install` to succeed against.
   deliberately avoided elsewhere (`entity-ref`, `integrity-mac` are
   both **not** copied per consumer for this reason).
 
-## 3. Decision: registry versions
+## 3. Decision: registry versions, under the `@lilydesignsystem` npm org
 
-**Publish, and depend on the published semver version.** This is not
-hypothetical — checked 2026-09-16, every package this family uses is
-**already published**, and the published version matches the sibling
-checkout's current version exactly:
+**Publish, and depend on the published semver version.** This was
+first checked 2026-09-16 against the (then-unscoped) package names,
+found already true, and adopted family-wide in WEB-2. It moved again
+almost immediately: the Lily project itself migrated every package to
+a proper npm **organization scope**, `@lilydesignsystem`, dropping the
+redundant `lily-design-system-` prefix now that the scope carries that
+meaning, and resetting every package to `0.1.0` under the new
+namespace (npm scopes are separate registry namespaces — no version
+history carries over from the unscoped names, which remain published
+but are no longer the ones this family depends on):
 
-| Package | Local checkout | npm registry |
+| Package (unscoped, retired) | Package (current) | Version |
 |---|---|---|
-| `lily-design-system-svelte-headless` | 0.3.1 | 0.3.1 |
-| `lily-design-system-svelte-theme-picker` | 0.1.1 | 0.1.1 |
-| `lily-design-system-svelte-locale-picker` | 0.1.1 | 0.1.1 |
-| `lily-design-system-svelte-text-size-picker` | 0.1.1 | 0.1.1 |
-| `lily-design-system-svelte-share-picker` | 0.1.1 | 0.1.1 |
-| `lily-design-system-svelte-picker-bar` | 0.1.0 | 0.1.0 |
+| `lily-design-system-svelte-headless` | `@lilydesignsystem/svelte-headless` | 0.1.0 |
+| `lily-design-system-svelte-theme-picker` | `@lilydesignsystem/svelte-theme-picker` | 0.1.0 |
+| `lily-design-system-svelte-locale-picker` | `@lilydesignsystem/svelte-locale-picker` | 0.1.0 |
+| `lily-design-system-svelte-text-size-picker` | `@lilydesignsystem/svelte-text-size-picker` | 0.1.0 |
+| `lily-design-system-svelte-share-picker` | `@lilydesignsystem/svelte-share-picker` | 0.1.0 |
+| `lily-design-system-svelte-picker-bar` | `@lilydesignsystem/svelte-picker-bar` | 0.1.0 |
 
-So "publish and take a registry version" needs no new publishing work
-today — only a `package.json` change, in every front-end, from a
-`file:` path to a `^`-prefixed registry version:
+Creating the npm organization itself is a one-time, web-only step (the
+npm CLI has no `npm org create` — only `npm org set/rm/ls` for
+managing membership in an org that already exists); once it exists,
+publishing and depending on it is ordinary npm.
+
+Every front-end's `package.json` (and every `import`/`resolve.alias`
+naming these packages) uses the scoped names:
 
 ```jsonc
-"lily-design-system-svelte-headless": "^0.3.1",
-"lily-design-system-svelte-locale-picker": "^0.1.1",
-"lily-design-system-svelte-picker-bar": "^0.1.0",
-"lily-design-system-svelte-share-picker": "^0.1.1",
-"lily-design-system-svelte-text-size-picker": "^0.1.1",
-"lily-design-system-svelte-theme-picker": "^0.1.1",
+"@lilydesignsystem/svelte-headless": "^0.1.0",
+"@lilydesignsystem/svelte-locale-picker": "^0.1.0",
+"@lilydesignsystem/svelte-picker-bar": "^0.1.0",
+"@lilydesignsystem/svelte-share-picker": "^0.1.0",
+"@lilydesignsystem/svelte-text-size-picker": "^0.1.0",
+"@lilydesignsystem/svelte-theme-picker": "^0.1.0",
 ```
 
 `pnpm install --frozen-lockfile` then succeeds on a clean runner with
-no sibling checkout — the property WEB-2's CI stage needs.
+no sibling checkout — the property WEB-2's CI stage needs — exactly as
+it did under the unscoped names; the scope migration changes the
+package identity, not this property.
 
 ## 4. The tradeoff, stated plainly
 
