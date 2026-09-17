@@ -524,6 +524,22 @@ cap**, so one enormous portfolio cannot become an unbounded response.
 that is not a tree; neither is silent, because a rollup that quietly
 covers half an estate reads as if it covered all of it.
 
+**The response also carries an `attrition` record** (TBA-12): a named,
+ordered, parent-linked trail — `root_plan` → `walked_plans` →
+`tasks_scanned`, then a three-way partition into `finished` /
+`work_in_progress` / `not_started` — explaining the `combined` figures'
+denominator inside the response rather than leaving the caller to
+reconstruct it from `tree` and `combined` by hand. This is a
+**reinterpretation**, not a port, of the CONSORT-style attrition trail
+`agents/share/time-based-analysis.md` §8 and care-pathway's T-14g
+established (repo `tasks.md` PA-3): a rollup's cohort is reached by a
+bounded containment tree walk with a per-plan task-count cap, not a
+linear status/window/suppression screen over one flat instance table,
+so the step vocabulary names what this endpoint actually filters
+(`walked_plans` discloses the tree walk's own `truncated`/`revisits`;
+`tasks_scanned` discloses which walked plans hit the per-plan task
+cap) rather than reusing care-pathway's literal step names.
+
 ## 8. Constraint analysis
 
 Findings ordered by **recoverable time**, each naming the rule that
@@ -873,6 +889,7 @@ each sum to the lead time; work ≤ process ≤ cycle ≤ lead; ratios in
 | **TBA-9** | Cross-plan rollup: flow across a plan and everything it contains, via `parent_ref` (§7.5) — **done 2026-08-24** | §14.1 |
 | **TBA-10** | Prometheus gauges: plan flow efficiency, p85 cycle time, WIP against limit — **done 2026-08-23** (`src/flow_metrics.rs`, default-off) | §14.1, §14.3 |
 | **TBA-11** | Monte-Carlo delivery forecasting — from the **throughput** distribution, not the cycle-time one (§9.2; the §17 entry records the correction) — **done 2026-08-23** | §14.1 |
+| **TBA-12** | Rollup attrition record: a named, parent-linked trail explaining the `rollup` response's denominator (§7.5; repo `tasks.md` PA-3) — **done 2026-09-17** | §14.1 |
 
 ## 16. Implementation status
 
@@ -925,6 +942,18 @@ spec's own §17 claim about which distribution a batch forecast needs.
 
 TBA-9 (cross-plan rollup) landed 2026-08-24: the pure, bounded
 `walk_descendants` in `src/tba.rs` and `GET /api/plans/{pid}/rollup`.
+
+TBA-12 (rollup attrition record) landed 2026-09-17: `AttritionStep` /
+`RollupAttritionInputs` / `ROLLUP_ATTRITION_STEP_LABELS` /
+`ROLLUP_ATTRITION_PARTITION_PARENT` / `rollup_attrition_trail` in
+`src/tba.rs`, wired into `GET /api/plans/{pid}/rollup`'s response as a
+new `attrition` key (`src/controllers/tba.rs`). Prompted by repo
+`tasks.md` PA-3, which named this endpoint alongside care-pathway's
+T-14g and patient-flow's `GET /api/stays/{pid}/time-analysis` as
+needing the same CONSORT-style disclosure; investigating patient-flow's
+endpoint found it serves one stay, not a cohort, so it has no
+denominator to explain and PA-3's scope there was corrected rather than
+built against (see repo `tasks.md`'s own note).
 
 **Every TBA task is now closed.** What remains are the §17 open
 questions, which are decisions rather than unbuilt work.

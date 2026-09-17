@@ -7722,12 +7722,34 @@ green as it sits; these finish it)**
   **secondary suppression** of sibling cells is required wherever a
   withheld cell could be recovered by differencing against a visible
   total. Depends: care-pathway T-14k (the reference implementation).
-- [ ] **PA-3 (S)** Adopt the CONSORT attrition record (care-pathway
+- [x] **PA-3 (S)** Adopt the CONSORT attrition record (care-pathway
   T-14g's `{label, operation, n, parent}` shape) on the other two TBA
   surfaces — portfolio's cross-plan rollup and patient-flow's
   `GET /api/stays/{pid}/time-analysis` cohort reads — so every cohort
   denominator in the family is explained inside the response. Depends:
-  T-14g.
+  T-14g. **Done 2026-09-17, portfolio only — premise corrected for
+  patient-flow.** Investigated both target endpoints before
+  implementing (`project-portfolio-management-service-with-loco`'s
+  `GET /api/plans/{pid}/rollup` and `patient-flow-service-with-rust`'s
+  `GET /api/stays/{pid}/time-analysis`): the latter is confirmed
+  **per-stay** (one `pid`, one timeline), not a cohort read — it has no
+  denominator, no status/window/suppression filter over a population,
+  and no other cohort-level TBA endpoint exists in that crate to attach
+  an attrition record to instead. This task's original premise (both
+  are "cohort reads") was wrong for patient-flow; rather than force a
+  record onto an endpoint with nothing to explain, that leg is dropped.
+  Portfolio's rollup genuinely has a cohort (the union of tasks under a
+  walked plan subtree) and real exclusions to explain (tree-walk depth/
+  node caps + revisits, the per-plan task-count cap, and the finished/
+  work-in-progress/not-started partition) — landed as TBA-12
+  (`project-portfolio-management-service-with-loco/src/tba.rs`:
+  `AttritionStep`/`RollupAttritionInputs`/`rollup_attrition_trail`,
+  wired into `rollup`'s response as a new `attrition` key), a
+  **reinterpretation** of care-pathway's literal step vocabulary rather
+  than a drop-in port, since a bounded tree walk is a structurally
+  different cohort shape than a linear status/window screen. See
+  `project-portfolio-management/spec/time-based-analysis.md` §7.5/§15/
+  §16 for the full account.
 - [ ] **PA-4 (S)** Add `event_log` and `journey_features` as named
   export codecs to
   [`agents/share/bulk-import-export.md`](agents/share/bulk-import-export.md)
