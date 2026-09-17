@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — full Lily `PickerBar` in the header, not `ThemePicker` alone
+
+Per `spec/lily-design-system-svelte-with-picker-bar/index.md`: replaced
+the lone `ThemePicker` with `@lilydesignsystem/svelte-picker-bar`
+(theme + locale + text-size + share, same as every operator
+front-end), with `themes`/`sizes` left unset so it uses Lily's own
+defaults (45 themes, alphabetical with the UK/US government themes
+grouped at the end; the 7-step `largest`…`smallest` text-size scale)
+rather than a hand-maintained list — the site's previous `THEMES`
+array (33 slugs) was already a subset of Lily's own 45. Added the
+matching `[data-text-size]` CSS rules to `static/assets/style.css`
+(this site never had a text-size picker before). No i18n catalogue
+exists here, so the locale picker runs self-contained — a local
+`LOCALES`/`LOCALE_LABELS` array, `lang`/`dir` applied by the picker
+itself rather than an app store (same special case as
+`patient-flow-front-end-with-svelte`). `SHARE_TARGETS` matches every
+other front-end: Email / LinkedIn / Reddit / Bluesky / Mastodon (via
+mastodonshare.com), plus Copy Link.
+
+Verified live: all four pickers render, 45 theme options, every share
+target present, no console errors.
+
 ### Changed — fixed the site for actual publish (PRO-H14)
 
 `lily-design-system-svelte-theme-picker` switched from a `file:` path
