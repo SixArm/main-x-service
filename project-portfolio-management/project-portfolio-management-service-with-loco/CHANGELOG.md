@@ -9,6 +9,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — rollup attrition record (TBA-12, repo `tasks.md` PA-3)
+
+`GET /api/plans/{pid}/rollup` gains an `attrition` key: a named,
+ordered, parent-linked trail (`root_plan` → `walked_plans` →
+`tasks_scanned`, then a `finished`/`work_in_progress`/`not_started`
+three-way partition) explaining the `combined` figures' denominator
+inside the response. `src/tba.rs`: `AttritionStep`,
+`RollupAttritionInputs`, `ROLLUP_ATTRITION_STEP_LABELS`,
+`ROLLUP_ATTRITION_PARTITION_PARENT`, `rollup_attrition_trail`, 6 new
+unit tests. A **reinterpretation** of care-pathway's T-14g CONSORT
+attrition trail (`agents/share/time-based-analysis.md` §8), not a
+literal port: this endpoint's cohort is reached by a bounded
+containment tree walk with a per-plan task-count cap, not a linear
+status/window/suppression screen, so the step vocabulary names the
+tree walk's own `truncated`/`revisits` and the per-plan `MAX_TASKS`
+cap rather than reusing care-pathway's literal labels. See
+`project-portfolio-management/spec/time-based-analysis.md` §7.5/§15/§16
+for the full account, including why patient-flow's leg of PA-3 was
+corrected rather than built (its `time-analysis` endpoint serves one
+stay, not a cohort — no denominator to explain).
+
 ### Added — outbound signed webhooks as a relay sink (T-28m, root `tasks.md` EV-3)
 
 `src/webhooks.rs`: a `WebhookSink` beside the relay's existing

@@ -544,7 +544,7 @@ fn tba_plan_paths() -> Value {
 }
 
 /// The cross-plan rollup path (`spec/time-based-analysis.md` §15
-/// TBA-9).
+/// TBA-9; the `attrition` key is TBA-12).
 fn tba_rollup_paths() -> Value {
     let plan_for_rollup = json!({
         "name": "pid", "in": "path", "required": true,
@@ -555,13 +555,13 @@ fn tba_rollup_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "Flow across a plan and everything it contains",
-                "description": "The combined figures are the **union of every task under this plan**, not an average of the children's ratios — averaging would weight a five-task plan equally with a five-hundred-task one. The per-plan table is returned alongside and, for a portfolio, is usually the more useful half: a rollup mixes boards whose teams mean different things by `in_progress`, so which child differs is a firmer finding than the combined number. The walk is bounded by depth and node caps and reports `truncated` when one fires; `revisits` is non-zero when containment is not a tree, which the write path should have refused.",
+                "description": "The combined figures are the **union of every task under this plan**, not an average of the children's ratios — averaging would weight a five-task plan equally with a five-hundred-task one. The per-plan table is returned alongside and, for a portfolio, is usually the more useful half: a rollup mixes boards whose teams mean different things by `in_progress`, so which child differs is a firmer finding than the combined number. The walk is bounded by depth and node caps and reports `truncated` when one fires; `revisits` is non-zero when containment is not a tree, which the write path should have refused. The `attrition` key names each step from the root plan down to the finished/work-in-progress/not-started split, so the combined figures' denominator is explained inside the response rather than left for the caller to reconstruct from `tree`/`combined` by hand.",
                 "parameters": [
                     plan_for_rollup,
                     { "name": "depth", "in": "query", "schema": { "type": "integer", "default": 32, "minimum": 1, "maximum": 32 } }
                 ],
                 "responses": {
-                    "200": { "description": "Combined figures, the walked tree, and the per-plan comparison" },
+                    "200": { "description": "Combined figures, the walked tree, the per-plan comparison, and the attrition record explaining the denominator" },
                     "404": { "description": "Unknown plan" },
                     "422": { "description": "depth out of range" }
                 }
