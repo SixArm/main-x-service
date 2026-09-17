@@ -36,40 +36,6 @@
     document.body.classList.toggle("kiosk", kiosk);
   });
 
-  // Lily theme catalogue offered in the theme select (DaisyUI-style
-  // slugs plus government/NHS design-system themes — the NHS ones are
-  // the natural fit here). Each slug has a stylesheet at
-  // `static/assets/themes/<slug>.css` (a symlink to the shared
-  // design-system themes) that ThemePicker swaps in; labels are
-  // title-cased from the slug by the component.
-  const THEMES = [
-    "abyss", "acid", "adobe-spectrum", "aqua", "autumn", "black",
-    "bumblebee", "business", "caramellatte", "cmyk", "coffee",
-    "corporate", "cupcake", "cyberpunk", "dark", "dim", "dracula",
-    "emerald", "fantasy", "forest", "garden", "halloween", "lemonade",
-    "light", "lofi", "luxury", "mozilla-protocol", "night", "nord",
-    "pastel", "retro", "silk", "sunset", "synthwave",
-    "united-kingdom-government-digital-service",
-    "united-kingdom-national-health-service-england-for-patients",
-    "united-kingdom-national-health-service-england-for-practitioners",
-    "united-kingdom-national-health-service-scotland-for-patients",
-    "united-kingdom-national-health-service-scotland-for-practitioners",
-    "united-kingdom-national-health-service-wales-for-patients",
-    "united-kingdom-national-health-service-wales-for-practitioners",
-    "united-states-web-design-system", "valentine", "winter", "wireframe",
-  ];
-
-  // Text sizes offered by the Lily TextSizePicker. Applied as
-  // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
-  // `data-theme`); see app.css for the corresponding font-size scale.
-  const SIZES = ["small", "medium", "large", "x-large"];
-  const SIZE_LABELS: Record<string, string> = {
-    small: "Small",
-    medium: "Medium",
-    large: "Large",
-    "x-large": "Extra large",
-  };
-
   // Share destinations for the Lily SharePicker. Lily ships no
   // third-party URLs — each `href` builder is ours. `url`/`title` are
   // supplied by SharePicker at share time (current page URL; the leaf
@@ -138,14 +104,10 @@
         share: "Share",
       }}
       themesUrl="/assets/themes/"
-      themes={THEMES}
       themeProps={{ storageKey: "mxi.patient-flow.theme" }}
       locales={[...LOCALES]}
       localeProps={{ localeLabels: LOCALE_LABELS }}
-      sizes={SIZES}
       textSizeProps={{
-        sizeLabels: SIZE_LABELS,
-        defaultValue: "medium",
         storageKey: "mxi.patient-flow.text-size",
       }}
       shareTargets={SHARE_TARGETS}
