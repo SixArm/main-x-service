@@ -22,8 +22,8 @@
   import type { Snippet } from "svelte";
   import type { LayoutData } from "./$types";
   import { i18n, t, isRtl, LOCALES, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
-  import PickerBar from "lily-design-system-svelte-picker-bar";
-  import type { ShareTarget } from "lily-design-system-svelte-share-picker";
+  import PickerBar from "@lilydesignsystem/svelte-picker-bar";
+  import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
   // Lily theme catalogue offered in the theme select (incl.
   // NHS England/Scotland/Wales patient & practitioner themes). Each slug

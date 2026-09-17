@@ -14,7 +14,7 @@
 <script lang="ts">
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
-    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
+    import { ThemePicker } from "@lilydesignsystem/svelte-theme-picker";
 
     // Same theme catalogue as the family's operator front-ends (DaisyUI
     // themes plus the bespoke NHS England/Scotland/Wales themes) — each

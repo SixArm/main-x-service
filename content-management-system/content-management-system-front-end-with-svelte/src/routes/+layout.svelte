@@ -2,8 +2,8 @@
   import "../app.css";
   import { page } from "$app/state";
   import { i18n, isRtl, t, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte";
-  import PickerBar from "lily-design-system-svelte-picker-bar";
-  import type { ShareTarget } from "lily-design-system-svelte-share-picker";
+  import PickerBar from "@lilydesignsystem/svelte-picker-bar";
+  import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
   let { children } = $props();
 

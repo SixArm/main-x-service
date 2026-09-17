@@ -39,8 +39,8 @@
         LOCALES,
         LOCALE_LABELS,
     } from "$lib/i18n.svelte.js";
-    import PickerBar from "lily-design-system-svelte-picker-bar";
-    import type { ShareTarget } from "lily-design-system-svelte-share-picker";
+    import PickerBar from "@lilydesignsystem/svelte-picker-bar";
+    import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
     // Available Lily/daisyUI theme names offered by the ThemePicker.
     // Lily theme catalogue offered in the theme select (incl.
@@ -197,7 +197,7 @@
 
     // Lily headless example — uncomment after `pnpm install` resolves the
     // file: dependency to use Lily's accessibility-primitive Button:
-    // import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
+    // import Button from "@lilydesignsystem/svelte-headless/src/lib/components/Button/Button.svelte";
 
     // `data.signedIn` is resolved server-side from the httpOnly session
     // cookie (`+layout.server.ts`); the browser never holds a token.

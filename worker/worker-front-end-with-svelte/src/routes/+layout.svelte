@@ -16,8 +16,8 @@
     import "../app.css";
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
-    import PickerBar from "lily-design-system-svelte-picker-bar";
-    import type { ShareTarget } from "lily-design-system-svelte-share-picker";
+    import PickerBar from "@lilydesignsystem/svelte-picker-bar";
+    import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
     // Full set of selectable Lily/DaisyUI-style themes shown in the picker,
     // including NHS-specific themes for healthcare deployments.
@@ -134,7 +134,7 @@
 
     // Lily headless example — uncomment after `pnpm install` resolves the
     // file: dependency to use Lily's accessibility-primitive Button:
-    // import Button from "lily-design-system-svelte-headless/src/lib/components/Button/Button.svelte";
+    // import Button from "@lilydesignsystem/svelte-headless/src/lib/components/Button/Button.svelte";
 
     // Text sizes offered by the Lily TextSizePicker. Applied as
     // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
