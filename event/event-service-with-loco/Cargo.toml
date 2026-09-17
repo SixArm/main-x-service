@@ -143,7 +143,7 @@ fluvio = ["dep:fluvio"]
 # Testing
 assertables = "10"
 tokio-test = "0.4"
-mockall = "0.13"
+mockall = "0.15"
 tempfile = "3.27"
 # T-2: proves the date-proximity scorer's timezone correctness against
 # the real IANA tz database (DST-aware), not a hand-picked fixed offset
