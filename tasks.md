@@ -7800,7 +7800,12 @@ green as it sits; these finish it)**
   queue. Tracked there, not here; this row exists so the family plan
   shows the work. Suggested order is stated in T-28 (the phased budget
   baseline T-28b first — it unblocks SPI/CPI, which T-23 left
-  permanently `no_baseline`).
+  permanently `no_baseline`). **2026-09-18: every item reachable
+  without an external blocker is done** —
+  T-28a/b/c/d/g/h/i/j/l/m/o/p all `[x]` in
+  `project-portfolio-management/spec/13-tasks.md`. **Still open**:
+  T-28e and T-28n (both depend on T-8, unbuilt); T-28f and T-28k (both
+  front-end-only, not yet picked up).
 - [ ] **EV-2 (L)** Enterprise identity federation — **SAML 2.0 and
   OIDC** as *upstream* identity providers to `authentication-service`,
   so a deployment's existing IdP signs users in and the family's own
