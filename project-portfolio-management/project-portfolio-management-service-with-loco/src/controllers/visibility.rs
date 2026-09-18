@@ -295,6 +295,72 @@ async fn list_milestones(
     format::json(views)
 }
 
+/// `PUT /api/plans/{pid}/milestones/{m_pid}` body.
+#[derive(Debug, Deserialize)]
+struct MilestoneReschedulePayload {
+    due: chrono::NaiveDate,
+}
+
+/// `PUT /api/plans/{pid}/milestones/{m_pid}` — reschedule a milestone's
+/// `due` date.
+///
+/// Added for T-28g: the `milestone_due_changed` trigger needs a real
+/// write path, and none existed before this — a milestone could be
+/// created and completed, never moved. Fires the trigger only when
+/// `due` actually changes, mirroring `plans::update`'s
+/// `plan_timeframe_changed` firing.
+#[debug_handler]
+async fn reschedule_milestone(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path((pid, m_pid)): Path<(String, String)>,
+    Json(payload): Json<MilestoneReschedulePayload>,
+) -> Result<Response> {
+    let item = super::governance::find_item(&ctx, &pid).await?;
+    let m_pid = Uuid::parse_str(&m_pid).map_err(|_| Error::NotFound)?;
+    let milestone = vis_models::find_milestone(&ctx.db, m_pid).await?;
+    if milestone.plan_pid != item.pid {
+        return Err(Error::NotFound);
+    }
+    let old_due = milestone.due;
+    let row_pid = milestone.pid;
+    let mut active: milestones::ActiveModel = milestone.into();
+    active.due = ActiveValue::set(payload.due);
+    let row = active
+        .update(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    AuditModel::record(
+        &ctx.db,
+        row_pid,
+        "milestone_rescheduled",
+        caller.actor(),
+        None,
+    )
+    .await
+    .ok();
+
+    if old_due != payload.due {
+        super::automation::fire(
+            &ctx,
+            &crate::automation::TriggerFact {
+                kind: "milestone_due_changed".to_string(),
+                plan_pid: item.pid,
+                from_status: Some(old_due.to_string()),
+                to_status: Some(payload.due.to_string()),
+            },
+            "milestone",
+            row_pid,
+            caller.actor(),
+        )
+        .await;
+    }
+
+    format::json(serde_json::json!({
+        "pid": row.pid.to_string(), "name": row.name, "due": row.due,
+    }))
+}
+
 /// `POST /api/plans/{pid}/milestones/{m_pid}/complete`.
 #[debug_handler]
 async fn complete_milestone(
@@ -881,6 +947,7 @@ pub fn routes() -> Routes {
         .add("/plans/{pid}/schedule", get(portfolio_schedule))
         .add("/plans/{pid}/milestones", post(create_milestone))
         .add("/plans/{pid}/milestones", get(list_milestones))
+        .add("/plans/{pid}/milestones/{m_pid}", put(reschedule_milestone))
         .add(
             "/plans/{pid}/milestones/{m_pid}/complete",
             post(complete_milestone),

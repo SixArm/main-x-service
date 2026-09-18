@@ -9,6 +9,43 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — deadline-shift trigger and rescheduling (T-28g)
+
+Two new automation triggers, narrowed to one field each like
+`milestone_due` was: `plan_timeframe_changed` (fires from
+`controllers::plans::update`) and `milestone_due_changed` (fires from a
+**new** `PUT /api/plans/{pid}/milestones/{m_pid}` reschedule endpoint —
+none existed before, a milestone could previously only be created and
+completed). Two new actions: `propose_reschedule` (walks direct
+`plan_dependencies` successors, computes each one's implied shift, and
+writes a notification carrying the proposal — moves nothing) and
+`shift_dependents` (applies the same computation instead of only
+proposing it, without re-entering the engine).
+
+`src/automation.rs` gains `SuccessorFact`/`ProposedShift`/
+`propose_shifts()` (8 unit tests). `src/controllers/automation.rs`
+gains `load_successors`/`act_propose_reschedule`/
+`act_shift_dependents`; `apply_action` now threads the firing's
+`action_index` through (bundled into a new `FiringContext` to stay
+under clippy's argument-count lint), so `shift_dependents` can log one
+`automation_runs` row per successor actually moved, in addition to the
+one row the engine already logs for the action as a whole. 3 new
+DB-gated request tests in `tests/requests/capabilities.rs`, including
+one proving `shift_dependents` does not cascade into a second rule
+watching the successor's own `plan_timeframe_changed`.
+
+Two scope decisions recorded in `spec/13-tasks.md` T-28g rather than
+guessed: every successor is proposed the **same** delta as the
+predecessor's own shift, regardless of lag (a fixed lag does not change
+how a delta propagates through it — lag only matters for the
+already-violated check); and `shift_dependents` re-derives the shift
+live rather than parsing back a prior `propose_reschedule`
+notification, since `notifications.message` carries no structured
+payload and re-deriving guarantees the two actions can never disagree.
+
+`cargo test --lib` 406/406, DB-gated suite 88/88 (was 85), clippy
+`-D warnings` clean, fmt clean.
+
 ### Added — phased budget baseline → EAC/ETC forecast (T-28b)
 
 New pure module `src/financials.rs` (`Baseline`/`BaselinePeriod`/

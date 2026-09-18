@@ -443,9 +443,39 @@ async fn update(
         &crate::auth::plan_resource_attrs(model.stage.as_deref()),
     )
     .map_err(super::record_rejection)?;
+    let plan_pid = model.pid;
+    // Captured before the write, since `target_date` lives in the
+    // payload and `model` is about to be consumed.
+    let old_target_date = model.to_plan().ok().and_then(|p| p.target_date);
     let updated = streaming::update_and_emit(&ctx.db, model, &wi, caller.actor()).await?;
     // Audit is written inside `update_and_emit` (see `streaming`).
     Metrics::global().plan_updated_total.inc();
+
+    // T-28g's deadline-shift trigger (FR-32): narrowed to `target_date`
+    // — "the plan's end" — the same way `milestone_due` was narrowed to
+    // one field rather than guessing a general task-date convention.
+    // Unlike a task-status trigger, `from_status`/`to_status` here
+    // carry the **old/new date strings themselves**, not a status
+    // filter — a rule for this trigger kind is refused one at write
+    // time (`automation::validate_trigger`), so every rule matches on
+    // the trigger firing at all, and it is the *action* that reads the
+    // two dates to compute a shift.
+    if old_target_date != wi.target_date {
+        super::automation::fire(
+            &ctx,
+            &crate::automation::TriggerFact {
+                kind: "plan_timeframe_changed".to_string(),
+                plan_pid,
+                from_status: old_target_date,
+                to_status: wi.target_date.clone(),
+            },
+            "plan",
+            plan_pid,
+            caller.actor(),
+        )
+        .await;
+    }
+
     format::json(PlanRef::of(&updated))
 }
 

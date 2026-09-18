@@ -1667,6 +1667,7 @@ mod tests {
         "/api/dependencies/{pid}",
         "/api/plans/{pid}/schedule",
         "/api/plans/{pid}/milestones",
+        "/api/plans/{pid}/milestones/{m_pid}",
         "/api/plans/{pid}/milestones/{m_pid}/complete",
         "/api/plans/{pid}/allocations",
         "/api/plans/{pid}/allocations/{a_pid}",

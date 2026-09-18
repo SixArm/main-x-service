@@ -40,6 +40,21 @@ pub const TRIGGER_KINDS: &[&str] = &[
     // one-shot call from `fire()`. Carries no status filter — see
     // `validate_trigger` below.
     "milestone_due",
+    // Added 2026-09-18 (T-28g), narrowed to `plans.target_date` — "the
+    // plan's end" — the same way `milestone_due` was narrowed to one
+    // field rather than guessing a general task-date convention. Fired
+    // from a single write (`controllers::plans::update`), like
+    // `plan_phase_changed`. Carries no status filter, but repurposes
+    // `TriggerFact::from_status`/`to_status` to carry the **old/new
+    // date strings themselves** rather than a filterable status — see
+    // `validate_trigger` below.
+    "plan_timeframe_changed",
+    // Added 2026-09-18 (T-28g), the milestone analogue of the above —
+    // `milestones.due` changing via the new `PUT
+    // /plans/{pid}/milestones/{m_pid}` reschedule endpoint (T-28g also
+    // added this write path; none existed before, since a milestone
+    // could previously only be created and completed).
+    "milestone_due_changed",
 ];
 
 /// What an automation may do when it fires.
@@ -49,11 +64,25 @@ pub const ACTION_KINDS: &[&str] = &[
     "notify",
     "schedule_action",
     "set_task_status",
+    // Added 2026-09-18 (T-28g). Computes each direct finish-start
+    // successor's implied new dates and writes a notification carrying
+    // the proposal — it moves nothing.
+    "propose_reschedule",
+    // Added 2026-09-18 (T-28g). The opt-in twin of `propose_reschedule`:
+    // applies the same computation instead of only proposing it.
+    "shift_dependents",
 ];
 
 /// Actions that change a task's status. These are applied without
 /// re-entering the engine, so automations cannot cascade.
 pub const ACTIONS_THAT_MUTATE_STATUS: &[&str] = &["set_task_status"];
+
+/// Actions that change a plan's own timeframe. Applied the same
+/// no-cascade way `ACTIONS_THAT_MUTATE_STATUS` already is: writing a
+/// successor's new dates does **not** re-fire `plan_timeframe_changed`
+/// on it, or a chain of dependencies would cascade through the engine
+/// rather than stopping at the one deadline that actually moved.
+pub const ACTIONS_THAT_MUTATE_TIMEFRAME: &[&str] = &["shift_dependents"];
 
 /// What a scheduled action may do when its deadline arrives. A
 /// deliberately small set: everything here is either a notification or
@@ -193,7 +222,9 @@ pub fn validate_action(
                 ));
             }
         }
-        "notify" => {
+        // `propose_reschedule` needs the identical shape: who gets
+        // told about the proposed shifts.
+        "notify" | "propose_reschedule" => {
             let recipient = required_str(value, "recipient_ref")?;
             if !person_like_ref(recipient) {
                 return Err(
@@ -236,6 +267,10 @@ pub fn validate_action(
                 ));
             }
         }
+        // No parameters: re-derives the same computation
+        // `propose_reschedule` would, applying it instead of only
+        // proposing it.
+        "shift_dependents" => {}
         _ => unreachable!("action_kind was checked against ACTION_KINDS above"),
     }
     Ok(())
@@ -356,6 +391,87 @@ pub fn is_due(
     now: chrono::DateTime<chrono::Utc>,
 ) -> bool {
     status == "pending" && due_at <= now
+}
+
+// -- T-28g: deadline-shift trigger and rescheduling ---------------------
+
+/// One direct finish-start successor of a shifted item, as the caller
+/// already has it loaded (one query, no N+1).
+#[derive(Debug, Clone, Copy)]
+pub struct SuccessorFact {
+    /// The `plan_dependencies` edge.
+    pub edge_pid: Uuid,
+    /// The successor plan.
+    pub successor_pid: Uuid,
+    /// May start this many days after the predecessor finishes.
+    pub lag_days: i32,
+    /// The successor's own current start, when it has one.
+    pub current_start: Option<chrono::NaiveDate>,
+    /// The successor's own current end, when it has one.
+    pub current_end: Option<chrono::NaiveDate>,
+}
+
+/// One proposed (or applied) shift of a direct successor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct ProposedShift {
+    /// The `plan_dependencies` edge this shift is proposed through.
+    pub edge_pid: Uuid,
+    /// The successor plan.
+    pub successor_pid: Uuid,
+    /// Same sign and magnitude as the predecessor's own move — a
+    /// finish-start lag is a fixed gap, so shifting the predecessor's
+    /// end by N days shifts the successor's implied dates by the same
+    /// N days, whatever the lag is. `+5` is +5 regardless of lag; lag
+    /// only ever appears in the **violation** check below, not in the
+    /// shift amount itself.
+    pub delta_days: i64,
+    /// `current_start + delta_days`, when the successor has a start.
+    pub proposed_start: Option<chrono::NaiveDate>,
+    /// `current_end + delta_days`, when the successor has an end.
+    pub proposed_end: Option<chrono::NaiveDate>,
+    /// Whether the successor's dependency was **already** violated
+    /// before this shift (`current_start < old predecessor end +
+    /// lag`) — named rather than silently proposed over. Applying the
+    /// same delta to both ends of an already-violated pair cannot fix
+    /// or worsen the violation, so this is computed once, not
+    /// recomputed against the proposed dates.
+    pub already_violated: bool,
+}
+
+/// Compute the direct successors' implied shift from one plan's
+/// timeframe change.
+///
+/// `old_end` / `new_end` are the shifted plan's own `target_date`
+/// before and after the write that fired the trigger; `delta_days` is
+/// derived from the two, not supplied separately, so a caller cannot
+/// pass a delta inconsistent with the dates it also passes.
+#[must_use]
+pub fn propose_shifts(
+    old_end: chrono::NaiveDate,
+    new_end: chrono::NaiveDate,
+    successors: &[SuccessorFact],
+) -> Vec<ProposedShift> {
+    let delta_days = (new_end - old_end).num_days();
+    successors
+        .iter()
+        .map(|s| {
+            let lag = chrono::Days::new(u64::try_from(s.lag_days.max(0)).unwrap_or(0));
+            let old_earliest = old_end + lag;
+            let already_violated = s.current_start.is_some_and(|start| start < old_earliest);
+            ProposedShift {
+                edge_pid: s.edge_pid,
+                successor_pid: s.successor_pid,
+                delta_days,
+                proposed_start: s
+                    .current_start
+                    .and_then(|d| d.checked_add_signed(chrono::Duration::days(delta_days))),
+                proposed_end: s
+                    .current_end
+                    .and_then(|d| d.checked_add_signed(chrono::Duration::days(delta_days))),
+                already_violated,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -673,5 +789,130 @@ mod tests {
                 "{action} must be a real action"
             );
         }
+    }
+
+    #[test]
+    fn timeframe_mutating_actions_are_declared_so_the_engine_can_avoid_cascades() {
+        assert!(ACTIONS_THAT_MUTATE_TIMEFRAME.contains(&"shift_dependents"));
+        for action in ACTIONS_THAT_MUTATE_TIMEFRAME {
+            assert!(
+                ACTION_KINDS.contains(action),
+                "{action} must be a real action"
+            );
+        }
+    }
+
+    // -- T-28g: propose_shifts ------------------------------------------
+
+    fn date(y: i32, m: u32, d: u32) -> chrono::NaiveDate {
+        chrono::NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    /// **Shifting a plan's end by 5 days proposes +5 on a finish-start
+    /// successor** — the exact acceptance wording — whatever the lag
+    /// is, because a fixed lag does not change how a delta propagates
+    /// through it.
+    #[test]
+    fn a_five_day_shift_proposes_five_days_on_the_successor_whatever_the_lag() {
+        let successors = [
+            SuccessorFact {
+                edge_pid: Uuid::from_u128(1),
+                successor_pid: Uuid::from_u128(2),
+                lag_days: 0,
+                current_start: Some(date(2026, 2, 1)),
+                current_end: Some(date(2026, 2, 10)),
+            },
+            SuccessorFact {
+                edge_pid: Uuid::from_u128(3),
+                successor_pid: Uuid::from_u128(4),
+                lag_days: 10,
+                current_start: Some(date(2026, 2, 11)),
+                current_end: Some(date(2026, 2, 20)),
+            },
+        ];
+        let shifts = propose_shifts(date(2026, 1, 31), date(2026, 2, 5), &successors);
+        assert_eq!(shifts[0].delta_days, 5);
+        assert_eq!(shifts[0].proposed_start, Some(date(2026, 2, 6)));
+        assert_eq!(shifts[1].delta_days, 5, "the lag does not change the delta");
+        assert_eq!(shifts[1].proposed_start, Some(date(2026, 2, 16)));
+    }
+
+    /// A negative shift (pulled earlier) proposes a negative delta.
+    #[test]
+    fn a_pulled_forward_end_proposes_a_negative_delta() {
+        let successors = [SuccessorFact {
+            edge_pid: Uuid::from_u128(1),
+            successor_pid: Uuid::from_u128(2),
+            lag_days: 0,
+            current_start: Some(date(2026, 2, 10)),
+            current_end: None,
+        }];
+        let shifts = propose_shifts(date(2026, 2, 1), date(2026, 1, 27), &successors);
+        assert_eq!(shifts[0].delta_days, -5);
+        assert_eq!(shifts[0].proposed_start, Some(date(2026, 2, 5)));
+    }
+
+    /// A successor whose dependency was **already violated** before
+    /// the shift is named as such, not silently proposed over.
+    #[test]
+    fn an_already_violated_successor_is_named() {
+        // Predecessor ends 2026-02-01, lag 5 ⇒ earliest_start 2026-02-06.
+        // The successor already starts 2026-02-03 — before that — so
+        // the dependency was already violated, before any shift.
+        let successors = [SuccessorFact {
+            edge_pid: Uuid::from_u128(1),
+            successor_pid: Uuid::from_u128(2),
+            lag_days: 5,
+            current_start: Some(date(2026, 2, 3)),
+            current_end: None,
+        }];
+        let shifts = propose_shifts(date(2026, 2, 1), date(2026, 2, 8), &successors);
+        assert!(shifts[0].already_violated);
+
+        // A successor that already respects the earliest start is not
+        // flagged.
+        let clean = [SuccessorFact {
+            edge_pid: Uuid::from_u128(3),
+            successor_pid: Uuid::from_u128(4),
+            lag_days: 5,
+            current_start: Some(date(2026, 2, 10)),
+            current_end: None,
+        }];
+        let ok = propose_shifts(date(2026, 2, 1), date(2026, 2, 8), &clean);
+        assert!(!ok[0].already_violated);
+    }
+
+    /// A successor with no dates at all proposes no dates, and is
+    /// never treated as violated (there is nothing to violate).
+    #[test]
+    fn an_undated_successor_proposes_nothing_and_is_never_violated() {
+        let successors = [SuccessorFact {
+            edge_pid: Uuid::from_u128(1),
+            successor_pid: Uuid::from_u128(2),
+            lag_days: 0,
+            current_start: None,
+            current_end: None,
+        }];
+        let shifts = propose_shifts(date(2026, 2, 1), date(2026, 2, 6), &successors);
+        assert_eq!(shifts[0].proposed_start, None);
+        assert_eq!(shifts[0].proposed_end, None);
+        assert!(!shifts[0].already_violated);
+    }
+
+    /// A zero-day "shift" (no actual change) proposes zero on every
+    /// successor — pinned so a caller cannot accidentally fire this
+    /// off a no-op write.
+    #[test]
+    fn a_zero_day_shift_proposes_nothing() {
+        let successors = [SuccessorFact {
+            edge_pid: Uuid::from_u128(1),
+            successor_pid: Uuid::from_u128(2),
+            lag_days: 0,
+            current_start: Some(date(2026, 2, 1)),
+            current_end: Some(date(2026, 2, 10)),
+        }];
+        let shifts = propose_shifts(date(2026, 2, 1), date(2026, 2, 1), &successors);
+        assert_eq!(shifts[0].delta_days, 0);
+        assert_eq!(shifts[0].proposed_start, Some(date(2026, 2, 1)));
     }
 }
