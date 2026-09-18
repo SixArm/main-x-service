@@ -264,6 +264,130 @@ now **creates a session row + sets the cookie** (§3) instead of returning
 a JWT. The front-end BFF receives the `Set-Cookie`; the browser is logged
 in via the session.
 
+## 7a. Enterprise identity federation — SAML 2.0 and OIDC (design, repo `tasks.md` EV-2)
+
+A deployment with its own enterprise identity provider (Okta, Entra ID,
+Ping, Keycloak, …) should be able to make that IdP the sign-in path,
+without touching anything downstream of §3: the session row, the
+cookie, the PASETO issuance, and every peer's offline verification stay
+exactly as they are. Federation is an **alternative front door onto the
+same session**, not a second authentication model living beside this
+one.
+
+### Goals & non-goals
+
+**Goals**
+
+- **SAML 2.0** (SP-initiated, HTTP-POST binding) and **OIDC**
+  (authorization-code flow, PKCE) as upstream identity providers to
+  `authentication-service`.
+- A successful IdP assertion establishes **the same Postgres session**
+  (§3) a magic-link verify does — same table, same cookie attributes,
+  same idle/absolute TTLs, same rotation-on-privilege-change rule. No
+  second session shape to keep in step with the first.
+- IdP claims map into `users.attributes` (`authorization-attributes.md`
+  §6), gated by the same `AUTH_ATTRIBUTE_VOCABULARY[_FILE]` allow-set
+  (`authorization-attributes.md` §12) a CLI/admin-API assignment
+  already goes through — an IdP claim is exactly as fallible as an
+  operator's typo, and gets the same protection.
+- **Magic link stays the default.** Federation is opt-in, configured
+  per deployment; a deployment that configures nothing behaves exactly
+  as it does today.
+
+**Non-goals**
+
+- **SAML/OIDC as a peer-to-peer credential.** This section is about how
+  a **human** signs in. Service-to-service authentication stays PASETO
+  v4.public (§5); an IdP token is never forwarded downstream, and no
+  peer ever verifies a SAML assertion or an OIDC ID token directly.
+- **Just-in-time provisioning policy** (auto-create a `users` row on
+  first federated sign-in vs. requiring a pre-existing account) — an
+  open question (below), not fixed by this design.
+- **Multiple simultaneous IdPs per deployment** in v1 — one federated
+  IdP, configured once; multi-IdP is a natural extension once the
+  single-IdP path is proven, not a v1 requirement.
+
+### The flow
+
+```
+browser ──(redirect)──▶ deployment's IdP (SAML AuthnRequest / OIDC authorize)
+IdP ──(assertion / ID token, back-channel or POST binding)──▶ authentication-service
+authentication-service:
+  1. verify signature against the IdP's published metadata/JWKS (fetched
+     under the SEC-V1 posture — see below)
+  2. map the verified claims to attrs, through AUTH_ATTRIBUTE_VOCABULARY
+  3. find-or-refuse the user (provisioning policy — open question)
+  4. create a session row + set the __Host-mxi_session cookie (§3) —
+     identical to a magic-link verify's outcome
+authentication-service ──(Set-Cookie)──▶ browser, now signed in
+```
+
+From this point everything downstream — `POST /token` (§5), the BFF
+pattern (§6), CSRF (§4), the blanket guard (§8) — is unmodified: it
+already only ever looks at the session, never at how the session was
+established.
+
+### The fail-closed posture on metadata/certificate fetch
+
+An IdP's SAML metadata document or OIDC JWKS is fetched exactly the
+way `authentication-verifier` already fetches this service's own
+published PASETO keys (`authentication-sessions.md` §5,
+[`security.md`](security.md) SEC-V1): **HTTPS-only** (loopback excepted
+for local development), a **request timeout**, and a **response-size
+cap**. A MITM-injected metadata document is the SAML/OIDC analogue of a
+MITM-injected key set, and it gets the identical defence rather than a
+bespoke, unaudited one. The fetched document is cached with an
+operator-configurable TTL; a refetch failure keeps serving the last
+good copy rather than locking out every federated user over a
+transient network blip — the same "the service always boots, warn +
+keep the last good state" posture `authentication-verifier`'s own key
+refresh loop already holds.
+
+### Attribute mapping
+
+A deployment declares a **claim → attribute key** mapping (e.g. the
+OIDC `groups` claim → the `dept` attribute, a SAML `Role` attribute
+statement → `access`). The mapping is deployment configuration, not
+code — this family has no opinion on any IdP's own claim vocabulary.
+Every mapped value still passes through
+`AUTH_ATTRIBUTE_VOCABULARY[_FILE]` (`authorization-attributes.md`
+§12) exactly as a CLI-assigned or admin-API-assigned attribute does: an
+unset vocabulary is unrestricted (today's behaviour, unchanged for a
+deployment with no vocabulary configured), and a configured one rejects
+an unrecognised key or value rather than silently granting nothing.
+This is the same reasoning §12 already gives for a human operator's
+typo, extended to an IdP's claim, which is no more trustworthy.
+
+### Rollout
+
+1. **This section** — the contract.
+2. **The auth-service task** — SAML 2.0 SP + OIDC RP support in
+   `authentication-service`, the metadata/JWKS fetch under the SEC-V1
+   posture above, the claim-mapping config surface, and the
+   session-creation path reusing §3's existing machinery verbatim (no
+   new session table, no new cookie).
+3. **Front-ends** — an IdP-initiated sign-in link alongside the
+   existing `/signin` magic-link form; no BFF change, since the
+   federated flow still ends at the same `Set-Cookie`.
+
+### Open questions
+
+- **Just-in-time provisioning.** Auto-create a `users` row on a first
+  successful federated sign-in (convenient, but means the IdP now
+  controls account creation), or require a pre-existing account an
+  admin provisioned (safer, more operational overhead)? *Lean:
+  deployment-configurable, defaulting to the safer "pre-existing account
+  required" — auto-provisioning is exactly the kind of default a
+  deployment should opt into, not inherit silently.*
+- **Single logout (SLO).** SAML defines a logout flow that can span
+  multiple service providers; whether this family's single BFF-per-app
+  topology needs it, or whether the existing per-session revoke (§3) is
+  sufficient, is unresolved.
+- **Metadata refresh cadence.** A fixed TTL vs. honouring the IdP
+  metadata document's own `validUntil`/`cacheDuration` hints — unresolved,
+  parallel to `authentication-verifier`'s own still-open key-refresh
+  cadence questions.
+
 ## 8. Blanket enforcement
 
 [jwt-enforcement.md](jwt-enforcement.md) is updated in lockstep: the

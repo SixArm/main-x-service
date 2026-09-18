@@ -72,7 +72,7 @@ Per-crate `spec.md`:
 | [fhir.md](fhir.md)                                               | HL7 FHIR R5 API (resource mapping per entity, endpoints, Bundle/OperationOutcome/CapabilityStatement, auth/masking, per-entity adoption) |
 | [api-versioning.md](api-versioning.md)                           | Header-based API versioning (`Accepts-version`); no version in URLs (`/api/v1` removed); default/negotiate/406 rules |
 | [jwt.md](jwt.md)                                                 | Why JWTs must not be used for sessions (principle)     |
-| [authentication-sessions.md](authentication-sessions.md)         | Cookie sessions (Postgres) + PASETO v4 cross-service tokens + BFF front-end (supersedes the RS256-JWT model) |
+| [authentication-sessions.md](authentication-sessions.md)         | Cookie sessions (Postgres) + PASETO v4 cross-service tokens + BFF front-end (supersedes the RS256-JWT model); §7a designs SAML 2.0 / OIDC enterprise identity federation as an alternative front door onto the same session (design only — EV-2) |
 | [jwt-enforcement.md](jwt-enforcement.md)                         | Blanket `/api/*` auth enforcement (coordinated; credential now PASETO/session) |
 | [authorization-attributes.md](authorization-attributes.md)       | ABAC: `attrs` claim + policy language + default policy (read allow / mutation deny), 401/403 split, sourcing |
 | [runbooks/first-deployment.md](runbooks/first-deployment.md) | Runbook: standing up any registry for the first time — activation order (ABAC policy → auth gate → PASETO key source → event transport → integrity → optional loops), a verification command per step, and the container-boot defects it found along the way |
