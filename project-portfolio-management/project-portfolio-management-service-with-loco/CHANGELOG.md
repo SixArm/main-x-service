@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — a hardcoded `spent_on` date aged out of its own test's window
+
+`tests/requests/effort.rs::someone_on_leave_reports_null_not_zero_percent`
+recorded a time entry at a fixed `"2026-08-20"` and read it back through
+`GET /api/capacity/utilization?window_days=28`. That passed for exactly
+28 days after the date was written and then failed on every date after
+— caught by this PR's own `db` CI job on 2026-09-18, 29 days past the
+hardcoded date, unrelated to anything this PR actually changed. Fixed
+by computing `spent_on` and the leave period relative to
+`chrono::Utc::now()` (mirroring `tests/requests/insights.rs`'s existing
+pattern) rather than a fixed calendar date. Verified locally against a
+real Postgres: `scripts/ci-check.sh test-db
+project-portfolio-management/project-portfolio-management-service-with-loco`,
+79/79 passing.
+
 ### Added — explainability pin: every derived GET discloses its inputs (T-28j)
 
 `src/openapi.rs`'s test module gains

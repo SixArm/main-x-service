@@ -127,6 +127,15 @@ async fn an_impossible_entry_is_refused() {
 // denominator, so nobody has to assume it was 100%.
 async fn someone_on_leave_reports_null_not_zero_percent() {
     super::isolate_search_index();
+    // Relative to "now", not a fixed calendar date: the read side is
+    // `window_days=28` from the moment of the request, so a hardcoded
+    // `spent_on` ages out of the window and the test starts failing on
+    // whatever date is more than 28 days past it — found 2026-09-18,
+    // when a `spent_on` written for an August run finally aged out.
+    let today = chrono::Utc::now().date_naive();
+    let spent_on = (today - chrono::Duration::days(5)).to_string();
+    let leave_starts_on = (today - chrono::Duration::days(90)).to_string();
+    let leave_ends_on = (today + chrono::Duration::days(90)).to_string();
     request::<App, _, _>(|request, _ctx| async move {
         let plan = create_plan!(request, "Utilisation plan");
         let worker = "person:bbbbbbbb-0000-0000-0000-000000000001";
@@ -143,7 +152,7 @@ async fn someone_on_leave_reports_null_not_zero_percent() {
         request
             .post(&format!("/api/plans/{plan}/time-entries"))
             .json(&json!({
-                "actor_ref": worker, "spent_on": "2026-08-20", "minutes": 480
+                "actor_ref": worker, "spent_on": spent_on, "minutes": 480
             }))
             .await;
 
@@ -151,8 +160,8 @@ async fn someone_on_leave_reports_null_not_zero_percent() {
         let leave = request
             .post("/api/non-working")
             .json(&json!({
-                "person_ref": absent, "starts_on": "2026-07-01",
-                "ends_on": "2026-12-31", "kind": "leave"
+                "person_ref": absent, "starts_on": leave_starts_on,
+                "ends_on": leave_ends_on, "kind": "leave"
             }))
             .await;
         assert_eq!(leave.status_code(), 200);
