@@ -74,7 +74,11 @@ fn capability_paths() -> Value {
             "get": { "tags": ["collaboration"],
                 "summary": "List review invitations (?subject_kind=&subject_pid=&reviewer=&status=; cap 200)",
                 "responses": { "200": { "description": "Invitations, newest first" } } } },
-        "/api/reviews/consensus": get("collaboration", "Aggregate verdict for one subject (?subject_kind=&subject_pid=): mean score, recommendation counts, strict majority (a tie reports none), outstanding invitations"),
+        "/api/reviews/consensus": {
+            "get": { "tags": ["collaboration"],
+                "summary": "Aggregate verdict for one subject (?subject_kind=&subject_pid=): mean score, recommendation counts, strict majority (a tie reports none), outstanding invitations",
+                "description": "mean_score is null when nobody has scored yet, never a fabricated zero. majority is null on a tie or with no verdicts — a plurality is never promoted to a majority. outstanding and declined come from the live invitation counts, so an unanswered invitation is never silently dropped from the picture, and complete is true only once every invitation has been answered.",
+                "responses": { "200": { "description": "Consensus" } } } },
         "/api/reviews/{pid}/respond": { "post": { "tags": ["collaboration"],
             "summary": "Reviewer accepts or declines the invitation",
             "responses": { "200": { "description": "The updated invitation" },
@@ -1754,5 +1758,135 @@ mod tests {
             "registered as undocumented but now documented — remove from the register:\n{}",
             done.join("\n")
         );
+    }
+
+    // -- T-28j: explainability pin (repo tasks.md EV-5) --------------------
+    //
+    // The "no black-box output" property (agents/share/time-based-analysis.md
+    // §8: every derived figure discloses its inputs and reasons, or is null
+    // with a reason) is already true of every hand-written entry in this
+    // document — this test makes it unbreakable rather than habitual, per
+    // spec/13-tasks.md T-28j. A new derived `GET` that ships with only a
+    // placeholder response description (`"OK"`, `"Recorded"`, a bare noun)
+    // fails here, the same way `spec_and_mounted_routes_agree_both_ways`
+    // already fails a new route that ships undocumented.
+
+    /// `GET` paths that fetch or list a stored record (or a raw,
+    /// unaggregated log of one) rather than compute a derived figure —
+    /// exempt from the disclosure check below. Each entry is a plain
+    /// CRUD read, an auth/audit/metrics utility, or a newest-first list
+    /// of records with nothing computed across them.
+    const NON_DERIVED_GET: &[&str] = &[
+        "/api/plans",
+        "/api/plans/search",
+        "/api/plans/{pid}",
+        "/api/plans/whoami",
+        "/api/plans/audit/recent",
+        "/api/plans/events/recent",
+        "/api/plans/{pid}/audit",
+        "/api/plans/merges/recent",
+        "/metrics.prom",
+        "/api/plans/{pid}/tasks",
+        "/api/plans/{pid}/sprints",
+        "/api/plans/{pid}/sprints/{s_pid}/notes",
+        "/api/reviews",
+        "/api/notifications",
+        "/api/automations",
+        "/api/automations/runs",
+        "/api/scheduled-actions",
+        "/api/workflows",
+        "/api/plans/{pid}/tpc",
+        "/api/key-results/{pid}/check-ins",
+        "/api/plans/{pid}/controls",
+        "/api/plans/{pid}/time-entries",
+    ];
+
+    /// Words and phrases this family's response conventions actually use
+    /// when a derived figure discloses its inputs, its absence, or a
+    /// refusal (`agents/share/time-based-analysis.md` §8–9). Not
+    /// exhaustive by design — a `description` long enough to be a real
+    /// paragraph (see [`discloses`]) is the primary signal; this list
+    /// only rescues a shorter-but-still-genuine disclosure.
+    const DISCLOSURE_MARKERS: &[&str] = &[
+        "derived",
+        "null",
+        "reason",
+        "unmeasured",
+        "withheld",
+        "as_of",
+        "excluded",
+        "coverage",
+        "never",
+        "fallback",
+        "falls back",
+        "override",
+        "unscored",
+        "even at zero",
+    ];
+
+    /// Whether one `GET` operation's own text discloses enough to count:
+    /// a substantial `description` paragraph (this file's own style for
+    /// explaining a disclosure-relevant behaviour), or a `summary` /
+    /// response `description` carrying one of [`DISCLOSURE_MARKERS`].
+    fn discloses(op: &Value) -> bool {
+        if op["description"].as_str().is_some_and(|d| d.len() >= 40) {
+            return true;
+        }
+        let mut text = op["summary"].as_str().unwrap_or_default().to_lowercase();
+        if let Some(responses) = op["responses"].as_object() {
+            for response in responses.values() {
+                if let Some(desc) = response["description"].as_str() {
+                    text.push(' ');
+                    text.push_str(&desc.to_lowercase());
+                }
+            }
+        }
+        DISCLOSURE_MARKERS
+            .iter()
+            .any(|marker| text.contains(marker))
+    }
+
+    /// Every derived `GET` either discloses its inputs/reasons or is
+    /// exempt as a plain record read — enumerated from this document
+    /// itself, so a new derived route with no disclosure fails CI
+    /// instead of merely disappointing a reviewer.
+    #[test]
+    fn every_derived_get_discloses_its_inputs_or_is_exempt_as_plain_crud() {
+        let s = spec();
+        let exempt: std::collections::BTreeSet<&str> = NON_DERIVED_GET.iter().copied().collect();
+        let mut undisclosed: Vec<String> = Vec::new();
+        for (path, item) in s["paths"].as_object().expect("paths") {
+            if exempt.contains(path.as_str()) {
+                continue;
+            }
+            let Some(op) = item.get("get") else { continue };
+            if !discloses(op) {
+                undisclosed.push(path.clone());
+            }
+        }
+        undisclosed.sort();
+        assert!(
+            undisclosed.is_empty(),
+            "derived GET with no disclosed inputs/reasons — add a real \
+             description, or add to NON_DERIVED_GET if it is genuinely a \
+             plain record read:\n{}",
+            undisclosed.join("\n")
+        );
+    }
+
+    /// Every `NON_DERIVED_GET` entry is a documented `GET`, so the
+    /// exemption list can only shrink as the crate grows and cannot
+    /// silently accumulate a stale or misspelled path.
+    #[test]
+    fn non_derived_get_register_is_accurate() {
+        let s = spec();
+        let paths = &s["paths"];
+        for path in NON_DERIVED_GET {
+            assert!(
+                paths[*path]["get"].is_object(),
+                "{path} is registered as a plain CRUD GET but is not a \
+                 documented GET at all — fix or remove the entry"
+            );
+        }
     }
 }

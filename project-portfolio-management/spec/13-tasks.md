@@ -619,7 +619,7 @@ described manual check confirms it. Split tasks too big for one PR
     refusal below the minimum history. **Acceptance:** fewer than the
     minimum periods ⇒ `null` + `insufficient_history`; the response
     names the history window it drew from.
-  - [ ] **T-28j (S) — Explainability pin, and the non-goal recorded.**
+  - [x] **T-28j (S) — Explainability pin, and the non-goal recorded.**
     A test that walks every derived `GET` in the OpenAPI document and
     asserts the response carries either an inputs/reasons block or a
     `null` with a reason — the "no black-box output" property this
@@ -628,6 +628,28 @@ described manual check confirms it. Split tasks too big for one PR
     assistant inside the service. **Acceptance:** the test enumerates
     routes from `openapi.rs`, so a new derived route without disclosure
     fails CI.
+    **Landed 2026-09-18.** `src/openapi.rs`'s `mod tests` gained
+    `every_derived_get_discloses_its_inputs_or_is_exempt_as_plain_crud`
+    (walks `spec()["paths"]`, the same mechanical enumeration
+    `spec_and_mounted_routes_agree_both_ways` already uses — every
+    derived `GET` either carries a substantial `description` or one of
+    a small set of this family's own disclosure markers — "null",
+    "unmeasured", "withheld", "as_of", "reason", "even at zero", …in
+    its summary/description/response text, or sits in a new
+    `NON_DERIVED_GET` register for a genuinely plain record read, the
+    same register-shrinks-only discipline `KNOWN_UNDOCUMENTED` already
+    established) + `non_derived_get_register_is_accurate` (the register
+    can't accumulate a stale or misspelled path). Running it against
+    the file as it already stood found exactly two real gaps, not
+    hypothetical ones: `/api/plans/{pid}/time-entries` was correctly a
+    plain raw listing (moved to `NON_DERIVED_GET` — its derived
+    sibling, `/api/plans/{pid}/effort`, already discloses), and
+    `/api/reviews/consensus` was a genuine miss — an aggregate verdict
+    with no documented disclosure of its `null`-on-no-scores /
+    `null`-on-tie behaviour, fixed with a real `description` rather
+    than loosened test criteria. §2.3 in
+    [`02-scope.md`](02-scope.md) gained the no-model-driven-assistant
+    refusal, cross-referencing this test by name.
   - [ ] **T-28k (M) — Responsive audit at a phone viewport.** Playwright
     (the existing API-stubbed e2e harness) at 390 × 844 across all 34
     routes: no horizontal body scroll, the primary action of each page

@@ -7894,10 +7894,10 @@ green as it sits; these finish it)**
   API and cites what it read. Portfolio's T-28j is the reference pin;
   care-pathway and patient-flow inherit the rule rather than re-decide
   it. **Done 2026-09-18** — written into §8 as a new subsection, citing
-  portfolio's own spec statement of the property and its still-unbuilt
-  T-28j (a CI-enforced pin, not yet landed — the doc rule states the
-  property and names T-28j as where it becomes enforced, without
-  claiming that enforcement already exists) as the reference.
+  portfolio's own spec statement of the property and T-28j (at the time,
+  a still-unbuilt CI-enforced pin) as the reference; T-28j itself landed
+  the same day, closing the gap between the doc's claim and the code —
+  see T-28j's own entry in `project-portfolio-management/spec/13-tasks.md`.
 
 ## Found 2026-09-03 (an upstream release turned CI red for 47 crates)
 
