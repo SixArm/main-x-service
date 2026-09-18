@@ -130,6 +130,7 @@
     { href: "/regulator", label: t("ppm.nav.regulator") },
     { href: "/capacity", label: t("ppm.nav.capacity") },
     { href: "/reports", label: t("ppm.nav.reports") },
+    { href: "/onboarding", label: "Onboarding" },
   ];
 
   // Reactive: tracks the server-resolved session presence.
