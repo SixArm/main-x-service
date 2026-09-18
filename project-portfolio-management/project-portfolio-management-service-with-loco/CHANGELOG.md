@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — per-user saved views (T-28l)
+
+`POST`/`GET`/`DELETE /api/saved-views[/{pid}]`: a route-scoped filter/
+sort/column preset, keyed by the caller's token `sub` and nothing else
+identity-shaped (no email, no name). Gated by the required-auth
+`AuthUser` extractor — a saved view with no owner makes no sense —
+independent of the blanket `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`
+flag. Every query is scoped to the caller's own `sub`; another user's
+view is `404` on read or delete, not `403` — its existence is not
+disclosed across users. `GET ?route=` narrows to one route (a saved
+view is never applied outside the route it was saved from); omitted,
+it lists all of the caller's own views.
+
+Verified end to end with two real minted PASETO identities in a
+dedicated test binary (`tests/saved_views.rs`) — needed because the
+`verifier` is a process-wide `OnceLock`, the same reason
+`tests/enforcement.rs` has its own binary.
+
 ### Added — intake demand forecast (T-28i)
 
 `GET /api/proposals/forecast` answers "how many approved proposals in

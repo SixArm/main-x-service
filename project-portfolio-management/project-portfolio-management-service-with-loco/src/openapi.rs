@@ -1680,6 +1680,9 @@ mod tests {
         "/api/reports/{pid}",
         "/api/reports/{pid}/run",
         "/api/at-a-glance",
+        // per-user saved views (T-28l)
+        "/api/saved-views",
+        "/api/saved-views/{pid}",
     ];
 
     /// Every route the controllers mount, as `(path, method)` pairs —
@@ -1711,6 +1714,7 @@ mod tests {
             crate::controllers::collaboration::routes(),
             crate::controllers::automation::routes(),
             crate::controllers::prioritisation::routes(),
+            crate::controllers::saved_views::routes(),
             crate::controllers::docs::routes(),
             crate::controllers::metrics::routes(),
         ];

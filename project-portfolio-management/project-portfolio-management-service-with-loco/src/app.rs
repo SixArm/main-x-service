@@ -181,6 +181,7 @@ impl Hooks for App {
             .add_route(controllers::collaboration::routes())
             .add_route(controllers::automation::routes())
             .add_route(controllers::prioritisation::routes())
+            .add_route(controllers::saved_views::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }
