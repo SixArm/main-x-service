@@ -29,6 +29,10 @@ fn unprocessable(message: &str) -> Error {
     )
 }
 
+fn conflict(message: &str) -> Error {
+    Error::CustomError(StatusCode::CONFLICT, ErrorDetail::new("conflict", message))
+}
+
 fn db_err(e: sea_orm::DbErr) -> Error {
     Error::Model(ModelError::from(e))
 }
@@ -351,11 +355,123 @@ async fn list_scenarios(State(ctx): State<AppContext>) -> Result<Response> {
     format::json(rows)
 }
 
-/// Prepare a scenario's member facts and run the pure evaluation.
+/// An evaluation plus its provenance: when it ran and which live rows
+/// it read, each with its own `updated_at` (T-28a) — so two
+/// evaluations of the same scenario a week apart can say why they
+/// disagree, instead of differing silently.
+pub(crate) struct EvaluationResult {
+    pub evaluation: rules::Evaluation,
+    pub as_of: chrono::DateTime<chrono::Utc>,
+    pub inputs_read: Vec<rules::InputRead>,
+}
+
+/// A plan member's facts plus the live rows that fed them.
+async fn plan_member_fact(
+    ctx: &AppContext,
+    pid: Uuid,
+) -> Result<(rules::MemberFact, Vec<rules::InputRead>)> {
+    let mut inputs_read = Vec::new();
+    let budgets = budget_lines::Entity::find()
+        .filter(budget_lines::Column::PlanPid.eq(pid))
+        .filter(budget_lines::Column::DeletedAt.is_null())
+        .all(&ctx.db)
+        .await
+        .map_err(db_err)?;
+    let mut planned: Vec<(String, i64)> = Vec::new();
+    for line in &budgets {
+        match planned.iter_mut().find(|(c, _)| *c == line.currency) {
+            Some((_, total)) => *total = total.saturating_add(line.planned_minor),
+            None => planned.push((line.currency.clone(), line.planned_minor)),
+        }
+        inputs_read.push(rules::InputRead {
+            kind: "budget_line",
+            pid: line.pid,
+            updated_at: line.updated_at.to_utc(),
+        });
+    }
+    let risk_rows = risks::Entity::find()
+        .filter(risks::Column::PlanPid.eq(pid))
+        .filter(risks::Column::DeletedAt.is_null())
+        .all(&ctx.db)
+        .await
+        .map_err(db_err)?;
+    let open_exposure: i32 = risk_rows
+        .iter()
+        .filter(|r| matches!(r.status.as_str(), "open" | "mitigating"))
+        .map(|r| r.probability * r.impact)
+        .sum();
+    for risk in &risk_rows {
+        inputs_read.push(rules::InputRead {
+            kind: "risk",
+            pid: risk.pid,
+            updated_at: risk.updated_at.to_utc(),
+        });
+    }
+    let link_rows = objective_links::Entity::find()
+        .filter(objective_links::Column::PlanPid.eq(pid))
+        .all(&ctx.db)
+        .await
+        .map_err(db_err)?;
+    let alignment_weight: i32 = link_rows.iter().map(|l| l.weight).sum();
+    for link in &link_rows {
+        inputs_read.push(rules::InputRead {
+            kind: "objective_link",
+            pid: link.pid,
+            updated_at: link.updated_at.to_utc(),
+        });
+    }
+    Ok((
+        rules::MemberFact {
+            pid,
+            planned_by_currency: planned,
+            open_exposure,
+            alignment_weight,
+        },
+        inputs_read,
+    ))
+}
+
+/// A proposal member's facts plus the live row that fed them.
+async fn proposal_member_fact(
+    ctx: &AppContext,
+    pid: Uuid,
+) -> Result<(rules::MemberFact, Vec<rules::InputRead>)> {
+    let proposal = proposals::Entity::find()
+        .filter(proposals::Column::Pid.eq(pid))
+        .filter(proposals::Column::DeletedAt.is_null())
+        .one(&ctx.db)
+        .await
+        .map_err(db_err)?;
+    let mut inputs_read = Vec::new();
+    if let Some(proposal) = &proposal {
+        inputs_read.push(rules::InputRead {
+            kind: "proposal",
+            pid: proposal.pid,
+            updated_at: proposal.updated_at.to_utc(),
+        });
+    }
+    let planned = proposal
+        .and_then(|p| Some((p.currency?, p.requested_minor?)))
+        .map(|(currency, amount)| vec![(currency, amount)])
+        .unwrap_or_default();
+    Ok((
+        rules::MemberFact {
+            pid,
+            planned_by_currency: planned,
+            open_exposure: 0,
+            alignment_weight: 0,
+        },
+        inputs_read,
+    ))
+}
+
+/// Prepare a scenario's member facts, run the pure evaluation, and
+/// record which live rows fed it.
 pub(crate) async fn evaluate(
     ctx: &AppContext,
     scenario: &scenarios::Model,
-) -> Result<rules::Evaluation> {
+) -> Result<EvaluationResult> {
+    let as_of = chrono::Utc::now();
     let plan_pids: Vec<Uuid> = scenario
         .members
         .get("plan_pids")
@@ -367,73 +483,32 @@ pub(crate) async fn evaluate(
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
     let mut members = Vec::new();
+    let mut inputs_read = Vec::new();
     for pid in &plan_pids {
-        let budgets = budget_lines::Entity::find()
-            .filter(budget_lines::Column::PlanPid.eq(*pid))
-            .filter(budget_lines::Column::DeletedAt.is_null())
-            .all(&ctx.db)
-            .await
-            .map_err(db_err)?;
-        let mut planned: Vec<(String, i64)> = Vec::new();
-        for line in &budgets {
-            match planned.iter_mut().find(|(c, _)| *c == line.currency) {
-                Some((_, total)) => *total = total.saturating_add(line.planned_minor),
-                None => planned.push((line.currency.clone(), line.planned_minor)),
-            }
-        }
-        let open_exposure: i32 = risks::Entity::find()
-            .filter(risks::Column::PlanPid.eq(*pid))
-            .filter(risks::Column::DeletedAt.is_null())
-            .all(&ctx.db)
-            .await
-            .map_err(db_err)?
-            .iter()
-            .filter(|r| matches!(r.status.as_str(), "open" | "mitigating"))
-            .map(|r| r.probability * r.impact)
-            .sum();
-        let alignment_weight: i32 = objective_links::Entity::find()
-            .filter(objective_links::Column::PlanPid.eq(*pid))
-            .all(&ctx.db)
-            .await
-            .map_err(db_err)?
-            .iter()
-            .map(|l| l.weight)
-            .sum();
-        members.push(rules::MemberFact {
-            pid: *pid,
-            planned_by_currency: planned,
-            open_exposure,
-            alignment_weight,
-        });
+        let (fact, mut read) = plan_member_fact(ctx, *pid).await?;
+        members.push(fact);
+        inputs_read.append(&mut read);
     }
     for pid in &proposal_pids {
-        let proposal = proposals::Entity::find()
-            .filter(proposals::Column::Pid.eq(*pid))
-            .filter(proposals::Column::DeletedAt.is_null())
-            .one(&ctx.db)
-            .await
-            .map_err(db_err)?;
-        let planned = proposal
-            .and_then(|p| Some((p.currency?, p.requested_minor?)))
-            .map(|(currency, amount)| vec![(currency, amount)])
-            .unwrap_or_default();
-        members.push(rules::MemberFact {
-            pid: *pid,
-            planned_by_currency: planned,
-            open_exposure: 0,
-            alignment_weight: 0,
-        });
+        let (fact, mut read) = proposal_member_fact(ctx, *pid).await?;
+        members.push(fact);
+        inputs_read.append(&mut read);
     }
     let must_include: Vec<Uuid> =
         serde_json::from_value(scenario.must_include.clone()).unwrap_or_default();
-    Ok(rules::evaluate_scenario(
+    let evaluation = rules::evaluate_scenario(
         &members,
         &rules::Constraints {
             budget_cap_minor: scenario.budget_cap_minor,
             currency: scenario.currency.clone(),
             must_include,
         },
-    ))
+    );
+    Ok(EvaluationResult {
+        evaluation,
+        as_of,
+        inputs_read,
+    })
 }
 
 /// Query for `GET /api/scenarios/compare`: the two scenario pids.
@@ -464,11 +539,12 @@ async fn compare_scenarios(
             .await
             .map_err(db_err)?
             .ok_or(Error::NotFound)?;
-        let evaluation = evaluate(&ctx, &scenario).await?;
-        pair.push((scenario, evaluation));
+        let result = evaluate(&ctx, &scenario).await?;
+        pair.push((scenario, result));
     }
-    let (b_side, b_eval) = pair.pop().expect("two loaded");
-    let (a_side, a_eval) = pair.pop().expect("two loaded");
+    let (b_side, b_result) = pair.pop().expect("two loaded");
+    let (a_side, a_result) = pair.pop().expect("two loaded");
+    let (a_eval, b_eval) = (&a_result.evaluation, &b_result.evaluation);
     // Per-currency planned delta (b - a); a currency present on only
     // one side still gets a row (the other side reads 0).
     let mut currencies: Vec<&str> = a_eval
@@ -488,7 +564,7 @@ async fn compare_scenarios(
                     .find(|(c, _)| c == currency)
                     .map_or(0, |(_, minor)| *minor)
             };
-            let (a_minor, b_minor) = (of(&a_eval), of(&b_eval));
+            let (a_minor, b_minor) = (of(a_eval), of(b_eval));
             serde_json::json!({
                 "currency": currency,
                 "a_minor": a_minor,
@@ -499,9 +575,11 @@ async fn compare_scenarios(
         .collect();
     format::json(serde_json::json!({
         "a": { "pid": a_side.pid, "name": a_side.name, "status": a_side.status,
-               "feasible": a_eval.violations.is_empty(), "evaluation": a_eval },
+               "feasible": a_eval.violations.is_empty(), "evaluation": a_eval,
+               "as_of": a_result.as_of, "inputs_read": a_result.inputs_read },
         "b": { "pid": b_side.pid, "name": b_side.name, "status": b_side.status,
-               "feasible": b_eval.violations.is_empty(), "evaluation": b_eval },
+               "feasible": b_eval.violations.is_empty(), "evaluation": b_eval,
+               "as_of": b_result.as_of, "inputs_read": b_result.inputs_read },
         "deltas": {
             "planned_by_currency": planned_delta,
             "exposure": b_eval.total_exposure - a_eval.total_exposure,
@@ -513,20 +591,25 @@ async fn compare_scenarios(
 
 /// `GET /api/scenarios/{pid}/evaluate` — what-if arithmetic over live
 /// data: per-currency spend vs the cap, summed risk exposure, summed
-/// OKR alignment, and named constraint violations.
+/// OKR alignment, and named constraint violations. Carries `as_of`
+/// (when this read ran) and `inputs_read` (each live row it summed,
+/// with that row's own `updated_at`) so two evaluations that disagree
+/// a week apart say why (T-28a).
 #[debug_handler]
 async fn evaluate_scenario(
     State(ctx): State<AppContext>,
     Path(pid): Path<String>,
 ) -> Result<Response> {
     let scenario = find_scenario(&ctx, &pid).await?;
-    let evaluation = evaluate(&ctx, &scenario).await?;
+    let result = evaluate(&ctx, &scenario).await?;
     format::json(serde_json::json!({
         "pid": scenario.pid.to_string(),
         "name": scenario.name,
         "status": scenario.status,
-        "evaluation": evaluation,
-        "feasible": evaluation.violations.is_empty(),
+        "evaluation": result.evaluation,
+        "feasible": result.evaluation.violations.is_empty(),
+        "as_of": result.as_of,
+        "inputs_read": result.inputs_read,
     }))
 }
 
@@ -543,11 +626,11 @@ async fn commit_scenario(
     if scenario.status != "draft" {
         return Err(unprocessable(&format!("scenario is {}", scenario.status)));
     }
-    let evaluation = evaluate(&ctx, &scenario).await?;
-    if !evaluation.violations.is_empty() {
+    let result = evaluate(&ctx, &scenario).await?;
+    if !result.evaluation.violations.is_empty() {
         return Err(unprocessable(&format!(
             "cannot commit an infeasible scenario: {}",
-            evaluation.violations.join("; ")
+            result.evaluation.violations.join("; ")
         )));
     }
     let row_pid = scenario.pid;
@@ -555,13 +638,62 @@ async fn commit_scenario(
     active.status = ActiveValue::set("committed".to_string());
     active.committed_at = ActiveValue::set(Some(chrono::Utc::now().into()));
     let row = active.update(&ctx.db).await.map_err(db_err)?;
-    let snapshot = serde_json::to_value(&evaluation).unwrap_or_default();
+    let snapshot = serde_json::to_value(&result.evaluation).unwrap_or_default();
     AuditModel::record(
         &ctx.db,
         row_pid,
         "scenario_committed",
         caller.actor(),
         Some(snapshot),
+    )
+    .await
+    .ok();
+    format::json(row)
+}
+
+/// `POST /api/scenarios/{pid}/rollback` — un-commit a committed
+/// scenario (T-28a). **Scoped to what `commit` actually mutates**: the
+/// scenario's own `status`/`committed_at`. The task's original text
+/// described restoring "each member's funding state to what the
+/// commit replaced" — but `commit_scenario` has never written to a
+/// member's `budget_lines`/`allocations`/any other row, only to the
+/// scenario's own two fields (confirmed by reading it, not assumed),
+/// so there is no member funding state to restore and none is
+/// invented here. This makes the acceptance criterion's "idempotent
+/// on funding state" trivially true: funding state is never touched
+/// by either commit or rollback, so there is nothing for repeated
+/// commit → rollback → commit cycles to drift.
+///
+/// Refused (`409`) unless the scenario is currently `committed` —
+/// mirroring `commit`'s own `draft`-only precondition. There is no
+/// separate "changed since commit" conflict to detect in this scope:
+/// with no member row ever mutated, no member row can have diverged
+/// from what commit wrote.
+#[debug_handler]
+async fn rollback_scenario(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pid): Path<String>,
+) -> Result<Response> {
+    let scenario = find_scenario(&ctx, &pid).await?;
+    if scenario.status != "committed" {
+        return Err(conflict(&format!(
+            "scenario is {}; only a committed scenario can be rolled back",
+            scenario.status
+        )));
+    }
+    let row_pid = scenario.pid;
+    let former_committed_at = scenario.committed_at;
+    let mut active: scenarios::ActiveModel = scenario.into();
+    active.status = ActiveValue::set("draft".to_string());
+    active.committed_at = ActiveValue::set(None);
+    let row = active.update(&ctx.db).await.map_err(db_err)?;
+    AuditModel::record(
+        &ctx.db,
+        row_pid,
+        "scenario_rolled_back",
+        caller.actor(),
+        Some(serde_json::json!({ "former_committed_at": former_committed_at })),
     )
     .await
     .ok();
@@ -948,6 +1080,7 @@ pub fn routes() -> Routes {
         .add("/scenarios/compare", get(compare_scenarios))
         .add("/scenarios/{pid}/evaluate", get(evaluate_scenario))
         .add("/scenarios/{pid}/commit", post(commit_scenario))
+        .add("/scenarios/{pid}/rollback", post(rollback_scenario))
         .add("/objectives", post(create_objective))
         .add("/objectives", get(list_objectives))
         .add("/objectives/{pid}/alignment", get(objective_alignment))
