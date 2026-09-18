@@ -20,6 +20,12 @@
 //!   with and without a value because it is a **search** filter only:
 //!   it narrows retrieval and never gates matching, so its cost belongs
 //!   here and nowhere near the matcher.
+//! - **`capacity_rollups`** (T-28d) — the pure arithmetic behind
+//!   `GET /capacity` (`visibility::summed_percent`) and `GET
+//!   /capacity/utilization` (`effort::utilisation`), scaled over the
+//!   input sizes the DB-gated `tests/requests/scale.rs` seeds. This is
+//!   the CPU half; that test proves the *I/O* half (the query count
+//!   feeding these) does not grow with plan/people count.
 
 use std::hint::black_box;
 
@@ -28,9 +34,9 @@ use project_portfolio_management_matcher::{
     Goal, IdentifierScheme, Plan, PlanIdentifier, PlanKind, PlanStatus,
 };
 use project_portfolio_management_service::{
-    merge,
+    effort, merge,
     search::{SearchEngine, SearchMode},
-    validation,
+    validation, visibility,
 };
 use uuid::Uuid;
 
@@ -225,5 +231,69 @@ fn bench_search(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_validation, bench_merge, bench_search);
+/// Capacity/utilisation rollups (T-28d): the pure arithmetic scales
+/// with the number of *allocations* / *people* summed, not with plan
+/// count directly, but plan count is what drives that in practice
+/// (roughly one allocation per plan per person). 40/400 brackets the
+/// scale `tests/requests/scale.rs` seeds (40 people) and an order of
+/// magnitude beyond it.
+fn bench_capacity_rollups(c: &mut Criterion) {
+    let mut group = c.benchmark_group("capacity_rollups");
+
+    for &people in &[40usize, 400] {
+        let allocations: Vec<(i32, Option<chrono::NaiveDate>, Option<chrono::NaiveDate>)> = (0
+            ..people)
+            .map(|i| {
+                let pct = 10 + i32::try_from(i % 90).unwrap_or(0);
+                (pct, None, None)
+            })
+            .collect();
+        let window = (
+            chrono::NaiveDate::from_ymd_opt(2026, 1, 1).expect("valid date"),
+            chrono::NaiveDate::from_ymd_opt(2026, 1, 31).expect("valid date"),
+        );
+        group.throughput(Throughput::Elements(people as u64));
+        group.bench_with_input(
+            BenchmarkId::new("summed_percent", people),
+            &allocations,
+            |b, allocations| {
+                b.iter(|| visibility::summed_percent(black_box(allocations), window.0, window.1));
+            },
+        );
+    }
+
+    for &people in &[40usize, 400] {
+        let facts: Vec<effort::CapacityFact> = (0..people)
+            .map(|i| effort::CapacityFact {
+                actor_ref: format!("worker:{i}"),
+                declared_minutes: 2400,
+                non_working_minutes: i64::try_from(i % 5).unwrap_or(0) * 60,
+                effort_minutes: i64::try_from(i % 30).unwrap_or(0) * 100,
+            })
+            .collect();
+        group.throughput(Throughput::Elements(people as u64));
+        group.bench_with_input(
+            BenchmarkId::new("utilisation", people),
+            &facts,
+            |b, facts| {
+                b.iter(|| {
+                    facts
+                        .iter()
+                        .map(|f| effort::utilisation(black_box(f), 60))
+                        .collect::<Vec<_>>()
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_validation,
+    bench_merge,
+    bench_search,
+    bench_capacity_rollups
+);
 criterion_main!(benches);
