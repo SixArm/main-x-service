@@ -1036,12 +1036,20 @@ described manual check confirms it. Split tasks too big for one PR
     links (2026-08-24) had added since that Dockerfile's last
     verification (2026-08-03). See the runbook's own "What 'verified
     against a fresh container' found" section.
-  - [ ] **T-28p (S) — Operator onboarding guide.** A role-by-role
+  - [x] **T-28p (S) — Operator onboarding guide.** A role-by-role
     "first hour" walkthrough (executive, PMO, resource manager) in the
     front-end docs, each step naming the route it lands on. It makes
     **no time-to-productivity claim** until one is measured.
     **Acceptance:** every route named in the guide exists (a test
     walks the guide's links against the route tree).
+    Landed 2026-09-18 in the sibling front-end crate (this task is
+    front-end content, not an API surface, so the implementation lives
+    in `project-portfolio-management-front-end-with-svelte`, not
+    here) — `/onboarding` route, `src/lib/onboarding.ts` (pure data,
+    three roles), `tests/unit/onboarding.test.ts` (walks every step
+    against the real route tree via `fs.existsSync`, plus a regex
+    guard against any timing-claim language). See that crate's own
+    `spec/index.md` §13 T-28p and `CHANGELOG.md` for the full account.
 
   **Suggested order:** T-28b first (it unblocks T-23's SPI/CPI and is
   the buyer question with the most weight); then T-28g and T-28a

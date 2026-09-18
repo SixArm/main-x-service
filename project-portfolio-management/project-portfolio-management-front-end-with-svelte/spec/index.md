@@ -730,6 +730,37 @@ links are **never** a match signal (entity spec §1).
   - **Resolved.** A `try`/`catch` around the call, a new `"serviceUnavailable"` error variant, and its message in `+page.svelte`.
   - **Acceptance:** `tests/unit/verify.test.ts` (new) unit-tests the `load` function directly — pinning `missingToken`, the new `serviceUnavailable` (fetch rejects), and `invalidToken` (non-ok response) branches — verified to fail with the `try`/`catch` reverted and pass with it restored. Three-part change: spec (here) + code + test.
 
+- [x] **T-28p (S) Operator onboarding guide** *(landed 2026-09-18)* — a
+  role-by-role "first hour" walkthrough (executive, PMO, resource
+  manager) at the new `/onboarding` route, each step naming the page it
+  lands on. Tracked at the family level in the service crate's own
+  `spec/13-tasks.md` T-28p (the "no onboarding path beyond the README
+  quick start" gap that checklist identified); implemented here since
+  the guide is front-end content, not an API surface.
+  - **Built.** `src/lib/onboarding.ts` — pure data, `ONBOARDING_ROLES`
+    (three roles, 6–8 steps each, every step naming a real route);
+    `src/routes/onboarding/+page.svelte` — a static page rendering it,
+    no API call, so nothing here can fail to load; a plain-English
+    `/onboarding` entry added to `navItems` in `+layout.svelte`
+    (unlocalized, matching the existing `/prioritisation` and
+    `/lifecycle` nav entries' precedent — not every nav item goes
+    through the 13-locale i18n catalogue).
+  - **Deliberately makes no time-to-productivity claim** — nobody has
+    measured how long a first hour with the guide actually takes, and
+    a guide is the same category of derived-looking-but-invented
+    number the family refuses to produce elsewhere from nothing.
+  - **Acceptance:** `tests/unit/onboarding.test.ts` (new, 4 tests) —
+    walks every role's every step and asserts (via `fs.existsSync`)
+    that its named route resolves to a real `+page.svelte` in
+    `src/routes`, rather than trusting the data file to stay in sync
+    with the route tree by hand; also pins that all three required
+    roles are present and that no step/summary text reads like a
+    timing claim (a `/\d+\s*(minute|hour)s?\b/i` regex guard). Three-part
+    change: spec (here) + code + test. Verified: `svelte-check` 0
+    errors / 0 warnings, `vitest run` 83/83 (was 79), `pnpm run build`
+    green (the new route appears in the build output), `prettier
+    --check` clean.
+
 ## 14. Implementation status
 
 **Implemented (MVP, v0.1.0).** The SvelteKit app is built and verified (svelte-check clean, vitest + Playwright green): the routes in §5 are live against the sibling service via the BFF proxy, with SVAR grid / Kanban / Gantt views, Lily theme + locale chrome, and 13-locale i18n covering the original identity + merge surface (the later oversight/executive dashboard views are English-first — CHANGELOG 2026-07-22). Open §13 items — the plan-detail audit timeline, recent activity, MatchBreakdown, child roll-up, and the issues/timeline/goals sub-routes (the roadmap sub-list in §5) — remain unchecked.

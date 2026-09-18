@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — operator onboarding guide (T-28p)
+
+`/onboarding` — a role-by-role "first hour" walkthrough (executive,
+PMO, resource manager), each step naming the real page it lands on.
+Pure static content (`src/lib/onboarding.ts`), no API call, so nothing
+on the page can fail to load. Deliberately makes no
+time-to-productivity claim — nobody has measured how long a first
+hour with the guide actually takes.
+
+`tests/unit/onboarding.test.ts` (new) walks every step and asserts,
+via `fs.existsSync`, that its named route resolves to a real
+`+page.svelte` — the guide cannot drift from the route tree
+undetected. See `spec/index.md` §13 T-28p and the service crate's own
+`spec/13-tasks.md` T-28p, where this gap was first identified.
+
 ### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
 
 Removed the hand-maintained `THEMES`/`THEME_LABELS` (39 slugs — a subset
