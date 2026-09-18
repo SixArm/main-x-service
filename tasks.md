@@ -7825,11 +7825,25 @@ green as it sits; these finish it)**
   changes), the SEC-V1-mirrored metadata/JWKS fetch posture, attribute
   mapping through the existing `AUTH_ATTRIBUTE_VOCABULARY` gate, and
   three open questions (JIT provisioning default, SLO, metadata refresh
-  cadence). **Still open**: the `authentication-service` implementation
-  itself (SAML SP + OIDC RP, the claim-mapping config surface, the
-  actual session-creation wiring) and the front-end sign-in-link
-  addition — genuinely new code against the family's central auth
-  service, not attempted here.
+  cadence).
+  **OIDC RP half also done 2026-09-18** — `authentication-service`'s
+  `oidc` Cargo feature (off by default): `GET /api/auth/oidc/
+  {login,callback}` — discovery, PKCE + state + nonce, a real
+  cryptographic ID-token verification (`openidconnect` crate, ES256
+  proved via a stub IdP in a DB-gated test — not just type-checked),
+  claim mapping through the vocabulary gate, and session establishment
+  reusing the magic-link path's exact sequence. Resolved the JIT
+  provisioning open question: `AUTH_OIDC_JIT_PROVISIONING`,
+  deployment-configurable, default **off** (an unknown email is `403`,
+  named and audited, unless opted in). Full account in that crate's own
+  `spec/index.md` §13 EV-2 entry and `CHANGELOG.md`.
+  **Still open**: **SAML 2.0 SP** — deliberately not attempted in the
+  same pass as OIDC, since its XML-DSig signature-verification surface
+  is a materially larger and different security-critical undertaking
+  (OIDC's cryptography is handled entirely by a vetted crate; SAML has
+  no equally-dominant, obviously-correct choice evaluated here yet) —
+  and the front-end sign-in-link addition (no front-end work landed
+  for the OIDC RP surface either).
 - [x] **EV-3 (M)** Outbound **webhook sink** as a family contract in
   [`agents/share/event-bus.md`](agents/share/event-bus.md) §12: a
   `WebhookSink` beside `LoggingSink` / `FluvioSink` in each crate's

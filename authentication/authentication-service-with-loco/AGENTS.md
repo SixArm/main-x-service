@@ -49,6 +49,20 @@ service crates only *declare* `loco-rs` but actually run hand-rolled
 Axum. They will be converted to real loco using this crate as the
 template (see root `AGENTS.md`).
 
+**Enterprise identity federation (EV-2, opt-in).** Behind the `oidc`
+Cargo feature (off by default — a build without it pulls in no extra
+HTTP/JWT stack at all), this crate can act as an OIDC **relying
+party**: `GET /api/auth/oidc/login` / `callback` let a deployment's own
+IdP sign a human in, establishing the **exact same** session §3 already
+gives a magic-link redemption — same table, same cookie, same PASETO
+minting. See
+[`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
+§7a for the design and `src/oidc.rs` / `src/controllers/oidc.rs` for
+the implementation. **SAML 2.0 is not implemented** — a deliberately
+separate, larger piece of work given its XML-DSig signature-verification
+surface, tracked as the remaining half of EV-2 rather than rushed
+alongside OIDC in the same pass.
+
 | Question | Answer |
 |---|---|
 | Framework | loco.rs 1.0.1 (real `Hooks`/`AppContext` boot, loco controllers, loco config, `sea-orm-migration` 2.0). |
@@ -78,6 +92,8 @@ template (see root `AGENTS.md`).
 | GET | `/api/auth/admin/users/{pid}/attributes` | Admin | Show a user's ABAC subject attributes. `403` unless the caller carries `access=admin`. |
 | PUT | `/api/auth/admin/users/{pid}/attributes` | Admin | Replace a user's ABAC attribute map (body `{ "attributes": { … } }`); validates keys/values, writes an `attributes_assigned` audit row. |
 | GET | `/api/compliance/audit/verify` | Bearer | Recompute SHA-256/SHA-3/MAC digests over `auth_events` rows; reports any row whose content no longer matches what was stored. Any authenticated caller (not admin-gated — see note). |
+| GET | `/api/auth/oidc/login` | — | **EV-2, `oidc` Cargo feature only.** Redirect to the configured IdP's authorization endpoint (PKCE + state + nonce). `404` when the feature is not compiled in or [`AUTH_OIDC_ISSUER_URL`](#configuration-env) is unset. |
+| GET | `/api/auth/oidc/callback` | — | **EV-2, `oidc` feature only.** Exchange the code, verify the ID token, map claims into `users.attributes`, establish the same session §3 gives a magic-link redemption, redirect to `FRONTEND_URL`. `403` when no local account exists and JIT provisioning is off (the default). |
 | GET | `/.well-known/paseto-keys` | — | Published Ed25519 public key(s) for offline PASETO verification. |
 | GET | `/api-docs/openapi.json` | — | Hand-written OpenAPI 3 document. |
 | GET | `/swagger-ui` | — | Swagger UI page (CDN assets) rendering the doc. |
@@ -162,13 +178,15 @@ src/
 │   ├── compliance.rs      GET /api/compliance/audit/verify — keyed integrity verification (bearer-required, not admin-gated; see spec §16)
 │   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
 │   ├── paseto_keys.rs     published key endpoint (/.well-known/paseto-keys — Ed25519 public key set)
-│   └── metrics.rs         /metrics.prom (Prometheus text exposition)
+│   ├── metrics.rs         /metrics.prom (Prometheus text exposition)
+│   └── oidc.rs            EV-2, `oidc` feature only: GET /api/auth/oidc/{login,callback} — discovery, PKCE, token exchange, ID-token verify (openidconnect crate), session establishment reusing auth.rs::verify's exact sequence
 ├── compliance/            mac.rs (HMAC-SHA256 via the shared integrity-mac crate) + audit_integrity.rs (SHA-256/SHA-3/MAC digest + verify over auth_events)
 ├── metrics.rs            Prometheus registry + auth-specific counters
 ├── i18n.rs               dependency-light email copy catalog (en / cy)
-├── openapi.rs            hand-written OpenAPI 3 document
-├── rate_limit.rs         per-email sliding-window magic-link issuance limiter
-├── secret_hash.rs        SHA-256 hash-at-rest for bearer-equivalent secrets (magic-link token / session jid / CSRF token) — SEC-A9
+├── oidc.rs                EV-2, `oidc` feature only: OidcConfig::from_env (federation config) + map_claims (IdP claim → ABAC attrs, vocabulary-gated) — pure, DB-free
+├── openapi.rs             hand-written OpenAPI 3 document
+├── rate_limit.rs          per-email sliding-window magic-link issuance limiter
+├── secret_hash.rs         SHA-256 hash-at-rest for bearer-equivalent secrets (magic-link token / session jid / CSRF token) — SEC-A9
 ├── models/
 │   ├── users.rs           magic-link user model (+ create_passwordless, GDPR erase + find_active_by_pid, ABAC attributes_map/attrs)
 │   ├── sessions.rs        opaque cookie session issue/revoke; session_data copies ABAC attrs at establishment; revoke_all_for_user for erasure (per the auth-sessions design)
@@ -200,8 +218,16 @@ config/                    development/production/test yaml (keys/ holds only a 
 | `AUTH_INTEGRITY_MAC_KEY_FILE` | — | Path form of the above; takes precedence over the inline var. |
 | `AUTH_INTEGRITY_MAC_KEY_ID` | — | Key id stamped into new MACs, for rotation. |
 | `AUTH_INTEGRITY_MAC_KEYS_RETIRED` | — | Comma-separated retired key material, still verifiable, no longer used to sign. |
-| `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs. |
+| `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs; also the redirect target after a successful OIDC sign-in. |
 | `DATABASE_URL` | loco config default | Postgres connection. |
+| `AUTH_OIDC_ISSUER_URL` | — | **EV-2** (`oidc` Cargo feature, off by default). The IdP's issuer URL, used for OIDC discovery. Unset ⇒ `/api/auth/oidc/*` is `404` — federation is opt-in per deployment even with the feature compiled in. |
+| `AUTH_OIDC_CLIENT_ID` | — | This service's registered OAuth2 client id at the IdP. |
+| `AUTH_OIDC_CLIENT_SECRET` | — | This service's client secret, inline. `AUTH_OIDC_CLIENT_SECRET_FILE` takes precedence when both are set. |
+| `AUTH_OIDC_CLIENT_SECRET_FILE` | — | Path form of the above. |
+| `AUTH_OIDC_REDIRECT_URL` | — | This service's own callback URL, registered with the IdP (`.../api/auth/oidc/callback`). |
+| `AUTH_OIDC_CLAIM_MAP` | — | Inline JSON claim-name → attribute-key map (e.g. `{"groups":"dept"}`); every mapped key/value still passes through `AUTH_ATTRIBUTE_VOCABULARY` exactly as a CLI/admin-API assignment would. `AUTH_OIDC_CLAIM_MAP_FILE` takes precedence when both are set. |
+| `AUTH_OIDC_CLAIM_MAP_FILE` | — | Path form of the above. |
+| `AUTH_OIDC_JIT_PROVISIONING` | off | `1`/`true` ⇒ a first successful federated sign-in for an unknown email auto-creates a passwordless account. Default **off** — the safer of §7a's two documented leans (an IdP should not silently control account creation); a deployment opts in explicitly. |
 
 ## When you are unsure
 

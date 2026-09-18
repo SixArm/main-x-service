@@ -1070,6 +1070,95 @@ only by that subject.
       `GET /api/compliance/audit/verify`; the doc comment's stated
       limitation is removed once true.
 
+- [x] **EV-2 (2026-09-18) — Enterprise identity federation: OIDC relying
+      party.** Design in
+      [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
+      §7a (written 2026-09-18, same day). Behind a new `oidc` Cargo
+      feature (off by default — a build without it pulls in no extra
+      HTTP/JWT stack): `GET /api/auth/oidc/login` (discovery, PKCE +
+      state + nonce, redirect) and `GET /api/auth/oidc/callback`
+      (authorization-code exchange, ID-token signature + nonce
+      verification via the `openidconnect` crate, claim mapping,
+      session establishment). Both routes are `404` unless
+      `AUTH_OIDC_ISSUER_URL` (and the other three required vars) are
+      set — federation stays invisible to a deployment that has not
+      opted in, exactly as §7a requires.
+      `src/oidc.rs` (`OidcConfig::from_env`, `map_claims` — pure,
+      unit-tested) + `src/controllers/oidc.rs` (the HTTP surface,
+      reusing `controllers::auth::verify`'s exact session-establishment
+      sequence — same `sessions::Model::issue`, same
+      `sign_access_token`, same two cookies).
+      **Claim mapping** goes through **exactly** the same validation an
+      operator's CLI/admin-API attribute assignment does
+      (`tasks::attributes::{validate_key, validate_value, vocabulary}`)
+      — an IdP claim is no more trustworthy than an operator's typo. A
+      claim that fails mapping is skipped and logged, never fatal to
+      the sign-in.
+      **Provisioning (resolves §7a's open question):** JIT
+      auto-provisioning is **off by default**
+      (`AUTH_OIDC_JIT_PROVISIONING`) — the safer of the two documented
+      leans, since auto-provisioning would let the IdP control account
+      creation. A sign-in for an email with no existing account is
+      `403`, named and audited (`oidc_sign_in`, detail `no_account`),
+      unless the deployment opts in.
+      **Fail-closed metadata fetch, mirroring SEC-V1**: discovery and
+      the JWKS fetch share one non-redirecting, 10s-timeout HTTP client
+      (`redirect::Policy::none()`), the identical MITM-injected-document
+      defence `authentication-verifier`'s own boot-time key-set fetch
+      already applies.
+      **Verified against a real signed ID token, not just
+      type-checked**: `tests/requests/oidc.rs` (its own
+      `#[cfg(feature = "oidc")]`-gated module in the shared request-test
+      binary) serves a minimal stub IdP from a local ephemeral-port
+      listener (discovery document, JWKS, token endpoint) and signs its
+      ID tokens **ES256** (P-256 ECDSA, a dev-only direct `p256`
+      dependency) — deliberately not `RS256`/`jsonwebtoken`, which would
+      reintroduce the `rsa` crate this family removed for
+      RUSTSEC-2023-0071 (`security.md` §7, 2026-08-21). Six DB-gated
+      tests, including the full round trip: login → a real cryptographic
+      ID-token exchange and verification → claim mapping lands in
+      `users.attributes` → the existing account is found (JIT off) →
+      session established, `__Host-mxi_session` cookie set.
+      **Decided rather than guessed:**
+      1. *SAML 2.0 is explicitly out of scope for this pass* — its
+         XML-DSig signature-verification surface is a materially
+         different, larger piece of security-critical work than OIDC's
+         (where a vetted crate does the cryptography), and warrants its
+         own dedicated, carefully-reviewed pass rather than being rushed
+         alongside OIDC in the same session. Tracked as the remaining
+         half of root `tasks.md` EV-2.
+      2. *Claims are read twice from the same already-verified ID
+         token* — once through `openidconnect`'s typed, cryptographically
+         checked view (subject/email/nonce), once as raw JSON (for the
+         deployment's `AUTH_OIDC_CLAIM_MAP`, which names claims the typed
+         view has no field for). Both reads decode the identical signed
+         bytes; nothing between them is untrusted.
+      3. *`GET`, not `POST`, for `/callback`* — this is a browser
+         top-level navigation returning from the IdP's own redirect
+         (an OAuth2/OIDC authorization-code response), never an XHR/BFF
+         call, so it follows the IdP's own required method rather than
+         this crate's other endpoints' POST convention.
+      **Env vars** — see `AGENTS.md`'s Configuration table:
+      `AUTH_OIDC_ISSUER_URL`, `AUTH_OIDC_CLIENT_ID`,
+      `AUTH_OIDC_CLIENT_SECRET[_FILE]`, `AUTH_OIDC_REDIRECT_URL`,
+      `AUTH_OIDC_CLAIM_MAP[_FILE]`, `AUTH_OIDC_JIT_PROVISIONING`.
+      **Verified:** `cargo test --lib --features oidc` (95/95, +5 pure
+      `oidc::` tests), `cargo test --features oidc -- --ignored`
+      (DB-gated suite green, +6 new `requests::oidc::*`), `cargo build`/
+      `clippy --all-targets --features oidc -- -D warnings` clean,
+      `cargo fmt --check` clean, `cargo deny check` clean (no new
+      advisory — confirmed the duplicate `reqwest` 0.12/0.13 the
+      `oauth2`/`openidconnect` dependency chain pulls in resolves
+      without `native-tls`/`openssl` in the lock file either way), and
+      the default build (no `oidc` feature) is bit-for-bit unaffected
+      (90/90 lib tests, unchanged). `scripts/ci-check.sh`'s
+      `extra_test_features_for()` now threads `--features oidc` through
+      **both** the plain `test` stage and the DB-gated `test-db` stage
+      (the latter previously ignored that function entirely for every
+      crate — a real, pre-existing gap, fixed in the same change,
+      since without it this whole feature's request-test suite would
+      never run in CI at all).
+
 ## 14. Implementation status
 
 > **Pivot landed.** The code reality is cookie sessions + PASETO
@@ -1102,7 +1191,12 @@ magic-link email (en / cy via `src/i18n.rs`, optional request `locale`);
 the **assignment surface has landed** — both the `user_attributes` CLI
 task and the `access=admin`-gated HTTP admin API, each writing an
 `attributes_assigned` audit row (§13); keyed integrity verification
-over `auth_events` (`GET /api/compliance/audit/verify`, §6.13).
+over `auth_events` (`GET /api/compliance/audit/verify`, §6.13);
+**OIDC relying-party identity federation** (`oidc` Cargo feature, off
+by default — `GET /api/auth/oidc/{login,callback}`, §13 EV-2) as an
+alternative front door onto the same session, magic link staying the
+default. **SAML 2.0 is not implemented** (§13 EV-2's stated remaining
+scope).
 
 ## 15. Roadmap
 

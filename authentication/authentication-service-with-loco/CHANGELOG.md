@@ -10,6 +10,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — OIDC relying-party identity federation (EV-2)
+
+`GET /api/auth/oidc/login` / `callback`, behind a new `oidc` Cargo
+feature (off by default): discovery, PKCE + state + nonce, an
+authorization-code exchange, real ID-token signature + nonce
+verification via the `openidconnect` crate, claim mapping into
+`users.attributes` (validated through the same vocabulary gate a
+CLI/admin-API assignment goes through), and session establishment
+reusing `controllers::auth::verify`'s exact sequence — the same
+`sessions` table, the same `__Host-mxi_session` cookie, the same
+PASETO minting. Magic link stays the default; federation is opt-in per
+deployment (both the Cargo feature and the four required env vars).
+
+JIT auto-provisioning defaults **off** (`AUTH_OIDC_JIT_PROVISIONING`)
+— an unknown email is `403`, named and audited, unless a deployment
+opts in; the safer of the two leans `agents/share/authentication-
+sessions.md` §7a left open.
+
+Verified against a real signed ES256 ID token from a stub IdP, not
+just type-checked (`tests/requests/oidc.rs`, 6 DB-gated tests). SAML
+2.0 is not implemented — deliberately separated out given its XML-DSig
+surface; tracked as the remaining half of root `tasks.md` EV-2.
+
+Also fixes a pre-existing gap in `scripts/ci-check.sh`: the DB-gated
+`test-db` stage never applied `extra_test_features_for()`, so any
+crate's optional-feature DB-gated tests (not just this one) would
+silently never run in CI.
+
 ### Added — capture the source IP on sessions and `auth_events` (T-14)
 
 This crate issued every session and audit row in the family without

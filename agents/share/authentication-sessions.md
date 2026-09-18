@@ -366,19 +366,36 @@ typo, extended to an IdP's claim, which is no more trustworthy.
    posture above, the claim-mapping config surface, and the
    session-creation path reusing §3's existing machinery verbatim (no
    new session table, no new cookie).
+   **OIDC RP half landed 2026-09-18** — behind a new `oidc` Cargo
+   feature (off by default): `GET /api/auth/oidc/login` / `callback`,
+   discovery + PKCE + state + nonce, a real ID-token signature + nonce
+   verification (the `openidconnect` crate), claim mapping through the
+   `AUTH_ATTRIBUTE_VOCABULARY` gate exactly as designed above, and
+   session establishment reusing `controllers::auth::verify`'s exact
+   sequence. Verified against a real signed ID token from a stub IdP
+   (six DB-gated tests), not just type-checked. **SAML 2.0 SP is not
+   implemented** — deliberately separated out: its XML-DSig
+   signature-verification surface is a materially larger, different
+   piece of security-critical work than OIDC's (where a vetted crate
+   does the cryptography), so it is tracked as a distinct remaining
+   piece of this rollout step rather than rushed alongside OIDC in the
+   same pass. See `authentication-service`'s own `spec/index.md` §13
+   EV-2 entry for the full account.
 3. **Front-ends** — an IdP-initiated sign-in link alongside the
    existing `/signin` magic-link form; no BFF change, since the
-   federated flow still ends at the same `Set-Cookie`.
+   federated flow still ends at the same `Set-Cookie`. **Not yet
+   done** — the OIDC RP backend above has no front-end entry point
+   yet.
 
 ### Open questions
 
-- **Just-in-time provisioning.** Auto-create a `users` row on a first
-  successful federated sign-in (convenient, but means the IdP now
-  controls account creation), or require a pre-existing account an
-  admin provisioned (safer, more operational overhead)? *Lean:
-  deployment-configurable, defaulting to the safer "pre-existing account
-  required" — auto-provisioning is exactly the kind of default a
-  deployment should opt into, not inherit silently.*
+- ~~**Just-in-time provisioning.**~~ — RESOLVED for the OIDC RP
+  (2026-09-18): `AUTH_OIDC_JIT_PROVISIONING`, deployment-configurable,
+  **default off**. A sign-in for an email with no existing account is
+  `403`, named and audited, unless a deployment opts in — the safer
+  lean this question always favoured, now the actual shipped default
+  rather than a documented intention. SAML SP will adopt the identical
+  flag/default once implemented.
 - **Single logout (SLO).** SAML defines a logout flow that can span
   multiple service providers; whether this family's single BFF-per-app
   topology needs it, or whether the existing per-session revoke (§3) is
