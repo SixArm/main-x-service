@@ -9,6 +9,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — deterministic scenario generator (T-28h)
+
+`POST /api/scenarios/generate` builds a **draft scenario** by scoring
+every active plan (Smart Score, reusing the exact `Estate` evidence
+gathering `GET /prioritisation` already uses) and pricing it (budget
+lines summed in the cap's currency), then greedily selecting by score
+per unit cost within an optional budget cap. Every candidate gets a
+rationale row: included with its score and cost, or excluded with
+`no_score` / `foreign_currency` / `over_cap` / `must_include_conflict`.
+A `must_include` candidate is force-included even when it alone
+exceeds the cap — never silently dropped. The generated scenario is an
+ordinary `draft`, so `evaluate`/`compare`/`commit`/`rollback` (T-28a)
+apply unmodified. The selection itself
+(`src/strategy.rs::generate_scenario`) is a pure function, unit-tested
+for determinism directly.
+
+Candidates are plans only, never proposals — Smart Score has no
+defined evidence trail for a not-yet-promoted proposal. See
+`spec/13-tasks.md` T-28h for this and a second scope note found while
+writing the test: under the default weights every plan scores via
+`momentum` alone (from `updated_at`), so a genuinely `no_score`
+candidate needs `momentum` configured to `0`.
+
 ### Added — capacity-at-scale regression guard (T-28d)
 
 `tests/requests/scale.rs::capacity_views_do_not_fan_out_with_scale`

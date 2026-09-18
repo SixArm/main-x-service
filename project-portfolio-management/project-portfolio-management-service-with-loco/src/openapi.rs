@@ -1658,6 +1658,7 @@ mod tests {
         "/api/scenarios/{pid}/evaluate",
         "/api/scenarios/{pid}/commit",
         "/api/scenarios/{pid}/rollback",
+        "/api/scenarios/generate",
         "/api/objectives",
         "/api/objectives/{pid}/alignment",
         "/api/plans/{pid}/objectives",
