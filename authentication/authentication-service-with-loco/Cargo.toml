@@ -72,6 +72,30 @@ base64 = { version = "0.22" }
 # parity with the older Axum services in the family.
 prometheus = { version = "0.13" }
 
+[features]
+# EV-2: SAML 2.0 / OIDC enterprise identity federation (design:
+# agents/share/authentication-sessions.md §7a). Off by default so a
+# deployment that does not federate pulls in no extra HTTP/crypto
+# stack — the same posture `authentication-verifier`'s own `fetch`
+# feature takes for its boot-time key-set fetch.
+oidc = ["dep:openidconnect", "dep:reqwest", "dep:url"]
+
+[dependencies.openidconnect]
+version = "4"
+optional = true
+default-features = false
+features = ["reqwest"]
+
+[dependencies.reqwest]
+version = "0.13"
+optional = true
+default-features = false
+features = ["rustls", "json"]
+
+[dependencies.url]
+version = "2"
+optional = true
+
 # musl release builds use mimalloc as the global allocator (see
 # src/bin/main.rs); gated by target so normal glibc/macOS builds do not
 # pull it in. cfg(target_env = "musl") matches musl-libc targets.
@@ -94,3 +118,10 @@ loco-rs = { workspace = true, features = ["testing"] }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }
 insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
+# T-EV-2 test-only: a stub OIDC provider in `tests/oidc.rs` signs its
+# ID tokens with ES256 (P-256 ECDSA), a pure-Rust implementation with
+# no `rsa`/RUSTSEC-2023-0071 exposure (the family removed `jsonwebtoken`
+# for exactly that advisory — see `security.md` §7's 2026-08-21 entry).
+# Dev-only: never shipped in the service itself.
+p256 = { version = "0.13", features = ["ecdsa"] }
+axum-test = { version = "17.3.0" }

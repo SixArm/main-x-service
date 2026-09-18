@@ -106,6 +106,18 @@ extra_test_features_for() {
       # (documented as a known gap in that same doc).
       printf -- '--features parquet'
       ;;
+    authentication/authentication-service-with-loco)
+      # `oidc` gates SAML/OIDC identity federation (EV-2,
+      # agents/share/authentication-sessions.md §7a): `src/oidc.rs`,
+      # `src/controllers/oidc.rs`, and their DB-gated request suite
+      # (`tests/requests/oidc.rs`, a stub OIDC provider signing real
+      # ES256 ID tokens) — self-contained, no live IdP needed. Off by
+      # default so a deployment that never federates pulls in no extra
+      # HTTP/JWT stack; without this override the whole feature would
+      # never compile or run in CI, same class of gap `parquet` above
+      # was found to have.
+      printf -- '--features oidc'
+      ;;
   esac
 }
 
@@ -262,9 +274,14 @@ run_stage() {
       # count its rows, so any other test writing an audit row concurrently
       # breaks them. Running them in parallel produced failures that looked
       # like chain defects but were only test interference.
+      # `extra_test_features_for` applies here too (not just the plain
+      # `test` stage): a crate's optional-feature DB-gated suite (e.g.
+      # authentication-service's `oidc`) would otherwise never compile
+      # or run under `--ignored` either — the same AV-1 gap `parquet`
+      # and `oidc` exist in that function to close.
       ( cd "${crate}" \
         && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
-           cargo test $(locked_flag "${crate}") -- --ignored --test-threads=1 )
+           cargo test $(locked_flag "${crate}") $(extra_test_features_for "${crate}") -- --ignored --test-threads=1 )
       ;;
     deny)
       if [[ ! -f "${crate}/deny.toml" ]]; then

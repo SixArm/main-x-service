@@ -16,5 +16,9 @@ pub mod compliance;
 pub mod docs;
 /// Prometheus metrics (`/metrics.prom`), mounted at the root.
 pub mod metrics;
+/// OIDC identity federation (EV-2): `/api/auth/oidc/{login,callback}`.
+/// Compiled only under the `oidc` Cargo feature.
+#[cfg(feature = "oidc")]
+pub mod oidc;
 /// Public key set (`/.well-known/paseto-keys`) for offline peer verification.
 pub mod paseto_keys;
