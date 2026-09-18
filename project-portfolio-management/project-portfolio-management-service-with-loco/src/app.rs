@@ -167,6 +167,7 @@ impl Hooks for App {
             .add_route(controllers::oversight::routes())
             .add_route(controllers::tba::routes())
             .add_route(controllers::tpc::routes())
+            .add_route(controllers::financials::routes())
             .add_route(controllers::controls::routes())
             .add_route(controllers::phase::routes())
             .add_route(controllers::distribution::routes())

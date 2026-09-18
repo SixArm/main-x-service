@@ -9,6 +9,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — phased budget baseline → EAC/ETC forecast (T-28b)
+
+New pure module `src/financials.rs` (`Baseline`/`BaselinePeriod`/
+`Forecast`/`EtcSource`/`ForecastAbsent`, `forecast()`/
+`rollup_forecast()`, 10 unit tests) and HTTP surface
+`src/controllers/financials.rs`:
+
+- `POST`/`GET /api/plans/{pid}/budget-baselines` — approve a
+  baseline version (planned cost per period, one currency, frozen at
+  approval); append-only, a re-baseline needs a reason, the
+  predecessor stays reproducible from its own version.
+- `GET /api/plans/{pid}/financials/forecast` — `EAC = AC + ETC`, ETC
+  from the plan's latest TPC cost-estimate-to-complete where
+  recorded, else the baseline's own not-yet-elapsed periods; a plan
+  with neither reports `null` with `no_currency_signal`, unchanged.
+- `GET /api/financials/forecast?plan=&depth=` — the same forecast
+  rolled over `parent_ref` (reuses `tba::walk_descendants` verbatim),
+  one row **per currency**, never merged into one sum.
+
+`GET /plans/{pid}/performance`'s `spi`/`cpi` stay `null` — a baseline
+alone is not earned value — but the reason now distinguishes
+`no_baseline` from a new `no_earned_value_signal` once a plan actually
+has one, so the message stays true rather than becoming a stale lie.
+See `spec/13-tasks.md` T-28b for the two scope decisions this made
+explicit rather than guessing (why SPI/CPI still aren't wired, and how
+the forecast's own currency is resolved).
+
+Migration `m20260918_000001_budget_baselines`: `budget_baselines` +
+`budget_baseline_periods`, both append-only (no `deleted_at`, matching
+`phase_transitions`' precedent). 6 new DB-gated request tests in
+`tests/requests/financials.rs`, verified against a real Postgres
+(`scripts/ci-check.sh test-db`); `cargo test --lib` 400/400, clippy
+`-D warnings` clean, fmt clean.
+
 ### Fixed — a hardcoded `spent_on` date aged out of its own test's window
 
 `tests/requests/effort.rs::someone_on_leave_reports_null_not_zero_percent`

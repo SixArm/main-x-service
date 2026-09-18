@@ -6,6 +6,7 @@
 mod capabilities;
 mod effort;
 mod event_outbox;
+mod financials;
 mod governance;
 mod insights;
 mod metrics_control;

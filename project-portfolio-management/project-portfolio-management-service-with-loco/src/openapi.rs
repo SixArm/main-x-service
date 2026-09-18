@@ -36,6 +36,7 @@ fn paths() -> Value {
     merge_object(&mut paths, tba_forecast_paths());
     merge_object(&mut paths, tba_rollup_paths());
     merge_object(&mut paths, tpc_paths());
+    merge_object(&mut paths, financials_paths());
     merge_object(&mut paths, control_paths());
     merge_object(&mut paths, phase_paths());
     merge_object(&mut paths, distribution_paths());
@@ -652,6 +653,58 @@ fn tpc_paths() -> Value {
                     { "name": "currency", "in": "query", "schema": { "type": "string", "default": "GBP" } }
                 ],
                 "responses": { "200": { "description": "Ranked triage" } }
+            }
+        }
+    })
+}
+
+/// The phased budget baseline and EAC/ETC forecast paths (T-28b, spec
+/// `13-tasks.md`).
+fn financials_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/budget-baselines": {
+            "post": {
+                "tags": ["financials"],
+                "summary": "Approve a new budget-baseline version: planned cost per period, in one currency",
+                "description": "Frozen at approval, append-only — a baseline is never edited; a re-baseline is a new row at version + 1. The first baseline needs no reason; every one after it does, the same distinction a backward phase move already draws between a plan's first phase and a later regression.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Approved: pid and version" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "Bad currency, no periods, a period ending before it starts, a negative planned_minor, or a re-baseline (version > 1) with no reason" }
+                }
+            },
+            "get": {
+                "tags": ["financials"],
+                "summary": "Every baseline version for this plan, newest first, with its periods",
+                "description": "The predecessor is preserved, never overwritten — an older forecast that named its baseline version stays reproducible from that version.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Baseline versions" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/plans/{pid}/financials/forecast": {
+            "get": {
+                "tags": ["financials"],
+                "summary": "Estimate at completion: EAC = actual cost (AC) + estimate to complete (ETC)",
+                "description": "ETC prefers the plan's latest TPC cost-estimate-to-complete where recorded; failing that, the baseline's own not-yet-elapsed periods, summed — and the response names which source it used. A plan without a baseline and without a TPC observation reports null with no_currency_signal, unchanged by this endpoint existing. Actual cost recorded in a different currency than the forecast's own is disclosed as excluded_other_currency_minor, never merged in. This task does not build a finance connector — actuals still arrive by hand or by a future bulk import.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "The forecast" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/financials/forecast": {
+            "get": {
+                "tags": ["financials"],
+                "summary": "The EAC/ETC forecast rolled over parent_ref from a root plan, one row per currency (?plan=&depth=)",
+                "description": "Reuses the same bounded, cycle-safe containment walk GET /plans/{pid}/rollup already uses, so a depth/node cap or a revisit is disclosed the same way. Currencies are never merged — a subtree spanning two currencies reports two rows, never one sum. A walked plan with neither a baseline nor a TPC observation is counted under no_currency_signal rather than silently missing from the total.",
+                "parameters": [
+                    { "name": "plan", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "depth", "in": "query", "schema": { "type": "integer", "default": 32, "minimum": 1, "maximum": 32 } }
+                ],
+                "responses": { "200": { "description": "The per-currency rollup" }, "404": { "description": "Unknown plan" }, "422": { "description": "depth out of range" } }
             }
         }
     })
@@ -1639,6 +1692,7 @@ mod tests {
             crate::controllers::oversight::routes(),
             crate::controllers::tba::routes(),
             crate::controllers::tpc::routes(),
+            crate::controllers::financials::routes(),
             crate::controllers::controls::routes(),
             crate::controllers::phase::routes(),
             crate::controllers::distribution::routes(),
@@ -1798,6 +1852,7 @@ mod tests {
         "/api/plans/{pid}/tpc",
         "/api/key-results/{pid}/check-ins",
         "/api/plans/{pid}/controls",
+        "/api/plans/{pid}/budget-baselines",
         "/api/plans/{pid}/time-entries",
     ];
 

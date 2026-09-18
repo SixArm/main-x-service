@@ -20,8 +20,8 @@ use uuid::Uuid;
 
 use crate::auth::MaybeAuthUser;
 use crate::models::_entities::{
-    adoption_snapshots, budget_lines, business_case_targets, plans, satisfaction_responses,
-    value_points,
+    adoption_snapshots, budget_baselines, budget_lines, business_case_targets, plans,
+    satisfaction_responses, value_points,
 };
 use crate::models::audit_logs::Model as AuditModel;
 use crate::value as rules;
@@ -417,22 +417,44 @@ async fn performance(
         .filter_map(|r| u8::try_from(r.score).ok())
         .collect();
 
+    // T-28b (spec §13) added the phased budget baseline itself, so
+    // "no phased budget baseline" is no longer always true — but it
+    // did **not** add an earned-value signal (percent complete against
+    // that baseline), which is what SPI/CPI actually need beyond the
+    // baseline. Both stay `null` with an accurate reason either way,
+    // never defaulted to 1.0 ("exactly on plan").
+    let has_baseline = budget_baselines::Entity::find()
+        .filter(budget_baselines::Column::PlanPid.eq(plan.pid))
+        .limit(1)
+        .one(&ctx.db)
+        .await
+        .map_err(db_err)?
+        .is_some();
+    let (absent, reason) = if has_baseline {
+        (
+            "no_earned_value_signal",
+            "a baseline exists, but this service computes no percent-complete \
+             (earned value) signal yet to score it against",
+        )
+    } else {
+        (
+            "no_baseline",
+            "no phased budget baseline: a plan without one is unmeasured, not on track",
+        )
+    };
+
     let body = serde_json::json!({
         "plan_pid": plan.pid.to_string(),
         "stakeholder": { "nps": rules::nps(&scores) },
-        // SPI and CPI need a phased budget baseline this service does
-        // not yet hold. Reported as unmeasured **with the reason**,
-        // rather than omitted (which would look like nothing to say) or
-        // defaulted to 1.0 (which would say "exactly on plan").
         "schedule": {
             "spi": serde_json::Value::Null,
-            "absent": "no_baseline",
-            "reason": "no phased budget baseline: a plan without one is unmeasured, not on track",
+            "absent": absent,
+            "reason": reason,
         },
         "financial": {
             "cpi": serde_json::Value::Null,
-            "absent": "no_baseline",
-            "reason": "no phased budget baseline",
+            "absent": absent,
+            "reason": reason,
         },
         "as_of": chrono::Utc::now(),
     });

@@ -7,6 +7,8 @@ pub mod automation_milestone_fires;
 pub mod automation_runs;
 pub mod automations;
 pub mod benefits;
+pub mod budget_baseline_periods;
+pub mod budget_baselines;
 pub mod budget_lines;
 pub mod business_case_targets;
 pub mod ceremonies;
