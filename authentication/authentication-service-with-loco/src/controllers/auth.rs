@@ -109,7 +109,10 @@ pub struct MagicLinkParams {
 
 /// Comma-separated allow-list of front-end return bases from
 /// `AUTH_ALLOWED_FRONTENDS` (exact `scheme://host[:port]` origins).
-fn allowed_frontends() -> Vec<String> {
+///
+/// `pub(crate)`: shared with `controllers::oidc`, which honours the same
+/// per-app `return_url` knob for its post-federation bridge redirect.
+pub(crate) fn allowed_frontends() -> Vec<String> {
     std::env::var("AUTH_ALLOWED_FRONTENDS")
         .unwrap_or_default()
         .split(',')
@@ -119,16 +122,22 @@ fn allowed_frontends() -> Vec<String> {
 }
 
 /// The default front-end base when no (or no allow-listed) `return_url` is
-/// supplied.
-fn default_frontend() -> String {
+/// supplied. `pub(crate)`: shared with `controllers::oidc` (see
+/// [`allowed_frontends`]).
+pub(crate) fn default_frontend() -> String {
     std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string())
 }
 
-/// Choose the front-end base for the magic-link email. A `requested`
-/// return base is honoured only when it exactly matches an `allowlist`
-/// entry (no open redirect); otherwise `default` is used. Pure, so it is
-/// unit-testable without env or a request.
-fn choose_frontend(requested: Option<&str>, allowlist: &[String], default: &str) -> String {
+/// Choose the front-end base for the magic-link email (or, shared with
+/// `controllers::oidc`, the post-federation bridge redirect). A
+/// `requested` return base is honoured only when it exactly matches an
+/// `allowlist` entry (no open redirect); otherwise `default` is used.
+/// Pure, so it is unit-testable without env or a request.
+pub(crate) fn choose_frontend(
+    requested: Option<&str>,
+    allowlist: &[String],
+    default: &str,
+) -> String {
     match requested.map(str::trim) {
         Some(r) if !r.is_empty() && allowlist.iter().any(|a| a == r) => r.to_string(),
         _ => default.to_string(),

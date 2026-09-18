@@ -1158,6 +1158,67 @@ only by that subject.
       crate — a real, pre-existing gap, fixed in the same change,
       since without it this whole feature's request-test suite would
       never run in CI at all).
+- [x] **EV-2 follow-up (2026-09-19) — fix the OIDC callback's session
+      handoff; add the front-end IdP-initiated sign-in link (§7a
+      rollout step 3).** The 2026-09-18 landing set
+      `__Host-mxi_session` directly on the `/callback` response and
+      redirected to `FRONTEND_URL`. That cookie is **host-locked to
+      this service's own origin** (`src/cookie.rs`'s `__Host-` prefix),
+      and in the reference BFF topology the front end is a *different*
+      origin (`:5173` vs. this service's `:5150`) — the cookie never
+      reached anywhere the browser would send it back, so a real
+      cross-origin deployment's federated sign-in silently failed to
+      actually establish a usable session, even though the DB-gated
+      test suite was green (it asserted the `Set-Cookie` header on the
+      direct same-client response, which is a correct assertion about
+      this service's own HTTP contract but does not model a browser
+      leaving for a different origin).
+      **Fix:** the callback now reuses the existing magic-link bridge
+      verbatim — `users::Model::create_magic_link` mints a single-use,
+      ~5-minute, hash-at-rest (SEC-A9) token for the verified user, and
+      the callback redirects to `{frontend}/verify?token=…` instead of
+      setting a session cookie itself. The front end's already-tested
+      `/verify` BFF route (a server-to-server `GET
+      /api/auth/magic-link/{token}`) performs the actual session
+      establishment and cookie re-hosting — the identical mechanism a
+      real magic-link sign-in already uses, not a new one. `GET
+      /api/auth/oidc/login` also gained an optional `?return_url=`,
+      reusing `controllers::auth::{choose_frontend, allowed_frontends,
+      default_frontend}` (made `pub(crate)`) so a multi-app deployment's
+      federated sign-in lands back on the requesting app rather than
+      always the family-wide default — the same allow-listed knob
+      `MagicLinkParams::return_url` already gives the magic-link flow.
+      See `src/controllers/oidc.rs`'s module doc comment for the full
+      "why bridge, not establish directly" reasoning.
+      **Trade, documented rather than silently accepted:** the audit
+      trail now records the OIDC identity event (`oidc_sign_in`) and
+      the generic session-establishment mechanics
+      (`magic_link_redeemed`) as two adjacent rows instead of one
+      OIDC-named row — correlatable by `pid`/`source_ip`/timestamp.
+      **Front end** (`authentication-front-end-with-svelte`): a "Sign
+      in with SSO" link on `/signin`, gated on
+      `PUBLIC_OIDC_SIGNIN_ENABLED` (this app's own opt-in — unset hides
+      it entirely, matching magic link staying the default) and a new
+      `/signin/sso` server route that 303-redirects the *browser* (not
+      a BFF `fetch` — the OIDC flow needs the browser itself to visit
+      the IdP and come back) to this service's `/api/auth/oidc/login`
+      with `return_url` set to the front end's own origin. Verified in
+      a real browser (Playwright): the link renders with the correct
+      text/href, and clicking it drives the 303 chain to
+      `{AUTH_API_URL}/api/auth/oidc/login?return_url=…` with the
+      correct encoded origin.
+      **Verified:** `tests/requests/oidc.rs` grew from 6 to 7 DB-gated
+      tests (the round-trip test now drives the full two-hop bridge —
+      `/callback` → extract the bridge token from the `Location` header
+      → `GET /api/auth/magic-link/{token}` → assert the session cookie
+      — plus a new `return_url` test); `cargo build`/`clippy
+      --all-targets --features oidc -- -D warnings` clean, `cargo fmt
+      --check` clean, `cargo test --lib` 95/95 (`oidc`) and 90/90
+      (default, unaffected), `cargo deny check` clean, and the full
+      `scripts/ci-check.sh test-db` run against real Postgres, all 7
+      OIDC tests green. Front end: `pnpm run check` (0 errors), `pnpm
+      exec vitest run` (32/32, +4 new), `pnpm run build`, `pnpm run
+      lint` all clean.
 
 ## 14. Implementation status
 
@@ -1194,9 +1255,12 @@ task and the `access=admin`-gated HTTP admin API, each writing an
 over `auth_events` (`GET /api/compliance/audit/verify`, §6.13);
 **OIDC relying-party identity federation** (`oidc` Cargo feature, off
 by default — `GET /api/auth/oidc/{login,callback}`, §13 EV-2) as an
-alternative front door onto the same session, magic link staying the
-default. **SAML 2.0 is not implemented** (§13 EV-2's stated remaining
-scope).
+alternative front door onto the same session, reached via a
+magic-link bridge token rather than a direct cross-origin cookie set
+(§13's 2026-09-19 follow-up); the sibling front end's IdP-initiated
+"Sign in with SSO" link (§7a rollout step 3) has also landed, opt-in
+via `PUBLIC_OIDC_SIGNIN_ENABLED`. Magic link stays the default.
+**SAML 2.0 is not implemented** (§13 EV-2's stated remaining scope).
 
 ## 15. Roadmap
 

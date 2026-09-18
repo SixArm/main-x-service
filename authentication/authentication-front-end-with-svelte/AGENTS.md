@@ -82,7 +82,8 @@ src/
     ├── +page.svelte              account dashboard (data from +layout.server.ts, NOT its own load)
     ├── +page.server.ts           sign-out action ONLY (no load of its own)
     ├── signup/+page.svelte + +page.server.ts   request a magic link (new account)
-    ├── signin/+page.svelte + +page.server.ts   request a magic link (existing account)
+    ├── signin/+page.svelte + +page.server.ts   request a magic link (existing account); "Sign in with SSO" link (EV-2, gated on PUBLIC_OIDC_SIGNIN_ENABLED)
+    ├── signin/sso/+server.ts     EV-2: GET -> 303 browser redirect to the auth service's /api/auth/oidc/login (return_url=this origin); 404 when SSO is not enabled
     ├── admin/attributes/         operator UI: view/replace a user's ABAC attributes (?pid=…; admin-gated; save action)
     └── verify/
         ├── +page.svelte          status UI
@@ -99,6 +100,7 @@ on mutations).
 |---|---|
 | Sign up | `POST /api/auth/signup {email, name?, locale?}` |
 | Sign in | `POST /api/auth/magic-link {email, locale?}` |
+| Sign in with SSO (EV-2) | **Browser navigation**, not a BFF call: `/signin/sso` 303s the browser itself to the auth service's `GET /api/auth/oidc/login?return_url={this app's origin}` — a `fetch` cannot do this hop, since the flow needs the browser to visit the IdP and come back. Opt-in via `PUBLIC_OIDC_SIGNIN_ENABLED`. |
 | Verify (`/verify?token=…`) | `GET /api/auth/magic-link/{token}` → relay `Set-Cookie: __Host-mxi_session` (and `__Host-mxi_csrf`) |
 | Dashboard load, every page | `POST /api/auth/token` (session cookie + CSRF header → bearer) then `GET /api/auth/me` (bearer) |
 | Sign out | `POST /api/auth/token` (as above) then `POST /api/auth/signout` (bearer) → revoke + clear cookies |
@@ -135,7 +137,10 @@ pnpm run build
 ```
 
 Configure the auth-service base URL with `AUTH_API_URL` (see
-`.env.example`; NOT `PUBLIC_API_BASE_URL` — see Ground rule 6).
+`.env.example`; NOT `PUBLIC_API_BASE_URL` — see Ground rule 6). Set
+`PUBLIC_OIDC_SIGNIN_ENABLED=true` to show the "Sign in with SSO" link
+(EV-2) — only when the paired auth-service deployment has its own
+`AUTH_OIDC_*` variables configured.
 
 `pnpm run test:e2e` (playwright) is **green (14/14, as of AFE-1)** — the
 `6/6` this line once said was stale even before AFE-1: AFE-3 had already

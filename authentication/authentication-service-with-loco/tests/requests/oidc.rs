@@ -215,6 +215,89 @@ async fn login_redirects_to_the_idp_with_pkce_state_and_nonce() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --features oidc -- --ignored`"]
+// `return_url` is the same per-app SSO knob `MagicLinkParams::return_url`
+// already gives the magic-link flow: honoured only when it exactly
+// matches `AUTH_ALLOWED_FRONTENDS`, carried in the flow cookie across
+// the round trip to the stub IdP, and used as the bridge's `/verify`
+// base instead of the family-wide `FRONTEND_URL` default.
+async fn login_return_url_is_carried_into_the_bridge_when_allow_listed() {
+    use authentication_service::models::users;
+
+    let (issuer, stub) = serve_stub_idp().await;
+    let redirect_url = "http://localhost:3000/api/auth/oidc/callback";
+    set_oidc_env(&issuer, redirect_url, None, false);
+    // SAFETY: see `set_oidc_env`; `#[serial]` prevents cross-test races.
+    unsafe {
+        std::env::set_var("AUTH_ALLOWED_FRONTENDS", "https://portfolio.example.com");
+    }
+
+    request::<App, _, _>(|request, ctx| async move {
+        let email = "sso.user@example.com";
+        users::Model::create_passwordless(&ctx.db, email, "SSO User")
+            .await
+            .expect("seed an existing account (JIT is off)");
+
+        let login_response = request
+            .get("/api/auth/oidc/login?return_url=https://portfolio.example.com")
+            .await;
+        let location = login_response
+            .header("location")
+            .to_str()
+            .expect("location")
+            .to_string();
+        let parsed = url::Url::parse(&location).expect("valid authorize URL");
+        let query: std::collections::HashMap<_, _> = parsed.query_pairs().into_owned().collect();
+        let state = query.get("state").expect("state").clone();
+        let nonce = query.get("nonce").expect("nonce").clone();
+        let flow_cookie = login_response
+            .header("set-cookie")
+            .to_str()
+            .expect("cookie")
+            .split(';')
+            .next()
+            .expect("cookie pair")
+            .to_string();
+
+        let now = chrono::Utc::now().timestamp();
+        let claims = json!({
+            "iss": issuer, "sub": "idp-subject-456", "aud": "test-client",
+            "exp": now + 300, "iat": now, "nonce": nonce,
+            "email": email, "email_verified": true,
+        });
+        *stub.id_token.lock().expect("lock") = Some(sign_id_token(&claims, "test-kid"));
+
+        let callback_response = request
+            .get(&format!(
+                "/api/auth/oidc/callback?code=stub-code&state={state}"
+            ))
+            .add_header(
+                axum::http::header::COOKIE,
+                flow_cookie.parse::<axum::http::HeaderValue>().unwrap(),
+            )
+            .await;
+        assert_eq!(callback_response.status_code(), 303);
+        let bridge_location = callback_response
+            .header("location")
+            .to_str()
+            .expect("bridge redirect")
+            .to_string();
+        assert!(
+            bridge_location.starts_with("https://portfolio.example.com/verify?token="),
+            "{bridge_location}"
+        );
+    })
+    .await;
+
+    // SAFETY: see `set_oidc_env`.
+    unsafe {
+        std::env::remove_var("AUTH_ALLOWED_FRONTENDS");
+    }
+    clear_oidc_env();
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --features oidc -- --ignored`"]
 async fn callback_refuses_a_state_mismatch_before_ever_calling_the_idp() {
     let (issuer, _state) = serve_stub_idp().await;
     set_oidc_env(
@@ -273,10 +356,13 @@ async fn callback_reports_an_idp_error_without_touching_the_token_endpoint() {
 // The full round trip: login -> a real ES256-signed ID token from the
 // stub IdP -> callback verifies it (signature + nonce, via
 // `openidconnect`'s own verifier) -> claims map to attrs -> the
-// existing account is found (JIT off, the safer default) -> the same
-// session establishment a magic-link redemption uses. This is the one
-// test that proves the whole sequence is wired correctly, not just
-// that each piece type-checks.
+// existing account is found (JIT off, the safer default) -> a
+// magic-link bridge token -> the front end's `/verify` BFF route would
+// consume it via `GET /api/auth/magic-link/{token}`, exactly as it
+// already does for a real magic-link sign-in (this test drives that
+// second hop directly, the way the BFF's server-side `fetch` would).
+// This is the one test that proves the whole sequence is wired
+// correctly end to end, not just that each piece type-checks.
 async fn callback_establishes_a_session_from_a_real_signed_id_token() {
     use authentication_service::models::users;
     use sea_orm::IntoActiveModel;
@@ -339,7 +425,45 @@ async fn callback_establishes_a_session_from_a_real_signed_id_token() {
             "{:?}",
             callback_response.text()
         );
-        let session_cookie = callback_response
+
+        // The callback redirects the *browser* to the front end's own
+        // `/verify?token=…` — it cannot set a usable session cookie
+        // itself, since `__Host-mxi_session` is host-locked to this
+        // service's own origin and the browser is about to leave it
+        // (see this module's `src/controllers/oidc.rs` doc comment).
+        let bridge_location = callback_response
+            .header("location")
+            .to_str()
+            .expect("a bridge redirect was set")
+            .to_string();
+        assert!(
+            bridge_location.starts_with("http://localhost:5173/verify?token="),
+            "{bridge_location}"
+        );
+        let bridge_token = bridge_location
+            .split("token=")
+            .nth(1)
+            .expect("token query param")
+            .to_string();
+
+        // No flow cookie survives the bridge — a replay of the callback
+        // URL (e.g. a browser back button) cannot mint a second bridge.
+        let cleared_flow = callback_response
+            .header("set-cookie")
+            .to_str()
+            .expect("the flow cookie is cleared")
+            .to_string();
+        assert!(cleared_flow.starts_with("__Host-mxi_oidc_flow=;"));
+
+        // This is exactly the server-to-server call the front end's
+        // `/verify` BFF route makes (`src/lib/server/auth.ts`'s
+        // `verifyMagicLink`) — same endpoint a real magic-link sign-in
+        // consumes, now reused as the OIDC session-establishment hop.
+        let verify_response = request
+            .get(&format!("/api/auth/magic-link/{bridge_token}"))
+            .await;
+        assert_eq!(verify_response.status_code(), 200);
+        let session_cookie = verify_response
             .header("set-cookie")
             .to_str()
             .expect("a session cookie was set")
