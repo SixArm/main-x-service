@@ -377,11 +377,12 @@ make. Portfolio's own spec is the reference statement of the property
 buyer-criteria triage in `project-portfolio-management/spec/13-tasks.md`
 T-28's "AI capabilities" row: *"which outputs are explainable and
 auditable vs black-box" — all of them, none*), and portfolio's T-28j
-is where the property becomes a **CI-enforced pin** rather than a
-habit: a test that walks every derived `GET` in the OpenAPI document
-and asserts each one carries either an inputs/reasons block or a
-`null` + reason, so a new derived route with no disclosure fails CI
-rather than merely disappointing a reviewer. care-pathway and
+(**landed 2026-09-18**) is where the property became a **CI-enforced
+pin** rather than a habit: a test that walks every derived `GET` in
+the OpenAPI document and asserts each one carries either an
+inputs/reasons block or a `null` + reason, so a new derived route with
+no disclosure fails CI rather than merely disappointing a reviewer.
+care-pathway and
 patient-flow inherit this rule rather than re-deciding it — a TBA
 surface added to either should get the same walk-the-OpenAPI-doc pin
 once it has an OpenAPI document to walk.

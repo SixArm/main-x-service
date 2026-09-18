@@ -9,6 +9,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — explainability pin: every derived GET discloses its inputs (T-28j)
+
+`src/openapi.rs`'s test module gains
+`every_derived_get_discloses_its_inputs_or_is_exempt_as_plain_crud`: walks
+every `GET` operation in the hand-written OpenAPI document (the same
+mechanical enumeration `spec_and_mounted_routes_agree_both_ways` already
+uses) and asserts each one either carries a substantial description /
+known disclosure marker ("null", "unmeasured", "withheld", "as_of",
+"reason", "even at zero", …) or sits in a new `NON_DERIVED_GET` register
+for a genuinely plain record read — the same register-shrinks-only
+discipline `KNOWN_UNDOCUMENTED` already established, backstopped by
+`non_derived_get_register_is_accurate`. Running it against the document
+as it stood found two real gaps: `/api/plans/{pid}/time-entries` was
+correctly plain (moved to the register), and `/api/reviews/consensus`
+was a genuine miss (an aggregate verdict with undocumented `null`-on-
+no-scores / `null`-on-tie behaviour), fixed with a real `description`
+rather than loosening the test. `project-portfolio-management/spec/
+02-scope.md` §2.3 gains the "no model-driven assistant inside the
+service" refusal this task also calls for, cross-referencing the test
+by name.
+
 ### Added — rollup attrition record (TBA-12, repo `tasks.md` PA-3)
 
 `GET /api/plans/{pid}/rollup` gains an `attrition` key: a named,
