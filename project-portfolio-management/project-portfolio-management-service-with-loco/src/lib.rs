@@ -47,6 +47,8 @@ pub mod distribution;
 /// five obligations in `agents/share/time-based-analysis.md` §7.1.
 pub mod effort;
 pub mod engineering;
+/// The phased budget baseline and the EAC/ETC forecast (T-28b).
+pub mod financials;
 /// The time-based-analysis flow-gauge refresh loop: default-off,
 /// bounded by a series cap, and suppressed below a board-size floor.
 pub mod flow_metrics;

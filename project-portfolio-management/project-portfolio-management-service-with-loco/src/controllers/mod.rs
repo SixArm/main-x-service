@@ -15,6 +15,8 @@ pub mod docs;
 /// Recorded effort and utilisation, including per person.
 pub mod effort;
 pub mod engineering;
+/// The phased budget baseline and the EAC/ETC forecast (T-28b).
+pub mod financials;
 pub mod governance;
 pub mod insights;
 pub mod metrics;

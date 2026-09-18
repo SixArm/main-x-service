@@ -528,7 +528,7 @@ described manual check confirms it. Split tasks too big for one PR
     **Acceptance:** commit → rollback → commit is idempotent on funding
     state; a member changed between commit and rollback blocks the
     rollback and is named; every evaluation response carries `as_of`.
-  - [ ] **T-28b (L) — Phased budget baseline → SPI / CPI / EAC and the
+  - [x] **T-28b (L) — Phased budget baseline → SPI / CPI / EAC and the
     portfolio overrun forecast.** A `budget_baselines` table: planned
     cost per period per plan, in one currency, **frozen at approval**;
     a re-baseline is a new version with a reason, append-only, and
@@ -546,6 +546,54 @@ described manual check confirms it. Split tasks too big for one PR
     the old figure is reproducible from the old version; the rollup
     over a subtree with two currencies reports two rows, never one sum;
     integer minor units throughout, no float.
+    **Landed 2026-09-18.** New pure module `src/financials.rs`
+    (`Baseline`/`BaselinePeriod`/`Forecast`/`EtcSource`/
+    `ForecastAbsent`/`forecast()`/`rollup_forecast()`, 10 unit tests);
+    HTTP surface `src/controllers/financials.rs`
+    (`POST`/`GET /plans/{pid}/budget-baselines`,
+    `GET /plans/{pid}/financials/forecast`,
+    `GET /financials/forecast?plan=&depth=`, reusing
+    `tba::walk_descendants` verbatim for the rollup walk); migration
+    `m20260918_000001_budget_baselines` (`budget_baselines` +
+    `budget_baseline_periods`, append-only, no `deleted_at`, matching
+    `phase_transitions`' precedent). 6 new DB-gated request tests in
+    `tests/requests/financials.rs`, all passing against a real
+    Postgres.
+    - [x] **Scope correction, decided rather than guessed:** the intro
+      prose's "unblocks SPI/CPI" is true only in the sense that a
+      baseline is now a real, storable thing — it does **not** make a
+      real SPI/CPI *value* possible, because those need **earned
+      value** (percent complete × baseline), and nothing in this
+      service computes percent complete as a trustworthy figure. The
+      acceptance criteria above never actually test a real SPI/CPI
+      number (only EAC/ETC/forecast/rollup/no-baseline-unchanged),
+      confirming this was the intended scope, not an oversight.
+      `GET /plans/{pid}/performance`'s `spi`/`cpi` stay `null`
+      (`src/controllers/value.rs::performance`) — but the **reason**
+      changes once a plan has a baseline, from `no_baseline` (still
+      accurate for a plan with none) to a new `no_earned_value_signal`
+      (a baseline exists, but nothing scores it), because reporting
+      "no baseline" once one genuinely exists would be a lie. Wiring a
+      real earned-value signal (what counts as "percent complete"? task
+      count? story points? a phase-weighted schedule?) is a separate,
+      undecided question — not guessed here, matching PRO-P33's own
+      "needs an owner decision, not a guessed default" posture.
+    - [x] **Currency resolution, decided rather than left implicit:**
+      the forecast's own currency is the baseline's when one exists (a
+      frozen, more durable record than a TPC observation), falling
+      back to the latest TPC observation's own currency when there is
+      no baseline at all. A TPC observation in a *different* currency
+      than an existing baseline is not used for ETC — mixing currencies
+      silently would be worse than falling back to the baseline's own
+      remaining periods.
+    - [x] **The rollup's query shape** (`GET /financials/forecast
+      ?plan=<pid>&depth=`) was not spelled out precisely by the task
+      text ("rolled over `parent_ref`" alone does not say how a root is
+      named); resolved by mirroring `GET /plans/{pid}/rollup`'s own
+      walk exactly — a required `plan` query param rather than a path
+      param, since this endpoint's natural home is beside the other
+      top-level `financials/*` views (`variance`, `exposure`), not
+      nested under `/plans/{pid}`.
   - [ ] **T-28c (M) — Skill-aware allocation.** An allocation may
     declare `skills_required[]` (short tags); the capacity view
     resolves a person's skills through the worker service by
