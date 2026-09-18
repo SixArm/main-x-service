@@ -34,7 +34,7 @@ use super::pagination::{Page, with_page_headers};
 use crate::auth::MaybeAuthUser;
 use crate::automation as rules;
 use crate::engineering::TASK_STATUSES;
-use crate::models::_entities::{plans, reviews, scheduled_actions, tasks};
+use crate::models::_entities::{plan_dependencies, plans, reviews, scheduled_actions, tasks};
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::capabilities as cap_models;
 use crate::validation::MAX_TEXT_LEN;
@@ -518,15 +518,30 @@ async fn act_schedule(
 /// detail recorded against it — one call per element of the rule's
 /// `actions` array, so a rule with several actions calls this several
 /// times, each independently logged (FR-32).
+/// The shared context every action of one matched rule's firing needs
+/// — bundled so `apply_action` takes a handful of arguments rather
+/// than one per fact about the firing.
+struct FiringContext<'a> {
+    rule: &'a crate::models::_entities::automations::Model,
+    fact: &'a rules::TriggerFact,
+    subject_kind: &'a str,
+    subject_pid: Uuid,
+    actor: Option<&'a str>,
+}
+
 async fn apply_action(
     ctx: &AppContext,
-    rule: &crate::models::_entities::automations::Model,
+    firing: &FiringContext<'_>,
     action: &rules::ParsedAction,
-    fact: &rules::TriggerFact,
-    subject_kind: &str,
-    subject_pid: Uuid,
-    actor: Option<&str>,
+    action_index: i32,
 ) -> (&'static str, serde_json::Value) {
+    let (rule, fact, subject_kind, subject_pid, actor) = (
+        firing.rule,
+        firing.fact,
+        firing.subject_kind,
+        firing.subject_pid,
+        firing.actor,
+    );
     match action.kind.as_str() {
         "assign" => act_assign(ctx, &rule.name, &action.value, subject_kind, subject_pid).await,
         "set_task_status" => {
@@ -557,6 +572,8 @@ async fn apply_action(
                 Err(e) => ("failed", serde_json::json!({ "reason": e.to_string() })),
             }
         }
+        "propose_reschedule" => act_propose_reschedule(ctx, &action.value, fact).await,
+        "shift_dependents" => act_shift_dependents(ctx, rule.pid, action_index, fact, actor).await,
         other => (
             "failed",
             serde_json::json!({ "reason": format!("unknown action_kind `{other}`") }),
@@ -601,6 +618,205 @@ async fn add_plan_label(ctx: &AppContext, plan_pid: Uuid, label: &str) -> Result
         .await
         .map_err(Error::Model)?;
     Ok(true)
+}
+
+/// Every direct finish-start successor of `plan_pid`, with its own
+/// current dates — one query for the edges, then one per successor for
+/// its dates (bounded by how many dependencies a plan realistically
+/// declares; no pagination cap exists on `plan_dependencies` writes
+/// today, so this is not yet N+1-hardened the way `tba::load_board` is).
+async fn load_successors(ctx: &AppContext, plan_pid: Uuid) -> Result<Vec<rules::SuccessorFact>> {
+    let edges = plan_dependencies::Entity::find()
+        .filter(plan_dependencies::Column::PredecessorPid.eq(plan_pid))
+        .all(&ctx.db)
+        .await
+        .map_err(db_err)?;
+    let mut out = Vec::with_capacity(edges.len());
+    for edge in edges {
+        let Some(successor) = plans::Entity::find()
+            .filter(plans::Column::Pid.eq(edge.successor_pid))
+            .filter(plans::Column::DeletedAt.is_null())
+            .one(&ctx.db)
+            .await
+            .map_err(db_err)?
+        else {
+            // The successor was deleted since the edge was recorded;
+            // skip it rather than propose a shift for a plan that no
+            // longer exists.
+            continue;
+        };
+        let parsed = successor.to_plan().map_err(Error::Model)?;
+        out.push(rules::SuccessorFact {
+            edge_pid: edge.pid,
+            successor_pid: edge.successor_pid,
+            lag_days: edge.lag_days,
+            current_start: parsed.start_date.and_then(|d| d.parse().ok()),
+            current_end: parsed.target_date.and_then(|d| d.parse().ok()),
+        });
+    }
+    Ok(out)
+}
+
+/// Parse the trigger fact's own old/new dates. `plan_timeframe_changed`
+/// carries them in `from_status`/`to_status` (see
+/// `crate::automation::TRIGGER_KINDS`'s own doc comment for why).
+fn shift_dates(fact: &rules::TriggerFact) -> Option<(chrono::NaiveDate, chrono::NaiveDate)> {
+    let old = fact.from_status.as_deref()?.parse().ok()?;
+    let new = fact.to_status.as_deref()?.parse().ok()?;
+    Some((old, new))
+}
+
+/// `propose_reschedule` — compute each direct successor's implied
+/// shift and **notify**, moving nothing.
+async fn act_propose_reschedule(
+    ctx: &AppContext,
+    action_value: &serde_json::Value,
+    fact: &rules::TriggerFact,
+) -> (&'static str, serde_json::Value) {
+    if fact.kind != "plan_timeframe_changed" {
+        return (
+            "skipped",
+            serde_json::json!({ "reason": "propose_reschedule only applies to plan_timeframe_changed" }),
+        );
+    }
+    let Some(recipient) = action_str(action_value, "recipient_ref") else {
+        return (
+            "failed",
+            serde_json::json!({ "reason": "no recipient_ref" }),
+        );
+    };
+    let Some((old_end, new_end)) = shift_dates(fact) else {
+        return (
+            "skipped",
+            serde_json::json!({ "reason": "no parseable target_date change" }),
+        );
+    };
+    let successors = match load_successors(ctx, fact.plan_pid).await {
+        Ok(s) => s,
+        Err(e) => return ("failed", serde_json::json!({ "reason": e.to_string() })),
+    };
+    if successors.is_empty() {
+        return (
+            "skipped",
+            serde_json::json!({ "reason": "no dependent plans" }),
+        );
+    }
+    let shifts = rules::propose_shifts(old_end, new_end, &successors);
+    let message = format!(
+        "Automation proposes rescheduling {} dependent plan(s) following a {}-day shift to this plan's end date",
+        shifts.len(),
+        (new_end - old_end).num_days(),
+    );
+    match cap_models::notify(
+        &ctx.db,
+        &recipient,
+        "plan",
+        fact.plan_pid,
+        "reschedule_proposed",
+        &message,
+    )
+    .await
+    {
+        Ok(_) => (
+            "applied",
+            serde_json::json!({ "recipient_ref": recipient, "shifts": shifts }),
+        ),
+        Err(e) => ("failed", serde_json::json!({ "reason": e.to_string() })),
+    }
+}
+
+/// `shift_dependents` — apply the same computation `propose_reschedule`
+/// would, to each direct successor's own `start_date`/`target_date`.
+///
+/// **No cascade**: each successor is written directly (not through
+/// `controllers::plans::update`), so applying a shift here never
+/// re-fires `plan_timeframe_changed`. One `automation_runs` row is
+/// logged per successor actually moved, in addition to the one the
+/// caller ([`apply_rule_actions`]) already logs for this action as a
+/// whole — the per-successor rows answer "what happened to this
+/// specific plan", the per-action row answers "did this rule's action
+/// fire at all".
+async fn act_shift_dependents(
+    ctx: &AppContext,
+    rule_pid: Uuid,
+    action_index: i32,
+    fact: &rules::TriggerFact,
+    actor: Option<&str>,
+) -> (&'static str, serde_json::Value) {
+    if fact.kind != "plan_timeframe_changed" {
+        return (
+            "skipped",
+            serde_json::json!({ "reason": "shift_dependents only applies to plan_timeframe_changed" }),
+        );
+    }
+    let Some((old_end, new_end)) = shift_dates(fact) else {
+        return (
+            "skipped",
+            serde_json::json!({ "reason": "no parseable target_date change" }),
+        );
+    };
+    let successors = match load_successors(ctx, fact.plan_pid).await {
+        Ok(s) => s,
+        Err(e) => return ("failed", serde_json::json!({ "reason": e.to_string() })),
+    };
+    if successors.is_empty() {
+        return (
+            "skipped",
+            serde_json::json!({ "reason": "no dependent plans" }),
+        );
+    }
+    let shifts = rules::propose_shifts(old_end, new_end, &successors);
+    let mut moved = Vec::with_capacity(shifts.len());
+    for shift in &shifts {
+        let Ok(Some(model)) = plans::Entity::find()
+            .filter(plans::Column::Pid.eq(shift.successor_pid))
+            .filter(plans::Column::DeletedAt.is_null())
+            .one(&ctx.db)
+            .await
+        else {
+            continue;
+        };
+        let Ok(mut plan) = model.to_plan() else {
+            continue;
+        };
+        plan.start_date = shift.proposed_start.map(|d| d.to_string());
+        plan.target_date = shift.proposed_end.map(|d| d.to_string());
+        let active: plans::ActiveModel = model.into();
+        if active.update_data(&ctx.db, &plan).await.is_err() {
+            continue;
+        }
+        cap_models::record_run(
+            &ctx.db,
+            rule_pid,
+            "plan",
+            shift.successor_pid,
+            action_index,
+            "applied",
+            serde_json::json!({
+                "edge_pid": shift.edge_pid.to_string(),
+                "delta_days": shift.delta_days,
+                "proposed_start": shift.proposed_start,
+                "proposed_end": shift.proposed_end,
+                "already_violated": shift.already_violated,
+            }),
+        )
+        .await
+        .ok();
+        AuditModel::record(
+            &ctx.db,
+            shift.successor_pid,
+            "automation_shifted_dependent",
+            actor,
+            Some(serde_json::json!({ "edge_pid": shift.edge_pid.to_string() })),
+        )
+        .await
+        .ok();
+        moved.push(shift.successor_pid.to_string());
+    }
+    (
+        "applied",
+        serde_json::json!({ "moved": moved, "shifts": shifts }),
+    )
 }
 
 /// Evaluate every enabled rule against one thing that just happened
@@ -684,15 +900,22 @@ async fn apply_rule_actions(
     // `automation_runs` rows, distinguished by `action_index`, so a
     // partial failure (action 2 of 3) is visible rather than
     // overwriting or being swallowed by the next action's result.
+    let firing = FiringContext {
+        rule,
+        fact,
+        subject_kind,
+        subject_pid,
+        actor,
+    };
     for (action_index, action) in actions.iter().enumerate() {
-        let (outcome, detail) =
-            apply_action(ctx, rule, action, fact, subject_kind, subject_pid, actor).await;
+        let action_index = i32::try_from(action_index).unwrap_or(i32::MAX);
+        let (outcome, detail) = apply_action(ctx, &firing, action, action_index).await;
         if let Err(err) = cap_models::record_run(
             &ctx.db,
             rule.pid,
             subject_kind,
             subject_pid,
-            i32::try_from(action_index).unwrap_or(i32::MAX),
+            action_index,
             outcome,
             detail.clone(),
         )

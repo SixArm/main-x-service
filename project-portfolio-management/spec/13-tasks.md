@@ -630,7 +630,7 @@ described manual check confirms it. Split tasks too big for one PR
     with the service's ABAC. **Acceptance:** attrs absent ⇒ identical
     nav; `view=executive` lands on `/executive`; every route stays
     reachable by URL regardless of the attribute.
-  - [ ] **T-28g (M) — Deadline-shift trigger and rescheduling.** Two
+  - [x] **T-28g (M) — Deadline-shift trigger and rescheduling.** Two
     narrow field-change triggers, the way `milestone_due` was narrowed
     rather than guessing a task-date convention: `plan_timeframe_changed`
     and `milestone_due_changed`. One new action, `propose_reschedule`:
@@ -645,6 +645,55 @@ described manual check confirms it. Split tasks too big for one PR
     finish-start successor and +5 − lag where a lag exists; a
     successor whose dependency is already violated is proposed with the
     violation named; the shifted successors fire no further rule.
+    **Landed 2026-09-18.** `plan_timeframe_changed` fires from
+    `controllers::plans::update` (mirroring `plan_phase_changed`'s
+    single-write pattern); `milestone_due_changed` fires from a **new**
+    `PUT /api/plans/{pid}/milestones/{m_pid}` reschedule endpoint
+    (`src/controllers/visibility.rs`) — none existed before this task, a
+    milestone could previously only be created and completed, never
+    moved. `src/automation.rs` gains `SuccessorFact`/`ProposedShift`/
+    `propose_shifts()` (8 unit tests); `src/controllers/automation.rs`
+    gains `load_successors`/`act_propose_reschedule`/
+    `act_shift_dependents`, and `apply_action` now takes the firing's
+    `action_index` (threaded from `apply_rule_actions`, bundled with the
+    rest of the firing's context into a new `FiringContext` to keep the
+    function under clippy's argument-count lint) so a mutating action
+    can log its own per-successor `automation_runs` rows against that
+    same index. 3 new DB-gated request tests in `tests/requests/
+    capabilities.rs`, verified against a real Postgres.
+    - [x] **The acceptance text's "+5 − lag where a lag exists" was not
+      implemented literally — decided rather than guessed.** A
+      finish-start lag is a *fixed* gap (`earliest_start = predecessor
+      end + lag`); shifting the predecessor's end by N days shifts the
+      implied earliest-start by the same N days regardless of what the
+      lag's value is, so subtracting the lag from the *shift amount*
+      would be dimensionally wrong (it would make the proposed shift
+      depend on an unrelated constant). `propose_shifts()` always
+      proposes the same delta on every direct successor, whatever its
+      lag; the lag matters only for the **violation** check (a
+      successor whose current start already falls short of `old
+      predecessor end + lag`, checked once, before any shift — see
+      `already_violated`), which is the reading `propose_shifts`
+      implements and pins with tests.
+    - [x] **Two `automation_runs` rows per `shift_dependents` firing,
+      not one.** The acceptance text's "one logged row per task moved"
+      and the base engine's existing "one row per action" (unchanged
+      for every other action kind) both hold simultaneously rather than
+      one being sacrificed for the other: `apply_rule_actions` still
+      logs its usual one row summarising the action itself (subject =
+      the plan whose deadline moved), and `act_shift_dependents`
+      additionally logs one row per successor it actually moved
+      (subject = that successor) — distinguishable by `subject_pid`,
+      with no schema change needed since `automation_runs.action_index`
+      carries no uniqueness constraint.
+    - [x] **`propose_reschedule`'s notification has no structured
+      payload to parse back.** `notifications.message` is a plain
+      `String` (no JSON column); `shift_dependents` does **not** read a
+      prior `propose_reschedule` notification back — it re-derives the
+      identical `propose_shifts()` computation live from the same
+      trigger fact. This is simpler than adding a payload column and
+      structurally guarantees the two actions can never disagree about
+      what "the proposed shift" was.
   - [ ] **T-28h (M) — Deterministic scenario generator.**
     `POST /scenarios/generate` takes the same constraints a scenario
     holds (budget cap, currency, must-include) and returns a **draft

@@ -547,6 +547,262 @@ async fn a_milestone_due_rule_fires_once_the_date_arrives_and_never_again() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// T-28g: shifting a plan's end proposes the same delta on a direct
+// finish-start successor, via a notification that moves nothing.
+async fn plan_timeframe_changed_proposes_a_shift_via_notification() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let predecessor: Value = request
+            .post("/api/plans")
+            .json(&json!({ "name": "Predecessor", "target_date": "2026-02-01" }))
+            .await
+            .json();
+        let predecessor_pid = predecessor["pid"].as_str().expect("pid").to_string();
+        let successor: Value = request
+            .post("/api/plans")
+            .json(&json!({ "name": "Successor", "start_date": "2026-02-05", "target_date": "2026-02-20" }))
+            .await
+            .json();
+        let successor_pid = successor["pid"].as_str().expect("pid").to_string();
+
+        request
+            .post("/api/dependencies")
+            .json(&json!({ "predecessor_pid": predecessor_pid, "successor_pid": successor_pid }))
+            .await
+            .assert_status_ok();
+
+        let recipient = person("55555555-5555-5555-5555-555555555555");
+        request
+            .post("/api/automations")
+            .json(&json!({
+                "plan_pid": predecessor_pid,
+                "name": "Propose downstream reschedule",
+                "trigger_kind": "plan_timeframe_changed",
+                "actions": [
+                    { "kind": "propose_reschedule", "value": { "recipient_ref": recipient } },
+                ],
+            }))
+            .await
+            .assert_status_ok();
+
+        // Shift the predecessor's end by 5 days.
+        request
+            .put(&format!("/api/plans/{predecessor_pid}"))
+            .json(&json!({ "name": "Predecessor", "target_date": "2026-02-06" }))
+            .await
+            .assert_status_ok();
+
+        let notifications: Value = request
+            .get(&format!("/api/notifications?recipient={recipient}"))
+            .await
+            .json();
+        let rows = notifications["notifications"]
+            .as_array()
+            .or_else(|| notifications.as_array())
+            .cloned()
+            .expect("notifications");
+        assert_eq!(rows.len(), 1, "one proposal notification: {rows:?}");
+
+        // Nothing moved — this is a proposal, not an application.
+        let successor_after: Value = request
+            .get(&format!("/api/plans/{successor_pid}"))
+            .await
+            .json();
+        assert_eq!(successor_after["target_date"], "2026-02-20");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// T-28g: shift_dependents actually applies the proposed shift, and
+// does not cascade — the successor's own move never re-fires a rule
+// watching plan_timeframe_changed.
+async fn shift_dependents_applies_the_shift_without_cascading() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let predecessor: Value = request
+            .post("/api/plans")
+            .json(&json!({ "name": "Predecessor2", "target_date": "2026-03-01" }))
+            .await
+            .json();
+        let predecessor_pid = predecessor["pid"].as_str().expect("pid").to_string();
+        let successor: Value = request
+            .post("/api/plans")
+            .json(&json!({ "name": "Successor2", "start_date": "2026-03-05", "target_date": "2026-03-20" }))
+            .await
+            .json();
+        let successor_pid = successor["pid"].as_str().expect("pid").to_string();
+
+        request
+            .post("/api/dependencies")
+            .json(&json!({ "predecessor_pid": predecessor_pid, "successor_pid": successor_pid }))
+            .await
+            .assert_status_ok();
+
+        let rule: Value = request
+            .post("/api/automations")
+            .json(&json!({
+                "plan_pid": predecessor_pid,
+                "name": "Apply downstream reschedule",
+                "trigger_kind": "plan_timeframe_changed",
+                "actions": [
+                    { "kind": "shift_dependents", "value": {} },
+                ],
+            }))
+            .await
+            .json();
+        let rule_pid = rule["pid"].as_str().expect("pid").to_string();
+
+        // A second rule, scoped to the *successor*, would fire on
+        // plan_timeframe_changed too — proving whether shift_dependents
+        // re-enters the engine.
+        let watchdog: Value = request
+            .post("/api/automations")
+            .json(&json!({
+                "plan_pid": successor_pid,
+                "name": "Would-be cascade watchdog",
+                "trigger_kind": "plan_timeframe_changed",
+                "actions": [
+                    { "kind": "add_label", "value": { "label": "cascaded" } },
+                ],
+            }))
+            .await
+            .json();
+        let watchdog_pid = watchdog["pid"].as_str().expect("pid").to_string();
+
+        // Shift the predecessor's end by 5 days.
+        request
+            .put(&format!("/api/plans/{predecessor_pid}"))
+            .json(&json!({ "name": "Predecessor2", "target_date": "2026-03-06" }))
+            .await
+            .assert_status_ok();
+
+        let successor_after: Value = request
+            .get(&format!("/api/plans/{successor_pid}"))
+            .await
+            .json();
+        assert_eq!(
+            successor_after["target_date"], "2026-03-25",
+            "the successor's own end shifted by the same 5 days"
+        );
+        assert_eq!(successor_after["start_date"], "2026-03-10");
+
+        // Two rows for this one firing: the generic per-action summary
+        // (subject = the predecessor that triggered) and the
+        // per-successor detail act_shift_dependents logs itself
+        // (subject = the successor actually moved).
+        let runs: Value = request
+            .get(&format!("/api/automations/runs?automation={rule_pid}"))
+            .await
+            .json();
+        let rows = runs.as_array().cloned().expect("runs");
+        assert_eq!(rows.len(), 2, "the per-action summary plus the per-successor detail: {rows:?}");
+
+        let successor_runs: Value = request
+            .get(&format!(
+                "/api/automations/runs?automation={rule_pid}&subject={successor_pid}"
+            ))
+            .await
+            .json();
+        let successor_rows = successor_runs.as_array().cloned().expect("runs");
+        assert_eq!(successor_rows.len(), 1, "one run logged for the successor moved");
+        assert_eq!(successor_rows[0]["subject_pid"], successor_pid);
+        assert_eq!(successor_rows[0]["outcome"], "applied");
+
+        // The watchdog must never have fired — no cascade.
+        let watchdog_runs: Value = request
+            .get(&format!("/api/automations/runs?automation={watchdog_pid}"))
+            .await
+            .json();
+        assert_eq!(
+            watchdog_runs.as_array().map(Vec::len),
+            Some(0),
+            "shift_dependents must not re-enter the engine"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// T-28g: rescheduling a milestone's due date fires
+// milestone_due_changed — the write path that did not exist before
+// this task.
+async fn rescheduling_a_milestone_fires_milestone_due_changed() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan_pid = create_plan!(request, "Milestone reschedule board");
+        let milestone: Value = request
+            .post(&format!("/api/plans/{plan_pid}/milestones"))
+            .json(&json!({ "name": "Code freeze", "due": "2026-04-01" }))
+            .await
+            .json();
+        let milestone_pid = milestone["pid"].as_str().expect("pid").to_string();
+
+        let rule: Value = request
+            .post("/api/automations")
+            .json(&json!({
+                "plan_pid": plan_pid,
+                "name": "Flag rescheduled milestones",
+                "trigger_kind": "milestone_due_changed",
+                "actions": [
+                    { "kind": "add_label", "value": { "label": "rescheduled" } },
+                ],
+            }))
+            .await
+            .json();
+        let rule_pid = rule["pid"].as_str().expect("pid").to_string();
+
+        let rescheduled: Value = request
+            .put(&format!("/api/plans/{plan_pid}/milestones/{milestone_pid}"))
+            .json(&json!({ "due": "2026-04-15" }))
+            .await
+            .json();
+        assert_eq!(rescheduled["due"], "2026-04-15");
+
+        let runs: Value = request
+            .get(&format!("/api/automations/runs?automation={rule_pid}"))
+            .await
+            .json();
+        let rows = runs.as_array().cloned().expect("runs");
+        assert_eq!(rows.len(), 1, "one firing for the one reschedule");
+        assert_eq!(rows[0]["subject_pid"], milestone_pid);
+        assert_eq!(rows[0]["outcome"], "applied");
+
+        let plan: Value = request.get(&format!("/api/plans/{plan_pid}")).await.json();
+        let tags = plan["tags"].as_array().cloned().unwrap_or_default();
+        assert!(
+            tags.iter().any(|t| t == "rescheduled"),
+            "the label action applied: {tags:?}"
+        );
+
+        // Completing the milestone (an unrelated write) must not fire
+        // the reschedule trigger again.
+        request
+            .post(&format!(
+                "/api/plans/{plan_pid}/milestones/{milestone_pid}/complete"
+            ))
+            .await
+            .assert_status_ok();
+        let after: Value = request
+            .get(&format!("/api/automations/runs?automation={rule_pid}"))
+            .await
+            .json();
+        assert_eq!(
+            after.as_array().map(Vec::len),
+            Some(1),
+            "completing is not rescheduling"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // Set and forget: a deadline in the future is not fired by a sweep, and
 // a cancelled one never fires at all.
 async fn scheduled_actions_only_fire_when_due_and_only_once() {
