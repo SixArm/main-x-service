@@ -1657,6 +1657,7 @@ mod tests {
         "/api/scenarios",
         "/api/scenarios/{pid}/evaluate",
         "/api/scenarios/{pid}/commit",
+        "/api/scenarios/{pid}/rollback",
         "/api/objectives",
         "/api/objectives/{pid}/alignment",
         "/api/plans/{pid}/objectives",

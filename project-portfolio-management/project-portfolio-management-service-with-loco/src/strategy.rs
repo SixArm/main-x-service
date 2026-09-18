@@ -55,6 +55,21 @@ pub struct Constraints {
     pub must_include: Vec<Uuid>,
 }
 
+/// One live row an evaluation read, with its own `updated_at` — so two
+/// evaluations of the same scenario that disagree can point at which
+/// input moved (T-28a). Populated by the controller (DB-touching); the
+/// shape itself is pure data.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct InputRead {
+    /// What kind of row this is: `"budget_line"`, `"risk"`,
+    /// `"objective_link"`, or `"proposal"`.
+    pub kind: &'static str,
+    /// The row's own pid.
+    pub pid: Uuid,
+    /// The row's own `updated_at`.
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
 /// A scenario evaluation: totals + named constraint violations.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Evaluation {

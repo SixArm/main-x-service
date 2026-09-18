@@ -9,6 +9,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — scenario rollback and evaluation provenance (T-28a)
+
+`POST /api/scenarios/{pid}/rollback` un-commits a `committed` scenario
+(status → `draft`, `committed_at` → `null`, audited as
+`scenario_rolled_back`), refused `409` unless the scenario is
+currently `committed` (a new `conflict()` helper). `GET
+/api/scenarios/{pid}/evaluate` and `GET /api/scenarios/compare` now
+carry `as_of` (when the read ran) and `inputs_read` — every live
+`budget_line`/`risk`/`objective_link`/`proposal` row the evaluation
+summed, each with its own `updated_at` — so two evaluations of the
+same scenario that disagree can say why.
+
+Scoped deliberately narrower than the task's original text, which
+described rollback restoring "each member's funding state to what the
+commit replaced": `commit_scenario` has never mutated a member's
+`budget_lines`/`allocations`/any other row, only the scenario's own
+`status`/`committed_at`, so there is no member funding state to
+restore and none is invented. See `spec/13-tasks.md` T-28a for the
+full "decided rather than guessed" note.
+
 ### Added — deadline-shift trigger and rescheduling (T-28g)
 
 Two new automation triggers, narrowed to one field each like

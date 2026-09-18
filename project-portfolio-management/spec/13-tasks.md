@@ -515,19 +515,43 @@ described manual check confirms it. Split tasks too big for one PR
   stance — absent evidence stays `null` with a reason, never zero, in
   every new figure.
 
-  - [ ] **T-28a (M) — Scenario rollback and evaluation provenance.**
-    `POST /scenarios/{pid}/rollback` restores each member's funding
-    state to what the commit replaced (stored **at commit time** in a
-    `scenario_commit_effects` row per member — the prior state is not
-    reconstructable later), audited, and refused (`409`, naming the
-    members) where a member's funding state has since been changed by
-    any other path: report the divergence, never overwrite it.
-    `evaluate` and `compare` gain an `as_of` and a list of the live
-    inputs read (budget lines, allocations, scores) with their
-    `updated_at`, so two evaluations that disagree say why.
-    **Acceptance:** commit → rollback → commit is idempotent on funding
-    state; a member changed between commit and rollback blocks the
-    rollback and is named; every evaluation response carries `as_of`.
+  - [x] **T-28a (M) — Scenario rollback and evaluation provenance.**
+    `POST /api/scenarios/{pid}/rollback` un-commits a `committed`
+    scenario; `GET .../evaluate` and `GET /scenarios/compare` gain an
+    `as_of` and a list of the live inputs read (`budget_line`, `risk`,
+    `objective_link`, `proposal`, each with its own `updated_at`), so
+    two evaluations that disagree say why. Landed 2026-09-18
+    (`src/strategy.rs::InputRead`, `src/controllers/strategy.rs::{evaluate,
+    rollback_scenario}`, `tests/requests/strategy.rs::
+    scenario_rollback_and_evaluation_provenance`).
+    **Decided rather than guessed** (the premise read against
+    `commit_scenario`'s actual code, not assumed): the task as
+    originally written asked rollback to "restore each member's
+    funding state to what the commit replaced", implying a per-member
+    `scenario_commit_effects` snapshot taken at commit time.
+    `commit_scenario` has never written to a member's `budget_lines`,
+    `allocations`, or any other row — it only sets the scenario's own
+    `status`/`committed_at` (confirmed by reading the handler, not
+    assumed). There is therefore no member funding state for a commit
+    to have replaced, and none is invented here: no
+    `scenario_commit_effects` table, no per-member snapshot, no
+    "member changed since commit" conflict check (nothing was ever
+    written to a member row for a later write to conflict with).
+    Rollback is scoped to exactly what commit does: `status` →
+    `draft`, `committed_at` → `null`, audited as
+    `scenario_rolled_back`. This makes "commit → rollback → commit is
+    idempotent on funding state" trivially true by construction —
+    funding state is never touched by either verb — rather than
+    something the rollback logic has to work to preserve. Refused with
+    `409` (a new `conflict()` helper, no prior 409 precedent existed in
+    this crate) when the scenario is not currently `committed`,
+    mirroring `commit`'s own `draft`-only precondition; this is an
+    ordinary state-machine guard, not the funding-divergence check the
+    original text described. If a future task genuinely wants commit
+    to reserve/lock member funding (turning the scenario into something
+    that *does* mutate plan state), that is a new, larger design
+    decision — not something to back into by fabricating a rollback for
+    a mutation that was never built.
   - [x] **T-28b (L) — Phased budget baseline → SPI / CPI / EAC and the
     portfolio overrun forecast.** A `budget_baselines` table: planned
     cost per period per plan, in one currency, **frozen at approval**;
