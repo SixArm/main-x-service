@@ -9,6 +9,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — capacity-at-scale regression guard (T-28d)
+
+`tests/requests/scale.rs::capacity_views_do_not_fan_out_with_scale`
+seeds 60 plans with allocations across 40 shared people and proves
+`GET /capacity`, `GET /capacity/utilization`, and `GET /at-a-glance`
+each issue the same, bounded number of SeaORM driver round trips at a
+5-plan baseline and at the full 60-plan scale — not timed, counted
+directly via a tracing layer over SeaORM's own `#[instrument]` driver
+spans (`sea_orm::driver::sqlx_postgres::*`), since no query-counting
+test pattern existed anywhere in this repo and `pg_stat_statements` is
+deliberately off on the family's test Postgres. Plus
+`benches/service_bench.rs::bench_capacity_rollups`, a Criterion bench
+over the pure rollup arithmetic (`visibility::summed_percent`,
+`effort::utilisation`) at the same scale.
+
+This is a **regression guard, not a fix**: all three endpoints were
+already query-bounded (confirmed by reading them directly) — the test
+proves it and catches a future per-row query creeping in. See
+`spec/13-tasks.md` T-28d for the tracing-callsite-caching mechanics the
+counter had to account for.
+
 ### Added — skill-aware allocation (T-28c)
 
 `allocations.skills_required` (JSONB, short tags) plus `GET

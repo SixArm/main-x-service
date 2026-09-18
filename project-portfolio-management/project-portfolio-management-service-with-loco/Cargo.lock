@@ -4980,6 +4980,7 @@ dependencies = [
  "tokio-stream",
  "tonic",
  "tracing",
+ "tracing-core",
  "tracing-opentelemetry",
  "tracing-subscriber",
  "uuid",

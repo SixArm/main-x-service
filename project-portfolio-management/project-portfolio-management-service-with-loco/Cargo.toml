@@ -154,6 +154,13 @@ tokio-stream = { version = "0.1", features = ["net"] }
 # `reqwest` moved to [dependencies] above (src/webhooks.rs); the
 # mounted-middleware test (`tests/otlp_middleware.rs`) reuses that same
 # declaration rather than needing its own.
+# `tests/requests/scale.rs`'s query-count layer needs
+# `callsite::rebuild_interest_cache()` directly: `tracing`'s global
+# callsite-interest cache is computed once per callsite and is not
+# invalidated by a thread-local `set_default`, so a callsite already
+# hit under an earlier test's (less-interested) subscriber must be
+# force-rechecked before this test's own subscriber can see it.
+tracing-core = { version = "0.1" }
 
 [[bench]]
 name = "service_bench"

@@ -661,13 +661,55 @@ described manual check confirms it. Split tasks too big for one PR
     (mirroring `src/auth.rs`'s boot-time PASETO-key-fetch test
     pattern), so it activates without a code change the day the
     worker service adds the endpoint.
-  - [ ] **T-28d (S) — Capacity at scale.** A DB-gated test seeds 60
+  - [x] **T-28d (S) — Capacity at scale.** A DB-gated test seeds 60
     plans with allocations across 40 shared people and asserts
     `GET /capacity`, `GET /capacity/utilization`, and `GET /at-a-glance`
     each complete in a **bounded query count** (asserted through the
     connection's statement log, not timed), plus a Criterion bench over
     the pure rollups. **Acceptance:** query count does not grow with
     plan count; the bench compiles under the `bench` CI stage.
+    Landed 2026-09-18
+    (`tests/requests/scale.rs::capacity_views_do_not_fan_out_with_scale`,
+    `benches/service_bench.rs::bench_capacity_rollups`). **Finding, not
+    a fix**: all three endpoints were already query-bounded before this
+    task (`capacity`/`at_a_glance` each issue a fixed small number of
+    bulk `find().all()` reads up front and do every per-row filter in
+    Rust memory; `utilization` issues exactly three bounded queries
+    regardless of window size) — read directly in
+    `src/controllers/visibility.rs`/`src/controllers/effort.rs`, not
+    assumed. T-28d is therefore a **regression guard**, proving what
+    was already true and catching a future per-row query creeping in,
+    not a query-count fix.
+    **"Asserted through the connection's statement log" — decided
+    rather than guessed.** No query-counting test pattern existed
+    anywhere in this repo (checked first), and `pg_stat_statements` is
+    deliberately not enabled on the family's test Postgres
+    (`agents/share/postgresql.md`). Rather than add either, the test
+    counts SeaORM's own `#[instrument(level = "trace")]` driver spans
+    (`sea_orm::driver::sqlx_postgres::{execute,query_one,query_all,…}`)
+    directly — one span per round trip, independent of the
+    `database.enable_logging`/`sqlx_logging` toggle (that flag governs
+    a *separate* sqlx-internal statement log, not these spans). Two
+    real `tracing` gotchas had to be handled, both verified empirically
+    against the real test Postgres rather than assumed correct from
+    reading the docs: (1) a thread-local `tracing::subscriber::
+    set_default` override — not `set_global_default`, which
+    `App::init_logger` already claims at boot — is sound here
+    specifically because every request test in this crate runs on
+    `#[tokio::test]`'s default **current-thread** runtime, so a task
+    can never migrate to a different OS thread mid-`.await` and hide a
+    query from the override; (2) `tracing`'s per-callsite interest
+    cache is computed once, the first time each span callsite fires
+    process-wide — an earlier DB-gated test in the same binary has
+    already fired every `sea_orm::driver::*` callsite under
+    `App::init_logger`'s own (non-trace) filter, which would otherwise
+    cache "not interesting" forever, so
+    `tracing_core::callsite::rebuild_interest_cache()` (a new
+    `tracing-core` dev-dependency) is called immediately after
+    installing the counting subscriber. The test proves the mechanism
+    itself works (not just that it compiles) by asserting a non-zero
+    count at the small-roster baseline before comparing it against the
+    scaled-up count.
   - [ ] **T-28e (M) — Report grouping and scheduled runs.**
     `report_definitions.group_by` (one field, counts + the money
     columns summed per currency); scheduled runs as a loco `worker`
