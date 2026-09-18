@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — skill-aware allocation (T-28c)
+
+`allocations.skills_required` (JSONB, short tags) plus `GET
+/api/plans/{pid}/skill-gap`, which resolves the assigned person's
+skills live against the worker service by `EntityRef`
+(`src/workers_client.rs`: lazy verify-on-read, TTL-cached in-process,
+never persisted) and reports each required tag `covered`, `missing`,
+or `unknown` (with a reason). A non-worker reference, an unconfigured
+resolver, or a non-2xx/unreachable worker service all resolve
+`unknown`, never `missing`.
+
+The worker service carries no skills endpoint today (confirmed by
+reading its `Worker`/`Assessment` models directly), so the resolver is
+built against a documented, assumed contract
+(`GET {base}/api/workers/{id}/skills`) rather than inventing that
+feature inside the worker crate as a side effect of this task. See
+`spec/13-tasks.md` T-28c for the full "decided rather than guessed"
+note.
+
 ### Added — scenario rollback and evaluation provenance (T-28a)
 
 `POST /api/scenarios/{pid}/rollback` un-commits a `committed` scenario

@@ -23,6 +23,10 @@ pub struct Model {
     pub start_date: Option<Date>,
     pub end_date: Option<Date>,
     pub deleted_at: Option<DateTimeWithTimeZone>,
+    /// Short skill tags this allocation requires (T-28c). Only the
+    /// requirement lands here — whether the assigned person holds a
+    /// tag is resolved live against the worker service, never stored.
+    pub skills_required: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

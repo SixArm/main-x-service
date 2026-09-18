@@ -39,6 +39,7 @@ mod m20260902_000001_automation_multi_action;
 mod m20260902_000002_automation_milestone_fires;
 mod m20260908_000001_webhook_deliveries;
 mod m20260918_000001_budget_baselines;
+mod m20260918_000002_allocation_skills;
 
 /// The crate's migrator: drives the ordered migration set for the loco
 /// CLI / boot-time migration.
@@ -78,6 +79,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260902_000002_automation_milestone_fires::Migration),
             Box::new(m20260908_000001_webhook_deliveries::Migration),
             Box::new(m20260918_000001_budget_baselines::Migration),
+            Box::new(m20260918_000002_allocation_skills::Migration),
             // inject-above (do not remove this comment)
         ]
     }

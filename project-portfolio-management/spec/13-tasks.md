@@ -618,17 +618,49 @@ described manual check confirms it. Split tasks too big for one PR
       param, since this endpoint's natural home is beside the other
       top-level `financials/*` views (`variance`, `exposure`), not
       nested under `/plans/{pid}`.
-  - [ ] **T-28c (M) — Skill-aware allocation.** An allocation may
-    declare `skills_required[]` (short tags); the capacity view
-    resolves a person's skills through the worker service by
-    `EntityRef` — lazy verify-on-read, cached with a TTL, **never copied
-    into any stored row** (people stay references, family doctrine) —
-    and reports a per-plan skill gap. A person whose worker record is
-    unreachable reports `unknown`, never "lacks the skill".
+  - [x] **T-28c (M) — Skill-aware allocation.** An allocation may
+    declare `skills_required[]` (short tags, `allocations.skills_required`
+    JSONB); `GET /plans/{pid}/skill-gap` resolves the assigned person's
+    skills live through the worker service by `EntityRef`
+    (`src/workers_client.rs`) — lazy verify-on-read, TTL-cached
+    in-process (`PROJECT_PORTFOLIO_MANAGEMENT_WORKER_SKILLS_CACHE_TTL_SECONDS`,
+    default 300s), **never copied into any stored row** (people stay
+    references, family doctrine) — and reports each tag as `covered`,
+    `missing`, or `unknown` (with a reason). A person whose worker
+    record is unreachable reports `unknown`, never "lacks the skill".
+    Landed 2026-09-18 (`src/visibility.rs::{SkillStatus,
+    SkillGapFinding, skill_gap}`, `src/workers_client.rs`,
+    `src/controllers/visibility.rs::skill_gap`,
+    `tests/requests/visibility.rs::
+    skill_gap_resolves_covered_missing_and_unknown`).
     **Acceptance:** no skill text lands in `allocations` beyond the
     requirement tags; a stubbed worker service returning `404` yields
     `unknown` with a reason; the gap finding names the tag and the
     plan.
+    **Decided rather than guessed** (confirmed by reading
+    `worker-service`'s `Worker` and `Assessment` models directly, not
+    assumed): the worker service carries **no skills-tag field or
+    endpoint today**. `Worker` has no such field, and its `Assessment`
+    machinery scores psychometric/personality scales (Watson-Glaser,
+    SHL, …) against `AssessmentScale`, not a short-tag vocabulary
+    matching `skills_required`. Rather than invent a new
+    skills-tagging feature inside the worker crate as an unsupervised
+    side effect of a portfolio task — a real, larger, cross-crate
+    design decision that was not asked for — the resolver is built
+    against a **documented, assumed contract**
+    (`GET {base}/api/workers/{id}/skills` → `{"skills": [...]}`,
+    stated in `src/workers_client.rs`'s module doc) that does not
+    exist on the worker service yet. Until it does,
+    `PROJECT_PORTFOLIO_MANAGEMENT_WORKER_SERVICE_URL` is typically
+    unset in a real deployment and every resolution reports `unknown`
+    with a "worker service not configured" reason — the honest
+    answer for a signal nothing upstream produces yet, not a defect
+    here. The mechanism (validation, caching, the `covered`/`missing`/
+    `unknown` split, the `404`/unreachable/non-worker-ref failure
+    modes) is real and fully tested against a stubbed HTTP server
+    (mirroring `src/auth.rs`'s boot-time PASETO-key-fetch test
+    pattern), so it activates without a code change the day the
+    worker service adds the endpoint.
   - [ ] **T-28d (S) — Capacity at scale.** A DB-gated test seeds 60
     plans with allocations across 40 shared people and asserts
     `GET /capacity`, `GET /capacity/utilization`, and `GET /at-a-glance`

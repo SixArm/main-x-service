@@ -1672,6 +1672,7 @@ mod tests {
         "/api/plans/{pid}/milestones/{m_pid}/complete",
         "/api/plans/{pid}/allocations",
         "/api/plans/{pid}/allocations/{a_pid}",
+        "/api/plans/{pid}/skill-gap",
         "/api/capacity",
         "/api/reports",
         "/api/reports/{pid}",

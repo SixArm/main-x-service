@@ -22,8 +22,9 @@ use crate::models::_entities::{
 };
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::visibility as vis_models;
-use crate::validation::MAX_TEXT_LEN;
+use crate::validation::{MAX_ARRAY_LEN, MAX_ITEM_LEN, MAX_TEXT_LEN};
 use crate::visibility as rules;
+use crate::workers_client;
 
 fn unprocessable(message: &str) -> Error {
     Error::CustomError(
@@ -409,6 +410,10 @@ struct AllocationPayload {
     start_date: Option<chrono::NaiveDate>,
     #[serde(default)]
     end_date: Option<chrono::NaiveDate>,
+    /// Short skill tags this allocation requires (T-28c). Only the
+    /// requirement tags land here — never any resolved skill data.
+    #[serde(default)]
+    skills_required: Vec<String>,
 }
 
 #[debug_handler]
@@ -430,6 +435,18 @@ async fn create_allocation(
     {
         problems.push("end_date is before start_date".to_string());
     }
+    if payload.skills_required.len() > MAX_ARRAY_LEN {
+        problems.push(format!("skills_required: exceeds {MAX_ARRAY_LEN} entries"));
+    }
+    for (i, tag) in payload.skills_required.iter().enumerate() {
+        if tag.trim().is_empty() {
+            problems.push(format!("skills_required[{i}]: must not be blank"));
+        } else if tag.chars().count() > MAX_ITEM_LEN {
+            problems.push(format!(
+                "skills_required[{i}]: exceeds {MAX_ITEM_LEN} characters"
+            ));
+        }
+    }
     if !problems.is_empty() {
         return Err(unprocessable(&problems.join("; ")));
     }
@@ -443,6 +460,7 @@ async fn create_allocation(
         start_date: ActiveValue::set(payload.start_date),
         end_date: ActiveValue::set(payload.end_date),
         deleted_at: ActiveValue::set(None),
+        skills_required: ActiveValue::set(serde_json::json!(payload.skills_required)),
         ..Default::default()
     }
     .insert(&ctx.db)
@@ -452,6 +470,38 @@ async fn create_allocation(
         .await
         .ok();
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
+}
+
+/// `GET /api/plans/{pid}/skill-gap` — for every allocation on this
+/// plan carrying `skills_required` tags, resolve the assigned
+/// person's held skills live against the worker service (by
+/// `EntityRef`, TTL-cached, T-28c) and report each tag's status.
+#[debug_handler]
+async fn skill_gap(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+    let item = super::governance::find_item(&ctx, &pid).await?;
+    let rows = vis_models::allocations_for(&ctx.db, item.pid).await?;
+    let base_url = std::env::var(workers_client::BASE_URL_ENV).ok();
+    let mut findings = Vec::new();
+    for row in &rows {
+        let tags: Vec<String> =
+            serde_json::from_value(row.skills_required.clone()).unwrap_or_default();
+        if tags.is_empty() {
+            continue;
+        }
+        let resolved = workers_client::resolve_skills(base_url.as_deref(), &row.person_ref).await;
+        let (held, reason) = match &resolved {
+            Ok(held) => (Some(held.as_slice()), None),
+            Err(reason) => (None, Some(reason.as_str())),
+        };
+        findings.extend(rules::skill_gap(
+            row.pid,
+            &row.person_ref,
+            &tags,
+            held,
+            reason,
+        ));
+    }
+    format::json(serde_json::json!({ "plan_pid": item.pid.to_string(), "findings": findings }))
 }
 
 /// `GET /api/plans/{pid}/allocations`.
@@ -958,6 +1008,7 @@ pub fn routes() -> Routes {
             "/plans/{pid}/allocations/{a_pid}",
             delete(delete_allocation),
         )
+        .add("/plans/{pid}/skill-gap", get(skill_gap))
         .add("/capacity", get(capacity))
         .add("/reports", post(create_report))
         .add("/reports", get(list_reports))
