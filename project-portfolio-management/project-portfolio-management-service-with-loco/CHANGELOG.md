@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — intake demand forecast (T-28i)
+
+`GET /api/proposals/forecast` answers "how many approved proposals in
+the next N periods?" by reusing the exact throughput Monte-Carlo
+behind `GET /plans/{pid}/forecast`
+(`crate::tba::{throughput_history, forecast_items}`, verbatim, no new
+pure logic) over the intake pipeline's own `proposal_approved` audit
+events instead of a task board's completions. Same seed determinism,
+same refusal below `MIN_THROUGHPUT_PERIODS`, and the response names
+the history window (`from`/`to`/`periods`/`period_days`) it drew from.
+`arrivals_per_period` (`proposals.created_at`) rides alongside for
+context but does not feed the forecast.
+
+`proposals` carries no `approved_at` column, so the approval instant
+comes from the audit trail (`audit_logs` rows with action
+`proposal_approved`) rather than the table itself. See
+`spec/13-tasks.md` T-28i.
+
 ### Added — deterministic scenario generator (T-28h)
 
 `POST /api/scenarios/generate` builds a **draft scenario** by scoring

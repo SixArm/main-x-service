@@ -844,7 +844,7 @@ described manual check confirms it. Split tasks too big for one PR
     reachable with `momentum` configured to `0` via
     `PROJECT_PORTFOLIO_MANAGEMENT_SMART_SCORE_WEIGHTS`, which the test
     does explicitly and documents inline.
-  - [ ] **T-28i (S) — Demand forecast.** Reuse the throughput
+  - [x] **T-28i (S) — Demand forecast.** Reuse the throughput
     Monte-Carlo behind `GET /plans/{pid}/forecast` over the intake
     pipeline: proposal arrivals and approvals per period from
     `proposals` timestamps, answering "how many approved proposals in
@@ -852,6 +852,26 @@ described manual check confirms it. Split tasks too big for one PR
     refusal below the minimum history. **Acceptance:** fewer than the
     minimum periods ⇒ `null` + `insufficient_history`; the response
     names the history window it drew from.
+    Landed 2026-09-18 (`GET /api/proposals/forecast`,
+    `src/controllers/governance.rs::intake_forecast` — a thin edge
+    reusing `crate::tba::{throughput_history, forecast_items}`
+    verbatim, no new pure logic needed;
+    `tests/requests/governance.rs::
+    intake_forecast_refuses_thin_history_and_is_deterministic`).
+    **Decided rather than guessed:** `proposals` carries no
+    `approved_at` column (confirmed by reading the entity, not
+    assumed) — a proposal's status transitions are tracked only as
+    `status` plus the audit trail, so the "approved" instant each
+    period-bucket needs comes from `audit_logs` rows with action
+    `proposal_approved` (`ProposalAction::Approve.token()`), not from
+    the `proposals` table itself. `arrivals_per_period`
+    (`proposals.created_at`) rides alongside for context but does not
+    feed the forecast, which answers the *approved* question the task
+    asks, not a *submitted* one. `null` + a reason (not the literal
+    string `insufficient_history`) is what `forecast_items` already
+    returns below `MIN_THROUGHPUT_PERIODS` — reused verbatim per the
+    task's own "same refusal" instruction, rather than adding a second,
+    parallel refusal shape.
   - [x] **T-28j (S) — Explainability pin, and the non-goal recorded.**
     A test that walks every derived `GET` in the OpenAPI document and
     asserts the response carries either an inputs/reasons block or a
