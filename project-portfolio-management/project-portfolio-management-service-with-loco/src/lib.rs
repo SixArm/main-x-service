@@ -114,6 +114,9 @@ pub mod visibility;
 /// (`agents/share/event-bus.md` §12, repo `tasks.md` EV-3).
 pub mod webhooks;
 pub mod workers;
+/// Live worker-skill resolution over the worker service by
+/// `EntityRef`, TTL-cached, never persisted (T-28c).
+pub mod workers_client;
 /// Custom workflows: configurable task and issue state vocabularies,
 /// each state declaring the category every derived view computes from.
 pub mod workflow;
