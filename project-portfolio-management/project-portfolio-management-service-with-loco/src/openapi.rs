@@ -1634,6 +1634,7 @@ mod tests {
         "/api/compliance/audit/verify",
         // governance (PPM Phase A)
         "/api/proposals",
+        "/api/proposals/forecast",
         "/api/proposals/{pid}",
         "/api/proposals/{pid}/submit",
         "/api/proposals/{pid}/review",
