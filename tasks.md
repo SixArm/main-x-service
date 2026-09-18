@@ -7815,6 +7815,16 @@ green as it sits; these finish it)**
   under the vocabulary gate, and the same fail-closed posture on
   metadata/certificate fetch as SEC-V1), then the auth service task.
   Magic link stays the default; federation is opt-in per deployment.
+  **Design half done 2026-09-18** — §7a written: goals/non-goals, the
+  flow (IdP assertion → the same §3 session, nothing downstream
+  changes), the SEC-V1-mirrored metadata/JWKS fetch posture, attribute
+  mapping through the existing `AUTH_ATTRIBUTE_VOCABULARY` gate, and
+  three open questions (JIT provisioning default, SLO, metadata refresh
+  cadence). **Still open**: the `authentication-service` implementation
+  itself (SAML SP + OIDC RP, the claim-mapping config surface, the
+  actual session-creation wiring) and the front-end sign-in-link
+  addition — genuinely new code against the family's central auth
+  service, not attempted here.
 - [x] **EV-3 (M)** Outbound **webhook sink** as a family contract in
   [`agents/share/event-bus.md`](agents/share/event-bus.md) §12: a
   `WebhookSink` beside `LoggingSink` / `FluvioSink` in each crate's
