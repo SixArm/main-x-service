@@ -7875,7 +7875,7 @@ green as it sits; these finish it)**
   journey links (2026-08-24) added after that Dockerfile's last
   verification (2026-08-03). See the runbook's own "What 'verified
   against a fresh container' found" section for the full account.
-- [ ] **EV-5 (S)** Record the "no black-box output" property as a
+- [x] **EV-5 (S)** Record the "no black-box output" property as a
   family rule in
   [`agents/share/time-based-analysis.md`](agents/share/time-based-analysis.md)
   §8 or a sibling: every derived figure discloses its inputs and its
@@ -7883,7 +7883,11 @@ green as it sits; these finish it)**
   deployment ever wants one, sits outside the services over their open
   API and cites what it read. Portfolio's T-28j is the reference pin;
   care-pathway and patient-flow inherit the rule rather than re-decide
-  it.
+  it. **Done 2026-09-18** — written into §8 as a new subsection, citing
+  portfolio's own spec statement of the property and its still-unbuilt
+  T-28j (a CI-enforced pin, not yet landed — the doc rule states the
+  property and names T-28j as where it becomes enforced, without
+  claiming that enforcement already exists) as the reference.
 
 ## Found 2026-09-03 (an upstream release turned CI red for 47 crates)
 
