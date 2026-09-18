@@ -68,7 +68,7 @@ macro_rules! live {
 /// the environment holds nothing usable. A malformed weight map is
 /// warned about and ignored wholesale rather than half-applied (the
 /// ABAC-policy posture).
-fn weights() -> rules::Weights {
+pub(crate) fn weights() -> rules::Weights {
     let raw = std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_SMART_SCORE_WEIGHTS").ok();
     match (raw.as_deref(), rules::parse_weights(raw.as_deref())) {
         (_, Some(parsed)) => parsed,
@@ -101,17 +101,21 @@ fn days_since(then: chrono::DateTime<chrono::FixedOffset>) -> i64 {
 
 /// Everything the service knows, loaded once so a ranked list of N
 /// plans costs a fixed number of queries rather than N × queries.
-struct Estate {
-    plans: Vec<plans::Model>,
+/// `pub(crate)` so the deterministic scenario generator (T-28h,
+/// `controllers::strategy::generate_scenario`) can reuse the exact
+/// same evidence-gathering the ranked list and single-plan score use,
+/// rather than a second, drifting copy of it.
+pub(crate) struct Estate {
+    pub(crate) plans: Vec<plans::Model>,
     benefits: Vec<benefits::Model>,
-    budget_lines: Vec<budget_lines::Model>,
+    pub(crate) budget_lines: Vec<budget_lines::Model>,
     objective_links: Vec<objective_links::Model>,
     risks: Vec<risks::Model>,
     reviews: Vec<reviews::Model>,
 }
 
 impl Estate {
-    async fn load(ctx: &AppContext) -> Result<Self> {
+    pub(crate) async fn load(ctx: &AppContext) -> Result<Self> {
         Ok(Self {
             plans: live!(plans, &ctx.db),
             benefits: live!(benefits, &ctx.db),
@@ -126,7 +130,7 @@ impl Estate {
     }
 
     /// Assemble one plan's score evidence.
-    fn facts(&self, plan: &plans::Model) -> rules::ScoreFacts {
+    pub(crate) fn facts(&self, plan: &plans::Model) -> rules::ScoreFacts {
         // --- ROI, single-currency only (no FX conversion, ever) ------
         let plan_benefits: Vec<&benefits::Model> = self
             .benefits

@@ -792,7 +792,7 @@ described manual check confirms it. Split tasks too big for one PR
       trigger fact. This is simpler than adding a payload column and
       structurally guarantees the two actions can never disagree about
       what "the proposed shift" was.
-  - [ ] **T-28h (M) — Deterministic scenario generator.**
+  - [x] **T-28h (M) — Deterministic scenario generator.**
     `POST /scenarios/generate` takes the same constraints a scenario
     holds (budget cap, currency, must-include) and returns a **draft
     scenario** whose members were chosen greedily by Smart Score per
@@ -806,6 +806,44 @@ described manual check confirms it. Split tasks too big for one PR
     candidate appears exactly once across included + excluded; a
     must-include that alone exceeds the cap is reported, not silently
     dropped.
+    Landed 2026-09-18 (`src/strategy.rs::{GenerateCandidateFact,
+    ExcludeReason, GenerateRationale, generate_scenario}` — the pure
+    selection, unit-tested for determinism directly (same facts in
+    reversed input order ⇒ byte-identical serialized output);
+    `src/controllers/strategy.rs::generate_scenario` — the impure
+    edge, reusing `controllers::prioritisation::Estate` (widened to
+    `pub(crate)`) so the generator scores candidates with the *exact*
+    same evidence-gathering `GET /prioritisation` and
+    `GET /plans/{pid}/smart-score` already use, not a second, drifting
+    copy of it;
+    `tests/requests/strategy.rs::
+    generate_scenario_scores_prices_and_never_silently_drops_must_include`).
+    **Decided rather than guessed, two scope points:**
+    (1) **candidates are plans only, never proposals.** The task's
+    text names "the same constraints a scenario holds," and a
+    scenario's membership can include `proposal_pids` — but Smart
+    Score has no defined evidence trail for a not-yet-promoted
+    proposal (no budget lines, risks, or objective links are keyed to
+    a proposal, only to a plan), so scoring one would mean inventing a
+    parallel, undocumented scoring path rather than reusing the real
+    one. The generator draws its candidate pool from every active
+    plan, exactly as `GET /prioritisation` already does.
+    (2) **a must-include candidate is force-included even over cap,
+    and `must_include_conflict` is reserved for a `must_include` pid
+    that names no real candidate at all** — not for the "alone over
+    cap" case, which the acceptance text's "reported, not silently
+    dropped" already covers by forcing inclusion and letting the
+    resulting infeasibility surface through the ordinary `evaluate`
+    path (T-28a) once the draft is saved, the same way a planner's own
+    over-cap scenario would be surfaced. Discovered empirically while
+    writing the test (not assumed): under the *default* Smart Score
+    weights every plan carries a nonzero `momentum` reading purely
+    from its `updated_at` timestamp, so a plan with **no other**
+    evidence still scores — there is no such thing as a plan with no
+    `updated_at`. A genuinely `no_score` candidate is therefore only
+    reachable with `momentum` configured to `0` via
+    `PROJECT_PORTFOLIO_MANAGEMENT_SMART_SCORE_WEIGHTS`, which the test
+    does explicitly and documents inline.
   - [ ] **T-28i (S) — Demand forecast.** Reuse the throughput
     Monte-Carlo behind `GET /plans/{pid}/forecast` over the intake
     pipeline: proposal arrivals and approvals per period from
