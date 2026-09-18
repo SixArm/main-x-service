@@ -37,6 +37,7 @@ pub mod report_definitions;
 pub mod reviews;
 pub mod risks;
 pub mod satisfaction_responses;
+pub mod saved_views;
 pub mod scenarios;
 pub mod scheduled_actions;
 pub mod sprint_commitments;

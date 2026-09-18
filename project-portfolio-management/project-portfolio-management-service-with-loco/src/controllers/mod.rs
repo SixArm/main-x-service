@@ -29,6 +29,9 @@ pub mod oversight;
 pub mod phase;
 pub mod plans;
 pub mod prioritisation;
+/// Per-user saved views: route-scoped filter/sort/column presets,
+/// keyed by the token `sub` (T-28l).
+pub mod saved_views;
 pub mod strategy;
 /// Time-based analysis: the read surface over the task transition log —
 /// per-task and plan flow, constraints, aging WIP, and Little's Law.

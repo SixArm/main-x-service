@@ -910,11 +910,27 @@ described manual check confirms it. Split tasks too big for one PR
     read-only list rather than an unusable grid. **Acceptance:** the
     e2e suite runs the mobile project in CI; each failing route is a
     named test, not a screenshot.
-  - [ ] **T-28l (S) — Per-user saved views.** A `saved_views` table
+  - [x] **T-28l (S) — Per-user saved views.** A `saved_views` table
     keyed by the token `sub` (route + filter + sort + columns; no other
     identity), served through the BFF so the browser holds nothing.
     **Acceptance:** two users on one route see their own views; a view
     is scoped to its route and never applied elsewhere.
+    Landed 2026-09-18 (`migration/src/m20260918_000003_saved_views.rs`;
+    `src/saved_views.rs` — pure payload validation;
+    `src/controllers/saved_views.rs` — `POST`/`GET`/`DELETE
+    /api/saved-views[/{pid}]`, gated by the required-auth `AuthUser`
+    extractor (a saved view with no owner makes no sense), every query
+    scoped to `claims.sub`; `tests/saved_views.rs::
+    saved_views_are_scoped_to_their_owner_and_their_route` — its own
+    test binary, mirroring `tests/enforcement.rs`'s reason: the
+    PASETO `verifier` is a process-wide `OnceLock`, so a test that
+    mints real tokens for two distinct identities needs to control
+    when that `OnceLock` is first populated, which the shared
+    `tests/requests/mod.rs` binary cannot guarantee). Another user's
+    view is `404` on both read and delete, not `403` — a view's
+    existence is not disclosed across users, the same posture the
+    family already applies to higher-stakes cross-user disclosures
+    (`cross-service-linking.md` §10.2).
   - [x] **T-28m (M) — Outbound webhooks as a relay sink.** Not a new
     `notify` transport: a `WebhookSink` beside `LoggingSink` /
     `FluvioSink` in `src/relay.rs`, delivering the outbox envelope to
