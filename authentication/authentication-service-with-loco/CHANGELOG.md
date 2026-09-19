@@ -10,6 +10,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `GET /api/auth/me` now returns the caller's own ABAC attrs (T-28f, repo `tasks.md` EV-1)
+
+`CurrentResponse` gains `attrs` — the caller's live `users.attributes`
+(not the PASETO token's `attrs` claim, which can be up to
+`TOKEN_EXPIRATION` stale). A front-end BFF reads this to drive
+presentation-only choices (e.g. portfolio's role-tailored
+navigation/landing view, T-28f); it is never itself an authorization
+decision. Additive field, no breaking change to existing callers.
+
 ### Documented — SAML 2.0 SP evaluated and deliberately deferred (no code change)
 
 Surveyed the Rust SAML crate ecosystem for a Service Provider library

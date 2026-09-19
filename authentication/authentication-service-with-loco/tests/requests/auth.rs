@@ -393,6 +393,39 @@ async fn can_get_current_user() {
     .await;
 }
 
+/// T-28f (repo `tasks.md` EV-1): `/me` must carry the caller's own ABAC
+/// attrs, live from `users.attributes` — not merely the token's `attrs`
+/// claim, which is a snapshot from mint time. Assigns attrs **after**
+/// the bearer was minted, so a stale-claim implementation would fail
+/// this while the live-DB-read one (the actual implementation) passes.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn current_user_carries_live_abac_attrs() {
+    request::<App, _, _>(|request, ctx| async move {
+        let logged_in = prepare_data::init_user_login(&request, &ctx).await;
+
+        let user = users::Model::find_by_email(&ctx.db, &logged_in.user.email)
+            .await
+            .expect("user exists");
+        user.into_active_model()
+            .set_attributes(&ctx.db, serde_json::json!({ "view": ["executive"] }))
+            .await
+            .expect("attrs update should succeed");
+
+        let (auth_key, auth_value) = prepare_data::auth_header(&logged_in.token);
+        let response = request
+            .get("/api/auth/me")
+            .add_header(auth_key, auth_value)
+            .await;
+        assert_eq!(response.status_code(), 200);
+
+        let body: serde_json::Value = serde_json::from_str(&response.text()).unwrap();
+        assert_eq!(body["attrs"]["view"], serde_json::json!(["executive"]));
+    })
+    .await;
+}
+
 /// Pins that `/me` without a bearer token is 401 (the route is gated).
 #[tokio::test]
 #[serial]

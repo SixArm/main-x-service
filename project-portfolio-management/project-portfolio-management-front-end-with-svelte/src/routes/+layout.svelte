@@ -8,11 +8,18 @@
   $props:
     - children: Snippet — the routed page content (`{@render children()}`).
     - data: LayoutData — `signedIn` resolved server-side from the httpOnly
-            session cookie (`+layout.server.ts`).
+            session cookie, `view` from the caller's ABAC attrs
+            (`+layout.server.ts`).
 
   Session affordance: per-app magic-link login on this app's own `/signin`;
   sign-out posts to the root page's `signout` action (BFF: revokes the
   session server-side + clears the cookie). The browser never holds a token.
+
+  Nav ordering (T-28f, repo `tasks.md` EV-1): `data.view` (a
+  deployment-declared ABAC attribute, e.g. `view=executive`) moves the
+  matching nav item to the front, via the pure `orderNavForView` helper
+  (`$lib/nav.ts`) — presentation only; every route stays reachable by URL
+  regardless. `view` absent ⇒ `navItems` unchanged, byte for byte.
 -->
 <script lang="ts">
   import "../app.css";
@@ -23,6 +30,7 @@
   import type { LayoutData } from "./$types";
   import { i18n, t, isRtl, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte";
   import { COLLECTIONS } from "$lib/api/types";
+  import { orderNavForView } from "$lib/nav";
   import PickerBar from "@lilydesignsystem/svelte-picker-bar";
   import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
@@ -133,6 +141,13 @@
     { href: "/onboarding", label: "Onboarding" },
   ];
 
+  // T-28f: reorders `navItems` around `data.view` (the deployment-declared
+  // ABAC attribute) — recomputes whenever `data` changes (sign-in/out,
+  // navigation), since `data` is a reactive prop. `navItems` unchanged
+  // when `data.view` is absent/unmatched, so this is a no-op for every
+  // deployment that has not opted in.
+  const orderedNavItems = $derived(orderNavForView(navItems, data.view));
+
   // Reactive: tracks the server-resolved session presence.
   const signedIn = $derived(data.signedIn);
 </script>
@@ -152,7 +167,7 @@
     <a href="/" class="brand">{t("brand.name")}</a>
     <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
       <ul>
-        {#each navItems as item (item.href)}
+        {#each orderedNavItems as item (item.href)}
           <li>
             <a
               href={item.href}

@@ -51,7 +51,7 @@
 
 <form class="row" onsubmit={capture}>
   <input placeholder={t("ppm.ideas.formTitle")} bind:value={title} required />
-  <input placeholder={t("ppm.ideas.formPitch")} bind:value={pitch} size="40" />
+  <input placeholder={t("ppm.ideas.formPitch")} bind:value={pitch} />
   <button class="button primary" type="submit">{t("ppm.ideas.capture")}</button>
 </form>
 
