@@ -9,6 +9,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — role-tailored navigation and landing page (T-28f)
+
+The nav and `/`'s landing route now respond to a deployment-declared
+`view` ABAC attribute (e.g. `view=executive` reorders the nav and
+lands `/` on `/executive`), read via a new `currentUser()` BFF call to
+the auth service's `GET /api/auth/me` — which itself needed a small
+upstream fix (`authentication-service-with-loco`'s `CurrentResponse`
+carried no `attrs` field at all; see that crate's own `CHANGELOG.md`).
+Presentation only: authorisation stays with the service's ABAC, and
+every route stays reachable by direct URL regardless of `view`.
+Absent/unmatched `view` ⇒ today's nav, unchanged. New pure module
+`src/lib/nav.ts`. See `spec/index.md` §13 T-28f.
+
+### Added — phone-viewport responsive audit (T-28k)
+
+A new `mobile` Playwright project (390×844) runs `tests/e2e/mobile.spec.ts`
+across all 35 real routes, asserting no horizontal body scroll and a
+visible primary heading per route. Found and fixed four real overflow
+sources: the SVAR `FilterBar` on `/plans` (fixed-width internal
+input, plus hiding it alongside the grid under the mobile breakpoint
+— filtering a plain name list has little value), an `<input
+size="40">` on `/ideas` (removed), and a bare `<table>` on `/reviews`.
+`/scenarios` also overflowed but needed no route-local edit: the
+global `input { max-width: 100% }` rule added to `src/app.css` covers
+it without touching its own `size="50"`/`size="12"`/`size="4"`
+attributes. `/plans`'s `Grid` and `/gantt`'s `Gantt` now degrade to a
+plain, read-only `<ul>` under a 600px breakpoint (CSS-only, no JS
+viewport detection); `src/app.css` also gained global `table` overflow
+containment covering every other route with the same shape of bug.
+Fixed a real regression this surfaced in `tests/e2e/smoke.spec.ts`
+(the mobile-list fallback duplicated the seeded plan's name in the
+DOM, making an existing `getByText` assertion ambiguous — rescoped to
+the grid cell). See `spec/index.md` §13 T-28k.
+
 ### Added — operator onboarding guide (T-28p)
 
 `/onboarding` — a role-by-role "first hour" walkthrough (executive,

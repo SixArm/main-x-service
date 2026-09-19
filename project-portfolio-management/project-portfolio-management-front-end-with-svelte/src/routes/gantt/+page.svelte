@@ -103,11 +103,25 @@
 {:else if !schedule || tasks.length === 0}
   <p class="surface">{t("list.empty")}</p>
 {:else}
+  <!-- T-28k (repo tasks.md EV-1): the SVAR Gantt is unusable under a
+       phone viewport (a horizontal-scrolling timeline needs real
+       width); `.mobile-list` below is its read-only stand-in,
+       switched purely by `@media (max-width: 600px)`. -->
   <div class="gantt-wrap" data-testid="ppm-gantt">
     <Willow>
       <Gantt {tasks} {links} readonly />
     </Willow>
   </div>
+  <ul class="mobile-list">
+    {#each tasks as task (task.id)}
+      <li>
+        <a href="/plans/{task.id}">{task.text}</a>
+        <span class="dates"
+          >{task.start.toLocaleDateString()} – {task.end.toLocaleDateString()}</span
+        >
+      </li>
+    {/each}
+  </ul>
   {#if undated.length > 0}
     <p class="muted small">
       {t("list.empty")}:
@@ -124,5 +138,38 @@
   }
   .gantt-wrap :global(.ppm-critical .wx-bar) {
     --wx-gantt-task-color: #c0392b;
+  }
+
+  /* T-28k: read-only stand-in for the Gantt under a phone viewport. */
+  .mobile-list {
+    display: none;
+  }
+
+  @media (max-width: 600px) {
+    .gantt-wrap {
+      display: none;
+    }
+    .mobile-list {
+      display: block;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .mobile-list li {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.75rem 0.25rem;
+      border-bottom: 1px solid var(--mxi-color-border);
+    }
+    .mobile-list a {
+      color: inherit;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .mobile-list .dates {
+      font-size: 0.85em;
+      opacity: 0.75;
+    }
   }
 </style>

@@ -83,7 +83,7 @@ alongside OIDC in the same pass.
 | POST | `/api/auth/magic-link` | — | Request a magic link for an existing account (sign in). |
 | GET | `/api/auth/magic-link/{token}` | — | Consume the link → server-side session + `__Host-mxi_session` cookie. |
 | POST | `/api/auth/token` | Session + CSRF | Exchange a valid session for a short-lived PASETO v4.public bearer (~5 min), carrying the session's ABAC `attrs` claim. Requires the `X-CSRF-Token` header to match the session's synchroniser token (`403` on mismatch). |
-| GET | `/api/auth/me` | Session | Current user (rejects revoked + GDPR-erased accounts). |
+| GET | `/api/auth/me` | Session | Current user (rejects revoked + GDPR-erased accounts) plus `attrs` — the caller's own live ABAC subject attributes, for presentation-only front-end choices (e.g. EV-1 T-28f's role-tailored nav). |
 | POST | `/api/auth/signout` | Session | Revoke the current session. |
 | GET | `/api/auth/audit/recent` | Admin | System-wide authentication audit trail (newest 100). `401` no/invalid token, `403` unless `access=admin` (SEC-A2 — the rows carry emails, an enumeration oracle if left open). |
 | GET | `/api/auth/account/export` | Session | GDPR right of access: the subject's data (`users` + `sessions` + `auth_events`). |

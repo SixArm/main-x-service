@@ -7796,16 +7796,44 @@ green as it sits; these finish it)**
 > T-28, the single source of truth for them. Only the consequences that
 > cross a subproject boundary are listed here.
 
-- [ ] **EV-1 (L)** portfolio **T-28a … T-28p** — the entity-level
+- [x] **EV-1 (L)** portfolio **T-28a … T-28p** — the entity-level
   queue. Tracked there, not here; this row exists so the family plan
   shows the work. Suggested order is stated in T-28 (the phased budget
   baseline T-28b first — it unblocks SPI/CPI, which T-23 left
   permanently `no_baseline`). **2026-09-18: every item reachable
   without an external blocker is done** —
   T-28a/b/c/d/g/h/i/j/l/m/o/p all `[x]` in
-  `project-portfolio-management/spec/13-tasks.md`. **Still open**:
-  T-28e and T-28n (both depend on T-8, unbuilt); T-28f and T-28k (both
-  front-end-only, not yet picked up).
+  `project-portfolio-management/spec/13-tasks.md`.
+  **T-28f landed 2026-09-19** (role-tailored navigation and landing
+  page), implemented in the front-end and found, in passing, to depend
+  on a real defect: T-28f's own text assumed `GET /api/auth/me`
+  already carried the caller's ABAC `attrs` — verified false family-wide
+  (`grep -rln "attrs" */*-front-end-with-svelte/src/lib/server/*.ts`,
+  no hits), so `authentication-service-with-loco`'s `CurrentResponse`
+  gained `attrs` first (that crate's own `spec/index.md` §13 T-17),
+  then the front-end's `src/lib/nav.ts` (new, pure) drives the nav
+  reorder + landing-route selection from it. Full account in the
+  front-end's own `spec/index.md` §13 T-28f.
+  **T-28k landed 2026-09-19** (responsive audit at a phone viewport):
+  a new `mobile` Playwright project (390×844) auditing all 35 real
+  routes (T-28k's own text said 34 — corrected via `find src/routes
+  -name "+page.svelte"`, not guessed) found four real overflow sources
+  (the SVAR `FilterBar` on `/plans`, a fixed-`size` `<input>` on
+  `/ideas`, a bare `<table>` on `/reviews`, and `/scenarios`) and fixed
+  each with the minimal real cause, not a blanket patch: `/plans`'s
+  `FilterBar` is hidden alongside its `Grid` under a 600px breakpoint
+  (both degrade to a read-only list); `/ideas`'s `size="40"` attribute
+  is removed; `/reviews` and `/scenarios` needed no route-local change
+  at all — `src/app.css`'s new global `input`/`table` overflow
+  containment already covered both (`/scenarios`'s own `size`
+  attributes are untouched). Also fixed a real regression the mobile
+  fallback caused in the existing desktop e2e suite (an ambiguous
+  `getByText` match). Full account in the front-end's own
+  `spec/index.md` §13 T-28k.
+  **Every item reachable without an external blocker is now done.**
+  **Still open**: T-28e and T-28n, both blocked on T-8 (unbuilt) —
+  the only remaining EV-1 scope, and it is a real external
+  dependency, not oversight.
 - [x] **EV-2 (L)** Enterprise identity federation — **SAML 2.0 and
   OIDC** as *upstream* identity providers to `authentication-service`,
   so a deployment's existing IdP signs users in and the family's own

@@ -1070,6 +1070,36 @@ only by that subject.
       `GET /api/compliance/audit/verify`; the doc comment's stated
       limitation is removed once true.
 
+- [x] **T-17 (S, 2026-09-19) — `GET /api/auth/me` exposes the caller's
+      own ABAC attrs (repo `tasks.md` EV-1 T-28f).** Found while
+      implementing portfolio's role-tailored navigation: T-28f's own
+      text assumed "the front-end reads the attrs the BFF already gets
+      from `/whoami`" — factually wrong, verified by reading
+      `src/views/auth.rs`'s `CurrentResponse` and every front-end's
+      `src/lib/server/auth.ts`/`config.ts` (`grep -rln "attrs" */*-
+      front-end-with-svelte/src/lib/server/*.ts` — no hits anywhere in
+      the family); no front-end BFF decodes the PASETO token itself
+      (doing so would mean hand-rolling a second PASETO verifier in
+      TypeScript, exactly the "vetted crate does the crypto" principle
+      this crate's own auth stack exists to honour), so `attrs` was
+      never reachable client-side at all. Fixed at the source instead
+      of working around it in one front-end: `CurrentResponse` gains
+      `attrs` (`user.attrs()` — the **live** `users.attributes`, not
+      the PASETO claim's up-to-`TOKEN_EXPIRATION`-stale snapshot, since
+      `/me` already does a fresh DB lookup for every other field).
+      Additive; every existing caller is unaffected.
+      **Verified:** two new unit tests in `src/views/auth.rs`
+      (`current_response_carries_the_users_live_attrs`,
+      `current_response_attrs_is_empty_not_absent_when_unset`) plus a
+      new DB-gated request test,
+      `tests/requests/auth.rs::current_user_carries_live_abac_attrs`,
+      which deliberately assigns attrs **after** minting the bearer
+      token, so a stale-claim implementation would fail it while the
+      live-DB-read implementation passes. `cargo test --lib --features
+      oidc` 97/97 (+2), `scripts/ci-check.sh test-db` 49/49 (+1) against
+      real Postgres, `clippy --all-targets --features oidc -- -D
+      warnings` and `cargo fmt --check` both clean.
+
 - [x] **EV-2 (2026-09-18) — Enterprise identity federation: OIDC relying
       party.** Design in
       [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)

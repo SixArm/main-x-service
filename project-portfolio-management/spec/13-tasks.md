@@ -502,12 +502,12 @@ described manual check confirms it. Split tasks too big for one PR
   | Strategic alignment | Smart Score with a disclosed per-component breakdown, `strategic_alignment` one of six weighted components (`src/prioritisation.rs`; `GET /prioritisation`, `GET /plans/{pid}/smart-score`); objectives registry + weighted `objective_links` + the OKR engine (T-16); gate reviews, lifecycle funnel, plan reviews with consensus | The Strategic Alignment Index (T-23: needs an input the service does not hold) | **Carried.** The buyer's question — "score and rank against custom objectives without a spreadsheet" — is answered by the objectives registry plus the env-tunable weights. Nothing new. |
   | Scenario modelling | `scenarios` are separate records; `GET /scenarios/{pid}/evaluate` reads live data without writing it; `GET /scenarios/compare` is the side-by-side; `POST …/commit` stamps funding | **Rollback** — a commit is one-way (`committed_at` only); an evaluation names no `as_of`, so two reads of one scenario a week apart differ silently | T-28a |
   | Resource management | `allocations` (person ref + role + percent + window); `GET /capacity` with `over_allocated`; `GET /capacity/utilization` (T-24); `GET /assignees/workload`; reassignment by largest slack | **Skill-based** allocation — an allocation carries a `role` string, no skills; no scale evidence for the "50+ concurrent projects" question | T-28c, T-28d |
-  | Reporting and analytics | Persona surfaces already exist — `at-a-glance`, `executive/*`, `board/*`, `financials/*`, `technology/*`, `auditor/*`, `compliance/*`, `regulator/*`, `risk/heatmap`; saved `report_definitions` (filter + field projection) run on demand; Monte-Carlo delivery forecast | Nothing ties a persona surface to the **caller** — every user gets the whole nav; `report_definitions` has no `group_by` (PPM-9 promised one) and no scheduled run (PPM-9 says synchronous only, awaiting T-8) | T-28e, T-28f |
+  | Reporting and analytics | Persona surfaces already exist — `at-a-glance`, `executive/*`, `board/*`, `financials/*`, `technology/*`, `auditor/*`, `compliance/*`, `regulator/*`, `risk/heatmap`; saved `report_definitions` (filter + field projection) run on demand; Monte-Carlo delivery forecast; **role-tailored nav/landing view now ties a persona surface to the caller** (T-28f, landed 2026-09-19, driven by a deployment-declared `view` ABAC attribute) | `report_definitions` has no `group_by` (PPM-9 promised one) and no scheduled run (PPM-9 says synchronous only, awaiting T-8) | T-28e |
   | Financial management | `budget_lines` per plan; variance per currency (`insights::variance_by_currency`, `GET /financials/variance`); exposure; TPC with cost-estimate-to-complete; value realization with ROI (T-22) | **Cost forecasting** — no phased baseline, so SPI/CPI are permanently `no_baseline` (T-23) and there is no EAC/ETC or portfolio-level overrun forecast; actuals arrive by hand until T-8 lands | **T-28b** — the single highest-leverage gap in the table |
   | Integrations | Open API: hand-written OpenAPI 3 + Swagger UI, pinned two-way against mounted routes; inbound `POST /devops/events`; the durable outbox → relay (event bus); deterministic external ids for Jira / Asana / Trello / MS Project / GitHub / Linear; **outbound signed webhooks** (`src/webhooks.rs`, T-28m, landed 2026-09-08 — family-shaped, root `tasks.md` EV-3 carries the contract) | The in-app `notify` action is still not email/push; no PM-tool import path (T-8 open, and no source-tool codec); two-way sync is roadmap only | T-28n (import codec). **Refused:** a native-connector catalogue / no-code integration builder — the open API, bulk, and signed webhooks *are* the integration surface of a service like this one. |
   | Task management | Gantt (`/gantt`, `/plans/[pid]/schedule`); `plan_dependencies` with cycle refusal, critical path, and slipping-dependency violations (`src/visibility.rs`); the append-only transition log; multi-plan reviews + rollup | **Automatic reprioritisation when a deadline shifts** — exactly the field-change trigger T-21 deferred for want of a declared field set. This checklist supplies it: the plan timeframe and a milestone's due date are the two dates a shift is asked about | T-28g |
   | AI capabilities | Every derived figure here is deterministic and discloses its inputs: Smart Score components, forecast by seed, constraint ranking, aging WIP, the controls verdicts. The buyer's question — "which outputs are explainable and auditable vs black-box" — is answered *all of them, none* | No portfolio-**optimisation** recommendation (the evaluator scores a scenario a planner wrote; it proposes none); no **demand** forecast (the intake pipeline has arrival history nobody forecasts from); no assistant | T-28h, T-28i, T-28j. **Refused:** an LLM assistant *inside the service* — it would be the one output that could not disclose its inputs, in a service whose every other number does. If one is ever wanted it sits at the front-end BFF over the open API and cites the endpoint it read. |
-  | Usability | Hamburger top-nav, 13 locales with parity tests, SVAR grid / Kanban / Gantt, Lily headless; `viewport` meta present | One `@media` rule in the whole app and two data-grid dependencies that are desktop-shaped — mobile is **unverified**, not absent; no per-user saved views (report definitions are shared); no role-specific UX (see reporting); no onboarding path beyond the README quick start | T-28k, T-28l, T-28p, and T-28f |
+  | Usability | Hamburger top-nav, 13 locales with parity tests, SVAR grid / Kanban / Gantt, Lily headless; `viewport` meta present; **mobile is now verified**, not merely present — a 35-route phone-viewport (390×844) Playwright audit (T-28k, landed 2026-09-19) found and fixed four real horizontal-scroll sources, with the two SVAR surfaces (grid, Gantt) degrading to a read-only list under a CSS breakpoint; **per-user saved views** (T-28l); **role-specific UX** (see reporting, T-28f); **an onboarding path** (`/onboarding`, T-28p) | Nothing outstanding from this row's original four items | *(closed — see reporting for T-28f)* |
   | Deployment effort | Containerised (Podman, Debian slim, MUSL static), `compose.*.yaml`; SSO through the central auth service (magic link + PASETO v4.public, BFF so no token reaches the browser); every knob an env var, documented family-wide in `configuration.md` | **SAML / OIDC** federation to an enterprise IdP — mentioned nowhere in the family, and it belongs to the auth service, not here; data migration waits on T-8 + T-28n; no go-live runbook, and the one that matters most is the activation gate: `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` **defaults off** | T-28o; SAML/OIDC → root `tasks.md` EV-2 |
 
   Two things the triage did **not** change: the matchable / operational
@@ -718,7 +718,7 @@ described manual check confirms it. Split tasks too big for one PR
     do not exist here yet) and lands second. **Acceptance:** a grouped
     run over two currencies never sums across them; a scheduled run is
     audited like an export (even at zero rows).
-  - [ ] **T-28f (M) — Role-tailored navigation and landing page.** The
+  - [x] **T-28f (M) — Role-tailored navigation and landing page.** The
     front-end reads the `attrs` the BFF already gets from `/whoami` and
     orders the nav / picks the landing view from a deployment-declared
     attribute (e.g. `view=executive|pmo|resource_manager`) — a
@@ -728,6 +728,16 @@ described manual check confirms it. Split tasks too big for one PR
     with the service's ABAC. **Acceptance:** attrs absent ⇒ identical
     nav; `view=executive` lands on `/executive`; every route stays
     reachable by URL regardless of the attribute.
+    **Landed 2026-09-19, implemented in the front-end** (not this
+    crate — it is presentation, not an API surface); full account in
+    `project-portfolio-management-front-end-with-svelte/spec/index.md`
+    §13 T-28f. **This task's own premise ("the BFF already gets attrs
+    from `/whoami`") was factually wrong — corrected, not guessed
+    around**: `GET /api/auth/me` (there is no `/whoami` endpoint)
+    carried no `attrs` field anywhere in the family before this landed;
+    fixed at the source in `authentication-service-with-loco`
+    (`CurrentResponse` gains `attrs`, that crate's own `spec/index.md`
+    §13 T-17).
   - [x] **T-28g (M) — Deadline-shift trigger and rescheduling.** Two
     narrow field-change triggers, the way `milestone_due` was narrowed
     rather than guessing a task-date convention: `plan_timeframe_changed`
@@ -903,13 +913,23 @@ described manual check confirms it. Split tasks too big for one PR
     than loosened test criteria. §2.3 in
     [`02-scope.md`](02-scope.md) gained the no-model-driven-assistant
     refusal, cross-referencing this test by name.
-  - [ ] **T-28k (M) — Responsive audit at a phone viewport.** Playwright
+  - [x] **T-28k (M) — Responsive audit at a phone viewport.** Playwright
     (the existing API-stubbed e2e harness) at 390 × 844 across all 34
     routes: no horizontal body scroll, the primary action of each page
     reachable, and the two SVAR surfaces (grid, Gantt) degrading to a
     read-only list rather than an unusable grid. **Acceptance:** the
     e2e suite runs the mobile project in CI; each failing route is a
     named test, not a screenshot.
+    **Landed 2026-09-19, implemented in the front-end** (not this crate
+    — it is layout, not an API surface); full account in
+    `project-portfolio-management-front-end-with-svelte/spec/index.md`
+    §13 T-28k. **This task's own route count was slightly off —
+    corrected, not guessed around**: the real route tree has 35 pages,
+    not 34 (`find src/routes -name "+page.svelte"`). Verified real
+    failures, not assumed ones: the audit named exactly four routes
+    (`/plans`, `/ideas`, `/reviews`, `/scenarios`) with a genuine
+    horizontal-scroll source each, fixed one at a time and re-verified
+    after each fix.
   - [x] **T-28l (S) — Per-user saved views.** A `saved_views` table
     keyed by the token `sub` (route + filter + sort + columns; no other
     identity), served through the BFF so the browser holds nothing.

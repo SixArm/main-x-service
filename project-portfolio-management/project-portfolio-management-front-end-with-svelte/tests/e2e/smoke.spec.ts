@@ -79,10 +79,19 @@ test.beforeEach(async ({ page }) => {
 // unrelated "case"/"work item" leftovers from the copy-adapt source
 // (`nav.cases`, `list.loadFailed: "Failed to load cases"`, …), but none of
 // those keys are rendered by these routes.
+//
+// Scoped to the SVAR grid cell specifically (not a bare `getByText`): T-28k
+// added a CSS-only phone-viewport fallback (`.mobile-list`, hidden at this
+// desktop viewport via `@media (max-width: 600px)`) that renders the same
+// plan name a second time in the DOM, so an unscoped text locator is
+// ambiguous — Playwright's strict mode does not consider CSS visibility
+// before resolving a locator to one element.
 test("list page renders the seeded plan", async ({ page }) => {
   await page.goto("/plans", { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "Plans" })).toBeVisible();
-  await expect(page.getByText("Website replatform")).toBeVisible();
+  await expect(
+    page.getByRole("gridcell", { name: "Website replatform" }),
+  ).toBeVisible();
 });
 
 // Pins: the create route renders the empty form. Heading text is "New

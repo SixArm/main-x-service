@@ -116,6 +116,13 @@ textarea {
   border: 1px solid var(--mxi-color-border);
   border-radius: var(--mxi-radius);
   background: var(--mxi-color-surface);
+  /* T-28k (repo tasks.md EV-1): several forms set a fixed HTML `size`
+     attribute (e.g. `size="40"`/`size="50"`), which sizes the input in
+     characters regardless of its container — a real horizontal-scroll
+     source at a phone viewport (measured on /ideas, /scenarios).
+     `max-width: 100%` only engages once the container is narrower than
+     that intrinsic width, so it changes nothing on a wide viewport. */
+  max-width: 100%;
 }
 input:focus,
 select:focus,
@@ -123,6 +130,17 @@ textarea:focus {
   outline: 2px solid var(--mxi-color-primary);
   outline-offset: 1px;
   border-color: var(--mxi-color-primary);
+}
+
+/* T-28k: a plain `<table>` (23 routes have at least one — dashboards,
+   boards, registers) does not reflow at a phone viewport; wrapping the
+   scroll on the table itself (rather than the page body) keeps every
+   column reachable via a contained horizontal scroll instead of
+   forcing the whole page to scroll sideways (measured on /reviews). */
+table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
 }
 
 .surface {
