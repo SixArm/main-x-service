@@ -10,6 +10,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — OIDC callback now bridges to the front end instead of stranding the session cookie
+
+The initial OIDC landing set `__Host-mxi_session` directly on the
+callback response and redirected to `FRONTEND_URL`. That cookie is
+**host-locked to this service's own origin** (`src/cookie.rs`), and in
+the reference BFF topology the front end is a *different* origin
+(`http://localhost:5173` vs. this service's `:5150`) — the cookie was
+stranded on an origin the browser never talks to again, so the sign-in
+silently failed to actually sign anyone in once a real front end was
+wired up. Fixed by reusing the existing magic-link bridge verbatim:
+the callback now mints a single-use `create_magic_link` token for the
+verified user and redirects to `{frontend}/verify?token=…` — the front
+end's already-tested `/verify` BFF route (`GET
+/api/auth/magic-link/{token}`) performs the actual session
+establishment and cookie re-hosting, exactly as it already does for a
+real magic-link sign-in. `GET /api/auth/oidc/login` also gained an
+optional `?return_url=` (the same allow-listed per-app knob
+`MagicLinkParams::return_url` gives the magic-link flow), so a
+multi-app deployment's federated sign-in lands back on the requesting
+app, not always the family-wide default. See `src/controllers/oidc.rs`'s
+module doc comment for the full reasoning.
+
 ### Added — OIDC relying-party identity federation (EV-2)
 
 `GET /api/auth/oidc/login` / `callback`, behind a new `oidc` Cargo
@@ -17,11 +39,12 @@ feature (off by default): discovery, PKCE + state + nonce, an
 authorization-code exchange, real ID-token signature + nonce
 verification via the `openidconnect` crate, claim mapping into
 `users.attributes` (validated through the same vocabulary gate a
-CLI/admin-API assignment goes through), and session establishment
-reusing `controllers::auth::verify`'s exact sequence — the same
-`sessions` table, the same `__Host-mxi_session` cookie, the same
-PASETO minting. Magic link stays the default; federation is opt-in per
-deployment (both the Cargo feature and the four required env vars).
+CLI/admin-API assignment goes through), and session establishment via
+the magic-link bridge above — the same `sessions` table, the same
+`__Host-mxi_session` cookie, the same PASETO minting, reached through
+the existing consume-token route rather than a parallel one. Magic
+link stays the default; federation is opt-in per deployment (both the
+Cargo feature and the four required env vars).
 
 JIT auto-provisioning defaults **off** (`AUTH_OIDC_JIT_PROVISIONING`)
 — an unknown email is `403`, named and audited, unless a deployment
@@ -29,9 +52,11 @@ opts in; the safer of the two leans `agents/share/authentication-
 sessions.md` §7a left open.
 
 Verified against a real signed ES256 ID token from a stub IdP, not
-just type-checked (`tests/requests/oidc.rs`, 6 DB-gated tests). SAML
-2.0 is not implemented — deliberately separated out given its XML-DSig
-surface; tracked as the remaining half of root `tasks.md` EV-2.
+just type-checked (`tests/requests/oidc.rs`, 7 DB-gated tests,
+including the bridge round trip and the `return_url` per-app knob).
+SAML 2.0 is not implemented — deliberately separated out given its
+XML-DSig surface; tracked as the remaining half of root `tasks.md`
+EV-2.
 
 Also fixes a pre-existing gap in `scripts/ci-check.sh`: the DB-gated
 `test-db` stage never applied `extra_test_features_for()`, so any

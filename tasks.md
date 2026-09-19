@@ -7837,13 +7837,32 @@ green as it sits; these finish it)**
   deployment-configurable, default **off** (an unknown email is `403`,
   named and audited, unless opted in). Full account in that crate's own
   `spec/index.md` §13 EV-2 entry and `CHANGELOG.md`.
+  **OIDC session-handoff fixed + front-end sign-in link landed
+  2026-09-19.** The 2026-09-18 OIDC callback set the
+  `__Host-mxi_session` cookie directly and redirected to
+  `FRONTEND_URL` — but that cookie is host-locked to the auth
+  service's own origin, and in the reference BFF topology the front
+  end is a *different* origin, so the cookie was stranded and a real
+  cross-origin deployment's federated sign-in silently never actually
+  established a session. Fixed by bridging through the existing
+  magic-link consume flow instead: the callback mints a single-use
+  `create_magic_link` token and redirects to `{frontend}/verify?token=…`,
+  where the front end's already-tested `/verify` BFF route performs the
+  real session establishment — the same mechanism a real magic-link
+  sign-in already uses. `GET /api/auth/oidc/login` also gained an
+  optional `?return_url=`, the same allow-listed per-app knob the
+  magic-link endpoints already give. `authentication-front-end-with-svelte`
+  gained the front-end half in the same pass: a "Sign in with SSO" link
+  on `/signin` (opt-in via `PUBLIC_OIDC_SIGNIN_ENABLED`) and a
+  `/signin/sso` route that redirects the browser itself (not a BFF
+  `fetch`) to the auth service's login endpoint — verified live in a
+  real browser. Full account in both crates' own `spec/index.md` §13
+  entries and `CHANGELOG.md`s.
   **Still open**: **SAML 2.0 SP** — deliberately not attempted in the
   same pass as OIDC, since its XML-DSig signature-verification surface
   is a materially larger and different security-critical undertaking
   (OIDC's cryptography is handled entirely by a vetted crate; SAML has
-  no equally-dominant, obviously-correct choice evaluated here yet) —
-  and the front-end sign-in-link addition (no front-end work landed
-  for the OIDC RP surface either).
+  no equally-dominant, obviously-correct choice evaluated here yet).
 - [x] **EV-3 (M)** Outbound **webhook sink** as a family contract in
   [`agents/share/event-bus.md`](agents/share/event-bus.md) §12: a
   `WebhookSink` beside `LoggingSink` / `FluvioSink` in each crate's

@@ -122,3 +122,25 @@ export async function signout(
     headers: { authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * The OIDC federation entry point (EV-2,
+ * `agents/share/authentication-sessions.md` §7a) on the auth service's
+ * own origin. `originForReturn` (this app's own origin, from
+ * `url.origin` in the caller) is passed as `return_url` so the auth
+ * service's post-federation bridge lands back on THIS app rather than
+ * its family-wide `FRONTEND_URL` default — the same per-app knob
+ * `requestMagicLink`/`signup`'s own `return_url` field already uses,
+ * honoured only when it matches the service's `AUTH_ALLOWED_FRONTENDS`
+ * allow-list (server-side config; not this app's concern).
+ *
+ * This is a **browser navigation target**, not a `fetch` call: the
+ * caller redirects the browser here (see `routes/signin/sso/+server.ts`)
+ * because the OIDC flow needs the browser itself to visit the identity
+ * provider and come back — a BFF `fetch` cannot do that hop. Pure
+ * string-building, so it is unit-testable without a request.
+ */
+export function oidcLoginUrl(originForReturn: string): string {
+  const params = new URLSearchParams({ return_url: originForReturn });
+  return `${AUTH_API_URL}/api/auth/oidc/login?${params.toString()}`;
+}

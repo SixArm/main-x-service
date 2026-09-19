@@ -10,6 +10,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — "Sign in with SSO" link (EV-2, T-13)
+
+A new `/signin/sso` server route and a conditional link on `/signin`
+for the auth service's OIDC relying-party backend
+(`agents/share/authentication-sessions.md` §7a). Gated on a new
+`PUBLIC_OIDC_SIGNIN_ENABLED` env var (unset by default — magic link
+stays the default sign-in path). Unlike every other auth action in
+this app, the new route is a plain browser-navigation redirect rather
+than a BFF `fetch`: the OIDC flow needs the browser itself to visit
+the identity provider and come back. See `spec/index.md` §13 T-13.
+
 ### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
 
 `spec/lily-design-system-svelte-with-picker-bar/index.md` calls for

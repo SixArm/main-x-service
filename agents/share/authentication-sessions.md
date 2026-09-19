@@ -370,22 +370,43 @@ typo, extended to an IdP's claim, which is no more trustworthy.
    feature (off by default): `GET /api/auth/oidc/login` / `callback`,
    discovery + PKCE + state + nonce, a real ID-token signature + nonce
    verification (the `openidconnect` crate), claim mapping through the
-   `AUTH_ATTRIBUTE_VOCABULARY` gate exactly as designed above, and
-   session establishment reusing `controllers::auth::verify`'s exact
-   sequence. Verified against a real signed ID token from a stub IdP
-   (six DB-gated tests), not just type-checked. **SAML 2.0 SP is not
-   implemented** — deliberately separated out: its XML-DSig
-   signature-verification surface is a materially larger, different
-   piece of security-critical work than OIDC's (where a vetted crate
-   does the cryptography), so it is tracked as a distinct remaining
-   piece of this rollout step rather than rushed alongside OIDC in the
-   same pass. See `authentication-service`'s own `spec/index.md` §13
-   EV-2 entry for the full account.
+   `AUTH_ATTRIBUTE_VOCABULARY` gate exactly as designed above. **SAML
+   2.0 SP is not implemented** — deliberately separated out: its
+   XML-DSig signature-verification surface is a materially larger,
+   different piece of security-critical work than OIDC's (where a
+   vetted crate does the cryptography), so it is tracked as a distinct
+   remaining piece of this rollout step rather than rushed alongside
+   OIDC in the same pass.
+   **Session-handoff fixed 2026-09-19.** The 2026-09-18 landing set
+   `__Host-mxi_session` directly on the `/callback` response and
+   redirected to `FRONTEND_URL` — but that cookie is host-locked to
+   the auth-service's own origin (§3), and in the reference BFF
+   topology (§6) the front end is a *different* origin, so the cookie
+   never reached anywhere the browser would send it back. Fixed by
+   reusing the existing magic-link consume flow (§7) as a **bridge**:
+   the callback mints a single-use `create_magic_link` token for the
+   verified user and redirects to `{frontend}/verify?token=…` instead
+   of setting a session cookie itself; the front end's `/verify` BFF
+   route performs the actual session establishment via the same
+   `GET /api/auth/magic-link/{token}` a real magic-link sign-in already
+   uses. `GET /api/auth/oidc/login` also gained an optional
+   `?return_url=`, the same allow-listed per-app knob the magic-link
+   endpoints already give (`controllers::auth::choose_frontend`), so a
+   multi-app deployment's federated sign-in lands back on the
+   requesting app.
+   Verified against a real signed ID token from a stub IdP, driving the
+   full two-hop bridge end to end (seven DB-gated tests), not just
+   type-checked. See `authentication-service`'s own `spec/index.md`
+   §13 EV-2 entries for the full account.
 3. **Front-ends** — an IdP-initiated sign-in link alongside the
    existing `/signin` magic-link form; no BFF change, since the
-   federated flow still ends at the same `Set-Cookie`. **Not yet
-   done** — the OIDC RP backend above has no front-end entry point
-   yet.
+   federated flow still ends at the same `Set-Cookie`. **Landed
+   2026-09-19** in `authentication-front-end-with-svelte`: a "Sign in
+   with SSO" link on `/signin`, opt-in per deployment via
+   `PUBLIC_OIDC_SIGNIN_ENABLED`, and a `/signin/sso` server route that
+   redirects the *browser* (not a BFF `fetch` — this hop needs the
+   browser itself to visit the IdP) to the auth service's
+   `/api/auth/oidc/login`. Verified in a real browser.
 
 ### Open questions
 

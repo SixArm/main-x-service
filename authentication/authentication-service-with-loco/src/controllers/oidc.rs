@@ -1,18 +1,45 @@
 //! OIDC identity federation (EV-2) — an **alternative front door** onto
-//! the exact same session §3 already establishes for a magic link.
-//! Nothing downstream of session establishment changes: same
-//! `sessions` table, same `__Host-mxi_session` cookie, same PASETO
-//! minting. Design: `agents/share/authentication-sessions.md` §7a.
+//! the exact same session §3 already establishes for a magic link,
+//! reached via the magic-link **bridge** described below rather than a
+//! parallel session-establishment path: same `sessions` table, same
+//! `__Host-mxi_session` cookie, same PASETO minting, just arrived at
+//! through the existing consume-token route instead of a duplicate of
+//! it. Design: `agents/share/authentication-sessions.md` §7a.
 //!
 //! | Method | Path | Purpose |
 //! |---|---|---|
 //! | `GET` | `/api/auth/oidc/login` | Redirect to the configured `IdP`'s authorization endpoint (PKCE + state + nonce). |
-//! | `GET` | `/api/auth/oidc/callback` | Exchange the authorization code, verify the ID token, map claims, establish the session. |
+//! | `GET` | `/api/auth/oidc/callback` | Exchange the authorization code, verify the ID token, map claims, bridge to the front end. |
 //!
 //! Both routes are `404` (not merely inert) unless
 //! [`crate::oidc::OidcConfig::from_env`] resolves — this whole surface
 //! stays invisible to a deployment that has not opted in, exactly as
 //! §7a requires ("federation is opt-in per deployment").
+//!
+//! **Why "bridge", not "establish the session directly".** The
+//! `__Host-mxi_session` cookie (`crate::cookie`) is host-locked to
+//! *this* service's own origin — correct for the magic-link flow, whose
+//! consuming request (`GET /api/auth/magic-link/{token}`) is a
+//! server-to-server call the front-end's own BFF makes on the front
+//! end's behalf (see `authentication-front-end-with-svelte`'s
+//! `src/routes/verify/+page.server.ts`). OIDC is different: the
+//! **browser itself** must navigate to the `IdP` and back, so the only
+//! response this service can hand back is one addressed to *this*
+//! origin — setting the session cookie here and redirecting the browser
+//! to `FRONTEND_URL` would leave the cookie stranded on an origin the
+//! front end never talks to. The fix reuses the existing magic-link
+//! bridge verbatim: mint a single-use, short-lived
+//! [`crate::models::users::Model::create_magic_link`] token for the
+//! now-federated-and-verified user and redirect the browser to
+//! `{frontend}/verify?token=…` — the front end's already-tested
+//! `/verify` BFF route (a server-to-server call to `GET
+//! /api/auth/magic-link/{token}`) does the actual session establishment
+//! and cookie re-hosting, identically to a magic-link sign-in. The
+//! trade: the audit trail records the OIDC identity event
+//! (`oidc_sign_in`) and the generic session-establishment mechanics
+//! (`magic_link_redeemed`) as two adjacent rows rather than one
+//! OIDC-named row — correlatable by `pid`/`source_ip`/timestamp, and
+//! documented here rather than silently accepted.
 //!
 //! **Fail-closed metadata fetch (mirrors SEC-V1).** OIDC discovery and
 //! the JWKS fetch both go through `openidconnect`'s own HTTP client,
@@ -32,7 +59,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use axum::extract::{ConnectInfo, Query, State};
-use axum::http::{HeaderMap, StatusCode, header::USER_AGENT};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::Redirect;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -45,6 +72,7 @@ use openidconnect::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::controllers::auth::{allowed_frontends, choose_frontend, default_frontend};
 use crate::models::{auth_events::Model as AuthEvent, sessions, users};
 use crate::oidc::OidcConfig;
 
@@ -113,12 +141,17 @@ fn client_parts(config: &OidcConfig) -> Result<(ClientId, Option<ClientSecret>, 
     ))
 }
 
-/// The flow cookie's payload.
+/// The flow cookie's payload. `frontend` is the return base resolved at
+/// `/login` time (`return_url` validated against `AUTH_ALLOWED_FRONTENDS`,
+/// exactly as the magic-link `return_url` knob works) and carried across
+/// the round trip to the `IdP` so `/callback` bridges to the same app
+/// that started the sign-in, not always the family-wide default.
 #[derive(Debug, Serialize, Deserialize)]
 struct FlowState {
     csrf_state: String,
     nonce: String,
     pkce_verifier: String,
+    frontend: String,
 }
 
 fn set_flow_cookie(state: &FlowState) -> Result<String> {
@@ -144,17 +177,20 @@ fn read_flow_cookie(headers: &HeaderMap) -> Option<FlowState> {
     serde_json::from_slice(&bytes).ok()
 }
 
-fn user_agent_of(headers: &HeaderMap) -> Option<String> {
-    headers
-        .get(USER_AGENT)
-        .and_then(|v| v.to_str().ok())
-        .map(ToString::to_string)
+/// `GET /api/auth/oidc/login` query.
+#[derive(Debug, Deserialize)]
+struct LoginQuery {
+    /// Optional return base (the requesting front-end's origin), honoured
+    /// only when it exactly matches `AUTH_ALLOWED_FRONTENDS` — the same
+    /// per-app SSO knob `MagicLinkParams::return_url` already gives the
+    /// magic-link flow (`controllers::auth::choose_frontend`).
+    return_url: Option<String>,
 }
 
 /// `GET /api/auth/oidc/login` — redirect to the `IdP`'s authorization
 /// endpoint.
 #[debug_handler]
-async fn login() -> Result<axum::response::Response> {
+async fn login(Query(query): Query<LoginQuery>) -> Result<axum::response::Response> {
     let Some(config) = OidcConfig::from_env() else {
         return Err(Error::NotFound);
     };
@@ -175,10 +211,16 @@ async fn login() -> Result<axum::response::Response> {
         .set_pkce_challenge(pkce_challenge)
         .url();
 
+    let frontend = choose_frontend(
+        query.return_url.as_deref(),
+        &allowed_frontends(),
+        &default_frontend(),
+    );
     let flow = FlowState {
         csrf_state: csrf_token.secret().clone(),
         nonce: nonce.secret().clone(),
         pkce_verifier: pkce_verifier.secret().clone(),
+        frontend,
     };
     let mut response = Redirect::to(auth_url.as_str()).into_response();
     response.headers_mut().insert(
@@ -274,38 +316,32 @@ async fn find_or_provision_user(
     }
 }
 
-/// Establish the same server-side session §3 already gives a
-/// magic-link sign-in — same `sessions::Model::issue` call, same
-/// `sign_access_token`, same two cookies — plus clearing the flow
-/// cookie. The one difference from `controllers::auth::verify` is the
-/// redirect destination: a browser navigation returning from the `IdP`
-/// lands on the front end directly, not a JSON body.
-async fn establish_session(
+/// Bridge the now-verified `IdP` identity onto the front end's own
+/// origin by minting a single-use, short-lived magic-link token
+/// ([`users::Model::create_magic_link`] — SEC-A9 hash-at-rest, SEC-A4
+/// atomic single-use consume, ~5-minute expiry: exactly the properties
+/// a session-establishment bridge needs) and redirecting the browser to
+/// `{frontend}/verify?token=…`. The front end's existing `/verify` BFF
+/// route consumes it via `GET /api/auth/magic-link/{token}`
+/// (`controllers::auth::verify`), which does the actual session
+/// creation and re-hosts the resulting cookie on the front end's own
+/// origin — see this module's doc comment for why a session cannot be
+/// established directly here.
+async fn bridge_to_frontend(
     ctx: &AppContext,
     user: &users::Model,
-    headers: &HeaderMap,
+    frontend: &str,
     source_ip: &str,
 ) -> Result<axum::response::Response> {
-    let sid = uuid::Uuid::new_v4().to_string();
-    let csrf_token = crate::csrf::generate_token();
-    let (_access_token, _sid, _exp) = crate::auth::sign_access_token(
-        &user.pid.to_string(),
-        &user.email,
-        &user.name,
-        &sid,
-        user.attrs(),
-    )
-    .map_err(|e| Error::string(&e.to_string()))?;
-    sessions::Model::issue(
-        &ctx.db,
-        &sid,
-        user.pid,
-        user_agent_of(headers),
-        Some(source_ip.to_string()),
-        sessions::session_data(&user.attributes, &csrf_token),
-    )
-    .await
-    .map_err(|e| Error::string(&e.to_string()))?;
+    let bridged = user
+        .clone()
+        .into_active_model()
+        .create_magic_link(&ctx.db)
+        .await
+        .map_err(|e| Error::string(&e.to_string()))?;
+    let Some(token) = bridged.magic_link_token else {
+        return Err(Error::string("failed to mint a session-bridge token"));
+    };
 
     AuthEvent::record_best_effort(
         &ctx.db,
@@ -317,22 +353,9 @@ async fn establish_session(
     )
     .await;
 
-    let front_end =
-        std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
-    let mut response = Redirect::to(&front_end).into_response();
+    let destination = format!("{frontend}/verify?token={token}");
+    let mut response = Redirect::to(&destination).into_response();
     response.headers_mut().insert(
-        axum::http::header::SET_COOKIE,
-        crate::cookie::set_session(&sid)
-            .parse()
-            .expect("valid set-cookie value"),
-    );
-    response.headers_mut().append(
-        axum::http::header::SET_COOKIE,
-        crate::csrf::set_csrf(&csrf_token)
-            .parse()
-            .expect("valid set-cookie value"),
-    );
-    response.headers_mut().append(
         axum::http::header::SET_COOKIE,
         clear_flow_cookie().parse().expect("valid set-cookie value"),
     );
@@ -388,6 +411,7 @@ async fn callback(
         return Err(unauthorized_oidc("state mismatch"));
     }
 
+    let frontend = flow.frontend.clone();
     let (email, raw_claims) = exchange_and_verify(&config, flow, code).await?;
     let (attrs, skipped_claims) = crate::oidc::map_claims(&raw_claims, &config.claim_map);
     if !skipped_claims.is_empty() {
@@ -404,13 +428,13 @@ async fn callback(
         .await
         .map_err(|e| Error::string(&e.to_string()))?;
     // SEC-A8 (same reasoning as the admin-API attribute path): a live
-    // session already snapshotted the OLD attrs, so revoke before
-    // issuing the new one.
+    // session already snapshotted the OLD attrs, so revoke before the
+    // bridge below can lead to a new one being established.
     sessions::Model::revoke_all_for_user(&ctx.db, updated.pid)
         .await
         .map_err(|e| Error::string(&e.to_string()))?;
 
-    let response = establish_session(&ctx, &updated, &headers, &source_ip).await?;
+    let response = bridge_to_frontend(&ctx, &updated, &frontend, &source_ip).await?;
     Ok(response)
 }
 

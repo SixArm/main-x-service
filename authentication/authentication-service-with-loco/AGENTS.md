@@ -92,8 +92,8 @@ alongside OIDC in the same pass.
 | GET | `/api/auth/admin/users/{pid}/attributes` | Admin | Show a user's ABAC subject attributes. `403` unless the caller carries `access=admin`. |
 | PUT | `/api/auth/admin/users/{pid}/attributes` | Admin | Replace a user's ABAC attribute map (body `{ "attributes": { … } }`); validates keys/values, writes an `attributes_assigned` audit row. |
 | GET | `/api/compliance/audit/verify` | Bearer | Recompute SHA-256/SHA-3/MAC digests over `auth_events` rows; reports any row whose content no longer matches what was stored. Any authenticated caller (not admin-gated — see note). |
-| GET | `/api/auth/oidc/login` | — | **EV-2, `oidc` Cargo feature only.** Redirect to the configured IdP's authorization endpoint (PKCE + state + nonce). `404` when the feature is not compiled in or [`AUTH_OIDC_ISSUER_URL`](#configuration-env) is unset. |
-| GET | `/api/auth/oidc/callback` | — | **EV-2, `oidc` feature only.** Exchange the code, verify the ID token, map claims into `users.attributes`, establish the same session §3 gives a magic-link redemption, redirect to `FRONTEND_URL`. `403` when no local account exists and JIT provisioning is off (the default). |
+| GET | `/api/auth/oidc/login` | — | **EV-2, `oidc` Cargo feature only.** Redirect to the configured IdP's authorization endpoint (PKCE + state + nonce). Accepts an optional `?return_url=` (the same allow-listed per-app knob `MagicLinkParams::return_url` gives the magic-link flow), carried through the flow cookie to the callback. `404` when the feature is not compiled in or [`AUTH_OIDC_ISSUER_URL`](#configuration-env) is unset. |
+| GET | `/api/auth/oidc/callback` | — | **EV-2, `oidc` feature only.** Exchange the code, verify the ID token, map claims into `users.attributes`, then **bridge** to the front end: mint a single-use magic-link token for the now-verified user and redirect to `{frontend}/verify?token=…` — the front end's existing `/verify` BFF route (`GET /api/auth/magic-link/{token}`) does the actual session establishment, since `__Host-mxi_session` is host-locked to this service's own origin and cannot be set usefully on a cross-origin redirect. See `src/controllers/oidc.rs`'s module doc for why. `403` when no local account exists and JIT provisioning is off (the default). |
 | GET | `/.well-known/paseto-keys` | — | Published Ed25519 public key(s) for offline PASETO verification. |
 | GET | `/api-docs/openapi.json` | — | Hand-written OpenAPI 3 document. |
 | GET | `/swagger-ui` | — | Swagger UI page (CDN assets) rendering the doc. |
@@ -179,7 +179,7 @@ src/
 │   ├── docs.rs            /api-docs/openapi.json + /swagger-ui
 │   ├── paseto_keys.rs     published key endpoint (/.well-known/paseto-keys — Ed25519 public key set)
 │   ├── metrics.rs         /metrics.prom (Prometheus text exposition)
-│   └── oidc.rs            EV-2, `oidc` feature only: GET /api/auth/oidc/{login,callback} — discovery, PKCE, token exchange, ID-token verify (openidconnect crate), session establishment reusing auth.rs::verify's exact sequence
+│   └── oidc.rs            EV-2, `oidc` feature only: GET /api/auth/oidc/{login,callback} — discovery, PKCE, token exchange, ID-token verify (openidconnect crate), bridges to the front end via a magic-link token (auth.rs::verify does the actual session establishment on the front end's own origin)
 ├── compliance/            mac.rs (HMAC-SHA256 via the shared integrity-mac crate) + audit_integrity.rs (SHA-256/SHA-3/MAC digest + verify over auth_events)
 ├── metrics.rs            Prometheus registry + auth-specific counters
 ├── i18n.rs               dependency-light email copy catalog (en / cy)
