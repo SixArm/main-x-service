@@ -7806,7 +7806,7 @@ green as it sits; these finish it)**
   `project-portfolio-management/spec/13-tasks.md`. **Still open**:
   T-28e and T-28n (both depend on T-8, unbuilt); T-28f and T-28k (both
   front-end-only, not yet picked up).
-- [ ] **EV-2 (L)** Enterprise identity federation — **SAML 2.0 and
+- [x] **EV-2 (L)** Enterprise identity federation — **SAML 2.0 and
   OIDC** as *upstream* identity providers to `authentication-service`,
   so a deployment's existing IdP signs users in and the family's own
   session + PASETO model stays exactly as it is downstream. Mentioned
@@ -7858,11 +7858,27 @@ green as it sits; these finish it)**
   `fetch`) to the auth service's login endpoint — verified live in a
   real browser. Full account in both crates' own `spec/index.md` §13
   entries and `CHANGELOG.md`s.
-  **Still open**: **SAML 2.0 SP** — deliberately not attempted in the
-  same pass as OIDC, since its XML-DSig signature-verification surface
-  is a materially larger and different security-critical undertaking
-  (OIDC's cryptography is handled entirely by a vetted crate; SAML has
-  no equally-dominant, obviously-correct choice evaluated here yet).
+  **SAML 2.0 SP evaluated and deferred 2026-09-19 — not merely
+  unscheduled.** Surveyed the Rust SAML crate ecosystem for something
+  clearing the same "vetted, pure-Rust, owns the crypto" bar
+  `openidconnect` cleared for the OIDC half. Neither real candidate
+  qualifies: `samael` verifies XML-DSig via a C FFI binding to
+  xmlsec1, pulling in `openssl`/`libxml2`/`libxslt` — contrary to this
+  family's rustls-only posture and a materially larger unaudited
+  attack surface than anything else in the tree; `saml`
+  (danielkov/saml) is pure Rust but its RSA-SHA256 support — needed
+  for interop with essentially every real-world IdP — depends on the
+  `rsa` crate, the exact crate removed family-wide on 2026-08-21 for
+  RUSTSEC-2023-0071, and is pre-alpha (5 GitHub stars, no
+  production-readiness claim). Hand-rolling XML-DSig verification
+  would itself violate the "never hand-roll signature verification"
+  principle the OIDC work's own crate choice honoured. Implementing
+  SAML SP today would force a real regression against one of two
+  already-deliberate security decisions rather than complete a clean
+  rollout step, so it stays out — full finding and the "revisit if" a
+  suitable crate emerges in
+  [`agents/share/authentication-sessions.md`](agents/share/authentication-sessions.md)
+  §7a and `authentication-service`'s own `spec/index.md` §13.
 - [x] **EV-3 (M)** Outbound **webhook sink** as a family contract in
   [`agents/share/event-bus.md`](agents/share/event-bus.md) §12: a
   `WebhookSink` beside `LoggingSink` / `FluvioSink` in each crate's
