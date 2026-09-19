@@ -1219,6 +1219,43 @@ only by that subject.
       OIDC tests green. Front end: `pnpm run check` (0 errors), `pnpm
       exec vitest run` (32/32, +4 new), `pnpm run build`, `pnpm run
       lint` all clean.
+- [x] **EV-2 (2026-09-19) — SAML 2.0 SP evaluated and deferred (not
+      merely unscheduled).** Surveyed the Rust SAML ecosystem for a
+      crate clearing the same bar `openidconnect` cleared for the OIDC
+      half — vetted, actively-adopted, pure Rust, owns the cryptography
+      entirely — and found none:
+      - **`samael`** (the most mature/starred candidate) verifies
+        XML-DSig via a C FFI binding to **xmlsec1**, pulling in
+        `openssl` + `libxml2` + `libxslt` and a C toolchain at build
+        time. This is exactly the class of dependency this family has
+        avoided everywhere else (rustls over openssl,
+        `agents/share/rust-loco-stack.md`'s "rustls" constraint; every
+        loco crate's `default-features = false` without `auth` to keep
+        `rsa`/OpenSSL-adjacent transitive dependencies out,
+        `security.md`'s 2026-08-21 update) — a materially larger,
+        unaudited-by-us attack surface than any crate this family has
+        taken on.
+      - **`saml`** (danielkov/saml) is pure Rust, but its `rsa-sha`
+        feature — required for interop with the RSA-SHA256 signing
+        essentially every real-world IdP uses — depends directly on
+        the `rsa` crate: the **exact** crate this family removed
+        family-wide on 2026-08-21 for RUSTSEC-2023-0071 (the Marvin
+        timing attack, `security.md` §7's "the supply-chain gate is
+        green again" entry). It is also pre-alpha (v0.0.1-alpha, 5
+        GitHub stars), with no production-readiness or audit claim.
+      Hand-rolling XML-DSig verification is not a third option — it is
+      precisely the "never hand-roll signature verification" case
+      this crate's own OIDC design explicitly avoided by choosing
+      `openidconnect`. Implementing SAML SP today would force a real
+      regression against one of two already-deliberate security
+      decisions (the `rsa` removal or the rustls-only posture) rather
+      than a clean rollout step. **Not an implementation gap to be
+      filled next session** — see
+      `agents/share/authentication-sessions.md` §7a's rollout step 2
+      for the full finding and the "revisit if" condition (a new
+      pure-Rust SAML crate that avoids `rsa`, or a deployment-specific
+      need that justifies reopening the tradeoff as its own
+      security-reviewed decision).
 
 ## 14. Implementation status
 
@@ -1260,7 +1297,11 @@ magic-link bridge token rather than a direct cross-origin cookie set
 (§13's 2026-09-19 follow-up); the sibling front end's IdP-initiated
 "Sign in with SSO" link (§7a rollout step 3) has also landed, opt-in
 via `PUBLIC_OIDC_SIGNIN_ENABLED`. Magic link stays the default.
-**SAML 2.0 is not implemented** (§13 EV-2's stated remaining scope).
+**SAML 2.0 SP is not implemented — evaluated and deliberately deferred**
+(§13's 2026-09-19 entry): no Rust crate today clears the "vetted,
+pure-Rust, owns the crypto" bar `openidconnect` cleared for OIDC
+without reintroducing either the banned `rsa` crate or an
+openssl/xmlsec1 C FFI surface.
 
 ## 15. Roadmap
 

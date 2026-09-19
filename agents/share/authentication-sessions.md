@@ -398,6 +398,35 @@ typo, extended to an IdP's claim, which is no more trustworthy.
    full two-hop bridge end to end (seven DB-gated tests), not just
    type-checked. See `authentication-service`'s own `spec/index.md`
    §13 EV-2 entries for the full account.
+   **SAML 2.0 SP evaluated and deferred, 2026-09-19** — not merely
+   unscheduled. A survey of the Rust SAML ecosystem found no crate
+   clearing the same bar `openidconnect` cleared for OIDC (a vetted,
+   actively-adopted, pure-Rust crate that owns the cryptography
+   entirely): `samael` (the most mature/starred option) does its
+   XML-DSig verification via a C FFI binding to **xmlsec1**, pulling in
+   `openssl`/`libxml2`/`libxslt` and a C toolchain — the opposite of
+   this family's rustls-everywhere, no-C-crypto-surface posture, and a
+   materially larger, unaudited-by-us attack surface than any dependency
+   this family has taken on elsewhere. `saml` (danielkov/saml) is pure
+   Rust, but its `rsa-sha` feature — needed for interop with the
+   RSA-SHA256 signing essentially every real-world IdP uses — depends
+   directly on the `rsa` crate, the **exact** crate this family removed
+   family-wide on 2026-08-21 for RUSTSEC-2023-0071 (Marvin timing
+   attack, `security.md` §7); it is also pre-alpha (v0.0.1-alpha, 5
+   GitHub stars) with no production-readiness claim. Hand-rolling
+   XML-DSig verification ourselves is worse than either option — it is
+   precisely the "never hand-roll signature verification" case the
+   OIDC work's own design explicitly avoided. No option satisfies
+   "vetted crate, pure Rust, doesn't reintroduce a banned dependency"
+   simultaneously today, so implementing SAML SP now would force a
+   real regression against one of two already-deliberate, documented
+   security decisions (SEC-I1's `rsa` removal or the rustls-only
+   posture) rather than a clean rollout step. **Revisit if**: a new
+   pure-Rust SAML crate emerges that avoids `rsa` (e.g. by supporting
+   `ring`/`rustls`-backed RSA verification, or ECDSA-only interop
+   becomes viable), or a deployment's specific need makes the tradeoff
+   worth reopening as its own security-reviewed decision rather than a
+   default rollout step.
 3. **Front-ends** — an IdP-initiated sign-in link alongside the
    existing `/signin` magic-link form; no BFF change, since the
    federated flow still ends at the same `Set-Cookie`. **Landed

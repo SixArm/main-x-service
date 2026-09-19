@@ -10,6 +10,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Documented — SAML 2.0 SP evaluated and deliberately deferred (no code change)
+
+Surveyed the Rust SAML crate ecosystem for a Service Provider library
+clearing the same bar `openidconnect` cleared for the OIDC relying
+party (vetted, actively-adopted, pure Rust, owns the XML-DSig
+cryptography entirely). None qualifies: `samael`, the most mature
+option, verifies signatures via a C FFI binding to xmlsec1 (pulling in
+`openssl`/`libxml2`/`libxslt`, contrary to this family's rustls-only
+posture); `saml` (danielkov/saml) is pure Rust but its RSA-SHA256
+support depends on the `rsa` crate — the exact crate removed
+family-wide on 2026-08-21 for RUSTSEC-2023-0071 — and is pre-alpha.
+Hand-rolling XML-DSig verification would violate the same
+never-hand-roll-signature-verification principle the OIDC work's own
+crate choice honoured. See `agents/share/authentication-sessions.md`
+§7a and `spec/index.md` §13's 2026-09-19 entry for the full finding
+and the revisit condition.
+
 ### Fixed — OIDC callback now bridges to the front end instead of stranding the session cookie
 
 The initial OIDC landing set `__Host-mxi_session` directly on the
