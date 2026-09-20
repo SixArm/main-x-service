@@ -201,36 +201,61 @@ fn default_source_kind() -> String {
     "metric".to_string()
 }
 
-/// `POST /api/plans/{pid}/controls` — register a control.
-#[debug_handler]
-async fn create(
-    Path(pid): Path<String>,
-    State(ctx): State<AppContext>,
-    caller: MaybeAuthUser,
-    Json(payload): Json<ControlPayload>,
-) -> Result<Response> {
-    let plan = find_plan(&ctx, &pid).await?;
+/// Why a control payload could not be registered — the same checks
+/// `create` and `register_standard` both need, factored once so the
+/// two entry points cannot drift.
+enum RegisterError {
+    BadTiming,
+    BadComparator,
+    BadSourceKind,
+    NameTooLong,
+    BadCadence,
+    NotEvaluable(Vec<rules::Invalid>),
+    /// The row failed to insert — a real `500`, not a `422`: everything
+    /// the caller controls already passed [`rules::validate`].
+    Db(sea_orm::DbErr),
+}
 
-    let Some(timing) = parse_timing(&payload.timing) else {
-        return Err(unprocessable(
-            "timing must be feedforward, concurrent, or feedback",
-        ));
-    };
-    let Some(comparator) = parse_comparator(&payload.comparator) else {
-        return Err(unprocessable(
-            "comparator must be at_least, at_most, within, or equals",
-        ));
-    };
+fn register_error(err: RegisterError) -> Error {
+    match err {
+        RegisterError::Db(e) => db_err(e),
+        RegisterError::BadTiming => {
+            unprocessable("timing must be feedforward, concurrent, or feedback")
+        }
+        RegisterError::BadComparator => {
+            unprocessable("comparator must be at_least, at_most, within, or equals")
+        }
+        RegisterError::BadSourceKind => {
+            unprocessable("source_kind must be metric, query, or manual")
+        }
+        RegisterError::NameTooLong => unprocessable("name is capped"),
+        RegisterError::BadCadence => unprocessable("cadence_days must be positive when present"),
+        RegisterError::NotEvaluable(problems) => unprocessable(&format!(
+            "control is not evaluable: {}",
+            serde_json::to_string(&problems).unwrap_or_default()
+        )),
+    }
+}
+
+/// Validate `payload` and insert the `controls` row (no audit — the two
+/// callers record different audit event names). Returns the inserted
+/// row plus the parsed [`rules::Timing`] (needed for
+/// `permitted_response`, and cheaper than re-parsing the stored token).
+async fn register_control(
+    ctx: &AppContext,
+    plan_pid: Uuid,
+    payload: &ControlPayload,
+) -> std::result::Result<(controls::Model, rules::Timing), RegisterError> {
+    let timing = parse_timing(&payload.timing).ok_or(RegisterError::BadTiming)?;
+    let comparator = parse_comparator(&payload.comparator).ok_or(RegisterError::BadComparator)?;
     if !["metric", "query", "manual"].contains(&payload.source_kind.as_str()) {
-        return Err(unprocessable(
-            "source_kind must be metric, query, or manual",
-        ));
+        return Err(RegisterError::BadSourceKind);
     }
     if payload.name.len() > MAX_TEXT_LEN {
-        return Err(unprocessable("name is capped"));
+        return Err(RegisterError::NameTooLong);
     }
     if payload.cadence_days.is_some_and(|d| d <= 0) {
-        return Err(unprocessable("cadence_days must be positive when present"));
+        return Err(RegisterError::BadCadence);
     }
 
     let standard = rules::Standard {
@@ -242,16 +267,12 @@ async fn create(
 
     // The whole point of validating here rather than at read time: a
     // control that can never be evaluated must not be registerable.
-    if let Err(problems) = rules::validate(&payload.name, &standard, KNOWN_METRICS) {
-        return Err(unprocessable(&format!(
-            "control is not evaluable: {}",
-            serde_json::to_string(&problems).unwrap_or_default()
-        )));
-    }
+    rules::validate(&payload.name, &standard, KNOWN_METRICS)
+        .map_err(RegisterError::NotEvaluable)?;
 
     let row = controls::ActiveModel {
         pid: ActiveValue::set(Uuid::new_v4()),
-        plan_pid: ActiveValue::set(plan.pid),
+        plan_pid: ActiveValue::set(plan_pid),
         name: ActiveValue::set(payload.name.trim().to_string()),
         timing: ActiveValue::set(timing_token(timing).to_string()),
         metric: ActiveValue::set(payload.metric.clone()),
@@ -270,7 +291,23 @@ async fn create(
     }
     .insert(&ctx.db)
     .await
-    .map_err(db_err)?;
+    .map_err(RegisterError::Db)?;
+
+    Ok((row, timing))
+}
+
+/// `POST /api/plans/{pid}/controls` — register a control.
+#[debug_handler]
+async fn create(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Json(payload): Json<ControlPayload>,
+) -> Result<Response> {
+    let plan = find_plan(&ctx, &pid).await?;
+    let (row, timing) = register_control(&ctx, plan.pid, &payload)
+        .await
+        .map_err(register_error)?;
 
     AuditModel::record(
         &ctx.db,
@@ -285,6 +322,181 @@ async fn create(
         "pid": row.pid.to_string(),
         "permitted_response": rules::permitted_response(timing),
     }))
+}
+
+/// `POST /api/plans/{pid}/controls/register-standard` body — PRO-P33
+/// (repo `tasks.md`).
+#[derive(Debug, Deserialize)]
+struct RegisterStandardPayload {
+    /// Required, no default: a WIP limit is plan/team-specific, and
+    /// this service has no notion of a universal "reasonable" one —
+    /// registering an invented number would be exactly the risk
+    /// PRO-P33 warns against, so the caller must supply their own.
+    work_in_progress_limit: i64,
+    /// Required, no default, for the identical reason as
+    /// `work_in_progress_limit`: `src/tba.rs`'s own
+    /// `service_level_expectation` takes its day target as a
+    /// caller-supplied parameter rather than a crate-wide constant,
+    /// because a cycle-time SLE is a per-plan commitment, not a fact
+    /// about the software.
+    cycle_time_p85_days: i64,
+    /// Optional — unlike the two above, "flag when actual spend departs
+    /// budget by more than N%" has a defensible universal default (10%,
+    /// in basis points, `Comparator::Within` a target of zero), so this
+    /// one may default rather than forcing every caller to supply it.
+    #[serde(default = "default_budget_variance_tolerance_bps")]
+    budget_variance_tolerance_bps: i64,
+}
+
+fn default_budget_variance_tolerance_bps() -> i64 {
+    1_000
+}
+
+/// The four controls this service can already evaluate (their metrics
+/// are in [`KNOWN_METRICS`]) but nothing registers on a plan's behalf.
+/// `gate_readiness` gets a fixed target (100%, i.e. fully ready — the
+/// one non-arbitrary bar for a readiness gate regardless of how
+/// readiness ends up being computed); `budget_variance` gets `payload`'s
+/// (defaulted) tolerance; the WIP limit and cycle-time SLE come from
+/// `payload` with no default, per its own doc comments.
+fn standard_control_payloads(payload: &RegisterStandardPayload) -> [ControlPayload; 4] {
+    let no_extra = || ControlPayload {
+        name: String::new(),
+        timing: String::new(),
+        metric: String::new(),
+        target_value: 0,
+        comparator: String::new(),
+        tolerance: None,
+        unit: None,
+        currency: None,
+        source_kind: default_source_kind(),
+        source_ref: None,
+        cadence_days: None,
+        owner_ref: None,
+    };
+    [
+        ControlPayload {
+            name: "Gate readiness".to_string(),
+            timing: "feedforward".to_string(),
+            metric: "gate_readiness".to_string(),
+            target_value: 10_000,
+            comparator: "at_least".to_string(),
+            unit: Some("bps".to_string()),
+            ..no_extra()
+        },
+        ControlPayload {
+            name: "Work in progress limit".to_string(),
+            timing: "concurrent".to_string(),
+            metric: "work_in_progress".to_string(),
+            target_value: payload.work_in_progress_limit,
+            comparator: "at_most".to_string(),
+            unit: Some("items".to_string()),
+            ..no_extra()
+        },
+        ControlPayload {
+            name: "Cycle time SLE (p85)".to_string(),
+            timing: "concurrent".to_string(),
+            metric: "cycle_time_p85".to_string(),
+            target_value: payload.cycle_time_p85_days,
+            comparator: "at_most".to_string(),
+            unit: Some("days".to_string()),
+            ..no_extra()
+        },
+        ControlPayload {
+            name: "Budget variance".to_string(),
+            timing: "feedback".to_string(),
+            metric: "budget_variance".to_string(),
+            target_value: 0,
+            comparator: "within".to_string(),
+            tolerance: Some(payload.budget_variance_tolerance_bps),
+            unit: Some("bps".to_string()),
+            ..no_extra()
+        },
+    ]
+}
+
+/// `POST /api/plans/{pid}/controls/register-standard` — PRO-P33 (repo
+/// `tasks.md`): the four controls whose metrics this service already
+/// produces names for (`gate_readiness`, `work_in_progress`,
+/// `cycle_time_p85`, `budget_variance` — `KNOWN_METRICS` already
+/// contains all four, and `rules::validate` already accepts them) but
+/// which nothing registers on a plan's behalf.
+///
+/// **Opt-in, per plan, never automatic.** A feedforward control's
+/// entire design intent (`rules::may_block`) is to be able to refuse a
+/// write once something enforces it; silently registering one on every
+/// existing plan would be an unrequested behavioural change the moment
+/// that enforcement lands, not merely a coverage-report change today.
+/// This endpoint exists so an operator can opt a plan in explicitly,
+/// with the two genuinely plan-specific numbers (`work_in_progress_limit`,
+/// `cycle_time_p85_days`) supplied rather than invented — see
+/// [`RegisterStandardPayload`]'s field docs.
+///
+/// **Retrospectives are deliberately not included.** There is no
+/// `KNOWN_METRICS` entry for "a retrospective happened" — inventing one
+/// here would be exactly the guessed-default risk this task exists to
+/// avoid; it needs its own design (repo `tasks.md` PRO-P33).
+///
+/// Idempotent: a metric the plan already has an enabled, non-deleted
+/// control for is reported `already_registered` rather than duplicated,
+/// so calling this twice is harmless.
+#[debug_handler]
+async fn register_standard(
+    Path(pid): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Json(payload): Json<RegisterStandardPayload>,
+) -> Result<Response> {
+    let plan = find_plan(&ctx, &pid).await?;
+    if payload.work_in_progress_limit <= 0 {
+        return Err(unprocessable("work_in_progress_limit must be positive"));
+    }
+    if payload.cycle_time_p85_days <= 0 {
+        return Err(unprocessable("cycle_time_p85_days must be positive"));
+    }
+    if payload.budget_variance_tolerance_bps < 0 {
+        return Err(unprocessable(
+            "budget_variance_tolerance_bps cannot be negative",
+        ));
+    }
+
+    let mut outcomes = Vec::with_capacity(4);
+    for candidate in &standard_control_payloads(&payload) {
+        let existing = controls::Entity::find()
+            .filter(controls::Column::PlanPid.eq(plan.pid))
+            .filter(controls::Column::Metric.eq(candidate.metric.as_str()))
+            .filter(controls::Column::DeletedAt.is_null())
+            .one(&ctx.db)
+            .await
+            .map_err(db_err)?;
+        if existing.is_some() {
+            outcomes.push(serde_json::json!({
+                "metric": candidate.metric,
+                "status": "already_registered",
+            }));
+            continue;
+        }
+        let (row, _timing) = register_control(&ctx, plan.pid, candidate)
+            .await
+            .map_err(register_error)?;
+        outcomes.push(serde_json::json!({
+            "metric": candidate.metric,
+            "status": "registered",
+            "pid": row.pid.to_string(),
+        }));
+    }
+
+    AuditModel::record(
+        &ctx.db,
+        plan.pid,
+        "standard_controls_registered",
+        caller.actor(),
+        None,
+    )
+    .await
+    .ok();
+
+    format::json(serde_json::json!({ "controls": outcomes }))
 }
 
 /// `GET /api/plans/{pid}/controls` — the register for one plan.
@@ -686,6 +898,10 @@ pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api")
         .add("/plans/{pid}/controls", post(create))
+        .add(
+            "/plans/{pid}/controls/register-standard",
+            post(register_standard),
+        )
         .add("/plans/{pid}/controls", get(list))
         .add("/plans/{pid}/controls/coverage", get(plan_coverage))
         .add("/controls/coverage", get(portfolio_coverage))

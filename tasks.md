@@ -7463,22 +7463,44 @@ green as it sits; these finish it)**
   and inventing those defaults unsupervised was judged the wrong call.
   See PRO-P33 and `project-portfolio-management/spec/13-tasks.md`
   T-26 for the full reasoning.
-- [ ] **PRO-P33 (S)** *(found 2026-09-02 via PRO-P19)* Decide how
-  project-portfolio-management-service registers the controls that
-  already exist in all but name — gate readiness (feedforward), WIP
-  limits and the SLE (concurrent), retrospectives and the variance
-  views (feedback) — so `GET /controls/coverage` reports reality
-  rather than only newly-authored controls. Not a code gap: every
-  metric except a retrospective one is already in `KNOWN_METRICS` and
-  already registerable through the existing `POST /plans/{pid}/controls`
-  API. What's missing is a decision on (a) the default
-  `target_value`/`comparator`/`tolerance` each gets, (b) whether
-  registration is automatic (risky — a feedforward control can block a
-  write, so an invented default would be a silent behavioural change
-  to every plan) or an explicit opt-in action, and (c) a computable
-  metric for "a retrospective happened" at all, which does not exist
-  today. See `project-portfolio-management/spec/13-tasks.md` T-26 for
-  the investigation.
+- [x] **PRO-P33 (S)** *(found 2026-09-02 via PRO-P19, decided and landed
+  2026-09-20)* Decided how project-portfolio-management-service
+  registers the controls that already exist in all but name — gate
+  readiness (feedforward), WIP limits and the SLE (concurrent),
+  retrospectives and the variance views (feedback) — so `GET
+  /controls/coverage` reports reality rather than only newly-authored
+  controls. Not a code gap: every metric except a retrospective one was
+  already in `KNOWN_METRICS` and already registerable through the
+  existing `POST /plans/{pid}/controls` API. **Decision:** a new,
+  explicitly **opt-in**, per-plan `POST
+  /api/plans/{pid}/controls/register-standard` endpoint — never
+  automatic. `gate_readiness` gets a fixed 100% target (the one
+  non-arbitrary bar for a readiness gate); `budget_variance` defaults to
+  a 10% tolerance (a standard PMO convention, overridable) — both are
+  registered with no caller input needed. `work_in_progress` and
+  `cycle_time_p85` get **no default at all**: both are required
+  parameters, refused when absent, because (verified against this
+  crate's own `service_level_expectation`, which already takes its SLE
+  target as a caller-supplied parameter rather than a constant, for the
+  identical reason) a WIP limit and a cycle-time SLE are per-plan
+  commitments this service has no basis to invent. Retrospectives stay
+  explicitly out of scope — still no computable metric for "a
+  retrospective happened," and this endpoint does not invent one.
+  **A verified fact that changes the risk calculus, not assumed:**
+  nothing in this service's write paths today actually enforces a
+  feedforward control's block (`grep` for `may_block`/
+  `permitted_response` outside the controls module itself finds no
+  hits) — the opt-in decision stands regardless, since a feedforward
+  control's *design intent* is to gate a write once something does
+  enforce it, and auto-registering on every plan would still be a
+  visible, unrequested change to the coverage report today. Idempotent
+  per metric (a second call reports `already_registered`, never
+  duplicates). Verified: 5 new DB-gated request tests, `cargo
+  build`/`clippy --all-targets -D warnings`/`fmt --check` clean,
+  `cargo test --lib` 423/423 unchanged, full DB-gated suite green
+  against real Postgres. See
+  `project-portfolio-management/spec/13-tasks.md` T-26 for the full
+  decision record and that crate's own `CHANGELOG.md`.
 - [~] **PRO-P20 (L)** T-21 triggers (field-change/date/SLE + multi-action
   rules); FE adoption of the PM suite (workflows, OKR, distribution,
   TPC/controls, effort/ceremony views — all honestly "Not built");

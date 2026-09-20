@@ -711,7 +711,20 @@ fn financials_paths() -> Value {
 }
 
 /// The Controlling-process paths (entity spec §9.2c / FR-38, FR-39).
+/// Split across two functions purely to stay under clippy's
+/// `too_many_lines`; the two `Value::Object`s are merged below.
 fn control_paths() -> Value {
+    let Value::Object(mut merged) = control_register_paths() else {
+        unreachable!("control_register_paths always returns an object")
+    };
+    let Value::Object(rest) = control_action_paths() else {
+        unreachable!("control_action_paths always returns an object")
+    };
+    merged.extend(rest);
+    Value::Object(merged)
+}
+
+fn control_register_paths() -> Value {
     let plan = json!({
         "name": "pid", "in": "path", "required": true,
         "schema": { "type": "string", "format": "uuid" }
@@ -736,6 +749,28 @@ fn control_paths() -> Value {
                 "responses": { "200": { "description": "Controls" }, "404": { "description": "Unknown plan" } }
             }
         },
+        "/api/plans/{pid}/controls/register-standard": {
+            "post": {
+                "tags": ["controls"],
+                "summary": "Opt this plan into the four controls this service already knows how to evaluate but registers for no plan automatically (PRO-P33)",
+                "description": "gate_readiness (feedforward, fixed at 100%), work_in_progress (concurrent, caller-supplied limit), cycle_time_p85 (concurrent, caller-supplied SLE days), and budget_variance (feedback, defaults to a 10% tolerance). Opt-in and per-plan, never automatic: a feedforward control's whole design intent is to be able to block a write once something enforces that, so silently registering one on every plan would be an unrequested behavioural change. work_in_progress_limit and cycle_time_p85_days have no default (both are plan-specific; inventing one would be the exact risk this endpoint exists to avoid) and are required. Idempotent per metric: one already registered and enabled is reported already_registered rather than duplicated. Retrospectives are deliberately not included — no metric exists for 'a retrospective happened' and this endpoint does not invent one.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Per-metric outcome: registered (with pid) or already_registered" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "work_in_progress_limit or cycle_time_p85_days missing/non-positive, or a negative budget_variance_tolerance_bps" }
+                }
+            }
+        }
+    })
+}
+
+fn control_action_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
         "/api/controls/{pid}": {
             "delete": {
                 "tags": ["controls"],
