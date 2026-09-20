@@ -390,7 +390,7 @@ described manual check confirms it. Split tasks too big for one PR
     than ranking them as zero; two plans with equal remaining value and
     cost rank identically however much has been sunk into either.
 
-- [ ] **T-26 — Controls / the Controlling process (§5.9.8 / FR-38,
+- [x] **T-26 — Controls / the Controlling process (§5.9.8 / FR-38,
   FR-39).**
   - [x] Pure `src/controls.rs`: the three timings and the response each
     permits, standard validation against the metrics the service
@@ -430,7 +430,7 @@ described manual check confirms it. Split tasks too big for one PR
   - [x] `#[ignore]`d request tests committed
     (`tests/requests/metrics_control.rs`; now 76 cases, +1 for the
     conversion endpoint above).
-  - [ ] Register the controls that already exist in all but name — gate
+  - [x] Register the controls that already exist in all but name — gate
     readiness (feedforward), WIP limits and the SLE (concurrent),
     retrospectives and the variance views (feedback) — so coverage
     reports reality rather than only newly-authored controls.
@@ -451,6 +451,73 @@ described manual check confirms it. Split tasks too big for one PR
     (no `KNOWN_METRICS` entry reflects "a retrospective happened"),
     which would need its own design, not a registration. Needs an
     owner decision before code, not a guessed default.
+    **Decided and landed 2026-09-20** (repo `tasks.md` PRO-P33):
+    - **Registration is opt-in, per-plan, never automatic** — a new
+      `POST /api/plans/{pid}/controls/register-standard` endpoint the
+      operator must explicitly call. **A fact that changes the risk
+      calculus, verified rather than assumed**: `grep -rln "may_block\|
+      permitted_response" src/` outside `controls.rs`/
+      `controllers/controls.rs` finds **no hits at all** — nothing in
+      this service's write paths (task/plan mutation) actually checks a
+      feedforward control's verdict today, so the "silently registering
+      one could block a write" risk the 2026-09-02 note raised is not
+      yet live. The opt-in decision stands anyway: a `feedforward`
+      control's whole *design intent* (`rules::may_block`) is to gate a
+      write once something enforces it, and auto-registering on every
+      existing plan would still be a visible, unrequested change to
+      `GET /controls/coverage`'s output the moment it did.
+    - **`gate_readiness`** — feedforward, `at_least` **10 000 bps
+      (100%)**, fixed, not overridable via this endpoint. The one
+      non-arbitrary bar for a readiness gate: whatever formula
+      eventually computes readiness, "ready" should mean 100% by
+      construction, regardless of formula. (10 000 bps for 100% matches
+      the basis-points-for-ratios convention `Standard.target_value`'s
+      own doc comment already names, and an existing test at line 255
+      of `tests/requests/metrics_control.rs` already used exactly this
+      value for `gate_readiness` before this task — confirmed by
+      reading it, not invented fresh.)
+    - **`budget_variance`** — feedback (never blocks, so the "invented
+      threshold" risk does not apply to it at all), `within` a target of
+      0 with a **default 1 000 bps (10%) tolerance**, overridable via
+      the endpoint's optional `budget_variance_tolerance_bps`. 10% is a
+      standard PMO variance-flag convention, not invented from nothing.
+    - **`work_in_progress` and `cycle_time_p85` get no default at
+      all** — both are **required** request fields
+      (`work_in_progress_limit`, `cycle_time_p85_days`), refused (`422`)
+      when missing or non-positive. Verified there is no crate-wide
+      convention to borrow either: `src/tba.rs`'s own
+      `service_level_expectation` takes its day target as a
+      **caller-supplied parameter**, never a constant, for the identical
+      reason — a cycle-time SLE (and a WIP limit) is a per-plan
+      commitment, not a fact about the software, so this task does not
+      invent one either.
+    - **Retrospectives are still explicitly out of scope** — confirmed
+      again: no `KNOWN_METRICS` entry reflects "a retrospective
+      happened," and this endpoint does not invent one. Needs its own
+      design (a follow-up, not silently dropped).
+    - **Idempotent per metric** — a metric the plan already has an
+      enabled, non-deleted control for is reported
+      `already_registered` rather than duplicated, so calling the
+      endpoint twice is harmless.
+    - Implementation reuses the existing `create` handler's
+      validate-then-insert path via a new shared `register_control`
+      helper (`src/controllers/controls.rs`) rather than a parallel
+      implementation, so the two entry points cannot drift.
+    - **Verified:** 5 new DB-gated request tests
+      (`tests/requests/metrics_control.rs`) — the two required fields
+      are refused when absent/non-positive; all four controls are
+      created with the right timing/target/tolerance; a second call is
+      idempotent; an explicit tolerance override is honoured; an
+      unknown plan is `404`. `cargo build`/`clippy --all-targets -D
+      warnings`/`fmt --check` clean; `cargo test --lib` 423/423
+      (unchanged — no new pure-logic surface, only a controller
+      composing existing rules); the full DB-gated suite green against
+      real Postgres via `scripts/ci-check.sh test-db`. New path added
+      to `src/openapi.rs` (`control_paths()` split into
+      `control_register_paths()`/`control_action_paths()` to stay under
+      clippy's 100-line limit) — the pinning test
+      (`spec_and_mounted_routes_agree_both_ways`) keeps the mounted
+      route and the documented one from drifting.
   - **Acceptance:** a feedforward control may block a write and a
     feedback control may not; a control naming an unknown metric is
     refused at **write**, not left permanently `Unmeasured`; an

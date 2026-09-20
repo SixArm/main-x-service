@@ -662,3 +662,232 @@ async fn converting_a_control_action_creates_a_task_on_the_plan() {
     })
     .await;
 }
+
+// --------------------------------------------- standard controls (PRO-P33)
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// PRO-P33 (repo tasks.md): the two genuinely plan-specific numbers
+// (work_in_progress_limit, cycle_time_p85_days) have no invented
+// default and are refused when missing/non-positive, rather than
+// silently falling back to a guessed number.
+async fn register_standard_requires_the_plan_specific_numbers() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan = create_plan!(request, "No defaults plan");
+
+        let missing = request
+            .post(&format!("/api/plans/{plan}/controls/register-standard"))
+            .json(&json!({}))
+            .await;
+        assert_eq!(missing.status_code(), 422);
+
+        let zero_wip = request
+            .post(&format!("/api/plans/{plan}/controls/register-standard"))
+            .json(&json!({ "work_in_progress_limit": 0, "cycle_time_p85_days": 10 }))
+            .await;
+        assert_eq!(zero_wip.status_code(), 422);
+
+        let negative_sle = request
+            .post(&format!("/api/plans/{plan}/controls/register-standard"))
+            .json(&json!({ "work_in_progress_limit": 6, "cycle_time_p85_days": -1 }))
+            .await;
+        assert_eq!(negative_sle.status_code(), 422);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// The four controls this service can already evaluate but registers
+// for no plan automatically: gate_readiness (feedforward, fixed at
+// 100%), work_in_progress and cycle_time_p85 (concurrent, caller's own
+// numbers), budget_variance (feedback, default 10% tolerance). Calling
+// this endpoint is itself the opt-in — nothing registers these without
+// it, and it never runs implicitly (e.g. on plan creation).
+async fn register_standard_creates_the_four_known_controls() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan = create_plan!(request, "Standard controls plan");
+
+        // Before opting in, the register is empty.
+        let before: Value = request
+            .get(&format!("/api/plans/{plan}/controls"))
+            .await
+            .json();
+        assert_eq!(before.as_array().expect("array").len(), 0);
+
+        let outcome: Value = request
+            .post(&format!("/api/plans/{plan}/controls/register-standard"))
+            .json(&json!({ "work_in_progress_limit": 6, "cycle_time_p85_days": 10 }))
+            .await
+            .json();
+        let controls = outcome["controls"].as_array().expect("controls array");
+        assert_eq!(controls.len(), 4, "gate_readiness, WIP, SLE, variance");
+        for row in controls {
+            assert_eq!(row["status"], "registered");
+        }
+
+        let registered: Vec<String> = controls
+            .iter()
+            .map(|c| c["metric"].as_str().expect("metric").to_string())
+            .collect();
+        for metric in [
+            "gate_readiness",
+            "work_in_progress",
+            "cycle_time_p85",
+            "budget_variance",
+        ] {
+            assert!(
+                registered.contains(&metric.to_string()),
+                "{metric} was registered"
+            );
+        }
+        // Retrospectives are deliberately not one of the four — no
+        // metric exists for "a retrospective happened".
+        assert!(!registered.iter().any(|m| m.contains("retrospective")));
+
+        let rows: Value = request
+            .get(&format!("/api/plans/{plan}/controls"))
+            .await
+            .json();
+        let rows = rows.as_array().expect("array");
+        assert_eq!(rows.len(), 4);
+        let wip = rows
+            .iter()
+            .find(|r| r["metric"] == "work_in_progress")
+            .expect("wip control");
+        assert_eq!(
+            wip["target_value"], 6,
+            "the caller's own WIP limit, not a guessed one"
+        );
+        assert_eq!(wip["timing"], "concurrent");
+        let sle = rows
+            .iter()
+            .find(|r| r["metric"] == "cycle_time_p85")
+            .expect("sle control");
+        assert_eq!(
+            sle["target_value"], 10,
+            "the caller's own SLE days, not a guessed one"
+        );
+        let gate = rows
+            .iter()
+            .find(|r| r["metric"] == "gate_readiness")
+            .expect("gate control");
+        assert_eq!(gate["timing"], "feedforward");
+        assert_eq!(gate["target_value"], 10_000, "100% in basis points");
+        let variance = rows
+            .iter()
+            .find(|r| r["metric"] == "budget_variance")
+            .expect("variance control");
+        assert_eq!(variance["timing"], "feedback");
+        assert_eq!(variance["tolerance"], 1_000, "default 10% tolerance");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// Calling the endpoint twice does not duplicate the controls — each
+// metric already enabled and registered is reported
+// already_registered instead.
+async fn register_standard_is_idempotent_per_metric() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan = create_plan!(request, "Idempotent plan");
+        let body = json!({ "work_in_progress_limit": 4, "cycle_time_p85_days": 14 });
+
+        let first: Value = request
+            .post(&format!("/api/plans/{plan}/controls/register-standard"))
+            .json(&body)
+            .await
+            .json();
+        assert!(
+            first["controls"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|c| c["status"] == "registered")
+        );
+
+        let second: Value = request
+            .post(&format!("/api/plans/{plan}/controls/register-standard"))
+            .json(&body)
+            .await
+            .json();
+        assert!(
+            second["controls"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|c| c["status"] == "already_registered"),
+            "a second call finds every metric already registered, not duplicated"
+        );
+
+        let rows: Value = request
+            .get(&format!("/api/plans/{plan}/controls"))
+            .await
+            .json();
+        assert_eq!(
+            rows.as_array().expect("array").len(),
+            4,
+            "still exactly four controls after calling register-standard twice"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// A caller may override the budget-variance tolerance; the WIP and SLE
+// numbers are always the caller's own (there is no default to compare
+// against).
+async fn register_standard_honours_an_explicit_variance_tolerance() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan = create_plan!(request, "Custom tolerance plan");
+        request
+            .post(&format!("/api/plans/{plan}/controls/register-standard"))
+            .json(&json!({
+                "work_in_progress_limit": 3,
+                "cycle_time_p85_days": 21,
+                "budget_variance_tolerance_bps": 500
+            }))
+            .await;
+
+        let rows: Value = request
+            .get(&format!("/api/plans/{plan}/controls"))
+            .await
+            .json();
+        let variance = rows
+            .as_array()
+            .expect("array")
+            .iter()
+            .find(|r| r["metric"] == "budget_variance")
+            .expect("variance control");
+        assert_eq!(
+            variance["tolerance"], 500,
+            "the caller's own tolerance, not the 10% default"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// An unknown plan is a plain 404, not a 500 or a silent empty success.
+async fn register_standard_on_an_unknown_plan_is_404() {
+    request::<App, _, _>(|request, _ctx| async move {
+        let response = request
+            .post("/api/plans/00000000-0000-0000-0000-000000000000/controls/register-standard")
+            .json(&json!({ "work_in_progress_limit": 5, "cycle_time_p85_days": 10 }))
+            .await;
+        assert_eq!(response.status_code(), 404);
+    })
+    .await;
+}

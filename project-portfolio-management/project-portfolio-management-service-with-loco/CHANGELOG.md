@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — opt-in registration of the four standard controls (T-26, PRO-P33)
+
+`POST /api/plans/{pid}/controls/register-standard`: registers
+`gate_readiness` (feedforward, fixed at 100%), `work_in_progress` and
+`cycle_time_p85` (concurrent, caller-supplied — no default, since a WIP
+limit and a cycle-time SLE are plan-specific commitments this service
+has no basis to invent), and `budget_variance` (feedback, defaults to
+a 10% tolerance, overridable). **Opt-in and per-plan, never
+automatic** — a feedforward control's whole design intent is to be
+able to block a write once something enforces that, so silently
+registering one on every plan would be an unrequested behavioural
+change. Idempotent per metric. Retrospectives are deliberately not
+included — no metric exists for "a retrospective happened," and this
+endpoint does not invent one. See `spec/13-tasks.md` T-26 for the full
+decision record, including the verified (not assumed) fact that no
+write path in this service currently enforces a feedforward control's
+block at all.
+
 ### Added — per-user saved views (T-28l)
 
 `POST`/`GET`/`DELETE /api/saved-views[/{pid}]`: a route-scoped filter/
