@@ -22,7 +22,7 @@ pub mod resources;
 /// FHIR search-parameter parsing + the in-memory match predicate.
 pub mod search;
 
-use crate::models::{Course, CourseIdentifier, EducationalLevel, IdentifierType};
+use crate::models::{Course, CourseIdentifier, CourseStatus, EducationalLevel, IdentifierType};
 use resources::{FhirBasic, FhirExtension, FhirIdentifier, FhirMeta};
 
 /// `identifier.system` URI for the course's scalar `course_code`
@@ -38,6 +38,26 @@ pub const EXT_LEVEL: &str = "urn:mxi:course:educational-level";
 pub const EXT_KEYWORD: &str = "urn:mxi:course:keyword";
 /// Extension URL carrying one `teaches` competency (repeatable).
 pub const EXT_TEACHES: &str = "urn:mxi:course:teaches";
+/// Extension URL carrying the course `description`.
+pub const EXT_DESCRIPTION: &str = "urn:mxi:course:description";
+/// Extension URL carrying one `about` subject (repeatable).
+pub const EXT_ABOUT: &str = "urn:mxi:course:about";
+/// Extension URL carrying the course's canonical `url`.
+pub const EXT_URL: &str = "urn:mxi:course:url";
+/// Extension URL carrying one `same_as` reference URL (repeatable).
+pub const EXT_SAME_AS: &str = "urn:mxi:course:same-as";
+/// Extension URL carrying one `assesses` competency (repeatable).
+pub const EXT_ASSESSES: &str = "urn:mxi:course:assesses";
+/// Extension URL carrying one `competency_required` entry (repeatable).
+pub const EXT_COMPETENCY_REQUIRED: &str = "urn:mxi:course:competency-required";
+/// Extension URL carrying `number_of_credits` (`valueUnsignedInt`).
+pub const EXT_NUMBER_OF_CREDITS: &str = "urn:mxi:course:number-of-credits";
+/// Extension URL carrying the lifecycle `status` (its lowercase serde tag).
+pub const EXT_STATUS: &str = "urn:mxi:course:status";
+/// Extension URL carrying the `active` flag (`valueBoolean`).
+pub const EXT_ACTIVE: &str = "urn:mxi:course:active";
+/// Extension URL carrying the `provider_id` UUID.
+pub const EXT_PROVIDER_ID: &str = "urn:mxi:course:provider-id";
 
 /// Map a [`CourseIdentifier`] scheme to its FHIR `identifier.system` URI.
 /// Well-known registries use their canonical namespace; the rest use a
@@ -107,18 +127,60 @@ fn level_from_string(s: &str) -> EducationalLevel {
         .unwrap_or_else(|_| EducationalLevel::Custom(s.to_string()))
 }
 
+/// Render a [`CourseStatus`] as its lowercase serde tag (`"published"`, …).
+fn status_to_string(status: CourseStatus) -> String {
+    serde_json::to_value(status)
+        .ok()
+        .as_ref()
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_default()
+}
+
+/// Parse a [`CourseStatus`] from its serde tag. Unlike the level, the status
+/// enum is closed, so an unknown value is an error rather than a fallback.
+fn status_from_string(s: &str) -> Result<CourseStatus, String> {
+    serde_json::from_value(serde_json::Value::String(s.to_string())).map_err(|_| {
+        format!(
+            "Invalid course status {s:?} (extension {EXT_STATUS}): expected one of \
+             draft, published, archived, retired"
+        )
+    })
+}
+
+/// The `valueString`s of every extension with `url`, in document order.
+fn ext_strings(fhir: &FhirBasic, url: &str) -> Vec<String> {
+    fhir.extension
+        .iter()
+        .filter(|e| e.url == url)
+        .filter_map(|e| e.value_string.clone())
+        .collect()
+}
+
+/// The first extension with `url`, if any.
+fn ext_first<'a>(fhir: &'a FhirBasic, url: &str) -> Option<&'a FhirExtension> {
+    fhir.extension.iter().find(|e| e.url == url)
+}
+
+/// The `valueString` of the first extension with `url`, if any.
+fn ext_string(fhir: &FhirBasic, url: &str) -> Option<String> {
+    ext_first(fhir, url).and_then(|e| e.value_string.clone())
+}
+
 /// Render a stored [`Course`] as the **non-standard** FHIR [`FhirBasic`].
 ///
 /// `id`/`meta.lastUpdated` come from the record; `meta.profile` advertises
 /// the non-standard course profile. `identifier` carries `course_code` (as a
 /// `schema.org/courseCode` token) then each [`CourseIdentifier`]. The name,
-/// `educational_level`, `keywords`, and `teaches` ride in `urn:mxi:course:*`
-/// extensions.
+/// `educational_level`, `description`, `url`, `number_of_credits`
+/// (`valueUnsignedInt`), `status`, `active` (`valueBoolean`), `provider_id`,
+/// and the repeatable `keywords`, `teaches`, `about`, `same_as`, `assesses`,
+/// and `competency_required` ride in `urn:mxi:course:*` extensions (one
+/// extension per value for the repeatable ones). `status` and `active` are
+/// always emitted.
 ///
-/// **Fidelity gaps** (no `Basic` element, not emitted): `description`,
-/// `about`, `url`, `same_as`, `assesses`, `competency_required`,
-/// `number_of_credits`, `status`, `active`, `provider_id`, credentials,
-/// syllabus sections, and the `instances` sub-resource.
+/// **Fidelity gaps** (structured, no flat extension, not emitted):
+/// credentials, syllabus sections, and the `instances` sub-resource.
 #[must_use]
 pub fn to_fhir_basic(course: &Course) -> FhirBasic {
     let mut basic = FhirBasic::new();
@@ -142,43 +204,51 @@ pub fn to_fhir_basic(course: &Course) -> FhirBasic {
     }));
     basic.identifier = identifier;
 
-    let mut extension = vec![FhirExtension {
-        url: EXT_NAME.to_string(),
-        value_string: Some(course.name.clone()),
-    }];
+    let mut extension = vec![FhirExtension::string(EXT_NAME, course.name.clone())];
     if let Some(ref level) = course.educational_level {
-        extension.push(FhirExtension {
-            url: EXT_LEVEL.to_string(),
-            value_string: Some(level_to_string(level)),
-        });
+        extension.push(FhirExtension::string(EXT_LEVEL, level_to_string(level)));
     }
-    extension.extend(course.keywords.iter().map(|k| FhirExtension {
-        url: EXT_KEYWORD.to_string(),
-        value_string: Some(k.clone()),
-    }));
-    extension.extend(course.teaches.iter().map(|t| FhirExtension {
-        url: EXT_TEACHES.to_string(),
-        value_string: Some(t.clone()),
-    }));
+    let repeated = [
+        (EXT_KEYWORD, &course.keywords),
+        (EXT_TEACHES, &course.teaches),
+        (EXT_ABOUT, &course.about),
+        (EXT_SAME_AS, &course.same_as),
+        (EXT_ASSESSES, &course.assesses),
+        (EXT_COMPETENCY_REQUIRED, &course.competency_required),
+    ];
+    for (url, values) in repeated {
+        extension.extend(values.iter().map(|v| FhirExtension::string(url, v.clone())));
+    }
+    if let Some(ref description) = course.description {
+        extension.push(FhirExtension::string(EXT_DESCRIPTION, description.clone()));
+    }
+    if let Some(ref url) = course.url {
+        extension.push(FhirExtension::string(EXT_URL, url.clone()));
+    }
+    if let Some(credits) = course.number_of_credits {
+        extension.push(FhirExtension::unsigned_int(EXT_NUMBER_OF_CREDITS, credits));
+    }
+    // `status` and `active` are always emitted: both have non-`None`
+    // defaults, so omitting them would make "absent" ambiguous on the way
+    // back in.
+    extension.push(FhirExtension::string(
+        EXT_STATUS,
+        status_to_string(course.status),
+    ));
+    extension.push(FhirExtension::boolean(EXT_ACTIVE, course.active));
+    if let Some(provider_id) = course.provider_id {
+        extension.push(FhirExtension::string(
+            EXT_PROVIDER_ID,
+            provider_id.to_string(),
+        ));
+    }
     basic.extension = extension;
 
     // Fidelity gaps (agents/share/fhir.md §2: every drop of fidelity is a
-    // documented, TODO-marked gap, never silent). None of these `Course`
-    // fields has a `Basic` element or an `urn:mxi:course:*` extension to
-    // ride in yet, so each is silently dropped on the way out. Add an
-    // extension (or, for `status`/`active`, use `Basic`'s own fields once
-    // FHIR resource is upgraded past the generic-`Basic` wrapper) as each
-    // becomes a real requirement — do not add a thirteenth silently.
-    // TODO(fhir): course.description is not emitted.
-    // TODO(fhir): course.about is not emitted.
-    // TODO(fhir): course.url is not emitted.
-    // TODO(fhir): course.same_as is not emitted.
-    // TODO(fhir): course.assesses is not emitted.
-    // TODO(fhir): course.competency_required is not emitted.
-    // TODO(fhir): course.number_of_credits is not emitted.
-    // TODO(fhir): course.status is not emitted.
-    // TODO(fhir): course.active is not emitted.
-    // TODO(fhir): course.provider_id is not emitted.
+    // documented, TODO-marked gap, never silent). These are the structured
+    // `Course` fields with no flat `urn:mxi:course:*` extension yet — each
+    // needs a nested (complex) extension or a contained resource, so each is
+    // dropped on the way out. Add one as each becomes a real requirement.
     // TODO(fhir): course.credentials is not emitted.
     // TODO(fhir): course's syllabus sections are not emitted.
     // TODO(fhir): the `instances` sub-resource is not emitted.
@@ -189,10 +259,12 @@ pub fn to_fhir_basic(course: &Course) -> FhirBasic {
 /// Parse an inbound [`FhirBasic`] into a stored [`Course`].
 ///
 /// The course **name** (extension `urn:mxi:course:name`) is required — a
-/// resource without one is a `400`. `educational_level`, `keywords`, and
-/// `teaches` come from their extensions; `identifier` tokens become
+/// resource without one is a `400`. Every other extension [`to_fhir_basic`]
+/// emits is read back into its field; `identifier` tokens become
 /// `course_code` (for the `schema.org/courseCode` system) or
-/// [`CourseIdentifier`]s (system → scheme).
+/// [`CourseIdentifier`]s (system → scheme). An absent `status` / `active`
+/// extension leaves the [`Course::new`] default (`published` / `true`), so a
+/// minimal hand-written resource still creates a live course.
 ///
 /// **Fidelity gaps**: only the fields [`to_fhir_basic`] emits are recovered;
 /// every other `Course` field defaults (see [`to_fhir_basic`]'s gap list).
@@ -201,8 +273,13 @@ pub fn to_fhir_basic(course: &Course) -> FhirBasic {
 ///
 /// # Errors
 ///
-/// Returns the missing-name diagnostic string when the resource carries no
-/// non-empty `urn:mxi:course:name` extension.
+/// Returns a diagnostic string (mapped to a `400` by the handler) when the
+/// resource carries no non-empty `urn:mxi:course:name` extension, or when a
+/// typed extension is present but malformed: a `status` that is not a known
+/// lifecycle tag, a `provider-id` that is not a UUID, or a `number-of-credits`
+/// / `active` extension missing its `valueUnsignedInt` / `valueBoolean`.
+/// Malformed values are rejected rather than dropped, so a client never gets
+/// a `201` for data the server silently discarded.
 pub fn from_fhir_basic(fhir: &FhirBasic) -> Result<Course, String> {
     let name = fhir
         .extension
@@ -223,18 +300,40 @@ pub fn from_fhir_basic(fhir: &FhirBasic) -> Result<Course, String> {
     {
         course.educational_level = Some(level_from_string(level));
     }
-    course.keywords = fhir
-        .extension
-        .iter()
-        .filter(|e| e.url == EXT_KEYWORD)
-        .filter_map(|e| e.value_string.clone())
-        .collect();
-    course.teaches = fhir
-        .extension
-        .iter()
-        .filter(|e| e.url == EXT_TEACHES)
-        .filter_map(|e| e.value_string.clone())
-        .collect();
+    course.keywords = ext_strings(fhir, EXT_KEYWORD);
+    course.teaches = ext_strings(fhir, EXT_TEACHES);
+    course.about = ext_strings(fhir, EXT_ABOUT);
+    course.same_as = ext_strings(fhir, EXT_SAME_AS);
+    course.assesses = ext_strings(fhir, EXT_ASSESSES);
+    course.competency_required = ext_strings(fhir, EXT_COMPETENCY_REQUIRED);
+    course.description = ext_string(fhir, EXT_DESCRIPTION);
+    course.url = ext_string(fhir, EXT_URL);
+
+    if let Some(ext) = ext_first(fhir, EXT_NUMBER_OF_CREDITS) {
+        let credits = ext.value_unsigned_int.ok_or_else(|| {
+            format!("Extension {EXT_NUMBER_OF_CREDITS} requires a valueUnsignedInt")
+        })?;
+        course.number_of_credits = Some(credits);
+    }
+    if let Some(ext) = ext_first(fhir, EXT_STATUS) {
+        let status = ext
+            .value_string
+            .as_deref()
+            .ok_or_else(|| format!("Extension {EXT_STATUS} requires a valueString"))?;
+        course.status = status_from_string(status)?;
+    }
+    if let Some(ext) = ext_first(fhir, EXT_ACTIVE) {
+        course.active = ext
+            .value_boolean
+            .ok_or_else(|| format!("Extension {EXT_ACTIVE} requires a valueBoolean"))?;
+    }
+    if let Some(ext) = ext_first(fhir, EXT_PROVIDER_ID) {
+        let raw = ext.value_string.as_deref().unwrap_or_default();
+        let provider_id = uuid::Uuid::parse_str(raw).map_err(|_| {
+            format!("Invalid provider id {raw:?} (extension {EXT_PROVIDER_ID}): expected a UUID")
+        })?;
+        course.provider_id = Some(provider_id);
+    }
 
     for id in &fhir.identifier {
         let Some(value) = id.value.clone() else {
@@ -257,16 +356,6 @@ pub fn from_fhir_basic(fhir: &FhirBasic) -> Result<Course, String> {
     // Fidelity gaps (mirrors to_fhir_basic's TODO list — nothing recovers
     // these fields here because to_fhir_basic never emitted them, so they
     // default on every round-trip through FHIR):
-    // TODO(fhir): course.description is not recovered.
-    // TODO(fhir): course.about is not recovered.
-    // TODO(fhir): course.url is not recovered.
-    // TODO(fhir): course.same_as is not recovered.
-    // TODO(fhir): course.assesses is not recovered.
-    // TODO(fhir): course.competency_required is not recovered.
-    // TODO(fhir): course.number_of_credits is not recovered.
-    // TODO(fhir): course.status is not recovered.
-    // TODO(fhir): course.active is not recovered.
-    // TODO(fhir): course.provider_id is not recovered.
     // TODO(fhir): course.credentials is not recovered.
     // TODO(fhir): course's syllabus sections are not recovered.
     // TODO(fhir): the `instances` sub-resource is not recovered.
@@ -353,6 +442,92 @@ mod tests {
     fn missing_name_is_rejected() {
         let basic = FhirBasic::new();
         assert!(from_fhir_basic(&basic).is_err());
+    }
+
+    /// Every field that rides in a flat extension survives
+    /// `DTO → Basic → DTO` — including the ten that were fidelity gaps
+    /// before T-31 (`description` … `provider_id`), with non-default `status`
+    /// and `active` so a silent fall-back to the default would be caught.
+    #[test]
+    fn extension_fields_round_trip() {
+        let mut course = Course::new("Data Structures");
+        course.description = Some("Lists, trees, and graphs.".to_string());
+        course.about = vec!["computer science".to_string(), "algorithms".to_string()];
+        course.url = Some("https://example.edu/courses/cs201".to_string());
+        course.same_as = vec!["https://www.wikidata.org/wiki/Q175263".to_string()];
+        course.assesses = vec!["tree traversal".to_string()];
+        course.competency_required = vec!["CS101".to_string(), "discrete math".to_string()];
+        course.number_of_credits = Some(4);
+        course.status = CourseStatus::Retired;
+        course.active = false;
+        course.provider_id = Some(uuid::Uuid::new_v4());
+
+        let back = from_fhir_basic(&to_fhir_basic(&course)).expect("valid resource");
+        assert_eq!(back.description, course.description);
+        assert_eq!(back.about, course.about);
+        assert_eq!(back.url, course.url);
+        assert_eq!(back.same_as, course.same_as);
+        assert_eq!(back.assesses, course.assesses);
+        assert_eq!(back.competency_required, course.competency_required);
+        assert_eq!(back.number_of_credits, course.number_of_credits);
+        assert_eq!(back.status, course.status);
+        assert_eq!(back.active, course.active);
+        assert_eq!(back.provider_id, course.provider_id);
+    }
+
+    /// Typed values serialize under their FHIR `value[x]` names, and only
+    /// the one that is set.
+    #[test]
+    fn typed_extensions_serialize_as_fhir_value_x() {
+        let mut course = Course::new("Statistics");
+        course.number_of_credits = Some(3);
+        let json = serde_json::to_value(to_fhir_basic(&course)).expect("serializes");
+        let ext = json["extension"].as_array().expect("extension array");
+        let find = |url: &str| {
+            ext.iter()
+                .find(|e| e["url"] == url)
+                .unwrap_or_else(|| panic!("{url} emitted"))
+                .clone()
+        };
+        let credits = find(EXT_NUMBER_OF_CREDITS);
+        assert_eq!(credits["valueUnsignedInt"], 3);
+        assert!(credits.get("valueString").is_none());
+        assert_eq!(find(EXT_ACTIVE)["valueBoolean"], true);
+        assert_eq!(find(EXT_STATUS)["valueString"], "published");
+    }
+
+    /// A minimal resource (name only) keeps the `Course::new` defaults for
+    /// the always-emitted `status` / `active`, and leaves the rest empty.
+    #[test]
+    fn absent_extensions_keep_defaults() {
+        let mut basic = FhirBasic::new();
+        basic.extension = vec![FhirExtension::string(EXT_NAME, "Ethics")];
+        let course = from_fhir_basic(&basic).expect("valid resource");
+        assert_eq!(course.status, CourseStatus::Published);
+        assert!(course.active);
+        assert_eq!(course.description, None);
+        assert_eq!(course.number_of_credits, None);
+        assert_eq!(course.provider_id, None);
+        assert!(course.about.is_empty());
+    }
+
+    /// Each malformed typed extension is a `400`-mapped error, never a
+    /// silent drop.
+    #[test]
+    fn malformed_typed_extensions_are_rejected() {
+        let bad = [
+            FhirExtension::string(EXT_STATUS, "pending"),
+            FhirExtension::string(EXT_PROVIDER_ID, "not-a-uuid"),
+            FhirExtension::string(EXT_NUMBER_OF_CREDITS, "3"),
+            FhirExtension::string(EXT_ACTIVE, "false"),
+            FhirExtension::boolean(EXT_STATUS, true),
+        ];
+        for ext in bad {
+            let mut basic = FhirBasic::new();
+            basic.extension = vec![FhirExtension::string(EXT_NAME, "Ethics"), ext.clone()];
+            let err = from_fhir_basic(&basic).expect_err("malformed extension rejected");
+            assert!(err.contains(&ext.url), "{err:?} names {}", ext.url);
+        }
     }
 
     /// A `Custom` educational level round-trips via its label.

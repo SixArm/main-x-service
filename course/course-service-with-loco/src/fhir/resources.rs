@@ -157,10 +157,13 @@ pub struct FhirCoding {
     pub display: Option<String>,
 }
 
-/// A FHIR `Extension` carrying one `valueString`. Used for the
+/// A FHIR `Extension` carrying one typed value. Used for the
 /// course-specific fields `Basic` cannot model natively (name, level,
-/// keywords, `teaches`). Repeatable fields emit one extension per value.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// keywords, `teaches`, description, …). Repeatable fields emit one
+/// extension per value. Exactly one `value[x]` is set per extension —
+/// `valueBoolean` for `active`, `valueUnsignedInt` for
+/// `number_of_credits`, `valueString` for everything else.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FhirExtension {
     /// The extension definition URL (a `urn:mxi:course:*` namespace).
     pub url: String,
@@ -171,6 +174,52 @@ pub struct FhirExtension {
         default
     )]
     pub value_string: Option<String>,
+    /// The boolean value.
+    #[serde(
+        rename = "valueBoolean",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
+    pub value_boolean: Option<bool>,
+    /// The unsigned-integer value.
+    #[serde(
+        rename = "valueUnsignedInt",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
+    pub value_unsigned_int: Option<u32>,
+}
+
+impl FhirExtension {
+    /// An extension carrying a `valueString`.
+    #[must_use]
+    pub fn string(url: &str, value: impl Into<String>) -> Self {
+        Self {
+            url: url.to_string(),
+            value_string: Some(value.into()),
+            ..Self::default()
+        }
+    }
+
+    /// An extension carrying a `valueBoolean`.
+    #[must_use]
+    pub fn boolean(url: &str, value: bool) -> Self {
+        Self {
+            url: url.to_string(),
+            value_boolean: Some(value),
+            ..Self::default()
+        }
+    }
+
+    /// An extension carrying a `valueUnsignedInt`.
+    #[must_use]
+    pub fn unsigned_int(url: &str, value: u32) -> Self {
+        Self {
+            url: url.to_string(),
+            value_unsigned_int: Some(value),
+            ..Self::default()
+        }
+    }
 }
 
 /// A FHIR `OperationOutcome` — the body of every non-2xx FHIR response

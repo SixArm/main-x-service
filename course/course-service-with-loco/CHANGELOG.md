@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — FHIR `Basic` carries ten more course fields (T-31)
+
+`GET /fhir/Basic/{id}` (and search) used to drop `description`, `about`,
+`url`, `same_as`, `assesses`, `competency_required`,
+`number_of_credits`, `status`, `active`, and `provider_id`, and a FHIR
+create/update reset them to defaults — so a FHIR round-trip of a
+retired, inactive course came back published and active. All ten now
+ride in documented `urn:mxi:course:*` extensions and round-trip.
+`active` uses `valueBoolean` and `number_of_credits` uses
+`valueUnsignedInt`; the rest use `valueString`. A malformed inbound
+value (unknown `status`, non-UUID `provider-id`, a typed extension
+missing its typed value) is now a `400` `OperationOutcome` instead of
+being ignored. Credentials, syllabus sections, and the `instances`
+sub-resource remain documented gaps.
+
+Verified: `cargo test --lib` (139 passed, +4), `cargo clippy
+--all-targets -- -D warnings`, `cargo fmt --check` all clean.
+
 ### Fixed — criterion 0.8 deprecated `criterion::black_box` (2026-09-07)
 
 Bumping `criterion` 0.5.1 → 0.8.2 (dev-dependency) turned `use of
