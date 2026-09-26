@@ -41,6 +41,11 @@ pub mod metrics;
 pub mod migration;
 /// Domain models and generated `SeaORM` entities.
 pub mod models;
+/// OIDC identity federation (EV-2): config + claim mapping. Compiled
+/// only under the `oidc` Cargo feature — a deployment that never
+/// federates pulls in no extra HTTP/JWT stack at all.
+#[cfg(feature = "oidc")]
+pub mod oidc;
 /// Hand-written `OpenAPI` 3 document for the auth API.
 pub mod openapi;
 /// Postgres-backed per-email sliding-window rate limiter for magic-link issuance.

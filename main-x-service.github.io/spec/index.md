@@ -76,14 +76,43 @@ git@github.com:SixArm/main-x-service.github.io.git` per checkout.
       four routes).
 - [x] `.github/workflows/deploy.yml`, pinned to Node 26 per
       `spec/node-current-version/index.md`.
-- [ ] Create the `SixArm/main-x-service.github.io` GitHub repository and
-      perform the first `git subtree split` + push — deliberately not
-      done as part of this subproject's initial scaffold, since creating
-      a new public repository is an outward-facing action outside this
-      site's own code; do this as an explicit, separate step.
-- [ ] Confirm the actual GitHub Pages URL / custom domain (if any) once
+- [x] Create the `SixArm/main-x-service.github.io` GitHub repository and
+      perform the first `git subtree split` + push.
+      Prerequisite fixed first: both `lily-design-system-svelte-theme-picker`
+      (`file:` → `^0.1.1`) and `static/assets/themes` (symlink → a vendored
+      copy) were resolving correctly only while this directory was nested
+      inside the monorepo — a `file:` path onto the sibling
+      `lilydesignsystem` checkout, and a symlink target, are each one
+      directory level shallower once `git subtree split` promotes this to
+      a repo root, so both silently pointed at the wrong place in the
+      exported sibling repo. Same class of bug WEB-2 found in every
+      operator front-end (`agents/share/svelte-front-end-stack.md`), not
+      caught here until actually publishing because nothing had ever
+      exercised the exported form before.
+- [x] Confirm the actual GitHub Pages URL / custom domain (if any) once
       the sibling repo exists, and update `homepage` in `package.json`
-      and the footer links accordingly.
+      and the footer links accordingly. The bare `https://
+      main-x-service.github.io/` URL floated as an option before the
+      repo existed turned out not to be obtainable under the `SixArm`
+      org — GitHub Pages only serves that top-level form for a repo
+      named `<owner>.github.io` where `<owner>` genuinely is the
+      account name, and the account here is `SixArm`, not
+      `main-x-service`. The live, confirmed URL is
+      `https://sixarm.github.io/main-x-service.github.io/`, and that is
+      what `homepage` and both generated `llms` files now say. The two
+      in-page mentions of `main-x-service.github.io/` were already the
+      bare subproject name, not a URL, so needed no change.
+- [x] Website-appropriate `static/llms.txt` / `static/llms.json`
+      (`spec/llms-json-and-llms-txt/index.md` §"Repo checkout vs.
+      published site"). Generated from the root `llms.json`'s same 102
+      entries plus a new "This site" section for the four real routes;
+      every other entry's `url` rewritten to its GitHub source
+      (`blob`/`tree` under `SixArm/main-x-service`) rather than a bare
+      repo-relative path, since this site renders only overview pages,
+      not a mirror of the whole tree. `llms.txt` is generated from the
+      same JSON rather than hand-duplicated, so the two cannot drift
+      against each other (they can still drift against the root files —
+      re-run the generation after a root `llms.json` content change).
 - [ ] Consider whether `/subprojects/` should eventually be generated
       from `llms.json` at build time via a monorepo-root prebuild script,
       rather than hand-maintained — deferred until the hand-maintained

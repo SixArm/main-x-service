@@ -15,6 +15,8 @@ pub mod docs;
 /// Recorded effort and utilisation, including per person.
 pub mod effort;
 pub mod engineering;
+/// The phased budget baseline and the EAC/ETC forecast (T-28b).
+pub mod financials;
 pub mod governance;
 pub mod insights;
 pub mod metrics;
@@ -27,6 +29,9 @@ pub mod oversight;
 pub mod phase;
 pub mod plans;
 pub mod prioritisation;
+/// Per-user saved views: route-scoped filter/sort/column presets,
+/// keyed by the token `sub` (T-28l).
+pub mod saved_views;
 pub mod strategy;
 /// Time-based analysis: the read surface over the task transition log —
 /// per-task and plan flow, constraints, aging WIP, and Little's Law.

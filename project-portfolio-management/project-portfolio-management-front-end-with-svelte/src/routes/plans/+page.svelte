@@ -94,11 +94,22 @@
           onchange={({ value }: { value: unknown }) => (filterRules = value)}
         />
       </div>
+      <!-- T-28k (repo tasks.md EV-1): the SVAR grid is a poor fit under
+           a phone viewport (fixed-height, horizontal-scrolling columns).
+           Both this and `.mobile-list` below render unconditionally;
+           `@media (max-width: 600px)` is the sole switch, so there is
+           no JS viewport detection and nothing to get out of sync with
+           SSR (this app has none — ssr = false, +layout.ts). -->
       <div class="grid-wrap">
         <Grid data={filtered} {columns} select init={initGrid} />
       </div>
     </FilterTheme>
   </GridTheme>
+  <ul class="mobile-list">
+    {#each filtered as row (row.id)}
+      <li><a href="/plans/{row.id}">{row.name}</a></li>
+    {/each}
+  </ul>
 {/if}
 
 <style>
@@ -118,5 +129,41 @@
     margin: 0 0 0.5rem;
     opacity: 0.75;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* T-28k: a plain, read-only list stands in for the SVAR grid under a
+     phone viewport — hidden above the breakpoint, shown below it. */
+  .mobile-list {
+    display: none;
+  }
+
+  @media (max-width: 600px) {
+    .grid-wrap {
+      display: none;
+    }
+    /* T-28k: the SVAR FilterBar (`.filter-wrap`) sits OUTSIDE
+       `.grid-wrap`, so hiding the grid alone left it as the actual
+       overflow source (measured: its `.wx-filter-bar` rendered at a
+       fixed ~610px regardless of viewport). Filtering a plain list of
+       names has little value anyway, so it is hidden alongside the
+       grid rather than reflowed. */
+    .filter-wrap {
+      display: none;
+    }
+    .mobile-list {
+      display: block;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .mobile-list li {
+      border-bottom: 1px solid var(--mxi-color-border);
+    }
+    .mobile-list a {
+      display: block;
+      padding: 0.75rem 0.25rem;
+      color: inherit;
+      text-decoration: none;
+    }
   }
 </style>

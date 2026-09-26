@@ -16,7 +16,7 @@ use uuid::Uuid;
 use super::plans::parse_kind_label;
 use crate::auth::{self, MaybeAuthUser};
 use crate::governance as rules;
-use crate::models::_entities::{budget_lines, gate_reviews, plans, proposals, risks};
+use crate::models::_entities::{audit_logs, budget_lines, gate_reviews, plans, proposals, risks};
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::governance as gov;
 use crate::models::plans::Model as PlanModel;
@@ -312,6 +312,110 @@ async fn promote_proposal(
         "status": updated.status,
         "plan_pid": model.pid.to_string(),
         "collection": updated.kind_target,
+    }))
+}
+
+/// `GET /api/proposals/forecast` query parameters — the same shape as
+/// `GET /plans/{pid}/forecast`'s (T-28i reuses its Monte-Carlo).
+#[derive(Debug, Deserialize)]
+struct IntakeForecastQuery {
+    /// How many periods ahead to forecast an approved count for.
+    #[serde(default)]
+    periods: Option<usize>,
+    /// Periods of history to sample (default 12).
+    #[serde(default)]
+    history_periods: Option<usize>,
+    /// Days per period (default 7).
+    #[serde(default)]
+    period_days: Option<i64>,
+    /// Simulation trials (default 10 000, capped).
+    #[serde(default)]
+    trials: Option<usize>,
+    /// Seed, so a caller can vary the draw deliberately.
+    #[serde(default)]
+    seed: Option<u64>,
+}
+
+/// `GET /api/proposals/forecast` — "how many approved proposals in
+/// the next N periods?" (T-28i), reusing the exact throughput
+/// Monte-Carlo behind `GET /plans/{pid}/forecast`
+/// ([`crate::tba::forecast_items`]) over the **intake pipeline**
+/// instead of a plan's task board: the history it samples is
+/// `proposal_approved` events per period, read from the audit trail
+/// (`proposals` itself carries no `approved_at` column — the audit
+/// row's own timestamp is the only record of when a proposal actually
+/// became approved). `arrivals_per_period` (from `proposals.created_at`
+/// directly) rides alongside for context; it does not feed the
+/// forecast, which answers the *approved* question, not the
+/// *submitted* one.
+#[debug_handler]
+async fn intake_forecast(
+    State(ctx): State<AppContext>,
+    Query(query): Query<IntakeForecastQuery>,
+) -> Result<Response> {
+    let period_days = query.period_days.unwrap_or(crate::tba::DEFAULT_PERIOD_DAYS);
+    if period_days <= 0 || period_days > 90 {
+        return Err(refuse("period_days must be between 1 and 90"));
+    }
+    let history_periods = query.history_periods.unwrap_or(12);
+    if history_periods == 0 || history_periods > 260 {
+        return Err(refuse("history_periods must be between 1 and 260"));
+    }
+    let trials = query.trials.unwrap_or(crate::tba::DEFAULT_TRIALS);
+    if trials > crate::tba::MAX_TRIALS {
+        return Err(refuse(&format!(
+            "trials must be at most {}",
+            crate::tba::MAX_TRIALS
+        )));
+    }
+
+    let now = chrono::Utc::now();
+    let period_ms = period_days.saturating_mul(crate::tba::DAY_MS);
+    let to_ms = now.timestamp_millis();
+    let from_ms = to_ms.saturating_sub(
+        i64::try_from(history_periods)
+            .unwrap_or(0)
+            .saturating_mul(period_ms),
+    );
+
+    let approved_ms: Vec<i64> = audit_logs::Entity::find()
+        .filter(audit_logs::Column::Action.eq(rules::ProposalAction::Approve.token()))
+        .all(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?
+        .iter()
+        .map(|row| row.created_at.timestamp_millis())
+        .collect();
+    let arrival_ms: Vec<i64> = proposals::Entity::find()
+        .all(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?
+        .iter()
+        .map(|row| row.created_at.timestamp_millis())
+        .collect();
+
+    let approvals_history = crate::tba::throughput_history(&approved_ms, from_ms, to_ms, period_ms);
+    let arrivals_history = crate::tba::throughput_history(&arrival_ms, from_ms, to_ms, period_ms);
+
+    let periods = query.periods.unwrap_or(4);
+    let seed = query.seed.unwrap_or(0x5EED_5EED_5EED_5EED);
+
+    format::json(serde_json::json!({
+        "as_of": now,
+        "note": "forecast samples the intake pipeline's own approval throughput \
+                 — how many proposals actually got approved per period — the \
+                 same Monte-Carlo GET /plans/{pid}/forecast runs over a task \
+                 board's completions. arrivals_per_period is contextual only \
+                 and does not feed the forecast.",
+        "history_window": {
+            "from": chrono::DateTime::from_timestamp_millis(from_ms),
+            "to": chrono::DateTime::from_timestamp_millis(to_ms),
+            "periods": history_periods,
+            "period_days": period_days,
+        },
+        "arrivals_per_period": arrivals_history,
+        "approvals_per_period": approvals_history,
+        "forecast": crate::tba::forecast_items(&approvals_history, periods, trials, period_days, seed),
     }))
 }
 
@@ -976,6 +1080,7 @@ pub fn routes() -> Routes {
         .prefix("/api")
         .add("/proposals", post(create_proposal))
         .add("/proposals", get(list_proposals))
+        .add("/proposals/forecast", get(intake_forecast))
         .add("/proposals/{pid}", get(get_proposal))
         .add("/proposals/{pid}", put(update_proposal))
         .add("/proposals/{pid}/submit", post(submit_proposal))

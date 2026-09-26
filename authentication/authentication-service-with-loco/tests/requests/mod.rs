@@ -7,5 +7,7 @@
 mod admin;
 mod auth;
 mod compliance;
+#[cfg(feature = "oidc")]
+mod oidc;
 mod prepare_data;
 mod rate_limit;

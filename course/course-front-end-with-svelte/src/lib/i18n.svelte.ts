@@ -4,12 +4,15 @@
 // surface is small and we keep the front-end dependency-light (drift
 // across the family front-ends is accepted, see AGENTS.md).
 //
-// Supported locales: English (`en`, the source of truth) plus Welsh
-// (`cy`, for the public-sector Welsh-language duty), Spanish (`es`),
-// French (`fr`), German (`de`), Arabic (`ar`, RTL), Russian (`ru`),
-// Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese
-// (`pt`), Indonesian (`id`), and Urdu (`ur`, RTL). An unknown key/locale
-// falls back to `en`, then to the key string itself. The chosen locale
+// Supported locales: English (`en`, the source of truth) plus American
+// English (`en_US`, identical content today — a distinct endonym for
+// the locale picker rather than a spelling divergence, since `en`'s
+// own copy is already American-spelled), Welsh (`cy`, for the
+// public-sector Welsh-language duty), Spanish (`es`), French (`fr`),
+// German (`de`), Arabic (`ar`, RTL), Russian (`ru`), Hindi (`hi`),
+// Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese (`pt`),
+// Indonesian (`id`), and Urdu (`ur`, RTL). An unknown key/locale falls
+// back to `en`, then to the key string itself. The chosen locale
 // persists to localStorage and drives the UI strings, `<html lang>`, and
 // `<html dir>` (right-to-left for `ar` / `ur`).
 
@@ -21,6 +24,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -44,6 +48,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -79,9 +84,10 @@ export function isRtl(locale: string): boolean {
 }
 
 /**
- * localStorage key under which the chosen UI locale is persisted. There is
- * no locale-switcher UI in the chrome (Lily's locale-picker was removed in
- * favour of share-picker/text-size-picker); this key is what
+ * localStorage key under which the chosen UI locale is persisted. The
+ * chrome's `PickerBar` locale picker calls {@link i18n}'s `set` on
+ * change (its own `applyDir={false}`, since this store already reflects
+ * `lang`/`dir` onto `<html>` — see `+layout.svelte`); this key is what
  * {@link readStoredLocale} reads on boot, so a locale set by other means
  * (e.g. a query param a future route handles) still sticks across visits.
  */
@@ -92,6 +98,190 @@ export const LOCALE_KEY = "mxi.course.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.calendar": "Calendar",
+    "nav.board": "Board",
+    // Layout / chrome
+    "brand.name": "Course",
+    "brand.tagline": "Main X Index",
+    "nav.toggle": "Toggle navigation",
+    "nav.dashboard": "Dashboard",
+    "nav.courses": "Courses",
+    "nav.newCourse": "New course",
+    "nav.matchCheck": "Match check",
+    "nav.merge": "Merge",
+    "chrome.theme": "Theme",
+    "chrome.language": "Language",
+    "chrome.share": "Share",
+    "chrome.textSize": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    // Dashboard
+    "dashboard.title": "Dashboard",
+    "dashboard.servicePrefix": "Service:",
+    "dashboard.status.ok": "ok",
+    "dashboard.status.down": "down",
+    "dashboard.status.loading": "loading",
+    "dashboard.recentActivity": "Recent activity",
+    "dashboard.noRecent": "No recent audit entries.",
+    // Courses list
+    "courses.title": "Courses",
+    "courses.new": "New course",
+    "courses.searchPlaceholder": "Search by name, identifier…",
+    "courses.fuzzy": "Fuzzy",
+    "courses.loading": "Loading…",
+    "courses.recordCount.one": "{n} record",
+    "courses.recordCount.other": "{n} records",
+    // Course detail
+    "detail.loading": "Loading…",
+    "detail.edit": "Edit",
+    "detail.audit": "Audit",
+    "detail.delete": "Delete",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
+    "detail.confirmDelete":
+      "Soft-delete this course? This cannot be undone via the UI.",
+    "detail.identity": "Identity",
+    "detail.id": "ID",
+    "detail.courseCode": "Course code",
+    "detail.status": "Status",
+    "detail.educationalLevel": "Educational level",
+    "detail.numberOfCredits": "Number of credits",
+    "detail.timeRequired": "Time required",
+    "detail.description": "Description",
+    "detail.url": "URL",
+    "detail.license": "License",
+    "detail.free": "Free",
+    "detail.yes": "yes",
+    "detail.no": "no",
+    "detail.empty": "—",
+    "detail.identifiers": "Identifiers",
+    "detail.teaches": "Teaches",
+    "detail.keywords": "Keywords",
+    "detail.alternateNames": "Alternate names",
+    "detail.sameAs": "Same-as (authoritative URLs)",
+    "detail.instances": "Instances",
+    "detail.customPrefix": "Custom:",
+    "detail.noDate": "(no date)",
+    "detail.capacity": "cap",
+    // Edit course
+    "edit.title": "Edit course",
+    "edit.cancel": "Cancel",
+    "edit.loading": "Loading…",
+    "edit.saveChanges": "Save changes",
+    // New course
+    "new.title": "New course",
+    "new.create": "Create",
+    "new.possibleDuplicates": "Possible duplicates",
+    "new.duplicatesDetected":
+      "Duplicates detected ({n}) — review below before resubmitting.",
+    // Audit log
+    "audit.title": "Audit log",
+    "audit.backToCourse": "Back to course",
+    "audit.loading": "Loading…",
+    "audit.noEntries": "No audit entries.",
+    "audit.by": "by",
+    "audit.payload": "Payload",
+    // Match check
+    "match.title": "Match check",
+    "match.name": "Name",
+    "match.courseCode": "Course code",
+    "match.providerId": "Provider ID",
+    "match.displayThreshold": "Display threshold",
+    "match.thresholdHint": "Client-side filter (0.0 – 1.0)",
+    "match.educationalLevel": "Educational level",
+    "match.keywords": "Keywords",
+    "match.keywordsHint": "Comma- or newline-separated",
+    "match.teaches": "Teaches (competencies)",
+    "match.teachesHint": "One per line",
+    "match.sameAs": "Same-as URLs",
+    "match.sameAsHint": "One per line",
+    "match.identifiers": "Identifiers",
+    "match.matching": "Matching…",
+    "match.findMatches": "Find matches",
+    // Merge
+    "merge.title": "Merge courses",
+    "merge.mainId": "Main course ID",
+    "merge.mainIdHint": "The surviving record",
+    "merge.duplicateId": "Duplicate course ID",
+    "merge.duplicateIdHint": "Will be soft-deleted",
+    "merge.reason": "Reason",
+    "merge.reasonHint": "Recorded in the merge audit trail",
+    "merge.reasonPlaceholder": "Confirmed duplicate",
+    "merge.loadPreview": "Load preview",
+    "merge.merging": "Merging…",
+    "merge.merge": "Merge",
+    "merge.bothIdsRequired": "Both IDs required",
+    "merge.mustDiffer": "Main and duplicate must differ",
+    "merge.confirm":
+      "Merge {dup}… into {main}…?\nThis soft-deletes the duplicate.",
+    "merge.preview": "Preview",
+    "merge.main": "Main",
+    "merge.duplicate": "Duplicate",
+    "merge.completed": "Merge completed",
+    "merge.recordCreated": "Merge record {id} created at {at}.",
+    "merge.viewMerged": "View merged main course",
+    // Course form
+    "form.name": "Name",
+    "form.courseCode": "Course code",
+    "form.courseCodeHint": "Provider-scoped (e.g. CS101)",
+    "form.status": "Status",
+    "form.description": "Description",
+    "form.url": "URL",
+    "form.license": "License",
+    "form.numberOfCredits": "Number of credits",
+    "form.educationalLevel": "Educational level",
+    "form.typicalAgeRange": "Typical age range",
+    "form.typicalAgeRangeHint": "e.g. 18-22",
+    "form.timeRequired": "Time required",
+    "form.timeRequiredHint": "ISO 8601 (e.g. PT45H)",
+    "form.alternateNames": "Alternate names",
+    "form.alternateNamesHint": "One per line",
+    "form.keywords": "Keywords",
+    "form.keywordsHint": "Comma- or newline-separated",
+    "form.teaches": "Teaches (competencies)",
+    "form.teachesHint": "One per line",
+    "form.availableLanguages": "Available languages",
+    "form.availableLanguagesHint": "BCP-47 codes (e.g. en fr de)",
+    "form.sameAs": "Same-as URLs",
+    "form.sameAsHint": "Wikidata, OER catalog, etc. — one per line",
+    "form.identifiers": "Identifiers",
+    "form.saving": "Saving…",
+    "form.save": "Save",
+    "form.reset": "Reset",
+    // Identifier input
+    "identifier.type": "Type",
+    "identifier.customOption": "Custom…",
+    "identifier.customLabel": "Custom label",
+    "identifier.value": "Value",
+    "identifier.url": "URL",
+    "identifier.remove": "Remove",
+    "identifier.add": "+ Add identifier",
+    // Search box
+    "search.placeholder": "Search…",
+    "search.submit": "Search",
+    // Match results
+    "results.title": "Match results",
+    "results.count": "({n})",
+    "results.none": "No candidates.",
+    "results.scoreBreakdown": "Score breakdown",
+    "results.score.name": "name",
+    "results.score.courseCode": "course code",
+    "results.score.provider": "provider",
+    "results.score.level": "level",
+    "results.score.keywords": "keywords",
+    "results.score.teaches": "teaches",
+    "results.score.deterministic":
+      "deterministic (identifier / provider+code / same-as)",
+    // Course grid column headers
+    "grid.id": "ID",
+    "grid.name": "Name",
+    "grid.courseCode": "Course code",
+    "grid.level": "Level",
+    "grid.status": "Status",
+    "grid.primaryIdentifier": "Primary identifier",
+  },
+  en_US: {
     "nav.calendar": "Calendar",
     "nav.board": "Board",
     // Layout / chrome
@@ -2335,7 +2525,17 @@ export const STRINGS_BY_LOCALE: Record<
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;

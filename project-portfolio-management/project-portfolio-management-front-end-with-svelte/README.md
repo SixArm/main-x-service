@@ -58,6 +58,7 @@ Every plan route lives under the static `plans/` directory.
 | `/proposals` | Work-intake board — proposal pipeline (draft → … → promoted) + duplicate-demand checks + promote-to-plan |
 | `/reports` | Saved reports — definitions, synchronous runs, CSV download |
 | `/scenarios` | Scenario planning — what-if candidate portfolios, evaluate, commit |
+| `/onboarding` | Operator onboarding — a role-by-role first-hour walkthrough (executive, PMO, resource manager), each step linking the page it lands on |
 | `/signin` | Magic-link sign-in (BFF flow) |
 | `/verify` | Magic-link verification landing page |
 

@@ -580,8 +580,32 @@ struct RollupQuery {
     depth: Option<usize>,
 }
 
+/// Build a rollup's attrition record (spec §15 TBA-12) from the
+/// already-computed walk and combined analysis — split out of
+/// `rollup()` itself purely to keep that handler under the line-count
+/// lint, not because this deserves its own testing surface (the pure
+/// logic it wraps, `tba::rollup_attrition_trail`, is unit-tested).
+fn rollup_attrition(
+    root_pid: Uuid,
+    walk: &tba::RollupWalk,
+    combined: &tba::PlanAnalysis,
+    tasks_capped_plans: usize,
+) -> Vec<tba::AttritionStep> {
+    tba::rollup_attrition_trail(&tba::RollupAttritionInputs {
+        root_note: format!("plan {root_pid}"),
+        walked_plans: walk.nodes.len(),
+        walk_truncated: walk.truncated,
+        walk_revisits: walk.revisits,
+        tasks_scanned: combined.tasks,
+        tasks_capped_plans,
+        finished: combined.finished,
+        work_in_progress: combined.work_in_progress,
+        not_started: combined.not_started,
+    })
+}
+
 /// `GET /api/plans/{pid}/rollup` — flow across a plan and everything it
-/// contains (spec §15 TBA-9).
+/// contains (spec §15 TBA-9; the `attrition` key is TBA-12).
 ///
 /// **The aggregate is the union of the descendants' tasks, not the
 /// average of their ratios** — the same reasoning as §7.2: an average
@@ -589,7 +613,12 @@ struct RollupQuery {
 /// one. The per-plan table is returned alongside, and for a portfolio
 /// it is usually the more useful half: a rollup mixes boards whose
 /// teams mean different things by `in_progress`, so *which child is
-/// different* is a firmer finding than the combined number.
+/// different* is a firmer finding than the combined number. The
+/// response also carries an `attrition` record (TBA-12) — a named,
+/// ordered, parent-linked trail from the root plan through the walked
+/// subtree down to the finished/work-in-progress/not-started split, so
+/// the denominator behind `combined` is explained rather than left for
+/// the caller to reconstruct from `tree` by hand.
 #[debug_handler]
 async fn rollup(
     State(ctx): State<AppContext>,
@@ -634,8 +663,12 @@ async fn rollup(
     // same analyses, so the two halves cannot disagree.
     let mut per_plan: Vec<serde_json::Value> = Vec::with_capacity(walk.nodes.len());
     let mut union: Vec<tba::TaskAnalysis> = Vec::new();
+    let mut tasks_capped_plans = 0usize;
     for node in &walk.nodes {
         let (rows, transitions) = load_board(&ctx, node.pid, None).await?;
+        if rows.len() as u64 >= MAX_TASKS {
+            tasks_capped_plans += 1;
+        }
         let paired = analyze_board(&rows, &transitions, &classes, as_of_ms);
         let analyses: Vec<tba::TaskAnalysis> = paired.into_iter().map(|(_, a)| a).collect();
         let summary = tba::plan(&analyses);
@@ -669,6 +702,7 @@ async fn rollup(
         .collect();
     let combined_sle =
         tba::service_level_expectation(&union_cycle_times, DEFAULT_SLE_PERCENTILE, None);
+    let attrition = rollup_attrition(root.pid, &walk, &combined, tasks_capped_plans);
 
     format::json(serde_json::json!({
         "as_of": now,
@@ -691,6 +725,7 @@ async fn rollup(
         "combined": combined,
         "combined_service_level_expectation": combined_sle,
         "by_plan": per_plan,
+        "attrition": attrition,
     }))
 }
 

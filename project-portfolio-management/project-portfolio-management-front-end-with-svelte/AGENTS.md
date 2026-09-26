@@ -116,10 +116,11 @@ src/
 │   │   ├── capabilities.ts        CapabilityClient (reviews, assignees, notifications, automations, scheduled actions, Smart Score, lifecycle)
 │   │   ├── ppm.ts                 PpmClient — the oversight/executive dashboard views' endpoints (board, governance, schedule, auditor, compliance, …)
 │   │   └── plans.ts               PlanRepository (list + listPage + search + get + create + update + remove + checkDuplicates + merge + recentMerges; all paths under /api/plans). No audit() or recentEvents() method.
-│   ├── server/                    BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange), session.ts (cookie), config.ts (PROJECT_PORTFOLIO_MANAGEMENT_API_URL / AUTH_API_URL)
+│   ├── server/                    BFF-only (never bundled to the browser): auth.ts (magic-link + session→PASETO exchange + currentUser(), T-28f), session.ts (cookie), config.ts (PROJECT_PORTFOLIO_MANAGEMENT_API_URL / AUTH_API_URL)
+│   ├── nav.ts                     T-28f (repo `tasks.md` EV-1), pure, DB-free: viewAttr/orderNavForView/landingRouteForView — role-tailored nav ordering + landing route from a deployment-declared `view` ABAC attribute
 │   └── components/                PlanForm.svelte, merge-validation.ts (pure guard). No MatchBreakdown / KanbanBoard / IssuesList / Timeline / Burndown / GoalsPanel / picker components — the board route uses @svar-ui/svelte-kanban directly.
 └── routes/
-    ├── +layout.svelte / +layout.ts / +layout.server.ts   top-bar nav (leftmost hamburger) + Plans destination + theme/locale selectors + session affordance + SPA toggle
+    ├── +layout.svelte / +layout.ts / +layout.server.ts   top-bar nav (leftmost hamburger) + Plans destination + theme/locale selectors + session affordance + SPA toggle; +layout.server.ts also resolves `view`/`landingRoute` (T-28f)
     ├── signin/ · verify/          per-app magic-link sign-in (BFF server routes)
     ├── api/proxy/[...path]/+server.ts   BFF proxy → portfolio service (injects the PASETO bearer)
     ├── +page.svelte               landing (links to /plans)
@@ -189,7 +190,8 @@ pnpm dev          # http://localhost:5173
 pnpm run check    # svelte-check (strict; 0/0 expected)
 pnpm run build
 pnpm test         # vitest unit suite
-pnpm test:e2e     # Playwright smoke (runs against `vite preview`)
+pnpm test:e2e     # Playwright — desktop (chromium) + mobile (390x844, T-28k)
+pnpm exec playwright test --project=mobile   # just the phone-viewport audit
 ```
 
 ## Auth — BFF + cookie session (no token in the browser)
@@ -217,6 +219,12 @@ off by default.
   `/api/proxy`) send the cookie (`credentials: 'include'`); state-changing
   requests carry a **CSRF token** (`X-CSRF-Token`). Safe `GET`/`HEAD` are
   CSRF-exempt.
+- **`currentUser()`** (T-28f, repo `tasks.md` EV-1) — `src/lib/server/auth.ts`
+  exchanges the session for a bearer, then calls the auth service's
+  `GET /api/auth/me`, which now returns `attrs` (the caller's own live
+  ABAC subject attributes). `+layout.server.ts` reads this to derive
+  `view`/`landingRoute` for role-tailored nav ordering — presentation
+  only, never an authorization decision.
 
 Source of truth:
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)

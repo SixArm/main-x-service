@@ -730,6 +730,191 @@ links are **never** a match signal (entity spec §1).
   - **Resolved.** A `try`/`catch` around the call, a new `"serviceUnavailable"` error variant, and its message in `+page.svelte`.
   - **Acceptance:** `tests/unit/verify.test.ts` (new) unit-tests the `load` function directly — pinning `missingToken`, the new `serviceUnavailable` (fetch rejects), and `invalidToken` (non-ok response) branches — verified to fail with the `try`/`catch` reverted and pass with it restored. Three-part change: spec (here) + code + test.
 
+- [x] **T-28p (S) Operator onboarding guide** *(landed 2026-09-18)* — a
+  role-by-role "first hour" walkthrough (executive, PMO, resource
+  manager) at the new `/onboarding` route, each step naming the page it
+  lands on. Tracked at the family level in the service crate's own
+  `spec/13-tasks.md` T-28p (the "no onboarding path beyond the README
+  quick start" gap that checklist identified); implemented here since
+  the guide is front-end content, not an API surface.
+  - **Built.** `src/lib/onboarding.ts` — pure data, `ONBOARDING_ROLES`
+    (three roles, 6–8 steps each, every step naming a real route);
+    `src/routes/onboarding/+page.svelte` — a static page rendering it,
+    no API call, so nothing here can fail to load; a plain-English
+    `/onboarding` entry added to `navItems` in `+layout.svelte`
+    (unlocalized, matching the existing `/prioritisation` and
+    `/lifecycle` nav entries' precedent — not every nav item goes
+    through the 13-locale i18n catalogue).
+  - **Deliberately makes no time-to-productivity claim** — nobody has
+    measured how long a first hour with the guide actually takes, and
+    a guide is the same category of derived-looking-but-invented
+    number the family refuses to produce elsewhere from nothing.
+  - **Acceptance:** `tests/unit/onboarding.test.ts` (new, 4 tests) —
+    walks every role's every step and asserts (via `fs.existsSync`)
+    that its named route resolves to a real `+page.svelte` in
+    `src/routes`, rather than trusting the data file to stay in sync
+    with the route tree by hand; also pins that all three required
+    roles are present and that no step/summary text reads like a
+    timing claim (a `/\d+\s*(minute|hour)s?\b/i` regex guard). Three-part
+    change: spec (here) + code + test. Verified: `svelte-check` 0
+    errors / 0 warnings, `vitest run` 83/83 (was 79), `pnpm run build`
+    green (the new route appears in the build output), `prettier
+    --check` clean.
+
+- [x] **T-28f (M) Role-tailored navigation and landing page** *(landed
+      2026-09-19)* — tracked at the family level in the service crate's
+      own `spec/13-tasks.md` T-28f; implemented here since it is
+      front-end presentation, not an API surface.
+      **The task's own premise was factually wrong — corrected, not
+      guessed around.** T-28f's text assumed "the front-end reads the
+      `attrs` the BFF already gets from `/whoami`." Verified false by
+      reading `authentication-service-with-loco/src/views/auth.rs`
+      (`GET /api/auth/me`'s `CurrentResponse` carried no `attrs` field
+      at all) and grepping every front-end's BFF (`grep -rln "attrs"
+      */*-front-end-with-svelte/src/lib/server/*.ts` — no hits anywhere
+      in the family). No front-end BFF decodes the PASETO token itself
+      either (that would mean hand-rolling a second verifier in
+      TypeScript — exactly what `authentication-verifier` exists to
+      avoid), so `attrs` was never reachable client-side at all. Fixed
+      at the source: `authentication-service-with-loco`'s
+      `CurrentResponse` now carries `attrs` (the **live**
+      `users.attributes`, not the PASETO claim's up-to-5-minute-stale
+      snapshot) — its own `spec/index.md` §13 T-17 carries the full
+      account.
+      **Built.** `src/lib/server/auth.ts` gained `currentUser()` (session
+      → bearer → `GET /api/auth/me` → `{pid, name, email, attrs}`).
+      `src/lib/nav.ts` (new, pure, DB-free): `viewAttr(attrs)` reads the
+      deployment-declared `view` attribute's first value (a vocabulary
+      the deployment declares, **not** an enum this code owns — an
+      unrecognised value is simply ignored, never an error);
+      `orderNavForView(items, view)` moves the nav item whose `href` is
+      `/${view}` to right after the brand/home link, leaving everything
+      else in original order, and is a no-op when `view` is
+      absent/unmatched (**default is today's full nav**, verified
+      byte-for-byte via the unchanged-array test); `landingRouteForView`
+      picks `/${view}` over the family-wide `/plans` default when
+      `view` matches `KNOWN_NAV_HREFS` (a small, explicitly-documented,
+      hand-kept-in-sync copy of `+layout.svelte`'s nav hrefs — needed
+      because `+layout.server.ts` resolves the landing route
+      **server-side**, before `navItems`'s i18n-dependent, client-side
+      array exists).
+      `+layout.server.ts` resolves `view`/`landingRoute` alongside the
+      existing `signedIn` (signed-out ⇒ `view: null`, unchanged nav, no
+      extra fetch cost beyond what a session already implies).
+      `+layout.svelte` derives `orderedNavItems = $derived(orderNavForView(navItems,
+      data.view))` and iterates that instead of `navItems` directly —
+      `navItems` itself, and every existing label/i18n lookup inside
+      it, is completely untouched. Root `+page.svelte` redirects to
+      `data.landingRoute` instead of the hardcoded `"/plans"`.
+      This is **presentation only**: authorisation stays entirely with
+      the service's ABAC (`agents/share/authorization-attributes.md`);
+      every route stays reachable by direct URL navigation regardless
+      of `view`, since `orderNavForView` reorders, it never removes.
+      **Acceptance (matches the family-level task's own three bullets):**
+      `attrs` absent ⇒ identical nav (`orderNavForView` unit-tested to
+      return the input array, item-for-item, when `view` is
+      null/undefined/empty/unmatched); `view=executive` lands on
+      `/executive` (the literal acceptance example, pinned in
+      `tests/unit/nav.test.ts`); every route stays reachable by URL
+      regardless of the attribute (nav ordering never removes an item,
+      and route access is unaffected — no new guard was added anywhere).
+      **Verified:** `tests/unit/nav.test.ts` (new, 13 tests) +
+      `tests/unit/server-auth.test.ts` (new, 4 tests) +
+      `tests/unit/layout.test.ts` updated for the layout's new `data`
+      shape; `pnpm run check` 0 errors/0 warnings; `pnpm exec vitest
+      run` 100/100 (was 83, +17); `pnpm run build` green; `pnpm run
+      lint` (`prettier --check`) clean. A real-browser check (Playwright)
+      confirmed the signed-out default path — `/` → `/plans`, nav opens
+      and renders unchanged — has zero regression, since a live
+      backend was not available to exercise the signed-in `view` path
+      end to end; that path is covered by the unit suite above plus
+      the auth-service's own DB-gated `current_user_carries_live_abac_attrs`
+      test proving `attrs` actually reaches the wire.
+
+- [x] **T-28k (M) Responsive audit at a phone viewport** *(landed
+      2026-09-19)* — tracked at the family level in the service crate's
+      own `spec/13-tasks.md` T-28k; implemented here since it is a
+      front-end layout concern.
+      **The task's own route count was slightly off — corrected, not
+      guessed around.** T-28k's text says "across all 34 routes";
+      enumerating the real route tree (`find src/routes -name
+      "+page.svelte"`, the same technique T-28p's onboarding test
+      already uses to stay in sync with the tree rather than a
+      hand-maintained list) gives **35**. Used the verified count.
+      **Built.** A new `mobile` Playwright project
+      (`playwright.config.ts`, 390×844 — the task's own viewport,
+      matched exactly) running a new `tests/e2e/mobile.spec.ts` that
+      iterates all 35 real routes, asserting per route (a) no
+      horizontal scroll on the document (`scrollWidth <= clientWidth`)
+      and (b) the page's `<h1>` heading is visible — a route-agnostic
+      proxy for "the primary content is reachable" that does not
+      require hand-picking a different specific "primary action"
+      selector for 35 different pages. Each route is its own named
+      Playwright test, per the task's own acceptance text ("each
+      failing route is a named test, not a screenshot").
+      **Real failures found and fixed, not guessed at.** Running the
+      audit before any layout fix named four real, specific failures:
+      `/plans` (642px), `/ideas` (396px), `/reviews` (480px),
+      `/scenarios` (480px) — all against a 390px viewport. Root causes,
+      each verified by inspecting actual `getBoundingClientRect()`
+      output at 390px width, not assumed:
+      - `/plans`: the SVAR **`FilterBar`** (not the `Grid`, which was
+        already handled) rendered its internal text input at a fixed
+        ~610px regardless of container width.
+      - `/ideas`: a plain `<input size="40">` — the HTML `size`
+        attribute sizes in characters, ignoring the container.
+      - `/scenarios`: **corrected, not guessed** — `/scenarios` also
+        carries `size="50"`/`size="12"`/`size="4"` inputs, but removing
+        `/ideas`'s `size="40"` was the only edit that route needed; the
+        global `input { max-width: 100% }` rule below (already
+        sufficient for `/scenarios`'s specific layout, verified by
+        re-running the full mobile suite) covers it without touching
+        the attribute at all — `/scenarios`'s `size` attributes are
+        untouched and it still passes.
+      - `/reviews`: a bare `<table>` with no responsive handling at
+        all.
+      **The two SVAR-widget routes** (`/plans`'s `Grid`, `/gantt`'s
+      `Gantt` — the family's own T-28k text names exactly these two)
+      get a **read-only list fallback**: both markups render
+      unconditionally; a single `@media (max-width: 600px)` rule hides
+      the SVAR widget (and, on `/plans`, the `FilterBar` alongside it —
+      filtering a plain name list has little value, and it was the
+      actual overflow source) and shows a plain `<ul>` instead. No JS
+      viewport detection, so nothing can get out of sync with SSR
+      (this app has none — `ssr = false`, `+layout.ts`).
+      **The `<input>`/`<table>` overflow got a global fix**, not two
+      route-local patches: `src/app.css` gained `input, select,
+      textarea { max-width: 100%; }` (only engages once a `size`-sized
+      input's intrinsic width exceeds its container — no effect at a
+      desktop viewport) and `table { display: block; overflow-x:
+      auto; max-width: 100%; }` (23 of the 35 routes use a bare
+      `<table>`; only `/reviews` happened to overflow at exactly
+      390px, but the fix is global so a route this audit did not
+      individually catch is covered too — the table's own internal
+      scroll stays contained to the table, not the page body).
+      **A real regression found and fixed in the same pass:**
+      `tests/e2e/smoke.spec.ts`'s `"list page renders the seeded
+      plan"` test broke once `/plans` rendered the seeded plan's name
+      twice in the DOM (once in the SVAR grid cell, once in the new,
+      CSS-hidden-at-desktop `.mobile-list`) — Playwright's strict-mode
+      locator resolution does not consider CSS visibility before
+      erroring on an ambiguous match. Fixed by scoping that assertion
+      to `getByRole("gridcell", …)`, which is what the test actually
+      meant to pin.
+      **Acceptance (matches the family-level task's own text):** the
+      e2e suite runs the mobile project in CI (`--project=mobile`);
+      every one of the 35 routes is its own named test — a failure
+      names the route, never a screenshot to eyeball.
+      **Verified:** `pnpm exec playwright test` (all projects) 60/60
+      (25 chromium, 35 mobile) — the mobile project was run against
+      the *unfixed* layout first and confirmed to fail exactly the
+      four named routes above, then again after each fix, closing one
+      real cause at a time rather than changing several things and
+      hoping; `pnpm run check` 0 errors/0 warnings; `pnpm exec vitest
+      run` 100/100 (unchanged — this task touched no unit-tested
+      logic); `pnpm run build` green; `pnpm run lint` (`prettier
+      --check`) clean.
+
 ## 14. Implementation status
 
 **Implemented (MVP, v0.1.0).** The SvelteKit app is built and verified (svelte-check clean, vitest + Playwright green): the routes in §5 are live against the sibling service via the BFF proxy, with SVAR grid / Kanban / Gantt views, Lily theme + locale chrome, and 13-locale i18n covering the original identity + merge surface (the later oversight/executive dashboard views are English-first — CHANGELOG 2026-07-22). Open §13 items — the plan-detail audit timeline, recent activity, MatchBreakdown, child roll-up, and the issues/timeline/goals sub-routes (the roadmap sub-list in §5) — remain unchecked.

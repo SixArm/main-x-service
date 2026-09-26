@@ -291,10 +291,11 @@ fn core_schemas() -> Value {
                     "name": { "type": "string" },
                     "email": { "type": "string", "format": "email" },
                     "is_verified": { "type": "boolean", "description": "Whether the email has been verified." } } },
-                "CurrentResponse": { "type": "object", "required": ["pid", "name", "email"], "properties": {
+                "CurrentResponse": { "type": "object", "required": ["pid", "name", "email", "attrs"], "properties": {
                     "pid": { "type": "string", "format": "uuid" },
                     "name": { "type": "string" },
-                    "email": { "type": "string", "format": "email" } } },
+                    "email": { "type": "string", "format": "email" },
+                    "attrs": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } }, "description": "The caller's own ABAC subject attributes (live users.attributes, not the PASETO claim, which can be up to TOKEN_EXPIRATION stale). See agents/share/authorization-attributes.md." } } },
                 "Claims": { "type": "object",
                     "description": "Decoded PASETO v4.public payload. sub carries the user pid; sid indexes the revocable sessions row.",
                     "required": ["sub", "email", "name", "iss", "aud", "exp", "iat", "sid"], "properties": {

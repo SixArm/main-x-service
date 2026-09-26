@@ -32,6 +32,163 @@ async fn item(
     created["pid"].as_str().expect("pid").to_string()
 }
 
+/// Serve `{"skills": skills}` from a local ephemeral-port HTTP
+/// listener — the worker-service stand-in T-28c's acceptance
+/// criterion calls for. Returns the base URL to set as
+/// `PROJECT_PORTFOLIO_MANAGEMENT_WORKER_SERVICE_URL`.
+async fn serve_worker_skills(skills: &[&str]) -> String {
+    let held: Vec<String> = skills.iter().map(|t| (*t).to_string()).collect();
+    let app = axum::Router::new().route(
+        "/api/workers/{id}/skills",
+        axum::routing::get(move || {
+            let body = json!({ "skills": held.clone() });
+            async move { axum::Json(body) }
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind ephemeral port");
+    let addr = listener.local_addr().expect("local addr");
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.expect("serve stub");
+    });
+    format!("http://{addr}")
+}
+
+/// Serve a `404` unconditionally — the "worker record unreachable"
+/// case the acceptance criterion names explicitly.
+async fn serve_worker_404() -> String {
+    let app = axum::Router::new().route(
+        "/api/workers/{id}/skills",
+        axum::routing::get(|| async { axum::http::StatusCode::NOT_FOUND }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind ephemeral port");
+    let addr = listener.local_addr().expect("local addr");
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.expect("serve stub");
+    });
+    format!("http://{addr}")
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// T-28c: skills_required lands on the allocation as tags only (no
+// skill data); the skill-gap view resolves live against a stubbed
+// worker service (covered/missing), reports `unknown` with a reason
+// when the worker service 404s, and reports `unknown` for a `person:`
+// reference (no worker skill profile to resolve).
+async fn skill_gap_resolves_covered_missing_and_unknown() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan = item(&request, "projects", "Project", "Skill Gap", None, None).await;
+
+        // A bad tag (blank) refuses at create, and no allocation lands.
+        assert_eq!(
+            request
+                .post(&format!("/api/plans/{plan}/allocations"))
+                .json(&json!({
+                    "person_ref": format!("worker:{}", uuid::Uuid::new_v4()),
+                    "percent": 50,
+                    "skills_required": [""],
+                }))
+                .await
+                .status_code(),
+            422
+        );
+
+        // Person A: a worker whose held skills cover "rust" but not
+        // "welding". Served by a stub worker service.
+        let base = serve_worker_skills(&["rust", "postgres"]).await;
+        // SAFETY: this crate's request tests run `#[serial]`, so no
+        // other test observes this env var while it is set.
+        unsafe {
+            std::env::set_var("PROJECT_PORTFOLIO_MANAGEMENT_WORKER_SERVICE_URL", &base);
+        }
+        let worker_a = format!("worker:{}", uuid::Uuid::new_v4());
+        request
+            .post(&format!("/api/plans/{plan}/allocations"))
+            .json(&json!({
+                "person_ref": worker_a, "percent": 40,
+                "skills_required": ["rust", "welding"],
+            }))
+            .await
+            .assert_status_ok();
+
+        // Person B: a plain `person:` reference — no worker skill
+        // profile exists to resolve, so every tag is `unknown`.
+        let person_b = format!("person:{}", uuid::Uuid::new_v4());
+        request
+            .post(&format!("/api/plans/{plan}/allocations"))
+            .json(&json!({
+                "person_ref": person_b, "percent": 30,
+                "skills_required": ["rust"],
+            }))
+            .await
+            .assert_status_ok();
+
+        let gap: Value = request
+            .get(&format!("/api/plans/{plan}/skill-gap"))
+            .await
+            .json();
+        let findings = gap["findings"].as_array().expect("findings");
+        let find = |person: &str, tag: &str| -> &Value {
+            findings
+                .iter()
+                .find(|f| f["person_ref"] == person && f["tag"] == tag)
+                .unwrap_or_else(|| panic!("no finding for {person}/{tag} in {findings:?}"))
+        };
+        assert_eq!(find(&worker_a, "rust")["status"], "covered");
+        assert_eq!(find(&worker_a, "welding")["status"], "missing");
+        assert_eq!(find(&person_b, "rust")["status"], "unknown");
+        assert!(
+            find(&person_b, "rust")["reason"]
+                .as_str()
+                .unwrap()
+                .contains("not a worker")
+        );
+
+        // Now point at a worker service that 404s every request — the
+        // acceptance criterion's literal case. A previously-resolved
+        // worker (worker_a) still reports its cached result; a fresh
+        // worker sees the 404 and reports `unknown` with a reason.
+        let not_found_base = serve_worker_404().await;
+        unsafe {
+            std::env::set_var(
+                "PROJECT_PORTFOLIO_MANAGEMENT_WORKER_SERVICE_URL",
+                &not_found_base,
+            );
+        }
+        let worker_c = format!("worker:{}", uuid::Uuid::new_v4());
+        request
+            .post(&format!("/api/plans/{plan}/allocations"))
+            .json(&json!({
+                "person_ref": worker_c, "percent": 20,
+                "skills_required": ["rust"],
+            }))
+            .await
+            .assert_status_ok();
+        let gap_after: Value = request
+            .get(&format!("/api/plans/{plan}/skill-gap"))
+            .await
+            .json();
+        let findings_after = gap_after["findings"].as_array().expect("findings");
+        let finding_c = findings_after
+            .iter()
+            .find(|f| f["person_ref"] == worker_c && f["tag"] == "rust")
+            .expect("worker_c finding");
+        assert_eq!(finding_c["status"], "unknown");
+        assert_eq!(finding_c["reason"], "worker service returned 404");
+
+        unsafe {
+            std::env::remove_var("PROJECT_PORTFOLIO_MANAGEMENT_WORKER_SERVICE_URL");
+        }
+    })
+    .await;
+}
+
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]

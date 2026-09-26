@@ -47,6 +47,8 @@ pub mod distribution;
 /// five obligations in `agents/share/time-based-analysis.md` §7.1.
 pub mod effort;
 pub mod engineering;
+/// The phased budget baseline and the EAC/ETC forecast (T-28b).
+pub mod financials;
 /// The time-based-analysis flow-gauge refresh loop: default-off,
 /// bounded by a series cap, and suppressed below a board-size floor.
 pub mod flow_metrics;
@@ -79,6 +81,9 @@ pub mod prioritisation;
 pub mod privacy;
 /// Durable event bus Phase 3: the outbox relay loop + retention purge.
 pub mod relay;
+/// Per-user saved views: route-scoped filter/sort/column presets,
+/// keyed by the token `sub` and nothing else identity-shaped (T-28l).
+pub mod saved_views;
 /// The set-and-forget ticker: the optional scheduled-action sweep loop.
 pub mod scheduler;
 /// Tantivy full-text search: index schema, engine, and query surface.
@@ -112,6 +117,9 @@ pub mod visibility;
 /// (`agents/share/event-bus.md` §12, repo `tasks.md` EV-3).
 pub mod webhooks;
 pub mod workers;
+/// Live worker-skill resolution over the worker service by
+/// `EntityRef`, TTL-cached, never persisted (T-28c).
+pub mod workers_client;
 /// Custom workflows: configurable task and issue state vocabularies,
 /// each state declaring the category every derived view computes from.
 pub mod workflow;

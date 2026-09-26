@@ -47,6 +47,7 @@ jobs:
     outputs:
       crates: ${{ steps.list.outputs.crates }}
       db-crates: ${{ steps.list.outputs.db-crates }}
+      front-ends: ${{ steps.list-fe.outputs.front-ends }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -64,6 +65,13 @@ jobs:
           # Crates enrolled for database-backed suites (ci/db-suites.txt),
           # intersected with the same affected set.
           echo "db-crates=$(scripts/ci-crates.sh --json --db)" >> "$GITHUB_OUTPUT"
+      - id: list-fe
+        # Same change-aware convention as scripts/ci-crates.sh, over the
+        # sixteen SvelteKit front-ends (tasks.md WEB-2).
+        env:
+          CI_CHANGED_SINCE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          echo "front-ends=$(scripts/ci-front-ends.sh --json)" >> "$GITHUB_OUTPUT"
 
   # Formatting is cheap and needs no build, so it runs once over every
   # crate rather than paying matrix setup 55 times.
@@ -84,6 +92,74 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: scripts/ci-check.sh docs
+
+  # The sixteen SvelteKit front-ends (tasks.md WEB-2). Each depends only
+  # on its own package.json — no root workspace, no path dependency on
+  # any other front-end in this repo — so this is a flat matrix, unlike
+  # the Rust `check` job's dependency-aware one. `pnpm install
+  # --frozen-lockfile` only became possible here once every front-end
+  # switched its six Lily packages from a `file:` path onto a sibling
+  # checkout (which no CI runner has) to a published registry version
+  # (agents/share/svelte-front-end-stack.md) — before that, this job
+  # could not have succeeded on any runner.
+  front-end:
+    name: ${{ matrix.front-end }}
+    needs: discover
+    # Skip outright when the change-aware matrix is empty; GitHub rejects
+    # a matrix vector with no values instead of running zero jobs.
+    if: needs.discover.outputs.front-ends != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        front-end: ${{ fromJson(needs.discover.outputs.front-ends) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          # Pinned exact, not a floating major: a newer 11.x enforces a
+          # `minimumReleaseAge` supply-chain policy (rejects a lockfile
+          # entry published within the last 24h) that 11.0.8 predates —
+          # found when this rejected lily-design-system-svelte-picker-bar
+          # on the PR that first added it, hours after publishing. The
+          # policy is reasonable in general; the fix here is a stable,
+          # tested pnpm version rather than working around a new default
+          # this repo hasn't evaluated yet.
+          version: 11.0.8
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+          cache-dependency-path: ${{ matrix.front-end }}/pnpm-lock.yaml
+      - run: cd '${{ matrix.front-end }}' && pnpm install --frozen-lockfile
+      - name: check (svelte-check)
+        run: cd '${{ matrix.front-end }}' && pnpm run check
+      - name: unit tests (vitest)
+        run: cd '${{ matrix.front-end }}' && pnpm exec vitest run
+      - name: build
+        run: cd '${{ matrix.front-end }}' && pnpm run build
+      - name: lint
+        run: cd '${{ matrix.front-end }}' && pnpm run lint
+      # e2e is an allowlist (same philosophy as ci/db-suites.txt): a
+      # front-end is added to ci/front-end-e2e-suites.txt once its suite
+      # has been observed green with no live backend running, so this
+      # job starts green and stays meaningful rather than training
+      # everyone to ignore a red check. See that file for which
+      # front-ends are enrolled and why the rest are not (most need a
+      # live Rust service and seeded data this job does not provide).
+      - name: e2e smoke (Playwright) — only if enrolled
+        run: |
+          cd '${{ matrix.front-end }}'
+          if grep -Fxq '${{ matrix.front-end }}' ../../ci/front-end-e2e-suites.txt; then
+            pnpm exec playwright install --with-deps chromium
+            if grep -q 'name: "smoke"' playwright.config.ts || grep -q "name: 'smoke'" playwright.config.ts; then
+              pnpm exec playwright test --project=smoke
+            else
+              pnpm exec playwright test
+            fi
+          else
+            echo "not enrolled in ci/front-end-e2e-suites.txt — skipping e2e"
+          fi
 
   check:
     name: ${{ matrix.crate }}

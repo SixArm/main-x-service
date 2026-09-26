@@ -169,3 +169,14 @@ out of scope, tracked in §13 / §15 and the crate specs' §13:
 - **No FHIR surface** — deliberate, not a gap: no FHIR resource models a
   plan ([`fhir.md`](../../agents/share/fhir.md) §3 puts portfolio out of
   scope).
+- **No model-driven assistant inside the service** — refused, not
+  deferred (T-28j, spec `13-tasks.md`). Every derived figure this
+  service serves discloses its own inputs and reasons or is `null`
+  with a reason (`agents/share/time-based-analysis.md` §8; pinned by
+  the service crate's `openapi::tests::every_derived_get_discloses_its_inputs_or_is_exempt_as_plain_crud`),
+  and a model-generated recommendation, forecast, or narrative summary
+  is the one output that could not honour that property — it has no
+  numerator or denominator to report, only a claim to trust. If a
+  deployment ever wants one, it sits outside this service, at a
+  front-end BFF or a separate tool, calling the open API and citing the
+  specific endpoint and response it read.

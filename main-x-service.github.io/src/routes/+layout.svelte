@@ -2,11 +2,11 @@
   Root layout — the site shell wrapping every route.
 
   Renders the persistent top navigation bar (brand, primary nav, the Lily
-  theme picker) and a <main> slot for the active page, plus a footer
-  linking back to the monorepo. Pure shell: this site has no data
-  fetching, no auth, and no forms — it is a read-only public front door
-  onto the main-x-service monorepo, not one of the family's operator
-  front-ends.
+  PickerBar — theme/locale/text-size/share) and a <main> slot for the
+  active page, plus a footer linking back to the monorepo. Pure shell:
+  this site has no data fetching, no auth, and no forms — it is a
+  read-only public front door onto the main-x-service monorepo, not one
+  of the family's operator front-ends.
 
   Props:
     - children: Snippet — the active route's content, rendered in <main>.
@@ -14,26 +14,8 @@
 <script lang="ts">
     import { page } from "$app/state";
     import type { Snippet } from "svelte";
-    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
-
-    // Same theme catalogue as the family's operator front-ends (DaisyUI
-    // themes plus the bespoke NHS England/Scotland/Wales themes) — each
-    // slug has a Lily stylesheet at static/assets/themes/<slug>.css (a
-    // symlink to the shared design-system themes) that ThemePicker swaps.
-    const THEMES = [
-        "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
-        "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
-        "dark", "dim", "dracula", "emerald", "fantasy", "forest", "garden",
-        "halloween", "lemonade", "light", "lofi", "luxury", "night", "nord",
-        "pastel", "retro", "silk", "sunset", "synthwave",
-        "united-kingdom-national-health-service-england-for-patients",
-        "united-kingdom-national-health-service-england-for-practitioners",
-        "united-kingdom-national-health-service-scotland-for-patients",
-        "united-kingdom-national-health-service-scotland-for-practitioners",
-        "united-kingdom-national-health-service-wales-for-patients",
-        "united-kingdom-national-health-service-wales-for-practitioners",
-        "valentine", "winter", "wireframe"
-    ];
+    import PickerBar from "@lilydesignsystem/svelte-picker-bar";
+    import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
     let { children }: { children: Snippet } = $props();
 
@@ -43,6 +25,82 @@
         { href: "/subprojects/", label: "Subprojects" },
         { href: "/about/", label: "About" },
     ] as const;
+
+    // This site has no `page.data.title` load-function convention (no
+    // per-route load functions at all) — each route's own <svelte:head>
+    // sets its title directly. Mirror that same "<label> · Main X Index"
+    // shape from navItems for SharePicker, rather than reading the DOM.
+    const activeNavLabel = $derived(
+        navItems.find((item) => item.href === page.url.pathname)?.label,
+    );
+    const pageTitle = $derived(
+        activeNavLabel ? `${activeNavLabel} · Main X Index` : "Main X Index",
+    );
+
+    // This site has no i18n catalogue (all copy is plain English) — same
+    // special case as patient-flow-front-end-with-svelte in the family.
+    // PickerBar's locale picker still runs fully self-contained: it sets
+    // `lang`/`dir` on `<html>` itself (`applyDir` left at its default,
+    // `true`), useful to a returning visitor's browser/assistive tech
+    // even though the page's own text stays English either way.
+    const LOCALES = [
+        "en", "en_US", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn",
+        "pt", "id", "ur",
+    ];
+    const LOCALE_LABELS: Record<string, string> = {
+        en: "English",
+        en_US: "English (United States)",
+        cy: "Cymraeg",
+        es: "Español",
+        fr: "Français",
+        de: "Deutsch",
+        ar: "العربية",
+        ru: "Русский",
+        hi: "हिन्दी",
+        zh: "中文",
+        bn: "বাংলা",
+        pt: "Português",
+        id: "Bahasa Indonesia",
+        ur: "اردو",
+    };
+
+    // Share destinations for the Lily SharePicker — same set as every
+    // operator front-end (agents/share/svelte-front-end-stack.md's
+    // sibling doc has no equivalent for share targets; this list is
+    // repo convention, not a shared constant).
+    const SHARE_TARGETS: ShareTarget[] = [
+        {
+            id: "email",
+            label: "Email",
+            href: (url, title) =>
+                `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
+            newTab: false,
+        },
+        {
+            id: "linkedin",
+            label: "LinkedIn",
+            href: (url) =>
+                `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+        },
+        {
+            id: "reddit",
+            label: "Reddit",
+            href: (url, title) =>
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+        },
+        {
+            id: "bluesky",
+            label: "Bluesky",
+            href: (url, title) =>
+                `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
+        },
+        {
+            id: "mastodon",
+            label: "Mastodon",
+            href: (url, title) =>
+                `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
+        },
+    ];
 </script>
 
 <div class="layout">
@@ -63,11 +121,25 @@
             </ul>
         </nav>
         <div class="chrome">
-            <ThemePicker
-                label="Theme"
+            <PickerBar
+                labels={{
+                    theme: "Theme",
+                    locale: "Language",
+                    textSize: "Text size",
+                    share: "Share",
+                }}
                 themesUrl="/assets/themes/"
-                themes={THEMES}
-                storageKey="mxi-github-io-theme"
+                themeProps={{ storageKey: "mxi-github-io-theme" }}
+                locales={LOCALES}
+                localeProps={{ localeLabels: LOCALE_LABELS }}
+                textSizeProps={{ storageKey: "mxi-github-io-text-size" }}
+                shareTargets={SHARE_TARGETS}
+                shareProps={{
+                    title: pageTitle,
+                    copyLabel: "Copy link",
+                    copiedLabel: "Copied",
+                    copyFailedLabel: "Could not copy — copy it from the address bar",
+                }}
             />
         </div>
     </header>
@@ -128,7 +200,16 @@
         color: var(--mxi-color-primary);
         font-weight: 600;
     }
-    .chrome :global(.theme-picker-button) {
+    .chrome :global(.picker-bar) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .chrome :global(.theme-picker-button),
+    .chrome :global(.locale-picker-button),
+    .chrome :global(.text-size-picker-button),
+    .chrome :global(.share-picker-button) {
         padding: 0.375rem 0.5rem;
         font-size: 0.875rem;
         color: var(--mxi-color-fg);

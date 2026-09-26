@@ -264,6 +264,197 @@ now **creates a session row + sets the cookie** (§3) instead of returning
 a JWT. The front-end BFF receives the `Set-Cookie`; the browser is logged
 in via the session.
 
+## 7a. Enterprise identity federation — SAML 2.0 and OIDC (design, repo `tasks.md` EV-2)
+
+A deployment with its own enterprise identity provider (Okta, Entra ID,
+Ping, Keycloak, …) should be able to make that IdP the sign-in path,
+without touching anything downstream of §3: the session row, the
+cookie, the PASETO issuance, and every peer's offline verification stay
+exactly as they are. Federation is an **alternative front door onto the
+same session**, not a second authentication model living beside this
+one.
+
+### Goals & non-goals
+
+**Goals**
+
+- **SAML 2.0** (SP-initiated, HTTP-POST binding) and **OIDC**
+  (authorization-code flow, PKCE) as upstream identity providers to
+  `authentication-service`.
+- A successful IdP assertion establishes **the same Postgres session**
+  (§3) a magic-link verify does — same table, same cookie attributes,
+  same idle/absolute TTLs, same rotation-on-privilege-change rule. No
+  second session shape to keep in step with the first.
+- IdP claims map into `users.attributes` (`authorization-attributes.md`
+  §6), gated by the same `AUTH_ATTRIBUTE_VOCABULARY[_FILE]` allow-set
+  (`authorization-attributes.md` §12) a CLI/admin-API assignment
+  already goes through — an IdP claim is exactly as fallible as an
+  operator's typo, and gets the same protection.
+- **Magic link stays the default.** Federation is opt-in, configured
+  per deployment; a deployment that configures nothing behaves exactly
+  as it does today.
+
+**Non-goals**
+
+- **SAML/OIDC as a peer-to-peer credential.** This section is about how
+  a **human** signs in. Service-to-service authentication stays PASETO
+  v4.public (§5); an IdP token is never forwarded downstream, and no
+  peer ever verifies a SAML assertion or an OIDC ID token directly.
+- **Just-in-time provisioning policy** (auto-create a `users` row on
+  first federated sign-in vs. requiring a pre-existing account) — an
+  open question (below), not fixed by this design.
+- **Multiple simultaneous IdPs per deployment** in v1 — one federated
+  IdP, configured once; multi-IdP is a natural extension once the
+  single-IdP path is proven, not a v1 requirement.
+
+### The flow
+
+```
+browser ──(redirect)──▶ deployment's IdP (SAML AuthnRequest / OIDC authorize)
+IdP ──(assertion / ID token, back-channel or POST binding)──▶ authentication-service
+authentication-service:
+  1. verify signature against the IdP's published metadata/JWKS (fetched
+     under the SEC-V1 posture — see below)
+  2. map the verified claims to attrs, through AUTH_ATTRIBUTE_VOCABULARY
+  3. find-or-refuse the user (provisioning policy — open question)
+  4. create a session row + set the __Host-mxi_session cookie (§3) —
+     identical to a magic-link verify's outcome
+authentication-service ──(Set-Cookie)──▶ browser, now signed in
+```
+
+From this point everything downstream — `POST /token` (§5), the BFF
+pattern (§6), CSRF (§4), the blanket guard (§8) — is unmodified: it
+already only ever looks at the session, never at how the session was
+established.
+
+### The fail-closed posture on metadata/certificate fetch
+
+An IdP's SAML metadata document or OIDC JWKS is fetched exactly the
+way `authentication-verifier` already fetches this service's own
+published PASETO keys (`authentication-sessions.md` §5,
+[`security.md`](security.md) SEC-V1): **HTTPS-only** (loopback excepted
+for local development), a **request timeout**, and a **response-size
+cap**. A MITM-injected metadata document is the SAML/OIDC analogue of a
+MITM-injected key set, and it gets the identical defence rather than a
+bespoke, unaudited one. The fetched document is cached with an
+operator-configurable TTL; a refetch failure keeps serving the last
+good copy rather than locking out every federated user over a
+transient network blip — the same "the service always boots, warn +
+keep the last good state" posture `authentication-verifier`'s own key
+refresh loop already holds.
+
+### Attribute mapping
+
+A deployment declares a **claim → attribute key** mapping (e.g. the
+OIDC `groups` claim → the `dept` attribute, a SAML `Role` attribute
+statement → `access`). The mapping is deployment configuration, not
+code — this family has no opinion on any IdP's own claim vocabulary.
+Every mapped value still passes through
+`AUTH_ATTRIBUTE_VOCABULARY[_FILE]` (`authorization-attributes.md`
+§12) exactly as a CLI-assigned or admin-API-assigned attribute does: an
+unset vocabulary is unrestricted (today's behaviour, unchanged for a
+deployment with no vocabulary configured), and a configured one rejects
+an unrecognised key or value rather than silently granting nothing.
+This is the same reasoning §12 already gives for a human operator's
+typo, extended to an IdP's claim, which is no more trustworthy.
+
+### Rollout
+
+1. **This section** — the contract.
+2. **The auth-service task** — SAML 2.0 SP + OIDC RP support in
+   `authentication-service`, the metadata/JWKS fetch under the SEC-V1
+   posture above, the claim-mapping config surface, and the
+   session-creation path reusing §3's existing machinery verbatim (no
+   new session table, no new cookie).
+   **OIDC RP half landed 2026-09-18** — behind a new `oidc` Cargo
+   feature (off by default): `GET /api/auth/oidc/login` / `callback`,
+   discovery + PKCE + state + nonce, a real ID-token signature + nonce
+   verification (the `openidconnect` crate), claim mapping through the
+   `AUTH_ATTRIBUTE_VOCABULARY` gate exactly as designed above. **SAML
+   2.0 SP is not implemented** — deliberately separated out: its
+   XML-DSig signature-verification surface is a materially larger,
+   different piece of security-critical work than OIDC's (where a
+   vetted crate does the cryptography), so it is tracked as a distinct
+   remaining piece of this rollout step rather than rushed alongside
+   OIDC in the same pass.
+   **Session-handoff fixed 2026-09-19.** The 2026-09-18 landing set
+   `__Host-mxi_session` directly on the `/callback` response and
+   redirected to `FRONTEND_URL` — but that cookie is host-locked to
+   the auth-service's own origin (§3), and in the reference BFF
+   topology (§6) the front end is a *different* origin, so the cookie
+   never reached anywhere the browser would send it back. Fixed by
+   reusing the existing magic-link consume flow (§7) as a **bridge**:
+   the callback mints a single-use `create_magic_link` token for the
+   verified user and redirects to `{frontend}/verify?token=…` instead
+   of setting a session cookie itself; the front end's `/verify` BFF
+   route performs the actual session establishment via the same
+   `GET /api/auth/magic-link/{token}` a real magic-link sign-in already
+   uses. `GET /api/auth/oidc/login` also gained an optional
+   `?return_url=`, the same allow-listed per-app knob the magic-link
+   endpoints already give (`controllers::auth::choose_frontend`), so a
+   multi-app deployment's federated sign-in lands back on the
+   requesting app.
+   Verified against a real signed ID token from a stub IdP, driving the
+   full two-hop bridge end to end (seven DB-gated tests), not just
+   type-checked. See `authentication-service`'s own `spec/index.md`
+   §13 EV-2 entries for the full account.
+   **SAML 2.0 SP evaluated and deferred, 2026-09-19** — not merely
+   unscheduled. A survey of the Rust SAML ecosystem found no crate
+   clearing the same bar `openidconnect` cleared for OIDC (a vetted,
+   actively-adopted, pure-Rust crate that owns the cryptography
+   entirely): `samael` (the most mature/starred option) does its
+   XML-DSig verification via a C FFI binding to **xmlsec1**, pulling in
+   `openssl`/`libxml2`/`libxslt` and a C toolchain — the opposite of
+   this family's rustls-everywhere, no-C-crypto-surface posture, and a
+   materially larger, unaudited-by-us attack surface than any dependency
+   this family has taken on elsewhere. `saml` (danielkov/saml) is pure
+   Rust, but its `rsa-sha` feature — needed for interop with the
+   RSA-SHA256 signing essentially every real-world IdP uses — depends
+   directly on the `rsa` crate, the **exact** crate this family removed
+   family-wide on 2026-08-21 for RUSTSEC-2023-0071 (Marvin timing
+   attack, `security.md` §7); it is also pre-alpha (v0.0.1-alpha, 5
+   GitHub stars) with no production-readiness claim. Hand-rolling
+   XML-DSig verification ourselves is worse than either option — it is
+   precisely the "never hand-roll signature verification" case the
+   OIDC work's own design explicitly avoided. No option satisfies
+   "vetted crate, pure Rust, doesn't reintroduce a banned dependency"
+   simultaneously today, so implementing SAML SP now would force a
+   real regression against one of two already-deliberate, documented
+   security decisions (SEC-I1's `rsa` removal or the rustls-only
+   posture) rather than a clean rollout step. **Revisit if**: a new
+   pure-Rust SAML crate emerges that avoids `rsa` (e.g. by supporting
+   `ring`/`rustls`-backed RSA verification, or ECDSA-only interop
+   becomes viable), or a deployment's specific need makes the tradeoff
+   worth reopening as its own security-reviewed decision rather than a
+   default rollout step.
+3. **Front-ends** — an IdP-initiated sign-in link alongside the
+   existing `/signin` magic-link form; no BFF change, since the
+   federated flow still ends at the same `Set-Cookie`. **Landed
+   2026-09-19** in `authentication-front-end-with-svelte`: a "Sign in
+   with SSO" link on `/signin`, opt-in per deployment via
+   `PUBLIC_OIDC_SIGNIN_ENABLED`, and a `/signin/sso` server route that
+   redirects the *browser* (not a BFF `fetch` — this hop needs the
+   browser itself to visit the IdP) to the auth service's
+   `/api/auth/oidc/login`. Verified in a real browser.
+
+### Open questions
+
+- ~~**Just-in-time provisioning.**~~ — RESOLVED for the OIDC RP
+  (2026-09-18): `AUTH_OIDC_JIT_PROVISIONING`, deployment-configurable,
+  **default off**. A sign-in for an email with no existing account is
+  `403`, named and audited, unless a deployment opts in — the safer
+  lean this question always favoured, now the actual shipped default
+  rather than a documented intention. SAML SP will adopt the identical
+  flag/default once implemented.
+- **Single logout (SLO).** SAML defines a logout flow that can span
+  multiple service providers; whether this family's single BFF-per-app
+  topology needs it, or whether the existing per-session revoke (§3) is
+  sufficient, is unresolved.
+- **Metadata refresh cadence.** A fixed TTL vs. honouring the IdP
+  metadata document's own `validUntil`/`cacheDuration` hints — unresolved,
+  parallel to `authentication-verifier`'s own still-open key-refresh
+  cadence questions.
+
 ## 8. Blanket enforcement
 
 [jwt-enforcement.md](jwt-enforcement.md) is updated in lockstep: the

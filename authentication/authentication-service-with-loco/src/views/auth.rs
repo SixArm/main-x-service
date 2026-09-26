@@ -50,6 +50,15 @@ pub struct CurrentResponse {
     pub name: String,
     /// Account email.
     pub email: String,
+    /// The caller's own ABAC subject attributes (`users.attributes`,
+    /// `authorization-attributes.md` §2/§6), the live DB value — not the
+    /// PASETO's `attrs` claim, which can be up to `TOKEN_EXPIRATION`
+    /// stale. A front-end's BFF reads this to drive presentation-only
+    /// choices (e.g. EV-1 T-28f's role-tailored navigation/landing
+    /// view); it is never itself an authorization decision — every
+    /// route stays reachable by URL regardless of what a caller's
+    /// attrs say, exactly as record-level ABAC already works.
+    pub attrs: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 impl CurrentResponse {
@@ -60,6 +69,7 @@ impl CurrentResponse {
             pid: user.pid.to_string(),
             name: user.name.clone(),
             email: user.email.clone(),
+            attrs: user.attrs(),
         }
     }
 }
@@ -208,7 +218,7 @@ impl AccountExport {
 
 #[cfg(test)]
 mod tests {
-    use super::AccountExport;
+    use super::{AccountExport, CurrentResponse};
     use crate::models::_entities::{auth_events, sessions, users};
     use chrono::{FixedOffset, TimeZone};
     use uuid::Uuid;
@@ -240,6 +250,27 @@ mod tests {
             deleted_at: None,
             attributes: serde_json::json!({ "access": ["write"] }),
         }
+    }
+
+    #[test]
+    fn current_response_carries_the_users_live_attrs() {
+        // T-28f (repo tasks.md EV-1): a front-end BFF reads this to drive
+        // presentation-only choices, so it must actually reach the wire.
+        let pid = Uuid::new_v4();
+        let response = CurrentResponse::new(&user(pid));
+        assert_eq!(
+            response.attrs.get("access"),
+            Some(&vec!["write".to_string()])
+        );
+    }
+
+    #[test]
+    fn current_response_attrs_is_empty_not_absent_when_unset() {
+        let pid = Uuid::new_v4();
+        let mut model = user(pid);
+        model.attributes = serde_json::json!({});
+        let response = CurrentResponse::new(&model);
+        assert!(response.attrs.is_empty());
     }
 
     #[test]

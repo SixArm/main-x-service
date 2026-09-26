@@ -167,6 +167,7 @@ impl Hooks for App {
             .add_route(controllers::oversight::routes())
             .add_route(controllers::tba::routes())
             .add_route(controllers::tpc::routes())
+            .add_route(controllers::financials::routes())
             .add_route(controllers::controls::routes())
             .add_route(controllers::phase::routes())
             .add_route(controllers::distribution::routes())
@@ -180,6 +181,7 @@ impl Hooks for App {
             .add_route(controllers::collaboration::routes())
             .add_route(controllers::automation::routes())
             .add_route(controllers::prioritisation::routes())
+            .add_route(controllers::saved_views::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes())
     }

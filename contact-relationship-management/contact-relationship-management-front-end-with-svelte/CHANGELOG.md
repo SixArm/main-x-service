@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
+
+`spec/lily-design-system-svelte-with-picker-bar/index.md` calls for
+"all Lily default themes (not any application-specific custom
+themes)" and "all Lily default text sizes." Removed the hand-maintained
+`THEMES` array (the same 45 slugs as Lily's own `DEFAULT_THEMES`, but
+in a different order — `valentine`/`winter`/`wireframe` sat after the
+UK/US government group instead of before it) and the `SIZES`/
+`SIZE_LABELS` (a custom 4-step `small`/`medium`/`large`/`x-large`
+scale — a real narrowing of Lily's 7-step scale) from
+`src/routes/+layout.svelte`. `PickerBar` now gets no `themes`/`sizes`
+prop at all, so it uses its own `DEFAULT_THEMES` (45, alphabetical,
+UK/US government themes grouped at the end) and `DEFAULT_SIZES` (the
+7-step `largest`…`smallest` scale) directly. Existing `storageKey`s
+(`mxi.crm.theme`, `mxi.crm.text-size`) are unchanged.
+
+`src/app.css`'s `[data-text-size]` rules rewritten for the new 7-step
+scale (was 3 rules for `small`/`large`/`x-large`; `medium` unscaled —
+now 6 rules for `smallest`/`smaller`/`small`/`large`/`larger`/`largest`;
+`normal` unscaled).
+
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-of-page chrome (theme, text-size, share pickers) previously
+wired `ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This restores a locale picker to the chrome (there was none before):
+`PickerBar` bundles all four unconditionally with no way to omit one.
+Wired with `applyDir={false}` and `onChange={(code) => i18n.set(code)}`,
+since this app's own `i18n.svelte.ts` store already reflects `lang`/`dir`
+onto `<html>`. Existing `storageKey`s (`mxi.crm.theme`,
+`mxi.crm.text-size`) are preserved via `themeProps`/`textSizeProps` so
+an operator's saved preference survives the change.
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon; the Mastodon target
+now points at `mastodonshare.com` instead of `mastodon.social/share`
+(a generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
+Also added `en_US` ("English (United States)") to `src/lib/i18n.svelte.ts`'s
+`LOCALES`/`LOCALE_LABELS`/`STRINGS` (a duplicate of `en`'s copy) and
+taught `normaliseLocale` to match a region variant like `en_US`/`en-US`
+exactly before falling back to primary-subtag stripping, so it no
+longer silently collapses to `en`. `document.documentElement.lang` is
+now set from `i18n.locale.replace("_", "-")` so `en_US` renders a valid
+BCP 47 `lang="en-US"`, matching what `LocalePicker` itself writes.
+`tests/unit/crm.test.ts` gained a test pinning `en_US`/`en-US`
+normalisation; the existing locale-parity test already covers the new
+`en_US` catalog entry since it loops over `LOCALES`.
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (CRM-T24)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

@@ -9,6 +9,271 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — opt-in registration of the four standard controls (T-26, PRO-P33)
+
+`POST /api/plans/{pid}/controls/register-standard`: registers
+`gate_readiness` (feedforward, fixed at 100%), `work_in_progress` and
+`cycle_time_p85` (concurrent, caller-supplied — no default, since a WIP
+limit and a cycle-time SLE are plan-specific commitments this service
+has no basis to invent), and `budget_variance` (feedback, defaults to
+a 10% tolerance, overridable). **Opt-in and per-plan, never
+automatic** — a feedforward control's whole design intent is to be
+able to block a write once something enforces that, so silently
+registering one on every plan would be an unrequested behavioural
+change. Idempotent per metric. Retrospectives are deliberately not
+included — no metric exists for "a retrospective happened," and this
+endpoint does not invent one. See `spec/13-tasks.md` T-26 for the full
+decision record, including the verified (not assumed) fact that no
+write path in this service currently enforces a feedforward control's
+block at all.
+
+### Added — per-user saved views (T-28l)
+
+`POST`/`GET`/`DELETE /api/saved-views[/{pid}]`: a route-scoped filter/
+sort/column preset, keyed by the caller's token `sub` and nothing else
+identity-shaped (no email, no name). Gated by the required-auth
+`AuthUser` extractor — a saved view with no owner makes no sense —
+independent of the blanket `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH`
+flag. Every query is scoped to the caller's own `sub`; another user's
+view is `404` on read or delete, not `403` — its existence is not
+disclosed across users. `GET ?route=` narrows to one route (a saved
+view is never applied outside the route it was saved from); omitted,
+it lists all of the caller's own views.
+
+Verified end to end with two real minted PASETO identities in a
+dedicated test binary (`tests/saved_views.rs`) — needed because the
+`verifier` is a process-wide `OnceLock`, the same reason
+`tests/enforcement.rs` has its own binary.
+
+### Added — intake demand forecast (T-28i)
+
+`GET /api/proposals/forecast` answers "how many approved proposals in
+the next N periods?" by reusing the exact throughput Monte-Carlo
+behind `GET /plans/{pid}/forecast`
+(`crate::tba::{throughput_history, forecast_items}`, verbatim, no new
+pure logic) over the intake pipeline's own `proposal_approved` audit
+events instead of a task board's completions. Same seed determinism,
+same refusal below `MIN_THROUGHPUT_PERIODS`, and the response names
+the history window (`from`/`to`/`periods`/`period_days`) it drew from.
+`arrivals_per_period` (`proposals.created_at`) rides alongside for
+context but does not feed the forecast.
+
+`proposals` carries no `approved_at` column, so the approval instant
+comes from the audit trail (`audit_logs` rows with action
+`proposal_approved`) rather than the table itself. See
+`spec/13-tasks.md` T-28i.
+
+### Added — deterministic scenario generator (T-28h)
+
+`POST /api/scenarios/generate` builds a **draft scenario** by scoring
+every active plan (Smart Score, reusing the exact `Estate` evidence
+gathering `GET /prioritisation` already uses) and pricing it (budget
+lines summed in the cap's currency), then greedily selecting by score
+per unit cost within an optional budget cap. Every candidate gets a
+rationale row: included with its score and cost, or excluded with
+`no_score` / `foreign_currency` / `over_cap` / `must_include_conflict`.
+A `must_include` candidate is force-included even when it alone
+exceeds the cap — never silently dropped. The generated scenario is an
+ordinary `draft`, so `evaluate`/`compare`/`commit`/`rollback` (T-28a)
+apply unmodified. The selection itself
+(`src/strategy.rs::generate_scenario`) is a pure function, unit-tested
+for determinism directly.
+
+Candidates are plans only, never proposals — Smart Score has no
+defined evidence trail for a not-yet-promoted proposal. See
+`spec/13-tasks.md` T-28h for this and a second scope note found while
+writing the test: under the default weights every plan scores via
+`momentum` alone (from `updated_at`), so a genuinely `no_score`
+candidate needs `momentum` configured to `0`.
+
+### Added — capacity-at-scale regression guard (T-28d)
+
+`tests/requests/scale.rs::capacity_views_do_not_fan_out_with_scale`
+seeds 60 plans with allocations across 40 shared people and proves
+`GET /capacity`, `GET /capacity/utilization`, and `GET /at-a-glance`
+each issue the same, bounded number of SeaORM driver round trips at a
+5-plan baseline and at the full 60-plan scale — not timed, counted
+directly via a tracing layer over SeaORM's own `#[instrument]` driver
+spans (`sea_orm::driver::sqlx_postgres::*`), since no query-counting
+test pattern existed anywhere in this repo and `pg_stat_statements` is
+deliberately off on the family's test Postgres. Plus
+`benches/service_bench.rs::bench_capacity_rollups`, a Criterion bench
+over the pure rollup arithmetic (`visibility::summed_percent`,
+`effort::utilisation`) at the same scale.
+
+This is a **regression guard, not a fix**: all three endpoints were
+already query-bounded (confirmed by reading them directly) — the test
+proves it and catches a future per-row query creeping in. See
+`spec/13-tasks.md` T-28d for the tracing-callsite-caching mechanics the
+counter had to account for.
+
+### Added — skill-aware allocation (T-28c)
+
+`allocations.skills_required` (JSONB, short tags) plus `GET
+/api/plans/{pid}/skill-gap`, which resolves the assigned person's
+skills live against the worker service by `EntityRef`
+(`src/workers_client.rs`: lazy verify-on-read, TTL-cached in-process,
+never persisted) and reports each required tag `covered`, `missing`,
+or `unknown` (with a reason). A non-worker reference, an unconfigured
+resolver, or a non-2xx/unreachable worker service all resolve
+`unknown`, never `missing`.
+
+The worker service carries no skills endpoint today (confirmed by
+reading its `Worker`/`Assessment` models directly), so the resolver is
+built against a documented, assumed contract
+(`GET {base}/api/workers/{id}/skills`) rather than inventing that
+feature inside the worker crate as a side effect of this task. See
+`spec/13-tasks.md` T-28c for the full "decided rather than guessed"
+note.
+
+### Added — scenario rollback and evaluation provenance (T-28a)
+
+`POST /api/scenarios/{pid}/rollback` un-commits a `committed` scenario
+(status → `draft`, `committed_at` → `null`, audited as
+`scenario_rolled_back`), refused `409` unless the scenario is
+currently `committed` (a new `conflict()` helper). `GET
+/api/scenarios/{pid}/evaluate` and `GET /api/scenarios/compare` now
+carry `as_of` (when the read ran) and `inputs_read` — every live
+`budget_line`/`risk`/`objective_link`/`proposal` row the evaluation
+summed, each with its own `updated_at` — so two evaluations of the
+same scenario that disagree can say why.
+
+Scoped deliberately narrower than the task's original text, which
+described rollback restoring "each member's funding state to what the
+commit replaced": `commit_scenario` has never mutated a member's
+`budget_lines`/`allocations`/any other row, only the scenario's own
+`status`/`committed_at`, so there is no member funding state to
+restore and none is invented. See `spec/13-tasks.md` T-28a for the
+full "decided rather than guessed" note.
+
+### Added — deadline-shift trigger and rescheduling (T-28g)
+
+Two new automation triggers, narrowed to one field each like
+`milestone_due` was: `plan_timeframe_changed` (fires from
+`controllers::plans::update`) and `milestone_due_changed` (fires from a
+**new** `PUT /api/plans/{pid}/milestones/{m_pid}` reschedule endpoint —
+none existed before, a milestone could previously only be created and
+completed). Two new actions: `propose_reschedule` (walks direct
+`plan_dependencies` successors, computes each one's implied shift, and
+writes a notification carrying the proposal — moves nothing) and
+`shift_dependents` (applies the same computation instead of only
+proposing it, without re-entering the engine).
+
+`src/automation.rs` gains `SuccessorFact`/`ProposedShift`/
+`propose_shifts()` (8 unit tests). `src/controllers/automation.rs`
+gains `load_successors`/`act_propose_reschedule`/
+`act_shift_dependents`; `apply_action` now threads the firing's
+`action_index` through (bundled into a new `FiringContext` to stay
+under clippy's argument-count lint), so `shift_dependents` can log one
+`automation_runs` row per successor actually moved, in addition to the
+one row the engine already logs for the action as a whole. 3 new
+DB-gated request tests in `tests/requests/capabilities.rs`, including
+one proving `shift_dependents` does not cascade into a second rule
+watching the successor's own `plan_timeframe_changed`.
+
+Two scope decisions recorded in `spec/13-tasks.md` T-28g rather than
+guessed: every successor is proposed the **same** delta as the
+predecessor's own shift, regardless of lag (a fixed lag does not change
+how a delta propagates through it — lag only matters for the
+already-violated check); and `shift_dependents` re-derives the shift
+live rather than parsing back a prior `propose_reschedule`
+notification, since `notifications.message` carries no structured
+payload and re-deriving guarantees the two actions can never disagree.
+
+`cargo test --lib` 406/406, DB-gated suite 88/88 (was 85), clippy
+`-D warnings` clean, fmt clean.
+
+### Added — phased budget baseline → EAC/ETC forecast (T-28b)
+
+New pure module `src/financials.rs` (`Baseline`/`BaselinePeriod`/
+`Forecast`/`EtcSource`/`ForecastAbsent`, `forecast()`/
+`rollup_forecast()`, 10 unit tests) and HTTP surface
+`src/controllers/financials.rs`:
+
+- `POST`/`GET /api/plans/{pid}/budget-baselines` — approve a
+  baseline version (planned cost per period, one currency, frozen at
+  approval); append-only, a re-baseline needs a reason, the
+  predecessor stays reproducible from its own version.
+- `GET /api/plans/{pid}/financials/forecast` — `EAC = AC + ETC`, ETC
+  from the plan's latest TPC cost-estimate-to-complete where
+  recorded, else the baseline's own not-yet-elapsed periods; a plan
+  with neither reports `null` with `no_currency_signal`, unchanged.
+- `GET /api/financials/forecast?plan=&depth=` — the same forecast
+  rolled over `parent_ref` (reuses `tba::walk_descendants` verbatim),
+  one row **per currency**, never merged into one sum.
+
+`GET /plans/{pid}/performance`'s `spi`/`cpi` stay `null` — a baseline
+alone is not earned value — but the reason now distinguishes
+`no_baseline` from a new `no_earned_value_signal` once a plan actually
+has one, so the message stays true rather than becoming a stale lie.
+See `spec/13-tasks.md` T-28b for the two scope decisions this made
+explicit rather than guessing (why SPI/CPI still aren't wired, and how
+the forecast's own currency is resolved).
+
+Migration `m20260918_000001_budget_baselines`: `budget_baselines` +
+`budget_baseline_periods`, both append-only (no `deleted_at`, matching
+`phase_transitions`' precedent). 6 new DB-gated request tests in
+`tests/requests/financials.rs`, verified against a real Postgres
+(`scripts/ci-check.sh test-db`); `cargo test --lib` 400/400, clippy
+`-D warnings` clean, fmt clean.
+
+### Fixed — a hardcoded `spent_on` date aged out of its own test's window
+
+`tests/requests/effort.rs::someone_on_leave_reports_null_not_zero_percent`
+recorded a time entry at a fixed `"2026-08-20"` and read it back through
+`GET /api/capacity/utilization?window_days=28`. That passed for exactly
+28 days after the date was written and then failed on every date after
+— caught by this PR's own `db` CI job on 2026-09-18, 29 days past the
+hardcoded date, unrelated to anything this PR actually changed. Fixed
+by computing `spent_on` and the leave period relative to
+`chrono::Utc::now()` (mirroring `tests/requests/insights.rs`'s existing
+pattern) rather than a fixed calendar date. Verified locally against a
+real Postgres: `scripts/ci-check.sh test-db
+project-portfolio-management/project-portfolio-management-service-with-loco`,
+79/79 passing.
+
+### Added — explainability pin: every derived GET discloses its inputs (T-28j)
+
+`src/openapi.rs`'s test module gains
+`every_derived_get_discloses_its_inputs_or_is_exempt_as_plain_crud`: walks
+every `GET` operation in the hand-written OpenAPI document (the same
+mechanical enumeration `spec_and_mounted_routes_agree_both_ways` already
+uses) and asserts each one either carries a substantial description /
+known disclosure marker ("null", "unmeasured", "withheld", "as_of",
+"reason", "even at zero", …) or sits in a new `NON_DERIVED_GET` register
+for a genuinely plain record read — the same register-shrinks-only
+discipline `KNOWN_UNDOCUMENTED` already established, backstopped by
+`non_derived_get_register_is_accurate`. Running it against the document
+as it stood found two real gaps: `/api/plans/{pid}/time-entries` was
+correctly plain (moved to the register), and `/api/reviews/consensus`
+was a genuine miss (an aggregate verdict with undocumented `null`-on-
+no-scores / `null`-on-tie behaviour), fixed with a real `description`
+rather than loosening the test. `project-portfolio-management/spec/
+02-scope.md` §2.3 gains the "no model-driven assistant inside the
+service" refusal this task also calls for, cross-referencing the test
+by name.
+
+### Added — rollup attrition record (TBA-12, repo `tasks.md` PA-3)
+
+`GET /api/plans/{pid}/rollup` gains an `attrition` key: a named,
+ordered, parent-linked trail (`root_plan` → `walked_plans` →
+`tasks_scanned`, then a `finished`/`work_in_progress`/`not_started`
+three-way partition) explaining the `combined` figures' denominator
+inside the response. `src/tba.rs`: `AttritionStep`,
+`RollupAttritionInputs`, `ROLLUP_ATTRITION_STEP_LABELS`,
+`ROLLUP_ATTRITION_PARTITION_PARENT`, `rollup_attrition_trail`, 6 new
+unit tests. A **reinterpretation** of care-pathway's T-14g CONSORT
+attrition trail (`agents/share/time-based-analysis.md` §8), not a
+literal port: this endpoint's cohort is reached by a bounded
+containment tree walk with a per-plan task-count cap, not a linear
+status/window/suppression screen, so the step vocabulary names the
+tree walk's own `truncated`/`revisits` and the per-plan `MAX_TASKS`
+cap rather than reusing care-pathway's literal labels. See
+`project-portfolio-management/spec/time-based-analysis.md` §7.5/§15/§16
+for the full account, including why patient-flow's leg of PA-3 was
+corrected rather than built (its `time-analysis` endpoint serves one
+stay, not a cohort — no denominator to explain).
+
 ### Added — outbound signed webhooks as a relay sink (T-28m, root `tasks.md` EV-3)
 
 `src/webhooks.rs`: a `WebhookSink` beside the relay's existing

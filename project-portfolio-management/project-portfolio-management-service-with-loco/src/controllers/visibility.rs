@@ -22,8 +22,9 @@ use crate::models::_entities::{
 };
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::visibility as vis_models;
-use crate::validation::MAX_TEXT_LEN;
+use crate::validation::{MAX_ARRAY_LEN, MAX_ITEM_LEN, MAX_TEXT_LEN};
 use crate::visibility as rules;
+use crate::workers_client;
 
 fn unprocessable(message: &str) -> Error {
     Error::CustomError(
@@ -295,6 +296,72 @@ async fn list_milestones(
     format::json(views)
 }
 
+/// `PUT /api/plans/{pid}/milestones/{m_pid}` body.
+#[derive(Debug, Deserialize)]
+struct MilestoneReschedulePayload {
+    due: chrono::NaiveDate,
+}
+
+/// `PUT /api/plans/{pid}/milestones/{m_pid}` — reschedule a milestone's
+/// `due` date.
+///
+/// Added for T-28g: the `milestone_due_changed` trigger needs a real
+/// write path, and none existed before this — a milestone could be
+/// created and completed, never moved. Fires the trigger only when
+/// `due` actually changes, mirroring `plans::update`'s
+/// `plan_timeframe_changed` firing.
+#[debug_handler]
+async fn reschedule_milestone(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path((pid, m_pid)): Path<(String, String)>,
+    Json(payload): Json<MilestoneReschedulePayload>,
+) -> Result<Response> {
+    let item = super::governance::find_item(&ctx, &pid).await?;
+    let m_pid = Uuid::parse_str(&m_pid).map_err(|_| Error::NotFound)?;
+    let milestone = vis_models::find_milestone(&ctx.db, m_pid).await?;
+    if milestone.plan_pid != item.pid {
+        return Err(Error::NotFound);
+    }
+    let old_due = milestone.due;
+    let row_pid = milestone.pid;
+    let mut active: milestones::ActiveModel = milestone.into();
+    active.due = ActiveValue::set(payload.due);
+    let row = active
+        .update(&ctx.db)
+        .await
+        .map_err(|e| Error::Model(ModelError::from(e)))?;
+    AuditModel::record(
+        &ctx.db,
+        row_pid,
+        "milestone_rescheduled",
+        caller.actor(),
+        None,
+    )
+    .await
+    .ok();
+
+    if old_due != payload.due {
+        super::automation::fire(
+            &ctx,
+            &crate::automation::TriggerFact {
+                kind: "milestone_due_changed".to_string(),
+                plan_pid: item.pid,
+                from_status: Some(old_due.to_string()),
+                to_status: Some(payload.due.to_string()),
+            },
+            "milestone",
+            row_pid,
+            caller.actor(),
+        )
+        .await;
+    }
+
+    format::json(serde_json::json!({
+        "pid": row.pid.to_string(), "name": row.name, "due": row.due,
+    }))
+}
+
 /// `POST /api/plans/{pid}/milestones/{m_pid}/complete`.
 #[debug_handler]
 async fn complete_milestone(
@@ -343,6 +410,10 @@ struct AllocationPayload {
     start_date: Option<chrono::NaiveDate>,
     #[serde(default)]
     end_date: Option<chrono::NaiveDate>,
+    /// Short skill tags this allocation requires (T-28c). Only the
+    /// requirement tags land here — never any resolved skill data.
+    #[serde(default)]
+    skills_required: Vec<String>,
 }
 
 #[debug_handler]
@@ -364,6 +435,18 @@ async fn create_allocation(
     {
         problems.push("end_date is before start_date".to_string());
     }
+    if payload.skills_required.len() > MAX_ARRAY_LEN {
+        problems.push(format!("skills_required: exceeds {MAX_ARRAY_LEN} entries"));
+    }
+    for (i, tag) in payload.skills_required.iter().enumerate() {
+        if tag.trim().is_empty() {
+            problems.push(format!("skills_required[{i}]: must not be blank"));
+        } else if tag.chars().count() > MAX_ITEM_LEN {
+            problems.push(format!(
+                "skills_required[{i}]: exceeds {MAX_ITEM_LEN} characters"
+            ));
+        }
+    }
     if !problems.is_empty() {
         return Err(unprocessable(&problems.join("; ")));
     }
@@ -377,6 +460,7 @@ async fn create_allocation(
         start_date: ActiveValue::set(payload.start_date),
         end_date: ActiveValue::set(payload.end_date),
         deleted_at: ActiveValue::set(None),
+        skills_required: ActiveValue::set(serde_json::json!(payload.skills_required)),
         ..Default::default()
     }
     .insert(&ctx.db)
@@ -386,6 +470,38 @@ async fn create_allocation(
         .await
         .ok();
     format::json(serde_json::json!({ "pid": row.pid.to_string() }))
+}
+
+/// `GET /api/plans/{pid}/skill-gap` — for every allocation on this
+/// plan carrying `skills_required` tags, resolve the assigned
+/// person's held skills live against the worker service (by
+/// `EntityRef`, TTL-cached, T-28c) and report each tag's status.
+#[debug_handler]
+async fn skill_gap(State(ctx): State<AppContext>, Path(pid): Path<String>) -> Result<Response> {
+    let item = super::governance::find_item(&ctx, &pid).await?;
+    let rows = vis_models::allocations_for(&ctx.db, item.pid).await?;
+    let base_url = std::env::var(workers_client::BASE_URL_ENV).ok();
+    let mut findings = Vec::new();
+    for row in &rows {
+        let tags: Vec<String> =
+            serde_json::from_value(row.skills_required.clone()).unwrap_or_default();
+        if tags.is_empty() {
+            continue;
+        }
+        let resolved = workers_client::resolve_skills(base_url.as_deref(), &row.person_ref).await;
+        let (held, reason) = match &resolved {
+            Ok(held) => (Some(held.as_slice()), None),
+            Err(reason) => (None, Some(reason.as_str())),
+        };
+        findings.extend(rules::skill_gap(
+            row.pid,
+            &row.person_ref,
+            &tags,
+            held,
+            reason,
+        ));
+    }
+    format::json(serde_json::json!({ "plan_pid": item.pid.to_string(), "findings": findings }))
 }
 
 /// `GET /api/plans/{pid}/allocations`.
@@ -881,6 +997,7 @@ pub fn routes() -> Routes {
         .add("/plans/{pid}/schedule", get(portfolio_schedule))
         .add("/plans/{pid}/milestones", post(create_milestone))
         .add("/plans/{pid}/milestones", get(list_milestones))
+        .add("/plans/{pid}/milestones/{m_pid}", put(reschedule_milestone))
         .add(
             "/plans/{pid}/milestones/{m_pid}/complete",
             post(complete_milestone),
@@ -891,6 +1008,7 @@ pub fn routes() -> Routes {
             "/plans/{pid}/allocations/{a_pid}",
             delete(delete_allocation),
         )
+        .add("/plans/{pid}/skill-gap", get(skill_gap))
         .add("/capacity", get(capacity))
         .add("/reports", post(create_report))
         .add("/reports", get(list_reports))

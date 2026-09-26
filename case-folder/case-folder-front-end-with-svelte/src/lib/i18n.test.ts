@@ -15,13 +15,15 @@ import {
     STRINGS_BY_LOCALE,
     isRtl,
     translate,
+    i18n,
     type Locale,
 } from './i18n.svelte';
 
 describe('i18n catalog', () => {
-    it('supports exactly the 13 required locales', () => {
+    it('supports exactly the 14 required locales', () => {
         expect([...LOCALES]).toEqual([
             'en',
+            'en_US',
             'cy',
             'es',
             'fr',
@@ -35,6 +37,15 @@ describe('i18n catalog', () => {
             'id',
             'ur',
         ]);
+    });
+
+    it('normalises en_US and en-US to the en_US locale rather than collapsing to en', () => {
+        i18n.set('en_US');
+        expect(i18n.locale).toBe('en_US');
+        i18n.set('en-US');
+        expect(i18n.locale).toBe('en_US');
+        i18n.set('en');
+        expect(i18n.locale).toBe('en');
     });
 
     it('every locale defines every key (full coverage)', () => {

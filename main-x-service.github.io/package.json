@@ -15,7 +15,9 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "lily-design-system-svelte-theme-picker": "file:../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker"
+    "@lilydesignsystem/svelte-picker-bar": "^0.1.0",
+    "@lilydesignsystem/svelte-share-picker": "^0.1.0",
+    "@lilydesignsystem/svelte-theme-picker": "^0.1.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.0",

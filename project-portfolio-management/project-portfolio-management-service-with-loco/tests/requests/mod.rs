@@ -6,11 +6,13 @@
 mod capabilities;
 mod effort;
 mod event_outbox;
+mod financials;
 mod governance;
 mod insights;
 mod metrics_control;
 mod oversight;
 mod plans;
+mod scale;
 mod strategy;
 mod tba;
 mod value_ceremony;

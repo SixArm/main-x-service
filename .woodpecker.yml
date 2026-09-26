@@ -53,6 +53,44 @@ steps:
     commands:
       - scripts/ci-check.sh docs
 
+  # The sixteen SvelteKit front-ends (tasks.md WEB-2), byte-identical
+  # commands to the GitHub `front-end` matrix job — Woodpecker's
+  # `matrix:` needs a static list (same reason the Rust steps loop
+  # rather than fan out), so this loops `scripts/ci-front-ends.sh`'s
+  # discovered list in one step instead. e2e is the same allowlist,
+  # ci/front-end-e2e-suites.txt.
+  - name: front-end
+    image: 'node:26-bookworm'
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends git
+      # Pinned exact (matching the GitHub pipeline's pnpm/action-setup),
+      # not a floating major — see ci.yml's identical comment: a newer
+      # 11.x enforces a `minimumReleaseAge` supply-chain policy that
+      # 11.0.8 predates.
+      - corepack enable && corepack prepare pnpm@11.0.8 --activate
+      - '[ -z "${CI_COMMIT_PULL_REQUEST}" ] || git fetch --no-tags origin "${CI_COMMIT_TARGET_BRANCH}"'
+      - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
+      - |
+        for fe in $(scripts/ci-front-ends.sh); do
+          echo "=== ${fe} ==="
+          ( cd "${fe}" \
+            && pnpm install --frozen-lockfile \
+            && pnpm run check \
+            && pnpm exec vitest run \
+            && pnpm run build \
+            && pnpm run lint \
+            && if grep -Fxq "${fe}" ../../ci/front-end-e2e-suites.txt; then \
+                 pnpm exec playwright install --with-deps chromium && \
+                 if grep -q 'name: "smoke"' playwright.config.ts || grep -q "name: 'smoke'" playwright.config.ts; then \
+                   pnpm exec playwright test --project=smoke; \
+                 else \
+                   pnpm exec playwright test; \
+                 fi; \
+               else \
+                 echo "not enrolled in ci/front-end-e2e-suites.txt — skipping e2e"; \
+               fi )
+        done
+
   - name: clippy
     image: *rust_image
     commands:

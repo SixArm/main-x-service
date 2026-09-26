@@ -9,10 +9,12 @@
   "description": "SvelteKit front-end for the Authentication Service (Main X Index): passwordless magic-link sign up / sign in / sign out.",
   "license": "MIT OR Apache-2.0",
   "dependencies": {
-    "lily-design-system-svelte-headless": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-headless",
-    "lily-design-system-svelte-share-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-share-picker",
-    "lily-design-system-svelte-text-size-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-text-size-picker",
-    "lily-design-system-svelte-theme-picker": "file:../../../../lilydesignsystem/lily-design-system/lily-design-system-svelte-helpers/lily-design-system-svelte-theme-picker"
+    "@lilydesignsystem/svelte-headless": "^0.1.0",
+    "@lilydesignsystem/svelte-locale-picker": "^0.1.0",
+    "@lilydesignsystem/svelte-picker-bar": "^0.1.0",
+    "@lilydesignsystem/svelte-share-picker": "^0.1.0",
+    "@lilydesignsystem/svelte-text-size-picker": "^0.1.0",
+    "@lilydesignsystem/svelte-theme-picker": "^0.1.0"
   },
   "scripts": {
     "dev": "vite dev",
@@ -27,14 +29,14 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
-    "@sveltejs/adapter-auto": "^4.0.0",
+    "@sveltejs/adapter-auto": "^7.0.1",
     "@sveltejs/kit": "^2.55.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@testing-library/svelte": "^5.3.1",
     "@types/node": "^22.0.0",
-    "jsdom": "^26.1.0",
+    "jsdom": "^30.1.0",
     "prettier": "^3.3.0",
-    "prettier-plugin-svelte": "^3.3.0",
+    "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.53.0",
     "svelte-check": "^4.2.0",
     "typescript": "^5.8.0",

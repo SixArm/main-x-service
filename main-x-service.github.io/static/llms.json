@@ -1,0 +1,606 @@
+{
+  "name": "Main X Index (main-x-service)",
+  "summary": "A federated identity index: ~55 self-contained Rust crates (loco.rs backend services + SvelteKit operator front-ends), one per real-world entity (person, worker, place, thing, event, course, organization, care pathway, case, plan/portfolio), each doing CRUD, probabilistic + deterministic matching, full-text search, record merge, an audit trail, and event streaming \u2014 plus a central SSO provider, a cross-service link-graph aggregator, and five consumer applications that build on the registries.",
+  "notes": "Each crate is self-contained (own REST API, own persistence, own matching algorithm) and shares an architecture and documentation layout, not code. Every subproject's spec/ directory is the single source of truth for that subproject; code conforms to the spec, not the reverse. This file describes the published documentation site (main-x-service.github.io), a curated front door \u2014 not the git checkout; every entry links to its GitHub source since the site itself renders only a handful of overview pages (see \"This site\" below).",
+  "repository": [
+    "https://github.com/SixArm/main-x-service",
+    "https://codeberg.org/SixArm/main-x-service"
+  ],
+  "license": {
+    "rust_crates": "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only",
+    "front_ends": "MIT OR Apache-2.0",
+    "doc": "LICENSE.md"
+  },
+  "sections": [
+    {
+      "title": "This site",
+      "items": [
+        {
+          "title": "Home",
+          "url": "https://sixarm.github.io/main-x-service.github.io/",
+          "description": "Elevator pitch and at-a-glance facts about the Main X Index"
+        },
+        {
+          "title": "Architecture",
+          "url": "https://sixarm.github.io/main-x-service.github.io/architecture/",
+          "description": "Layered request flow, the two internal service shapes, cross-cutting subsystems"
+        },
+        {
+          "title": "Subprojects",
+          "url": "https://sixarm.github.io/main-x-service.github.io/subprojects/",
+          "description": "The full family index (services, matchers, libraries, front-ends, consumer apps, cross-cutting services), each linking to its GitHub source"
+        },
+        {
+          "title": "About",
+          "url": "https://sixarm.github.io/main-x-service.github.io/about/",
+          "description": "What this site is, spec-driven development, AI-assisted development, license"
+        }
+      ]
+    },
+    {
+      "title": "Start here",
+      "items": [
+        {
+          "title": "index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/index.md",
+          "description": "Repo root navigation (subprojects, examples, running, architecture snapshot)"
+        },
+        {
+          "title": "AGENTS.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/AGENTS.md",
+          "description": "The full subproject index plus CI, spec-driven-development, and shared-doc wiring"
+        },
+        {
+          "title": "agents/share/overview.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/overview.md",
+          "description": "The honest per-crate capability matrix \u2014 what each crate actually has today"
+        },
+        {
+          "title": "agents/share/architecture.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/architecture.md",
+          "description": "The layered request flow and the two internal service shapes"
+        },
+        {
+          "title": "AI_STATEMENT.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/AI_STATEMENT.md",
+          "description": "How AI tools are used to develop this software, and the bounds on that use"
+        },
+        {
+          "title": "tasks.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/tasks.md",
+          "description": "The live, repo-spanning work queue"
+        },
+        {
+          "title": "plan.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/plan.md",
+          "description": "Cross-subproject planning"
+        },
+        {
+          "title": "tutorials/",
+          "url": "https://github.com/SixArm/main-x-service/tree/main/tutorials/",
+          "description": "Six live-verified walkthroughs: getting started, identity lifecycle, auth & ABAC, cross-service linking, bulk import/export, the event bus"
+        },
+        {
+          "title": "tutorials/01-getting-started.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/tutorials/01-getting-started.md",
+          "description": "Tutorial 1: getting started"
+        },
+        {
+          "title": "tutorials/02-identity-lifecycle.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/tutorials/02-identity-lifecycle.md",
+          "description": "Tutorial 2: identity lifecycle"
+        },
+        {
+          "title": "tutorials/03-authentication-abac.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/tutorials/03-authentication-abac.md",
+          "description": "Tutorial 3: authentication & ABAC"
+        },
+        {
+          "title": "tutorials/04-cross-service-linking.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/tutorials/04-cross-service-linking.md",
+          "description": "Tutorial 4: cross-service linking"
+        },
+        {
+          "title": "tutorials/05-bulk-import-export.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/tutorials/05-bulk-import-export.md",
+          "description": "Tutorial 5: bulk import/export"
+        },
+        {
+          "title": "tutorials/06-event-bus.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/tutorials/06-event-bus.md",
+          "description": "Tutorial 6: the event bus"
+        },
+        {
+          "title": "examples/",
+          "url": "https://github.com/SixArm/main-x-service/tree/main/examples/",
+          "description": "Runnable reference material: Podman compose stacks, synthetic data fixtures, an ABAC policy cookbook, per-service .http request collections"
+        },
+        {
+          "title": "examples/compose/",
+          "url": "https://github.com/SixArm/main-x-service/tree/main/examples/compose/",
+          "description": "Podman compose stacks"
+        },
+        {
+          "title": "examples/data/",
+          "url": "https://github.com/SixArm/main-x-service/tree/main/examples/data/",
+          "description": "Synthetic data fixtures"
+        },
+        {
+          "title": "examples/policies/",
+          "url": "https://github.com/SixArm/main-x-service/tree/main/examples/policies/",
+          "description": "ABAC policy cookbook"
+        },
+        {
+          "title": "examples/api/",
+          "url": "https://github.com/SixArm/main-x-service/tree/main/examples/api/",
+          "description": "Per-service .http request collections"
+        },
+        {
+          "title": "sixarm-services-skill/",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/sixarm-services-skill/SKILL.md",
+          "description": "A Claude Code skill explaining this system's concepts, terminology, and worked examples"
+        },
+        {
+          "title": "sixarm-services-maintainer-skill/",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/sixarm-services-maintainer-skill/SKILL.md",
+          "description": "A Claude Code skill for making a code/spec/infrastructure change here"
+        }
+      ]
+    },
+    {
+      "title": "Entity registry services (Rust, loco.rs)",
+      "items": [
+        {
+          "title": "person-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/person/person-service-with-loco/spec/index.md",
+          "description": "Person (general) identity registry"
+        },
+        {
+          "title": "worker-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/worker/worker-service-with-loco/spec/index.md",
+          "description": "Worker (workforce/professional) identity registry, plus assessments"
+        },
+        {
+          "title": "place-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/place/place-service-with-loco/spec/index.md",
+          "description": "Place registry (schema.org/Place)"
+        },
+        {
+          "title": "thing-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/thing/thing-service-with-loco/spec/index.md",
+          "description": "Thing/asset registry (schema.org/Thing)"
+        },
+        {
+          "title": "event-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/event/event-service-with-loco/spec/index.md",
+          "description": "Time-bounded event registry (schema.org/Event)"
+        },
+        {
+          "title": "course-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/course/course-service-with-loco/spec/index.md",
+          "description": "Course-identity registry plus CourseInstance sub-resource"
+        },
+        {
+          "title": "authentication-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/authentication/authentication-service-with-loco/spec/index.md",
+          "description": "Central SSO \u2014 passwordless magic-link, cookie sessions, PASETO v4.public issuance"
+        },
+        {
+          "title": "organization-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/organization/organization-service-with-loco/spec/index.md",
+          "description": "Organization registry (schema.org/Organization); family FHIR reference implementation"
+        },
+        {
+          "title": "care-pathway-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-service-with-loco/spec/index.md",
+          "description": "Clinical care-pathway registry"
+        },
+        {
+          "title": "case-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/case/case-service-with-loco/spec/index.md",
+          "description": "Governmental case-tracking registry"
+        },
+        {
+          "title": "project-portfolio-management-service",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-service-with-loco/spec/index.md",
+          "description": "Plan registry \u2014 one recursive tree; a full PM suite (goals/tasks/issues/timeline/burndown)"
+        }
+      ]
+    },
+    {
+      "title": "Matcher crates (dependency-light comparison libraries)",
+      "items": [
+        {
+          "title": "person-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/person/person-matcher-rust-crate/spec/index.md",
+          "description": "Demographic + multinational national-identifier matching"
+        },
+        {
+          "title": "worker-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/worker/worker-matcher-rust-crate/spec/index.md",
+          "description": "Workforce/professional identity matching"
+        },
+        {
+          "title": "place-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/place/place-matcher-rust-crate/spec/index.md",
+          "description": "Geographic/postal-address/venue matching"
+        },
+        {
+          "title": "thing-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/thing/thing-matcher-rust-crate/spec/index.md",
+          "description": "Generic thing/asset matching"
+        },
+        {
+          "title": "event-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/event/event-matcher-rust-crate/spec/index.md",
+          "description": "Time-bounded event matching"
+        },
+        {
+          "title": "course-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/course/course-matcher-rust-crate/spec/index.md",
+          "description": "Course matching (name, code, level, keywords)"
+        },
+        {
+          "title": "organization-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/organization/organization-matcher-rust-crate/spec/index.md",
+          "description": "Organization matching (name, address, LEI/DUNS/GLN/\u2026)"
+        },
+        {
+          "title": "care-pathway-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-matcher-rust-crate/spec/index.md",
+          "description": "Clinical care-pathway matching"
+        },
+        {
+          "title": "case-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/case/case-matcher-rust-crate/spec/index.md",
+          "description": "Governmental case matching"
+        },
+        {
+          "title": "project-portfolio-management-matcher",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-matcher-rust-crate/spec/index.md",
+          "description": "Plan matching (no kind gate)"
+        }
+      ]
+    },
+    {
+      "title": "Library crates (peer-side, not services or matchers)",
+      "items": [
+        {
+          "title": "authentication-verifier",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/authentication/authentication-verifier-rust-crate/index.md",
+          "description": "Offline PASETO v4.public (Ed25519) verification; published to crates.io"
+        },
+        {
+          "title": "integrity-mac",
+          "url": "https://github.com/SixArm/main-x-service/tree/main/integrity/integrity-mac-rust-crate/",
+          "description": "Keyed integrity MACs (HMAC-SHA256) with production-grade key handling, embedded family-wide"
+        },
+        {
+          "title": "entity-ref",
+          "url": "https://github.com/SixArm/main-x-service/tree/main/link/entity-ref-rust-crate/",
+          "description": "The EntityRef URN type + the closed v1 EdgeKind registry for cross-service linking; published to crates.io as entity-ref"
+        }
+      ]
+    },
+    {
+      "title": "Cross-cutting services",
+      "items": [
+        {
+          "title": "link-graph-service-with-loco",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/link/link-graph-service-with-loco/spec/index.md",
+          "description": "Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter"
+        }
+      ]
+    },
+    {
+      "title": "GitHub Pages",
+      "items": [
+        {
+          "title": "main-x-service.github.io/",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/main-x-service.github.io/index.md",
+          "description": "Public documentation front door for this monorepo (SvelteKit + Lily Design System, static/prerendered); published via git subtree to a sibling read-only repo, see spec/monorepo-github-pages/"
+        }
+      ]
+    },
+    {
+      "title": "Front-end projects (SvelteKit operator SPAs)",
+      "items": [
+        {
+          "title": "person-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/person/person-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for Person CRUD/search/match/merge/audit"
+        },
+        {
+          "title": "worker-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/worker/worker-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for Worker"
+        },
+        {
+          "title": "place-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/place/place-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for Place"
+        },
+        {
+          "title": "thing-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/thing/thing-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for Thing"
+        },
+        {
+          "title": "event-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/event/event-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for Event"
+        },
+        {
+          "title": "course-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/course/course-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for Course"
+        },
+        {
+          "title": "authentication-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/authentication/authentication-front-end-with-svelte/spec/index.md",
+          "description": "Passwordless magic-link sign up/in/out UI"
+        },
+        {
+          "title": "organization-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/organization/organization-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for Organization"
+        },
+        {
+          "title": "care-pathway-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for care pathways"
+        },
+        {
+          "title": "case-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/case/case-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI for governmental cases"
+        },
+        {
+          "title": "project-portfolio-management-front-end-with-svelte",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-front-end-with-svelte/spec/index.md",
+          "description": "Operator UI plus Kanban/Gantt/burndown project-management views"
+        }
+      ]
+    },
+    {
+      "title": "Consumer applications (build on the registries)",
+      "items": [
+        {
+          "title": "case-folder",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/case-folder/spec/index.md",
+          "description": "NHS paper case-note folder location tracking"
+        },
+        {
+          "title": "patient-flow",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/patient-flow/spec/index.md",
+          "description": "NHS hospital bed management and ward whiteboards"
+        },
+        {
+          "title": "workforce-planning-management",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/workforce-planning-management/spec/index.md",
+          "description": "All-in-one HR across the employee lifecycle"
+        },
+        {
+          "title": "contact-relationship-management",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/contact-relationship-management/spec/index.md",
+          "description": "Customer/prospect relationships (sales, marketing, service, support)"
+        },
+        {
+          "title": "content-management-system",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/content-management-system/spec/index.md",
+          "description": "Headless content management (block documents, assets, editorial lifecycle)"
+        }
+      ]
+    },
+    {
+      "title": "Shared reference docs (agents/share/)",
+      "items": [
+        {
+          "title": "agents/share/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/index.md",
+          "description": "The index of every shared doc below, kept current in one place"
+        },
+        {
+          "title": "agents/share/dataflow.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/dataflow.md",
+          "description": "Create / match / merge / search data flows"
+        },
+        {
+          "title": "agents/share/match-search-merge.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/match-search-merge.md",
+          "description": "Matching, search, and merge workflows combined"
+        },
+        {
+          "title": "agents/share/privacy.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/privacy.md",
+          "description": "Data masking, GDPR export, consent"
+        },
+        {
+          "title": "agents/share/jwt.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/jwt.md",
+          "description": "Why JWTs are not used for sessions"
+        },
+        {
+          "title": "agents/share/authentication-sessions.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/authentication-sessions.md",
+          "description": "Cookie sessions + PASETO v4 cross-service tokens + the BFF pattern"
+        },
+        {
+          "title": "agents/share/authorization-attributes.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/authorization-attributes.md",
+          "description": "ABAC \u2014 the policy language, default policy, 401/403 split"
+        },
+        {
+          "title": "agents/share/security.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/security.md",
+          "description": "Audit summary, cross-cutting invariants, the REQUIRE_AUTH activation gate"
+        },
+        {
+          "title": "agents/share/auditability.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/auditability.md",
+          "description": "Audit logging and event streaming"
+        },
+        {
+          "title": "agents/share/cross-service-linking.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/cross-service-linking.md",
+          "description": "The hybrid write-local + read-model-aggregator link topology"
+        },
+        {
+          "title": "agents/share/bulk-import-export.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/bulk-import-export.md",
+          "description": "Async bulk import/export (JSONL/CSV/Parquet)"
+        },
+        {
+          "title": "agents/share/availability.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/availability.md",
+          "description": "Scaling, health checks, graceful shutdown"
+        },
+        {
+          "title": "agents/share/observability.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/observability.md",
+          "description": "Tracing + OpenTelemetry rollout status"
+        },
+        {
+          "title": "agents/share/restful.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/restful.md",
+          "description": "RESTful API conventions and pagination"
+        },
+        {
+          "title": "agents/share/fhir.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/fhir.md",
+          "description": "HL7 FHIR R5 API design and per-entity resource mapping"
+        },
+        {
+          "title": "agents/share/api-versioning.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/api-versioning.md",
+          "description": "Header-based API versioning (Accepts-version)"
+        },
+        {
+          "title": "agents/share/loco.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/loco.md",
+          "description": "The loco.rs framework conventions used family-wide"
+        },
+        {
+          "title": "agents/share/rust-loco-stack.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/rust-loco-stack.md",
+          "description": "The full Rust + loco dependency stack"
+        },
+        {
+          "title": "agents/share/postgresql.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/postgresql.md",
+          "description": "PostgreSQL setup, extensions, the local test database"
+        },
+        {
+          "title": "agents/share/compliance-for-healthcare.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/compliance-for-healthcare.md",
+          "description": "HIPAA, NHS, EHDS, ONC/HTI, IEC 62304"
+        },
+        {
+          "title": "agents/share/compliance-for-technology.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/compliance-for-technology.md",
+          "description": "GDPR, ISO/IEC 27001, ISO/IEC 42001"
+        },
+        {
+          "title": "agents/share/locales.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/locales.md",
+          "description": "Supported locales for i18n/l10n"
+        },
+        {
+          "title": "agents/share/configuration.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/configuration.md",
+          "description": "The complete environment-variable reference"
+        }
+      ]
+    },
+    {
+      "title": "Continuous integration & policy",
+      "items": [
+        {
+          "title": ".github/workflows/ci.yml",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/.github/workflows/ci.yml",
+          "description": "GitHub CI pipeline (fmt, clippy, test, test-db, deny, evidence, fuzz, msrv, bench)"
+        },
+        {
+          "title": ".woodpecker.yml",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/.woodpecker.yml",
+          "description": "Codeberg CI pipeline \u2014 byte-identical stages to ci.yml"
+        },
+        {
+          "title": "scripts/ci-check.sh",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/scripts/ci-check.sh",
+          "description": "Run any CI stage locally, exactly as CI runs it"
+        },
+        {
+          "title": "ci/msrv.txt",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/ci/msrv.txt",
+          "description": "The declared Minimum Supported Rust Version (current stable minus two)"
+        },
+        {
+          "title": "ci/db-suites.txt",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/ci/db-suites.txt",
+          "description": "The allowlist of crates whose --ignored Postgres suite runs in CI"
+        },
+        {
+          "title": "SECURITY.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/SECURITY.md",
+          "description": "How to report a vulnerability"
+        },
+        {
+          "title": "CONTRIBUTING.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/CONTRIBUTING.md",
+          "description": "Contribution ground rules"
+        },
+        {
+          "title": "GOVERNANCE.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/GOVERNANCE.md",
+          "description": "Sole-maintainer governance"
+        },
+        {
+          "title": "LICENSE.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/LICENSE.md",
+          "description": "Per-subproject SPDX license expressions"
+        }
+      ]
+    },
+    {
+      "title": "Optional",
+      "items": [
+        {
+          "title": "BENCHMARKS.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/BENCHMARKS.md",
+          "description": "Criterion benchmark suite inventory"
+        },
+        {
+          "title": "COMPARISONS.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/COMPARISONS.md",
+          "description": "How this system compares to adjacent kinds of systems (MDM platforms, \u2026)"
+        },
+        {
+          "title": "RFC.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/RFC.md",
+          "description": "Open questions the maintainer wants outside views on"
+        },
+        {
+          "title": "NEWS.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/NEWS.md",
+          "description": "Project news and milestones"
+        },
+        {
+          "title": "CHANGELOG.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/CHANGELOG.md",
+          "description": "Repo-level (monorepo-wide) change summary"
+        },
+        {
+          "title": "MAINTAINERS.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/MAINTAINERS.md",
+          "description": "Maintainer contact"
+        },
+        {
+          "title": "INSTALL.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/INSTALL.md",
+          "description": "Build/run prerequisites"
+        }
+      ]
+    }
+  ]
+}

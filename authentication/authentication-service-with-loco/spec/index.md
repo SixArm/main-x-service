@@ -1070,6 +1070,223 @@ only by that subject.
       `GET /api/compliance/audit/verify`; the doc comment's stated
       limitation is removed once true.
 
+- [x] **T-17 (S, 2026-09-19) — `GET /api/auth/me` exposes the caller's
+      own ABAC attrs (repo `tasks.md` EV-1 T-28f).** Found while
+      implementing portfolio's role-tailored navigation: T-28f's own
+      text assumed "the front-end reads the attrs the BFF already gets
+      from `/whoami`" — factually wrong, verified by reading
+      `src/views/auth.rs`'s `CurrentResponse` and every front-end's
+      `src/lib/server/auth.ts`/`config.ts` (`grep -rln "attrs" */*-
+      front-end-with-svelte/src/lib/server/*.ts` — no hits anywhere in
+      the family); no front-end BFF decodes the PASETO token itself
+      (doing so would mean hand-rolling a second PASETO verifier in
+      TypeScript, exactly the "vetted crate does the crypto" principle
+      this crate's own auth stack exists to honour), so `attrs` was
+      never reachable client-side at all. Fixed at the source instead
+      of working around it in one front-end: `CurrentResponse` gains
+      `attrs` (`user.attrs()` — the **live** `users.attributes`, not
+      the PASETO claim's up-to-`TOKEN_EXPIRATION`-stale snapshot, since
+      `/me` already does a fresh DB lookup for every other field).
+      Additive; every existing caller is unaffected.
+      **Verified:** two new unit tests in `src/views/auth.rs`
+      (`current_response_carries_the_users_live_attrs`,
+      `current_response_attrs_is_empty_not_absent_when_unset`) plus a
+      new DB-gated request test,
+      `tests/requests/auth.rs::current_user_carries_live_abac_attrs`,
+      which deliberately assigns attrs **after** minting the bearer
+      token, so a stale-claim implementation would fail it while the
+      live-DB-read implementation passes. `cargo test --lib --features
+      oidc` 97/97 (+2), `scripts/ci-check.sh test-db` 49/49 (+1) against
+      real Postgres, `clippy --all-targets --features oidc -- -D
+      warnings` and `cargo fmt --check` both clean.
+
+- [x] **EV-2 (2026-09-18) — Enterprise identity federation: OIDC relying
+      party.** Design in
+      [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
+      §7a (written 2026-09-18, same day). Behind a new `oidc` Cargo
+      feature (off by default — a build without it pulls in no extra
+      HTTP/JWT stack): `GET /api/auth/oidc/login` (discovery, PKCE +
+      state + nonce, redirect) and `GET /api/auth/oidc/callback`
+      (authorization-code exchange, ID-token signature + nonce
+      verification via the `openidconnect` crate, claim mapping,
+      session establishment). Both routes are `404` unless
+      `AUTH_OIDC_ISSUER_URL` (and the other three required vars) are
+      set — federation stays invisible to a deployment that has not
+      opted in, exactly as §7a requires.
+      `src/oidc.rs` (`OidcConfig::from_env`, `map_claims` — pure,
+      unit-tested) + `src/controllers/oidc.rs` (the HTTP surface,
+      reusing `controllers::auth::verify`'s exact session-establishment
+      sequence — same `sessions::Model::issue`, same
+      `sign_access_token`, same two cookies).
+      **Claim mapping** goes through **exactly** the same validation an
+      operator's CLI/admin-API attribute assignment does
+      (`tasks::attributes::{validate_key, validate_value, vocabulary}`)
+      — an IdP claim is no more trustworthy than an operator's typo. A
+      claim that fails mapping is skipped and logged, never fatal to
+      the sign-in.
+      **Provisioning (resolves §7a's open question):** JIT
+      auto-provisioning is **off by default**
+      (`AUTH_OIDC_JIT_PROVISIONING`) — the safer of the two documented
+      leans, since auto-provisioning would let the IdP control account
+      creation. A sign-in for an email with no existing account is
+      `403`, named and audited (`oidc_sign_in`, detail `no_account`),
+      unless the deployment opts in.
+      **Fail-closed metadata fetch, mirroring SEC-V1**: discovery and
+      the JWKS fetch share one non-redirecting, 10s-timeout HTTP client
+      (`redirect::Policy::none()`), the identical MITM-injected-document
+      defence `authentication-verifier`'s own boot-time key-set fetch
+      already applies.
+      **Verified against a real signed ID token, not just
+      type-checked**: `tests/requests/oidc.rs` (its own
+      `#[cfg(feature = "oidc")]`-gated module in the shared request-test
+      binary) serves a minimal stub IdP from a local ephemeral-port
+      listener (discovery document, JWKS, token endpoint) and signs its
+      ID tokens **ES256** (P-256 ECDSA, a dev-only direct `p256`
+      dependency) — deliberately not `RS256`/`jsonwebtoken`, which would
+      reintroduce the `rsa` crate this family removed for
+      RUSTSEC-2023-0071 (`security.md` §7, 2026-08-21). Six DB-gated
+      tests, including the full round trip: login → a real cryptographic
+      ID-token exchange and verification → claim mapping lands in
+      `users.attributes` → the existing account is found (JIT off) →
+      session established, `__Host-mxi_session` cookie set.
+      **Decided rather than guessed:**
+      1. *SAML 2.0 is explicitly out of scope for this pass* — its
+         XML-DSig signature-verification surface is a materially
+         different, larger piece of security-critical work than OIDC's
+         (where a vetted crate does the cryptography), and warrants its
+         own dedicated, carefully-reviewed pass rather than being rushed
+         alongside OIDC in the same session. Tracked as the remaining
+         half of root `tasks.md` EV-2.
+      2. *Claims are read twice from the same already-verified ID
+         token* — once through `openidconnect`'s typed, cryptographically
+         checked view (subject/email/nonce), once as raw JSON (for the
+         deployment's `AUTH_OIDC_CLAIM_MAP`, which names claims the typed
+         view has no field for). Both reads decode the identical signed
+         bytes; nothing between them is untrusted.
+      3. *`GET`, not `POST`, for `/callback`* — this is a browser
+         top-level navigation returning from the IdP's own redirect
+         (an OAuth2/OIDC authorization-code response), never an XHR/BFF
+         call, so it follows the IdP's own required method rather than
+         this crate's other endpoints' POST convention.
+      **Env vars** — see `AGENTS.md`'s Configuration table:
+      `AUTH_OIDC_ISSUER_URL`, `AUTH_OIDC_CLIENT_ID`,
+      `AUTH_OIDC_CLIENT_SECRET[_FILE]`, `AUTH_OIDC_REDIRECT_URL`,
+      `AUTH_OIDC_CLAIM_MAP[_FILE]`, `AUTH_OIDC_JIT_PROVISIONING`.
+      **Verified:** `cargo test --lib --features oidc` (95/95, +5 pure
+      `oidc::` tests), `cargo test --features oidc -- --ignored`
+      (DB-gated suite green, +6 new `requests::oidc::*`), `cargo build`/
+      `clippy --all-targets --features oidc -- -D warnings` clean,
+      `cargo fmt --check` clean, `cargo deny check` clean (no new
+      advisory — confirmed the duplicate `reqwest` 0.12/0.13 the
+      `oauth2`/`openidconnect` dependency chain pulls in resolves
+      without `native-tls`/`openssl` in the lock file either way), and
+      the default build (no `oidc` feature) is bit-for-bit unaffected
+      (90/90 lib tests, unchanged). `scripts/ci-check.sh`'s
+      `extra_test_features_for()` now threads `--features oidc` through
+      **both** the plain `test` stage and the DB-gated `test-db` stage
+      (the latter previously ignored that function entirely for every
+      crate — a real, pre-existing gap, fixed in the same change,
+      since without it this whole feature's request-test suite would
+      never run in CI at all).
+- [x] **EV-2 follow-up (2026-09-19) — fix the OIDC callback's session
+      handoff; add the front-end IdP-initiated sign-in link (§7a
+      rollout step 3).** The 2026-09-18 landing set
+      `__Host-mxi_session` directly on the `/callback` response and
+      redirected to `FRONTEND_URL`. That cookie is **host-locked to
+      this service's own origin** (`src/cookie.rs`'s `__Host-` prefix),
+      and in the reference BFF topology the front end is a *different*
+      origin (`:5173` vs. this service's `:5150`) — the cookie never
+      reached anywhere the browser would send it back, so a real
+      cross-origin deployment's federated sign-in silently failed to
+      actually establish a usable session, even though the DB-gated
+      test suite was green (it asserted the `Set-Cookie` header on the
+      direct same-client response, which is a correct assertion about
+      this service's own HTTP contract but does not model a browser
+      leaving for a different origin).
+      **Fix:** the callback now reuses the existing magic-link bridge
+      verbatim — `users::Model::create_magic_link` mints a single-use,
+      ~5-minute, hash-at-rest (SEC-A9) token for the verified user, and
+      the callback redirects to `{frontend}/verify?token=…` instead of
+      setting a session cookie itself. The front end's already-tested
+      `/verify` BFF route (a server-to-server `GET
+      /api/auth/magic-link/{token}`) performs the actual session
+      establishment and cookie re-hosting — the identical mechanism a
+      real magic-link sign-in already uses, not a new one. `GET
+      /api/auth/oidc/login` also gained an optional `?return_url=`,
+      reusing `controllers::auth::{choose_frontend, allowed_frontends,
+      default_frontend}` (made `pub(crate)`) so a multi-app deployment's
+      federated sign-in lands back on the requesting app rather than
+      always the family-wide default — the same allow-listed knob
+      `MagicLinkParams::return_url` already gives the magic-link flow.
+      See `src/controllers/oidc.rs`'s module doc comment for the full
+      "why bridge, not establish directly" reasoning.
+      **Trade, documented rather than silently accepted:** the audit
+      trail now records the OIDC identity event (`oidc_sign_in`) and
+      the generic session-establishment mechanics
+      (`magic_link_redeemed`) as two adjacent rows instead of one
+      OIDC-named row — correlatable by `pid`/`source_ip`/timestamp.
+      **Front end** (`authentication-front-end-with-svelte`): a "Sign
+      in with SSO" link on `/signin`, gated on
+      `PUBLIC_OIDC_SIGNIN_ENABLED` (this app's own opt-in — unset hides
+      it entirely, matching magic link staying the default) and a new
+      `/signin/sso` server route that 303-redirects the *browser* (not
+      a BFF `fetch` — the OIDC flow needs the browser itself to visit
+      the IdP and come back) to this service's `/api/auth/oidc/login`
+      with `return_url` set to the front end's own origin. Verified in
+      a real browser (Playwright): the link renders with the correct
+      text/href, and clicking it drives the 303 chain to
+      `{AUTH_API_URL}/api/auth/oidc/login?return_url=…` with the
+      correct encoded origin.
+      **Verified:** `tests/requests/oidc.rs` grew from 6 to 7 DB-gated
+      tests (the round-trip test now drives the full two-hop bridge —
+      `/callback` → extract the bridge token from the `Location` header
+      → `GET /api/auth/magic-link/{token}` → assert the session cookie
+      — plus a new `return_url` test); `cargo build`/`clippy
+      --all-targets --features oidc -- -D warnings` clean, `cargo fmt
+      --check` clean, `cargo test --lib` 95/95 (`oidc`) and 90/90
+      (default, unaffected), `cargo deny check` clean, and the full
+      `scripts/ci-check.sh test-db` run against real Postgres, all 7
+      OIDC tests green. Front end: `pnpm run check` (0 errors), `pnpm
+      exec vitest run` (32/32, +4 new), `pnpm run build`, `pnpm run
+      lint` all clean.
+- [x] **EV-2 (2026-09-19) — SAML 2.0 SP evaluated and deferred (not
+      merely unscheduled).** Surveyed the Rust SAML ecosystem for a
+      crate clearing the same bar `openidconnect` cleared for the OIDC
+      half — vetted, actively-adopted, pure Rust, owns the cryptography
+      entirely — and found none:
+      - **`samael`** (the most mature/starred candidate) verifies
+        XML-DSig via a C FFI binding to **xmlsec1**, pulling in
+        `openssl` + `libxml2` + `libxslt` and a C toolchain at build
+        time. This is exactly the class of dependency this family has
+        avoided everywhere else (rustls over openssl,
+        `agents/share/rust-loco-stack.md`'s "rustls" constraint; every
+        loco crate's `default-features = false` without `auth` to keep
+        `rsa`/OpenSSL-adjacent transitive dependencies out,
+        `security.md`'s 2026-08-21 update) — a materially larger,
+        unaudited-by-us attack surface than any crate this family has
+        taken on.
+      - **`saml`** (danielkov/saml) is pure Rust, but its `rsa-sha`
+        feature — required for interop with the RSA-SHA256 signing
+        essentially every real-world IdP uses — depends directly on
+        the `rsa` crate: the **exact** crate this family removed
+        family-wide on 2026-08-21 for RUSTSEC-2023-0071 (the Marvin
+        timing attack, `security.md` §7's "the supply-chain gate is
+        green again" entry). It is also pre-alpha (v0.0.1-alpha, 5
+        GitHub stars), with no production-readiness or audit claim.
+      Hand-rolling XML-DSig verification is not a third option — it is
+      precisely the "never hand-roll signature verification" case
+      this crate's own OIDC design explicitly avoided by choosing
+      `openidconnect`. Implementing SAML SP today would force a real
+      regression against one of two already-deliberate security
+      decisions (the `rsa` removal or the rustls-only posture) rather
+      than a clean rollout step. **Not an implementation gap to be
+      filled next session** — see
+      `agents/share/authentication-sessions.md` §7a's rollout step 2
+      for the full finding and the "revisit if" condition (a new
+      pure-Rust SAML crate that avoids `rsa`, or a deployment-specific
+      need that justifies reopening the tradeoff as its own
+      security-reviewed decision).
+
 ## 14. Implementation status
 
 > **Pivot landed.** The code reality is cookie sessions + PASETO
@@ -1102,7 +1319,19 @@ magic-link email (en / cy via `src/i18n.rs`, optional request `locale`);
 the **assignment surface has landed** — both the `user_attributes` CLI
 task and the `access=admin`-gated HTTP admin API, each writing an
 `attributes_assigned` audit row (§13); keyed integrity verification
-over `auth_events` (`GET /api/compliance/audit/verify`, §6.13).
+over `auth_events` (`GET /api/compliance/audit/verify`, §6.13);
+**OIDC relying-party identity federation** (`oidc` Cargo feature, off
+by default — `GET /api/auth/oidc/{login,callback}`, §13 EV-2) as an
+alternative front door onto the same session, reached via a
+magic-link bridge token rather than a direct cross-origin cookie set
+(§13's 2026-09-19 follow-up); the sibling front end's IdP-initiated
+"Sign in with SSO" link (§7a rollout step 3) has also landed, opt-in
+via `PUBLIC_OIDC_SIGNIN_ENABLED`. Magic link stays the default.
+**SAML 2.0 SP is not implemented — evaluated and deliberately deferred**
+(§13's 2026-09-19 entry): no Rust crate today clears the "vetted,
+pure-Rust, owns the crypto" bar `openidconnect` cleared for OIDC
+without reintroducing either the banned `rsa` crate or an
+openssl/xmlsec1 C FFI surface.
 
 ## 15. Roadmap
 

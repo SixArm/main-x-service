@@ -251,6 +251,75 @@ pub fn summed_percent(
         .sum()
 }
 
+/// One required-tag's status against a resolved skill set (T-28c).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillStatus {
+    /// The resolved skill set names this tag.
+    Covered,
+    /// The resolved skill set was read and does not name this tag.
+    Missing,
+    /// No skill set could be resolved for the assigned person (an
+    /// unreachable worker record, a non-worker reference, or no
+    /// resolver configured) — never reported as [`Missing`], since
+    /// that would claim a fact nothing actually checked.
+    Unknown,
+}
+
+/// One allocation's skill-gap finding, naming the tag, the status, and
+/// (for [`SkillStatus::Unknown`]) why nothing could be resolved.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SkillGapFinding {
+    /// The allocation this finding is about.
+    pub allocation_pid: Uuid,
+    /// The person assigned to that allocation.
+    pub person_ref: String,
+    /// The required tag this finding is about.
+    pub tag: String,
+    /// Covered, missing, or unknown.
+    pub status: SkillStatus,
+    /// Why the status is [`SkillStatus::Unknown`] — absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// Compare one allocation's required tags against its resolved skill
+/// set (`None` when resolution failed for any reason — see
+/// [`SkillStatus::Unknown`]). Pure: the caller does the resolving.
+#[must_use]
+pub fn skill_gap(
+    allocation_pid: Uuid,
+    person_ref: &str,
+    skills_required: &[String],
+    resolved: Option<&[String]>,
+    unresolved_reason: Option<&str>,
+) -> Vec<SkillGapFinding> {
+    skills_required
+        .iter()
+        .map(|tag| {
+            let (status, reason) = match resolved {
+                Some(held) if held.iter().any(|h| h == tag) => (SkillStatus::Covered, None),
+                Some(_) => (SkillStatus::Missing, None),
+                None => (
+                    SkillStatus::Unknown,
+                    Some(
+                        unresolved_reason
+                            .unwrap_or("skill set could not be resolved")
+                            .to_string(),
+                    ),
+                ),
+            };
+            SkillGapFinding {
+                allocation_pid,
+                person_ref: person_ref.to_string(),
+                tag: tag.clone(),
+                status,
+                reason,
+            }
+        })
+        .collect()
+}
+
 /// Escape one CSV field (RFC-4180 style: quote when needed, double
 /// embedded quotes).
 #[must_use]
@@ -445,5 +514,40 @@ mod tests {
         assert_eq!(csv_field("a,b"), "\"a,b\"");
         assert_eq!(csv_field("say \"hi\""), "\"say \"\"hi\"\"\"");
         assert_eq!(csv_field("line\nbreak"), "\"line\nbreak\"");
+    }
+
+    /// Skill gap: a resolved set names covered and missing tags; an
+    /// unresolved set (`None`) names every tag `unknown` with a
+    /// reason — never `missing`, since nothing was actually checked.
+    #[test]
+    fn skill_gap_covers_missing_and_unknown() {
+        let allocation_pid = Uuid::from_u128(1);
+        let held = vec!["rust".to_string(), "postgres".to_string()];
+        let required = vec!["rust".to_string(), "welding".to_string()];
+
+        let resolved = skill_gap(allocation_pid, "worker:0c4f", &required, Some(&held), None);
+        assert_eq!(resolved.len(), 2);
+        assert_eq!(resolved[0].tag, "rust");
+        assert_eq!(resolved[0].status, SkillStatus::Covered);
+        assert!(resolved[0].reason.is_none());
+        assert_eq!(resolved[1].tag, "welding");
+        assert_eq!(resolved[1].status, SkillStatus::Missing);
+        assert!(resolved[1].reason.is_none());
+
+        let unresolved = skill_gap(
+            allocation_pid,
+            "worker:0c4f",
+            &required,
+            None,
+            Some("worker service returned 404"),
+        );
+        assert!(unresolved.iter().all(|f| f.status == SkillStatus::Unknown));
+        assert_eq!(
+            unresolved[0].reason.as_deref(),
+            Some("worker service returned 404")
+        );
+
+        // No required tags ⇒ no findings, resolved or not.
+        assert!(skill_gap(allocation_pid, "worker:0c4f", &[], Some(&held), None).is_empty());
     }
 }

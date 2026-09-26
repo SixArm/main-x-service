@@ -49,9 +49,10 @@ describe("i18n catalog", () => {
         expect(translate(bogus, "en")).toBe("does.not.exist");
     });
 
-    it("supports exactly the 13 expected locales with endonym labels", () => {
+    it("supports exactly the 14 expected locales with endonym labels", () => {
         expect([...LOCALES]).toEqual([
             "en",
+            "en_US",
             "cy",
             "es",
             "fr",
@@ -70,8 +71,8 @@ describe("i18n catalog", () => {
         }
     });
 
-    it("every one of the 13 locales covers every English key (full coverage)", () => {
-        expect(LOCALES.length).toBe(13);
+    it("every one of the 14 locales covers every English key (full coverage)", () => {
+        expect(LOCALES.length).toBe(14);
         for (const locale of LOCALES) {
             const table = STRINGS_BY_LOCALE[locale];
             for (const key of STRING_KEYS) {
@@ -123,6 +124,15 @@ describe("i18n reactive locale", () => {
     it("set() reduces a region subtag to its primary language", () => {
         i18n.set("cy-GB");
         expect(i18n.locale).toBe("cy");
+    });
+
+    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+        i18n.set("en_US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en-US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en");
+        expect(i18n.locale).toBe("en");
     });
 
     it("set() falls back to the default for an unsupported locale", () => {

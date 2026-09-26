@@ -8,6 +8,7 @@ pub mod event_outbox;
 pub mod governance;
 pub mod merge_records;
 pub mod plans;
+pub mod saved_views;
 pub mod strategy;
 pub mod visibility;
 pub mod webhook_deliveries;

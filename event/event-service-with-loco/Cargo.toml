@@ -143,7 +143,7 @@ fluvio = ["dep:fluvio"]
 # Testing
 assertables = "10"
 tokio-test = "0.4"
-mockall = "0.13"
+mockall = "0.15"
 tempfile = "3.27"
 # T-2: proves the date-proximity scorer's timezone correctness against
 # the real IANA tz database (DST-aware), not a hand-picked fixed offset
@@ -159,7 +159,7 @@ chrono-tz = "0.10"
 # any network dependency.
 ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-base64 = { version = "0.22" }
+base64 = { version = "0.23" }
 # The activation proof (tests/enforcement.rs) sets process-wide env vars
 # before booting the router, so it must not run beside another test in
 # the same process; `tower` drives that router with `oneshot`.

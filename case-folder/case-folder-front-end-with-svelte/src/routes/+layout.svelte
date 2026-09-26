@@ -1,8 +1,9 @@
 <script lang="ts">
     // Root layout — the chrome wrapped around every route.
     //
-    // Renders the NHS-themed utility row (theme/text-size/share pickers,
-    // the signed-in identity / sign-out control), the branded top header
+    // Renders the NHS-themed utility row (the Lily PickerBar — theme,
+    // locale, text-size, and share pickers as one row — plus the
+    // signed-in identity / sign-out control), the branded top header
     // with primary navigation (hamburger-collapsible on narrow viewports),
     // the full-width main content slot, and the footer. The primary
     // navigation shows on every real route (including the dashboard at
@@ -31,16 +32,19 @@
     import Footer from '$lib/components/Footer/Footer.svelte';
     import NavigationMenu from '$lib/components/NavigationMenu/NavigationMenu.svelte';
 
-    import ThemePicker from 'lily-design-system-svelte-theme-picker';
-    import {
-        SharePicker,
-        type ShareTarget,
-    } from 'lily-design-system-svelte-share-picker';
-    import { TextSizePicker } from 'lily-design-system-svelte-text-size-picker';
+    import PickerBar from '@lilydesignsystem/svelte-picker-bar';
+    import type { ShareTarget } from '@lilydesignsystem/svelte-share-picker';
 
     import { cache } from '$lib/store/cache.svelte';
     import { api } from '$lib/api/client';
-    import { i18n, t, isRtl, type StringKey } from '$lib/i18n.svelte';
+    import {
+        i18n,
+        t,
+        isRtl,
+        LOCALES,
+        LOCALE_LABELS,
+        type StringKey,
+    } from '$lib/i18n.svelte';
 
     let { children } = $props();
 
@@ -65,23 +69,16 @@
     $effect(() => {
         if (!browser) return;
         const locale = i18n.locale;
-        document.documentElement.setAttribute('lang', locale);
+        // `lang` must read BCP 47 ("en-US"), while `i18n.locale` uses an
+        // underscore for a region subtag ("en_US"); this must agree with
+        // what PickerBar's LocalePicker itself writes via its own
+        // `bcp47LocaleTag`, since both write the same attribute.
+        document.documentElement.setAttribute('lang', locale.replace('_', '-'));
         document.documentElement.setAttribute(
             'dir',
             isRtl(locale) ? 'rtl' : 'ltr',
         );
     });
-
-    // Text sizes offered by the Lily TextSizePicker. Applied as
-    // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
-    // `data-theme`); see app.css for the corresponding font-size scale.
-    const SIZES = ['small', 'medium', 'large', 'x-large'];
-    const SIZE_LABELS: Record<string, string> = {
-        small: 'Small',
-        medium: 'Medium',
-        large: 'Large',
-        'x-large': 'Extra large',
-    };
 
     // Share destinations for the Lily SharePicker. Lily ships no
     // third-party URLs — each `href` builder is ours. `url`/`title` are
@@ -92,16 +89,23 @@
     // SharePicker having to read the DOM).
     const SHARE_TARGETS: ShareTarget[] = [
         {
+            id: 'email',
+            label: 'Email',
+            href: (url, title) =>
+                `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
+            newTab: false,
+        },
+        {
             id: 'linkedin',
             label: 'LinkedIn',
             href: (url) =>
                 `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
         },
         {
-            id: 'mastodon',
-            label: 'Mastodon',
+            id: 'reddit',
+            label: 'Reddit',
             href: (url, title) =>
-                `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
         },
         {
             id: 'bluesky',
@@ -110,10 +114,10 @@
                 `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
         },
         {
-            id: 'reddit',
-            label: 'Reddit',
+            id: 'mastodon',
+            label: 'Mastodon',
             href: (url, title) =>
-                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+                `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
         },
     ];
 
@@ -156,108 +160,6 @@
         { href: '/reports', key: 'nav.reports' },
     ];
 
-    // Full Lily/DaisyUI theme catalogue (copied verbatim from the sibling
-    // course-front-end-with-svelte for family parity). Each slug has a Lily
-    // stylesheet at `static/assets/themes/<slug>.css` (a symlink to the shared
-    // design-system themes) that ThemePicker swaps in. Includes the NHS
-    // England/Scotland/Wales patient & practitioner themes; the
-    // practitioner-facing English theme is the sensible NHS default.
-    const themes = [
-        'abyss',
-        'acid',
-        'aqua',
-        'autumn',
-        'black',
-        'bumblebee',
-        'business',
-        'caramellatte',
-        'cmyk',
-        'coffee',
-        'corporate',
-        'cupcake',
-        'cyberpunk',
-        'dark',
-        'dim',
-        'dracula',
-        'emerald',
-        'fantasy',
-        'forest',
-        'garden',
-        'halloween',
-        'lemonade',
-        'light',
-        'lofi',
-        'luxury',
-        'night',
-        'nord',
-        'pastel',
-        'retro',
-        'silk',
-        'sunset',
-        'synthwave',
-        'united-kingdom-national-health-service-england-for-patients',
-        'united-kingdom-national-health-service-england-for-practitioners',
-        'united-kingdom-national-health-service-scotland-for-patients',
-        'united-kingdom-national-health-service-scotland-for-practitioners',
-        'united-kingdom-national-health-service-wales-for-patients',
-        'united-kingdom-national-health-service-wales-for-practitioners',
-        'valentine',
-        'winter',
-        'wireframe',
-    ];
-
-    // Human-readable labels for the theme select — the FULL theme name for
-    // each slug (DaisyUI names title-cased; the NHS slugs spelled out in full).
-    const THEME_LABELS: Record<string, string> = {
-        abyss: 'Abyss',
-        acid: 'Acid',
-        aqua: 'Aqua',
-        autumn: 'Autumn',
-        black: 'Black',
-        bumblebee: 'Bumblebee',
-        business: 'Business',
-        caramellatte: 'Caramellatte',
-        cmyk: 'Cmyk',
-        coffee: 'Coffee',
-        corporate: 'Corporate',
-        cupcake: 'Cupcake',
-        cyberpunk: 'Cyberpunk',
-        dark: 'Dark',
-        dim: 'Dim',
-        dracula: 'Dracula',
-        emerald: 'Emerald',
-        fantasy: 'Fantasy',
-        forest: 'Forest',
-        garden: 'Garden',
-        halloween: 'Halloween',
-        lemonade: 'Lemonade',
-        light: 'Light',
-        lofi: 'Lofi',
-        luxury: 'Luxury',
-        night: 'Night',
-        nord: 'Nord',
-        pastel: 'Pastel',
-        retro: 'Retro',
-        silk: 'Silk',
-        sunset: 'Sunset',
-        synthwave: 'Synthwave',
-        valentine: 'Valentine',
-        winter: 'Winter',
-        wireframe: 'Wireframe',
-        'united-kingdom-national-health-service-england-for-patients':
-            'United Kingdom National Health Service England for Patients',
-        'united-kingdom-national-health-service-england-for-practitioners':
-            'United Kingdom National Health Service England for Practitioners',
-        'united-kingdom-national-health-service-scotland-for-patients':
-            'United Kingdom National Health Service Scotland for Patients',
-        'united-kingdom-national-health-service-scotland-for-practitioners':
-            'United Kingdom National Health Service Scotland for Practitioners',
-        'united-kingdom-national-health-service-wales-for-patients':
-            'United Kingdom National Health Service Wales for Patients',
-        'united-kingdom-national-health-service-wales-for-practitioners':
-            'United Kingdom National Health Service Wales for Practitioners',
-    };
-
     // Mark a nav link as the current page for `aria-current`. The
     // dashboard link must match exactly (every path starts with '/'),
     // while section links match any of their sub-paths (e.g. /folders/new
@@ -272,31 +174,40 @@
 
 <div class="utility-row">
     <div class="page-wrapper">
-        <ThemePicker
-            label={t('chrome.theme')}
+        <PickerBar
+            labels={{
+                theme: t('chrome.theme'),
+                locale: t('chrome.language'),
+                textSize: t('nav.text_size'),
+                share: t('nav.share'),
+            }}
             themesUrl="/assets/themes/"
-            {themes}
-            themeLabels={THEME_LABELS}
-            defaultValue="united-kingdom-national-health-service-england-for-practitioners"
-            storageKey="case-folder:theme"
-            class="utility-row-picker"
-        />
-        <TextSizePicker
-            label={t('nav.text_size')}
-            sizes={SIZES}
-            sizeLabels={SIZE_LABELS}
-            defaultValue="medium"
-            storageKey="case-folder:text-size"
-            class="utility-row-picker"
-        />
-        <SharePicker
-            label={t('nav.share')}
-            title={pageTitle}
-            targets={SHARE_TARGETS}
-            copyLabel={t('share.copy_link')}
-            copiedLabel={t('share.copied')}
-            copyFailedLabel={t('share.copy_failed')}
-            class="utility-row-picker"
+            themeProps={{
+                defaultValue:
+                    'united-kingdom-national-health-service-england-for-practitioners',
+                storageKey: 'case-folder:theme',
+                class: 'utility-row-picker',
+            }}
+            locales={[...LOCALES]}
+            localeProps={{
+                value: i18n.locale,
+                localeLabels: LOCALE_LABELS,
+                applyDir: false,
+                onChange: (code: string) => i18n.set(code),
+                class: 'utility-row-picker',
+            }}
+            textSizeProps={{
+                storageKey: 'case-folder:text-size',
+                class: 'utility-row-picker',
+            }}
+            shareTargets={SHARE_TARGETS}
+            shareProps={{
+                title: pageTitle,
+                copyLabel: t('share.copy_link'),
+                copiedLabel: t('share.copied'),
+                copyFailedLabel: t('share.copy_failed'),
+                class: 'utility-row-picker',
+            }}
         />
         {#if user}
             <span class="auth-status">

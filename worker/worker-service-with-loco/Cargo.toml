@@ -173,7 +173,7 @@ tempfile = "3.27"
 # any network dependency.
 ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-base64 = { version = "0.22" }
+base64 = { version = "0.23" }
 
 # An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
 # `tests/otlp_middleware.rs` (PRO-H9, ported from person-service): the

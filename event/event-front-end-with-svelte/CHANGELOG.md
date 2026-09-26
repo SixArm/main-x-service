@@ -9,6 +9,60 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
+
+`spec/lily-design-system-svelte-with-picker-bar/index.md` (repo root)
+calls for "all Lily default themes (not any application-specific
+custom themes)" and "all Lily default text sizes." Removed the
+hand-maintained `THEMES`/`THEME_LABELS` (41 slugs — a subset of
+Lily's own 45, missing `adobe-spectrum`, `mozilla-protocol`, and the
+UK/US government themes) and `SIZES`/`SIZE_LABELS` (a custom 4-step
+`small`/`medium`/`large`/`x-large` scale) arrays from `+layout.svelte`;
+`PickerBar` now gets no `themes`/`sizes` prop at all, so it uses its
+own `DEFAULT_THEMES` (45, alphabetical, UK/US government themes
+grouped at the end) and `DEFAULT_SIZES` (the 7-step `largest`…
+`smallest` scale) directly — a superset of what was offered before,
+not a behavioural narrowing.
+
+`src/app.css`'s `[data-text-size]` rules rewritten for the new 7-step
+scale (was 3 rules for `small`/`large`/`x-large`; `medium` unscaled,
+now `normal` unscaled).
+
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-of-page chrome (theme, text-size, share pickers) previously
+wired `ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This restores a locale picker to the chrome: the layout previously had
+none at all (the i18n store `$lib/i18n.svelte.ts` was the only way to
+change locale, e.g. programmatically), and `PickerBar` bundles all
+four unconditionally with no way to omit one. Wired with
+`applyDir={false}` and `onChange={(code) => i18n.set(code)}`, since
+this app's own `i18n.svelte.ts` store already reflects `lang`/`dir`
+onto `<html>`. The chrome's `labels.locale` reuses the existing
+`chrome.language` i18n key, already translated across all 13 locales.
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon; the Mastodon target
+now points at `mastodonshare.com` instead of `mastodon.social/share`
+(a generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
+Also added `en_US` ("English (United States)") to
+`src/lib/i18n.svelte.ts`'s `LOCALES`/`LOCALE_LABELS`/`STRINGS` (a
+duplicate of `en`'s copy — `en`'s own strings were already
+American-spelled, so this is a distinct locale-picker entry, not a
+spelling fork) and taught `normaliseLocale` to match a region variant
+like `en_US`/`en-US` exactly before falling back to stripping to its
+primary subtag (previously `en_US` would have silently collapsed to
+`en`, since only the primary subtag was ever checked).
+
 ### Fixed — the Events list page crashed against a real service (T-30)
 
 `EventRepository.search()` read `data.items` from the service's search
