@@ -1305,7 +1305,7 @@ dependencies = [
  "mimalloc",
  "opentelemetry 0.32.0",
  "opentelemetry-otlp",
- "opentelemetry-proto 0.33.0",
+ "opentelemetry-proto",
  "opentelemetry-semantic-conventions",
  "opentelemetry_sdk 0.32.1",
  "prometheus",
@@ -4229,36 +4229,24 @@ dependencies = [
  "js-sys",
  "pin-project-lite",
  "thiserror 2.0.20",
+ "tracing",
 ]
 
 [[package]]
 name = "opentelemetry-otlp"
-version = "0.32.0"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9966929966d17620d7c316c643ba62631826e10021409357772d5eea84f62c35"
+checksum = "699a67345e21962a231955b9059a157e428b219fa5df8efe11f08346fb23a344"
 dependencies = [
  "http",
- "opentelemetry 0.32.0",
- "opentelemetry-proto 0.32.0",
- "opentelemetry_sdk 0.32.1",
+ "opentelemetry 0.33.0",
+ "opentelemetry-proto",
+ "opentelemetry_sdk 0.33.0",
  "prost",
  "thiserror 2.0.20",
  "tokio",
  "tonic",
  "tonic-types",
-]
-
-[[package]]
-name = "opentelemetry-proto"
-version = "0.32.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56d658ba1faf63f7b9c492cfbe6e0ec365440a16132d3270c1065f7b33f1b638"
-dependencies = [
- "opentelemetry 0.32.0",
- "opentelemetry_sdk 0.32.1",
- "prost",
- "tonic",
- "tonic-prost",
 ]
 
 [[package]]
