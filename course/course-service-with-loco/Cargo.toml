@@ -133,7 +133,7 @@ criterion = { version = "0.8", features = ["html_reports"] }
 # server transport, so the export pipeline is proved against a real gRPC
 # listener in a normal `cargo test` run — no external collector, nothing
 # `#[ignore]`d.
-opentelemetry-proto = { version = "0.32", default-features = false, features = [
+opentelemetry-proto = { version = "0.33", default-features = false, features = [
   "gen-tonic",
   "trace",
   "metrics",
