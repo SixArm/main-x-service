@@ -101,7 +101,7 @@ strsim = "0.11"
 prometheus = "0.14"
 # SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
 # See src/compliance/audit_chain.rs.
-sha2 = "0.10"
+sha2 = "0.11"
 # Second integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
 # structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
 # cryptanalytic advance against one design family does not transfer to
