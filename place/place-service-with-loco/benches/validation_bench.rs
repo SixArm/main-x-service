@@ -6,11 +6,12 @@
 //! cost of each rule shows up) and `normalize_place` on a record needing
 //! trimming/title-casing.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::validation::{normalize_place, validate_place};
+use std::hint::black_box;
 
 /// Benchmark validating a minimal (name-only) place.
 fn bench_validate_simple(c: &mut Criterion) {
