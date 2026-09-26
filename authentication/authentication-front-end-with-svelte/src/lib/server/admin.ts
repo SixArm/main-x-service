@@ -16,8 +16,7 @@ type FetchFn = typeof fetch;
 /** Success carries the payload; failure carries the HTTP status and a
  *  human-readable message (from the service's `{error, description}`). */
 export type AdminResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; message: string };
+  { ok: true; data: T } | { ok: false; status: number; message: string };
 
 /** Read the `{error, description}` body of a failed admin response into a
  *  message, falling back to the status text. */
