@@ -87,7 +87,7 @@ opentelemetry-otlp = { version = "0.32", default-features = false, features = [
   "metrics",
 ] }
 opentelemetry-semantic-conventions = { version = "0.32" }
-tracing-opentelemetry = { version = "0.33" }
+tracing-opentelemetry = { version = "0.34" }
 
 # Outbound webhook delivery (agents/share/event-bus.md §12, repo
 # tasks.md EV-3, this crate's own spec/13-tasks.md T-28m) — src/webhooks.rs.
