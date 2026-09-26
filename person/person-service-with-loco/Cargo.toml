@@ -84,7 +84,7 @@ opentelemetry-otlp = { version = "0.32", default-features = false, features = [
 opentelemetry-semantic-conventions = { version = "0.32" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-opentelemetry = { version = "0.33" }
+tracing-opentelemetry = { version = "0.34" }
 
 # Utilities
 uuid = { version = "1.26", features = ["v4", "serde"] }
