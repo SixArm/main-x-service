@@ -46,7 +46,7 @@
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.70.0",
     "vite": "^6.2.0",
-    "vitest": "^4.1.8"
+    "vitest": "^5.0.1"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.3.1",
