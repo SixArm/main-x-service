@@ -70,7 +70,7 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 # rather than silently dropped. No `logs` feature — this pipeline is
 # traces + metrics only.
 opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
-opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
 opentelemetry-otlp = { version = "0.32", default-features = false, features = [
   "grpc-tonic",
   "trace",
