@@ -115,7 +115,7 @@ jobs:
         front-end: ${{ fromJson(needs.discover.outputs.front-ends) }}
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           # Pinned exact, not a floating major: a newer 11.x enforces a
           # `minimumReleaseAge` supply-chain policy (rejects a lockfile
