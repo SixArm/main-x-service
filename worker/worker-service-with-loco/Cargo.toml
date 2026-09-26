@@ -54,7 +54,7 @@ tonic-prost = "0.14"
 prost = "0.14"
 
 # OpenAPI Documentation
-utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 # Data Streaming
