@@ -53,7 +53,7 @@ tantivy = "0.26"
 tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
 
 # OpenAPI Documentation
-utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
 # Data Streaming
