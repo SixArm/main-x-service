@@ -4,14 +4,17 @@
 // surface is small and we keep the front-end dependency-light (drift
 // across the family front-ends is accepted, see AGENTS.md).
 //
-// Supported locales: English (`en`, the source of truth) plus Welsh
-// (`cy`, for the public-sector Welsh-language duty), Spanish (`es`),
-// French (`fr`), German (`de`), Arabic (`ar`, RTL), Russian (`ru`),
-// Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese
-// (`pt`), Indonesian (`id`), and Urdu (`ur`, RTL). An unknown key/locale
-// falls back to `en`, then to the key string itself. The chosen locale
-// persists to localStorage and drives the UI strings, `<html lang>`, and
-// `<html dir>` (right-to-left for `ar` / `ur`).
+// Supported locales: English (`en`, the source of truth) plus American
+// English (`en_US`, identical content today — a distinct endonym for the
+// locale picker rather than a spelling divergence, since `en`'s own copy
+// is already American-spelled), Welsh (`cy`, for the public-sector
+// Welsh-language duty), Spanish (`es`), French (`fr`), German (`de`),
+// Arabic (`ar`, RTL), Russian (`ru`), Hindi (`hi`), Mandarin Chinese
+// (`zh`), Bengali (`bn`), Portuguese (`pt`), Indonesian (`id`), and Urdu
+// (`ur`, RTL). An unknown key/locale falls back to `en`, then to the key
+// string itself. The chosen locale persists to localStorage and drives
+// the UI strings, `<html lang>`, and `<html dir>` (right-to-left for
+// `ar` / `ur`).
 
 import { browser } from "$app/environment";
 
@@ -21,6 +24,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -44,6 +48,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -90,6 +95,225 @@ export const LOCALE_KEY = "mxi.care-pathway.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.pathways": "Pathways",
+    "nav.insights": "Insights",
+    "nav.board": "Board",
+    "nav.gantt": "Gantt",
+    "nav.sequence": "Sequence",
+    "nav.time": "Time",
+    // Layout / chrome
+    "brand.name": "Care Pathways",
+    "brand.full": "Main X · Care Pathways",
+    "nav.toggle": "Toggle navigation",
+    "nav.carePathways": "Care pathways",
+    "nav.newCarePathway": "New care pathway",
+    "chrome.theme": "Theme",
+    "chrome.language": "Language",
+    "chrome.share": "Share",
+    "chrome.textSize": "Text size",
+    "share.copyLink": "Copy link",
+    "share.linkCopied": "Link copied",
+    "share.copyFailed": "Could not copy — copy it from the address bar",
+    "session.title": "Session",
+    "session.signedIn": "Signed in",
+    "session.signOut": "Sign out",
+    "session.signIn": "Sign in",
+    "session.pasteToken": "Paste a token",
+    "session.pasteTokenPlaceholder": "Paste access token",
+    "session.accessToken": "Access token",
+    "session.useToken": "Use token",
+    "session.hint":
+      "Token comes from the authentication-service (magic-link sign-in).",
+    // List page
+    "list.title": "Care pathways",
+    "list.new": "New care pathway",
+    "list.searchPlaceholder": "Search by name…",
+    "list.searchLabel": "Search care pathways by name",
+    "list.search": "Search",
+    "list.clear": "Clear",
+    "list.loading": "Loading…",
+    "list.noMatch": "No care pathways match “{q}”.",
+    "list.empty": "No care pathways yet.",
+    "list.createOne": "Create one",
+    "list.showActivity": "Show recent activity",
+    "list.hideActivity": "Hide recent activity",
+    "list.recentActivity": "Recent activity",
+    "list.loadingActivity": "Loading recent activity…",
+    "list.noActivity": "No recent activity.",
+    // Detail page
+    "detail.fallbackName": "Care pathway",
+    "detail.loading": "Loading…",
+    "detail.careSetting": "Care setting:",
+    "detail.provider": "Provider:",
+    "detail.pathwayCode": "Pathway code:",
+    "detail.conditionCodes": "Condition codes:",
+    "detail.identifiers": "Identifiers:",
+    "detail.interventions": "Interventions:",
+    "detail.keywords": "Keywords:",
+    "detail.languages": "Languages:",
+    "detail.id": "ID:",
+    "detail.edit": "Edit",
+    "detail.checking": "Checking…",
+    "detail.checkDuplicates": "Check duplicates",
+    "detail.delete": "Delete",
+    "detail.mergedInto": "Merged {dup} into this record.",
+    "detail.cannotMergeSelf": "Cannot merge a record into itself.",
+    "detail.potentialDuplicates": "Potential duplicates",
+    "detail.noneAboveThreshold": "None above the match threshold.",
+    "detail.mergeIntoConfirm": "Merge into this record?",
+    "detail.merging": "Merging…",
+    "detail.confirmMerge": "Confirm merge",
+    "detail.cancel": "Cancel",
+    "detail.mergeInto": "Merge into this record",
+    "detail.showAudit": "Show audit trail",
+    "detail.hideAudit": "Hide audit trail",
+    "detail.auditTrail": "Audit trail",
+    "detail.loadingAudit": "Loading audit trail…",
+    "detail.noAuditEntries": "No audit entries.",
+    "detail.notFound": "Not found",
+    "detail.checkFailed": "Check failed",
+    "detail.mergeFailed": "Merge failed",
+    "detail.auditLoadFailed": "Audit load failed",
+    // New / edit pages
+    "new.title": "New care pathway",
+    "new.create": "Create",
+    "edit.title": "Edit care pathway",
+    "edit.fallbackName": "care pathway",
+    "edit.loading": "Loading…",
+    "edit.saveChanges": "Save changes",
+    // Form
+    "form.name": "Name",
+    "form.careSetting": "Care setting",
+    "form.pathwayCode": "Pathway code",
+    "form.providerId": "Provider id",
+    "form.providerName": "Provider name",
+    "form.alternateNames": "Alternate names",
+    "form.interventions": "Interventions",
+    "form.keywords": "Keywords",
+    "form.sameAs": "Same-as URLs",
+    "form.languages": "Languages",
+    "form.commaSeparated": "(comma-separated)",
+    "form.bcp47CommaSeparated": "(BCP-47, comma-separated)",
+    "form.targetConditionCodes": "Target condition codes",
+    "form.identifiers": "Identifiers",
+    "form.remove": "Remove",
+    "form.addConditionCode": "+ Add condition code",
+    "form.addIdentifier": "+ Add identifier",
+    "form.saving": "Saving…",
+    "form.save": "Save",
+    "form.nameRequired": "Name is required.",
+    "form.saveFailed": "Save failed",
+    "time.contains": "Contains",
+    "time.excludes": "Excludes",
+    "time.compareComplement": "Compare against the complement",
+    "time.applyFilter": "Apply filter",
+    "time.processMap": "The process map",
+    "time.variants": "Journey variants",
+    "time.sunburst": "Sunburst",
+    "time.sankey": "Sankey",
+    "time.dottedChart": "Dotted chart",
+    "time.loadDottedChart": "Load dotted chart",
+    "time.loading": "Loading…",
+    "time.stalledJourneys": "Stalled journeys",
+    "time.compare": "Compare",
+    "time.matched": "Matched",
+    "time.complement": "Complement",
+    "time.attritionHeading": "How the cohort was arrived at",
+    "nav.bulk": "Bulk",
+    "bulk.head.title": "Bulk import/export — Main X",
+    "bulk.title": "Bulk import / export",
+    "bulk.intro":
+      "Upload a file of care pathways, or extract a filtered set, as a background job.",
+    "bulk.job.title": "Job",
+    "bulk.job.id": "Job ID",
+    "bulk.job.submittedAt": "Submitted",
+    "bulk.job.status": "Status",
+    "bulk.job.polling": "Checking…",
+    "bulk.job.progress": "Progress",
+    "bulk.job.unknownTotal": "counting…",
+    "bulk.job.rowsCreated": "Rows created",
+    "bulk.job.rowsUpserted": "Rows upserted",
+    "bulk.job.rowsToReview": "Rows queued for review",
+    "bulk.job.rowsErrored": "Rows errored",
+    "bulk.artifact.output": "Output file",
+    "bulk.artifact.errors": "Error report",
+    "bulk.artifact.note":
+      "Internal storage reference — not a downloadable link.",
+    "bulk.import.title": "Import",
+    "bulk.import.file": "File",
+    "bulk.import.fileHint": "JSONL, CSV, or TSV.",
+    "bulk.import.fileRequired": "Choose a file to import.",
+    "bulk.import.format": "Format",
+    "bulk.import.formatHint": "Must match the file's actual format.",
+    "bulk.import.dryRun": "Dry run (preview only, nothing is saved)",
+    "bulk.import.dryRunHint":
+      "Validates and classifies every row without writing anything.",
+    "bulk.import.dryRunNotice": "This was a dry run — nothing was saved.",
+    "bulk.import.submitting": "Submitting…",
+    "bulk.import.submit": "Start import",
+    "bulk.export.title": "Export",
+    "bulk.export.format": "Format",
+    "bulk.export.formatHint": "The downloaded file's format.",
+    "bulk.export.masking": "Masking",
+    "bulk.export.maskingHint": "Full requires elevated authorisation.",
+    "bulk.export.query": "Search query",
+    "bulk.export.queryHint":
+      "Optional — leave blank to export the unfiltered list.",
+    "bulk.export.limit": "Limit",
+    "bulk.export.limitHint": "Optional row cap.",
+    "bulk.export.submitting": "Submitting…",
+    "bulk.export.submit": "Start export",
+    "bulk.format.jsonl": "JSONL",
+    "bulk.format.csv": "CSV",
+    "bulk.format.tsv": "TSV",
+    "bulk.masking.masked": "Masked (default)",
+    "bulk.masking.full": "Full (unmasked)",
+    "bulk.status.queued": "Queued",
+    "bulk.status.running": "Running",
+    "bulk.status.completed": "Completed",
+    "bulk.status.completedWithErrors": "Completed with errors",
+    "bulk.status.failed": "Failed",
+    "bulk.kind.import": "Import",
+    "bulk.kind.export": "Export",
+    "bulk.error.expired": "This job has expired or is no longer visible.",
+    "bulk.jobs.title": "Recent jobs",
+    "bulk.jobs.filterKind": "Kind",
+    "bulk.jobs.filterStatus": "Status",
+    "bulk.jobs.all": "All",
+    "bulk.jobs.refresh": "Refresh",
+    "bulk.jobs.orderNote": "Newest first.",
+    "bulk.jobs.loading": "Loading…",
+    "bulk.jobs.empty": "No bulk jobs yet.",
+    "bulk.jobs.col.id": "ID",
+    "bulk.jobs.col.kind": "Kind",
+    "bulk.jobs.col.format": "Format",
+    "bulk.jobs.col.status": "Status",
+    "bulk.jobs.col.rows": "Rows",
+    "nav.reviewQueue": "Reviews",
+    "reviewQueue.head.title": "Review queue — Main X",
+    "reviewQueue.title": "Duplicate review queue",
+    "reviewQueue.intro":
+      "Candidate duplicate pairs a bulk import queued for a human decision.",
+    "reviewQueue.filterStatus": "Status",
+    "reviewQueue.status.pending": "Pending",
+    "reviewQueue.status.confirmed": "Confirmed",
+    "reviewQueue.status.rejected": "Rejected",
+    "reviewQueue.status.automerged": "Auto-merged",
+    "reviewQueue.empty": "No candidate pairs match this filter.",
+    "reviewQueue.col.pair": "Pair",
+    "reviewQueue.col.score": "Score",
+    "reviewQueue.col.detection": "Detection",
+    "reviewQueue.col.provenance": "Provenance",
+    "reviewQueue.col.status": "Status",
+    "reviewQueue.col.queuedAt": "Queued",
+    "reviewQueue.col.actions": "Actions",
+    "reviewQueue.confirm": "Confirm duplicate",
+    "reviewQueue.reject": "Reject",
+    "reviewQueue.error.alreadyDecided":
+      "Someone else already decided this pair.",
+    "reviewQueue.unknownReviewer": "—",
+  },
+  en_US: {
     "nav.pathways": "Pathways",
     "nav.insights": "Insights",
     "nav.board": "Board",
@@ -2912,7 +3136,17 @@ export const STRINGS_BY_LOCALE: Record<
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;

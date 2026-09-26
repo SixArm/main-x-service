@@ -13,6 +13,7 @@ import {
     RTL_LOCALES,
     isRtl,
     translate,
+    i18n,
     type StringKey,
 } from "../../src/lib/i18n.svelte";
 
@@ -54,14 +55,15 @@ describe("i18n catalog", () => {
         expect(DEFAULT_LOCALE).toBe("en");
     });
 
-    it("supports exactly the thirteen expected locales with labels", () => {
+    it("supports exactly the fourteen expected locales with labels", () => {
         expect([...LOCALES]).toEqual([
-            "en", "cy", "es", "fr", "de",
+            "en", "en_US", "cy", "es", "fr", "de",
             "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
         ]);
-        expect(LOCALES.length).toBe(13);
+        expect(LOCALES.length).toBe(14);
         expect(LOCALE_LABELS).toEqual({
             en: "English",
+            en_US: "English (United States)",
             cy: "Cymraeg",
             es: "Español",
             fr: "Français",
@@ -75,6 +77,16 @@ describe("i18n catalog", () => {
             id: "Bahasa Indonesia",
             ur: "اردو",
         });
+    });
+
+    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+        expect(i18n.set !== undefined).toBe(true);
+        i18n.set("en_US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en-US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en");
+        expect(i18n.locale).toBe("en");
     });
 
     it("spot-checks the new-locale translations", () => {

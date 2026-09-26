@@ -20,7 +20,7 @@ path = "src/bin/main.rs"
 integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # Unkeyed content digests, kept for structural diversity.
 sha2 = { version = "0.11" }
-sha3 = { version = "0.10" }
+sha3 = { version = "0.12" }
 # Async Runtime
 tokio = { version = "1.53", features = ["full"] }
 
@@ -136,9 +136,9 @@ tempfile = "3.27"
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the bearer-verification path is exercised without the auth service or
 # any network dependency.
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-base64 = { version = "0.22" }
+base64 = { version = "0.23" }
 # The activation proof (tests/enforcement.rs) sets process-wide env vars
 # before booting the router, so it must not run beside another test in
 # the same process.

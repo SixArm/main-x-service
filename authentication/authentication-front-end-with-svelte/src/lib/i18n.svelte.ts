@@ -4,11 +4,14 @@
 // surface is tiny and we keep the front-end dependency-light (drift
 // across the family front-ends is accepted, see AGENTS.md).
 //
-// Supported locales: English (`en`, the source of truth) plus Welsh
-// (`cy`, for the public-sector Welsh-language duty), Spanish (`es`),
-// French (`fr`), German (`de`), Arabic (`ar`, RTL), Russian (`ru`),
-// Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese
-// (`pt`), Indonesian (`id`), and Urdu (`ur`, RTL). Shared chrome terms
+// Supported locales: English (`en`, the source of truth) plus American
+// English (`en_US`, identical content today — a distinct endonym for the
+// locale picker rather than a spelling divergence, since `en`'s own copy
+// is already American-spelled), Welsh (`cy`, for the public-sector
+// Welsh-language duty), Spanish (`es`), French (`fr`), German (`de`),
+// Arabic (`ar`, RTL), Russian (`ru`), Hindi (`hi`), Mandarin Chinese
+// (`zh`), Bengali (`bn`), Portuguese (`pt`), Indonesian (`id`), and Urdu
+// (`ur`, RTL). Shared chrome terms
 // reuse the family's established translations (see the course front-end)
 // for consistency. An unknown key/locale falls back to `en`, then to the
 // key string itself. The chosen locale persists to localStorage, drives
@@ -24,6 +27,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -47,6 +51,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -126,6 +131,69 @@ const STRINGS = {
     "signin.noAccount": "No account yet?",
     "signin.create": "Create one",
     "signin.failed": "Request failed",
+    "signin.sso": "Sign in with SSO",
+    // Sign up
+    "signup.title": "Create account",
+    "signup.email": "Email",
+    "signup.name": "Name",
+    "signup.nameOptional": "(optional)",
+    "signup.submit": "Send magic link",
+    "signup.submitting": "Sending…",
+    "signup.sent":
+      "If that email is valid, a magic link is on its way. In development the link is printed to the auth service console — open it to finish signing in.",
+    "signup.backToSignin": "Back to sign in",
+    "signup.haveAccount": "Already have an account?",
+    "signup.signin": "Sign in",
+    "signup.failed": "Sign up failed",
+    // Verify
+    "verify.working.title": "Signing you in…",
+    "verify.working.body": "Verifying your magic link.",
+    "verify.error.title": "Could not sign you in",
+    "verify.error.missingToken": "This link is missing its token.",
+    "verify.error.invalid": "This link is invalid or expired.",
+    "verify.error.serviceUnavailable":
+      "We could not reach the sign-in service. Please try again in a moment.",
+    "verify.error.requestNew": "Request a new link",
+  },
+  en_US: {
+    brand: "Main X Auth",
+    "nav.home": "Home",
+    "nav.signin": "Sign in",
+    "nav.signup": "Sign up",
+    "nav.locale": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    "nav.theme": "Theme",
+    "nav.toggle": "Toggle navigation",
+    "session.signedInAs": "Signed in as",
+    // Home / account
+    "account.title": "Account",
+    "account.loading": "Loading…",
+    "account.name": "Name:",
+    "account.email": "Email:",
+    "account.id": "ID:",
+    "account.signout": "Sign out",
+    "account.notSignedIn": "You are not signed in.",
+    "account.signinPrompt.signin": "Sign in",
+    "account.signinPrompt.or": "or",
+    "account.signinPrompt.create": "create an account",
+    "account.loadFailed": "Failed to load profile",
+    "account.rateLimited":
+      "Too many requests. Please wait a few minutes and try again.",
+    // Sign in
+    "signin.title": "Sign in",
+    "signin.email": "Email",
+    "signin.submit": "Email me a magic link",
+    "signin.submitting": "Sending…",
+    "signin.sent":
+      "If that email has an account, a magic link is on its way. In development the link is printed to the auth service console — open it to sign in.",
+    "signin.noAccount": "No account yet?",
+    "signin.create": "Create one",
+    "signin.failed": "Request failed",
+    "signin.sso": "Sign in with SSO",
     // Sign up
     "signup.title": "Create account",
     "signup.email": "Email",
@@ -185,6 +253,7 @@ const STRINGS = {
     "signin.noAccount": "Dim cyfrif eto?",
     "signin.create": "Crëwch un",
     "signin.failed": "Methodd y cais",
+    "signin.sso": "Mewngofnodi gydag SSO",
     "signup.title": "Creu cyfrif",
     "signup.email": "E-bost",
     "signup.name": "Enw",
@@ -243,6 +312,7 @@ const STRINGS = {
     "signin.noAccount": "¿Aún no tienes cuenta?",
     "signin.create": "Crea una",
     "signin.failed": "La solicitud falló",
+    "signin.sso": "Iniciar sesión con SSO",
     "signup.title": "Crear cuenta",
     "signup.email": "Correo electrónico",
     "signup.name": "Nombre",
@@ -301,6 +371,7 @@ const STRINGS = {
     "signin.noAccount": "Pas encore de compte ?",
     "signin.create": "Créez-en un",
     "signin.failed": "La requête a échoué",
+    "signin.sso": "Se connecter avec SSO",
     "signup.title": "Créer un compte",
     "signup.email": "E-mail",
     "signup.name": "Nom",
@@ -359,6 +430,7 @@ const STRINGS = {
     "signin.noAccount": "Noch kein Konto?",
     "signin.create": "Eines erstellen",
     "signin.failed": "Anfrage fehlgeschlagen",
+    "signin.sso": "Mit SSO anmelden",
     "signup.title": "Konto erstellen",
     "signup.email": "E-Mail",
     "signup.name": "Name",
@@ -416,6 +488,7 @@ const STRINGS = {
     "signin.noAccount": "ليس لديك حساب بعد؟",
     "signin.create": "أنشئ واحدًا",
     "signin.failed": "فشل الطلب",
+    "signin.sso": "تسجيل الدخول عبر SSO",
     "signup.title": "إنشاء حساب",
     "signup.email": "البريد الإلكتروني",
     "signup.name": "الاسم",
@@ -474,6 +547,7 @@ const STRINGS = {
     "signin.noAccount": "Ещё нет учётной записи?",
     "signin.create": "Создайте её",
     "signin.failed": "Запрос не выполнен",
+    "signin.sso": "Войти через SSO",
     "signup.title": "Создать учётную запись",
     "signup.email": "Эл. почта",
     "signup.name": "Имя",
@@ -531,6 +605,7 @@ const STRINGS = {
     "signin.noAccount": "अभी तक कोई खाता नहीं?",
     "signin.create": "एक बनाएँ",
     "signin.failed": "अनुरोध विफल रहा",
+    "signin.sso": "SSO से साइन इन करें",
     "signup.title": "खाता बनाएँ",
     "signup.email": "ईमेल",
     "signup.name": "नाम",
@@ -587,6 +662,7 @@ const STRINGS = {
     "signin.noAccount": "还没有账户？",
     "signin.create": "创建一个",
     "signin.failed": "请求失败",
+    "signin.sso": "使用 SSO 登录",
     "signup.title": "创建账户",
     "signup.email": "电子邮箱",
     "signup.name": "姓名",
@@ -643,6 +719,7 @@ const STRINGS = {
     "signin.noAccount": "এখনও কোনো অ্যাকাউন্ট নেই?",
     "signin.create": "একটি তৈরি করুন",
     "signin.failed": "অনুরোধ ব্যর্থ হয়েছে",
+    "signin.sso": "SSO দিয়ে সাইন ইন করুন",
     "signup.title": "অ্যাকাউন্ট তৈরি করুন",
     "signup.email": "ইমেল",
     "signup.name": "নাম",
@@ -701,6 +778,7 @@ const STRINGS = {
     "signin.noAccount": "Ainda não tem conta?",
     "signin.create": "Crie uma",
     "signin.failed": "O pedido falhou",
+    "signin.sso": "Entrar com SSO",
     "signup.title": "Criar conta",
     "signup.email": "E-mail",
     "signup.name": "Nome",
@@ -758,6 +836,7 @@ const STRINGS = {
     "signin.noAccount": "Belum punya akun?",
     "signin.create": "Buat satu",
     "signin.failed": "Permintaan gagal",
+    "signin.sso": "Masuk dengan SSO",
     "signup.title": "Buat akun",
     "signup.email": "Email",
     "signup.name": "Nama",
@@ -815,6 +894,7 @@ const STRINGS = {
     "signin.noAccount": "ابھی تک کوئی اکاؤنٹ نہیں؟",
     "signin.create": "ایک بنائیں",
     "signin.failed": "درخواست ناکام ہوئی",
+    "signin.sso": "SSO کے ساتھ سائن ان کریں",
     "signup.title": "اکاؤنٹ بنائیں",
     "signup.email": "ای میل",
     "signup.name": "نام",
@@ -857,8 +937,17 @@ export const STRINGS_BY_LOCALE: Record<
 // Accepts a region subtag (cy-GB → cy) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  // Take the primary subtag before any `-`/`_`, lowercased.
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;

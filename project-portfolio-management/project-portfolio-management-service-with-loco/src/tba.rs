@@ -1398,6 +1398,159 @@ pub fn walk_descendants(
 }
 
 // ---------------------------------------------------------------------
+// Rollup attrition record (spec §15 TBA-12, repo tasks.md PA-3)
+// ---------------------------------------------------------------------
+
+/// The closed, ordered set of labels a [`rollup_attrition_trail`]'s
+/// linear chain carries, before the three-way status partition —
+/// `rollup_attrition_trail` always produces exactly these, in this
+/// order, so a test can enumerate this vocabulary rather than trusting
+/// the builder not to have silently dropped one.
+///
+/// This is a **reinterpretation** of care-pathway's
+/// `ATTRITION_STEP_LABELS` (`src/tba.rs`, T-14g), not a port of its
+/// literal vocabulary: a rollup's cohort is reached by a containment
+/// **tree walk** with a task-count cap per node, not a linear
+/// status/window/suppression screen over one flat table of instances.
+/// The shape that survives the reinterpretation is the same one — a
+/// named, ordered, parent-pointing trail explaining a denominator — but
+/// the labels name what this endpoint actually filters.
+pub const ROLLUP_ATTRITION_STEP_LABELS: &[&str] = &["root_plan", "walked_plans", "tasks_scanned"];
+
+/// The index of `"tasks_scanned"` in a base [`rollup_attrition_trail`] —
+/// the parent every status-partition leaf
+/// (`"finished"`/`"work_in_progress"`/`"not_started"`) forks from.
+pub const ROLLUP_ATTRITION_PARTITION_PARENT: usize = 2;
+
+/// One step of a rollup's attrition record. Same shape as
+/// care-pathway's `AttritionStep` (`label`/`operation`/`instances`/
+/// `parent`), copied rather than shared: the two crates have no common
+/// dependency this would live in, and the shape is small enough that a
+/// shared crate for one struct would be the wrong trade (per
+/// `agents/share/architecture.md`'s drift-accepted front-end/FHIR
+/// precedent).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct AttritionStep {
+    /// One of [`ROLLUP_ATTRITION_STEP_LABELS`], or `"finished"` /
+    /// `"work_in_progress"` / `"not_started"` (the partition leaves).
+    pub label: &'static str,
+    /// A human-readable account of what this step actually did (or,
+    /// for a step with nothing yet to exclude, why not) — the
+    /// denominator explained in the response, not merely stated.
+    pub operation: String,
+    /// Instances (plans for the first two steps, tasks thereafter)
+    /// remaining after this step.
+    pub instances: usize,
+    /// The index of the step this one narrows from; `None` for the
+    /// root only.
+    pub parent: Option<usize>,
+}
+
+/// Inputs to [`rollup_attrition_trail`], bundled because the
+/// alternative — nine positional `usize`/`bool` arguments, several
+/// meaning similar things — is exactly the call site clippy's
+/// `too_many_arguments` lint exists to catch, and a bundle also gives
+/// each field a name at the call site instead of a position to
+/// miscount.
+///
+/// `tasks_capped_plans` is the count of walked plans whose own task
+/// load reached `MAX_TASKS` — an approximate signal (a plan with
+/// exactly 1000 live tasks and no cap firing is indistinguishable from
+/// one truncated at 1000), disclosed as such in
+/// [`rollup_attrition_trail`]'s `operation` text rather than silently
+/// treated as exact.
+#[derive(Clone, Debug)]
+pub struct RollupAttritionInputs {
+    /// A human-readable name for the root plan.
+    pub root_note: String,
+    /// Plans reached by the containment walk (`RollupWalk::nodes.len()`).
+    pub walked_plans: usize,
+    /// Whether a depth or node cap stopped the walk early.
+    pub walk_truncated: bool,
+    /// Plans reached by more than one path (`RollupWalk::revisits`).
+    pub walk_revisits: usize,
+    /// Tasks unioned across every walked plan.
+    pub tasks_scanned: usize,
+    /// Walked plans whose own task load reached `MAX_TASKS`.
+    pub tasks_capped_plans: usize,
+    /// Tasks with a recorded finish.
+    pub finished: usize,
+    /// Tasks started and not finished.
+    pub work_in_progress: usize,
+    /// Tasks never started.
+    pub not_started: usize,
+}
+
+/// Build a rollup's attrition record (spec §15 TBA-12): the containment
+/// walk's own `truncated`/`revisits` bookkeeping, the per-node
+/// `MAX_TASKS` cap, and the finished/work-in-progress/not-started
+/// three-way partition that `plan()` already computes — named, ordered,
+/// and parent-linked, rather than left as scattered fields the caller
+/// has to reassemble into a story by hand.
+#[must_use]
+pub fn rollup_attrition_trail(inputs: &RollupAttritionInputs) -> Vec<AttritionStep> {
+    vec![
+        AttritionStep {
+            label: "root_plan",
+            operation: inputs.root_note.clone(),
+            instances: 1,
+            parent: None,
+        },
+        AttritionStep {
+            label: "walked_plans",
+            operation: if inputs.walk_truncated {
+                format!(
+                    "breadth-first containment walk from the root, {} \
+                     revisit(s); a depth or node cap stopped the walk before it \
+                     covered the whole subtree",
+                    inputs.walk_revisits
+                )
+            } else {
+                format!(
+                    "breadth-first containment walk from the root, {} \
+                     revisit(s); the walk covered the whole subtree",
+                    inputs.walk_revisits
+                )
+            },
+            instances: inputs.walked_plans,
+            parent: Some(0),
+        },
+        AttritionStep {
+            label: "tasks_scanned",
+            operation: if inputs.tasks_capped_plans == 0 {
+                "every walked plan's live tasks, none at the per-plan cap".to_string()
+            } else {
+                format!(
+                    "every walked plan's live tasks; {} plan(s) reached \
+                     the per-plan task cap and may hold more tasks than scanned",
+                    inputs.tasks_capped_plans
+                )
+            },
+            instances: inputs.tasks_scanned,
+            parent: Some(1),
+        },
+        AttritionStep {
+            label: "finished",
+            operation: "tasks with a recorded finish".to_string(),
+            instances: inputs.finished,
+            parent: Some(ROLLUP_ATTRITION_PARTITION_PARENT),
+        },
+        AttritionStep {
+            label: "work_in_progress",
+            operation: "started, not yet finished".to_string(),
+            instances: inputs.work_in_progress,
+            parent: Some(ROLLUP_ATTRITION_PARTITION_PARENT),
+        },
+        AttritionStep {
+            label: "not_started",
+            operation: "never started".to_string(),
+            instances: inputs.not_started,
+            parent: Some(ROLLUP_ATTRITION_PARTITION_PARENT),
+        },
+    ]
+}
+
+// ---------------------------------------------------------------------
 // Monte-Carlo delivery forecasting (spec §15 TBA-11)
 // ---------------------------------------------------------------------
 
@@ -2659,6 +2812,105 @@ mod tests {
         let walk = walk_descendants(&tree(&[(1, 1)]), node(1), 500, 32);
         assert_eq!(walk.nodes.len(), 1);
         assert_eq!(walk.revisits, 1);
+    }
+
+    // -- Rollup attrition record (§15 TBA-12, repo tasks.md PA-3) ----------
+
+    /// Defaults matching a small, uncapped, untruncated rollup; tests
+    /// override only the fields they care about.
+    fn rollup_inputs() -> RollupAttritionInputs {
+        RollupAttritionInputs {
+            root_note: "plan root".to_string(),
+            walked_plans: 5,
+            walk_truncated: false,
+            walk_revisits: 0,
+            tasks_scanned: 20,
+            tasks_capped_plans: 0,
+            finished: 12,
+            work_in_progress: 3,
+            not_started: 5,
+        }
+    }
+
+    #[test]
+    fn rollup_attrition_trail_produces_the_documented_labels_in_order() {
+        let trail = rollup_attrition_trail(&rollup_inputs());
+        let labels: Vec<&str> = trail.iter().map(|s| s.label).collect();
+        assert_eq!(
+            labels,
+            [
+                "root_plan",
+                "walked_plans",
+                "tasks_scanned",
+                "finished",
+                "work_in_progress",
+                "not_started",
+            ]
+        );
+    }
+
+    #[test]
+    fn rollup_attrition_trail_chains_parents_correctly() {
+        let trail = rollup_attrition_trail(&rollup_inputs());
+        assert_eq!(trail[0].parent, None, "root has no parent");
+        assert_eq!(trail[1].parent, Some(0), "walked_plans narrows root_plan");
+        assert_eq!(
+            trail[2].parent,
+            Some(1),
+            "tasks_scanned narrows walked_plans"
+        );
+        for leaf in &trail[3..] {
+            assert_eq!(
+                leaf.parent,
+                Some(ROLLUP_ATTRITION_PARTITION_PARENT),
+                "every partition leaf forks from tasks_scanned"
+            );
+        }
+    }
+
+    #[test]
+    fn rollup_attrition_trail_partition_sums_to_tasks_scanned() {
+        let trail = rollup_attrition_trail(&rollup_inputs());
+        let tasks_scanned = trail[2].instances;
+        let partition_sum: usize = trail[3..].iter().map(|s| s.instances).sum();
+        assert_eq!(partition_sum, tasks_scanned);
+    }
+
+    #[test]
+    fn rollup_attrition_trail_names_a_truncated_walk() {
+        let mut truncated_inputs = rollup_inputs();
+        truncated_inputs.walked_plans = 500;
+        truncated_inputs.walk_truncated = true;
+        truncated_inputs.walk_revisits = 2;
+        let truncated = rollup_attrition_trail(&truncated_inputs);
+        assert!(truncated[1].operation.contains("cap stopped the walk"));
+        assert!(
+            truncated[1].operation.contains('2'),
+            "reports the revisit count"
+        );
+
+        let complete = rollup_attrition_trail(&rollup_inputs());
+        assert!(complete[1].operation.contains("covered the whole subtree"));
+    }
+
+    #[test]
+    fn rollup_attrition_trail_names_task_capped_plans() {
+        let mut capped_inputs = rollup_inputs();
+        capped_inputs.tasks_scanned = 1000;
+        capped_inputs.tasks_capped_plans = 2;
+        let capped = rollup_attrition_trail(&capped_inputs);
+        assert!(capped[2].operation.contains("2 plan(s) reached"));
+
+        let uncapped = rollup_attrition_trail(&rollup_inputs());
+        assert!(uncapped[2].operation.contains("none at the per-plan cap"));
+    }
+
+    #[test]
+    fn rollup_attrition_step_labels_matches_the_linear_chain() {
+        let trail = rollup_attrition_trail(&rollup_inputs());
+        for (index, expected) in ROLLUP_ATTRITION_STEP_LABELS.iter().enumerate() {
+            assert_eq!(trail[index].label, *expected);
+        }
     }
 
     // -- Monte-Carlo forecasting (§15 TBA-11) ------------------------------

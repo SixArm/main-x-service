@@ -27,6 +27,7 @@ import { browser } from "$app/environment";
 /** Locales the UI is translated into. */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -50,6 +51,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -73,6 +75,97 @@ export const LOCALE_KEY = "mxi.cms.locale";
 // Every translatable UI string, keyed by a stable dotted key.
 const STRINGS = {
   en: {
+    "brand.name": "Main X · CMS",
+    "nav.dashboard": "Dashboard",
+    "nav.entries": "Entries",
+    "nav.assets": "Assets",
+    "nav.workflow": "Workflow",
+    "nav.translations": "Translations",
+    "nav.insights": "Insights",
+    "nav.settings": "Settings",
+    "nav.signin": "Sign in",
+    "nav.signout": "Sign out",
+    "chrome.language": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    "chrome.theme": "Theme",
+    "common.loading": "Loading…",
+    "common.error": "Failed to load",
+    "common.retry": "Retry",
+    "common.status": "Status",
+    "common.locale": "Locale",
+    "common.title": "Title",
+    "common.actions": "Actions",
+    "common.updated": "Updated",
+    "common.noData": "No data yet",
+    "site.choose": "Choose a site",
+    "entry.published": "Published",
+    "entry.draft": "Draft",
+    "entry.inReview": "In review",
+    "entry.approved": "Approved",
+    "entry.archived": "Archived",
+    "entry.liveRevision": "Live revision",
+    "entry.draftAhead": "Draft is ahead of what is live",
+    "insights.health": "Content health",
+    "insights.throughput": "Throughput",
+    "insights.backlog": "Backlog",
+    "insights.asOf": "As of",
+    "insights.findings": "Findings",
+    "insights.rule": "Rule",
+    "insights.noFindings": "Nothing to report",
+    "preview.heading": "Preview",
+    "preview.notLive": "This is not what readers see",
+    "preview.localeServed": "Locale served",
+    "entry.key": "Key",
+    "entry.type": "Type",
+    "entry.locales": "Locales",
+    "entry.history": "Revision history",
+    "entry.blocks": "Content blocks",
+    "entry.addBlock": "Add block",
+    "entry.save": "Save revision",
+    "entry.conflict": "Someone else saved first",
+    "entry.conflictHelp":
+      "Your draft was based on an older revision. Compare before overwriting.",
+    "entry.restore": "Restore",
+    "entry.restoreHelp":
+      "Restoring writes a new revision; history is never rewritten.",
+    "entry.diff": "Compare",
+    "entry.identical": "No differences",
+    "workflow.action": "Action",
+    "workflow.reason": "Reason",
+    "workflow.reasonRequired": "This action needs a reason",
+    "workflow.blockers": "Cannot publish yet",
+    "workflow.remedy": "What to do",
+    "workflow.ready": "Ready to publish",
+    "workflow.scheduled": "Scheduled",
+    "assets.altMissing": "No alt text",
+    "assets.altGate": "An image without alt text stops the page publishing",
+    "assets.orphans": "Referenced by nothing",
+    "assets.orphansNote": "Reported, never deleted",
+    "assets.storage": "Storage used",
+    "translations.queue": "Open requests",
+    "translations.stale": "Behind the source",
+    "translations.source": "Source locale",
+    "settings.templates": "Templates",
+    "settings.menus": "Menus",
+    "settings.redirects": "Redirects",
+    "settings.webhooks": "Webhooks",
+    "settings.contentTypes": "Content types",
+    "preview.open": "Preview",
+    "preview.serverSide": "The preview link stays on the server",
+    "common.cancel": "Cancel",
+    "common.remove": "Remove",
+    "common.moveUp": "Move up",
+    "common.moveDown": "Move down",
+    "common.saved": "Saved",
+    "common.author": "Author",
+    "common.size": "Size",
+    "common.path": "Path",
+  },
+  en_US: {
     "brand.name": "Main X · CMS",
     "nav.dashboard": "Dashboard",
     "nav.entries": "Entries",
@@ -1273,16 +1366,23 @@ export type MessageKey = keyof (typeof STRINGS)["en"];
 export const MESSAGE_KEYS = Object.keys(STRINGS.en) as MessageKey[];
 
 /** Narrow a string to a supported locale, honouring a region subtag
- *  (`fr-CA` → `fr`); `null` when nothing matches. */
+ *  (`fr-CA` → `fr`); `null` when nothing matches.
+ *
+ *  Exact match is tried first (hyphen/underscore-insensitive, so
+ *  `en_US`/`en-US` both resolve to that entry) before falling back to
+ *  the primary subtag — otherwise a region variant that is itself a
+ *  supported locale, like `en_US`, would silently collapse to `en`. */
 export function normaliseLocale(
   value: string | null | undefined,
 ): Locale | null {
   if (!value) return null;
-  const lower = value.toLowerCase();
-  const exact = LOCALES.find((code) => code === lower);
+  const normalized = value.trim().replace(/-/g, "_").toLowerCase();
+  const exact = LOCALES.find(
+    (code) => code.replace(/-/g, "_").toLowerCase() === normalized,
+  );
   if (exact) return exact;
-  const primary = lower.split("-")[0];
-  return LOCALES.find((code) => code === primary) ?? null;
+  const primary = normalized.split("_")[0];
+  return LOCALES.find((code) => code.toLowerCase() === primary) ?? null;
 }
 
 /** Whether `locale` is written right-to-left. */

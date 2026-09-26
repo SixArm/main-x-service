@@ -9,6 +9,104 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — role-tailored navigation and landing page (T-28f)
+
+The nav and `/`'s landing route now respond to a deployment-declared
+`view` ABAC attribute (e.g. `view=executive` reorders the nav and
+lands `/` on `/executive`), read via a new `currentUser()` BFF call to
+the auth service's `GET /api/auth/me` — which itself needed a small
+upstream fix (`authentication-service-with-loco`'s `CurrentResponse`
+carried no `attrs` field at all; see that crate's own `CHANGELOG.md`).
+Presentation only: authorisation stays with the service's ABAC, and
+every route stays reachable by direct URL regardless of `view`.
+Absent/unmatched `view` ⇒ today's nav, unchanged. New pure module
+`src/lib/nav.ts`. See `spec/index.md` §13 T-28f.
+
+### Added — phone-viewport responsive audit (T-28k)
+
+A new `mobile` Playwright project (390×844) runs `tests/e2e/mobile.spec.ts`
+across all 35 real routes, asserting no horizontal body scroll and a
+visible primary heading per route. Found and fixed four real overflow
+sources: the SVAR `FilterBar` on `/plans` (fixed-width internal
+input, plus hiding it alongside the grid under the mobile breakpoint
+— filtering a plain name list has little value), an `<input
+size="40">` on `/ideas` (removed), and a bare `<table>` on `/reviews`.
+`/scenarios` also overflowed but needed no route-local edit: the
+global `input { max-width: 100% }` rule added to `src/app.css` covers
+it without touching its own `size="50"`/`size="12"`/`size="4"`
+attributes. `/plans`'s `Grid` and `/gantt`'s `Gantt` now degrade to a
+plain, read-only `<ul>` under a 600px breakpoint (CSS-only, no JS
+viewport detection); `src/app.css` also gained global `table` overflow
+containment covering every other route with the same shape of bug.
+Fixed a real regression this surfaced in `tests/e2e/smoke.spec.ts`
+(the mobile-list fallback duplicated the seeded plan's name in the
+DOM, making an existing `getByText` assertion ambiguous — rescoped to
+the grid cell). See `spec/index.md` §13 T-28k.
+
+### Added — operator onboarding guide (T-28p)
+
+`/onboarding` — a role-by-role "first hour" walkthrough (executive,
+PMO, resource manager), each step naming the real page it lands on.
+Pure static content (`src/lib/onboarding.ts`), no API call, so nothing
+on the page can fail to load. Deliberately makes no
+time-to-productivity claim — nobody has measured how long a first
+hour with the guide actually takes.
+
+`tests/unit/onboarding.test.ts` (new) walks every step and asserts,
+via `fs.existsSync`, that its named route resolves to a real
+`+page.svelte` — the guide cannot drift from the route tree
+undetected. See `spec/index.md` §13 T-28p and the service crate's own
+`spec/13-tasks.md` T-28p, where this gap was first identified.
+
+### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
+
+Removed the hand-maintained `THEMES`/`THEME_LABELS` (39 slugs — a subset
+of Lily's own 45, missing `adobe-spectrum`, `mozilla-protocol`, and the
+UK/US government themes) and `SIZES`/`SIZE_LABELS` (a custom 4-step
+`small`/`medium`/`large`/`x-large` scale) arrays from `+layout.svelte`.
+`PickerBar` now gets no `themes`/`sizes` prop at all, so it uses its own
+`DEFAULT_THEMES` (45, alphabetical, UK/US government themes grouped at
+the end) and `DEFAULT_SIZES` (the 7-step `largest`…`smallest` scale)
+directly — a superset of what was offered before, not a behavioural
+narrowing.
+
+`src/app.css`'s `[data-text-size]` rules rewritten for the new 7-step
+scale (was 3 rules for `small`/`large`/`x-large`; the custom scale's
+`medium` default is now Lily's `normal`, still unscaled).
+
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-bar chrome (theme, text-size, share pickers) previously wired
+`ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This restores a locale picker to the chrome, since `PickerBar` bundles
+all four unconditionally with no way to omit one. Wired with
+`applyDir={false}` and `onChange={(code) => i18n.set(code)}`, since
+this app's own `i18n.svelte.ts` store already reflects `lang`/`dir`
+onto `<html>`; the `<html lang>` effect now hyphenates the locale
+(`i18n.locale.replace("_", "-")`) to stay valid BCP47, agreeing with
+what `LocalePicker` itself writes via its own `bcp47LocaleTag`.
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon; the Mastodon target
+now points at `mastodonshare.com` instead of `mastodon.social/share`
+(a generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
+Also added `en_US` ("English (United States)") to
+`src/lib/i18n.svelte.ts`'s `LOCALES`/`LOCALE_LABELS`/`STRINGS` (a
+verbatim duplicate of `en`'s copy) and taught `normaliseLocale` to
+match a region variant like `en_US`/`en-US` exactly before falling
+back to stripping to its primary subtag (previously `en_US` would have
+silently collapsed to `en`, since only the primary subtag was ever
+checked).
+
 ### Fixed — `/verify` crashed with a raw 500 when the authentication service was unreachable (FE-5)
 
 `src/routes/verify/+page.server.ts` called `await verifyMagicLink(fetch,

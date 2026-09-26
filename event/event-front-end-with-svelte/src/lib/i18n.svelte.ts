@@ -4,13 +4,15 @@
 // the surface is tiny and we keep the front-end dependency-light (drift is
 // accepted family-wide — see the repo `feedback_front_end_drift` memory).
 //
-// Supported locales: English (`en`, default) + Welsh (`cy`), Spanish
-// (`es`), French (`fr`), German (`de`), Arabic (`ar`, RTL), Russian
-// (`ru`), Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`),
-// Portuguese (`pt`), Indonesian (`id`), Urdu (`ur`, RTL). Unknown
-// key/locale falls back to `en`. The chosen locale persists to
-// localStorage under `mxi.event.locale` and is reflected onto
-// `<html lang>` / `<html dir>` by the layout.
+// Supported locales: English (`en`, default) plus American English
+// (`en_US`, identical content today — a distinct endonym for the locale
+// picker rather than a spelling divergence, since `en`'s own copy is
+// already American-spelled), Welsh (`cy`), Spanish (`es`), French (`fr`),
+// German (`de`), Arabic (`ar`, RTL), Russian (`ru`), Hindi (`hi`),
+// Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese (`pt`), Indonesian
+// (`id`), Urdu (`ur`, RTL). Unknown key/locale falls back to `en`. The
+// chosen locale persists to localStorage under `mxi.event.locale` and is
+// reflected onto `<html lang>` / `<html dir>` by the layout.
 
 import { browser } from "$app/environment";
 
@@ -20,6 +22,7 @@ import { browser } from "$app/environment";
  */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -58,6 +61,7 @@ export function isRtl(locale: string): boolean {
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -80,6 +84,175 @@ const LOCALE_KEY = "mxi.event.locale";
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
   en: {
+    "nav.calendar": "Calendar",
+    // Layout / chrome
+    brand: "Event",
+    "brand.tagline": "Main X Index",
+    "nav.dashboard": "Dashboard",
+    "nav.events": "Events",
+    "nav.newEvent": "New event",
+    "nav.matchCheck": "Match check",
+    "nav.merge": "Merge",
+    "nav.toggle": "Toggle navigation",
+    "chrome.theme": "Theme",
+    "chrome.language": "Language",
+    "chrome.share": "Share",
+    "chrome.textSize": "Text size",
+    "share.copyLink": "Copy link",
+    "share.linkCopied": "Link copied",
+    "share.copyFailed": "Could not copy — copy it from the address bar",
+    // Dashboard
+    "dashboard.title": "Dashboard",
+    "dashboard.service": "Service:",
+    "dashboard.recentActivity": "Recent activity",
+    "dashboard.noRecent": "No recent audit entries.",
+    // Events list
+    "events.title": "Events",
+    "events.new": "New event",
+    "events.searchPlaceholder": "Search by name, organizer, identifier…",
+    "events.filter.from": "From",
+    "events.filter.to": "To",
+    "events.filter.status": "Status",
+    "events.filter.type": "Type",
+    "events.filter.any": "any",
+    "events.filter.fuzzy": "Fuzzy",
+    "events.filter.apply": "Apply filters",
+    "events.loading": "Loading…",
+    "events.count.one": "{n} event",
+    "events.count.other": "{n} events",
+    // Grid headers
+    "grid.id": "ID",
+    "grid.name": "Name",
+    "grid.start": "Start",
+    "grid.type": "Type",
+    "grid.status": "Status",
+    "grid.mode": "Mode",
+    // New event
+    "new.title": "New event",
+    "new.create": "Create",
+    "new.duplicatesTitle": "Possible duplicates",
+    "new.duplicatesDetected":
+      "Duplicates detected ({n}) — review below before resubmitting.",
+    // Match check
+    "match.title": "Match check",
+    "match.name": "Name",
+    "match.threshold": "Threshold",
+    "match.thresholdHint": "0.0 – 1.0",
+    "match.start": "Start",
+    "match.end": "End",
+    "match.organizerName": "Organizer name",
+    "match.find": "Find matches",
+    "match.matching": "Matching…",
+    // Merge
+    "merge.title": "Merge events",
+    "merge.mainId": "Main event ID",
+    "merge.mainIdHint": "The surviving record",
+    "merge.dupId": "Duplicate event ID",
+    "merge.dupIdHint": "Will be soft-deleted",
+    "merge.reason": "Reason",
+    "merge.reasonHint": "Recorded in the merge audit trail",
+    "merge.reasonPlaceholder": "Confirmed duplicate",
+    "merge.loadPreview": "Load preview",
+    "merge.merge": "Merge",
+    "merge.merging": "Merging…",
+    "merge.bothIdsRequired": "Both IDs required",
+    "merge.idsMustDiffer": "Main and duplicate must differ",
+    "merge.confirm":
+      "Merge {dup}… into {main}…?\nThis soft-deletes the duplicate.",
+    "merge.previewTitle": "Preview",
+    "merge.preview.main": "Main",
+    "merge.preview.duplicate": "Duplicate",
+    "merge.preview.none": "—",
+    "merge.preview.noDate": "no date",
+    "merge.completedTitle": "Merge completed",
+    "merge.completedBody": "Merge record {id} created at {at}.",
+    "merge.viewMerged": "View merged main event",
+    // Event detail
+    "detail.loading": "Loading…",
+    "detail.edit": "Edit",
+    "detail.audit": "Audit",
+    "detail.delete": "Delete",
+    "detail.exportGdpr": "Export data (GDPR)",
+    "detail.exportingGdpr": "Exporting…",
+    "detail.showMasked": "Show masked",
+    "detail.showFull": "Show full",
+    "detail.maskedNotice":
+      "Showing the masked view — some fields are redacted.",
+    "detail.identity": "Identity",
+    "detail.id": "ID",
+    "detail.start": "Start",
+    "detail.end": "End",
+    "detail.status": "Status",
+    "detail.type": "Type",
+    "detail.mode": "Mode",
+    "detail.timeZone": "Time zone",
+    "detail.duration": "Duration",
+    "detail.description": "Description",
+    "detail.empty": "—",
+    "detail.loc.place": "Place",
+    "detail.loc.address": "Address",
+    "detail.loc.virtual": "Virtual",
+    "detail.loc.text": "Text",
+    "detail.location": "Location",
+    "detail.organizers": "Organizers",
+    "detail.performers": "Performers",
+    "detail.identifiers": "Identifiers",
+    "detail.offers": "Offers",
+    "detail.ticket": "Ticket",
+    "detail.confirmDelete":
+      "Soft-delete this event? This cannot be undone via the UI.",
+    // Edit event
+    "edit.title": "Edit event",
+    "edit.cancel": "Cancel",
+    "edit.loading": "Loading…",
+    "edit.save": "Save changes",
+    // Audit page
+    "audit.title": "Audit log",
+    "audit.back": "Back to event",
+    "audit.loading": "Loading…",
+    "audit.none": "No audit entries.",
+    "audit.by": "by",
+    "audit.payload": "Payload",
+    // Event form
+    "form.name": "Name",
+    "form.required": "Required",
+    "form.eventType": "Event type",
+    "form.start": "Start",
+    "form.startHint": "ISO 8601 / RFC 3339",
+    "form.end": "End",
+    "form.endAfterStart": "End must be ≥ start",
+    "form.doorTime": "Door time",
+    "form.doorBeforeStart": "Door time must be ≤ start",
+    "form.status": "Status",
+    "form.attendanceMode": "Attendance mode",
+    "form.timeZone": "Time zone",
+    "form.timeZoneHint": "IANA, e.g. America/Los_Angeles",
+    "form.allDay": "All day",
+    "form.no": "No",
+    "form.yes": "Yes",
+    "form.description": "Description",
+    "form.url": "URL",
+    "form.duration": "Duration",
+    "form.durationHint": "ISO 8601, e.g. PT1H30M",
+    "form.maxCapacityTotal": "Max capacity (total)",
+    "form.maxPhysical": "Max physical",
+    "form.maxVirtual": "Max virtual",
+    "form.keywords": "Keywords",
+    "form.keywordsHint": "Comma-separated",
+    "form.languages": "Languages",
+    "form.languagesHint": "ISO 639-1, e.g. en fr",
+    "form.saving": "Saving…",
+    "form.save": "Save",
+    "form.reset": "Reset",
+    // Search box
+    "search.placeholder": "Search…",
+    "search.submit": "Search",
+    // Match results list
+    "results.title": "Match results",
+    "results.none": "No candidates.",
+    "results.breakdown": "Score breakdown",
+  },
+  en_US: {
     "nav.calendar": "Calendar",
     // Layout / chrome
     brand: "Event",
@@ -2132,8 +2305,17 @@ export type StringKey = keyof (typeof STRINGS)["en"];
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  // Take the primary subtag before any `-`/`_`, lowercased.
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;

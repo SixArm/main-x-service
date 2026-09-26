@@ -85,13 +85,18 @@ impl Hooks for App {
     /// key set (`/.well-known/paseto-keys`), the docs (`/api-docs` +
     /// `/swagger-ui`), and the Prometheus metrics (`/metrics.prom`).
     fn routes(_ctx: &AppContext) -> AppRoutes {
-        AppRoutes::with_default_routes() // controller routes below
+        let routes = AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::auth::routes())
             .add_route(controllers::compliance::routes())
             .add_route(controllers::admin::routes())
             .add_route(controllers::paseto_keys::routes())
             .add_route(controllers::docs::routes())
-            .add_route(controllers::metrics::routes())
+            .add_route(controllers::metrics::routes());
+        // EV-2: SAML/OIDC identity federation, opt-in via the `oidc`
+        // Cargo feature (see `src/oidc.rs`).
+        #[cfg(feature = "oidc")]
+        let routes = routes.add_route(controllers::oidc::routes());
+        routes
     }
 
     /// Layer the header-based API-versioning middleware (spec §13 T-13)

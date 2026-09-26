@@ -8,11 +8,13 @@ vi.mock("$app/environment", () => ({ browser: false }));
 
 import {
     LOCALES,
+    LOCALE_LABELS,
     DEFAULT_LOCALE,
     CATALOG,
     STRING_KEYS,
     isRtl,
     translate,
+    i18n,
     type StringKey,
 } from "../../src/lib/i18n.svelte";
 
@@ -60,11 +62,21 @@ describe("i18n catalog", () => {
         }
     });
 
-    it("ships all 13 locales", () => {
-        expect(LOCALES).toHaveLength(13);
+    it("ships all 14 locales", () => {
+        expect(LOCALES).toHaveLength(14);
         expect([...LOCALES]).toEqual([
-            "en", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
+            "en", "en_US", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
         ]);
+        expect(LOCALE_LABELS.en_US).toBe("English (United States)");
+    });
+
+    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+        i18n.set("en_US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en-US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en");
+        expect(i18n.locale).toBe("en");
     });
 
     it("spot-checks new locale glossary translations", () => {

@@ -10,6 +10,7 @@ vi.mock("$app/environment", () => ({ browser: false }));
 import {
     translate,
     isRtl,
+    i18n,
     LOCALES,
     DEFAULT_LOCALE,
     STRING_KEYS,
@@ -70,11 +71,21 @@ describe("i18n translate()", () => {
         expect(DEFAULT_LOCALE).toBe("en");
     });
 
-    it("supports all 13 locales", () => {
-        expect(LOCALES).toHaveLength(13);
+    it("supports all 14 locales", () => {
+        expect(LOCALES).toHaveLength(14);
         expect([...LOCALES]).toEqual([
-            "en", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
+            "en", "en_US", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
         ]);
+    });
+
+    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+        expect(i18n.set !== undefined).toBe(true);
+        i18n.set("en_US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en-US");
+        expect(i18n.locale).toBe("en_US");
+        i18n.set("en");
+        expect(i18n.locale).toBe("en");
     });
 
     it("spot-checks the new Arabic translations", () => {

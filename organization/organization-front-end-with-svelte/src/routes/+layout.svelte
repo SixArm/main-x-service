@@ -19,62 +19,9 @@
     import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
-    import { i18n, t, isRtl, type StringKey } from "$lib/i18n.svelte";
-    import { ThemePicker } from "lily-design-system-svelte-theme-picker";
-    import { SharePicker, type ShareTarget } from "lily-design-system-svelte-share-picker";
-    import { TextSizePicker } from "lily-design-system-svelte-text-size-picker";
-
-    // Lily theme catalogue offered in the theme select (incl.
-    // NHS England/Scotland/Wales patient & practitioner themes). Each slug
-    // has a Lily stylesheet at `static/assets/themes/<slug>.css` (a symlink
-    // to the shared design-system themes) that ThemePicker swaps in.
-    const THEMES = [
-        "abyss", "acid", "aqua", "autumn", "black", "bumblebee", "business",
-        "caramellatte", "cmyk", "coffee", "corporate", "cupcake", "cyberpunk",
-        "dark", "dim", "dracula", "emerald", "fantasy", "forest", "garden",
-        "halloween", "lemonade", "light", "lofi", "luxury", "night", "nord",
-        "pastel", "retro", "silk", "sunset", "synthwave",
-        "united-kingdom-national-health-service-england-for-patients",
-        "united-kingdom-national-health-service-england-for-practitioners",
-        "united-kingdom-national-health-service-scotland-for-patients",
-        "united-kingdom-national-health-service-scotland-for-practitioners",
-        "united-kingdom-national-health-service-wales-for-patients",
-        "united-kingdom-national-health-service-wales-for-practitioners",
-        "valentine", "winter", "wireframe"
-    ];
-
-    // Human-readable labels for the theme select — the FULL theme name for
-    // each slug (DaisyUI names title-cased; the NHS slugs spelled out in full).
-    const THEME_LABELS: Record<string, string> = {
-        abyss: "Abyss", acid: "Acid", aqua: "Aqua", autumn: "Autumn",
-        black: "Black", bumblebee: "Bumblebee", business: "Business",
-        caramellatte: "Caramellatte", cmyk: "Cmyk", coffee: "Coffee",
-        corporate: "Corporate", cupcake: "Cupcake", cyberpunk: "Cyberpunk",
-        dark: "Dark", dim: "Dim", dracula: "Dracula", emerald: "Emerald",
-        fantasy: "Fantasy", forest: "Forest", garden: "Garden",
-        halloween: "Halloween", lemonade: "Lemonade", light: "Light",
-        lofi: "Lofi", luxury: "Luxury", night: "Night", nord: "Nord",
-        pastel: "Pastel", retro: "Retro", silk: "Silk", sunset: "Sunset",
-        synthwave: "Synthwave", valentine: "Valentine", winter: "Winter",
-        wireframe: "Wireframe",
-        "united-kingdom-national-health-service-england-for-patients": "United Kingdom National Health Service England for Patients",
-        "united-kingdom-national-health-service-england-for-practitioners": "United Kingdom National Health Service England for Practitioners",
-        "united-kingdom-national-health-service-scotland-for-patients": "United Kingdom National Health Service Scotland for Patients",
-        "united-kingdom-national-health-service-scotland-for-practitioners": "United Kingdom National Health Service Scotland for Practitioners",
-        "united-kingdom-national-health-service-wales-for-patients": "United Kingdom National Health Service Wales for Patients",
-        "united-kingdom-national-health-service-wales-for-practitioners": "United Kingdom National Health Service Wales for Practitioners",
-    };
-
-    // Text sizes offered by the Lily TextSizePicker. Applied as
-    // `data-text-size` on <html> (attribute-based, mirroring ThemePicker's
-    // `data-theme`); see app.css for the corresponding font-size scale.
-    const SIZES = ["small", "medium", "large", "x-large"];
-    const SIZE_LABELS: Record<string, string> = {
-        small: "Small",
-        medium: "Medium",
-        large: "Large",
-        "x-large": "Extra large",
-    };
+    import { i18n, t, isRtl, LOCALES, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
+    import PickerBar from "@lilydesignsystem/svelte-picker-bar";
+    import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
     // Share destinations for the Lily SharePicker. Lily ships no
     // third-party URLs — each `href` builder is ours. `url`/`title` are
@@ -85,16 +32,23 @@
     // <title> without SharePicker having to read the DOM).
     const SHARE_TARGETS: ShareTarget[] = [
         {
+            id: "email",
+            label: "Email",
+            href: (url, title) =>
+                `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
+            newTab: false,
+        },
+        {
             id: "linkedin",
             label: "LinkedIn",
             href: (url) =>
                 `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
         },
         {
-            id: "mastodon",
-            label: "Mastodon",
+            id: "reddit",
+            label: "Reddit",
             href: (url, title) =>
-                `https://mastodon.social/share?text=${encodeURIComponent(`${title} ${url}`)}`,
+                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
         },
         {
             id: "bluesky",
@@ -103,10 +57,10 @@
                 `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
         },
         {
-            id: "reddit",
-            label: "Reddit",
+            id: "mastodon",
+            label: "Mastodon",
             href: (url, title) =>
-                `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
+                `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
         },
     ];
 
@@ -131,7 +85,7 @@
     $effect(() => {
         const locale = i18n.locale;
         if (!browser || typeof document === "undefined") return;
-        document.documentElement.lang = locale;
+        document.documentElement.lang = locale.replace("_", "-");
         document.documentElement.dir = isRtl(locale) ? "rtl" : "ltr";
     });
 
@@ -168,27 +122,34 @@
                     </li>
                 {/each}
             </ul>
-            <ThemePicker
-                label={t("chrome.theme")}
+            <PickerBar
+                labels={{
+                    theme: t("chrome.theme"),
+                    locale: t("chrome.language"),
+                    textSize: t("nav.text_size"),
+                    share: t("nav.share"),
+                }}
                 themesUrl="/assets/themes/"
-                themes={THEMES}
-                themeLabels={THEME_LABELS}
-                storageKey="lily-theme"
-            />
-            <TextSizePicker
-                label={t("nav.text_size")}
-                sizes={SIZES}
-                sizeLabels={SIZE_LABELS}
-                defaultValue="medium"
-                storageKey="lily-text-size"
-            />
-            <SharePicker
-                label={t("nav.share")}
-                title={pageTitle}
-                targets={SHARE_TARGETS}
-                copyLabel={t("share.copy_link")}
-                copiedLabel={t("share.copied")}
-                copyFailedLabel={t("share.copy_failed")}
+                themeProps={{
+                    storageKey: "lily-theme",
+                }}
+                locales={[...LOCALES]}
+                localeProps={{
+                    value: i18n.locale,
+                    localeLabels: LOCALE_LABELS,
+                    applyDir: false,
+                    onChange: (code: string) => i18n.set(code),
+                }}
+                textSizeProps={{
+                    storageKey: "lily-text-size",
+                }}
+                shareTargets={SHARE_TARGETS}
+                shareProps={{
+                    title: pageTitle,
+                    copyLabel: t("share.copy_link"),
+                    copiedLabel: t("share.copied"),
+                    copyFailedLabel: t("share.copy_failed"),
+                }}
             />
             <section class="session" aria-label={t("session.title")}>
                 <div class="session-title">{t("session.title")}</div>
@@ -308,7 +269,14 @@
         gap: 0.4rem;
         font-size: 0.85rem;
     }
+    .primary-nav :global(.picker-bar) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
     .primary-nav :global(.theme-picker-button),
+    .primary-nav :global(.locale-picker-button),
     .primary-nav :global(.text-size-picker-button),
     .primary-nav :global(.share-picker-button) {
         padding: 0.3rem 0.4rem;

@@ -6,21 +6,23 @@
 // module mirrors the design of the family reference module at
 // course/course-front-end-with-svelte/src/lib/i18n.svelte.ts.
 //
-// Supported locales: English (`en`, the source of truth) plus Welsh
-// (`cy`, for the public-sector Welsh-language duty), Spanish (`es`),
-// French (`fr`), German (`de`), Arabic (`ar`, RTL), Russian (`ru`),
-// Hindi (`hi`), Mandarin Chinese (`zh`), Bengali (`bn`), Portuguese
-// (`pt`), Indonesian (`id`), and Urdu (`ur`, RTL). An unknown key/locale
-// falls back to `en`, then to the key string itself. The chosen locale
-// persists to localStorage and drives the UI strings, `<html lang>`, and
-// `<html dir>` (right-to-left for `ar` / `ur`).
+// Supported locales: English (`en`, the source of truth) plus American
+// English (`en_US`, identical content today — a distinct endonym for the
+// locale picker rather than a spelling divergence, since `en`'s own copy
+// is already American-spelled), Welsh (`cy`, for the public-sector
+// Welsh-language duty), Spanish (`es`), French (`fr`), German (`de`),
+// Arabic (`ar`, RTL), Russian (`ru`), Hindi (`hi`), Mandarin Chinese
+// (`zh`), Bengali (`bn`), Portuguese (`pt`), Indonesian (`id`), and Urdu
+// (`ur`, RTL). An unknown key/locale falls back to `en`, then to the key
+// string itself. The chosen locale persists to localStorage and drives
+// the UI strings, `<html lang>`, and `<html dir>` (right-to-left for
+// `ar` / `ur`).
 //
 // The i18n store is the SINGLE SOURCE OF TRUTH for the locale: it owns
 // persistence and is reflected onto `<html lang>` / `<html dir>` by the
-// root layout. There is currently no in-app locale switcher (the Lily
-// LocalePicker that called `i18n.set` was removed from the layout in
-// favour of the Lily share/text-size pickers); `i18n.set` remains the
-// programmatic entry point for a future one.
+// root layout. The Lily PickerBar's LocalePicker calls `i18n.set` on
+// change (its own `applyDir={false}`, since this store already reflects
+// `lang`/`dir` onto `<html>` — see `+layout.svelte`).
 
 import { browser } from '$app/environment';
 
@@ -30,6 +32,7 @@ import { browser } from '$app/environment';
  */
 export const LOCALES = [
     'en',
+    'en_US',
     'cy',
     'es',
     'fr',
@@ -53,6 +56,7 @@ export const DEFAULT_LOCALE: Locale = 'en';
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
     en: 'English',
+    en_US: 'English (United States)',
     cy: 'Cymraeg',
     es: 'Español',
     fr: 'Français',
@@ -100,6 +104,504 @@ export const LOCALE_KEY = 'mxi.case-folder.locale';
 // missing translation is a type error (the `StringKey` union below).
 const STRINGS = {
     en: {
+        // Brand / chrome
+        'brand.name': 'Case Tracking',
+        'brand.tagline': 'NHS paper records',
+        'chrome.language': 'Language',
+        'chrome.theme': 'Theme',
+        'nav.share': 'Share',
+        'nav.text_size': 'Text size',
+        'share.copy_link': 'Copy link',
+        'share.copied': 'Link copied',
+        'share.copy_failed': 'Could not copy — copy it from the address bar',
+        'theme.default': 'Default',
+        'theme.highContrast': 'High contrast',
+        'nav.toggle': 'Toggle navigation',
+        'auth.signedInAs': 'Signed in as',
+        'auth.signOut': 'Sign out',
+        // Nav links
+        'nav.dashboard': 'Dashboard',
+        'nav.patients': 'Patients',
+        'nav.folders': 'Folders',
+        'nav.volumes': 'Volumes',
+        'nav.workers': 'Workers',
+        'nav.buildings': 'Buildings',
+        'nav.cabinets': 'Cabinets',
+        'nav.move': 'Move folder',
+        'nav.scan': 'Scan',
+        'nav.history': 'Move history',
+        'nav.alerts': 'Alerts',
+        'nav.reports': 'Reports',
+        // Layout regions / footer / skip link
+        'layout.skipToContent': 'Skip to main content',
+        'layout.siteHeader': 'Site header',
+        'layout.siteFooter': 'Site footer',
+        'layout.primaryNavigation': 'Primary navigation',
+        'footer.text':
+            'Case Tracking — built with the Lily Design System (NHS theme) and SVAR Svelte. Demo data only; not a regulated medical record.',
+        // Shared / common
+        'common.backToDashboard': 'Back to dashboard',
+        'common.cancel': 'Cancel',
+        'common.move': 'Move',
+        'common.view': 'View',
+        'common.remove': 'Remove',
+        'common.action': 'Action',
+        'common.status': 'Status',
+        'common.patient': 'Patient',
+        'common.folder': 'Folder',
+        'common.cabinet': 'Cabinet',
+        'common.title': 'Title',
+        'common.name': 'Name',
+        'common.role': 'Role',
+        'common.reason': 'Reason',
+        'common.movedBy': 'Moved by',
+        'common.lastMoved': 'Last moved',
+        'common.nhsNumber': 'NHS Number',
+        'common.dateOfBirth': 'Date of birth',
+        'common.description': 'Description',
+        'common.notes': 'Notes',
+        'common.entered': 'Entered',
+        'common.left': 'Left',
+        'common.when': 'When',
+        'common.from': 'From',
+        'common.to': 'To',
+        'common.source': 'Source',
+        'common.volume': 'Volume',
+        'common.stillHere': 'Still here',
+        'common.noMovesYet': 'No moves recorded yet.',
+        'common.inTransitPorter': 'In transit (porter carrying)',
+        'common.selectCabinetOption': '— Select cabinet —',
+        'common.inTransitOption': '— In transit —',
+        'status.inCabinet': 'in-cabinet',
+        'status.inTransit': 'in-transit',
+        // Folder status badges (display labels)
+        'badge.located': 'Located',
+        'badge.porterInMotion': 'Porter in motion',
+        // Dashboard
+        'dashboard.welcomePrefix': 'Welcome.',
+        'dashboard.inTransit.one':
+            'You have {n} folder currently in transit. Use the',
+        'dashboard.inTransit.other':
+            'You have {n} folders currently in transit. Use the',
+        'dashboard.moveFolderPage': 'Move folder',
+        'dashboard.pageToRecord': 'page to record a placement.',
+        'dashboard.folderSummary': 'Folder summary',
+        'dashboard.patients': 'Patients',
+        'dashboard.foldersTracked': '{n} folders tracked',
+        'dashboard.inCabinet': 'In cabinet',
+        'dashboard.inTransitCard': 'In transit',
+        'dashboard.buildings': 'Buildings',
+        'dashboard.roomsCabinets': '{rooms} rooms · {cabinets} cabinets',
+        'dashboard.moves24h': 'Moves (24h)',
+        'dashboard.auditedPlacements': 'Audited folder placements',
+        'dashboard.folderRegister': 'Folder register',
+        'dashboard.viewAll': 'View all',
+        'dashboard.addFolder': 'Add folder',
+        'dashboard.recentMoves': 'Recent moves',
+        'dashboard.seeFullHistory': 'See full audit history →',
+        'dashboard.cabinetUtilisation': 'Cabinet utilisation',
+        // Error boundary
+        'error.backToDashboard': 'Back to dashboard',
+        'error.heading': 'Case Tracking API error',
+        'error.unknown': 'Unknown error',
+        'error.apiHint':
+            'The app talks to the Loco JSON API through /api (proxied to the Loco server in dev). Make sure that API is running. See README.md § "Quick start".',
+        // Login
+        'login.title': 'Sign in',
+        'login.intro':
+            "Enter your work email address. If it is recognised, we'll send you a one-time sign-in link. No password required.",
+        'login.sendError': 'Could not send sign-in link',
+        'login.enterEmail': 'Enter your email address.',
+        'login.checkEmail': 'Check your email',
+        'login.sentBody':
+            'matches a known account, a sign-in link is on its way. The link expires in 10 minutes.',
+        'login.sentPrefix': 'If',
+        'login.devShortcut': 'Development shortcut:',
+        'login.openLink': 'open your sign-in link',
+        'login.formLabel': 'Sign in',
+        'login.emailLabel': 'Email address',
+        'login.submit': 'Email me a sign-in link',
+        // Auth callback
+        'callback.title': 'Signing you in',
+        'callback.error': 'Sign-in link could not be used',
+        'callback.backToSignIn': 'Back to sign in',
+        'callback.completing': 'One moment — completing your sign-in…',
+        // Scan
+        'scan.heading': 'Scan a folder',
+        'scan.intro':
+            'Scan a barcode or type an NHS Number (or folder id) to jump straight to a folder and record its move — the Scan4Safety fast path. No hardware scanner needed; a keyboard-wedge scanner types into the box below.',
+        'scan.failed': 'Scan failed',
+        'scan.formLabel': 'Scan',
+        'scan.fieldLabel': 'Scan or search',
+        'scan.fieldDescription':
+            'NHS Number (e.g. 943 476 5919) or a folder id.',
+        'scan.placeholder': 'Scan or type…',
+        'scan.matches': 'Matches ({n})',
+        'scan.moveThisFolder': 'Move this folder',
+        'scan.noFolderFound': 'No folder found for “{term}”.',
+        // Move folder
+        'move.heading': 'Move a folder',
+        'move.intro':
+            "Enter a patient's NHS Number, pick the folder you're moving, then pick the destination cabinet (or mark it in transit).",
+        'move.recorded': 'Move recorded',
+        'move.formLabel': 'Move folder',
+        'move.patientNhs': 'Patient NHS Number',
+        'move.invalidNhs': 'Enter a valid 10-digit NHS Number.',
+        'move.folder': 'Folder',
+        'move.selectFolderError': 'Select which folder to move.',
+        'move.pickFolderDescription':
+            "Pick which of this patient's folders to move.",
+        'move.enterNhsDescription': 'Enter an NHS Number to see folders.',
+        'move.selectFolderOption': '— Select folder —',
+        'move.destination': 'Destination',
+        'move.workerLabel': 'Worker (from Main Worker Service)',
+        'move.workerDescription':
+            'Pick a registered worker, or leave blank to use the free-text field below.',
+        'move.freeTextOnly': '— Free-text only —',
+        'move.movedByLabel': 'Moved by (free text)',
+        'move.movedByDescription': 'Used when no worker is selected.',
+        'move.movedByPlaceholder': 'e.g. Alice (porter)',
+        'move.reasonPlaceholder': 'e.g. Outpatient appointment',
+        'move.recordMove': 'Record move',
+        'move.patientFolders': 'Patient folders',
+        'move.enterValidNhs':
+            "Enter a valid NHS Number to see this patient's folders.",
+        'move.folderNotFound': 'Folder not found.',
+        'move.recordedSummary':
+            'Recorded move of {patient} — {folder} from {from} to {to}.',
+        // Folders index
+        'folders.register': 'Folder register',
+        'folders.searchPlaceholder':
+            'Search by NHS Number, patient, folder title, or cabinet',
+        'folders.searchLabel': 'Search folders',
+        'folders.addFolder': 'Add folder',
+        'folders.tableLabel': 'Folders',
+        'folders.tableCaption':
+            'All paper case-note folders tracked by the system',
+        'folders.colNhsNumber': 'NHS Number',
+        'folders.colPatient': 'Patient',
+        'folders.colFolder': 'Folder',
+        'folders.colCabinet': 'Cabinet',
+        'folders.colStatus': 'Status',
+        'folders.colLastMoved': 'Last moved',
+        'folders.colAction': 'Action',
+        'folders.noMatch': 'No folders match',
+        // New folder
+        'folderNew.backToFolders': 'Back to folders',
+        'folderNew.heading': 'Add a new folder',
+        'folderNew.intro':
+            "A folder belongs to one patient. If the patient is not yet registered with the Main Patient Service, we'll create them; otherwise the new folder is attached to the existing patient record.",
+        'folderNew.cannotSave': 'Cannot save folder',
+        'folderNew.invalidNhs':
+            'Enter a valid 10-digit NHS Number (Modulus 11 check failed).',
+        'folderNew.titleRequired': 'Folder title is required.',
+        'folderNew.formLabel': 'Add folder',
+        'folderNew.nhsDescription': '10 digits, formatted XXX XXX XXXX.',
+        'folderNew.titleLabel': 'Folder title',
+        'folderNew.titleDescription': 'e.g. Volume 1, Cardiology 2023',
+        'folderNew.patientName': 'Patient name',
+        'folderNew.patientNameDescription': 'Only needed for a new patient.',
+        'folderNew.dobDescription': 'Only needed for a new patient.',
+        'folderNew.initialCabinet': 'Initial cabinet',
+        'folderNew.initialCabinetDescription':
+            'Leave blank if the folder is in transit.',
+        'folderNew.saveFolder': 'Save folder',
+        // Folder detail
+        'folderDetail.backToFolders': 'Back to folders',
+        'folderDetail.patientPrefix': 'Patient:',
+        'folderDetail.detailsLabel': 'Folder details',
+        'folderDetail.folderTitle': 'Folder title',
+        'folderDetail.currentCabinet': 'Current cabinet',
+        'folderDetail.moveThisFolder': 'Move this folder',
+        'folderDetail.moveHistory': 'Move history',
+        // Patients index
+        'patients.heading': 'Patients',
+        'patients.searchPlaceholder': 'Search by NHS Number or name',
+        'patients.searchLabel': 'Search patients',
+        'patients.tableLabel': 'Patients',
+        'patients.tableCaption':
+            'All patients with one or more registered folders',
+        'patients.colFolders': 'Folders',
+        'patients.noMatch': 'No patients match',
+        // Patient detail
+        'patientDetail.backToPatients': 'Back to patients',
+        'patientDetail.notFoundHeading':
+            'Patient not found in Main Patient Service',
+        'patientDetail.notFoundBody':
+            'No patient record exists for NHS Number {nhs}. The folders below are reconstructed from local snapshots written when each folder was created.',
+        'patientDetail.sourcePrefix': 'Source:',
+        'patientDetail.recordActions': 'Patient record actions',
+        'patientDetail.nhsNumberHeading': 'NHS Number {nhs}',
+        'patientDetail.foldersForPatient': 'Folders for this patient ({n})',
+        'patientDetail.patientFoldersTable': 'Patient folders',
+        'patientDetail.colVolume': 'Volume',
+        'patientDetail.noFoldersYet': 'No folders yet.',
+        'patientDetail.addFolderForPatient': 'Add a folder for this patient',
+        'patientDetail.moveHistoryForPatient': 'Move history for this patient',
+        'patientDetail.demoUnavailable':
+            "“{action}” isn't available in this demo.",
+        // Buildings index
+        'buildings.heading': 'Buildings',
+        'buildings.addBuilding': 'Add building',
+        'buildings.tableLabel': 'Buildings',
+        'buildings.tableCaption': 'Physical sites holding records rooms',
+        'buildings.colRooms': 'Rooms',
+        'buildings.noBuildings': 'No buildings yet.',
+        // New building
+        'buildingNew.backToBuildings': 'Back to buildings',
+        'buildingNew.heading': 'Add a building',
+        'buildingNew.intro':
+            'One building can have many rooms; each room can hold many cabinets.',
+        'buildingNew.cannotSave': 'Cannot save building',
+        'buildingNew.nameRequired': 'Building name is required.',
+        'buildingNew.formLabel': 'Add building',
+        'buildingNew.nameLabel': 'Building name',
+        'buildingNew.saveBuilding': 'Save building',
+        // Building detail
+        'buildingDetail.backToBuildings': 'Back to buildings',
+        'buildingDetail.rooms': 'Rooms ({n})',
+        'buildingDetail.roomsTable': 'Rooms',
+        'buildingDetail.colCabinets': 'Cabinets',
+        'buildingDetail.noRooms': 'No rooms yet.',
+        'buildingDetail.addRoom': 'Add a room',
+        'buildingDetail.addRoomLabel': 'Add room',
+        'buildingDetail.roomNameRequired': 'Room name is required.',
+        'buildingDetail.roomName': 'Room name',
+        'buildingDetail.saveRoom': 'Save room',
+        'buildingDetail.presenceHistory': 'Folder presence history',
+        'buildingDetail.presenceIntro':
+            'Folders that have been in any cabinet in this building, newest first.',
+        'buildingDetail.presenceTable': 'Building folder presence history',
+        'buildingDetail.presenceCaption':
+            "Aggregated across this building's cabinets",
+        'buildingDetail.noPresence':
+            'No folder presence recorded in this building yet.',
+        // Cabinets index
+        'cabinets.heading': 'File cabinets',
+        'cabinets.addCabinet': 'Add cabinet',
+        'cabinets.tableLabel': 'Cabinets',
+        'cabinets.tableCaption':
+            'Physical file cabinets, their building/room, and occupancy',
+        'cabinets.colLabel': 'Label',
+        'cabinets.colBuilding': 'Building',
+        'cabinets.colRoom': 'Room',
+        'cabinets.colCapacity': 'Capacity',
+        'cabinets.colFolders': 'Folders',
+        'cabinets.colUtilisation': 'Utilisation',
+        // New cabinet
+        'cabinetNew.backToCabinets': 'Back to cabinets',
+        'cabinetNew.heading': 'Add a file cabinet',
+        'cabinetNew.intro':
+            'A cabinet lives inside a room (which lives inside a building).',
+        'cabinetNew.noRoomsHeading': 'No rooms exist yet',
+        'cabinetNew.noRoomsBody':
+            "first, then add a room from the building's page.",
+        'cabinetNew.noRoomsBuilding': 'building',
+        'cabinetNew.noRoomsCreate': 'Create a',
+        'cabinetNew.cannotSave': 'Cannot save cabinet',
+        'cabinetNew.labelRequired': 'Cabinet label is required.',
+        'cabinetNew.roomRequired': 'Select a room.',
+        'cabinetNew.formLabel': 'Add cabinet',
+        'cabinetNew.labelLabel': 'Cabinet label',
+        'cabinetNew.labelPlaceholder': 'e.g. Cabinet D3',
+        'cabinetNew.roomLabel': 'Room',
+        'cabinetNew.selectRoomOption': '— Select a room —',
+        'cabinetNew.capacityLabel': 'Capacity',
+        'cabinetNew.capacityDescription':
+            'Approximate number of folders the cabinet holds. Leave blank for unknown.',
+        'cabinetNew.saveCabinet': 'Save cabinet',
+        // Cabinet detail
+        'cabinetDetail.backToCabinets': 'Back to cabinets',
+        'cabinetDetail.currentFolders':
+            'Folders currently in this cabinet ({n})',
+        'cabinetDetail.currentFoldersTable': 'Current folders',
+        'cabinetDetail.empty': 'This cabinet is currently empty.',
+        'cabinetDetail.presenceHistory': 'Folder presence history',
+        'cabinetDetail.presenceIntro':
+            'Which folders have been in this cabinet, and when. Newest first.',
+        'cabinetDetail.presenceTable': 'Folder presence history',
+        'cabinetDetail.presenceCaption': 'Derived from the move audit log',
+        'cabinetDetail.colReasonLeft': 'Reason left',
+        'cabinetDetail.noPresence':
+            'No folder has been recorded in this cabinet yet.',
+        // Room detail
+        'roomDetail.backToBuildings': 'Back to buildings',
+        'roomDetail.presenceHistory': 'Folder presence history',
+        'roomDetail.presenceIntro':
+            'Folders that have been in any cabinet in this room, newest first.',
+        'roomDetail.presenceTable': 'Room folder presence history',
+        'roomDetail.presenceCaption': "Aggregated across this room's cabinets",
+        'roomDetail.noPresence':
+            'No folder presence recorded in this room yet.',
+        // Volumes index
+        'volumes.heading': 'Volumes',
+        'volumes.printLabels': 'Print labels',
+        'volumes.newVolume': 'New volume',
+        'volumes.intro':
+            "A volume is a movable bundle of one patient's folders. Move the volume and every folder inside it moves together.",
+        'volumes.tableLabel': 'Volumes',
+        'volumes.tableCaption':
+            'Bundles of folders, each belonging to one patient',
+        'volumes.colFolders': 'Folders',
+        'volumes.colLocation': 'Location',
+        'volumes.noVolumes':
+            "No volumes yet. Create one to bundle a patient's folders.",
+        'volumes.noLabelsSelected': 'No labels selected.',
+        'volumes.queued.one':
+            'Queued {n} label × {copies} {copy} for printing.',
+        'volumes.queued.other':
+            'Queued {n} labels × {copies} {copy} for printing.',
+        'volumes.copy': 'copy',
+        'volumes.copies': 'copies',
+        // New volume
+        'volumeNew.backToVolumes': 'Back to volumes',
+        'volumeNew.heading': 'New volume',
+        'volumeNew.intro':
+            'A volume bundles folders for one patient. The patient must already be registered (create a folder for them first). You can add folders to the volume once it exists.',
+        'volumeNew.cannotCreate': 'Cannot create volume',
+        'volumeNew.invalidNhs':
+            'Enter a valid 10-digit NHS Number (Modulus 11 check failed).',
+        'volumeNew.titleRequired': 'Volume title is required.',
+        'volumeNew.formLabel': 'New volume',
+        'volumeNew.patientNhs': 'Patient NHS Number',
+        'volumeNew.nhsDescription': '10 digits, formatted XXX XXX XXXX.',
+        'volumeNew.titleLabel': 'Volume title',
+        'volumeNew.titleDescription': 'e.g. Alice Johnson — Vol 1',
+        'volumeNew.initialCabinet': 'Initial cabinet',
+        'volumeNew.initialCabinetDescription':
+            'Where the volume lives. Leave blank if in transit.',
+        'volumeNew.createVolume': 'Create volume',
+        // Volume detail
+        'volumeDetail.backToVolumes': 'Back to volumes',
+        'volumeDetail.somethingWrong': 'Something went wrong',
+        'volumeDetail.foldersIn': 'Folders in this volume ({n})',
+        'volumeDetail.foldersTable': 'Volume folders',
+        'volumeDetail.noFolders': 'No folders in this volume yet.',
+        'volumeDetail.addFolderLabel': 'Add a folder',
+        'volumeDetail.addFolderFor': 'Add a folder for {patient}',
+        'volumeDetail.chooseFolder': '— Choose a folder —',
+        'volumeDetail.addToVolume': 'Add to volume',
+        'volumeDetail.renameVolume': 'Rename volume',
+        'volumeDetail.rename': 'Rename',
+        'volumeDetail.moveVolume': 'Move this volume',
+        'volumeDetail.moveIntro':
+            'Relocates every folder in the volume together.',
+        'volumeDetail.moveFormLabel': 'Move volume',
+        'volumeDetail.destinationCabinet': 'Destination cabinet',
+        'volumeDetail.moveReasonPlaceholder': 'e.g. Outpatient clinic',
+        'volumeDetail.moveVolumeButton': 'Move volume',
+        'volumeDetail.moveHistory': 'Move history',
+        // Workers index
+        'workers.heading': 'Workers',
+        'workers.intro':
+            "Staff who move folders. Open a worker to see the folders they've moved and every folder belonging to their patients.",
+        'workers.tableLabel': 'Workers',
+        'workers.tableCaption': 'Workers from the Main Worker Service',
+        'workers.noWorkers': 'No workers found.',
+        // Worker detail
+        'workerDetail.backToWorkers': 'Back to workers',
+        'workerDetail.foldersMoved': 'Folders moved by this worker ({n})',
+        'workerDetail.foldersMovedTable': 'Folders moved by this worker',
+        'workerDetail.noMovedFolders':
+            "This worker hasn't moved any folders yet.",
+        'workerDetail.patientsFolders': "All their patients' folders ({n})",
+        'workerDetail.patientsFoldersIntro':
+            'Every folder belonging to a patient this worker has handled.',
+        'workerDetail.patientsFoldersTable': "This worker's patients' folders",
+        'workerDetail.noPatientFolders': 'No patient folders to show yet.',
+        'workerDetail.movesByWorker': 'Moves by this worker',
+        // History index
+        'history.backToDashboard': 'Back to dashboard',
+        'history.heading': 'Move history (audit log)',
+        'history.filterPlaceholder':
+            'Filter by patient, NHS number, cabinet, or porter',
+        'history.filterLabel': 'Filter audit log',
+        'history.tableLabel': 'Move audit log',
+        'history.tableCaption':
+            'Every recorded movement of a paper folder, newest first',
+        'history.noMatch': 'No moves match your filter.',
+        // History detail
+        'historyDetail.backToHistory': 'Back to move history',
+        'historyDetail.heading': 'Move event',
+        'historyDetail.folderInvolved': 'Folder involved',
+        'historyDetail.detailsLabel': 'Move event details',
+        'historyDetail.otherFolders': 'Other folders for {patient}',
+        'historyDetail.noOtherFolders': 'No other folders for this patient.',
+        // Reports
+        'reports.backToDashboard': 'Back to dashboard',
+        'reports.heading': 'Reports',
+        'reports.atAGlance': 'At a glance',
+        'reports.kpiPatients': 'Patients:',
+        'reports.kpiFolders': 'Folders:',
+        'reports.kpiFoldersDetail':
+            '({inCabinet} in cabinet, {inTransit} in transit)',
+        'reports.kpiVolumes': 'Volumes:',
+        'reports.kpiCabinets': 'Cabinets:',
+        'reports.kpiCabinetsDetail': 'in {n} buildings',
+        'reports.kpiMoves': 'Moves — last 24h:',
+        'reports.kpiMoves7d': 'last 7d:',
+        'reports.cabinetUtilisation': 'Cabinet utilisation',
+        'reports.colCabinet': 'Cabinet',
+        'reports.colFolders': 'Folders',
+        'reports.colCapacity': 'Capacity',
+        'reports.colUtilisation': 'Utilisation',
+        'reports.inTransit': 'In transit ({n})',
+        'reports.noInTransit': 'No folders are in transit.',
+        'reports.activityByWorker': 'Activity by worker',
+        'reports.colWorker': 'Worker',
+        'reports.colMoves': 'Moves',
+        'reports.noMovesYet': 'No moves recorded yet.',
+        'reports.derivedLive':
+            'Reports are derived live from the API — no separate reporting store.',
+        // Alerts
+        'alerts.backToDashboard': 'Back to dashboard',
+        'alerts.heading': 'Geofence alerts',
+        'alerts.intro':
+            'Case notes that crossed a building boundary. A geofence breach is any move whose origin and destination cabinets are in different buildings.',
+        'alerts.tableLabel': 'Geofence alerts',
+        'alerts.tableCaption': 'Boundary-crossing moves, newest first',
+        'alerts.colCrossed': 'Crossed',
+        'alerts.none':
+            'No geofence breaches — every folder has stayed within its building.',
+        // FolderGrid (SVAR) column headers
+        'grid.nhsNumber': 'NHS Number',
+        'grid.patient': 'Patient',
+        'grid.folder': 'Folder',
+        'grid.cabinet': 'Cabinet',
+        'grid.status': 'Status',
+        'grid.lastMoved': 'Last moved',
+        // Addressograph box
+        'addressograph.label': 'Patient addressograph',
+        'addressograph.nhsNo': 'NHS No.',
+        'addressograph.dob': 'D.O.B.',
+        'addressograph.sex': 'Sex',
+        'addressograph.address': 'Address',
+        // ButtonBar
+        'buttonBar.label': 'Actions',
+        'buttonBar.patient': 'Patient',
+        'buttonBar.referrals': 'Referrals',
+        'buttonBar.activate': 'Activate',
+        'buttonBar.caseNotes': 'Case Notes',
+        'buttonBar.pathways': 'Pathways',
+        'buttonBar.legalStatus': 'Legal Status',
+        'buttonBar.documents': 'Documents',
+        'buttonBar.wrapper': 'Wrapper',
+        'buttonBar.audit': 'Audit',
+        'buttonBar.quickReports': 'Quick Reports',
+        // Labels dialog
+        'labels.title': 'Labels',
+        'labels.searchLabel': 'Search labels',
+        'labels.searchPlaceholder': 'Enter text to search...',
+        'labels.find': 'Find',
+        'labels.clear': 'Clear',
+        'labels.volumeTitles': 'Volume titles',
+        'labels.noMatching': 'No matching volumes.',
+        'labels.numberOfCopies': 'Number of Copies:',
+        'labels.copiesLabel': 'Number of copies',
+        'labels.print': 'Print',
+        'labels.close': 'Close',
+    },
+    en_US: {
         // Brand / chrome
         'brand.name': 'Case Tracking',
         'brand.tagline': 'NHS paper records',
@@ -6215,7 +6717,17 @@ export const STRINGS_BY_LOCALE: Record<
 // Accepts a region subtag (es-MX → es) and is case-insensitive.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
     if (!raw) return null;
-    const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? '';
+    const trimmed = raw.trim();
+    // Exact match first (hyphen/underscore-insensitive) so a region variant
+    // that is itself a supported locale — `en_US`/`en-US` — resolves to
+    // that entry rather than being collapsed to its primary subtag below.
+    const normalized = trimmed.replace(/-/g, '_').toLowerCase();
+    const exact = (LOCALES as readonly string[]).find(
+        (l) => l.toLowerCase() === normalized,
+    );
+    if (exact) return exact as Locale;
+    // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+    const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? '';
     return (LOCALES as readonly string[]).includes(primary)
         ? (primary as Locale)
         : null;

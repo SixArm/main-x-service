@@ -200,6 +200,329 @@ async fn scenarios_evaluate_and_commit_feasibly() {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// T-28a: evaluate/compare carry `as_of` + the live rows they read
+// (each with its own `updated_at`); commit -> rollback -> commit is
+// idempotent (rollback only ever touches the scenario's own
+// status/committed_at — there is no member funding state to restore,
+// since commit never wrote any); rollback on a scenario that was
+// never committed is refused 409, naming the actual status.
+async fn scenario_rollback_and_evaluation_provenance() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let plan: Value = request
+            .post("/api/plans")
+            .json(&json!({ "kind": "Project", "name": "Rollback Target" }))
+            .await
+            .json();
+        let plan_pid = plan["pid"].as_str().expect("pid").to_string();
+        request
+            .post(&format!("/api/plans/{plan_pid}/budget-lines"))
+            .json(&json!({ "category": "capex", "description": "build",
+                            "currency": "GBP", "planned_minor": 400_000 }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/plans/{plan_pid}/risks"))
+            .json(&json!({ "title": "Vendor risk", "probability": 2, "impact": 3 }))
+            .await
+            .assert_status_ok();
+
+        let scenario: Value = request
+            .post("/api/scenarios")
+            .json(&json!({ "name": "Provenance", "plan_pids": [plan_pid] }))
+            .await
+            .json();
+        let scenario_pid = scenario["pid"].as_str().expect("pid").to_string();
+
+        // `evaluate` discloses when it ran and which live rows it summed.
+        let evaluated: Value = request
+            .get(&format!("/api/scenarios/{scenario_pid}/evaluate"))
+            .await
+            .json();
+        assert!(evaluated["as_of"].is_string(), "as_of is disclosed");
+        let inputs = evaluated["inputs_read"].as_array().expect("array");
+        assert!(
+            inputs
+                .iter()
+                .any(|i| i["kind"] == "budget_line" && i["updated_at"].is_string()),
+            "the budget line is named with its own updated_at: {inputs:?}"
+        );
+        assert!(
+            inputs.iter().any(|i| i["kind"] == "risk"),
+            "the risk is named: {inputs:?}"
+        );
+
+        // `compare` discloses both sides' provenance independently.
+        let other: Value = request
+            .post("/api/scenarios")
+            .json(&json!({ "name": "Empty" }))
+            .await
+            .json();
+        let other_pid = other["pid"].as_str().expect("pid");
+        let compared: Value = request
+            .get(&format!(
+                "/api/scenarios/compare?a={scenario_pid}&b={other_pid}"
+            ))
+            .await
+            .json();
+        assert!(compared["a"]["as_of"].is_string());
+        assert!(compared["b"]["as_of"].is_string());
+        assert!(!compared["a"]["inputs_read"].as_array().unwrap().is_empty());
+        assert!(compared["b"]["inputs_read"].as_array().unwrap().is_empty());
+
+        // A scenario that was never committed cannot be rolled back.
+        assert_eq!(
+            request
+                .post(&format!("/api/scenarios/{scenario_pid}/rollback"))
+                .await
+                .status_code(),
+            409,
+            "draft scenarios cannot be rolled back"
+        );
+
+        // Commit -> rollback -> commit is idempotent on funding state:
+        // the plan's own budget line is untouched by either call,
+        // because commit never wrote to it in the first place.
+        request
+            .post(&format!("/api/scenarios/{scenario_pid}/commit"))
+            .await
+            .assert_status_ok();
+        let before_rollback: Value = request
+            .get(&format!("/api/plans/{plan_pid}/budget-lines"))
+            .await
+            .json();
+        let rolled_back: Value = request
+            .post(&format!("/api/scenarios/{scenario_pid}/rollback"))
+            .await
+            .json();
+        assert_eq!(rolled_back["status"], "draft");
+        assert!(rolled_back["committed_at"].is_null());
+        let after_rollback: Value = request
+            .get(&format!("/api/plans/{plan_pid}/budget-lines"))
+            .await
+            .json();
+        assert_eq!(
+            before_rollback, after_rollback,
+            "rollback never touches member funding state, because commit never did either"
+        );
+        let recommitted: Value = request
+            .post(&format!("/api/scenarios/{scenario_pid}/commit"))
+            .await
+            .json();
+        assert_eq!(recommitted["status"], "committed");
+
+        // Rolling back an already-draft scenario refuses the same way.
+        request
+            .post(&format!("/api/scenarios/{scenario_pid}/rollback"))
+            .await
+            .assert_status_ok();
+        assert_eq!(
+            request
+                .post(&format!("/api/scenarios/{scenario_pid}/rollback"))
+                .await
+                .status_code(),
+            409
+        );
+
+        // The audit trail names both the commit(s) and the rollback.
+        let audit: Value = request
+            .get(&format!("/api/plans/{scenario_pid}/audit"))
+            .await
+            .json();
+        let actions: Vec<&str> = audit
+            .as_array()
+            .expect("array")
+            .iter()
+            .map(|row| row["action"].as_str().unwrap_or_default())
+            .collect();
+        assert!(actions.contains(&"scenario_rolled_back"));
+        assert_eq!(
+            actions
+                .iter()
+                .filter(|a| **a == "scenario_committed")
+                .count(),
+            2,
+            "both commits are audited: {actions:?}"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// T-28h: POST /scenarios/generate scores every active plan (Smart
+// Score), prices it (budget lines in the cap's currency), and
+// greedily fills the cap; a no-evidence plan is excluded `no_score`
+// (never scored zero); a must-include plan is force-included even
+// over cap; the resulting scenario is an ordinary draft that the
+// existing evaluate/commit/rollback paths already handle; the same
+// call repeated against unchanged data is byte-identical.
+async fn generate_scenario_scores_prices_and_never_silently_drops_must_include() {
+    super::isolate_search_index();
+    // Zero out `momentum` (default 500bp): under the default weights
+    // *every* plan carries a momentum reading from `updated_at` alone,
+    // so a genuinely no-evidence plan can never actually reach
+    // `no_score` — there is no such thing as a plan with zero
+    // `updated_at`. The freed weight moves to `strategic_alignment` so
+    // the total still sums to 10 000bp.
+    // SAFETY: this crate's request tests run `#[serial]`.
+    unsafe {
+        std::env::set_var(
+            "PROJECT_PORTFOLIO_MANAGEMENT_SMART_SCORE_WEIGHTS",
+            r#"{"roi":2500,"strategic_alignment":2500,"expert_review":1500,"risk":1500,"demand":1000,"priority":1000,"momentum":0}"#,
+        );
+    }
+    request::<App, _, _>(|request, _ctx| async move {
+        let objective: Value = request
+            .post("/api/objectives")
+            .json(&json!({ "title": "Modernise records" }))
+            .await
+            .json();
+        let objective_pid = objective["pid"].as_str().expect("pid").to_string();
+
+        // Best ratio: modest cost, decent evidence.
+        let cheap: Value = request
+            .post("/api/plans")
+            .json(&json!({ "kind": "Project", "name": "Cheap Winner" }))
+            .await
+            .json();
+        let cheap_pid = cheap["pid"].as_str().expect("pid").to_string();
+        request
+            .post(&format!("/api/plans/{cheap_pid}/objectives"))
+            .json(&json!({ "objective_pid": objective_pid, "weight": 5 }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/plans/{cheap_pid}/budget-lines"))
+            .json(&json!({ "category": "capex", "description": "build",
+                            "currency": "GBP", "planned_minor": 50_000 }))
+            .await
+            .assert_status_ok();
+
+        // Scored but expensive: priced out once the cap is spent on
+        // the cheap winner and the must-include member.
+        let costly: Value = request
+            .post("/api/plans")
+            .json(&json!({ "kind": "Project", "name": "Costly Also-Ran" }))
+            .await
+            .json();
+        let costly_pid = costly["pid"].as_str().expect("pid").to_string();
+        request
+            .post(&format!("/api/plans/{costly_pid}/objectives"))
+            .json(&json!({ "objective_pid": objective_pid, "weight": 3 }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/plans/{costly_pid}/budget-lines"))
+            .json(&json!({ "category": "capex", "description": "build",
+                            "currency": "GBP", "planned_minor": 900_000 }))
+            .await
+            .assert_status_ok();
+
+        // No evidence at all: excluded `no_score`, never scored zero.
+        let blank: Value = request
+            .post("/api/plans")
+            .json(&json!({ "kind": "Project", "name": "No Evidence" }))
+            .await
+            .json();
+        let blank_pid = blank["pid"].as_str().expect("pid").to_string();
+
+        // Must-include, deliberately over-priced enough to consume
+        // most of the cap alone.
+        let mandatory: Value = request
+            .post("/api/plans")
+            .json(&json!({ "kind": "Project", "name": "Mandatory" }))
+            .await
+            .json();
+        let mandatory_pid = mandatory["pid"].as_str().expect("pid").to_string();
+        request
+            .post(&format!("/api/plans/{mandatory_pid}/objectives"))
+            .json(&json!({ "objective_pid": objective_pid, "weight": 1 }))
+            .await
+            .assert_status_ok();
+        request
+            .post(&format!("/api/plans/{mandatory_pid}/budget-lines"))
+            .json(&json!({ "category": "capex", "description": "build",
+                            "currency": "GBP", "planned_minor": 800_000 }))
+            .await
+            .assert_status_ok();
+
+        let payload = json!({
+            "name": "T-28h Generated",
+            "budget_cap_minor": 900_000,
+            "currency": "GBP",
+            "must_include": [mandatory_pid],
+        });
+        let generated: Value = request
+            .post("/api/scenarios/generate")
+            .json(&payload)
+            .await
+            .json();
+        assert_eq!(generated["status"], "draft");
+        let scenario_pid = generated["pid"].as_str().expect("pid").to_string();
+        let rationale = generated["rationale"].as_array().expect("rationale");
+
+        let row_for = |pid: &str| -> &Value {
+            rationale
+                .iter()
+                .find(|r| r["pid"] == pid)
+                .unwrap_or_else(|| panic!("no rationale row for {pid} in {rationale:?}"))
+        };
+        assert_eq!(row_for(&mandatory_pid)["included"], true, "forced in");
+        assert_eq!(row_for(&blank_pid)["reason"], "no_score");
+        assert_eq!(row_for(&blank_pid)["included"], false);
+        assert!(row_for(&blank_pid).get("score").is_none());
+        assert_eq!(row_for(&cheap_pid)["included"], true, "best ratio, fits");
+        assert_eq!(
+            row_for(&costly_pid)["included"],
+            false,
+            "priced out once the mandatory member and the cheap winner spend the cap"
+        );
+        assert_eq!(row_for(&costly_pid)["reason"], "over_cap");
+
+        // The generated scenario is an ordinary draft: the existing
+        // evaluate → commit → rollback path handles it unmodified.
+        let evaluated: Value = request
+            .get(&format!("/api/scenarios/{scenario_pid}/evaluate"))
+            .await
+            .json();
+        assert_eq!(evaluated["status"], "draft");
+        assert!(evaluated["as_of"].is_string());
+
+        // Same constraints, unchanged data ⇒ byte-identical rationale
+        // (only the freshly-minted scenario pid/name differ).
+        let regenerated: Value = request
+            .post("/api/scenarios/generate")
+            .json(&payload)
+            .await
+            .json();
+        assert_eq!(regenerated["rationale"], generated["rationale"]);
+
+        // An unresolvable must_include is named, not silently dropped.
+        let ghost = uuid::Uuid::new_v4().to_string();
+        let with_ghost: Value = request
+            .post("/api/scenarios/generate")
+            .json(&json!({ "must_include": [ghost] }))
+            .await
+            .json();
+        let ghost_rationale = with_ghost["rationale"].as_array().expect("rationale");
+        let ghost_row = ghost_rationale
+            .iter()
+            .find(|r| r["pid"] == ghost)
+            .expect("ghost row");
+        assert_eq!(ghost_row["reason"], "must_include_conflict");
+    })
+    .await;
+    // SAFETY: same justification as the `set_var` above.
+    unsafe {
+        std::env::remove_var("PROJECT_PORTFOLIO_MANAGEMENT_SMART_SCORE_WEIGHTS");
+    }
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // OKR alignment: weighted links upsert per (objective, item); the
 // objective rolls weights up per collection; the item lists its
 // mappings; weight bounds refuse.

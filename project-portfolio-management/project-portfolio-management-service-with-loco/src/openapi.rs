@@ -36,6 +36,7 @@ fn paths() -> Value {
     merge_object(&mut paths, tba_forecast_paths());
     merge_object(&mut paths, tba_rollup_paths());
     merge_object(&mut paths, tpc_paths());
+    merge_object(&mut paths, financials_paths());
     merge_object(&mut paths, control_paths());
     merge_object(&mut paths, phase_paths());
     merge_object(&mut paths, distribution_paths());
@@ -74,7 +75,11 @@ fn capability_paths() -> Value {
             "get": { "tags": ["collaboration"],
                 "summary": "List review invitations (?subject_kind=&subject_pid=&reviewer=&status=; cap 200)",
                 "responses": { "200": { "description": "Invitations, newest first" } } } },
-        "/api/reviews/consensus": get("collaboration", "Aggregate verdict for one subject (?subject_kind=&subject_pid=): mean score, recommendation counts, strict majority (a tie reports none), outstanding invitations"),
+        "/api/reviews/consensus": {
+            "get": { "tags": ["collaboration"],
+                "summary": "Aggregate verdict for one subject (?subject_kind=&subject_pid=): mean score, recommendation counts, strict majority (a tie reports none), outstanding invitations",
+                "description": "mean_score is null when nobody has scored yet, never a fabricated zero. majority is null on a tie or with no verdicts — a plurality is never promoted to a majority. outstanding and declined come from the live invitation counts, so an unanswered invitation is never silently dropped from the picture, and complete is true only once every invitation has been answered.",
+                "responses": { "200": { "description": "Consensus" } } } },
         "/api/reviews/{pid}/respond": { "post": { "tags": ["collaboration"],
             "summary": "Reviewer accepts or declines the invitation",
             "responses": { "200": { "description": "The updated invitation" },
@@ -544,7 +549,7 @@ fn tba_plan_paths() -> Value {
 }
 
 /// The cross-plan rollup path (`spec/time-based-analysis.md` §15
-/// TBA-9).
+/// TBA-9; the `attrition` key is TBA-12).
 fn tba_rollup_paths() -> Value {
     let plan_for_rollup = json!({
         "name": "pid", "in": "path", "required": true,
@@ -555,13 +560,13 @@ fn tba_rollup_paths() -> Value {
             "get": {
                 "tags": ["time-based-analysis"],
                 "summary": "Flow across a plan and everything it contains",
-                "description": "The combined figures are the **union of every task under this plan**, not an average of the children's ratios — averaging would weight a five-task plan equally with a five-hundred-task one. The per-plan table is returned alongside and, for a portfolio, is usually the more useful half: a rollup mixes boards whose teams mean different things by `in_progress`, so which child differs is a firmer finding than the combined number. The walk is bounded by depth and node caps and reports `truncated` when one fires; `revisits` is non-zero when containment is not a tree, which the write path should have refused.",
+                "description": "The combined figures are the **union of every task under this plan**, not an average of the children's ratios — averaging would weight a five-task plan equally with a five-hundred-task one. The per-plan table is returned alongside and, for a portfolio, is usually the more useful half: a rollup mixes boards whose teams mean different things by `in_progress`, so which child differs is a firmer finding than the combined number. The walk is bounded by depth and node caps and reports `truncated` when one fires; `revisits` is non-zero when containment is not a tree, which the write path should have refused. The `attrition` key names each step from the root plan down to the finished/work-in-progress/not-started split, so the combined figures' denominator is explained inside the response rather than left for the caller to reconstruct from `tree`/`combined` by hand.",
                 "parameters": [
                     plan_for_rollup,
                     { "name": "depth", "in": "query", "schema": { "type": "integer", "default": 32, "minimum": 1, "maximum": 32 } }
                 ],
                 "responses": {
-                    "200": { "description": "Combined figures, the walked tree, and the per-plan comparison" },
+                    "200": { "description": "Combined figures, the walked tree, the per-plan comparison, and the attrition record explaining the denominator" },
                     "404": { "description": "Unknown plan" },
                     "422": { "description": "depth out of range" }
                 }
@@ -653,8 +658,73 @@ fn tpc_paths() -> Value {
     })
 }
 
+/// The phased budget baseline and EAC/ETC forecast paths (T-28b, spec
+/// `13-tasks.md`).
+fn financials_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
+        "/api/plans/{pid}/budget-baselines": {
+            "post": {
+                "tags": ["financials"],
+                "summary": "Approve a new budget-baseline version: planned cost per period, in one currency",
+                "description": "Frozen at approval, append-only — a baseline is never edited; a re-baseline is a new row at version + 1. The first baseline needs no reason; every one after it does, the same distinction a backward phase move already draws between a plan's first phase and a later regression.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Approved: pid and version" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "Bad currency, no periods, a period ending before it starts, a negative planned_minor, or a re-baseline (version > 1) with no reason" }
+                }
+            },
+            "get": {
+                "tags": ["financials"],
+                "summary": "Every baseline version for this plan, newest first, with its periods",
+                "description": "The predecessor is preserved, never overwritten — an older forecast that named its baseline version stays reproducible from that version.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "Baseline versions" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/plans/{pid}/financials/forecast": {
+            "get": {
+                "tags": ["financials"],
+                "summary": "Estimate at completion: EAC = actual cost (AC) + estimate to complete (ETC)",
+                "description": "ETC prefers the plan's latest TPC cost-estimate-to-complete where recorded; failing that, the baseline's own not-yet-elapsed periods, summed — and the response names which source it used. A plan without a baseline and without a TPC observation reports null with no_currency_signal, unchanged by this endpoint existing. Actual cost recorded in a different currency than the forecast's own is disclosed as excluded_other_currency_minor, never merged in. This task does not build a finance connector — actuals still arrive by hand or by a future bulk import.",
+                "parameters": [plan],
+                "responses": { "200": { "description": "The forecast" }, "404": { "description": "Unknown plan" } }
+            }
+        },
+        "/api/financials/forecast": {
+            "get": {
+                "tags": ["financials"],
+                "summary": "The EAC/ETC forecast rolled over parent_ref from a root plan, one row per currency (?plan=&depth=)",
+                "description": "Reuses the same bounded, cycle-safe containment walk GET /plans/{pid}/rollup already uses, so a depth/node cap or a revisit is disclosed the same way. Currencies are never merged — a subtree spanning two currencies reports two rows, never one sum. A walked plan with neither a baseline nor a TPC observation is counted under no_currency_signal rather than silently missing from the total.",
+                "parameters": [
+                    { "name": "plan", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+                    { "name": "depth", "in": "query", "schema": { "type": "integer", "default": 32, "minimum": 1, "maximum": 32 } }
+                ],
+                "responses": { "200": { "description": "The per-currency rollup" }, "404": { "description": "Unknown plan" }, "422": { "description": "depth out of range" } }
+            }
+        }
+    })
+}
+
 /// The Controlling-process paths (entity spec §9.2c / FR-38, FR-39).
+/// Split across two functions purely to stay under clippy's
+/// `too_many_lines`; the two `Value::Object`s are merged below.
 fn control_paths() -> Value {
+    let Value::Object(mut merged) = control_register_paths() else {
+        unreachable!("control_register_paths always returns an object")
+    };
+    let Value::Object(rest) = control_action_paths() else {
+        unreachable!("control_action_paths always returns an object")
+    };
+    merged.extend(rest);
+    Value::Object(merged)
+}
+
+fn control_register_paths() -> Value {
     let plan = json!({
         "name": "pid", "in": "path", "required": true,
         "schema": { "type": "string", "format": "uuid" }
@@ -679,6 +749,28 @@ fn control_paths() -> Value {
                 "responses": { "200": { "description": "Controls" }, "404": { "description": "Unknown plan" } }
             }
         },
+        "/api/plans/{pid}/controls/register-standard": {
+            "post": {
+                "tags": ["controls"],
+                "summary": "Opt this plan into the four controls this service already knows how to evaluate but registers for no plan automatically (PRO-P33)",
+                "description": "gate_readiness (feedforward, fixed at 100%), work_in_progress (concurrent, caller-supplied limit), cycle_time_p85 (concurrent, caller-supplied SLE days), and budget_variance (feedback, defaults to a 10% tolerance). Opt-in and per-plan, never automatic: a feedforward control's whole design intent is to be able to block a write once something enforces that, so silently registering one on every plan would be an unrequested behavioural change. work_in_progress_limit and cycle_time_p85_days have no default (both are plan-specific; inventing one would be the exact risk this endpoint exists to avoid) and are required. Idempotent per metric: one already registered and enabled is reported already_registered rather than duplicated. Retrospectives are deliberately not included — no metric exists for 'a retrospective happened' and this endpoint does not invent one.",
+                "parameters": [plan],
+                "responses": {
+                    "200": { "description": "Per-metric outcome: registered (with pid) or already_registered" },
+                    "404": { "description": "Unknown plan" },
+                    "422": { "description": "work_in_progress_limit or cycle_time_p85_days missing/non-positive, or a negative budget_variance_tolerance_bps" }
+                }
+            }
+        }
+    })
+}
+
+fn control_action_paths() -> Value {
+    let plan = json!({
+        "name": "pid", "in": "path", "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+    });
+    json!({
         "/api/controls/{pid}": {
             "delete": {
                 "tags": ["controls"],
@@ -1577,6 +1669,7 @@ mod tests {
         "/api/compliance/audit/verify",
         // governance (PPM Phase A)
         "/api/proposals",
+        "/api/proposals/forecast",
         "/api/proposals/{pid}",
         "/api/proposals/{pid}/submit",
         "/api/proposals/{pid}/review",
@@ -1600,6 +1693,8 @@ mod tests {
         "/api/scenarios",
         "/api/scenarios/{pid}/evaluate",
         "/api/scenarios/{pid}/commit",
+        "/api/scenarios/{pid}/rollback",
+        "/api/scenarios/generate",
         "/api/objectives",
         "/api/objectives/{pid}/alignment",
         "/api/plans/{pid}/objectives",
@@ -1610,14 +1705,19 @@ mod tests {
         "/api/dependencies/{pid}",
         "/api/plans/{pid}/schedule",
         "/api/plans/{pid}/milestones",
+        "/api/plans/{pid}/milestones/{m_pid}",
         "/api/plans/{pid}/milestones/{m_pid}/complete",
         "/api/plans/{pid}/allocations",
         "/api/plans/{pid}/allocations/{a_pid}",
+        "/api/plans/{pid}/skill-gap",
         "/api/capacity",
         "/api/reports",
         "/api/reports/{pid}",
         "/api/reports/{pid}/run",
         "/api/at-a-glance",
+        // per-user saved views (T-28l)
+        "/api/saved-views",
+        "/api/saved-views/{pid}",
     ];
 
     /// Every route the controllers mount, as `(path, method)` pairs —
@@ -1635,6 +1735,7 @@ mod tests {
             crate::controllers::oversight::routes(),
             crate::controllers::tba::routes(),
             crate::controllers::tpc::routes(),
+            crate::controllers::financials::routes(),
             crate::controllers::controls::routes(),
             crate::controllers::phase::routes(),
             crate::controllers::distribution::routes(),
@@ -1648,6 +1749,7 @@ mod tests {
             crate::controllers::collaboration::routes(),
             crate::controllers::automation::routes(),
             crate::controllers::prioritisation::routes(),
+            crate::controllers::saved_views::routes(),
             crate::controllers::docs::routes(),
             crate::controllers::metrics::routes(),
         ];
@@ -1754,5 +1856,136 @@ mod tests {
             "registered as undocumented but now documented — remove from the register:\n{}",
             done.join("\n")
         );
+    }
+
+    // -- T-28j: explainability pin (repo tasks.md EV-5) --------------------
+    //
+    // The "no black-box output" property (agents/share/time-based-analysis.md
+    // §8: every derived figure discloses its inputs and reasons, or is null
+    // with a reason) is already true of every hand-written entry in this
+    // document — this test makes it unbreakable rather than habitual, per
+    // spec/13-tasks.md T-28j. A new derived `GET` that ships with only a
+    // placeholder response description (`"OK"`, `"Recorded"`, a bare noun)
+    // fails here, the same way `spec_and_mounted_routes_agree_both_ways`
+    // already fails a new route that ships undocumented.
+
+    /// `GET` paths that fetch or list a stored record (or a raw,
+    /// unaggregated log of one) rather than compute a derived figure —
+    /// exempt from the disclosure check below. Each entry is a plain
+    /// CRUD read, an auth/audit/metrics utility, or a newest-first list
+    /// of records with nothing computed across them.
+    const NON_DERIVED_GET: &[&str] = &[
+        "/api/plans",
+        "/api/plans/search",
+        "/api/plans/{pid}",
+        "/api/plans/whoami",
+        "/api/plans/audit/recent",
+        "/api/plans/events/recent",
+        "/api/plans/{pid}/audit",
+        "/api/plans/merges/recent",
+        "/metrics.prom",
+        "/api/plans/{pid}/tasks",
+        "/api/plans/{pid}/sprints",
+        "/api/plans/{pid}/sprints/{s_pid}/notes",
+        "/api/reviews",
+        "/api/notifications",
+        "/api/automations",
+        "/api/automations/runs",
+        "/api/scheduled-actions",
+        "/api/workflows",
+        "/api/plans/{pid}/tpc",
+        "/api/key-results/{pid}/check-ins",
+        "/api/plans/{pid}/controls",
+        "/api/plans/{pid}/budget-baselines",
+        "/api/plans/{pid}/time-entries",
+    ];
+
+    /// Words and phrases this family's response conventions actually use
+    /// when a derived figure discloses its inputs, its absence, or a
+    /// refusal (`agents/share/time-based-analysis.md` §8–9). Not
+    /// exhaustive by design — a `description` long enough to be a real
+    /// paragraph (see [`discloses`]) is the primary signal; this list
+    /// only rescues a shorter-but-still-genuine disclosure.
+    const DISCLOSURE_MARKERS: &[&str] = &[
+        "derived",
+        "null",
+        "reason",
+        "unmeasured",
+        "withheld",
+        "as_of",
+        "excluded",
+        "coverage",
+        "never",
+        "fallback",
+        "falls back",
+        "override",
+        "unscored",
+        "even at zero",
+    ];
+
+    /// Whether one `GET` operation's own text discloses enough to count:
+    /// a substantial `description` paragraph (this file's own style for
+    /// explaining a disclosure-relevant behaviour), or a `summary` /
+    /// response `description` carrying one of [`DISCLOSURE_MARKERS`].
+    fn discloses(op: &Value) -> bool {
+        if op["description"].as_str().is_some_and(|d| d.len() >= 40) {
+            return true;
+        }
+        let mut text = op["summary"].as_str().unwrap_or_default().to_lowercase();
+        if let Some(responses) = op["responses"].as_object() {
+            for response in responses.values() {
+                if let Some(desc) = response["description"].as_str() {
+                    text.push(' ');
+                    text.push_str(&desc.to_lowercase());
+                }
+            }
+        }
+        DISCLOSURE_MARKERS
+            .iter()
+            .any(|marker| text.contains(marker))
+    }
+
+    /// Every derived `GET` either discloses its inputs/reasons or is
+    /// exempt as a plain record read — enumerated from this document
+    /// itself, so a new derived route with no disclosure fails CI
+    /// instead of merely disappointing a reviewer.
+    #[test]
+    fn every_derived_get_discloses_its_inputs_or_is_exempt_as_plain_crud() {
+        let s = spec();
+        let exempt: std::collections::BTreeSet<&str> = NON_DERIVED_GET.iter().copied().collect();
+        let mut undisclosed: Vec<String> = Vec::new();
+        for (path, item) in s["paths"].as_object().expect("paths") {
+            if exempt.contains(path.as_str()) {
+                continue;
+            }
+            let Some(op) = item.get("get") else { continue };
+            if !discloses(op) {
+                undisclosed.push(path.clone());
+            }
+        }
+        undisclosed.sort();
+        assert!(
+            undisclosed.is_empty(),
+            "derived GET with no disclosed inputs/reasons — add a real \
+             description, or add to NON_DERIVED_GET if it is genuinely a \
+             plain record read:\n{}",
+            undisclosed.join("\n")
+        );
+    }
+
+    /// Every `NON_DERIVED_GET` entry is a documented `GET`, so the
+    /// exemption list can only shrink as the crate grows and cannot
+    /// silently accumulate a stale or misspelled path.
+    #[test]
+    fn non_derived_get_register_is_accurate() {
+        let s = spec();
+        let paths = &s["paths"];
+        for path in NON_DERIVED_GET {
+            assert!(
+                paths[*path]["get"].is_object(),
+                "{path} is registered as a plain CRUD GET but is not a \
+                 documented GET at all — fix or remove the entry"
+            );
+        }
     }
 }

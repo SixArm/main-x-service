@@ -26,6 +26,79 @@ fn a_proposal(title: &str) -> Value {
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// T-28i: below the minimum periods of history, the forecast is
+// null + a reason and never a confident-looking number; with enough
+// periods and real approvals, it returns a real forecast, names the
+// history window it drew from, and is deterministic (same seed, same
+// answer, called twice back to back).
+async fn intake_forecast_refuses_thin_history_and_is_deterministic() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        // Below MIN_THROUGHPUT_PERIODS (6): the forecast is null with
+        // a reason, not silently a number.
+        let thin: Value = request
+            .get("/api/proposals/forecast?history_periods=2")
+            .await
+            .json();
+        assert!(thin["forecast"]["median_items"].is_null());
+        assert!(
+            thin["forecast"]["reason"]
+                .as_str()
+                .is_some_and(|r| r.contains("periods of throughput history")),
+            "{thin:?}"
+        );
+        assert_eq!(thin["history_window"]["periods"], 2);
+
+        // Approve three proposals so the intake pipeline has real
+        // approval throughput to sample from.
+        for title in ["Alpha", "Beta", "Gamma"] {
+            let created: Value = request
+                .post("/api/proposals")
+                .json(&a_proposal(title))
+                .await
+                .json();
+            let pid = created["pid"].as_str().expect("pid").to_string();
+            for action in ["submit", "review", "approve"] {
+                request
+                    .post(&format!("/api/proposals/{pid}/{action}"))
+                    .await
+                    .assert_status_ok();
+            }
+        }
+
+        let query = "/api/proposals/forecast?history_periods=6&periods=4&seed=42";
+        let first: Value = request.get(query).await.json();
+        assert_eq!(first["history_window"]["periods"], 6);
+        assert_eq!(first["history_window"]["period_days"], 7);
+        assert!(first["history_window"]["from"].is_string());
+        assert!(first["history_window"]["to"].is_string());
+        assert!(
+            first["forecast"]["median_items"].is_number(),
+            "enough history for a real forecast: {first:?}"
+        );
+        assert!(first["forecast"]["reason"].is_null());
+        let approvals: Vec<i64> = first["approvals_per_period"]
+            .as_array()
+            .expect("array")
+            .iter()
+            .map(|v| v.as_i64().unwrap_or(0))
+            .collect();
+        assert!(
+            approvals.iter().sum::<i64>() >= 3,
+            "at least our three approvals land in the window (others may too, \
+             from other tests sharing this database): {approvals:?}"
+        );
+
+        // Same seed, same (unchanged) data ⇒ byte-identical forecast.
+        let second: Value = request.get(query).await.json();
+        assert_eq!(first["forecast"], second["forecast"]);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 // The full intake pipeline: draft → submitted → in_review → approved →
 // promoted, which mints a real plan in the target collection;
 // out-of-order actions and post-submission edits are refused.

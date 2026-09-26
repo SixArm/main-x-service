@@ -11,6 +11,7 @@ import { browser } from "$app/environment";
 /** Locales the UI is translated into. */
 export const LOCALES = [
   "en",
+  "en_US",
   "cy",
   "es",
   "fr",
@@ -34,6 +35,7 @@ export const DEFAULT_LOCALE: Locale = "en";
 /** Human-readable name for the locale switcher, written in that locale. */
 export const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
+  en_US: "English (United States)",
   cy: "Cymraeg",
   es: "Español",
   fr: "Français",
@@ -65,6 +67,70 @@ export const LOCALE_KEY = "mxi.crm.locale";
 // Every translatable UI string, keyed by a stable dotted key.
 const STRINGS = {
   en: {
+    "nav.engagement": "Engagement",
+    "nav.partners": "Partners",
+    "nav.followups": "Follow-ups",
+    "nav.executive": "Executive",
+    "nav.dpo": "DPO",
+    "common.board": "Board",
+    "contact.jobTitle": "Job title",
+    "account.tier": "Tier",
+    "account.industry": "Industry",
+    "brand.name": "Main X · CRM",
+    "nav.dashboard": "Dashboard",
+    "nav.contacts": "Contacts",
+    "nav.accounts": "Accounts",
+    "nav.leads": "Leads",
+    "nav.deals": "Deals",
+    "nav.campaigns": "Campaigns",
+    "nav.tickets": "Tickets",
+    "nav.articles": "Knowledge base",
+    "nav.signin": "Sign in",
+    "chrome.language": "Language",
+    "nav.share": "Share",
+    "nav.text_size": "Text size",
+    "share.copy_link": "Copy link",
+    "share.copied": "Link copied",
+    "share.copy_failed": "Could not copy — copy it from the address bar",
+    "common.loading": "Loading…",
+    "common.error": "Failed to load",
+    "common.status": "Status",
+    "common.name": "Name",
+    "common.actions": "Actions",
+    "common.amount": "Amount",
+    "common.masked": "Hidden",
+    "dash.title": "CRM dashboard",
+    "dash.winRate": "Win rate",
+    "dash.openDeals": "Open deals",
+    "dash.openTickets": "Open tickets",
+    "dash.forecast": "Forecast",
+    "dash.noData": "No data yet",
+    "contact.consent": "Marketing consent",
+    "contact.timeline": "Timeline",
+    "contact.grant": "Grant consent",
+    "contact.withdraw": "Withdraw",
+    "contact.subjectAccess": "Download my data",
+    "contact.erase": "Erase (anonymise)",
+    "contact.eraseConfirm": "Erase this contact? This cannot be undone.",
+    "lead.score": "Score",
+    "lead.breakdown": "Score breakdown",
+    "lead.source": "Source",
+    "deal.board": "Deal board",
+    "deal.stage": "Stage",
+    "deal.won": "Won",
+    "deal.lost": "Lost",
+    "campaign.funnel": "Funnel",
+    "campaign.roi": "ROI",
+    "campaign.recipients": "Recipients",
+    "campaign.run": "Run (simulated)",
+    "ticket.priority": "Priority",
+    "ticket.due": "Response due",
+    "ticket.breached": "Breached",
+    "article.version": "Version",
+    "article.publish": "Publish",
+    "article.search": "Search articles",
+  },
+  en_US: {
     "nav.engagement": "Engagement",
     "nav.partners": "Partners",
     "nav.followups": "Follow-ups",
@@ -925,7 +991,17 @@ export const STRINGS_BY_LOCALE: Record<
 // Normalise raw input to a supported locale, or null if unsupported.
 function normaliseLocale(raw: string | null | undefined): Locale | null {
   if (!raw) return null;
-  const primary = raw.trim().split(/[-_]/)[0]?.toLowerCase() ?? "";
+  const trimmed = raw.trim();
+  // Exact match first (hyphen/underscore-insensitive) so a region variant
+  // that is itself a supported locale — `en_US`/`en-US` — resolves to
+  // that entry rather than being collapsed to its primary subtag below.
+  const normalized = trimmed.replace(/-/g, "_").toLowerCase();
+  const exact = (LOCALES as readonly string[]).find(
+    (l) => l.toLowerCase() === normalized,
+  );
+  if (exact) return exact as Locale;
+  // Otherwise take the primary subtag before any `-`/`_`, lowercased.
+  const primary = trimmed.split(/[-_]/)[0]?.toLowerCase() ?? "";
   return (LOCALES as readonly string[]).includes(primary)
     ? (primary as Locale)
     : null;

@@ -27,11 +27,13 @@ const children = createRawSnippet(() => ({
 // the `open` class on the <nav>. (spec §5 "Layout shell & navigation".)
 describe("+layout top-bar navigation", () => {
     it("hamburger toggles nav visibility (aria-expanded + .open)", async () => {
-        // The layout reads `data.signedIn` (server-resolved session); a
-        // signed-out stub is enough for the nav test.
+        // The layout reads `data.signedIn` (server-resolved session) and
+        // `data.view` (T-28f nav ordering, repo `tasks.md` EV-1); a
+        // signed-out stub with no view preference is enough for the nav
+        // toggle test.
         const { getByLabelText, container } = render(Layout, {
             children,
-            data: { signedIn: false },
+            data: { signedIn: false, view: null, landingRoute: "/plans" },
         });
         const button = getByLabelText("Toggle navigation");
         const nav = container.querySelector("nav");

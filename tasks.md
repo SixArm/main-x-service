@@ -7042,7 +7042,7 @@ crate above.
   fetch. Two crates independently re-run standalone afterward
   (`person-service-with-loco`, `project-portfolio-management-matcher`)
   as an extra spot-check, both green.
-- [ ] **PRO-H14 (M)** **Publish `main-x-service.github.io`.**
+- [x] **PRO-H14 (M)** **Publish `main-x-service.github.io`.**
   *(Premise corrected 2026-09-07: the scaffold below now exists — see
   `main-x-service.github.io/` in this monorepo and
   `spec/monorepo-github-pages/index.md` — recovered and merged from a
@@ -7077,6 +7077,33 @@ crate above.
   outward-facing, effectively irreversible action; confirm the domain
   with the maintainer before either the `static/llms.*` files (their
   `url` values depend on it) or the publish step.
+  **Done 2026-09-17.** Domain confirmed with the maintainer: a
+  dedicated repo, `SixArm/main-x-service.github.io` — but the premise
+  that naming it that way yields a bare `https://main-x-service.github.io/`
+  was wrong and corrected mid-rollout: GitHub Pages only serves that
+  top-level `<name>.github.io` form when the **owner account itself**
+  is named `<name>`; the owner here is `SixArm`, so the real, confirmed
+  live URL is `https://sixarm.github.io/main-x-service.github.io/`.
+  Both `static/llms.txt`/`static/llms.json` generated (the root
+  `llms.json`'s same entries, every `url` rewritten to its GitHub
+  source since this site renders only four overview routes, plus a new
+  "This site" section for those routes) — same script derives both
+  files from one JSON so they can't drift from each other. Publish
+  step needed two prerequisite fixes neither WEB-2 nor the original
+  scaffold had caught: `lily-design-system-svelte-theme-picker` was
+  still a `file:` path onto the sibling checkout (switched to the
+  registry version, `agents/share/svelte-front-end-stack.md`), and
+  `static/assets/themes` was a symlink onto that same checkout (now a
+  vendored copy) — both resolved correctly only while nested inside
+  the monorepo, one directory level deeper than where `git subtree
+  split` promotes this directory to, so both would have silently
+  broken on the very first real export. Repo created, `git subtree
+  push` run, Pages enabled (`build_type=workflow`, matching
+  `deploy.yml`'s `actions/deploy-pages` usage). Live site verified with
+  a real browser: renders, no console errors, all four Lily pickers
+  present (picker-bar landed on top separately — see the sibling
+  `spec/lily-design-system-svelte-with-picker-bar/index.md` work),
+  45 theme options with the UK/US group last.
 
 ### PRO-P — per-family targeted fixes
 
@@ -7436,22 +7463,44 @@ green as it sits; these finish it)**
   and inventing those defaults unsupervised was judged the wrong call.
   See PRO-P33 and `project-portfolio-management/spec/13-tasks.md`
   T-26 for the full reasoning.
-- [ ] **PRO-P33 (S)** *(found 2026-09-02 via PRO-P19)* Decide how
-  project-portfolio-management-service registers the controls that
-  already exist in all but name — gate readiness (feedforward), WIP
-  limits and the SLE (concurrent), retrospectives and the variance
-  views (feedback) — so `GET /controls/coverage` reports reality
-  rather than only newly-authored controls. Not a code gap: every
-  metric except a retrospective one is already in `KNOWN_METRICS` and
-  already registerable through the existing `POST /plans/{pid}/controls`
-  API. What's missing is a decision on (a) the default
-  `target_value`/`comparator`/`tolerance` each gets, (b) whether
-  registration is automatic (risky — a feedforward control can block a
-  write, so an invented default would be a silent behavioural change
-  to every plan) or an explicit opt-in action, and (c) a computable
-  metric for "a retrospective happened" at all, which does not exist
-  today. See `project-portfolio-management/spec/13-tasks.md` T-26 for
-  the investigation.
+- [x] **PRO-P33 (S)** *(found 2026-09-02 via PRO-P19, decided and landed
+  2026-09-20)* Decided how project-portfolio-management-service
+  registers the controls that already exist in all but name — gate
+  readiness (feedforward), WIP limits and the SLE (concurrent),
+  retrospectives and the variance views (feedback) — so `GET
+  /controls/coverage` reports reality rather than only newly-authored
+  controls. Not a code gap: every metric except a retrospective one was
+  already in `KNOWN_METRICS` and already registerable through the
+  existing `POST /plans/{pid}/controls` API. **Decision:** a new,
+  explicitly **opt-in**, per-plan `POST
+  /api/plans/{pid}/controls/register-standard` endpoint — never
+  automatic. `gate_readiness` gets a fixed 100% target (the one
+  non-arbitrary bar for a readiness gate); `budget_variance` defaults to
+  a 10% tolerance (a standard PMO convention, overridable) — both are
+  registered with no caller input needed. `work_in_progress` and
+  `cycle_time_p85` get **no default at all**: both are required
+  parameters, refused when absent, because (verified against this
+  crate's own `service_level_expectation`, which already takes its SLE
+  target as a caller-supplied parameter rather than a constant, for the
+  identical reason) a WIP limit and a cycle-time SLE are per-plan
+  commitments this service has no basis to invent. Retrospectives stay
+  explicitly out of scope — still no computable metric for "a
+  retrospective happened," and this endpoint does not invent one.
+  **A verified fact that changes the risk calculus, not assumed:**
+  nothing in this service's write paths today actually enforces a
+  feedforward control's block (`grep` for `may_block`/
+  `permitted_response` outside the controls module itself finds no
+  hits) — the opt-in decision stands regardless, since a feedforward
+  control's *design intent* is to gate a write once something does
+  enforce it, and auto-registering on every plan would still be a
+  visible, unrequested change to the coverage report today. Idempotent
+  per metric (a second call reports `already_registered`, never
+  duplicates). Verified: 5 new DB-gated request tests, `cargo
+  build`/`clippy --all-targets -D warnings`/`fmt --check` clean,
+  `cargo test --lib` 423/423 unchanged, full DB-gated suite green
+  against real Postgres. See
+  `project-portfolio-management/spec/13-tasks.md` T-26 for the full
+  decision record and that crate's own `CHANGELOG.md`.
 - [~] **PRO-P20 (L)** T-21 triggers (field-change/date/SLE + multi-action
   rules); FE adoption of the PM suite (workflows, OKR, distribution,
   TPC/controls, effort/ceremony views — all honestly "Not built");
@@ -7681,11 +7730,14 @@ green as it sits; these finish it)**
 > which is the single source of truth for them. Only the consequences
 > that cross a subproject boundary are listed here.
 
-- [ ] **PA-1 (L)** care-pathway **T-14a … T-14m** — the entity-level
+- [x] **PA-1 (L)** care-pathway **T-14a … T-14m** — the entity-level
   queue. Tracked there, not here; this row exists so the family plan
   shows the work. Suggested order and the pure-function / property-test
-  discipline are stated in T-14.
-- [ ] **PA-2 (S)** Record the two disclosure rules the triage settled
+  discipline are stated in T-14. **Done 2026-09-17** — confirmed via
+  [`care-pathway/spec/13-tasks.md`](care-pathway/spec/13-tasks.md) that
+  all thirteen T-14 sub-tasks (T-14a through T-14m) landed 2026-09-09
+  through 2026-09-11; no further work needed here.
+- [x] **PA-2 (S)** Record the two disclosure rules the triage settled
   in the family contract,
   [`agents/share/time-based-analysis.md`](agents/share/time-based-analysis.md)
   §8, so portfolio and patient-flow inherit them rather than re-decide:
@@ -7695,27 +7747,60 @@ green as it sits; these finish it)**
   **secondary suppression** of sibling cells is required wherever a
   withheld cell could be recovered by differencing against a visible
   total. Depends: care-pathway T-14k (the reference implementation).
-- [ ] **PA-3 (S)** Adopt the CONSORT attrition record (care-pathway
+  **Done 2026-09-17** — both rules written into §8 as a new subsection,
+  citing care-pathway's `src/suppression.rs` (`decide()`/`render()`,
+  `is_suppressed()`) as the reference implementation to copy.
+- [x] **PA-3 (S)** Adopt the CONSORT attrition record (care-pathway
   T-14g's `{label, operation, n, parent}` shape) on the other two TBA
   surfaces — portfolio's cross-plan rollup and patient-flow's
   `GET /api/stays/{pid}/time-analysis` cohort reads — so every cohort
   denominator in the family is explained inside the response. Depends:
-  T-14g.
-- [ ] **PA-4 (S)** Add `event_log` and `journey_features` as named
+  T-14g. **Done 2026-09-17, portfolio only — premise corrected for
+  patient-flow.** Investigated both target endpoints before
+  implementing (`project-portfolio-management-service-with-loco`'s
+  `GET /api/plans/{pid}/rollup` and `patient-flow-service-with-rust`'s
+  `GET /api/stays/{pid}/time-analysis`): the latter is confirmed
+  **per-stay** (one `pid`, one timeline), not a cohort read — it has no
+  denominator, no status/window/suppression filter over a population,
+  and no other cohort-level TBA endpoint exists in that crate to attach
+  an attrition record to instead. This task's original premise (both
+  are "cohort reads") was wrong for patient-flow; rather than force a
+  record onto an endpoint with nothing to explain, that leg is dropped.
+  Portfolio's rollup genuinely has a cohort (the union of tasks under a
+  walked plan subtree) and real exclusions to explain (tree-walk depth/
+  node caps + revisits, the per-plan task-count cap, and the finished/
+  work-in-progress/not-started partition) — landed as TBA-12
+  (`project-portfolio-management-service-with-loco/src/tba.rs`:
+  `AttritionStep`/`RollupAttritionInputs`/`rollup_attrition_trail`,
+  wired into `rollup`'s response as a new `attrition` key), a
+  **reinterpretation** of care-pathway's literal step vocabulary rather
+  than a drop-in port, since a bounded tree walk is a structurally
+  different cohort shape than a linear status/window screen. See
+  `project-portfolio-management/spec/time-based-analysis.md` §7.5/§15/
+  §16 for the full account.
+- [x] **PA-4 (S)** Add `event_log` and `journey_features` as named
   export codecs to
   [`agents/share/bulk-import-export.md`](agents/share/bulk-import-export.md)
   §5, with the rule TreatmentPatterns enforces by splitting `export()`
   from `exportPatientLevel()`: a per-journey row is **patient-level and
   non-shareable** — gated by masking profile and audited, never
   suppressed as if it were an aggregate. Depends: care-pathway T-14a.
-- [ ] **PA-5 (S)** Open question to settle family-wide, not
+  **Done 2026-09-17** — written as new §5.1, naming both codecs, the
+  role-not-identifier `resource` rule for `event_log`, and the
+  destructive-action-not-read gating (mirroring `continues_as`) rather
+  than a suppression pass, since a patient-level row has no cell to
+  suppress.
+- [x] **PA-5 (S)** Open question to settle family-wide, not
   per-service: where a fairness slice by demographic attributes is
   computed at all (care-pathway [OQ-7](care-pathway/spec/16-open-questions.md)).
   The lean there is "in the caller's secure processing environment over
   the exported features, not in the registry"; if that is the family
   answer, write it into
   [`agents/share/privacy.md`](agents/share/privacy.md) so case and
-  patient-flow do not each re-open it.
+  patient-flow do not each re-open it. **Done 2026-09-17** — adopted the
+  lean as the family answer and wrote it into `privacy.md` as a new
+  subsection, pointing at `journey_features` (PA-4) as the intended
+  export path for such a join.
 
 ## Phase 10 — PPM evaluation-criteria triage (2026-09-03)
 
@@ -7733,12 +7818,45 @@ green as it sits; these finish it)**
 > T-28, the single source of truth for them. Only the consequences that
 > cross a subproject boundary are listed here.
 
-- [ ] **EV-1 (L)** portfolio **T-28a … T-28p** — the entity-level
+- [x] **EV-1 (L)** portfolio **T-28a … T-28p** — the entity-level
   queue. Tracked there, not here; this row exists so the family plan
   shows the work. Suggested order is stated in T-28 (the phased budget
   baseline T-28b first — it unblocks SPI/CPI, which T-23 left
-  permanently `no_baseline`).
-- [ ] **EV-2 (L)** Enterprise identity federation — **SAML 2.0 and
+  permanently `no_baseline`). **2026-09-18: every item reachable
+  without an external blocker is done** —
+  T-28a/b/c/d/g/h/i/j/l/m/o/p all `[x]` in
+  `project-portfolio-management/spec/13-tasks.md`.
+  **T-28f landed 2026-09-19** (role-tailored navigation and landing
+  page), implemented in the front-end and found, in passing, to depend
+  on a real defect: T-28f's own text assumed `GET /api/auth/me`
+  already carried the caller's ABAC `attrs` — verified false family-wide
+  (`grep -rln "attrs" */*-front-end-with-svelte/src/lib/server/*.ts`,
+  no hits), so `authentication-service-with-loco`'s `CurrentResponse`
+  gained `attrs` first (that crate's own `spec/index.md` §13 T-17),
+  then the front-end's `src/lib/nav.ts` (new, pure) drives the nav
+  reorder + landing-route selection from it. Full account in the
+  front-end's own `spec/index.md` §13 T-28f.
+  **T-28k landed 2026-09-19** (responsive audit at a phone viewport):
+  a new `mobile` Playwright project (390×844) auditing all 35 real
+  routes (T-28k's own text said 34 — corrected via `find src/routes
+  -name "+page.svelte"`, not guessed) found four real overflow sources
+  (the SVAR `FilterBar` on `/plans`, a fixed-`size` `<input>` on
+  `/ideas`, a bare `<table>` on `/reviews`, and `/scenarios`) and fixed
+  each with the minimal real cause, not a blanket patch: `/plans`'s
+  `FilterBar` is hidden alongside its `Grid` under a 600px breakpoint
+  (both degrade to a read-only list); `/ideas`'s `size="40"` attribute
+  is removed; `/reviews` and `/scenarios` needed no route-local change
+  at all — `src/app.css`'s new global `input`/`table` overflow
+  containment already covered both (`/scenarios`'s own `size`
+  attributes are untouched). Also fixed a real regression the mobile
+  fallback caused in the existing desktop e2e suite (an ambiguous
+  `getByText` match). Full account in the front-end's own
+  `spec/index.md` §13 T-28k.
+  **Every item reachable without an external blocker is now done.**
+  **Still open**: T-28e and T-28n, both blocked on T-8 (unbuilt) —
+  the only remaining EV-1 scope, and it is a real external
+  dependency, not oversight.
+- [x] **EV-2 (L)** Enterprise identity federation — **SAML 2.0 and
   OIDC** as *upstream* identity providers to `authentication-service`,
   so a deployment's existing IdP signs users in and the family's own
   session + PASETO model stays exactly as it is downstream. Mentioned
@@ -7752,6 +7870,65 @@ green as it sits; these finish it)**
   under the vocabulary gate, and the same fail-closed posture on
   metadata/certificate fetch as SEC-V1), then the auth service task.
   Magic link stays the default; federation is opt-in per deployment.
+  **Design half done 2026-09-18** — §7a written: goals/non-goals, the
+  flow (IdP assertion → the same §3 session, nothing downstream
+  changes), the SEC-V1-mirrored metadata/JWKS fetch posture, attribute
+  mapping through the existing `AUTH_ATTRIBUTE_VOCABULARY` gate, and
+  three open questions (JIT provisioning default, SLO, metadata refresh
+  cadence).
+  **OIDC RP half also done 2026-09-18** — `authentication-service`'s
+  `oidc` Cargo feature (off by default): `GET /api/auth/oidc/
+  {login,callback}` — discovery, PKCE + state + nonce, a real
+  cryptographic ID-token verification (`openidconnect` crate, ES256
+  proved via a stub IdP in a DB-gated test — not just type-checked),
+  claim mapping through the vocabulary gate, and session establishment
+  reusing the magic-link path's exact sequence. Resolved the JIT
+  provisioning open question: `AUTH_OIDC_JIT_PROVISIONING`,
+  deployment-configurable, default **off** (an unknown email is `403`,
+  named and audited, unless opted in). Full account in that crate's own
+  `spec/index.md` §13 EV-2 entry and `CHANGELOG.md`.
+  **OIDC session-handoff fixed + front-end sign-in link landed
+  2026-09-19.** The 2026-09-18 OIDC callback set the
+  `__Host-mxi_session` cookie directly and redirected to
+  `FRONTEND_URL` — but that cookie is host-locked to the auth
+  service's own origin, and in the reference BFF topology the front
+  end is a *different* origin, so the cookie was stranded and a real
+  cross-origin deployment's federated sign-in silently never actually
+  established a session. Fixed by bridging through the existing
+  magic-link consume flow instead: the callback mints a single-use
+  `create_magic_link` token and redirects to `{frontend}/verify?token=…`,
+  where the front end's already-tested `/verify` BFF route performs the
+  real session establishment — the same mechanism a real magic-link
+  sign-in already uses. `GET /api/auth/oidc/login` also gained an
+  optional `?return_url=`, the same allow-listed per-app knob the
+  magic-link endpoints already give. `authentication-front-end-with-svelte`
+  gained the front-end half in the same pass: a "Sign in with SSO" link
+  on `/signin` (opt-in via `PUBLIC_OIDC_SIGNIN_ENABLED`) and a
+  `/signin/sso` route that redirects the browser itself (not a BFF
+  `fetch`) to the auth service's login endpoint — verified live in a
+  real browser. Full account in both crates' own `spec/index.md` §13
+  entries and `CHANGELOG.md`s.
+  **SAML 2.0 SP evaluated and deferred 2026-09-19 — not merely
+  unscheduled.** Surveyed the Rust SAML crate ecosystem for something
+  clearing the same "vetted, pure-Rust, owns the crypto" bar
+  `openidconnect` cleared for the OIDC half. Neither real candidate
+  qualifies: `samael` verifies XML-DSig via a C FFI binding to
+  xmlsec1, pulling in `openssl`/`libxml2`/`libxslt` — contrary to this
+  family's rustls-only posture and a materially larger unaudited
+  attack surface than anything else in the tree; `saml`
+  (danielkov/saml) is pure Rust but its RSA-SHA256 support — needed
+  for interop with essentially every real-world IdP — depends on the
+  `rsa` crate, the exact crate removed family-wide on 2026-08-21 for
+  RUSTSEC-2023-0071, and is pre-alpha (5 GitHub stars, no
+  production-readiness claim). Hand-rolling XML-DSig verification
+  would itself violate the "never hand-roll signature verification"
+  principle the OIDC work's own crate choice honoured. Implementing
+  SAML SP today would force a real regression against one of two
+  already-deliberate security decisions rather than complete a clean
+  rollout step, so it stays out — full finding and the "revisit if" a
+  suitable crate emerges in
+  [`agents/share/authentication-sessions.md`](agents/share/authentication-sessions.md)
+  §7a and `authentication-service`'s own `spec/index.md` §13.
 - [x] **EV-3 (M)** Outbound **webhook sink** as a family contract in
   [`agents/share/event-bus.md`](agents/share/event-bus.md) §12: a
   `WebhookSink` beside `LoggingSink` / `FluvioSink` in each crate's
@@ -7812,7 +7989,7 @@ green as it sits; these finish it)**
   journey links (2026-08-24) added after that Dockerfile's last
   verification (2026-08-03). See the runbook's own "What 'verified
   against a fresh container' found" section for the full account.
-- [ ] **EV-5 (S)** Record the "no black-box output" property as a
+- [x] **EV-5 (S)** Record the "no black-box output" property as a
   family rule in
   [`agents/share/time-based-analysis.md`](agents/share/time-based-analysis.md)
   §8 or a sibling: every derived figure discloses its inputs and its
@@ -7820,7 +7997,11 @@ green as it sits; these finish it)**
   deployment ever wants one, sits outside the services over their open
   API and cites what it read. Portfolio's T-28j is the reference pin;
   care-pathway and patient-flow inherit the rule rather than re-decide
-  it.
+  it. **Done 2026-09-18** — written into §8 as a new subsection, citing
+  portfolio's own spec statement of the property and T-28j (at the time,
+  a still-unbuilt CI-enforced pin) as the reference; T-28j itself landed
+  the same day, closing the gap between the doc's claim and the code —
+  see T-28j's own entry in `project-portfolio-management/spec/13-tasks.md`.
 
 ## Found 2026-09-03 (an upstream release turned CI red for 47 crates)
 
@@ -7980,7 +8161,7 @@ green as it sits; these finish it)**
   five. Place untouched (PRO-H10 never reached it; 7/7 already). The
   5 / 11 roll-out question is **still open** and moves to WEB-2's
   scope: decide it when the CI stage makes the answer testable.
-- [ ] **WEB-2 (L)** A **front-end CI stage**. `scripts/ci-front-ends.sh`
+- [x] **WEB-2 (L)** A **front-end CI stage**. `scripts/ci-front-ends.sh`
   discovering `*/*-front-end-with-svelte/package.json` (the shape
   `ci-crates.sh` already has), and a `front-end` job in **both** CI
   files that runs, per project: `pnpm install --frozen-lockfile`,
@@ -7997,6 +8178,44 @@ green as it sits; these finish it)**
   a front-end PR's green checks are Rust checks and say nothing about
   the diff — worth a sentence in `AGENTS.md` so nobody reads 168 green
   as verification. Depends: WEB-1 (or the stage is born red), WEB-3.
+  **Done 2026-09-16.** The blocker resolved itself rather than needing
+  a publish: checked against the npm registry, every one of the six
+  Lily packages this family uses was **already published** and at the
+  exact version the sibling checkout has (`agents/share/
+  svelte-front-end-stack.md`, the decided-once doc this row asked for)
+  — headless 0.3.1, theme/locale/text-size/share-picker 0.1.1,
+  picker-bar 0.1.0. All sixteen front-ends' six Lily `file:` deps
+  switched to `^`-pinned registry versions and every lockfile
+  regenerated **incrementally** (`git checkout -- pnpm-lock.yaml` +
+  `pnpm install`, never a full `rm -rf node_modules pnpm-lock.yaml`) —
+  the first attempt did the latter, which silently re-resolved every
+  *other* semver-ranged dependency too (an unrelated `@svar-ui/
+  svelte-filter` minor bump broke patient-flow's `svelte-check` this
+  way) and was reverted in favour of the minimal diff: 77 lines per
+  lockfile, only the six Lily entries, confirmed by grep. `scripts/
+  ci-front-ends.sh` mirrors `ci-crates.sh`'s change-aware shape (no
+  path-dependency graph needed — front-ends don't depend on each
+  other). The `front-end` matrix job/step landed in both `ci.yml` and
+  `.woodpecker.yml`, byte-identical commands.
+  e2e is `ci/front-end-e2e-suites.txt`, the same allowlist philosophy
+  as `ci/db-suites.txt`: 15 of 16 front-ends were **observed** green
+  (`CI=1`, isolated, no live backend) and enrolled; `case-folder` is
+  the one genuine exception — its own `playwright.config.ts` and
+  `global-setup.ts` assume a live `case-folder-service-with-rust` +
+  seed data, out of scope for a job with no backend to offer it.
+  Getting an honest "observed green" out of sixteen suites run
+  back-to-back on one shared machine surfaced two false negatives
+  worth recording (both documented in the allowlist file itself, for
+  whoever enrols a seventeenth front-end): `reuseExistingServer`
+  silently reusing a *different* project's still-running preview
+  server from an earlier run (fixed with `CI=1`, which forces a fresh
+  server and fails loudly on a port collision instead of reusing one),
+  and different front-ends pinning different `@playwright/test`
+  versions, so installing one project's deps could prune a Chromium
+  revision a sibling project's suite still needed from the shared
+  local browser cache (fixed by reinstalling the browser immediately
+  before each suite — a purely local artefact, since each real CI job
+  gets its own fresh container).
 - [x] **WEB-3 (S)** **Lockfile drift sweep.** `pnpm-lock.yaml` in
   **eleven** front-ends still carries the stale
   `lily-design-system-svelte-headless` entry with no peer-resolved

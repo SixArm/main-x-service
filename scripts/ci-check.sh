@@ -106,6 +106,18 @@ extra_test_features_for() {
       # (documented as a known gap in that same doc).
       printf -- '--features parquet'
       ;;
+    authentication/authentication-service-with-loco)
+      # `oidc` gates SAML/OIDC identity federation (EV-2,
+      # agents/share/authentication-sessions.md §7a): `src/oidc.rs`,
+      # `src/controllers/oidc.rs`, and their DB-gated request suite
+      # (`tests/requests/oidc.rs`, a stub OIDC provider signing real
+      # ES256 ID tokens) — self-contained, no live IdP needed. Off by
+      # default so a deployment that never federates pulls in no extra
+      # HTTP/JWT stack; without this override the whole feature would
+      # never compile or run in CI, same class of gap `parquet` above
+      # was found to have.
+      printf -- '--features oidc'
+      ;;
   esac
 }
 
@@ -262,9 +274,14 @@ run_stage() {
       # count its rows, so any other test writing an audit row concurrently
       # breaks them. Running them in parallel produced failures that looked
       # like chain defects but were only test interference.
+      # `extra_test_features_for` applies here too (not just the plain
+      # `test` stage): a crate's optional-feature DB-gated suite (e.g.
+      # authentication-service's `oidc`) would otherwise never compile
+      # or run under `--ignored` either — the same AV-1 gap `parquet`
+      # and `oidc` exist in that function to close.
       ( cd "${crate}" \
         && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
-           cargo test $(locked_flag "${crate}") -- --ignored --test-threads=1 )
+           cargo test $(locked_flag "${crate}") $(extra_test_features_for "${crate}") -- --ignored --test-threads=1 )
       ;;
     deny)
       if [[ ! -f "${crate}/deny.toml" ]]; then
@@ -377,10 +394,21 @@ if [[ "${STAGE}" == "docs" ]]; then
   # someone simply types the old spelling into a new link.
   # Two files are excluded because they must spell the forbidden form in
   # order to forbid it: this checker and the spec that defines the rule.
-  # Excluding anything else would be a hole rather than a base case.
+  # `vendor/` and `main-x-service.github.io/static/assets/themes/` are
+  # excluded on different grounds: both hold verbatim, unedited
+  # third-party content (agents/share/svelte-front-end-stack.md §8; the
+  # latter is a second, self-contained vendored copy the GitHub Pages
+  # subproject needs so it survives `git subtree split` — see its own
+  # spec/index.md §5/§6) kept byte-identical to its upstream source for
+  # re-sync, not this repo's own writing — an upstream comment naming
+  # *its own* project's `AGENTS/` convention is not a claim about a path
+  # in this repository. Excluding anything else would be a hole rather
+  # than a base case.
   bad_refs="$(git grep -lI 'AGENTS/' -- . \
       ':(exclude)scripts/ci-check.sh' \
-      ':(exclude)spec/agents-directory-name-is-lowercase/index.md' || true)"
+      ':(exclude)spec/agents-directory-name-is-lowercase/index.md' \
+      ':(exclude)vendor/**' \
+      ':(exclude)main-x-service.github.io/static/assets/themes/**' || true)"
   if [[ -n "${bad_refs}" ]]; then
     echo "  files referencing an uppercase AGENTS/ directory:" >&2
     printf '    %s\n' ${bad_refs} >&2

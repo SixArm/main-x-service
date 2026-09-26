@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
+
+Removed the hand-maintained `THEMES` array (39 slugs — DaisyUI-style
+themes plus the UK/US government + NHS design-system themes, a subset
+of Lily's own 45, missing `adobe-spectrum`, `mozilla-protocol`, and
+several of the government/NHS themes) and `SIZES`/`SIZE_LABELS` (a
+custom 4-step `small`/`medium`/`large`/`x-large` scale). `PickerBar`
+now gets no `themes`/`sizes` prop at all, so it uses its own
+`DEFAULT_THEMES` (45, alphabetical, UK/US government themes grouped
+at the end) and `DEFAULT_SIZES` (the 7-step `largest`…`smallest`
+scale) directly — a superset of what was offered before, not a
+behavioural narrowing.
+
+`src/app.css`'s `[data-text-size]` rules rewritten for the new 7-step
+scale (was 3 rules for `small`/`large`/`x-large`; `normal` — formerly
+`medium` — stays unscaled).
+
+### Changed — chrome consolidated onto Lily `PickerBar`; locale picker restored
+
+The top-of-page chrome (theme, text-size, share pickers) previously
+wired `ThemePicker`/`TextSizePicker`/`SharePicker` individually in
+`+layout.svelte`. Replaced with the single Lily
+`lily-design-system-svelte-picker-bar` component, which composes all
+four pickers — theme, locale, text-size, share — as one row.
+
+This restores a locale picker to the chrome, since `PickerBar` bundles
+all four unconditionally with no way to omit one. Unlike the sibling
+front-ends, this project has no i18n store — its UI text is plain
+English literals — so the locale picker is wired fully self-contained:
+`locales`/`localeProps={{ localeLabels }}` only, no `value`, `onChange`,
+or `applyDir` override, letting the component set `lang`/`dir` on
+`<html>` itself. `LOCALES`/`LOCALE_LABELS` are defined as local consts
+directly in `+layout.svelte` (the family's standard 14-locale set)
+rather than added to an i18n store, since none exists here.
+
+`SHARE_TARGETS` gained an `email` (`mailto:`) target and now orders
+Email / LinkedIn / Reddit / Bluesky / Mastodon; the Mastodon target
+now points at `mastodonshare.com` instead of `mastodon.social/share`
+(a generic sharer rather than one specific instance).
+
+New dependencies: `lily-design-system-svelte-locale-picker`,
+`lily-design-system-svelte-picker-bar` (both `file:` deps on the
+sibling Lily checkout, same pattern as the existing four).
+
 ### Added — vitest coverage for the BFF session/token-exchange code (PF-T23)
 
 `src/lib/server/{session,auth}.ts` — the httpOnly-cookie helpers,

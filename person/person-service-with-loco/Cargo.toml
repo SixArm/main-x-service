@@ -101,7 +101,7 @@ strsim = "0.11"
 prometheus = "0.14"
 # SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
 # See src/compliance/audit_chain.rs.
-sha2 = "0.10"
+sha2 = "0.11"
 # Second integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
 # structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
 # cryptanalytic advance against one design family does not transfer to
@@ -199,18 +199,18 @@ fluvio = ["dep:fluvio"]
 # Serialises the DB-gated audit-chain tests: they each truncate
 # `audit_log`, so running them concurrently would have one test wipe
 # another's chain mid-append.
-serial_test = "3.5"
+serial_test = "4.0"
 # Testing
 assertables = "10"
 tokio-test = "0.4"
-mockall = "0.13"
+mockall = "0.15"
 tempfile = "3.27"
 proptest = "1.11"
 
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the bearer-verification path is exercised without the auth service or
 # any network dependency.
-ed25519-dalek = { version = "2.2" }
+ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
 base64 = { version = "0.23" }
 

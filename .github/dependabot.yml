@@ -14,6 +14,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -28,6 +29,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -42,6 +44,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -56,6 +59,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -70,6 +74,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -84,6 +89,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -98,6 +104,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -112,6 +119,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -126,6 +134,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -140,6 +149,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -154,6 +164,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -168,6 +179,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -182,6 +194,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -196,6 +209,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -210,6 +224,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -224,6 +239,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -238,6 +254,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -252,6 +269,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -266,6 +284,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -280,6 +299,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -294,6 +314,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -308,6 +329,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -322,6 +344,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -336,6 +359,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -350,6 +374,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -364,6 +389,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -378,6 +404,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -392,6 +419,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -406,6 +434,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -420,6 +449,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -434,6 +464,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -448,6 +479,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -462,6 +494,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -476,6 +509,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -490,6 +524,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -504,6 +539,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -518,6 +554,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -532,6 +569,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -546,6 +584,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -560,6 +599,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -574,6 +614,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -588,6 +629,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -602,6 +644,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -616,6 +659,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -630,6 +674,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -644,6 +689,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -658,6 +704,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -672,6 +719,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -686,6 +734,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -700,6 +749,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -714,6 +764,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -728,6 +779,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -742,6 +794,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -756,6 +809,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -770,6 +824,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -784,6 +839,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -798,6 +854,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -812,6 +869,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -826,6 +884,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -840,6 +899,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -854,6 +914,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -868,6 +929,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -882,6 +944,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -896,6 +959,7 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    versioning-strategy: increase
     labels:
       - "dependencies"
       - "rust"
@@ -1004,6 +1068,20 @@ updates:
           - "patch"
   - package-ecosystem: "npm"
     directory: "/event/event-front-end-with-svelte"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "javascript"
+    groups:
+      routine:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "npm"
+    directory: "/main-x-service.github.io"
     schedule:
       interval: "weekly"
       day: "monday"

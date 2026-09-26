@@ -4,7 +4,7 @@
 // non-2xx outcome into a single boolean, against a mocked fetch. No
 // SvelteKit runtime or real authentication service involved.
 import { describe, expect, it, vi } from "vitest";
-import { requestMagicLink, signup } from "../../src/lib/server/auth";
+import { oidcLoginUrl, requestMagicLink, signup } from "../../src/lib/server/auth";
 
 describe("requestMagicLink", () => {
     it("returns 'sent' on a 2xx upstream response", async () => {
@@ -64,6 +64,24 @@ describe("signup", () => {
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ email: "a@example.test", name: "Alice", locale: "cy" }),
             }),
+        );
+    });
+});
+
+// EV-2 (agents/share/authentication-sessions.md §7a): the OIDC
+// entry-point URL is a browser NAVIGATION target, not a fetch — this
+// pins only the pure string-building, not a network call.
+describe("oidcLoginUrl", () => {
+    it("points at the auth service's /api/auth/oidc/login", () => {
+        expect(oidcLoginUrl("https://auth-front-end.example.test")).toContain(
+            "/api/auth/oidc/login?",
+        );
+    });
+
+    it("carries the caller's origin as return_url", () => {
+        const url = oidcLoginUrl("https://auth-front-end.example.test");
+        expect(new URL(url).searchParams.get("return_url")).toBe(
+            "https://auth-front-end.example.test",
         );
     });
 });

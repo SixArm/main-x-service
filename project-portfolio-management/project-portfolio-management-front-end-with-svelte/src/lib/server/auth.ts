@@ -58,3 +58,30 @@ export async function signout(fetchFn: FetchFn, sid: string): Promise<void> {
     headers: { authorization: `Bearer ${token}` },
   });
 }
+
+/** The caller's own public fields, including their live ABAC subject
+ *  attributes (T-28f, repo `tasks.md` EV-1) — a string→strings map,
+ *  e.g. `{ view: ["executive"] }`, sourced from `users.attributes`, not
+ *  decoded from the PASETO token itself (this BFF never parses PASETO —
+ *  that would mean hand-rolling a second verifier in TypeScript, the
+ *  exact thing `authentication-verifier` exists to avoid). `null` when
+ *  the session/token is invalid. */
+export interface CurrentUser {
+  pid: string;
+  name: string;
+  email: string;
+  attrs: Record<string, string[]>;
+}
+
+export async function currentUser(
+  fetchFn: FetchFn,
+  sid: string,
+): Promise<CurrentUser | null> {
+  const token = await exchangeToken(fetchFn, sid);
+  if (!token) return null;
+  const res = await fetchFn(`${AUTH_API_URL}/api/auth/me`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as CurrentUser;
+}
