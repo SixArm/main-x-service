@@ -156,7 +156,7 @@ fluvio = { version = "0.50", optional = true }
 # RecordBatch; `parquet`'s own `arrow` feature is the writer/reader that
 # serializes one to/from Parquet bytes — same crates.io release line
 # (59.1.0) since the two are versioned in lockstep upstream.
-arrow = { version = "59.2.0", default-features = false, optional = true }
+arrow = { version = "60.0.0", default-features = false, optional = true }
 parquet = { version = "59.2.0", default-features = false, features = ["arrow"], optional = true }
 
 # S3-compatible artifact storage for bulk jobs (BLK-4, optional —
