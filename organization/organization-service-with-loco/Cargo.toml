@@ -84,7 +84,7 @@ fluvio = { version = "0.50", optional = true }
 # span/metric exporters' own `grpc-tonic` feature needs no rename.
 opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
 opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
-opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+opentelemetry-otlp = { version = "0.33", default-features = false, features = [
   "grpc-tonic",
   "trace",
   "metrics",
