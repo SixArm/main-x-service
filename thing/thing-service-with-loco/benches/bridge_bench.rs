@@ -11,7 +11,8 @@
 //! - `bridge_end_to_end`   — adapter + engine call (the realistic dedup path).
 //! - `bridge_one_to_many`  — single query vs. 100 candidates.
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 
 use thing_service::matching::adapter::to_matcher_thing;
 use thing_service::matching::matcher_lib::{MatchConfig, MatchingEngine};
