@@ -113,7 +113,7 @@ opentelemetry-otlp = { version = "0.32", default-features = false, features = [
   "trace",
   "metrics",
 ] }
-opentelemetry-semantic-conventions = { version = "0.32" }
+opentelemetry-semantic-conventions = { version = "0.33" }
 tracing-opentelemetry = { version = "0.33" }
 
 [features]
