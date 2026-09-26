@@ -126,7 +126,7 @@ jobs:
           # tested pnpm version rather than working around a new default
           # this repo hasn't evaluated yet.
           version: 11.0.8
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 26
           cache: pnpm
