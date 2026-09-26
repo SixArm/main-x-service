@@ -28,7 +28,7 @@ importers:
         version: 0.1.0(svelte@5.56.3)
       '@svar-ui/svelte-calendar':
         specifier: ^2.6.0
-        version: 2.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)
+        version: 2.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@6.0.3)
       '@svar-ui/svelte-filemanager':
         specifier: ^2.6.0
         version: 2.6.0
@@ -43,20 +43,20 @@ importers:
         version: 2.7.1
       '@svar-ui/svelte-kanban':
         specifier: ^2.6.0
-        version: 2.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)
+        version: 2.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
         specifier: ^1.49.0
         version: 1.60.0
       '@sveltejs/adapter-auto':
         specifier: ^4.0.0
-        version: 4.0.0(@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@5.9.3)(vite@6.4.3(@types/node@22.19.21)))
+        version: 4.0.0(@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@6.0.3)(vite@6.4.3(@types/node@22.19.21)))
       '@sveltejs/adapter-node':
         specifier: ^5.2.0
-        version: 5.5.4(@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@5.9.3)(vite@6.4.3(@types/node@22.19.21)))
+        version: 5.5.4(@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@6.0.3)(vite@6.4.3(@types/node@22.19.21)))
       '@sveltejs/kit':
         specifier: ^2.55.0
-        version: 2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@5.9.3)(vite@6.4.3(@types/node@22.19.21))
+        version: 2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@6.0.3)(vite@6.4.3(@types/node@22.19.21))
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.4
         version: 6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21))
@@ -80,10 +80,10 @@ importers:
         version: 5.56.3
       svelte-check:
         specifier: ^4.2.0
-        version: 4.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)
+        version: 4.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@6.0.3)
       typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
+        specifier: ^6.0.3
+        version: 6.0.3
       vite:
         specifier: ^6.2.0
         version: 6.4.3(@types/node@22.19.21)
@@ -1285,8 +1285,8 @@ packages:
     resolution: {integrity: sha512-hdF5ZgjTqgAntKkklYw0R03MG2x/bSzTtkxmIRw/sTNV8YXsCJ1tfLAX23lhxhHJlEf3CRCOCGGWw3vI3GaSPw==}
     engines: {node: '>=18'}
 
-  typescript@5.9.3:
-    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -1816,7 +1816,7 @@ snapshots:
     dependencies:
       '@svar-ui/lib-state': 1.9.7
 
-  '@svar-ui/svelte-calendar@2.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)':
+  '@svar-ui/svelte-calendar@2.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@6.0.3)':
     dependencies:
       '@svar-ui/calendar-ical': 2.6.0
       '@svar-ui/calendar-locales': 2.6.0
@@ -1831,7 +1831,7 @@ snapshots:
       '@svar-ui/svelte-menu': 2.5.3
       '@svar-ui/svelte-toolbar': 2.5.3
       svelte: 5.56.3
-      svelte-check: 4.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)
+      svelte-check: 4.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@6.0.3)
     transitivePeerDependencies:
       - picomatch
       - typescript
@@ -1960,7 +1960,7 @@ snapshots:
       '@svar-ui/svelte-menu': 2.6.0
       '@svar-ui/svelte-toolbar': 2.6.0
 
-  '@svar-ui/svelte-kanban@2.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)':
+  '@svar-ui/svelte-kanban@2.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@6.0.3)':
     dependencies:
       '@svar-ui/core-locales': 2.6.0
       '@svar-ui/kanban-locales': 2.6.0
@@ -1973,7 +1973,7 @@ snapshots:
       '@svar-ui/svelte-menu': 2.6.0
       '@svar-ui/svelte-toolbar': 2.6.0
       svelte: 5.56.3
-      svelte-check: 4.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3)
+      svelte-check: 4.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@6.0.3)
     transitivePeerDependencies:
       - picomatch
       - typescript
@@ -2044,20 +2044,20 @@ snapshots:
     dependencies:
       acorn: 8.17.0
 
-  '@sveltejs/adapter-auto@4.0.0(@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@5.9.3)(vite@6.4.3(@types/node@22.19.21)))':
+  '@sveltejs/adapter-auto@4.0.0(@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@6.0.3)(vite@6.4.3(@types/node@22.19.21)))':
     dependencies:
-      '@sveltejs/kit': 2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@5.9.3)(vite@6.4.3(@types/node@22.19.21))
+      '@sveltejs/kit': 2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@6.0.3)(vite@6.4.3(@types/node@22.19.21))
       import-meta-resolve: 4.2.0
 
-  '@sveltejs/adapter-node@5.5.4(@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@5.9.3)(vite@6.4.3(@types/node@22.19.21)))':
+  '@sveltejs/adapter-node@5.5.4(@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@6.0.3)(vite@6.4.3(@types/node@22.19.21)))':
     dependencies:
       '@rollup/plugin-commonjs': 29.0.3(rollup@4.61.1)
       '@rollup/plugin-json': 6.1.0(rollup@4.61.1)
       '@rollup/plugin-node-resolve': 16.0.3(rollup@4.61.1)
-      '@sveltejs/kit': 2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@5.9.3)(vite@6.4.3(@types/node@22.19.21))
+      '@sveltejs/kit': 2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@6.0.3)(vite@6.4.3(@types/node@22.19.21))
       rollup: 4.61.1
 
-  '@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@5.9.3)(vite@6.4.3(@types/node@22.19.21))':
+  '@sveltejs/kit@2.65.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.56.3)(vite@6.4.3(@types/node@22.19.21)))(svelte@5.56.3)(typescript@6.0.3)(vite@6.4.3(@types/node@22.19.21))':
     dependencies:
       '@standard-schema/spec': 1.1.0
       '@sveltejs/acorn-typescript': 1.0.10(acorn@8.17.0)
@@ -2075,7 +2075,7 @@ snapshots:
       svelte: 5.56.3
       vite: 6.4.3(@types/node@22.19.21)
     optionalDependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
 
   '@sveltejs/load-config@0.1.1': {}
 
@@ -2534,7 +2534,7 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  svelte-check@4.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@5.9.3):
+  svelte-check@4.6.0(picomatch@4.0.4)(svelte@5.56.3)(typescript@6.0.3):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@sveltejs/load-config': 0.1.1
@@ -2543,7 +2543,7 @@ snapshots:
       picocolors: 1.1.1
       sade: 1.8.1
       svelte: 5.56.3
-      typescript: 5.9.3
+      typescript: 6.0.3
     transitivePeerDependencies:
       - picomatch
 
@@ -2601,7 +2601,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  typescript@5.9.3: {}
+  typescript@6.0.3: {}
 
   undici-types@6.21.0: {}
 
