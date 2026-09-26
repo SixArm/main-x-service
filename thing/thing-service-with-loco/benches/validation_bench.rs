@@ -3,7 +3,8 @@
 //! Criterion benchmarks for validation and normalization: a minimal record,
 //! a fully-populated record, and in-place normalization.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use thing_service::models::identifier::ThingIdentifier;
 use thing_service::models::thing::Thing;
 use thing_service::validation::{normalize_thing, validate_thing};
