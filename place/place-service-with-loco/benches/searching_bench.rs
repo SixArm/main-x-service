@@ -5,9 +5,10 @@
 //! Models a linear scan that scores a query against 100 candidate names via
 //! `name_similarity`, for both an exact query and a fuzzy (misspelled) one.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use place_service::matching::name::name_similarity;
 use place_service::models::place::Place;
+use std::hint::black_box;
 
 /// Benchmark scoring an exact-match query against 100 names.
 fn bench_search_by_name(c: &mut Criterion) {
