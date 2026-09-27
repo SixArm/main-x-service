@@ -7,7 +7,7 @@
 //! the realistic deduplication path of scoring one query against 100
 //! candidates.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use place_service::matching::geo::geo_similarity;
 use place_service::matching::name::name_similarity;
 use place_service::matching::phonetic::soundex;
@@ -16,6 +16,7 @@ use place_service::models::address::PostalAddress;
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::models::place_type::PlaceType;
+use std::hint::black_box;
 
 /// Benchmark name similarity on exact, fuzzy, and unrelated name pairs.
 fn bench_name_similarity(c: &mut Criterion) {

@@ -6,8 +6,9 @@
 //! `Place` records (single and batches of 100) — the work that dominates a
 //! read path once rows are fetched.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use place_service::models::place::Place;
+use std::hint::black_box;
 
 /// Benchmark constructing a single `Place`.
 fn bench_place_construction(c: &mut Criterion) {
