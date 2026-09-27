@@ -99,11 +99,7 @@ export const ALL_STATUSES: PlanStatus[] = [
 
 /** The status of a single goal. */
 export type GoalStatus =
-  | "NotStarted"
-  | "InProgress"
-  | "Achieved"
-  | "Missed"
-  | { Custom: string };
+  "NotStarted" | "InProgress" | "Achieved" | "Missed" | { Custom: string };
 
 /** A plan objective; only the title feeds matching. */
 export interface Goal {
