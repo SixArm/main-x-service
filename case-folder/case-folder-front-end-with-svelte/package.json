@@ -29,7 +29,7 @@
     "@sveltejs/adapter-auto": "^4.0.0",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
-    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/svelte": "^5.4.2",
     "@types/node": "^22.0.0",
     "axe-core": "^4.13.0",
@@ -39,14 +39,14 @@
     "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.9",
-    "prettier-plugin-svelte": "^3.3.0",
+    "prettier-plugin-svelte": "^4.1.1",
     "svelte": "^5.57.1",
     "svelte-check": "^4.7.6",
     "svelte-eslint-parser": "^1.8.1",
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.70.1",
     "vite": "^6.2.0",
-    "vitest": "^4.1.8"
+    "vitest": "^5.0.1"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.3.1",
