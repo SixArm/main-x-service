@@ -3,7 +3,8 @@
 //! Criterion benchmarks approximating name search: scoring a query against
 //! 100 records, for exact and fuzzy queries.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use thing_service::matching::name::name_similarity;
 use thing_service::models::thing::Thing;
 

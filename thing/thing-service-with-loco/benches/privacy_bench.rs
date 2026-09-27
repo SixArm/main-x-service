@@ -3,7 +3,8 @@
 //! Criterion benchmarks for the privacy operations: masking (rich and
 //! minimal records) and GDPR export (single and 100-record batch).
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use thing_service::models::identifier::ThingIdentifier;
 use thing_service::models::thing::Thing;
 use thing_service::privacy::{gdpr_export, mask_thing};
