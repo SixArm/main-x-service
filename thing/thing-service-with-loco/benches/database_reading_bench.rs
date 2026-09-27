@@ -3,7 +3,8 @@
 //! Criterion benchmarks approximating read-side cost: single and batch
 //! `Thing` construction (a proxy for row hydration).
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use thing_service::models::thing::Thing;
 
 /// Benchmark constructing a single `Thing`.
