@@ -63,13 +63,7 @@ export interface Address {
 
 /** Transport of a {@link ContactPoint} (phone, email, …). */
 export type ContactPointSystem =
-  | "phone"
-  | "fax"
-  | "email"
-  | "pager"
-  | "url"
-  | "sms"
-  | "other";
+  "phone" | "fax" | "email" | "pager" | "url" | "sms" | "other";
 /** Intended use of a {@link ContactPoint} (home, work, mobile, …). */
 export type ContactPointUse = "home" | "work" | "temp" | "old" | "mobile";
 
@@ -92,13 +86,7 @@ export type IdentifierUse = "usual" | "official" | "temp" | "secondary" | "old";
  * passport, tax id, or other.
  */
 export type IdentifierType =
-  | "MRN"
-  | "SSN"
-  | "DL"
-  | "NPI"
-  | "PPN"
-  | "TAX"
-  | "Other";
+  "MRN" | "SSN" | "DL" | "NPI" | "PPN" | "TAX" | "Other";
 
 /**
  * An external identifier for the worker. A record may carry several; each
@@ -153,13 +141,7 @@ export interface IdentityDocument {
 
 /** Status/use of a {@link HumanName} (usual, official, maiden, …). */
 export type NameUse =
-  | "usual"
-  | "official"
-  | "temp"
-  | "nickname"
-  | "anonymous"
-  | "old"
-  | "maiden";
+  "usual" | "official" | "temp" | "nickname" | "anonymous" | "old" | "maiden";
 
 /**
  * A structured person name. `given` is an ordered list (first, middle, …);
@@ -273,11 +255,7 @@ export interface Worker {
  * {@link MatchResultsList}.
  */
 export type MatchQuality =
-  | "definite"
-  | "certain"
-  | "probable"
-  | "possible"
-  | "unlikely";
+  "definite" | "certain" | "probable" | "possible" | "unlikely";
 
 /**
  * Per-component score breakdown emitted by the matcher, each value in
