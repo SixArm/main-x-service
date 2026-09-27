@@ -142,7 +142,7 @@ serial_test = "4.0.1"
 tower = { version = "0.5", features = ["util"] }
 
 # Benchmarking
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 # An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
 # `tests/otlp_middleware.rs` (PRO-H12, ported from person-service): the
@@ -154,7 +154,7 @@ criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 # crate's main `tonic = "0.12"` dependency — Cargo links both without
 # conflict since they are separate crates to the compiler; there is no
 # version to unify.
-opentelemetry-proto = { version = "0.32", default-features = false, features = [
+opentelemetry-proto = { version = "0.33", default-features = false, features = [
   "gen-tonic",
   "trace",
   "metrics",

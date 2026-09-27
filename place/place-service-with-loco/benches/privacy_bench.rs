@@ -5,10 +5,11 @@
 //! Measures `mask_place` (rich vs. minimal record) and `gdpr_export` (single
 //! record and a batch of 100), the latter dominated by Serde serialization.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use place_service::models::geo::GeoCoordinates;
 use place_service::models::place::Place;
 use place_service::privacy::{gdpr_export, mask_place};
+use std::hint::black_box;
 
 /// Benchmark masking a record with phone, fax, and geo set.
 fn bench_mask_place(c: &mut Criterion) {

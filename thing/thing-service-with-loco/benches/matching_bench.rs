@@ -3,7 +3,8 @@
 //! Criterion benchmarks for the matching hot path: name / url / Soundex
 //! component functions, a full `compute_match`, and a 100-candidate batch.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 use thing_service::matching::name::name_similarity;
 use thing_service::matching::phonetic::soundex;
 use thing_service::matching::scoring::{MatchWeights, compute_match};
