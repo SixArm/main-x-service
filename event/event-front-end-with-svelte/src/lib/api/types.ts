@@ -204,10 +204,7 @@ export interface TextLocation {
  * have several locations (e.g. a mixed-mode event with a place and a stream).
  */
 export type Location =
-  | PlaceLocation
-  | PostalAddressLocation
-  | VirtualLocation
-  | TextLocation;
+  PlaceLocation | PostalAddressLocation | VirtualLocation | TextLocation;
 
 // ─── Party ───────────────────────────────────────────────────────────
 
@@ -245,11 +242,7 @@ export interface Reference {
 
 /** Ticket/offer availability, mirroring schema.org/ItemAvailability (PascalCase wire values). */
 export type OfferAvailability =
-  | "InStock"
-  | "SoldOut"
-  | "PreOrder"
-  | "OutOfStock"
-  | "Discontinued";
+  "InStock" | "SoldOut" | "PreOrder" | "OutOfStock" | "Discontinued";
 
 /**
  * A purchasable offer attached to an event, e.g. a ticket tier
@@ -404,11 +397,7 @@ export interface Event {
  * bands.
  */
 export type MatchQuality =
-  | "definite"
-  | "certain"
-  | "probable"
-  | "possible"
-  | "unlikely";
+  "definite" | "certain" | "probable" | "possible" | "unlikely";
 
 /** Per-component score map (component name → 0..1 score, or null if not applicable). */
 export type MatchBreakdown = Record<string, number | null>;
