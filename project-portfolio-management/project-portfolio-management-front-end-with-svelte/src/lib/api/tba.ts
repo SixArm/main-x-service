@@ -179,10 +179,7 @@ export interface Flow {
   implied_cycle_time_days: number | null;
   observed_p50_cycle_time_days: number | null;
   interpretation:
-    | "wip_growing"
-    | "steady_state"
-    | "queue_draining"
-    | "insufficient_data";
+    "wip_growing" | "steady_state" | "queue_draining" | "insufficient_data";
   detail: string;
 }
 
