@@ -211,10 +211,7 @@ export interface PathwayEvent {
 
 /** Enrolment lifecycle status. The service's status machine gates moves. */
 export type InstanceStatus =
-  | "active"
-  | "on_hold"
-  | "completed"
-  | "discontinued";
+  "active" | "on_hold" | "completed" | "discontinued";
 
 /** The four lifecycle columns rendered on the Kanban board, in order. */
 export const INSTANCE_STATUSES: InstanceStatus[] = [
@@ -414,10 +411,7 @@ export interface BulkExportRequest {
  * no auto-merge path, so it never actually appears.
  */
 export type ReviewQueueStatus =
-  | "pending"
-  | "confirmed"
-  | "rejected"
-  | "automerged";
+  "pending" | "confirmed" | "rejected" | "automerged";
 
 /**
  * One stored review-queue item, mirroring the Rust `ReviewQueueItem`.
