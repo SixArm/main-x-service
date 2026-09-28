@@ -22,12 +22,7 @@ export interface Proposal {
   requested_minor: number | null;
   currency: string | null;
   status:
-    | "draft"
-    | "submitted"
-    | "in_review"
-    | "approved"
-    | "rejected"
-    | "promoted";
+    "draft" | "submitted" | "in_review" | "approved" | "rejected" | "promoted";
   promoted_plan_pid: string | null;
 }
 

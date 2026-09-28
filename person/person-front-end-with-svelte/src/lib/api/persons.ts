@@ -145,8 +145,7 @@ export class PersonRepository {
    */
   async match(request: MatchRequest): Promise<MatchResult[]> {
     type MatchEnvelope =
-      | MatchResult[]
-      | { matches: MatchResult[]; total?: number };
+      MatchResult[] | { matches: MatchResult[]; total?: number };
     const data = await this.http.post<MatchEnvelope>("/api/persons/match", {
       body: request,
     });
