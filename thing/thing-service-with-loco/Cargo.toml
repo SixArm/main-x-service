@@ -69,18 +69,18 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 # port. `internal-logs` is kept ON so a failing export is visible in the
 # log rather than silently dropped. No `logs` feature — this pipeline is
 # traces + metrics only.
-opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
-opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
-opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+opentelemetry = { version = "0.33", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = [
   "grpc-tonic",
   "trace",
   "metrics",
   "internal-logs",
 ] }
-opentelemetry-semantic-conventions = { version = "0.32" }
+opentelemetry-semantic-conventions = { version = "0.33" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-opentelemetry = { version = "0.33" }
+tracing-opentelemetry = { version = "0.34" }
 
 # Utilities
 uuid = { version = "1.26", features = ["v4", "serde"] }
@@ -142,7 +142,7 @@ serial_test = "4.0.1"
 tower = { version = "0.5", features = ["util"] }
 
 # Benchmarking
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
 # An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
 # `tests/otlp_middleware.rs` (PRO-H12, ported from person-service): the
@@ -154,7 +154,7 @@ criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 # crate's main `tonic = "0.12"` dependency — Cargo links both without
 # conflict since they are separate crates to the compiler; there is no
 # version to unify.
-opentelemetry-proto = { version = "0.32", default-features = false, features = [
+opentelemetry-proto = { version = "0.33", default-features = false, features = [
   "gen-tonic",
   "trace",
   "metrics",

@@ -17,6 +17,20 @@
 # Re-run and commit the diff whenever a crate or front-end is added,
 # removed, or moved.
 #
+# NOTE (2026-09-26): Dependabot's default `auto` strategy was observed
+# bumping a direct dependency's `Cargo.lock` entry past what the
+# crate's own `Cargo.toml` version requirement allows, without editing
+# `Cargo.toml` — e.g. leaving `rstest = { version = "0.25" }` in place
+# while locking `rstest` to `0.27.0`. That makes `Cargo.lock`
+# inconsistent with `Cargo.toml`, so `cargo … --locked` in CI correctly
+# refuses to build every such PR. `versioning-strategy: increase` looks
+# like the fix but is NOT a valid value for the `cargo` ecosystem —
+# GitHub's schema only accepts `auto` or `lockfile-only` here (unlike
+# npm, which also allows `increase`/`increase-if-necessary`/`widen`);
+# setting it broke config validation for every entry in this file
+# repo-wide. There is currently no config-level fix for this; affected
+# PRs need a manual Cargo.toml bump alongside the lockfile change, or
+# closing so a later Dependabot run can retry.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
