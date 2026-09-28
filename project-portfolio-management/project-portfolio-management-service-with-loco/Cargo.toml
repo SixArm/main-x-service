@@ -79,15 +79,15 @@ fluvio = { version = "0.50", optional = true }
 # see src/observability.rs's module docs). This crate declares no `tonic`
 # dependency of its own (no gRPC stub), so the span/metric exporters' own
 # `grpc-tonic` feature needs no rename.
-opentelemetry = { version = "0.32", features = ["trace", "metrics"] }
-opentelemetry_sdk = { version = "0.32", features = ["trace", "metrics"] }
-opentelemetry-otlp = { version = "0.32", default-features = false, features = [
+opentelemetry = { version = "0.33", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = [
   "grpc-tonic",
   "trace",
   "metrics",
 ] }
-opentelemetry-semantic-conventions = { version = "0.32" }
-tracing-opentelemetry = { version = "0.33" }
+opentelemetry-semantic-conventions = { version = "0.33" }
+tracing-opentelemetry = { version = "0.34" }
 
 # Outbound webhook delivery (agents/share/event-bus.md §12, repo
 # tasks.md EV-3, this crate's own spec/13-tasks.md T-28m) — src/webhooks.rs.
@@ -141,7 +141,7 @@ tempfile = { version = "3" }
 # server transport, so the export pipeline is proved against a real gRPC
 # listener in a normal `cargo test` run — no external collector, nothing
 # `#[ignore]`d.
-opentelemetry-proto = { version = "0.32", default-features = false, features = [
+opentelemetry-proto = { version = "0.33", default-features = false, features = [
   "gen-tonic",
   "trace",
   "metrics",
