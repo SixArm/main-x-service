@@ -157,7 +157,7 @@ fluvio = { version = "0.50", optional = true }
 # serializes one to/from Parquet bytes — same crates.io release line
 # (59.1.0) since the two are versioned in lockstep upstream.
 arrow = { version = "60.0.0", default-features = false, optional = true }
-parquet = { version = "59.2.0", default-features = false, features = ["arrow"], optional = true }
+parquet = { version = "60.0.0", default-features = false, features = ["arrow"], optional = true }
 
 # S3-compatible artifact storage for bulk jobs (BLK-4, optional —
 # agents/share/bulk-import-export.md §12: care-pathway is the reference
