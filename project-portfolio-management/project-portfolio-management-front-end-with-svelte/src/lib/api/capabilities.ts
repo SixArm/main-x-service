@@ -18,12 +18,7 @@ export type ReviewSubjectKind = "idea" | "proposal" | "plan";
 
 /** Invitation lifecycle; `invited` / `accepted` still owe a verdict. */
 export type ReviewStatus =
-  | "invited"
-  | "accepted"
-  | "declined"
-  | "submitted"
-  | "expired"
-  | "withdrawn";
+  "invited" | "accepted" | "declined" | "submitted" | "expired" | "withdrawn";
 
 /** Inside the organisation, or an outside expert. */
 export type ReviewerScope = "internal" | "external";
@@ -96,17 +91,11 @@ export interface Notification {
 
 /** What can fire a rule. */
 export type TriggerKind =
-  | "task_moved"
-  | "review_submitted"
-  | "plan_stage_changed";
+  "task_moved" | "review_submitted" | "plan_stage_changed";
 
 /** What a rule may do. */
 export type ActionKind =
-  | "assign"
-  | "add_label"
-  | "notify"
-  | "schedule_action"
-  | "set_task_status";
+  "assign" | "add_label" | "notify" | "schedule_action" | "set_task_status";
 
 /** One configured rule. */
 export interface Automation {

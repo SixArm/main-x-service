@@ -53,7 +53,16 @@
   const filterFields = [
     { id: "code", label: "Code", type: "text" },
     { id: "name", label: "Ward", type: "text" },
-    { id: "kind", label: "Kind", type: "text", options: ["inpatient", "assessment", "virtual"] },
+    {
+      id: "kind",
+      label: "Kind",
+      type: "text",
+      options: [
+        { id: "inpatient", label: "inpatient" },
+        { id: "assessment", label: "assessment" },
+        { id: "virtual", label: "virtual" },
+      ],
+    },
     { id: "specialty", label: "Specialty", type: "text" },
   ];
   let filterRules = $state<unknown>(null);

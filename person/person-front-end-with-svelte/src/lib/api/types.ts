@@ -50,13 +50,7 @@ export interface Address {
 
 /** Channel of a {@link ContactPoint}. */
 export type ContactPointSystem =
-  | "phone"
-  | "fax"
-  | "email"
-  | "pager"
-  | "url"
-  | "sms"
-  | "other";
+  "phone" | "fax" | "email" | "pager" | "url" | "sms" | "other";
 /** Intended use of a {@link ContactPoint}. */
 export type ContactPointUse = "home" | "work" | "temp" | "old" | "mobile";
 
@@ -76,13 +70,7 @@ export interface ContactPoint {
 export type IdentifierUse = "usual" | "official" | "temp" | "secondary" | "old";
 /** Kind of {@link Identifier} (MRN, SSN, driver's licence, NPI, …). */
 export type IdentifierType =
-  | "MRN"
-  | "SSN"
-  | "DL"
-  | "NPI"
-  | "PPN"
-  | "TAX"
-  | "Other";
+  "MRN" | "SSN" | "DL" | "NPI" | "PPN" | "TAX" | "Other";
 
 /** A namespaced identifier assigned to a person by some system. */
 export interface Identifier {
@@ -134,13 +122,7 @@ export interface IdentityDocument {
 
 /** Intended use of a {@link HumanName} (legal, nickname, maiden, …). */
 export type NameUse =
-  | "usual"
-  | "official"
-  | "temp"
-  | "nickname"
-  | "anonymous"
-  | "old"
-  | "maiden";
+  "usual" | "official" | "temp" | "nickname" | "anonymous" | "old" | "maiden";
 
 /** A structured human name (FHIR HumanName-aligned). */
 export interface HumanName {
@@ -298,11 +280,7 @@ export interface Person {
 
 /** Confidence band assigned to a match, derived from its score. */
 export type MatchQuality =
-  | "definite"
-  | "certain"
-  | "probable"
-  | "possible"
-  | "unlikely";
+  "definite" | "certain" | "probable" | "possible" | "unlikely";
 
 /**
  * Per-component score breakdown emitted by the matcher. Keys: name,
