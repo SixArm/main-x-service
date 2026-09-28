@@ -114,7 +114,7 @@ impl SearchEngine {
             .parse_query(query_str)
             .map_err(|e| crate::Error::Search(format!("parse_query: {e}")))?;
         let top = searcher
-            .search(&query, &TopDocs::with_limit(limit))
+            .search(&query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("search: {e}")))?;
         Ok(extract_ids(&searcher, s.id, &top))
     }
@@ -130,7 +130,7 @@ impl SearchEngine {
         let term = Term::from_field_text(s.name, query_str);
         let query = FuzzyTermQuery::new(term, 2, true);
         let top = searcher
-            .search(&query, &TopDocs::with_limit(limit))
+            .search(&query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("fuzzy_search: {e}")))?;
         Ok(extract_ids(&searcher, s.id, &top))
     }
@@ -159,7 +159,7 @@ impl SearchEngine {
             .parse_query(&query_str)
             .map_err(|e| crate::Error::Search(format!("parse range: {e}")))?;
         let top = searcher
-            .search(&query, &TopDocs::with_limit(limit))
+            .search(&query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("search range: {e}")))?;
         Ok(extract_ids(&searcher, s.id, &top))
     }
@@ -194,7 +194,10 @@ impl SearchEngine {
             name_q
         };
         let top = searcher
-            .search(final_q.as_ref(), &TopDocs::with_limit(limit))
+            .search(
+                final_q.as_ref(),
+                &TopDocs::with_limit(limit).order_by_score(),
+            )
             .map_err(|e| crate::Error::Search(format!("search name+date: {e}")))?;
         Ok(extract_ids(&searcher, s.id, &top))
     }
