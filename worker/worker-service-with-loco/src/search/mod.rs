@@ -224,7 +224,7 @@ impl SearchEngine {
             .map_err(|e| crate::Error::Search(format!("Failed to parse query: {e}")))?;
 
         let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(limit))
+            .search(&query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("Search failed: {e}")))?;
 
         // Resolve each hit's stored `id` field into a worker-ID string.
@@ -264,7 +264,7 @@ impl SearchEngine {
         let fuzzy_query = FuzzyTermQuery::new(term, 2, true);
 
         let top_docs = searcher
-            .search(&fuzzy_query, &TopDocs::with_limit(limit))
+            .search(&fuzzy_query, &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {e}")))?;
 
         // Resolve each hit's stored `id` field into a worker-ID string.
@@ -332,7 +332,10 @@ impl SearchEngine {
         };
 
         let top_docs = searcher
-            .search(final_query.as_ref(), &TopDocs::with_limit(limit))
+            .search(
+                final_query.as_ref(),
+                &TopDocs::with_limit(limit).order_by_score(),
+            )
             .map_err(|e| crate::Error::Search(format!("Search failed: {e}")))?;
 
         // Resolve each hit's stored `id` field into a worker-ID string.
