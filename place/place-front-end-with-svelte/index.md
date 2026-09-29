@@ -81,6 +81,7 @@ no public API base URL. These are server-side only, read in
 |---|---|---|
 | `PLACE_API_URL` | `http://localhost:5150` | Place Service base URL — the proxy injects a server-exchanged PASETO and forwards |
 | `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
+| `PUBLIC_OIDC_SIGNIN_ENABLED` | unset | Set to `true` to show the opt-in "Sign in with SSO" link (`/signin/sso`, OIDC via the auth service); unset hides it |
 
 ## Tech stack reminder
 

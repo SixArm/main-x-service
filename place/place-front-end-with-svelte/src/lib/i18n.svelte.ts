@@ -355,6 +355,90 @@ const STRINGS = {
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
+    "nav.tour": "جولة",
+    "splash.hero.tour": "ابدأ الجولة",
+    "tour.head": "ابدأ الجولة",
+    "tour.toc": "في هذه الصفحة",
+    "tour.open": "افتح هذه الشاشة",
+    "tour.top": "العودة إلى الأعلى",
+    "tour.start.title": "قبل أن تبدأ",
+    "tour.start.summary":
+      "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
+    "tour.start.step.1":
+      "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
+    "tour.start.step.2":
+      "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
+    "tour.start.step.3":
+      "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
+    "tour.start.step.4":
+      "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
+    "tour.intro":
+      "جولة إرشادية في سجل الأماكن: ما تفعله كل شاشة وخطوات استخدامها، من تسجيل مكان إلى دمج التكرارات.",
+    "tour.s1.title": "تسجيل مكان",
+    "tour.s1.summary":
+      "أنشئ سجلًا باسم ونوع مكان وعنوان وإحداثيات. تُكتشف المشكلات قبل حفظ أي شيء.",
+    "tour.s1.step.1":
+      "افتح «مكان جديد» من الشريط العلوي وأدخل الاسم، وهو مطلوب، إضافةً إلى الاسم البديل ونوع المكان والوصف والهاتف والموقع الإلكتروني وGLN.",
+    "tour.s1.step.2":
+      "حدّد «تضمين العنوان» لملء الشارع والمدينة/المنطقة والمنطقة/الولاية والرمز البريدي والبلد، وحدّد «تضمين الإحداثيات» لخط العرض وخط الطول والارتفاع.",
+    "tour.s1.step.3":
+      "أصلح أي أخطاء تظهر في الحقول: يجب أن يتكوّن GLN من 13 رقمًا، ويتراوح خط العرض بين -90 و90 وخط الطول بين -180 و180.",
+    "tour.s1.step.4":
+      "اختر «إنشاء». إذا عثرت الخدمة على تكرارات محتملة فستُعرض تحت «تكرارات محتملة» لتراجعها قبل إعادة الإرسال.",
+    "tour.s2.title": "البحث عن مكان وفتحه",
+    "tour.s2.summary":
+      "ابحث في السجل بالاسم أو المنطقة أو المعرّف، ثم افتح أي صف لعرض السجل كاملًا.",
+    "tour.s2.step.1":
+      "افتح «الأماكن» واكتب في مربع البحث، مثل اسم أو منطقة أو معرّف، ثم اختر «بحث».",
+    "tour.s2.step.2":
+      "فعّل «تقريبي» لتحمّل الأخطاء الإملائية، أو «صوتي (Soundex)» لمطابقة الأماكن المتشابهة في النطق؛ ويسري كلاهما عند البحث التالي.",
+    "tour.s2.step.3":
+      "فعّل «إخفاء الحقول الحساسة» للتصفح مع إخفاء التفاصيل الحساسة؛ وتُحدَّث النتائج فورًا.",
+    "tour.s2.step.4":
+      "اختر صفًا لفتح ذلك المكان. استخدم «مكان جديد» أعلى الصفحة متى احتجت إلى إضافة مكان.",
+    "tour.s3.title": "فحص التطابقات",
+    "tour.s3.summary": "قيّم مكانًا افتراضيًا مقابل الفهرس قبل إنشائه.",
+    "tour.s3.step.1":
+      "افتح «فحص التطابق» وأدخل اسم المكان الذي لست متأكدًا منه.",
+    "tour.s3.step.2":
+      "يمكنك ملء العنوان اختياريًا، وحدّد «تضمين الإحداثيات الجغرافية» لإضافة خط عرض وخط طول يدخلان في حساب النتيجة.",
+    "tour.s3.step.3": "اضبط «العتبة» بين 0.0 و1.0، ثم اختر «البحث عن تطابقات».",
+    "tour.s3.step.4":
+      "اقرأ «نتائج المطابقة»: يعرض كل مرشح جودته وتفصيل نتيجته حسب الاسم والموقع الجغرافي والعنوان والمعرّف، ويذكر التطابق الصوتي أو الحتمي (GLN).",
+    "tour.s4.title": "معالجة قائمة المراجعة",
+    "tour.s4.summary":
+      "راجع أزواج التكرار المرشحة المخزَّنة وسجّل قرارًا لكل زوج. تتطلب هذه الشاشة تسجيل الدخول.",
+    "tour.s4.step.1":
+      "افتح «المراجعة» واختر «تشغيل الفحص» لإضافة أزواج التكرار المرشحة إلى القائمة؛ وضيّق القائمة حسب الحالة وحجم الصفحة.",
+    "tour.s4.step.2":
+      "شاهد الأزواج على «اللوحة» حيث يمكنك سحب بطاقة قيد الانتظار، أو في قائمة «الطابور» بأعمدة النتيجة والجودة والطريقة.",
+    "tour.s4.step.3":
+      "اختر «مقارنة» لعرض السجل أ والسجل ب جنبًا إلى جنب مع تفصيل النتيجة حسب المكوّن.",
+    "tour.s4.step.4":
+      "اختر «تأكيد التكرار» أو «رفض»؛ ولا يمكن البتّ إلا في العناصر قيد الانتظار. التأكيد يسجّل القرار فقط، فللدمج اختر «الإبقاء على أ ودمج ب فيه» أو «الإبقاء على ب ودمج أ فيه».",
+    "tour.s5.title": "دمج مكانين",
+    "tour.s5.summary":
+      "ادمج تكرارًا مؤكَّدًا في السجل الذي تريد الإبقاء عليه، مع ذكر السبب ومسار تدقيق كامل.",
+    "tour.s5.step.1":
+      "افتح «دمج» وأدخل معرّف المكان الرئيسي، وهو السجل الذي سيبقى، ومعرّف المكان المكرر الذي سيُحذف حذفًا مؤقتًا. ويجب أن يختلف المعرّفان.",
+    "tour.s5.step.2":
+      "اختر «تحميل المعاينة» لرؤية السجلين بوسمَي «الرئيسي» و«المكرر» قبل أن يتغير أي شيء.",
+    "tour.s5.step.3":
+      "أدخل «السبب»، وهو يُسجَّل في مسار تدقيق الدمج، ثم اختر «دمج» وأكّد الرسالة.",
+    "tour.s5.step.4":
+      "تعرض رسالة اكتمال الدمج سجل الدمج الجديد ورابطًا إلى «عرض المكان الرئيسي المدمج».",
+    "tour.s6.title": "فحص مكان وتصديره وتدقيقه",
+    "tour.s6.summary":
+      "افتح مكانًا لترى كل ما هو محفوظ عنه، واعرضه مُقنَّعًا، وصدّره لطلب بيانات، واقرأ تاريخه.",
+    "tour.s6.step.1":
+      "من «الأماكن» افتح مكانًا لترى الهوية والعنوان والإحداثيات الجغرافية والمعرفات وساعات العمل والمرافق في عرض واحد، بحسب المتوفر منها.",
+    "tour.s6.step.2":
+      "اختر «إظهار المُقنَّع» لإعادة تحميل السجل مع إخفاء الحقول الحساسة، و«إظهار الكامل» للعودة.",
+    "tour.s6.step.3":
+      "اختر «تصدير البيانات (GDPR)» لتنزيل بيانات المكان كملف JSON، أو «تحرير» و«حذف» لتعديله أو حذفه حذفًا مؤقتًا؛ ويطلب «حذف» تأكيدك أولًا.",
+    "tour.s6.step.4":
+      "اختر «تدقيق» لفتح «سجل التدقيق»: يعرض كل إدخال من أجرى التغيير ومتى، مع «حمولة» قابلة للتوسيع.",
+    "signin.sso": "تسجيل الدخول عبر SSO",
   },
   "cy-001": {
     "nav.review": "Adolygu",
@@ -642,6 +726,92 @@ const STRINGS = {
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
+    "nav.tour": "Taith",
+    "splash.hero.tour": "Cymerwch y daith",
+    "tour.head": "Cymerwch y daith",
+    "tour.toc": "Ar y dudalen hon",
+    "tour.open": "Agor y sgrin hon",
+    "tour.top": "Yn ôl i'r brig",
+    "tour.start.title": "Cyn i chi ddechrau",
+    "tour.start.summary":
+      "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+    "tour.start.step.1":
+      "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
+    "tour.start.step.2":
+      "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+    "tour.start.step.3":
+      "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+    "tour.start.step.4":
+      "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+    "tour.intro":
+      "Taith dywys drwy'r gofrestr Lleoedd: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o gofrestru lle i uno dyblygion.",
+    "tour.s1.title": "Cofrestru lle",
+    "tour.s1.summary":
+      "Crëwch gofnod gydag enw, math o le, cyfeiriad a chyfesurynnau. Caiff problemau eu nodi cyn cadw dim.",
+    "tour.s1.step.1":
+      "Agorwch Lle newydd o'r bar uchaf a rhowch yr Enw, sy'n ofynnol, ynghyd ag Enw arall, Math o le, Disgrifiad, Ffôn, Gwefan a GLN.",
+    "tour.s1.step.2":
+      "Ticiwch Cynnwys cyfeiriad i lenwi Stryd, Dinas / ardal, Rhanbarth / talaith, Cod post a Gwlad, a ticiwch Cynnwys cyfesurynnau ar gyfer Lledred, Hydred a Drychiad.",
+    "tour.s1.step.3":
+      "Cywirwch unrhyw wallau yn y meysydd: rhaid i'r GLN fod yn 13 digid, mae lledred o -90 i 90 a hydred o -180 i 180.",
+    "tour.s1.step.4":
+      "Dewiswch Creu. Os bydd y gwasanaeth yn dod o hyd i ddyblygiadau tebygol, fe'u rhestrir o dan Dyblygiadau posibl i chi eu hadolygu cyn ailgyflwyno.",
+    "tour.s2.title": "Dod o hyd i le a'i agor",
+    "tour.s2.summary":
+      "Chwiliwch y gofrestr yn ôl enw, ardal neu ddynodwr, yna agorwch unrhyw res i weld y cofnod llawn.",
+    "tour.s2.step.1":
+      "Agorwch Lleoedd a theipiwch yn y blwch chwilio, er enghraifft enw, ardal neu ddynodwr, yna dewiswch Chwilio.",
+    "tour.s2.step.2":
+      "Trowch Niwlog ymlaen i oddef camsillafu, neu Ffonetig (Soundex) i gydweddu lleoedd sy'n swnio'n debyg; mae'r ddau'n gweithio yn y chwiliad nesaf.",
+    "tour.s2.step.3":
+      "Trowch Cuddio meysydd sensitif ymlaen i bori gyda manylion sensitif wedi'u cuddio; mae'r canlyniadau'n adnewyddu ar unwaith.",
+    "tour.s2.step.4":
+      "Dewiswch res i agor y lle hwnnw. Defnyddiwch Lle newydd ar frig y dudalen pryd bynnag y bydd angen ychwanegu un.",
+    "tour.s3.title": "Gwirio am gydweddiadau",
+    "tour.s3.summary":
+      "Sgoriwch lle damcaniaethol yn erbyn y mynegai cyn i chi ei greu.",
+    "tour.s3.step.1":
+      "Agorwch Gwiriad cydweddu a rhowch Enw'r lle nad ydych yn siŵr amdano.",
+    "tour.s3.step.2":
+      "Gallwch lenwi'r cyfeiriad, a thiciwch Cynnwys cyfesurynnau daearyddol i ychwanegu lledred a hydred sy'n cyfrif tuag at y sgôr.",
+    "tour.s3.step.3":
+      "Gosodwch Trothwy rhwng 0.0 ac 1.0, yna dewiswch Dod o hyd i gydweddiadau.",
+    "tour.s3.step.4":
+      "Darllenwch y Canlyniadau cydweddu: mae pob ymgeisydd yn dangos ei ansawdd a dadansoddiad sgôr yn ôl enw, daearyddol, cyfeiriad a dynodwr, ac yn nodi cydweddiad ffonetig neu benderfynol (GLN).",
+    "tour.s4.title": "Gweithio'r ciw adolygu",
+    "tour.s4.summary":
+      "Ewch drwy'r parau dyblyg sydd wedi'u storio a chofnodwch dyfarniad ar bob pâr. Mae'r sgrin hon yn gofyn i chi fod wedi mewngofnodi.",
+    "tour.s4.step.1":
+      "Agorwch Adolygu a dewiswch Rhedeg sgan i ychwanegu parau dyblyg posibl at y ciw; cyfyngwch y rhestr yn ôl Statws a Maint tudalen.",
+    "tour.s4.step.2":
+      "Gwelwch y parau ar y Bwrdd, lle gallwch lusgo cerdyn sy'n aros, neu yn y rhestr Rhes gyda'i cholofnau Sgôr, Ansawdd a Dull.",
+    "tour.s4.step.3":
+      "Dewiswch Cymharu i weld Cofnod A a Chofnod B ochr yn ochr, ynghyd â'r Dadansoddiad sgôr yn ôl cydran.",
+    "tour.s4.step.4":
+      "Dewiswch Cadarnhau'r dyblyg neu Gwrthod; dim ond eitemau sy'n aros y gellir eu penderfynu. Mae cadarnhau'n cofnodi'r dyfarniad yn unig, felly i uno dewiswch Cadw A, uno B iddo neu Cadw B, uno A iddo.",
+    "tour.s5.title": "Uno dau le",
+    "tour.s5.summary":
+      "Unwch ddyblyg cadarnhaol â'r cofnod rydych am ei gadw, gyda rheswm a llwybr archwilio llawn.",
+    "tour.s5.step.1":
+      "Agorwch Uno a rhowch ID y prif le, y cofnod sy'n goroesi, ac ID y lle dyblyg, a fydd yn cael ei feddal-ddileu. Rhaid i'r ddau fod yn wahanol.",
+    "tour.s5.step.2":
+      "Dewiswch Llwytho rhagolwg i weld y ddau gofnod wedi'u labelu Prif a Dyblyg cyn i ddim newid.",
+    "tour.s5.step.3":
+      "Rhowch Rheswm, sy'n cael ei gofnodi yn llwybr archwilio'r uno, yna dewiswch Uno a chadarnhewch yr anogwr.",
+    "tour.s5.step.4":
+      "Mae neges uno wedi'i gwblhau yn dangos y cofnod uno newydd ac yn cysylltu â Gweld y prif le wedi'i uno.",
+    "tour.s6.title": "Archwilio, allforio ac archwilio lle",
+    "tour.s6.summary":
+      "Agorwch le i weld popeth a gedwir amdano, ei weld wedi'i guddio, ei allforio ar gyfer cais am ddata a darllen ei hanes.",
+    "tour.s6.step.1":
+      "O Lleoedd, agorwch le i weld Hunaniaeth, Cyfeiriad, Cyfesurynnau daearyddol, Dynodyddion, Oriau agor a Chyfleusterau mewn un olwg, ar gyfer pa rai bynnag sydd wedi'u cofnodi.",
+    "tour.s6.step.2":
+      "Dewiswch Dangos wedi'i guddio i ail-lwytho'r cofnod gyda meysydd sensitif wedi'u cuddio, a Dangos yn llawn i newid yn ôl.",
+    "tour.s6.step.3":
+      "Dewiswch Allforio data (GDPR) i lawrlwytho data'r lle fel ffeil JSON, neu Golygu a Dileu i'w newid neu ei feddal-ddileu; mae Dileu yn gofyn i chi gadarnhau'n gyntaf.",
+    "tour.s6.step.4":
+      "Dewiswch Archwilio i agor y Cofnod archwilio: mae pob cofnod yn dangos pwy wnaeth y newid a phryd, gyda Llwyth y gellir ei ehangu.",
+    "signin.sso": "Mewngofnodi gydag SSO",
   },
   "en-001": {
     "nav.review": "Review",
@@ -944,6 +1114,92 @@ const STRINGS = {
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
+    "nav.tour": "Tour",
+    "splash.hero.tour": "Take the tour",
+    "tour.head": "Take the tour",
+    "tour.toc": "On this page",
+    "tour.open": "Open this screen",
+    "tour.top": "Back to top",
+    "tour.start.title": "Before you begin",
+    "tour.start.summary":
+      "You need an account to work with real data. Signing in takes under a minute and needs no password.",
+    "tour.start.step.1":
+      "Choose Sign in at the top right and enter your email address.",
+    "tour.start.step.2":
+      "Open the magic link we email you. It works once and expires quickly.",
+    "tour.start.step.3":
+      "You return to the app signed in, with nothing to remember or reset.",
+    "tour.start.step.4":
+      "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
+    "tour.intro":
+      "A guided walkthrough of the Place registry: what each screen does and the steps to use it, from registering a place to merging duplicates.",
+    "tour.s1.title": "Register a place",
+    "tour.s1.summary":
+      "Create a record with a name, place type, address and coordinates. Problems are flagged before anything is saved.",
+    "tour.s1.step.1":
+      "Open New place from the top bar and enter the Name, which is required, plus an Alternate name, Place type, Description, Telephone, Website and GLN.",
+    "tour.s1.step.2":
+      "Tick Include address to fill in Street, City / locality, Region / state, Postal code and Country, and tick Include coords for Latitude, Longitude and Elevation.",
+    "tour.s1.step.3":
+      "Fix any inline errors: the GLN must be 13 digits, latitude runs from -90 to 90 and longitude from -180 to 180.",
+    "tour.s1.step.4":
+      "Select Create. If the service finds likely duplicates, they are listed under Possible duplicates so you can review them before you resubmit.",
+    "tour.s2.title": "Find and open a place",
+    "tour.s2.summary":
+      "Search the registry by name, locality or identifier, then open any row for the full record.",
+    "tour.s2.step.1":
+      "Open Places and type into the search box, for example a name, a locality or an identifier, then select Search.",
+    "tour.s2.step.2":
+      "Switch on Fuzzy to tolerate typos, or Phonetic (Soundex) to match places that sound alike; both apply on the next search.",
+    "tour.s2.step.3":
+      "Switch on Mask sensitive fields to browse with sensitive details redacted; the results refresh straight away.",
+    "tour.s2.step.4":
+      "Select a row to open that place. Use New place at the top of the page whenever you need to add one.",
+    "tour.s3.title": "Check for matches",
+    "tour.s3.summary":
+      "Score a hypothetical place against the index before you create it.",
+    "tour.s3.step.1":
+      "Open Match check and enter the Name of the place you are unsure about.",
+    "tour.s3.step.2":
+      "Optionally fill in the address, and tick Include geo coordinates to add a latitude and longitude that count towards the score.",
+    "tour.s3.step.3":
+      "Set a Threshold between 0.0 and 1.0, then select Find matches.",
+    "tour.s3.step.4":
+      "Read the Match results: each candidate shows its quality and a score breakdown by name, geo, address and identifier, and notes a phonetic or deterministic (GLN) match.",
+    "tour.s4.title": "Work the review queue",
+    "tour.s4.summary":
+      "Go through stored duplicate candidates and record a verdict on each pair. This screen needs you to be signed in.",
+    "tour.s4.step.1":
+      "Open Review and select Run scan to add candidate duplicate pairs to the queue; narrow the list by Status and Page size.",
+    "tour.s4.step.2":
+      "See pairs on the Board, where you can drag a pending card, or in the Queue list with its Score, Quality and Method columns.",
+    "tour.s4.step.3":
+      "Select Compare to see Record A and Record B side by side, along with the Score breakdown by component.",
+    "tour.s4.step.4":
+      "Choose Confirm duplicate or Reject; only pending items can be decided. Confirming records the verdict only, so to merge pick Keep A, merge B into it or Keep B, merge A into it.",
+    "tour.s5.title": "Merge two places",
+    "tour.s5.summary":
+      "Combine a confirmed duplicate into the record you want to keep, with a reason and a full audit trail.",
+    "tour.s5.step.1":
+      "Open Merge and enter the Main place ID, the surviving record, and the Duplicate place ID, which will be soft-deleted. The two must differ.",
+    "tour.s5.step.2":
+      "Select Load preview to see both records labelled Main and Duplicate before anything changes.",
+    "tour.s5.step.3":
+      "Enter a Reason, which is recorded in the merge audit trail, then select Merge and confirm the prompt.",
+    "tour.s5.step.4":
+      "A completed-merge message shows the new merge record and links to View merged main place.",
+    "tour.s6.title": "Inspect, export and audit a place",
+    "tour.s6.summary":
+      "Open a place to see everything held about it, view it masked, export it for a data request and read its history.",
+    "tour.s6.step.1":
+      "From Places, open a place to see Identity, Address, Geo coordinates, Identifiers, Opening hours and Amenities in one view, for whichever of them are recorded.",
+    "tour.s6.step.2":
+      "Select Show masked to reload the record with sensitive fields redacted, and Show full to switch back.",
+    "tour.s6.step.3":
+      "Select Export data (GDPR) to download that place's data as a JSON file, or Edit and Delete to change or soft-delete it; Delete asks you to confirm first.",
+    "tour.s6.step.4":
+      "Select Audit to open the Audit log: each entry shows who made the change and when, with an expandable Payload.",
+    "signin.sso": "Sign in with SSO",
   },
   "es-001": {
     "nav.review": "Revisión",
@@ -1232,6 +1488,92 @@ const STRINGS = {
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
+    "nav.tour": "Recorrido",
+    "splash.hero.tour": "Haz el recorrido",
+    "tour.head": "Haz el recorrido",
+    "tour.toc": "En esta página",
+    "tour.open": "Abrir esta pantalla",
+    "tour.top": "Volver arriba",
+    "tour.start.title": "Antes de empezar",
+    "tour.start.summary":
+      "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
+    "tour.start.step.1":
+      "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
+    "tour.start.step.2":
+      "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
+    "tour.start.step.3":
+      "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
+    "tour.start.step.4":
+      "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
+    "tour.intro":
+      "Un recorrido guiado por el registro de lugares: qué hace cada pantalla y los pasos para usarla, desde registrar un lugar hasta fusionar duplicados.",
+    "tour.s1.title": "Registrar un lugar",
+    "tour.s1.summary":
+      "Crea un registro con nombre, tipo de lugar, dirección y coordenadas. Los problemas se señalan antes de guardar nada.",
+    "tour.s1.step.1":
+      "Abre Nuevo lugar en la barra superior e introduce el Nombre, que es obligatorio, además del Nombre alternativo, Tipo de lugar, Descripción, Teléfono, Sitio web y GLN.",
+    "tour.s1.step.2":
+      "Marca Incluir dirección para rellenar Calle, Ciudad / localidad, Región / estado, Código postal y País, y marca Incluir coordenadas para Latitud, Longitud y Elevación.",
+    "tour.s1.step.3":
+      "Corrige los errores que aparezcan en los campos: el GLN debe tener 13 dígitos, la latitud va de -90 a 90 y la longitud de -180 a 180.",
+    "tour.s1.step.4":
+      "Selecciona Crear. Si el servicio encuentra posibles duplicados, aparecen en Posibles duplicados para que los revises antes de volver a enviar.",
+    "tour.s2.title": "Buscar y abrir un lugar",
+    "tour.s2.summary":
+      "Busca en el registro por nombre, localidad o identificador y abre cualquier fila para ver el registro completo.",
+    "tour.s2.step.1":
+      "Abre Lugares y escribe en el cuadro de búsqueda, por ejemplo un nombre, una localidad o un identificador, y selecciona Buscar.",
+    "tour.s2.step.2":
+      "Activa Difusa para tolerar errores tipográficos, o Fonética (Soundex) para encontrar lugares que suenan parecido; ambas se aplican en la siguiente búsqueda.",
+    "tour.s2.step.3":
+      "Activa Enmascarar campos sensibles para navegar con los datos sensibles ocultos; los resultados se actualizan de inmediato.",
+    "tour.s2.step.4":
+      "Selecciona una fila para abrir ese lugar. Usa Nuevo lugar en la parte superior de la página siempre que necesites añadir uno.",
+    "tour.s3.title": "Comprobar coincidencias",
+    "tour.s3.summary":
+      "Puntúa un lugar hipotético frente al índice antes de crearlo.",
+    "tour.s3.step.1":
+      "Abre Comprobar coincidencias e introduce el Nombre del lugar sobre el que tienes dudas.",
+    "tour.s3.step.2":
+      "Rellena la dirección si quieres y marca Incluir coordenadas geográficas para añadir una latitud y una longitud que cuenten en la puntuación.",
+    "tour.s3.step.3":
+      "Fija un Umbral entre 0.0 y 1.0 y selecciona Buscar coincidencias.",
+    "tour.s3.step.4":
+      "Lee los Resultados de coincidencia: cada candidato muestra su calidad y un desglose de puntuación por nombre, geografía, dirección e identificador, e indica si hay coincidencia fonética o determinista (GLN).",
+    "tour.s4.title": "Trabajar la cola de revisión",
+    "tour.s4.summary":
+      "Recorre los pares candidatos a duplicados almacenados y registra un veredicto para cada uno. Esta pantalla requiere haber iniciado sesión.",
+    "tour.s4.step.1":
+      "Abre Revisión y selecciona Ejecutar análisis para añadir pares candidatos a duplicados a la cola; acota la lista por Estado y Tamaño de página.",
+    "tour.s4.step.2":
+      "Consulta los pares en el Tablero, donde puedes arrastrar una tarjeta pendiente, o en la lista Cola con sus columnas Puntuación, Calidad y Método.",
+    "tour.s4.step.3":
+      "Selecciona Comparar para ver el Registro A y el Registro B lado a lado, junto con el Desglose de puntuación por componente.",
+    "tour.s4.step.4":
+      "Elige Confirmar duplicado o Rechazar; solo se pueden decidir los elementos pendientes. Confirmar solo registra el veredicto, así que para fusionar elige Conservar A y fusionar B en él o Conservar B y fusionar A en él.",
+    "tour.s5.title": "Fusionar dos lugares",
+    "tour.s5.summary":
+      "Combina un duplicado confirmado con el registro que quieres conservar, con un motivo y un rastro de auditoría completo.",
+    "tour.s5.step.1":
+      "Abre Fusionar e introduce el ID del lugar principal, el registro que sobrevive, y el ID del lugar duplicado, que se eliminará de forma lógica. Ambos deben ser distintos.",
+    "tour.s5.step.2":
+      "Selecciona Cargar vista previa para ver ambos registros etiquetados como Principal y Duplicado antes de que cambie nada.",
+    "tour.s5.step.3":
+      "Introduce un Motivo, que se registra en el rastro de auditoría de la fusión, y selecciona Fusionar y confirma el aviso.",
+    "tour.s5.step.4":
+      "Un mensaje de fusión completada muestra el nuevo registro de fusión y enlaza a Ver el lugar principal fusionado.",
+    "tour.s6.title": "Inspeccionar, exportar y auditar un lugar",
+    "tour.s6.summary":
+      "Abre un lugar para ver todo lo que se guarda sobre él, verlo enmascarado, exportarlo para una solicitud de datos y leer su historial.",
+    "tour.s6.step.1":
+      "Desde Lugares, abre un lugar para ver Identidad, Dirección, Coordenadas geográficas, Identificadores, Horario de apertura y Servicios en una sola vista, según lo que esté registrado.",
+    "tour.s6.step.2":
+      "Selecciona Mostrar enmascarado para recargar el registro con los campos sensibles ocultos, y Mostrar completo para volver.",
+    "tour.s6.step.3":
+      "Selecciona Exportar datos (RGPD) para descargar los datos del lugar como archivo JSON, o Editar y Eliminar para modificarlo o eliminarlo de forma lógica; Eliminar pide confirmación antes.",
+    "tour.s6.step.4":
+      "Selecciona Auditoría para abrir el Registro de auditoría: cada entrada muestra quién hizo el cambio y cuándo, con una Carga útil desplegable.",
+    "signin.sso": "Iniciar sesión con SSO",
   },
   "fr-001": {
     "nav.review": "Révision",
@@ -1520,6 +1862,92 @@ const STRINGS = {
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
+    "nav.tour": "Visite guidée",
+    "splash.hero.tour": "Faire la visite guidée",
+    "tour.head": "Faire la visite guidée",
+    "tour.toc": "Sur cette page",
+    "tour.open": "Ouvrir cet écran",
+    "tour.top": "Retour en haut",
+    "tour.start.title": "Avant de commencer",
+    "tour.start.summary":
+      "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+    "tour.start.step.1":
+      "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
+    "tour.start.step.2":
+      "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+    "tour.start.step.3":
+      "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+    "tour.start.step.4":
+      "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
+    "tour.intro":
+      "Une visite guidée du registre des lieux : le rôle de chaque écran et les étapes pour l'utiliser, de l'enregistrement d'un lieu à la fusion des doublons.",
+    "tour.s1.title": "Enregistrer un lieu",
+    "tour.s1.summary":
+      "Créez une fiche avec nom, type de lieu, adresse et coordonnées. Les problèmes sont signalés avant tout enregistrement.",
+    "tour.s1.step.1":
+      "Ouvrez Nouveau lieu dans la barre supérieure et saisissez le Nom, obligatoire, ainsi que le Nom alternatif, le Type de lieu, la Description, le Téléphone, le Site web et le GLN.",
+    "tour.s1.step.2":
+      "Cochez Inclure l'adresse pour renseigner la Rue, la Ville / localité, la Région / état, le Code postal et le Pays, et Inclure les coordonnées pour la Latitude, la Longitude et l'Altitude.",
+    "tour.s1.step.3":
+      "Corrigez les erreurs affichées dans les champs : le GLN doit comporter 13 chiffres, la latitude va de -90 à 90 et la longitude de -180 à 180.",
+    "tour.s1.step.4":
+      "Sélectionnez Créer. Si le service trouve des doublons probables, ils sont listés sous Doublons possibles pour que vous les examiniez avant de renvoyer.",
+    "tour.s2.title": "Trouver et ouvrir un lieu",
+    "tour.s2.summary":
+      "Recherchez dans le registre par nom, localité ou identifiant, puis ouvrez une ligne pour voir la fiche complète.",
+    "tour.s2.step.1":
+      "Ouvrez Lieux et saisissez dans la zone de recherche, par exemple un nom, une localité ou un identifiant, puis sélectionnez Rechercher.",
+    "tour.s2.step.2":
+      "Activez Approximatif pour tolérer les fautes de frappe, ou Phonétique (Soundex) pour trouver des lieux qui se prononcent de façon proche ; les deux s'appliquent à la recherche suivante.",
+    "tour.s2.step.3":
+      "Activez Masquer les champs sensibles pour parcourir avec les détails sensibles masqués ; les résultats se rafraîchissent aussitôt.",
+    "tour.s2.step.4":
+      "Sélectionnez une ligne pour ouvrir ce lieu. Utilisez Nouveau lieu en haut de la page chaque fois que vous devez en ajouter un.",
+    "tour.s3.title": "Vérifier les correspondances",
+    "tour.s3.summary":
+      "Évaluez un lieu hypothétique par rapport à l'index avant de le créer.",
+    "tour.s3.step.1":
+      "Ouvrez Vérifier les correspondances et saisissez le Nom du lieu dont vous n'êtes pas sûr.",
+    "tour.s3.step.2":
+      "Renseignez éventuellement l'adresse et cochez Inclure les coordonnées géographiques pour ajouter une latitude et une longitude qui comptent dans le score.",
+    "tour.s3.step.3":
+      "Définissez un Seuil entre 0.0 et 1.0, puis sélectionnez Trouver des correspondances.",
+    "tour.s3.step.4":
+      "Lisez les Résultats de correspondance : chaque candidat affiche sa qualité et le détail du score par nom, géo, adresse et identifiant, et signale une correspondance phonétique ou déterministe (GLN).",
+    "tour.s4.title": "Traiter la file de révision",
+    "tour.s4.summary":
+      "Passez en revue les paires de doublons candidates enregistrées et consignez un verdict pour chacune. Cet écran exige d'être connecté.",
+    "tour.s4.step.1":
+      "Ouvrez Révision et sélectionnez Lancer l'analyse pour ajouter des paires de doublons candidates à la file ; filtrez la liste par Statut et Taille de page.",
+    "tour.s4.step.2":
+      "Consultez les paires sur le Tableau, où vous pouvez faire glisser une carte en attente, ou dans la liste File avec ses colonnes Score, Qualité et Méthode.",
+    "tour.s4.step.3":
+      "Sélectionnez Comparer pour voir la Fiche A et la Fiche B côte à côte, avec le Détail du score par composant.",
+    "tour.s4.step.4":
+      "Choisissez Confirmer le doublon ou Rejeter ; seuls les éléments en attente peuvent être tranchés. Confirmer n'enregistre que le verdict ; pour fusionner, choisissez Conserver A, y fusionner B ou Conserver B, y fusionner A.",
+    "tour.s5.title": "Fusionner deux lieux",
+    "tour.s5.summary":
+      "Combinez un doublon confirmé dans la fiche que vous voulez conserver, avec un motif et une piste d'audit complète.",
+    "tour.s5.step.1":
+      "Ouvrez Fusionner et saisissez l'ID du lieu principal, la fiche conservée, et l'ID du lieu en double, qui sera supprimé logiquement. Les deux doivent être différents.",
+    "tour.s5.step.2":
+      "Sélectionnez Charger l'aperçu pour voir les deux fiches étiquetées Principal et Doublon avant tout changement.",
+    "tour.s5.step.3":
+      "Saisissez un Motif, consigné dans la piste d'audit de la fusion, puis sélectionnez Fusionner et confirmez l'invite.",
+    "tour.s5.step.4":
+      "Un message de fusion terminée affiche le nouvel enregistrement de fusion et renvoie vers Voir le lieu principal fusionné.",
+    "tour.s6.title": "Consulter, exporter et auditer un lieu",
+    "tour.s6.summary":
+      "Ouvrez un lieu pour voir tout ce qui est conservé à son sujet, l'afficher masqué, l'exporter pour une demande de données et lire son historique.",
+    "tour.s6.step.1":
+      "Depuis Lieux, ouvrez un lieu pour voir Identité, Adresse, Coordonnées géographiques, Identifiants, Heures d'ouverture et Équipements en une seule vue, selon ce qui est renseigné.",
+    "tour.s6.step.2":
+      "Sélectionnez Afficher masqué pour recharger la fiche avec les champs sensibles masqués, et Afficher complet pour revenir.",
+    "tour.s6.step.3":
+      "Sélectionnez Exporter les données (RGPD) pour télécharger les données du lieu en fichier JSON, ou Modifier et Supprimer pour le changer ou le supprimer logiquement ; Supprimer demande d'abord confirmation.",
+    "tour.s6.step.4":
+      "Sélectionnez Audit pour ouvrir le Journal d'audit : chaque entrée indique qui a fait le changement et quand, avec une Charge utile dépliable.",
+    "signin.sso": "Se connecter avec SSO",
   },
   "hi-001": {
     "nav.review": "समीक्षा",
@@ -1806,6 +2234,92 @@ const STRINGS = {
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
+    "nav.tour": "टूर",
+    "splash.hero.tour": "टूर देखें",
+    "tour.head": "टूर देखें",
+    "tour.toc": "इस पृष्ठ पर",
+    "tour.open": "यह स्क्रीन खोलें",
+    "tour.top": "ऊपर लौटें",
+    "tour.start.title": "शुरू करने से पहले",
+    "tour.start.summary":
+      "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
+    "tour.start.step.1":
+      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.2":
+      "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
+    "tour.start.step.3":
+      "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
+    "tour.start.step.4":
+      "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
+    "tour.intro":
+      "स्थान रजिस्ट्री का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, किसी स्थान को दर्ज करने से लेकर डुप्लिकेट मर्ज करने तक।",
+    "tour.s1.title": "किसी स्थान को दर्ज करना",
+    "tour.s1.summary":
+      "नाम, स्थान प्रकार, पता और निर्देशांक के साथ रिकॉर्ड बनाएँ। कुछ भी सहेजने से पहले समस्याएँ बता दी जाती हैं।",
+    "tour.s1.step.1":
+      "शीर्ष पट्टी से «नया स्थान» खोलें और नाम (अनिवार्य) के साथ वैकल्पिक नाम, स्थान प्रकार, विवरण, टेलीफ़ोन, वेबसाइट और GLN दर्ज करें।",
+    "tour.s1.step.2":
+      "पता भरने के लिए «पता शामिल करें» चुनें (सड़क, शहर/इलाका, क्षेत्र/राज्य, डाक कोड, देश) और अक्षांश, देशांतर व ऊँचाई के लिए «निर्देशांक शामिल करें» चुनें।",
+    "tour.s1.step.3":
+      "फ़ील्ड में दिखने वाली त्रुटियाँ ठीक करें: GLN 13 अंकों का होना चाहिए, अक्षांश -90 से 90 और देशांतर -180 से 180 के बीच होना चाहिए।",
+    "tour.s1.step.4":
+      "«बनाएँ» चुनें। यदि सेवा को संभावित डुप्लिकेट मिलते हैं, तो वे «संभावित डुप्लिकेट» के नीचे दिखते हैं ताकि आप दोबारा भेजने से पहले उनकी समीक्षा कर सकें।",
+    "tour.s2.title": "स्थान खोजना और खोलना",
+    "tour.s2.summary":
+      "नाम, इलाके या पहचानकर्ता से रजिस्ट्री खोजें, फिर पूरा रिकॉर्ड देखने के लिए कोई भी पंक्ति खोलें।",
+    "tour.s2.step.1":
+      "«स्थान» खोलें और खोज बॉक्स में लिखें, जैसे नाम, इलाका या पहचानकर्ता, फिर «खोजें» चुनें।",
+    "tour.s2.step.2":
+      "टाइपो सहने के लिए «अस्पष्ट» या मिलती-जुलती ध्वनि वाले स्थान खोजने के लिए «ध्वन्यात्मक (Soundex)» चालू करें; दोनों अगली खोज पर लागू होते हैं।",
+    "tour.s2.step.3":
+      "संवेदनशील विवरण छिपाकर देखने के लिए «संवेदनशील फ़ील्ड छिपाएँ» चालू करें; परिणाम तुरंत ताज़ा हो जाते हैं।",
+    "tour.s2.step.4":
+      "उस स्थान को खोलने के लिए कोई पंक्ति चुनें। नया स्थान जोड़ना हो तो पृष्ठ के ऊपर «नया स्थान» का उपयोग करें।",
+    "tour.s3.title": "मिलान जाँचना",
+    "tour.s3.summary":
+      "किसी काल्पनिक स्थान को बनाने से पहले इंडेक्स के विरुद्ध उसका स्कोर देखें।",
+    "tour.s3.step.1":
+      "«मिलान जाँच» खोलें और जिस स्थान के बारे में संदेह है उसका नाम दर्ज करें।",
+    "tour.s3.step.2":
+      "चाहें तो पता भरें, और स्कोर में गिने जाने वाले अक्षांश व देशांतर जोड़ने के लिए «भौगोलिक निर्देशांक शामिल करें» चुनें।",
+    "tour.s3.step.3":
+      "0.0 से 1.0 के बीच «सीमा» तय करें, फिर «मिलान खोजें» चुनें।",
+    "tour.s3.step.4":
+      "«मिलान परिणाम» पढ़ें: हर उम्मीदवार अपनी गुणवत्ता और नाम, भौगोलिक, पता व पहचानकर्ता के अनुसार स्कोर विवरण दिखाता है, और ध्वन्यात्मक या निर्धारक (GLN) मिलान बताता है।",
+    "tour.s4.title": "समीक्षा कतार पर काम करना",
+    "tour.s4.summary":
+      "संग्रहीत डुप्लिकेट उम्मीदवार जोड़ियों को देखें और हर जोड़ी पर निर्णय दर्ज करें। इस स्क्रीन के लिए साइन इन होना ज़रूरी है।",
+    "tour.s4.step.1":
+      "«समीक्षा» खोलें और कतार में उम्मीदवार डुप्लिकेट जोड़ियाँ जोड़ने के लिए «स्कैन चलाएं» चुनें; सूची को स्थिति और पृष्ठ आकार से सीमित करें।",
+    "tour.s4.step.2":
+      "जोड़ियों को «बोर्ड» पर देखें, जहाँ आप लंबित कार्ड खींच सकते हैं, या स्कोर, गुणवत्ता और विधि कॉलम वाली «कतार» सूची में देखें।",
+    "tour.s4.step.3":
+      "«तुलना करें» चुनें और रिकॉर्ड A व रिकॉर्ड B को साथ-साथ देखें, साथ में घटक के अनुसार स्कोर विवरण भी।",
+    "tour.s4.step.4":
+      "«डुप्लिकेट की पुष्टि करें» या «अस्वीकार करें» चुनें; केवल लंबित आइटम पर निर्णय हो सकता है। पुष्टि केवल निर्णय दर्ज करती है, इसलिए मर्ज के लिए «A रखें, B को उसमें मिलाएँ» या «B रखें, A को उसमें मिलाएँ» चुनें।",
+    "tour.s5.title": "दो स्थान मर्ज करना",
+    "tour.s5.summary":
+      "पुष्ट डुप्लिकेट को उस रिकॉर्ड में मिलाएँ जिसे आप रखना चाहते हैं, कारण और पूरे ऑडिट ट्रेल के साथ।",
+    "tour.s5.step.1":
+      "«मर्ज करें» खोलें और मुख्य स्थान आईडी (जो रिकॉर्ड बचेगा) तथा डुप्लिकेट स्थान आईडी (जो सॉफ़्ट-डिलीट होगा) दर्ज करें। दोनों अलग होने चाहिए।",
+    "tour.s5.step.2":
+      "कुछ भी बदलने से पहले दोनों रिकॉर्ड «मुख्य» और «डुप्लिकेट» लेबल के साथ देखने के लिए «पूर्वावलोकन लोड करें» चुनें।",
+    "tour.s5.step.3":
+      "«कारण» दर्ज करें, जो मर्ज के ऑडिट ट्रेल में दर्ज होता है, फिर «मर्ज करें» चुनें और संदेश की पुष्टि करें।",
+    "tour.s5.step.4":
+      "मर्ज पूरा होने का संदेश नया मर्ज रिकॉर्ड दिखाता है और «मर्ज किया गया मुख्य स्थान देखें» से जोड़ता है।",
+    "tour.s6.title": "किसी स्थान की जाँच, निर्यात और ऑडिट",
+    "tour.s6.summary":
+      "किसी स्थान को खोलकर उसके बारे में सब कुछ देखें, मास्क्ड रूप में देखें, डेटा अनुरोध के लिए निर्यात करें और उसका इतिहास पढ़ें।",
+    "tour.s6.step.1":
+      "«स्थान» से कोई स्थान खोलें और पहचान, पता, भौगोलिक निर्देशांक, पहचानकर्ता, खुलने का समय और सुविधाएँ एक ही दृश्य में देखें, जो भी दर्ज हों।",
+    "tour.s6.step.2":
+      "संवेदनशील फ़ील्ड छिपाकर रिकॉर्ड दोबारा लोड करने के लिए «मास्क्ड दिखाएँ» चुनें, और वापस जाने के लिए «पूर्ण दिखाएँ»।",
+    "tour.s6.step.3":
+      "उस स्थान का डेटा JSON फ़ाइल के रूप में डाउनलोड करने के लिए «डेटा निर्यात करें (GDPR)» चुनें, या बदलने/सॉफ़्ट-डिलीट करने के लिए «संपादित करें» और «हटाएँ»; «हटाएँ» पहले पुष्टि माँगता है।",
+    "tour.s6.step.4":
+      "«ऑडिट» चुनकर «ऑडिट लॉग» खोलें: हर प्रविष्टि दिखाती है कि बदलाव किसने और कब किया, साथ में विस्तार योग्य «पेलोड»।",
+    "signin.sso": "SSO से साइन इन करें",
   },
   "zh-cn": {
     "nav.review": "审核",
@@ -2070,6 +2584,87 @@ const STRINGS = {
       "阿拉伯语、中文、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
+    "nav.tour": "导览",
+    "splash.hero.tour": "开始导览",
+    "tour.head": "开始导览",
+    "tour.toc": "本页内容",
+    "tour.open": "打开此页面",
+    "tour.top": "返回顶部",
+    "tour.start.title": "开始之前",
+    "tour.start.summary":
+      "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
+    "tour.start.step.1": "点击右上角的“登录”，输入你的邮箱地址。",
+    "tour.start.step.2":
+      "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
+    "tour.start.step.3": "你会以已登录状态回到应用，无需记忆或重置任何内容。",
+    "tour.start.step.4":
+      "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
+    "tour.intro":
+      "地点登记库的图文导览：每个页面的作用和使用步骤，从登记一个地点到合并重复记录。",
+    "tour.s1.title": "登记一个地点",
+    "tour.s1.summary":
+      "创建包含名称、地点类型、地址和坐标的记录。保存之前就会提示问题。",
+    "tour.s1.step.1":
+      "从顶部导航栏打开“新建地点”，填写必填的名称，以及别名、地点类型、描述、电话、网站和 GLN。",
+    "tour.s1.step.2":
+      "勾选“包含地址”以填写街道、城市/地区、省/州、邮政编码和国家，勾选“包含坐标”以填写纬度、经度和海拔。",
+    "tour.s1.step.3":
+      "修正字段中提示的错误：GLN 必须为 13 位数字，纬度范围为 -90 至 90，经度范围为 -180 至 180。",
+    "tour.s1.step.4":
+      "选择“创建”。如果服务发现可能的重复项，它们会列在“可能的重复项”下，供您在重新提交前查看。",
+    "tour.s2.title": "查找并打开地点",
+    "tour.s2.summary":
+      "按名称、地区或标识符搜索登记库，然后打开任意一行查看完整记录。",
+    "tour.s2.step.1":
+      "打开“地点”，在搜索框中输入名称、地区或标识符，然后选择“搜索”。",
+    "tour.s2.step.2":
+      "开启“模糊”以容忍拼写错误，或开启“语音 (Soundex)”以匹配发音相近的地点；两者都在下一次搜索时生效。",
+    "tour.s2.step.3":
+      "开启“遮盖敏感字段”即可在隐藏敏感信息的情况下浏览；结果会立即刷新。",
+    "tour.s2.step.4":
+      "选择某一行即可打开该地点。需要添加地点时，使用页面顶部的“新建地点”。",
+    "tour.s3.title": "检查匹配",
+    "tour.s3.summary": "在创建之前，先用索引为一个假设的地点打分。",
+    "tour.s3.step.1": "打开“匹配检查”，输入您不确定的地点的名称。",
+    "tour.s3.step.2":
+      "可选择填写地址，并勾选“包含地理坐标”，添加计入得分的纬度和经度。",
+    "tour.s3.step.3": "将“阈值”设为 0.0 到 1.0 之间，然后选择“查找匹配”。",
+    "tour.s3.step.4":
+      "查看“匹配结果”：每个候选项会显示其质量，以及按名称、地理、地址和标识符划分的得分明细，并注明语音匹配或确定性（GLN）匹配。",
+    "tour.s4.title": "处理审核队列",
+    "tour.s4.summary":
+      "逐一查看已存储的候选重复对并为每对记录结论。此页面需要先登录。",
+    "tour.s4.step.1":
+      "打开“审核”，选择“运行扫描”将候选重复对加入队列；可按状态和每页数量缩小列表范围。",
+    "tour.s4.step.2":
+      "在“看板”上查看各对（可拖动待处理卡片），或在带有得分、质量和方法列的“队列”列表中查看。",
+    "tour.s4.step.3":
+      "选择“比较”，并排查看记录 A 和记录 B，以及按组成部分划分的分数明细。",
+    "tour.s4.step.4":
+      "选择“确认为重复”或“拒绝”；只能对待处理项做决定。确认仅记录结论，若要合并，请选择“保留 A，将 B 合并入 A”或“保留 B，将 A 合并入 B”。",
+    "tour.s5.title": "合并两个地点",
+    "tour.s5.summary":
+      "将已确认的重复项合并到您想保留的记录中，并附上原因和完整的审计轨迹。",
+    "tour.s5.step.1":
+      "打开“合并”，输入主地点 ID（保留的记录）和重复地点 ID（将被软删除）。两者必须不同。",
+    "tour.s5.step.2":
+      "选择“加载预览”，在任何改动发生之前查看标记为“主”和“重复”的两条记录。",
+    "tour.s5.step.3":
+      "输入“原因”（将记录在合并审计轨迹中），然后选择“合并”并确认提示。",
+    "tour.s5.step.4":
+      "合并完成消息会显示新的合并记录，并链接到“查看合并后的主地点”。",
+    "tour.s6.title": "查看、导出并审计地点",
+    "tour.s6.summary":
+      "打开一个地点，查看其全部信息，切换脱敏视图，为数据请求导出，并阅读其历史记录。",
+    "tour.s6.step.1":
+      "在“地点”中打开一个地点，即可在同一视图中查看身份、地址、地理坐标、标识符、营业时间和设施（以已记录的为准）。",
+    "tour.s6.step.2":
+      "选择“显示脱敏视图”可重新加载并隐去敏感字段，选择“显示完整视图”则切换回来。",
+    "tour.s6.step.3":
+      "选择“导出数据（GDPR）”将该地点的数据下载为 JSON 文件，或使用“编辑”和“删除”修改或软删除；“删除”会先要求确认。",
+    "tour.s6.step.4":
+      "选择“审计”打开“审计日志”：每条记录显示由谁在何时做出更改，并带有可展开的“负载”。",
+    "signin.sso": "使用 SSO 登录",
   },
 } as const;
 

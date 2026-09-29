@@ -109,6 +109,7 @@
         { href: "/places/match", key: "nav.matchCheck" },
         { href: "/places/merge", key: "nav.merge" },
         { href: "/review", key: "nav.review" },
+        { href: "/tour", key: "nav.tour" },
     ] as const;
 </script>
 
