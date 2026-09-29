@@ -783,6 +783,13 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `CASE_KEYCLOAK_*` configuration; `request_claims` /
+      `enforce_request` feed the blanket guard, the extractors and so the
+      record-level `authorize_record` and link/bulk authz; `tests/keycloak_guard.rs`.
+      Verifier side: `authentication-verifier` KC-1.
+
 - [x] **T-7 (M) Batch `POST /api/cases/deduplicate` endpoint.**
   `src/auth.rs::DESTRUCTIVE_POST_SUFFIXES` already lists `/deduplicate`
   as a destructive-action path (matching `agents/share/match-search-merge.md`'s

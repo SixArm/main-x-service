@@ -38,7 +38,7 @@ static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
 /// Blanket auth-enforcement middleware. Reads the `CASE_REQUIRE_AUTH`
 /// flag per request via [`auth::require_auth`] and delegates the decision
-/// to the pure [`auth::enforce`]: public paths and the disabled flag pass
+/// to [`auth::enforce_request`]: public paths and the disabled flag pass
 /// through; otherwise a valid bearer token is required (`401`) and the
 /// token's `attrs` claim must satisfy the process-wide ABAC policy
 /// ([`auth::policy`]) for the action derived from the method + path
@@ -47,19 +47,11 @@ static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 async fn require_auth_mw(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
     let method = req.method().clone();
-    // Snapshot the current (hot-reloadable) policy and verifier for this
-    // request; a concurrent policy reload or key-set refresh does not
-    // affect a decision/verification already in flight.
+    // Snapshot the current (hot-reloadable) policy for this request; the
+    // verifiers (PASETO and/or Keycloak) are read live by `request_claims`.
     let policy = auth::policy().current();
-    let verifier = auth::verifier().current();
-    match auth::enforce(
-        auth::require_auth(),
-        &method,
-        &path,
-        req.headers(),
-        &verifier,
-        &policy,
-    ) {
+    match auth::enforce_request(auth::require_auth(), &method, &path, req.headers(), &policy).await
+    {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
     }
