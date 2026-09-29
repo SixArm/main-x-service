@@ -289,3 +289,9 @@ test("detail check-duplicates hides the record itself (self-exclusion)", async (
   await expect(page.locator("h2 ~ ul a")).toHaveCount(1);
   await expect(page.locator("h2 ~ ul a")).toHaveText("Housing benefit review");
 });
+
+test("/tour renders anonymously with seven sections", async ({ page }) => {
+  await page.goto("/tour");
+  await expect(page).toHaveURL(/\/tour$/);
+  await expect(page.locator(".sections > section:not(.closing)")).toHaveCount(7);
+});
