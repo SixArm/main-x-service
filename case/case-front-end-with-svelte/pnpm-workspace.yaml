@@ -1,2 +1,8 @@
 allowBuilds:
   esbuild: true
+overrides:
+  # svelte-theme-picker/locale/share/text-size 0.1.1 pass `baseClass` to
+  # headless IconButton/Listbox, which only exists from headless 0.2.0, yet
+  # they declare `^0.1.0`; without this the picker buttons lose their
+  # `*-picker-button` classes and render unstyled.
+  "@lilydesignsystem/svelte-headless": 0.2.0
