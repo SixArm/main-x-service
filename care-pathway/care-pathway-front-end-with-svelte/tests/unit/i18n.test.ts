@@ -20,6 +20,7 @@ describe("i18n catalog", () => {
     expect([...LOCALES]).toEqual([
       "ar-001",
       "cy-001",
+      "de-de",
       "en-001",
       "es-001",
       "fr-001",
@@ -89,7 +90,9 @@ describe("i18n catalog", () => {
     expect(i18n.locale).toBe("zh-cn");
     i18n.set("ZH-CN");
     expect(i18n.locale).toBe("zh-cn");
-    i18n.set("de");
+    i18n.set("de-DE");
+    expect(i18n.locale).toBe("de-de");
+    i18n.set("ja");
     expect(i18n.locale).toBe("en-001");
   });
 });

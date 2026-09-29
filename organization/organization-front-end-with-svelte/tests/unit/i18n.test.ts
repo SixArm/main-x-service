@@ -17,17 +17,18 @@ import {
 } from "../../src/lib/i18n.svelte";
 
 describe("i18n catalog", () => {
-  it("supports exactly the 7 required locales, sorted by code", () => {
+  it("supports exactly the 8 required locales, sorted by code", () => {
     expect([...LOCALES]).toEqual([
       "ar-001",
       "cy-001",
+      "de-de",
       "en-001",
       "es-001",
       "fr-001",
       "hi-001",
       "zh-cn",
     ]);
-    expect(LOCALES.length).toBe(7);
+    expect(LOCALES.length).toBe(8);
   });
 
   it("has a human-readable label for every locale", () => {
@@ -36,7 +37,7 @@ describe("i18n catalog", () => {
     }
   });
 
-  it("every locale covers every key (full 7-locale coverage)", () => {
+  it("every locale covers every key (full 8-locale coverage)", () => {
     for (const locale of LOCALES) {
       const table = STRINGS_BY_LOCALE[locale];
       for (const key of STRING_KEYS) {

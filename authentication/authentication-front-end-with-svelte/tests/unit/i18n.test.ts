@@ -1,6 +1,6 @@
 // Pins the i18n catalog + reactive locale store: en-001/cy-001 lookups, the
 // fallback chain (unknown locale → en-001, unknown key → the key itself),
-// that every one of the 7 locales covers every English key, a spot-check
+// that every one of the 8 locales covers every English key, a spot-check
 // of a non-Latin locale, RTL detection for ar-001, and that the reactive
 // `i18n` store reflects switches, reduces region and legacy codes (cy-GB → cy-001), and
 // falls back to the default for an unsupported locale.
@@ -51,10 +51,11 @@ describe("i18n catalog", () => {
     expect(translate(bogus, "en-001")).toBe("does.not.exist");
   });
 
-  it("supports exactly the 7 expected locales, sorted by code, with endonym labels", () => {
+  it("supports exactly the 8 expected locales, sorted by code, with endonym labels", () => {
     expect([...LOCALES]).toEqual([
       "ar-001",
       "cy-001",
+      "de-de",
       "en-001",
       "es-001",
       "fr-001",
@@ -64,6 +65,7 @@ describe("i18n catalog", () => {
     expect(LOCALE_LABELS).toEqual({
       "ar-001": "العربية",
       "cy-001": "Cymraeg",
+      "de-de": "Deutsch - Deutschland",
       "en-001": "English",
       "es-001": "Español",
       "fr-001": "Français",
@@ -75,8 +77,8 @@ describe("i18n catalog", () => {
     }
   });
 
-  it("every one of the 7 locales covers every English key (full coverage)", () => {
-    expect(LOCALES.length).toBe(7);
+  it("every one of the 8 locales covers every English key (full coverage)", () => {
+    expect(LOCALES.length).toBe(8);
     for (const locale of LOCALES) {
       const table = STRINGS_BY_LOCALE[locale];
       for (const key of STRING_KEYS) {

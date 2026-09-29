@@ -95,15 +95,7 @@
         margin-bottom: 2rem;
         padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 4vw, 3rem);
         border-radius: calc(var(--nhs-border-radius) * 2);
-        background: linear-gradient(
-            135deg,
-            var(--color-primary, var(--nhs-blue)),
-            color-mix(
-                in oklch,
-                var(--color-primary, var(--nhs-blue)) 80%,
-                var(--nhs-white)
-            )
-        );
+        background: var(--color-primary, var(--nhs-blue));
         color: var(--color-primary-content, #fff);
     }
     .eyebrow {

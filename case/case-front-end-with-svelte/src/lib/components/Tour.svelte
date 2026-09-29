@@ -95,15 +95,7 @@
     margin-bottom: 2rem;
     padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 4vw, 3rem);
     border-radius: calc(var(--mxi-radius) * 2);
-    background: linear-gradient(
-      135deg,
-      var(--mxi-color-primary),
-      color-mix(
-        in oklch,
-        var(--mxi-color-primary) 45%,
-        var(--mxi-color-surface)
-      )
-    );
+    background: var(--mxi-color-primary);
     color: var(--mxi-color-primary-fg);
   }
   .eyebrow {
