@@ -608,6 +608,87 @@ const STRINGS = {
         'splash.features.6.title': 'التنبيهات والتقارير',
         'splash.features.6.body':
             'راجع التنبيهات بين المباني واستخدام الخزائن والأرقام الرئيسية.',
+        'nav.tour': 'جولة',
+        'splash.hero.tour': 'ابدأ الجولة',
+        'tour.head': 'ابدأ الجولة',
+        'tour.toc': 'في هذه الصفحة',
+        'tour.open': 'افتح هذه الشاشة',
+        'tour.top': 'العودة إلى الأعلى',
+        'tour.start.title': 'قبل أن تبدأ',
+        'tour.start.summary':
+            'تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.',
+        'tour.start.step.1':
+            'اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.',
+        'tour.start.step.2':
+            'افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.',
+        'tour.start.step.3':
+            'تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.',
+        'tour.start.step.4':
+            'استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.',
+        'tour.intro':
+            'جولة إرشادية في تتبع الحالات: ما تفعله كل شاشة وخطوات استخدامها، من إضافة مجلد إلى مراجعة سجل تدقيق النقل.',
+        'tour.s1.title': 'إضافة مجلد إلى السجل',
+        'tour.s1.summary':
+            'ينتمي كل مجلد ورقي لملاحظات الحالة إلى مريض واحد ويُتتبَّع منذ لحظة إضافته.',
+        'tour.s1.step.1':
+            'افتح المجلدات واختر إضافة مجلد، ثم أدخل رقم NHS المكوّن من 10 أرقام للمريض، ويجب أن يجتاز فحص المقياس 11.',
+        'tour.s1.step.2':
+            'اكتب عنوان المجلد، مثل «المجلّد 1» أو «أمراض القلب 2023».',
+        'tour.s1.step.3':
+            'إذا لم يكن المريض مسجلاً بعد، فأدخل أيضاً اسم المريض وتاريخ الميلاد؛ أما للمريض المسجل فلا حاجة إليهما.',
+        'tour.s1.step.4':
+            'اختر الخزانة الأولية، أو اتركها فارغة إن كان المجلد قيد النقل، ثم اختر حفظ المجلد.',
+        'tour.s2.title': 'العثور على مجلد',
+        'tour.s2.summary':
+            'يجيب سجل المجلدات عن سؤال «أين هذا المجلد الآن؟» من مربع بحث واحد.',
+        'tour.s2.step.1':
+            'افتح المجلدات واكتب رقم NHS أو اسم المريض أو عنوان المجلد أو الخزانة في البحث في المجلدات.',
+        'tour.s2.step.2':
+            'اقرأ في كل صف الخزانة والحالة (في الخزانة أو قيد النقل) وآخر نقل.',
+        'tour.s2.step.3':
+            'افتح مجلداً لعرض تفاصيله وسجل النقل الخاص به، أو افتح المريض من المرضى لرؤية جميع مجلداته.',
+        'tour.s2.step.4': 'اختر نقل هذا المجلد للانتقال مباشرة إلى تسجيل نقله.',
+        'tour.s3.title': 'نقل مجلد',
+        'tour.s3.summary': 'يُسجَّل كل وضع للمجلد، فيبقى موقعه محدّثاً دائماً.',
+        'tour.s3.step.1':
+            'افتح نقل مجلد، وأدخل رقم NHS للمريض، ثم اختر أي مجلدات هذا المريض تنقل.',
+        'tour.s3.step.2':
+            'اختر الخزانة الوجهة، أو قيد النقل (يحمله الحامل) إن كان في الطريق.',
+        'tour.s3.step.3':
+            'اختر عاملاً من القائمة، أو اكتب اسماً ضمن نُقل بواسطة، وأضف السبب.',
+        'tour.s3.step.4':
+            'اختر تسجيل النقل؛ تؤكد الصفحة تم تسجيل النقل وتُضاف العملية إلى سجل التدقيق.',
+        'tour.s4.title': 'مسح مجلد',
+        'tour.s4.summary':
+            'المسار السريع لمكتب السجلات: لا حاجة إلى ماسح ضوئي مخصص، مع أن الماسح الذي يكتب عبر لوحة المفاتيح يعمل أيضاً.',
+        'tour.s4.step.1': 'افتح مسح وانقر داخل مربع مسح أو بحث.',
+        'tour.s4.step.2': 'امسح رمزاً شريطياً، أو اكتب رقم NHS أو معرّف مجلد.',
+        'tour.s4.step.3': 'راجع قائمة التطابقات وافتح مجلداً لعرض تفاصيله.',
+        'tour.s4.step.4':
+            'اختر نقل هذا المجلد لتسجيل نقله مع تحديد المجلد مسبقاً؛ وإن لم يوجد تطابق، تخبرك الصفحة بأنه لم يُعثر على مجلد.',
+        'tour.s5.title': 'تجميع المجلدات في مجلّدات',
+        'tour.s5.summary':
+            'المجلّد حزمة قابلة للنقل من مجلدات مريض واحد، فتنتقل معاً.',
+        'tour.s5.step.1':
+            'افتح المجلّدات واختر مجلّد جديد، ثم أدخل رقم NHS للمريض وعنوان المجلّد؛ ويجب أن يكون للمريض مجلد بالفعل.',
+        'tour.s5.step.2':
+            'افتح المجلّد واستخدم إضافة مجلد لضم مجلدات ذلك المريض إليه.',
+        'tour.s5.step.3':
+            'استخدم نقل هذا المجلّد لنقل كل مجلد بداخله إلى خزانة وجهة واحدة في خطوة واحدة.',
+        'tour.s5.step.4':
+            'عد إلى المجلّدات، واختر طباعة التسميات، وحدّد المجلّدات، واضبط عدد النسخ، ثم اختر طباعة لإضافتها إلى قائمة الطباعة.',
+        'tour.s6.title': 'مراجعة السجل والتنبيهات والتقارير',
+        'tour.s6.summary':
+            'تُحفظ كل عملية نقل، فيمكنك معرفة من نقل ماذا ومتى ولماذا.',
+        'tour.s6.step.1':
+            'افتح سجل النقل واستخدم تصفية سجل التدقيق للتضييق بحسب المريض أو رقم NHS أو الخزانة أو الحامل؛ وتظهر أحدث العمليات أولاً.',
+        'tour.s6.step.2':
+            'افتح صفاً لعرض حدث النقل كاملاً والمجلد المعني ومجلدات المريض الأخرى.',
+        'tour.s6.step.3':
+            'افتح التنبيهات لعرض تنبيهات السياج الجغرافي: عمليات نقل تقع خزانتا مصدرها ووجهتها في مبنيين مختلفين.',
+        'tour.s6.step.4':
+            'افتح التقارير لعرض الأعداد بنظرة سريعة واستخدام الخزائن والمجلدات قيد النقل والنشاط بحسب العامل، وكلها مشتقة مباشرة.',
+        'signin.sso': 'تسجيل الدخول عبر SSO',
     },
     'cy-001': {
         'brand.name': 'Olrhain Achosion',
@@ -1149,6 +1230,92 @@ const STRINGS = {
         'splash.features.6.title': 'Rhybuddion ac adroddiadau',
         'splash.features.6.body':
             'Adolygwch rybuddion rhwng adeiladau, defnydd cabinetau a ffigurau allweddol.',
+        'nav.tour': 'Taith',
+        'splash.hero.tour': 'Cymerwch y daith',
+        'tour.head': 'Cymerwch y daith',
+        'tour.toc': 'Ar y dudalen hon',
+        'tour.open': 'Agor y sgrin hon',
+        'tour.top': "Yn ôl i'r brig",
+        'tour.start.title': 'Cyn i chi ddechrau',
+        'tour.start.summary':
+            "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+        'tour.start.step.1':
+            'Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.',
+        'tour.start.step.2':
+            "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+        'tour.start.step.3':
+            "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+        'tour.start.step.4':
+            "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+        'tour.intro':
+            "Taith dywys drwy Olrhain Achosion: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o ychwanegu ffolder i wirio'r log archwilio symud.",
+        'tour.s1.title': 'Ychwanegu ffolder at y gofrestr',
+        'tour.s1.summary':
+            "Mae pob ffolder papur o nodiadau achos yn perthyn i un claf ac yn cael ei olrhain o'r eiliad y byddwch yn ei ychwanegu.",
+        'tour.s1.step.1':
+            "Agorwch Ffolderi a dewiswch Ychwanegu ffolder, yna rhowch Rhif GIG 10 digid y claf, sy'n gorfod pasio'r prawf Modwlws 11.",
+        'tour.s1.step.2':
+            'Teipiwch Teitl ffolder, fel Cyfrol 1 neu Cardioleg 2023.',
+        'tour.s1.step.3':
+            "Ar gyfer claf nad yw wedi'i gofrestru eto, llenwch Enw'r claf a Dyddiad geni hefyd; nid oes eu hangen ar gyfer claf sy'n bodoli eisoes.",
+        'tour.s1.step.4':
+            "Dewiswch y Cabinet cychwynnol, neu gadewch ef yn wag os yw'r ffolder ar daith, yna dewiswch Cadw ffolder.",
+        'tour.s2.title': 'Dod o hyd i ffolder',
+        'tour.s2.summary':
+            'Mae\'r Gofrestr ffolderi yn ateb "ble mae\'r ffolder hwn ar hyn o bryd?" o un blwch chwilio.',
+        'tour.s2.step.1':
+            'Agorwch Ffolderi a theipiwch Rhif GIG, enw claf, teitl ffolder neu gabinet yn Chwilio ffolderi.',
+        'tour.s2.step.2':
+            'Darllenwch Cabinet, Statws (mewn cabinet neu ar daith) a Symudwyd ddiwethaf pob rhes.',
+        'tour.s2.step.3':
+            "Agorwch ffolder i weld ei manylion a'i Hanes symud, neu agorwch y claf o Gleifion i weld ei holl ffolderi.",
+        'tour.s2.step.4':
+            'Dewiswch Symud y ffolder hwn i fynd yn syth at gofnodi symudiad ar ei gyfer.',
+        'tour.s3.title': 'Symud ffolder',
+        'tour.s3.summary':
+            'Cofnodir pob lleoliad, felly mae lleoliad ffolder bob amser yn gyfredol.',
+        'tour.s3.step.1':
+            "Agorwch Symud ffolder, rhowch Rhif GIG y claf, yna dewiswch pa un o ffolderi'r claf hwnnw rydych yn ei symud.",
+        'tour.s3.step.2':
+            'Dewiswch y Cabinet cyrchfan, neu Ar daith (porthor yn cario) os yw ar ei ffordd.',
+        'tour.s3.step.3':
+            "Dewiswch Weithiwr o'r rhestr, neu teipiwch enw o dan Symudwyd gan, ac ychwanegwch Reswm.",
+        'tour.s3.step.4':
+            "Dewiswch Cofnodi symudiad; mae'r dudalen yn cadarnhau Symudiad wedi'i gofnodi ac mae'r symudiad yn ymuno â'r log archwilio.",
+        'tour.s4.title': 'Sganio ffolder',
+        'tour.s4.summary':
+            "Y llwybr cyflym i'r ddesg cofnodion: nid oes angen sganiwr caledwedd, er bod sganiwr sy'n teipio drwy'r bysellfwrdd yn gweithio hefyd.",
+        'tour.s4.step.1':
+            'Agorwch Sganio a chliciwch yn y blwch Sganio neu chwilio.',
+        'tour.s4.step.2':
+            'Sganiwch god bar, neu teipiwch Rhif GIG neu id ffolder.',
+        'tour.s4.step.3':
+            'Adolygwch y rhestr Cydweddiadau ac agorwch ffolder i weld ei manylion.',
+        'tour.s4.step.4':
+            "Dewiswch Symud y ffolder hwn i gofnodi ei symudiad gyda'r ffolder eisoes wedi'i ddewis; os nad oes dim yn cydweddu, mae'r dudalen yn dweud na cheir hyd i ffolder.",
+        'tour.s5.title': 'Bwndelu ffolderi yn gyfrolau',
+        'tour.s5.summary':
+            "Bwndel symudol o ffolderi un claf yw cyfrol, felly maen nhw'n teithio gyda'i gilydd.",
+        'tour.s5.step.1':
+            "Agorwch Cyfrolau a dewiswch Cyfrol newydd, yna rhowch Rhif GIG y claf a Theitl cyfrol; rhaid i'r claf fod â ffolder eisoes.",
+        'tour.s5.step.2':
+            "Agorwch y gyfrol a defnyddiwch Ychwanegu ffolder i fwndelu ffolderi'r claf hwnnw ynddi.",
+        'tour.s5.step.3':
+            'Defnyddiwch Symud y gyfrol hon i symud pob ffolder ynddi i un cabinet cyrchfan mewn un cam.',
+        'tour.s5.step.4':
+            "Yn ôl ar Gyfrolau, dewiswch Argraffu labeli, dewiswch y cyfrolau, gosodwch Nifer y Copïau a dewiswch Argraffu i'w rhoi yn y ciw.",
+        'tour.s6.title': 'Adolygu hanes, rhybuddion ac adroddiadau',
+        'tour.s6.summary':
+            'Cedwir pob symudiad, felly gallwch ateb pwy symudodd beth, pryd a pham.',
+        'tour.s6.step.1':
+            "Agorwch Hanes symud a defnyddiwch Hidlo'r log archwilio i gyfyngu yn ôl claf, rhif GIG, cabinet neu borthor; daw'r symudiadau diweddaraf gyntaf.",
+        'tour.s6.step.2':
+            'Agorwch res i weld y digwyddiad symud llawn, y ffolder dan sylw a ffolderi eraill y claf.',
+        'tour.s6.step.3':
+            "Agorwch Rhybuddion i weld rhybuddion geoffin: symudiadau lle mae'r cabinetau tarddiad a chyrchfan mewn adeiladau gwahanol.",
+        'tour.s6.step.4':
+            "Agorwch Adroddiadau i weld y cyfrifon cryno, defnydd cabinetau, ffolderi ar daith a gweithgarwch fesul gweithiwr, i gyd wedi'u deillio'n fyw.",
+        'signin.sso': 'Mewngofnodi gydag SSO',
     },
     'en-001': {
         // Brand / chrome
@@ -1718,6 +1885,91 @@ const STRINGS = {
         'splash.features.6.title': 'Alerts and reports',
         'splash.features.6.body':
             'Review cross-building alerts, cabinet utilisation and headline figures.',
+        'nav.tour': 'Tour',
+        'splash.hero.tour': 'Take the tour',
+        'tour.head': 'Take the tour',
+        'tour.toc': 'On this page',
+        'tour.open': 'Open this screen',
+        'tour.top': 'Back to top',
+        'tour.start.title': 'Before you begin',
+        'tour.start.summary':
+            'You need an account to work with real data. Signing in takes under a minute and needs no password.',
+        'tour.start.step.1':
+            'Choose Sign in at the top right and enter your email address.',
+        'tour.start.step.2':
+            'Open the magic link we email you. It works once and expires quickly.',
+        'tour.start.step.3':
+            'You return to the app signed in, with nothing to remember or reset.',
+        'tour.start.step.4':
+            'Use the buttons beside Sign in to change the theme, language and text size, or to share the page.',
+        'tour.intro':
+            'A guided walkthrough of Case Tracking: what each screen does and the steps to use it, from adding a folder to checking the move audit log.',
+        'tour.s1.title': 'Add a folder to the register',
+        'tour.s1.summary':
+            'Every paper case-note folder belongs to one patient and is tracked from the moment you add it.',
+        'tour.s1.step.1':
+            "Open Folders and choose Add folder, then enter the patient's 10-digit NHS Number, which must pass the Modulus 11 check.",
+        'tour.s1.step.2':
+            'Type a Folder title such as Volume 1 or Cardiology 2023.',
+        'tour.s1.step.3':
+            'For a patient who is not yet registered, also fill in Patient name and Date of birth; for an existing patient they are not needed.',
+        'tour.s1.step.4':
+            'Pick the Initial cabinet, or leave it blank if the folder is in transit, then choose Save folder.',
+        'tour.s2.title': 'Find a folder',
+        'tour.s2.summary':
+            'The Folder register answers "where is this folder right now?" from one search box.',
+        'tour.s2.step.1':
+            'Open Folders and type an NHS Number, patient name, folder title or cabinet into Search folders.',
+        'tour.s2.step.2':
+            "Read each row's Cabinet, Status (in cabinet or in transit) and Last moved.",
+        'tour.s2.step.3':
+            'Open a folder to see its details and Move history, or open the patient from Patients to see all of their folders.',
+        'tour.s2.step.4':
+            'Choose Move this folder to go straight to recording a move for it.',
+        'tour.s3.title': 'Move a folder',
+        'tour.s3.summary':
+            "Every placement is recorded, so a folder's location is always current.",
+        'tour.s3.step.1':
+            "Open Move folder, enter the Patient NHS Number, then pick which of that patient's folders you are moving.",
+        'tour.s3.step.2':
+            'Choose the Destination cabinet, or In transit (porter carrying) if it is on its way.',
+        'tour.s3.step.3':
+            'Pick a Worker from the list, or type a name under Moved by, and add a Reason.',
+        'tour.s3.step.4':
+            'Choose Record move; the page confirms Move recorded and the move joins the audit log.',
+        'tour.s4.title': 'Scan a folder',
+        'tour.s4.summary':
+            'The fast path for the records desk: no hardware scanner is needed, though a keyboard-wedge scanner works too.',
+        'tour.s4.step.1': 'Open Scan and click into the Scan or search box.',
+        'tour.s4.step.2':
+            'Scan a barcode, or type an NHS Number or a folder id.',
+        'tour.s4.step.3':
+            'Review the Matches list and open a folder to see its details.',
+        'tour.s4.step.4':
+            'Choose Move this folder to record its move with the folder already selected; if nothing matches, the page tells you no folder was found.',
+        'tour.s5.title': 'Bundle folders into volumes',
+        'tour.s5.summary':
+            "A volume is a movable bundle of one patient's folders, so they travel together.",
+        'tour.s5.step.1':
+            "Open Volumes and choose New volume, then enter the patient's NHS Number and a Volume title; the patient must already have a folder.",
+        'tour.s5.step.2':
+            "Open the volume and use Add a folder to bundle that patient's folders into it.",
+        'tour.s5.step.3':
+            'Use Move this volume to relocate every folder inside it to one Destination cabinet in a single step.',
+        'tour.s5.step.4':
+            'Back on Volumes, choose Print labels, select the volumes, set the Number of Copies and choose Print to queue them.',
+        'tour.s6.title': 'Review history, alerts and reports',
+        'tour.s6.summary':
+            'Every move is kept, so you can answer who moved what, when and why.',
+        'tour.s6.step.1':
+            'Open Move history and use Filter audit log to narrow it by patient, NHS number, cabinet or porter; the newest moves come first.',
+        'tour.s6.step.2':
+            "Open a row to see the full move event, the folder involved and the patient's other folders.",
+        'tour.s6.step.3':
+            'Open Alerts to see geofence alerts: moves whose origin and destination cabinets are in different buildings.',
+        'tour.s6.step.4':
+            'Open Reports for the at-a-glance counts, cabinet utilisation, folders in transit and activity by worker, all derived live.',
+        'signin.sso': 'Sign in with SSO',
     },
     'es-001': {
         'brand.name': 'Seguimiento de casos',
@@ -2273,6 +2525,92 @@ const STRINGS = {
         'splash.features.6.title': 'Alertas e informes',
         'splash.features.6.body':
             'Revisa las alertas entre edificios, el uso de los archivadores y las cifras clave.',
+        'nav.tour': 'Recorrido',
+        'splash.hero.tour': 'Haz el recorrido',
+        'tour.head': 'Haz el recorrido',
+        'tour.toc': 'En esta página',
+        'tour.open': 'Abrir esta pantalla',
+        'tour.top': 'Volver arriba',
+        'tour.start.title': 'Antes de empezar',
+        'tour.start.summary':
+            'Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.',
+        'tour.start.step.1':
+            'Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.',
+        'tour.start.step.2':
+            'Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.',
+        'tour.start.step.3':
+            'Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.',
+        'tour.start.step.4':
+            'Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.',
+        'tour.intro':
+            'Un recorrido guiado por Seguimiento de casos: qué hace cada pantalla y los pasos para usarla, desde añadir una carpeta hasta consultar el registro de auditoría de movimientos.',
+        'tour.s1.title': 'Añadir una carpeta al registro',
+        'tour.s1.summary':
+            'Cada carpeta de papel con notas del caso pertenece a un paciente y se rastrea desde el momento en que la añade.',
+        'tour.s1.step.1':
+            'Abra Carpetas y elija Añadir carpeta; después introduzca el Número del NHS de 10 dígitos del paciente, que debe superar la comprobación de módulo 11.',
+        'tour.s1.step.2':
+            'Escriba un Título de la carpeta, como Volumen 1 o Cardiología 2023.',
+        'tour.s1.step.3':
+            'Si el paciente aún no está registrado, rellene también Nombre del paciente y Fecha de nacimiento; para un paciente existente no hacen falta.',
+        'tour.s1.step.4':
+            'Elija el Archivador inicial, o déjelo en blanco si la carpeta está en tránsito, y pulse Guardar carpeta.',
+        'tour.s2.title': 'Encontrar una carpeta',
+        'tour.s2.summary':
+            'El Registro de carpetas responde a «¿dónde está esta carpeta ahora?» desde un único cuadro de búsqueda.',
+        'tour.s2.step.1':
+            'Abra Carpetas y escriba un Número del NHS, nombre de paciente, título de carpeta o archivador en Buscar carpetas.',
+        'tour.s2.step.2':
+            'Lea el Archivador, el Estado (en archivador o en tránsito) y el Último movimiento de cada fila.',
+        'tour.s2.step.3':
+            'Abra una carpeta para ver sus detalles y su Historial de movimientos, o abra al paciente desde Pacientes para ver todas sus carpetas.',
+        'tour.s2.step.4':
+            'Pulse Mover esta carpeta para ir directamente a registrar un movimiento.',
+        'tour.s3.title': 'Mover una carpeta',
+        'tour.s3.summary':
+            'Cada ubicación queda registrada, de modo que la ubicación de una carpeta siempre está al día.',
+        'tour.s3.step.1':
+            'Abra Mover carpeta, introduzca el Número del NHS del paciente y elija cuál de sus carpetas va a mover.',
+        'tour.s3.step.2':
+            'Elija el Archivador de destino, o En tránsito (transportado por celador) si va de camino.',
+        'tour.s3.step.3':
+            'Elija un Trabajador de la lista, o escriba un nombre en Movido por, y añada un Motivo.',
+        'tour.s3.step.4':
+            'Pulse Registrar movimiento; la página confirma Movimiento registrado y el movimiento pasa al registro de auditoría.',
+        'tour.s4.title': 'Escanear una carpeta',
+        'tour.s4.summary':
+            'La vía rápida para el servicio de historias: no hace falta un escáner físico, aunque un escáner que escribe como teclado también funciona.',
+        'tour.s4.step.1':
+            'Abra Escanear y haga clic en el cuadro Escanear o buscar.',
+        'tour.s4.step.2':
+            'Escanee un código de barras, o escriba un Número del NHS o un id de carpeta.',
+        'tour.s4.step.3':
+            'Revise la lista de Coincidencias y abra una carpeta para ver sus detalles.',
+        'tour.s4.step.4':
+            'Pulse Mover esta carpeta para registrar su movimiento con la carpeta ya seleccionada; si no hay coincidencias, la página indica que no se encontró ninguna carpeta.',
+        'tour.s5.title': 'Agrupar carpetas en volúmenes',
+        'tour.s5.summary':
+            'Un volumen es un conjunto movible de las carpetas de un paciente, de modo que viajan juntas.',
+        'tour.s5.step.1':
+            'Abra Volúmenes y elija Nuevo volumen; introduzca el Número del NHS del paciente y un Título del volumen. El paciente ya debe tener una carpeta.',
+        'tour.s5.step.2':
+            'Abra el volumen y use Añadir una carpeta para agrupar en él las carpetas de ese paciente.',
+        'tour.s5.step.3':
+            'Use Mover este volumen para trasladar todas las carpetas que contiene a un único archivador de destino en un solo paso.',
+        'tour.s5.step.4':
+            'De vuelta en Volúmenes, elija Imprimir etiquetas, seleccione los volúmenes, indique el Número de copias y pulse Imprimir para ponerlas en cola.',
+        'tour.s6.title': 'Revisar historial, alertas e informes',
+        'tour.s6.summary':
+            'Se conserva cada movimiento, así que puede saber quién movió qué, cuándo y por qué.',
+        'tour.s6.step.1':
+            'Abra Historial de movimientos y use Filtrar registro de auditoría para acotar por paciente, número del NHS, archivador o celador; los movimientos más recientes van primero.',
+        'tour.s6.step.2':
+            'Abra una fila para ver el evento de movimiento completo, la carpeta implicada y las demás carpetas del paciente.',
+        'tour.s6.step.3':
+            'Abra Alertas para ver las alertas de geocerca: movimientos cuyo archivador de origen y de destino están en edificios distintos.',
+        'tour.s6.step.4':
+            'Abra Informes para ver los recuentos de un vistazo, la utilización de archivadores, las carpetas en tránsito y la actividad por trabajador, todo derivado en vivo.',
+        'signin.sso': 'Iniciar sesión con SSO',
     },
     'fr-001': {
         'brand.name': 'Suivi des dossiers',
@@ -2825,6 +3163,92 @@ const STRINGS = {
         'splash.features.6.title': 'Alertes et rapports',
         'splash.features.6.body':
             "Consultez les alertes entre bâtiments, l'utilisation des armoires et les chiffres clés.",
+        'nav.tour': 'Visite guidée',
+        'splash.hero.tour': 'Faire la visite guidée',
+        'tour.head': 'Faire la visite guidée',
+        'tour.toc': 'Sur cette page',
+        'tour.open': 'Ouvrir cet écran',
+        'tour.top': 'Retour en haut',
+        'tour.start.title': 'Avant de commencer',
+        'tour.start.summary':
+            "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+        'tour.start.step.1':
+            'Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.',
+        'tour.start.step.2':
+            "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+        'tour.start.step.3':
+            "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+        'tour.start.step.4':
+            'Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.',
+        'tour.intro':
+            "Une visite guidée de Suivi des dossiers : ce que fait chaque écran et les étapes pour l'utiliser, de l'ajout d'un dossier à la consultation du journal d'audit des déplacements.",
+        'tour.s1.title': 'Ajouter un dossier au registre',
+        'tour.s1.summary':
+            "Chaque dossier papier de notes de cas appartient à un patient et est suivi dès l'instant où vous l'ajoutez.",
+        'tour.s1.step.1':
+            'Ouvrez Dossiers et choisissez Ajouter un dossier, puis saisissez le numéro NHS à 10 chiffres du patient, qui doit réussir le contrôle modulo 11.',
+        'tour.s1.step.2':
+            'Saisissez un Titre du dossier, par exemple Volume 1 ou Cardiologie 2023.',
+        'tour.s1.step.3':
+            "Pour un patient pas encore enregistré, renseignez aussi Nom du patient et Date de naissance ; pour un patient existant, ce n'est pas nécessaire.",
+        'tour.s1.step.4':
+            "Choisissez l'Armoire initiale, ou laissez-la vide si le dossier est en transit, puis choisissez Enregistrer le dossier.",
+        'tour.s2.title': 'Retrouver un dossier',
+        'tour.s2.summary':
+            'Le Registre des dossiers répond à « où est ce dossier en ce moment ? » depuis une seule zone de recherche.',
+        'tour.s2.step.1':
+            'Ouvrez Dossiers et saisissez un numéro NHS, un nom de patient, un titre de dossier ou une armoire dans Rechercher des dossiers.',
+        'tour.s2.step.2':
+            "Lisez l'Armoire, le Statut (en armoire ou en transit) et le Dernier déplacement de chaque ligne.",
+        'tour.s2.step.3':
+            'Ouvrez un dossier pour voir ses détails et son Historique des déplacements, ou ouvrez le patient depuis Patients pour voir tous ses dossiers.',
+        'tour.s2.step.4':
+            'Choisissez Déplacer ce dossier pour enregistrer directement un déplacement.',
+        'tour.s3.title': 'Déplacer un dossier',
+        'tour.s3.summary':
+            "Chaque emplacement est enregistré, de sorte que la position d'un dossier est toujours à jour.",
+        'tour.s3.step.1':
+            'Ouvrez Déplacer un dossier, saisissez le Numéro NHS du patient, puis choisissez lequel de ses dossiers vous déplacez.',
+        'tour.s3.step.2':
+            "Choisissez l'armoire de Destination, ou En transit (porté par un brancardier) si le dossier est en route.",
+        'tour.s3.step.3':
+            'Choisissez un membre du personnel dans la liste, ou saisissez un nom sous Déplacé par, et ajoutez un Motif.',
+        'tour.s3.step.4':
+            "Choisissez Enregistrer le déplacement ; la page confirme Déplacement enregistré et le déplacement rejoint le journal d'audit.",
+        'tour.s4.title': 'Scanner un dossier',
+        'tour.s4.summary':
+            "La voie rapide pour le service des dossiers : aucun lecteur matériel n'est nécessaire, même si une douchette qui simule le clavier fonctionne aussi.",
+        'tour.s4.step.1':
+            'Ouvrez Scanner et cliquez dans la zone Scanner ou rechercher.',
+        'tour.s4.step.2':
+            'Scannez un code-barres, ou saisissez un numéro NHS ou un identifiant de dossier.',
+        'tour.s4.step.3':
+            'Consultez la liste des Correspondances et ouvrez un dossier pour voir ses détails.',
+        'tour.s4.step.4':
+            "Choisissez Déplacer ce dossier pour enregistrer son déplacement avec le dossier déjà sélectionné ; s'il n'y a aucune correspondance, la page indique qu'aucun dossier n'a été trouvé.",
+        'tour.s5.title': 'Regrouper des dossiers en volumes',
+        'tour.s5.summary':
+            "Un volume est un ensemble déplaçable des dossiers d'un patient, qui voyagent donc ensemble.",
+        'tour.s5.step.1':
+            'Ouvrez Volumes et choisissez Nouveau volume, puis saisissez le Numéro NHS du patient et un Titre du volume ; le patient doit déjà avoir un dossier.',
+        'tour.s5.step.2':
+            'Ouvrez le volume et utilisez Ajouter un dossier pour y regrouper les dossiers de ce patient.',
+        'tour.s5.step.3':
+            "Utilisez Déplacer ce volume pour transférer tous les dossiers qu'il contient vers une seule armoire de destination en une seule étape.",
+        'tour.s5.step.4':
+            'De retour sur Volumes, choisissez Imprimer les étiquettes, sélectionnez les volumes, définissez le Nombre de copies et choisissez Imprimer pour les mettre en file.',
+        'tour.s6.title': "Consulter l'historique, les alertes et les rapports",
+        'tour.s6.summary':
+            'Chaque déplacement est conservé, de sorte que vous pouvez savoir qui a déplacé quoi, quand et pourquoi.',
+        'tour.s6.step.1':
+            "Ouvrez Historique des déplacements et utilisez Filtrer le journal d'audit pour restreindre par patient, numéro NHS, armoire ou brancardier ; les déplacements les plus récents viennent en premier.",
+        'tour.s6.step.2':
+            "Ouvrez une ligne pour voir l'événement de déplacement complet, le dossier concerné et les autres dossiers du patient.",
+        'tour.s6.step.3':
+            "Ouvrez Alertes pour voir les alertes de géorepérage : des déplacements dont les armoires d'origine et de destination sont dans des bâtiments différents.",
+        'tour.s6.step.4':
+            "Ouvrez Rapports pour les chiffres clés, l'utilisation des armoires, les dossiers en transit et l'activité par membre du personnel, le tout calculé en direct.",
+        'signin.sso': 'Se connecter avec SSO',
     },
     'hi-001': {
         'brand.name': 'केस ट्रैकिंग',
@@ -3359,6 +3783,91 @@ const STRINGS = {
         'splash.features.6.title': 'अलर्ट और रिपोर्ट',
         'splash.features.6.body':
             'इमारतों के बीच अलर्ट, अलमारियों का उपयोग और मुख्य आँकड़े देखें।',
+        'nav.tour': 'टूर',
+        'splash.hero.tour': 'टूर देखें',
+        'tour.head': 'टूर देखें',
+        'tour.toc': 'इस पृष्ठ पर',
+        'tour.open': 'यह स्क्रीन खोलें',
+        'tour.top': 'ऊपर लौटें',
+        'tour.start.title': 'शुरू करने से पहले',
+        'tour.start.summary':
+            'वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।',
+        'tour.start.step.1':
+            'ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।',
+        'tour.start.step.2':
+            'हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।',
+        'tour.start.step.3':
+            'आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।',
+        'tour.start.step.4':
+            'थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।',
+        'tour.intro':
+            'केस ट्रैकिंग का मार्गदर्शित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, फ़ोल्डर जोड़ने से लेकर स्थानांतरण ऑडिट लॉग देखने तक।',
+        'tour.s1.title': 'रजिस्टर में फ़ोल्डर जोड़ना',
+        'tour.s1.summary':
+            'केस-नोट का हर काग़ज़ी फ़ोल्डर एक मरीज़ का होता है और जोड़े जाने के क्षण से ही उसे ट्रैक किया जाता है।',
+        'tour.s1.step.1':
+            'फ़ोल्डर खोलें और फ़ोल्डर जोड़ें चुनें, फिर मरीज़ का 10 अंकों का NHS नंबर डालें, जो मॉड्यूलस 11 जाँच में सफल होना चाहिए।',
+        'tour.s1.step.2':
+            'फ़ोल्डर शीर्षक लिखें, जैसे खंड 1 या कार्डियोलॉजी 2023।',
+        'tour.s1.step.3':
+            'जो मरीज़ अभी पंजीकृत नहीं है, उसके लिए मरीज़ का नाम और जन्म तिथि भी भरें; मौजूदा मरीज़ के लिए इनकी ज़रूरत नहीं है।',
+        'tour.s1.step.4':
+            'प्रारंभिक अलमारी चुनें, या फ़ोल्डर स्थानांतरण में हो तो उसे खाली छोड़ें, फिर फ़ोल्डर सहेजें चुनें।',
+        'tour.s2.title': 'फ़ोल्डर ढूँढना',
+        'tour.s2.summary':
+            'फ़ोल्डर रजिस्टर एक ही खोज बॉक्स से बताता है कि "यह फ़ोल्डर अभी कहाँ है?"',
+        'tour.s2.step.1':
+            'फ़ोल्डर खोलें और फ़ोल्डर खोजें में NHS नंबर, मरीज़ का नाम, फ़ोल्डर शीर्षक या अलमारी लिखें।',
+        'tour.s2.step.2':
+            'हर पंक्ति की अलमारी, स्थिति (अलमारी में या स्थानांतरण में) और अंतिम स्थानांतरण पढ़ें।',
+        'tour.s2.step.3':
+            'फ़ोल्डर खोलकर उसका ब्योरा और स्थानांतरण इतिहास देखें, या मरीज़ खोलकर उसके सभी फ़ोल्डर देखें।',
+        'tour.s2.step.4':
+            'इस फ़ोल्डर को स्थानांतरित करें चुनकर सीधे उसका स्थानांतरण दर्ज करें।',
+        'tour.s3.title': 'फ़ोल्डर स्थानांतरित करना',
+        'tour.s3.summary':
+            'हर स्थान दर्ज होता है, इसलिए फ़ोल्डर की जगह की जानकारी हमेशा ताज़ा रहती है।',
+        'tour.s3.step.1':
+            'फ़ोल्डर स्थानांतरित करें खोलें, मरीज़ का NHS नंबर डालें, फिर चुनें कि उस मरीज़ का कौन-सा फ़ोल्डर स्थानांतरित कर रहे हैं।',
+        'tour.s3.step.2':
+            'गंतव्य अलमारी चुनें, या रास्ते में हो तो स्थानांतरण में (पोर्टर ले जा रहा है) चुनें।',
+        'tour.s3.step.3':
+            'सूची से कर्मचारी चुनें, या द्वारा स्थानांतरित के अंतर्गत नाम लिखें, और कारण जोड़ें।',
+        'tour.s3.step.4':
+            'स्थानांतरण दर्ज करें चुनें; पेज स्थानांतरण दर्ज किया गया दिखाता है और यह स्थानांतरण ऑडिट लॉग में जुड़ जाता है।',
+        'tour.s4.title': 'फ़ोल्डर स्कैन करना',
+        'tour.s4.summary':
+            'रिकॉर्ड डेस्क के लिए तेज़ रास्ता: हार्डवेयर स्कैनर ज़रूरी नहीं है, हालाँकि कीबोर्ड की तरह टाइप करने वाला स्कैनर भी चलता है।',
+        'tour.s4.step.1': 'स्कैन खोलें और स्कैन या खोजें बॉक्स में क्लिक करें।',
+        'tour.s4.step.2':
+            'बारकोड स्कैन करें, या NHS नंबर या फ़ोल्डर आईडी लिखें।',
+        'tour.s4.step.3':
+            'मिलान सूची देखें और फ़ोल्डर खोलकर उसका ब्योरा देखें।',
+        'tour.s4.step.4':
+            'इस फ़ोल्डर को स्थानांतरित करें चुनें ताकि फ़ोल्डर पहले से चुने हुए के साथ स्थानांतरण दर्ज हो; कुछ न मिले तो पेज बताता है कि कोई फ़ोल्डर नहीं मिला।',
+        'tour.s5.title': 'फ़ोल्डरों को खंडों में बाँधना',
+        'tour.s5.summary':
+            'खंड एक मरीज़ के फ़ोल्डरों का ऐसा समूह है जिसे साथ ले जाया जा सकता है, इसलिए वे एक साथ चलते हैं।',
+        'tour.s5.step.1':
+            'खंड खोलें और नया खंड चुनें, फिर मरीज़ का NHS नंबर और खंड शीर्षक डालें; मरीज़ का पहले से कोई फ़ोल्डर होना चाहिए।',
+        'tour.s5.step.2':
+            'खंड खोलें और एक फ़ोल्डर जोड़ें से उस मरीज़ के फ़ोल्डर उसमें बाँधें।',
+        'tour.s5.step.3':
+            'इस खंड को स्थानांतरित करें से उसके भीतर के सभी फ़ोल्डरों को एक ही चरण में एक गंतव्य अलमारी में भेजें।',
+        'tour.s5.step.4':
+            'खंड पर लौटकर लेबल प्रिंट करें चुनें, खंड चुनें, प्रतियों की संख्या तय करें और प्रिंट चुनकर उन्हें कतार में लगाएँ।',
+        'tour.s6.title': 'इतिहास, अलर्ट और रिपोर्ट देखना',
+        'tour.s6.summary':
+            'हर स्थानांतरण सुरक्षित रहता है, इसलिए आप जान सकते हैं कि किसने क्या, कब और क्यों स्थानांतरित किया।',
+        'tour.s6.step.1':
+            'स्थानांतरण इतिहास खोलें और ऑडिट लॉग फ़िल्टर करें से मरीज़, NHS नंबर, अलमारी या पोर्टर के आधार पर छाँटें; सबसे नए स्थानांतरण पहले आते हैं।',
+        'tour.s6.step.2':
+            'किसी पंक्ति को खोलकर पूरा स्थानांतरण ब्योरा, संबंधित फ़ोल्डर और मरीज़ के अन्य फ़ोल्डर देखें।',
+        'tour.s6.step.3':
+            'अलर्ट खोलकर जियोफ़ेंस अलर्ट देखें: ऐसे स्थानांतरण जिनकी मूल और गंतव्य अलमारियाँ अलग-अलग इमारतों में हैं।',
+        'tour.s6.step.4':
+            'रिपोर्ट खोलकर एक नज़र में गिनती, अलमारी उपयोग, स्थानांतरण में फ़ोल्डर और कर्मचारी के अनुसार गतिविधि देखें, सब कुछ लाइव तैयार होता है।',
+        'signin.sso': 'SSO से साइन इन करें',
     },
     'zh-cn': {
         'brand.name': '病案追踪',
@@ -3858,6 +4367,86 @@ const STRINGS = {
         'splash.features.5.body': '搜索每一次文件夹移动的完整审计日志。',
         'splash.features.6.title': '警报与报告',
         'splash.features.6.body': '查看跨楼宇警报、档案柜使用情况和关键数据。',
+        'nav.tour': '导览',
+        'splash.hero.tour': '开始导览',
+        'tour.head': '开始导览',
+        'tour.toc': '本页内容',
+        'tour.open': '打开此页面',
+        'tour.top': '返回顶部',
+        'tour.start.title': '开始之前',
+        'tour.start.summary':
+            '处理真实数据需要账号。登录不到一分钟，也不需要密码。',
+        'tour.start.step.1': '点击右上角的“登录”，输入你的邮箱地址。',
+        'tour.start.step.2':
+            '打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。',
+        'tour.start.step.3':
+            '你会以已登录状态回到应用，无需记忆或重置任何内容。',
+        'tour.start.step.4':
+            '使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。',
+        'tour.intro':
+            '病例追踪的导览：每个界面的作用及使用步骤，从添加文件夹到查看移动审计日志。',
+        'tour.s1.title': '向登记册添加文件夹',
+        'tour.s1.summary':
+            '每个纸质病例记录文件夹都属于一位患者，从添加的那一刻起就会被追踪。',
+        'tour.s1.step.1':
+            '打开“文件夹”并选择“添加文件夹”，然后输入患者 10 位的 NHS 号码，该号码必须通过模 11 校验。',
+        'tour.s1.step.2': '输入文件夹标题，例如“卷册 1”或“心脏科 2023”。',
+        'tour.s1.step.3':
+            '如果患者尚未登记，还需填写患者姓名和出生日期；已有患者则无需填写。',
+        'tour.s1.step.4':
+            '选择初始档案柜；如果文件夹正在运送中则留空，然后选择“保存文件夹”。',
+        'tour.s2.title': '查找文件夹',
+        'tour.s2.summary':
+            '文件夹登记册只需一个搜索框，就能回答“这个文件夹现在在哪里？”。',
+        'tour.s2.step.1':
+            '打开“文件夹”，在“搜索文件夹”中输入 NHS 号码、患者姓名、文件夹标题或档案柜。',
+        'tour.s2.step.2':
+            '查看每一行的档案柜、状态（在档案柜中或运送中）和最近移动。',
+        'tour.s2.step.3':
+            '打开文件夹可查看详情和移动历史，或从“患者”打开患者以查看其所有文件夹。',
+        'tour.s2.step.4': '选择“移动此文件夹”，可直接为它记录一次移动。',
+        'tour.s3.title': '移动文件夹',
+        'tour.s3.summary':
+            '每一次存放都会被记录，因此文件夹的位置始终是最新的。',
+        'tour.s3.step.1':
+            '打开“移动文件夹”，输入患者 NHS 号码，然后选择要移动该患者的哪个文件夹。',
+        'tour.s3.step.2':
+            '选择目的地档案柜；如果文件夹正在途中，则选择“运送中（搬运员携带）”。',
+        'tour.s3.step.3':
+            '从列表中选择员工，或在“移动者”下输入姓名，并填写原因。',
+        'tour.s3.step.4':
+            '选择“记录移动”；页面会显示“移动已记录”，该次移动随即加入审计日志。',
+        'tour.s4.title': '扫描文件夹',
+        'tour.s4.summary':
+            '记录室的快捷通道：无需专用扫描设备，不过模拟键盘输入的扫码枪同样可用。',
+        'tour.s4.step.1': '打开“扫描”，点击“扫描或搜索”框。',
+        'tour.s4.step.2': '扫描条形码，或输入 NHS 号码或文件夹编号。',
+        'tour.s4.step.3': '查看“匹配项”列表，并打开文件夹查看详情。',
+        'tour.s4.step.4':
+            '选择“移动此文件夹”，即可在已选定该文件夹的情况下记录移动；如果没有匹配项，页面会提示未找到文件夹。',
+        'tour.s5.title': '将文件夹归入卷册',
+        'tour.s5.summary':
+            '卷册是同一位患者文件夹的可移动集合，因此它们会一起移动。',
+        'tour.s5.step.1':
+            '打开“卷册”并选择“新建卷册”，然后输入患者 NHS 号码和卷册标题；该患者必须已有文件夹。',
+        'tour.s5.step.2':
+            '打开该卷册，使用“添加文件夹”把该患者的文件夹归入其中。',
+        'tour.s5.step.3':
+            '使用“移动此卷册”，一步就把其中所有文件夹移到同一个目的地档案柜。',
+        'tour.s5.step.4':
+            '回到“卷册”，选择“打印标签”，选中卷册，设置份数，然后选择“打印”加入打印队列。',
+        'tour.s6.title': '查看历史、警报和报告',
+        'tour.s6.summary':
+            '每一次移动都会保留，因此你可以查清是谁在何时、为何移动了什么。',
+        'tour.s6.step.1':
+            '打开“移动历史”，用“筛选审计日志”按患者、NHS 号码、档案柜或搬运员缩小范围；最新的移动排在最前。',
+        'tour.s6.step.2':
+            '打开某一行，可查看完整的移动事件、相关文件夹以及该患者的其他文件夹。',
+        'tour.s6.step.3':
+            '打开“警报”查看地理围栏警报：起点和终点档案柜位于不同楼宇的移动。',
+        'tour.s6.step.4':
+            '打开“报告”查看概览数据、档案柜使用情况、运送中的文件夹和按员工统计的活动，全部实时生成。',
+        'signin.sso': '使用 SSO 登录',
     },
 } as const;
 

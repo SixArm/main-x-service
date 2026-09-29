@@ -7,8 +7,12 @@
 <script lang="ts">
   import type { ActionData } from "./$types";
   import { enhance } from "$app/forms";
+  import { env } from "$env/dynamic/public";
+  import { t } from "$lib/i18n.svelte";
 
   let { form }: { form: ActionData } = $props();
+  // Opt-in SSO (EV-2): a browser navigation, not a form action.
+  const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === "true";
 </script>
 
 <svelte:head><title>Sign in — Contact Relationship Management</title></svelte:head>
@@ -28,6 +32,9 @@
       </label>
       <button class="primary" type="submit">Send magic link</button>
     </form>
+    {#if ssoEnabled}
+      <p><a class="btn" href="/signin/sso">{t("signin.sso")}</a></p>
+    {/if}
     {#if form?.error}
       <p class="error" role="alert">
         Could not send the sign-in link. Please try again.

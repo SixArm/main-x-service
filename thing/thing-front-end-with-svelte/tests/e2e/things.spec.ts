@@ -328,3 +328,13 @@ test.describe("Thing front-end page-visit guard", () => {
         });
     }
 });
+
+// The public tour renders anonymously (no redirect to sign-in).
+test.describe("tour (anonymous)", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+    test("tour page renders signed out", async ({ page }) => {
+        await page.goto("/tour");
+        await expect(page).toHaveURL(/\/tour$/);
+        await expect(page.locator("section[id^=s] .steps li")).toHaveCount(28);
+    });
+});

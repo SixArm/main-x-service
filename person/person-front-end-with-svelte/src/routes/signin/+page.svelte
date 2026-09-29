@@ -8,9 +8,11 @@
 <script lang="ts">
     import type { ActionData } from "./$types";
     import { enhance } from "$app/forms";
-    import { i18n } from "$lib/i18n.svelte.js";
+    import { i18n, t } from "$lib/i18n.svelte.js";
+    import { env } from "$env/dynamic/public";
 
     let { form }: { form: ActionData } = $props();
+    const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === "true";
 </script>
 
 <svelte:head><title>Sign in</title></svelte:head>
@@ -33,4 +35,9 @@
             </p>
         {/if}
     </form>
+    {#if ssoEnabled}
+        <p>
+            <a class="button" href="/signin/sso">{t("signin.sso")}</a>
+        </p>
+    {/if}
 {/if}

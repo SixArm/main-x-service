@@ -51,6 +51,7 @@ The browser calls the same-origin BFF proxy at `/api/proxy` — there is no publ
 | --- | --- | --- |
 | `THING_API_URL` | `http://localhost:5150` | Thing Service base URL — the proxy injects a server-exchanged PASETO and forwards |
 | `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
+| `PUBLIC_OIDC_SIGNIN_ENABLED` | unset | Set to `true` to show "Sign in with SSO" on `/signin` and enable `/signin/sso` (only when the auth service has OIDC configured) |
 
 Set in `.env`. Both are read server-side in `src/lib/server/config.ts` and are never exposed to the client bundle.
 

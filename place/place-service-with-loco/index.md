@@ -114,6 +114,7 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 | `PLACE_EVENT_RELAY_INTERVAL_SECS` | Relay drain poll interval in seconds (floored at 1) | `5` |
 | `PLACE_EVENT_RETENTION_DAYS` | Outbox row TTL, enforced by the Phase-3 relay's retention purge | `7` |
 | `PLACE_FLUVIO_ENDPOINT` | Real-broker relay sink (`FluvioSink`, needs the `fluvio` Cargo feature) | unset (no-broker `LoggingSink`) |
+| `PLACE_KEYCLOAK_URL` / `_REALM` / `_AUDIENCES` / `_ROLE_MAP[_FILE]` | Also accept Keycloak access tokens as bearers (needs the `keycloak` Cargo feature); see `agents/share/runbooks/keycloak-sso.md` | unset (off) |
 | `PLACE_INTEGRITY_MAC_KEY` / `_KEY_FILE` | Keyed integrity MAC root key (hex) / a file holding it (`_KEY_FILE` wins) — unset means no MAC is written and `/api/records/verify` + `/api/audit/verify` report `mac_absent` | unset |
 
 ## Testing

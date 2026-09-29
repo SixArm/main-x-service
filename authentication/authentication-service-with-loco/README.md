@@ -74,6 +74,13 @@ curl -s localhost:5150/api/auth/magic-link/<TOKEN>
   [AGENTS.md](./AGENTS.md) for all env vars).
 - **Queue**: Postgres-backed background jobs (repo convention).
 
+## Cargo features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `paseto` | on | PASETO v4.public issuance: `POST /api/auth/token`, `GET /.well-known/paseto-keys`, bearer verification. `--no-default-features` removes them (404); bearer-gated routes then authenticate the session cookie. |
+| `oidc` | off | OIDC relying-party federation (also how Keycloak is federated; there is no `keycloak` feature here). |
+
 ## Testing
 
 ```bash

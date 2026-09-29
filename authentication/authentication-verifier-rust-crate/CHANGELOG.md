@@ -10,6 +10,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `keycloak` feature: verify Keycloak (OIDC) access tokens (KC-1)
+
+`authentication_verifier::keycloak` (off by default): `KeycloakVerifier`
+verifies a Keycloak-issued JWT and yields the same `Claims` a PASETO
+token does, so the ABAC engine and every service guard are unchanged.
+Built on `axum-keycloak-auth` directly — the engine `loco-keycloak-auth`
+wraps — because that wrapper is typed against loco 0.15 and cannot be
+used from a loco 1.x service. Fail-closed additions over the engine: the
+Keycloak URL must be `https` (loopback excepted), the token `iss` must
+equal `{url}/realms/{realm}` (the engine checks signature and audience
+but not issuer), at least one audience is mandatory, `email_verified`
+is required when an `email` is present, and Keycloak roles become ABAC
+attributes **only** through an explicit `role_map` (an unmapped role
+grants nothing). Covered by unit tests and `tests/keycloak_e2e.rs`,
+which verifies real RS256 JWTs against a local OIDC discovery + JWKS
+server (valid, expired, wrong audience, wrong issuer, unverified email,
+tampered signature, garbage, unreachable realm).
+
+### Changed — PASETO is now the `paseto` feature (default on) (KC-1)
+
+`rusty_paseto`, `Verifier` and `ReloadableVerifier` moved into
+`src/paseto.rs` behind `paseto`, which is on by default, so every
+existing consumer is unchanged. `--no-default-features` builds carry no
+PASETO code (`Claims` and the `abac` engine stay). `fetch` now implies
+`paseto`. The criterion bench requires `paseto`. Verify each shape:
+`cargo test`, `cargo test --no-default-features`,
+`cargo test --no-default-features --features keycloak`.
+
 ### Fixed — the `fetch` feature is now exercised by CI (AV-1)
 
 `default = []` means the repo's plain `cargo test` never compiled, let

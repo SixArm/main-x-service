@@ -39,6 +39,8 @@ pnpm exec playwright test   # stubbed; no service required
 pnpm check          # svelte-check
 ```
 
+Optional: `PUBLIC_OIDC_SIGNIN_ENABLED=true` shows a "Sign in with SSO" link (OIDC via the auth service).
+
 Environment: `CMS_API_URL` (the CMS service) and `AUTH_API_URL` (the
 authentication service). The browser talks only to this app's own
 origin; both variables are read server-side.

@@ -25,6 +25,7 @@ bundle) — see [`.env.example`](.env.example).
 |---|---|---|
 | `CRM_API_URL` | `http://localhost:5150` | The Loco sibling's base URL |
 | `AUTH_API_URL` | `http://localhost:5150` | The authentication service (session → PASETO exchange, magic-link) |
+| `PUBLIC_OIDC_SIGNIN_ENABLED` | unset | Set `true` to show "Sign in with SSO" (`/signin/sso`); needs OIDC configured on the auth service |
 
 ## Stack
 

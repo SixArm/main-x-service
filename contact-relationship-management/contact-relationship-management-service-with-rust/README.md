@@ -58,5 +58,6 @@ working groups) + nine more derived views · audits ·
 `/events/recent` · OpenAPI + Swagger · `/metrics.prom`.
 
 Auth enforcement defaults **off** (`CRM_REQUIRE_AUTH` is the family
-activation gate); upstream lookups will default to **stub mode**;
+activation gate; optional `keycloak` cargo feature also accepts Keycloak
+access tokens via `CRM_KEYCLOAK_URL` / `_REALM` / `_AUDIENCES` / `_ROLE_MAP[_FILE]`); upstream lookups will default to **stub mode**;
 events default to the in-memory transport.

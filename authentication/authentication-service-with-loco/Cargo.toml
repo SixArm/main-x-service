@@ -65,14 +65,25 @@ include_dir = { version = "0.7" }
 # central auth provider, other services verify tokens offline against the
 # published Ed25519 keys at /.well-known/paseto-keys — no shared secret,
 # no introspection hop. (Supersedes the prior RS256-JWT + JWKS model.)
-rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-ed25519-dalek = { version = "3.0" }
+# Optional: gated by the default-on `paseto` feature.
+rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"], optional = true }
+ed25519-dalek = { version = "3.0", optional = true }
 base64 = { version = "0.22" }
 # Prometheus text-exposition metrics served at GET /metrics.prom, for
 # parity with the older Axum services in the family.
 prometheus = { version = "0.13" }
 
 [features]
+# PASETO v4.public token issuance (`POST /api/auth/token`), the published
+# key set (`GET /.well-known/paseto-keys`), and bearer-token verification
+# for the bearer-gated routes. ON by default: a default build is
+# unchanged. Without it the service still runs sessions, magic links,
+# (with `oidc`) OIDC federation, admin attributes and GDPR routes — those
+# routes authenticate by the session cookie instead of a bearer token —
+# but issues no tokens and serves neither route (404). There is no
+# `keycloak` feature here: this crate federates Keycloak through `oidc`.
+default = ["paseto"]
+paseto = ["dep:rusty_paseto", "dep:ed25519-dalek"]
 # EV-2: SAML 2.0 / OIDC enterprise identity federation (design:
 # agents/share/authentication-sessions.md §7a). Off by default so a
 # deployment that does not federate pulls in no extra HTTP/crypto
@@ -113,7 +124,7 @@ required-features = []
 # to pin the duplicated-by-convention Claims shape and footer-kid contract:
 # this service signs PASETO v4.public, the verifier crate verifies, the
 # claims round-trip.
-authentication-verifier = { path = "../authentication-verifier-rust-crate" }
+authentication-verifier = { path = "../authentication-verifier-rust-crate", default-features = false, features = ["paseto"] }
 loco-rs = { workspace = true, features = ["testing"] }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }

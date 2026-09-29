@@ -58,3 +58,12 @@ export async function signout(fetchFn: FetchFn, sid: string): Promise<void> {
     headers: { authorization: `Bearer ${token}` },
   });
 }
+
+/** The browser-navigation entry point for OIDC / SSO sign-in (EV-2,
+ *  `agents/share/authentication-sessions.md` §7a). The browser itself must
+ *  visit the identity provider and come back, so a BFF `fetch` cannot do
+ *  this hop; `originForReturn` is THIS app's origin, the bridge target. */
+export function oidcLoginUrl(originForReturn: string): string {
+  const params = new URLSearchParams({ return_url: originForReturn });
+  return `${AUTH_API_URL}/api/auth/oidc/login?${params.toString()}`;
+}

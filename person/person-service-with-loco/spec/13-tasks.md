@@ -1248,3 +1248,10 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     full DB-gated suite passes, 0 failed; `cargo test --lib` unaffected
     (355 passed, same count); `cargo build`/`clippy --all-targets --
     -D warnings` clean.
+
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `PERSON_KEYCLOAK_*` configuration; `request_claims` /
+      `claims_from_token` / `enforce_request` shared by REST and gRPC;
+      `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
+      KC-1; reference: organization-service.

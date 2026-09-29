@@ -16,7 +16,8 @@
 
 /// Loco `Hooks` boot: route registration, workers, seeding, truncation.
 pub mod app;
-/// PASETO v4.public issuance, verification, key-set publication, bearer extractor.
+/// Access-token `Claims` + the `AuthUser` extractor; with the default-on `paseto`
+/// feature also PASETO v4.public issuance, verification and key-set publication.
 pub mod auth;
 /// Loco HTTP controllers (magic-link auth + paseto-keys endpoint).
 /// Compliance controls: keyed integrity over the auth-event trail.

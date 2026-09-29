@@ -21,4 +21,5 @@ pub mod metrics;
 #[cfg(feature = "oidc")]
 pub mod oidc;
 /// Public key set (`/.well-known/paseto-keys`) for offline peer verification.
+#[cfg(feature = "paseto")]
 pub mod paseto_keys;

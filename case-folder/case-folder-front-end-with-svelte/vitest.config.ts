@@ -22,6 +22,7 @@ export default defineConfig({
             // test stubs (used only when a test imports a route/layout).
             '$app/state': fileURLToPath(new URL('./src/lib/test-support/app-state.ts', import.meta.url)),
             '$app/navigation': fileURLToPath(new URL('./src/lib/test-support/app-navigation.ts', import.meta.url)),
+            '$env/dynamic/public': fileURLToPath(new URL('./src/lib/test-support/env-dynamic-public.ts', import.meta.url)),
             '$app/environment': fileURLToPath(new URL('./src/lib/test-support/app-environment.ts', import.meta.url)),
             // PickerBar (theme/locale/text-size/share pickers as one row) has
             // a default export, like the individual theme-picker it replaced,

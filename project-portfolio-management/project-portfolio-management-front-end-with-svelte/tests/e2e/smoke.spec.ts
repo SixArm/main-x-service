@@ -189,3 +189,9 @@ test("detail check-duplicates hides the record itself (self-exclusion)", async (
   await expect(page.locator("h2 ~ ul a")).toHaveCount(1);
   await expect(page.locator("h2 ~ ul a")).toHaveText("Website rebuild");
 });
+
+test("tour renders anonymously with six workflow sections", async ({ page }) => {
+  await page.goto("/tour");
+  await expect(page).toHaveURL(/\/tour$/);
+  await expect(page.locator(".tour section[id]")).toHaveCount(7);
+});

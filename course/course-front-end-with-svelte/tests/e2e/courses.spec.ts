@@ -349,3 +349,20 @@ test.describe("Course front-end anonymous home", () => {
         await expect(page.locator(".tile")).toHaveCount(18);
     });
 });
+
+// "/tour" is public: an anonymous visitor gets the walkthrough, not a
+// redirect to /signin.
+test.describe("Course front-end anonymous tour", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test("anonymous /tour renders seven sections and stays put", async ({
+        page,
+    }) => {
+        await page.goto("/tour");
+        await expect(page).toHaveURL(/\/tour$/);
+        await expect(
+            page.getByRole("heading", { level: 1, name: "Take the tour" }),
+        ).toBeVisible();
+        await expect(page.locator(".tour .sections .steps")).toHaveCount(7);
+    });
+});

@@ -228,6 +228,88 @@ const STRINGS = {
     "splash.features.6.body":
       "عاين لغة قبل نشرها، وتابع سلامة المحتوى والأعمال المتراكمة على لوحة المعلومات.",
     "nav.toggle": "تبديل التنقل",
+    "nav.tour": "جولة",
+    "splash.hero.tour": "ابدأ الجولة",
+    "tour.head": "ابدأ الجولة",
+    "tour.toc": "في هذه الصفحة",
+    "tour.open": "افتح هذه الشاشة",
+    "tour.top": "العودة إلى الأعلى",
+    "tour.start.title": "قبل أن تبدأ",
+    "tour.start.summary":
+      "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
+    "tour.start.step.1":
+      "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
+    "tour.start.step.2":
+      "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
+    "tour.start.step.3":
+      "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
+    "tour.start.step.4":
+      "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
+    "tour.s1.title": "العثور على مدخل وفتحه",
+    "tour.s1.summary": "حدّد أي مدخل في موقع وافتحه للتحرير.",
+    "tour.s1.step.1":
+      "افتح المدخلات، ثم اختر الموقع الذي تعمل عليه ضمن «اختر موقعًا».",
+    "tour.s1.step.2":
+      "ضيّق القائمة بقائمة «النوع» المنسدلة، أو اكتب جزءًا من الاسم في خانة «المفتاح».",
+    "tour.s1.step.3":
+      "اقرأ أعمدة المفتاح والنوع ولغة المصدر والحالة؛ وتحمل المدخلات المؤرشفة علامة «مؤرشف».",
+    "tour.s1.step.4": "اختر مفتاح مدخل لفتح صفحته، حيث تحرره وتراجعه وتنشره.",
+    "tour.s2.title": "تحرير كتل المحتوى وحفظ نسخة",
+    "tour.s2.summary":
+      "تُبنى المدخلات من كتل منظّمة بدلًا من HTML مخزَّن، وكل حفظ يصبح نسخة.",
+    "tour.s2.step.1":
+      "في صفحة المدخل، اختر لغة من جدول اللغات الذي يعرض حالة كل لغة ونسختها المنشورة وهل تأخرت عن المصدر.",
+    "tour.s2.step.2":
+      "ضمن «كتل المحتوى» حرّر الكتل واستخدم «إضافة كتلة» لإدراج عنوان أو فقرة أو قائمة أو اقتباس أو صورة أو كود؛ وتعيد «تحريك لأعلى» و«تحريك لأسفل» و«إزالة» الترتيب أو الحذف.",
+    "tour.s2.step.3": "غيّر العنوان عند الحاجة، ثم اختر «حفظ النسخة».",
+    "tour.s2.step.4":
+      "عندما تتقدم المسودة على المنشور، تذكر الصفحة ذلك، فتعرف دائمًا أن القرّاء ما زالوا يرون النسخة الأقدم.",
+    "tour.s3.title": "مقارنة النسخ واستعادتها",
+    "tour.s3.summary":
+      "لا يُعاد كتابة السجل أبدًا، فيمكنك النظر إلى الوراء والتراجع بأمان.",
+    "tour.s3.step.1":
+      "مرّر إلى «سجل النسخ» الذي يسرد كل نسخة بعنوانها ومؤلفها وتاريخها؛ وتُعلَّم المنشورة بـ«منشور».",
+    "tour.s3.step.2":
+      "اختر «مقارنة» بجانب نسخة لترى الفرق بينها وبين ما تحرره؛ وتذكر الصفحة إن كانتا متطابقتين.",
+    "tour.s3.step.3":
+      "اختر «استعادة» على نسخة أقدم؛ فتُكتب نسخة جديدة وتبقى كل النسخ السابقة كما هي.",
+    "tour.s3.step.4":
+      "إذا حفظ شخص آخر قبلك، تُبلغك الصفحة وتعرض النسخة الفائزة لتقارن قبل الكتابة فوق أي شيء.",
+    "tour.s4.title": "المراجعة والنشر",
+    "tour.s4.summary":
+      "انقل المدخل عبر سير العمل التحريري مع إظهار العوائق والأسباب بوضوح.",
+    "tour.s4.step.1":
+      "في صفحة المدخل، راجع لوحة النشر: «جاهز للنشر»، أو «لا يمكن النشر بعد» مع جدول القاعدة والعنوان وما ينبغي فعله.",
+    "tour.s4.step.2":
+      "في لوحة سير العمل، اختر إجراءً (submit أو approve أو reject أو publish أو unpublish أو archive) واكتب السبب؛ ويتطلب reject وunpublish وarchive سببًا.",
+    "tour.s4.step.3":
+      "اختر «معاينة» لرؤية اللغة المحددة كمعاينة من الخادم؛ وينبّهك إشعار عندما لا تكون ما يراه القرّاء.",
+    "tour.s4.step.4":
+      "افتح «سير العمل» من القائمة لترى ما ينتظر: المدخلات «قيد المراجعة» وطلبات الترجمة المفتوحة والعناصر «المجدولة».",
+    "tour.s5.title": "حافظ على حداثة الترجمات",
+    "tour.s5.summary": "اعرف أي اللغات تأخرت عن المصدر قبل أن يلاحظ القرّاء.",
+    "tour.s5.step.1":
+      "افتح «الترجمات» واختر موقعًا واقرأ جدول اللغات: لكل لغة مدخلاتها وعدد المسودة والمنشور منها.",
+    "tour.s5.step.2":
+      "اقرأ القاعدة المطبوعة في الصفحة لتعرف بدقة ما يُعدّ متأخرًا عن المصدر، ووقت «حتى تاريخ» الذي حُسبت فيه.",
+    "tour.s5.step.3":
+      "ضمن «الطلبات المفتوحة» ابحث عن كل مفتاح مدخل مع اللغة والحالة والمؤلف ووقت آخر تحديث.",
+    "tour.s5.step.4":
+      "لإصلاح واحد، افتح المدخل من «المدخلات»، واختر اللغة في جدول اللغات فيه، واحفظ نسخة جديدة بتلك اللغة.",
+    "tour.s6.title": "فحص الأصول والنص البديل",
+    "tour.s6.summary":
+      "اطّلع على كل صورة وملف في الموقع والتقط النص البديل المفقود قبل أن يمنع النشر.",
+    "tour.s6.step.1":
+      "افتح «الأصول» واقرأ الملخص: المساحة المستخدمة والصور بدون نص بديل والملفات التي لا يشير إليها شيء.",
+    "tour.s6.step.2":
+      "في الجدول، افحص عنوان كل أصل ونوعه وحجمه ونصه البديل؛ وتحمل الصورة بلا نص بديل علامة «لا يوجد نص بديل».",
+    "tour.s6.step.3":
+      "تذكّر القاعدة: الصورة بدون نص بديل تمنع نشر الصفحة، فعالجها قبل نقل المدخل إلى النشر.",
+    "tour.s6.step.4":
+      "تُبلَّغ بالملفات «التي لا يشير إليها شيء» لانتباهك، لكنها لا تُحذف تلقائيًا أبدًا.",
+    "tour.intro":
+      "جولة إرشادية في نظام إدارة المحتوى: كيف تجد مدخلًا وتحرر كتل المحتوى فيه وتستعيد نسخًا قديمة وتنشر عبر سير العمل وتحافظ على حداثة الترجمات وتدير الأصول.",
+    "signin.sso": "تسجيل الدخول عبر SSO",
   },
   "cy-001": {
     "brand.name": "Main X · CMS",
@@ -392,6 +474,92 @@ const STRINGS = {
     "splash.features.6.body":
       "Rhagolwg iaith cyn iddi fynd yn fyw, a dilyn iechyd cynnwys a'r ôl-groniad ar y dangosfwrdd.",
     "nav.toggle": "Toglo llywio",
+    "nav.tour": "Taith",
+    "splash.hero.tour": "Cymerwch y daith",
+    "tour.head": "Cymerwch y daith",
+    "tour.toc": "Ar y dudalen hon",
+    "tour.open": "Agor y sgrin hon",
+    "tour.top": "Yn ôl i'r brig",
+    "tour.start.title": "Cyn i chi ddechrau",
+    "tour.start.summary":
+      "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+    "tour.start.step.1":
+      "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
+    "tour.start.step.2":
+      "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+    "tour.start.step.3":
+      "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+    "tour.start.step.4":
+      "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+    "tour.s1.title": "Dod o hyd i gofnod a'i agor",
+    "tour.s1.summary":
+      "Dewch o hyd i unrhyw gofnod mewn safle a'i agor i'w olygu.",
+    "tour.s1.step.1":
+      "Agorwch Cofnodion ac, o dan Dewis safle, dewiswch y safle rydych chi'n gweithio arno.",
+    "tour.s1.step.2":
+      "Culhewch y rhestr gyda'r gwymplen Math, neu teipiwch ran o enw yn y blwch Allwedd.",
+    "tour.s1.step.3":
+      "Darllenwch y colofnau Allwedd, Math, Iaith ffynhonnell a Statws; mae cofnodion wedi'u harchifo'n dangos marc Archifwyd.",
+    "tour.s1.step.4":
+      "Dewiswch allwedd cofnod i agor ei dudalen, lle byddwch yn ei olygu, ei adolygu a'i gyhoeddi.",
+    "tour.s2.title": "Golygu blociau cynnwys a chadw diwygiad",
+    "tour.s2.summary":
+      "Mae cofnodion wedi'u hadeiladu o flociau strwythuredig yn hytrach na HTML wedi'i storio, ac mae pob cadw yn dod yn ddiwygiad.",
+    "tour.s2.step.1":
+      "Ar dudalen y cofnod, dewiswch leoliad yn y tabl Ieithoedd, sy'n dangos statws pob un, ei ddiwygiad byw ac a yw y tu ôl i'r ffynhonnell.",
+    "tour.s2.step.2":
+      "O dan Blociau cynnwys, golygwch y blociau a defnyddiwch Ychwanegu bloc i osod pennawd, paragraff, rhestr, dyfyniad, delwedd neu god; mae Symud i fyny, Symud i lawr a Dileu yn ad-drefnu neu'n dileu.",
+    "tour.s2.step.3":
+      "Newidiwch y Teitl os oes angen, yna dewiswch Cadw diwygiad.",
+    "tour.s2.step.4":
+      "Pan fo'r drafft ar y blaen i'r hyn sy'n fyw, mae'r dudalen yn dweud hynny, felly rydych bob amser yn gwybod bod darllenwyr yn dal i weld yr hen fersiwn.",
+    "tour.s3.title": "Cymharu ac adfer diwygiadau",
+    "tour.s3.summary":
+      "Nid yw hanes byth yn cael ei ailysgrifennu, felly gallwch edrych yn ôl a dadwneud yn ddiogel.",
+    "tour.s3.step.1":
+      "Sgroliwch i Hanes diwygiadau, sy'n rhestru pob diwygiad gyda'i deitl, ei awdur a'i ddyddiad; mae'r un byw wedi'i farcio Cyhoeddwyd.",
+    "tour.s3.step.2":
+      "Dewiswch Cymharu wrth ymyl diwygiad i weld sut mae'n wahanol i'r un rydych yn ei olygu; mae diwygiadau unfath yn dweud hynny.",
+    "tour.s3.step.3":
+      "Dewiswch Adfer ar ddiwygiad hŷn; mae hyn yn ysgrifennu diwygiad newydd ac yn gadael pob un blaenorol yn gyfan.",
+    "tour.s3.step.4":
+      "Os yw rhywun arall wedi cadw'n gyntaf, mae'r dudalen yn dweud hynny ac yn dangos y diwygiad buddugol, fel y gallwch gymharu cyn trosysgrifo unrhyw beth.",
+    "tour.s4.title": "Adolygu a chyhoeddi",
+    "tour.s4.summary":
+      "Symudwch gofnod drwy'r llif gwaith golygyddol, gyda rhwystrau a rhesymau'n cael eu gwneud yn eglur.",
+    "tour.s4.step.1":
+      "Ar dudalen y cofnod, gwiriwch y panel cyhoeddi: Yn barod i'w gyhoeddi, neu Methu cyhoeddi eto gyda thabl o'r Rheol, y Teitl a Beth i'w wneud.",
+    "tour.s4.step.2":
+      "Ym mhanel Llif gwaith, dewiswch Gweithred (submit, approve, reject, publish, unpublish neu archive) a theipiwch Reswm; mae reject, unpublish ac archive angen un.",
+    "tour.s4.step.3":
+      "Dewiswch Rhagolwg i weld yr iaith ddewisedig fel rhagolwg ochr-gweinydd; mae hysbysiad yn eich rhybuddio pan nad dyna mae darllenwyr yn ei weld.",
+    "tour.s4.step.4":
+      "Agorwch Llif gwaith yn y ddewislen i weld beth sy'n aros: cofnodion Dan adolygiad, ceisiadau cyfieithu agored ac eitemau Wedi'u trefnu.",
+    "tour.s5.title": "Cadw cyfieithiadau'n gyfredol",
+    "tour.s5.summary":
+      "Gwelwch pa ieithoedd sydd wedi syrthio y tu ôl i'r ffynhonnell cyn i ddarllenwyr sylwi.",
+    "tour.s5.step.1":
+      "Agorwch Cyfieithiadau, dewiswch safle, a darllenwch y tabl Ieithoedd: ar gyfer pob iaith, ei chofnodion a faint sy'n Drafft ac wedi'u Cyhoeddi.",
+    "tour.s5.step.2":
+      "Darllenwch y rheol sydd wedi'i hargraffu ar y dudalen, i wybod yn union beth sy'n cyfrif fel y tu ôl i'r ffynhonnell, a'r amser Fel ar y pryd y cafodd ei gyfrifo.",
+    "tour.s5.step.3":
+      "O dan Ceisiadau agored, dewch o hyd i bob Allwedd cofnod gyda'i Iaith, ei Statws, ei Awdur a'i amser Diweddarwyd diwethaf.",
+    "tour.s5.step.4":
+      "I drwsio un, agorwch y cofnod o Gofnodion, dewiswch yr iaith yn ei dabl Ieithoedd, a chadwch ddiwygiad newydd yn yr iaith honno.",
+    "tour.s6.title": "Gwirio asedau a thestun amgen",
+    "tour.s6.summary":
+      "Gwelwch bob delwedd a ffeil mewn safle a dalwch destun amgen coll cyn iddo rwystro cyhoeddi.",
+    "tour.s6.step.1":
+      "Agorwch Asedau a darllenwch y crynodeb: Storfa a ddefnyddiwyd, delweddau Heb destun amgen, a ffeiliau Heb eu cyfeirio gan ddim.",
+    "tour.s6.step.2":
+      "Yn y tabl, gwiriwch Teitl, Math, Maint a thestun amgen pob ased; mae delwedd heb destun amgen yn dangos marc Heb destun amgen.",
+    "tour.s6.step.3":
+      "Cofiwch y rheol: mae delwedd heb destun amgen yn atal cyhoeddi'r dudalen, felly trwsiwch hi cyn symud cofnod i'w gyhoeddi.",
+    "tour.s6.step.4":
+      "Mae ffeiliau a restrir fel Heb eu cyfeirio gan ddim yn cael eu hadrodd i'ch sylw, ond ni chânt byth eu dileu'n awtomatig.",
+    "tour.intro":
+      "Taith dywys drwy'r system rheoli cynnwys: sut i ddod o hyd i gofnod, golygu ei flociau cynnwys, adfer fersiynau hŷn, cyhoeddi drwy'r llif gwaith, cadw cyfieithiadau'n gyfredol a rheoli asedau.",
+    "signin.sso": "Mewngofnodi gydag SSO",
   },
   "en-001": {
     "brand.name": "Main X · CMS",
@@ -555,6 +723,90 @@ const STRINGS = {
     "splash.features.6.body":
       "Preview a locale before it goes live, and track content health and backlog on the dashboard.",
     "nav.toggle": "Toggle navigation",
+    "nav.tour": "Tour",
+    "splash.hero.tour": "Take the tour",
+    "tour.head": "Take the tour",
+    "tour.toc": "On this page",
+    "tour.open": "Open this screen",
+    "tour.top": "Back to top",
+    "tour.start.title": "Before you begin",
+    "tour.start.summary":
+      "You need an account to work with real data. Signing in takes under a minute and needs no password.",
+    "tour.start.step.1":
+      "Choose Sign in at the top right and enter your email address.",
+    "tour.start.step.2":
+      "Open the magic link we email you. It works once and expires quickly.",
+    "tour.start.step.3":
+      "You return to the app signed in, with nothing to remember or reset.",
+    "tour.start.step.4":
+      "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
+    "tour.s1.title": "Find and open an entry",
+    "tour.s1.summary": "Locate any entry in a site and open it for editing.",
+    "tour.s1.step.1":
+      "Open Entries and, under Choose a site, pick the site you work on.",
+    "tour.s1.step.2":
+      "Narrow the list with the Type drop-down, or type part of a name in the Key box.",
+    "tour.s1.step.3":
+      "Read the Key, Type, Source locale and Status columns; archived entries carry an Archived marker.",
+    "tour.s1.step.4":
+      "Select an entry's key to open its page, where you edit, review and publish it.",
+    "tour.s2.title": "Edit content blocks and save a revision",
+    "tour.s2.summary":
+      "Entries are built from structured blocks rather than stored HTML, and every save becomes a revision.",
+    "tour.s2.step.1":
+      "On the entry page, pick a locale in the Locales table, which shows each locale's status, live revision and whether it is behind the source.",
+    "tour.s2.step.2":
+      "Under Content blocks, edit the blocks and use Add block to insert a heading, paragraph, list, quote, image or code block; Move up, Move down and Remove reorder or delete.",
+    "tour.s2.step.3": "Change the Title if needed, then choose Save revision.",
+    "tour.s2.step.4":
+      "When the draft is ahead of what is live, the page says so, so you always know readers still see the older version.",
+    "tour.s3.title": "Compare and restore revisions",
+    "tour.s3.summary":
+      "History is never rewritten, so you can look back and undo safely.",
+    "tour.s3.step.1":
+      "Scroll to Revision history, which lists each revision with its title, author and date; the live one is marked Published.",
+    "tour.s3.step.2":
+      "Choose Compare beside a revision to see how it differs from the one you are editing; identical revisions say so.",
+    "tour.s3.step.3":
+      "Choose Restore on an older revision; this writes a new revision and leaves every earlier one intact.",
+    "tour.s3.step.4":
+      "If someone else saved first, the page says so and shows the winning revision, so you can compare before overwriting anything.",
+    "tour.s4.title": "Review and publish",
+    "tour.s4.summary":
+      "Move an entry through the editorial workflow, with blockers and reasons made explicit.",
+    "tour.s4.step.1":
+      "On the entry page, check the publish panel: Ready to publish, or Cannot publish yet with a table of the Rule, Title and What to do.",
+    "tour.s4.step.2":
+      "In the Workflow panel, choose an Action (submit, approve, reject, publish, unpublish or archive) and type a Reason; reject, unpublish and archive require one.",
+    "tour.s4.step.3":
+      "Choose Preview to see the selected locale as a server-side preview; a notice warns when it is not what readers see.",
+    "tour.s4.step.4":
+      "Open Workflow in the menu to see what is waiting: entries In review, open translation requests, and Scheduled items.",
+    "tour.s5.title": "Keep translations current",
+    "tour.s5.summary":
+      "See which locales have fallen behind the source before readers notice.",
+    "tour.s5.step.1":
+      "Open Translations, pick a site, and read the Locales table: for each locale, its entries and how many are Draft and Published.",
+    "tour.s5.step.2":
+      "Read the rule printed on the page, so you know exactly what counts as behind the source, and the As of time it was worked out.",
+    "tour.s5.step.3":
+      "Under Open requests, find each entry Key with its Locale, Status, Author and last Updated time.",
+    "tour.s5.step.4":
+      "To fix one, open the entry from Entries, select the locale in its Locales table, and save a new revision in that language.",
+    "tour.s6.title": "Check assets and alt text",
+    "tour.s6.summary":
+      "See every image and file in a site and catch missing alt text before it blocks publishing.",
+    "tour.s6.step.1":
+      "Open Assets and read the summary: Storage used, images with No alt text, and files Referenced by nothing.",
+    "tour.s6.step.2":
+      "In the table, check each asset's Title, Type, Size and alt text; an image without alt text carries a No alt text marker.",
+    "tour.s6.step.3":
+      "Remember the rule: an image without alt text stops the page publishing, so fix it before you move an entry to publish.",
+    "tour.s6.step.4":
+      "Files listed as Referenced by nothing are reported for your attention, but they are never deleted automatically.",
+    "tour.intro":
+      "A guided walkthrough of the CMS: how to find an entry, edit its content blocks, restore old revisions, publish through the workflow, keep translations current and manage assets.",
+    "signin.sso": "Sign in with SSO",
   },
   "es-001": {
     "brand.name": "Main X · CMS",
@@ -720,6 +972,92 @@ const STRINGS = {
     "splash.features.6.body":
       "Previsualiza un idioma antes de publicarlo y sigue la salud del contenido y las tareas pendientes en el panel.",
     "nav.toggle": "Alternar navegación",
+    "nav.tour": "Recorrido",
+    "splash.hero.tour": "Haz el recorrido",
+    "tour.head": "Haz el recorrido",
+    "tour.toc": "En esta página",
+    "tour.open": "Abrir esta pantalla",
+    "tour.top": "Volver arriba",
+    "tour.start.title": "Antes de empezar",
+    "tour.start.summary":
+      "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
+    "tour.start.step.1":
+      "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
+    "tour.start.step.2":
+      "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
+    "tour.start.step.3":
+      "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
+    "tour.start.step.4":
+      "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
+    "tour.s1.title": "Encontrar y abrir una entrada",
+    "tour.s1.summary":
+      "Localiza cualquier entrada de un sitio y ábrela para editarla.",
+    "tour.s1.step.1":
+      "Abre Entradas y, en Elegir un sitio, selecciona el sitio con el que trabajas.",
+    "tour.s1.step.2":
+      "Reduce la lista con el desplegable Tipo, o escribe parte de un nombre en el cuadro Clave.",
+    "tour.s1.step.3":
+      "Consulta las columnas Clave, Tipo, Idioma de origen y Estado; las entradas archivadas llevan la marca Archivada.",
+    "tour.s1.step.4":
+      "Selecciona la clave de una entrada para abrir su página, donde la editas, revisas y publicas.",
+    "tour.s2.title": "Editar bloques de contenido y guardar una revisión",
+    "tour.s2.summary":
+      "Las entradas se componen de bloques estructurados, no de HTML almacenado, y cada guardado se convierte en una revisión.",
+    "tour.s2.step.1":
+      "En la página de la entrada, elige un idioma en la tabla Idiomas, que muestra el estado de cada uno, su revisión publicada y si va por detrás del origen.",
+    "tour.s2.step.2":
+      "En Bloques de contenido, edita los bloques y usa Añadir bloque para insertar un encabezado, párrafo, lista, cita, imagen o código; Subir, Bajar y Quitar reordenan o eliminan.",
+    "tour.s2.step.3":
+      "Cambia el Título si hace falta y elige Guardar revisión.",
+    "tour.s2.step.4":
+      "Cuando el borrador va por delante de lo publicado, la página lo indica, así sabes siempre que los lectores aún ven la versión anterior.",
+    "tour.s3.title": "Comparar y restaurar revisiones",
+    "tour.s3.summary":
+      "El historial nunca se reescribe, así que puedes mirar atrás y deshacer con seguridad.",
+    "tour.s3.step.1":
+      "Baja hasta Historial de revisiones, que lista cada revisión con su título, autor y fecha; la publicada lleva la marca Publicada.",
+    "tour.s3.step.2":
+      "Elige Comparar junto a una revisión para ver en qué difiere de la que editas; si son idénticas, lo indica.",
+    "tour.s3.step.3":
+      "Elige Restaurar en una revisión anterior; se escribe una nueva revisión y todas las anteriores quedan intactas.",
+    "tour.s3.step.4":
+      "Si alguien guardó antes, la página lo indica y muestra la revisión ganadora, para que compares antes de sobrescribir nada.",
+    "tour.s4.title": "Revisar y publicar",
+    "tour.s4.summary":
+      "Lleva una entrada por el flujo de trabajo editorial, con los bloqueos y los motivos a la vista.",
+    "tour.s4.step.1":
+      "En la página de la entrada, mira el panel de publicación: Listo para publicar, o No se puede publicar todavía, con una tabla de Regla, Título y Qué hacer.",
+    "tour.s4.step.2":
+      "En el panel Flujo de trabajo, elige una Acción (submit, approve, reject, publish, unpublish o archive) y escribe un Motivo; reject, unpublish y archive lo exigen.",
+    "tour.s4.step.3":
+      "Elige Vista previa para ver el idioma seleccionado como vista previa del servidor; un aviso indica cuándo no es lo que ven los lectores.",
+    "tour.s4.step.4":
+      "Abre Flujo de trabajo en el menú para ver lo que espera: entradas En revisión, solicitudes de traducción abiertas y elementos Programados.",
+    "tour.s5.title": "Mantener al día las traducciones",
+    "tour.s5.summary":
+      "Descubre qué idiomas se han quedado por detrás del origen antes de que lo noten los lectores.",
+    "tour.s5.step.1":
+      "Abre Traducciones, elige un sitio y lee la tabla Idiomas: para cada idioma, sus entradas y cuántas están en Borrador y Publicadas.",
+    "tour.s5.step.2":
+      "Lee la regla impresa en la página para saber exactamente qué cuenta como ir por detrás del origen, y la hora Al momento en que se calculó.",
+    "tour.s5.step.3":
+      "En Solicitudes abiertas, encuentra cada Clave de entrada con su Idioma, Estado, Autor y hora de última Actualización.",
+    "tour.s5.step.4":
+      "Para corregir una, abre la entrada desde Entradas, selecciona el idioma en su tabla Idiomas y guarda una nueva revisión en ese idioma.",
+    "tour.s6.title": "Revisar recursos y texto alternativo",
+    "tour.s6.summary":
+      "Consulta todas las imágenes y archivos de un sitio y detecta el texto alternativo que falta antes de que bloquee la publicación.",
+    "tour.s6.step.1":
+      "Abre Recursos y lee el resumen: Almacenamiento usado, imágenes Sin texto alternativo y archivos Sin referencias.",
+    "tour.s6.step.2":
+      "En la tabla, revisa el Título, Tipo, Tamaño y texto alternativo de cada recurso; una imagen sin texto alternativo lleva la marca Sin texto alternativo.",
+    "tour.s6.step.3":
+      "Recuerda la regla: una imagen sin texto alternativo impide publicar la página, así que corrígela antes de pasar una entrada a publicar.",
+    "tour.s6.step.4":
+      "Los archivos indicados como Sin referencias se comunican para tu atención, pero nunca se eliminan automáticamente.",
+    "tour.intro":
+      "Un recorrido guiado por el CMS: cómo encontrar una entrada, editar sus bloques de contenido, restaurar revisiones antiguas, publicar mediante el flujo de trabajo, mantener al día las traducciones y gestionar los recursos.",
+    "signin.sso": "Iniciar sesión con SSO",
   },
   "fr-001": {
     "brand.name": "Main X · CMS",
@@ -885,6 +1223,93 @@ const STRINGS = {
     "splash.features.6.body":
       "Prévisualisez une langue avant sa mise en ligne et suivez la santé du contenu et le travail en attente sur le tableau de bord.",
     "nav.toggle": "Basculer la navigation",
+    "nav.tour": "Visite guidée",
+    "splash.hero.tour": "Faire la visite guidée",
+    "tour.head": "Faire la visite guidée",
+    "tour.toc": "Sur cette page",
+    "tour.open": "Ouvrir cet écran",
+    "tour.top": "Retour en haut",
+    "tour.start.title": "Avant de commencer",
+    "tour.start.summary":
+      "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+    "tour.start.step.1":
+      "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
+    "tour.start.step.2":
+      "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+    "tour.start.step.3":
+      "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+    "tour.start.step.4":
+      "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
+    "tour.s1.title": "Trouver et ouvrir une entrée",
+    "tour.s1.summary":
+      "Repérez n'importe quelle entrée d'un site et ouvrez-la pour la modifier.",
+    "tour.s1.step.1":
+      "Ouvrez Entrées puis, sous Choisir un site, sélectionnez le site sur lequel vous travaillez.",
+    "tour.s1.step.2":
+      "Réduisez la liste avec le menu Type, ou saisissez une partie du nom dans le champ Clé.",
+    "tour.s1.step.3":
+      "Lisez les colonnes Clé, Type, Langue source et Statut ; les entrées archivées portent la mention Archivée.",
+    "tour.s1.step.4":
+      "Sélectionnez la clé d'une entrée pour ouvrir sa page, où vous la modifiez, la relisez et la publiez.",
+    "tour.s2.title":
+      "Modifier des blocs de contenu et enregistrer une révision",
+    "tour.s2.summary":
+      "Les entrées sont composées de blocs structurés plutôt que de HTML stocké, et chaque enregistrement devient une révision.",
+    "tour.s2.step.1":
+      "Sur la page de l'entrée, choisissez une langue dans le tableau Langues, qui indique le statut de chacune, sa révision en ligne et si elle est en retard sur la source.",
+    "tour.s2.step.2":
+      "Sous Blocs de contenu, modifiez les blocs et utilisez Ajouter un bloc pour insérer un titre, un paragraphe, une liste, une citation, une image ou du code ; Monter, Descendre et Retirer réordonnent ou suppriment.",
+    "tour.s2.step.3":
+      "Modifiez le Titre si nécessaire, puis choisissez Enregistrer la révision.",
+    "tour.s2.step.4":
+      "Lorsque le brouillon est en avance sur ce qui est en ligne, la page l'indique : vous savez toujours que les lecteurs voient encore l'ancienne version.",
+    "tour.s3.title": "Comparer et restaurer des révisions",
+    "tour.s3.summary":
+      "L'historique n'est jamais réécrit : vous pouvez revenir en arrière et annuler sans risque.",
+    "tour.s3.step.1":
+      "Faites défiler jusqu'à Historique des révisions, qui liste chaque révision avec son titre, son auteur et sa date ; celle en ligne porte la mention Publiée.",
+    "tour.s3.step.2":
+      "Choisissez Comparer à côté d'une révision pour voir en quoi elle diffère de celle que vous modifiez ; des révisions identiques sont signalées.",
+    "tour.s3.step.3":
+      "Choisissez Restaurer sur une révision plus ancienne ; cela écrit une nouvelle révision et laisse intactes toutes les précédentes.",
+    "tour.s3.step.4":
+      "Si quelqu'un a enregistré avant vous, la page l'indique et affiche la révision gagnante, pour comparer avant d'écraser quoi que ce soit.",
+    "tour.s4.title": "Relire et publier",
+    "tour.s4.summary":
+      "Faites avancer une entrée dans le flux éditorial, avec les blocages et les motifs rendus explicites.",
+    "tour.s4.step.1":
+      "Sur la page de l'entrée, consultez le panneau de publication : Prêt à publier, ou Publication impossible pour l'instant avec un tableau Règle, Titre et Que faire.",
+    "tour.s4.step.2":
+      "Dans le panneau Flux de travail, choisissez une Action (submit, approve, reject, publish, unpublish ou archive) et saisissez un Motif ; reject, unpublish et archive en exigent un.",
+    "tour.s4.step.3":
+      "Choisissez Aperçu pour voir la langue sélectionnée en aperçu côté serveur ; un avis signale quand ce n'est pas ce que voient les lecteurs.",
+    "tour.s4.step.4":
+      "Ouvrez Flux de travail dans le menu pour voir ce qui attend : entrées En révision, demandes de traduction ouvertes et éléments Planifiés.",
+    "tour.s5.title": "Garder les traductions à jour",
+    "tour.s5.summary":
+      "Repérez les langues en retard sur la source avant que les lecteurs ne le remarquent.",
+    "tour.s5.step.1":
+      "Ouvrez Traductions, choisissez un site et lisez le tableau Langues : pour chaque langue, ses entrées et combien sont en Brouillon et Publiées.",
+    "tour.s5.step.2":
+      "Lisez la règle affichée sur la page pour savoir exactement ce qui compte comme un retard sur la source, ainsi que l'heure À la date de son calcul.",
+    "tour.s5.step.3":
+      "Sous Demandes ouvertes, retrouvez chaque Clé d'entrée avec sa Langue, son Statut, son Auteur et l'heure de dernière Mise à jour.",
+    "tour.s5.step.4":
+      "Pour en corriger une, ouvrez l'entrée depuis Entrées, sélectionnez la langue dans son tableau Langues et enregistrez une nouvelle révision dans cette langue.",
+    "tour.s6.title": "Vérifier les ressources et le texte alternatif",
+    "tour.s6.summary":
+      "Consultez toutes les images et tous les fichiers d'un site et repérez le texte alternatif manquant avant qu'il ne bloque la publication.",
+    "tour.s6.step.1":
+      "Ouvrez Ressources et lisez le résumé : Stockage utilisé, images Sans texte alternatif et fichiers Référencés par rien.",
+    "tour.s6.step.2":
+      "Dans le tableau, vérifiez le Titre, le Type, la Taille et le texte alternatif de chaque ressource ; une image sans texte alternatif porte la mention Sans texte alternatif.",
+    "tour.s6.step.3":
+      "Retenez la règle : une image sans texte alternatif empêche la publication de la page ; corrigez-la avant de publier une entrée.",
+    "tour.s6.step.4":
+      "Les fichiers signalés comme Référencés par rien sont portés à votre attention, mais ne sont jamais supprimés automatiquement.",
+    "tour.intro":
+      "Une visite guidée du CMS : comment trouver une entrée, modifier ses blocs de contenu, restaurer d'anciennes révisions, publier via le flux de travail, garder les traductions à jour et gérer les ressources.",
+    "signin.sso": "Se connecter avec SSO",
   },
   "hi-001": {
     "brand.name": "Main X · CMS",
@@ -1048,6 +1473,92 @@ const STRINGS = {
     "splash.features.6.body":
       "किसी भाषा को लाइव होने से पहले देखें, और डैशबोर्ड पर सामग्री स्वास्थ्य और लंबित कार्य ट्रैक करें।",
     "nav.toggle": "नेविगेशन टॉगल करें",
+    "nav.tour": "टूर",
+    "splash.hero.tour": "टूर देखें",
+    "tour.head": "टूर देखें",
+    "tour.toc": "इस पृष्ठ पर",
+    "tour.open": "यह स्क्रीन खोलें",
+    "tour.top": "ऊपर लौटें",
+    "tour.start.title": "शुरू करने से पहले",
+    "tour.start.summary":
+      "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
+    "tour.start.step.1":
+      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.2":
+      "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
+    "tour.start.step.3":
+      "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
+    "tour.start.step.4":
+      "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
+    "tour.s1.title": "प्रविष्टि खोजें और खोलें",
+    "tour.s1.summary":
+      "किसी साइट की कोई भी प्रविष्टि खोजें और संपादन के लिए खोलें।",
+    "tour.s1.step.1":
+      "प्रविष्टियाँ खोलें और «साइट चुनें» में वह साइट चुनें जिस पर आप काम करते हैं।",
+    "tour.s1.step.2":
+      "प्रकार ड्रॉप-डाउन से सूची सीमित करें, या «कुंजी» बॉक्स में नाम का कोई हिस्सा लिखें।",
+    "tour.s1.step.3":
+      "कुंजी, प्रकार, स्रोत भाषा और स्थिति कॉलम पढ़ें; संग्रहीत प्रविष्टियों पर «संग्रहीत» चिह्न होता है।",
+    "tour.s1.step.4":
+      "किसी प्रविष्टि की कुंजी चुनकर उसका पेज खोलें, जहाँ आप उसे संपादित, समीक्षा और प्रकाशित करते हैं।",
+    "tour.s2.title": "कंटेंट ब्लॉक संपादित करें और संस्करण सहेजें",
+    "tour.s2.summary":
+      "प्रविष्टियाँ संग्रहीत HTML के बजाय संरचित ब्लॉक से बनती हैं, और हर सहेजना एक संस्करण बन जाता है।",
+    "tour.s2.step.1":
+      "प्रविष्टि पेज पर भाषाएँ तालिका में एक भाषा चुनें, जो हर भाषा की स्थिति, लाइव संस्करण और स्रोत से पीछे होने की जानकारी दिखाती है।",
+    "tour.s2.step.2":
+      "«कंटेंट ब्लॉक» में ब्लॉक संपादित करें और «ब्लॉक जोड़ें» से शीर्षक, अनुच्छेद, सूची, उद्धरण, चित्र या कोड ब्लॉक डालें; ऊपर ले जाएँ, नीचे ले जाएँ और हटाएँ से क्रम बदलें या हटाएँ।",
+    "tour.s2.step.3":
+      "आवश्यकता हो तो शीर्षक बदलें, फिर «संस्करण सहेजें» चुनें।",
+    "tour.s2.step.4":
+      "जब ड्राफ़्ट लाइव संस्करण से आगे होता है, पेज यह बताता है, ताकि आपको पता रहे कि पाठक अब भी पुराना संस्करण देख रहे हैं।",
+    "tour.s3.title": "संस्करणों की तुलना और बहाली",
+    "tour.s3.summary":
+      "इतिहास कभी दोबारा नहीं लिखा जाता, इसलिए आप पीछे देख सकते हैं और सुरक्षित रूप से पूर्ववत कर सकते हैं।",
+    "tour.s3.step.1":
+      "«संस्करण इतिहास» तक स्क्रॉल करें, जो हर संस्करण को शीर्षक, लेखक और तारीख के साथ सूचीबद्ध करता है; लाइव वाले पर «प्रकाशित» लिखा होता है।",
+    "tour.s3.step.2":
+      "किसी संस्करण के बगल में «तुलना करें» चुनें और देखें कि वह आपके संपादित संस्करण से कैसे अलग है; समान होने पर यह बताया जाता है।",
+    "tour.s3.step.3":
+      "किसी पुराने संस्करण पर «बहाल करें» चुनें; इससे नया संस्करण बनता है और पिछले सभी जस के तस रहते हैं।",
+    "tour.s3.step.4":
+      "अगर किसी और ने पहले सहेजा है, तो पेज बताता है और जीतने वाला संस्करण दिखाता है, ताकि कुछ भी अधिलेखित करने से पहले आप तुलना कर सकें।",
+    "tour.s4.title": "समीक्षा और प्रकाशन",
+    "tour.s4.summary":
+      "किसी प्रविष्टि को संपादकीय वर्कफ़्लो से गुज़ारें, जहाँ बाधाएँ और कारण स्पष्ट दिखते हैं।",
+    "tour.s4.step.1":
+      "प्रविष्टि पेज पर प्रकाशन पैनल देखें: «प्रकाशन के लिए तैयार», या «अभी प्रकाशित नहीं हो सकता» और नियम, शीर्षक व क्या करें की तालिका।",
+    "tour.s4.step.2":
+      "वर्कफ़्लो पैनल में एक कार्रवाई (submit, approve, reject, publish, unpublish या archive) चुनें और कारण लिखें; reject, unpublish और archive के लिए कारण ज़रूरी है।",
+    "tour.s4.step.3":
+      "चुनी हुई भाषा को सर्वर-साइड पूर्वावलोकन में देखने के लिए «पूर्वावलोकन» चुनें; जब यह वह न हो जो पाठक देखते हैं, तो चेतावनी दिखती है।",
+    "tour.s4.step.4":
+      "मेनू में «वर्कफ़्लो» खोलें और देखें कि क्या प्रतीक्षा में है: «समीक्षा में» प्रविष्टियाँ, खुले अनुवाद अनुरोध और «निर्धारित» आइटम।",
+    "tour.s5.title": "अनुवाद अद्यतन रखें",
+    "tour.s5.summary":
+      "पाठकों के ध्यान देने से पहले देखें कि कौन-सी भाषाएँ स्रोत से पीछे हो गई हैं।",
+    "tour.s5.step.1":
+      "«अनुवाद» खोलें, साइट चुनें और भाषाएँ तालिका पढ़ें: हर भाषा के लिए उसकी प्रविष्टियाँ और कितनी ड्राफ़्ट व प्रकाशित हैं।",
+    "tour.s5.step.2":
+      "पेज पर छपा नियम पढ़ें ताकि पता रहे कि स्रोत से पीछे होना ठीक-ठीक क्या माना जाता है, और वह «तक की स्थिति» समय जब इसकी गणना हुई।",
+    "tour.s5.step.3":
+      "«खुले अनुरोध» में हर प्रविष्टि की कुंजी उसकी भाषा, स्थिति, लेखक और अंतिम अद्यतन समय के साथ देखें।",
+    "tour.s5.step.4":
+      "किसी को ठीक करने के लिए «प्रविष्टियाँ» से प्रविष्टि खोलें, उसकी भाषाएँ तालिका में भाषा चुनें और उस भाषा में नया संस्करण सहेजें।",
+    "tour.s6.title": "एसेट और वैकल्पिक टेक्स्ट जाँचें",
+    "tour.s6.summary":
+      "किसी साइट की हर छवि और फ़ाइल देखें और वैकल्पिक टेक्स्ट की कमी को प्रकाशन रोकने से पहले पकड़ें।",
+    "tour.s6.step.1":
+      "«एसेट» खोलें और सारांश पढ़ें: उपयोग किया गया स्टोरेज, बिना वैकल्पिक टेक्स्ट वाली छवियाँ, और वे फ़ाइलें जिन्हें कोई संदर्भित नहीं करता।",
+    "tour.s6.step.2":
+      "तालिका में हर एसेट का शीर्षक, प्रकार, आकार और वैकल्पिक टेक्स्ट देखें; बिना वैकल्पिक टेक्स्ट की छवि पर «कोई वैकल्पिक टेक्स्ट नहीं» चिह्न होता है।",
+    "tour.s6.step.3":
+      "नियम याद रखें: बिना वैकल्पिक टेक्स्ट की छवि पेज का प्रकाशन रोकती है, इसलिए प्रविष्टि प्रकाशित करने से पहले इसे ठीक करें।",
+    "tour.s6.step.4":
+      "«कोई संदर्भित नहीं करता» वाली फ़ाइलें आपके ध्यान के लिए बताई जाती हैं, पर कभी अपने-आप हटाई नहीं जातीं।",
+    "tour.intro":
+      "सीएमएस का निर्देशित परिचय: प्रविष्टि कैसे खोजें, उसके कंटेंट ब्लॉक कैसे संपादित करें, पुराने संस्करण कैसे बहाल करें, वर्कफ़्लो से कैसे प्रकाशित करें, अनुवाद कैसे अद्यतन रखें और एसेट कैसे प्रबंधित करें।",
+    "signin.sso": "SSO से साइन इन करें",
   },
   "zh-cn": {
     "brand.name": "Main X · CMS",
@@ -1200,6 +1711,83 @@ const STRINGS = {
     "splash.features.6.body":
       "在语言版本上线前预览，并在仪表板上跟踪内容健康度和待办事项。",
     "nav.toggle": "切换导航",
+    "nav.tour": "导览",
+    "splash.hero.tour": "开始导览",
+    "tour.head": "开始导览",
+    "tour.toc": "本页内容",
+    "tour.open": "打开此页面",
+    "tour.top": "返回顶部",
+    "tour.start.title": "开始之前",
+    "tour.start.summary":
+      "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
+    "tour.start.step.1": "点击右上角的“登录”，输入你的邮箱地址。",
+    "tour.start.step.2":
+      "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
+    "tour.start.step.3": "你会以已登录状态回到应用，无需记忆或重置任何内容。",
+    "tour.start.step.4":
+      "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
+    "tour.s1.title": "查找并打开条目",
+    "tour.s1.summary": "在站点中找到任意条目并打开进行编辑。",
+    "tour.s1.step.1": "打开“条目”，在“选择站点”中选择你要处理的站点。",
+    "tour.s1.step.2":
+      "用“类型”下拉框缩小列表，或在“键”输入框中输入名称的一部分。",
+    "tour.s1.step.3":
+      "查看“键”“类型”“源语言”和“状态”列；已归档的条目带有“已归档”标记。",
+    "tour.s1.step.4": "选择条目的键即可打开其页面，在那里编辑、审阅并发布。",
+    "tour.s2.title": "编辑内容块并保存修订",
+    "tour.s2.summary":
+      "条目由结构化内容块而非存储的 HTML 构成，每次保存都会生成一个修订。",
+    "tour.s2.step.1":
+      "在条目页面的“语言”表中选择一种语言，表中显示各语言的状态、线上修订以及是否落后于源语言。",
+    "tour.s2.step.2":
+      "在“内容块”下编辑各块，用“添加块”插入标题、段落、列表、引用、图片或代码块；用“上移”“下移”“移除”调整顺序或删除。",
+    "tour.s2.step.3": "如有需要修改标题，然后选择“保存修订”。",
+    "tour.s2.step.4":
+      "当草稿领先于线上版本时，页面会提示，让你始终知道读者看到的仍是旧版本。",
+    "tour.s3.title": "比较并恢复修订",
+    "tour.s3.summary": "历史记录不会被改写，因此你可以放心回看并撤销。",
+    "tour.s3.step.1":
+      "滚动到“修订历史”，其中列出每个修订的标题、作者和日期；线上版本标有“已发布”。",
+    "tour.s3.step.2":
+      "在某个修订旁选择“比较”，查看它与你正在编辑的版本有何不同；完全相同时会有提示。",
+    "tour.s3.step.3":
+      "在较旧的修订上选择“恢复”；这会写入一个新修订，此前的所有修订保持不变。",
+    "tour.s3.step.4":
+      "如果别人先保存了，页面会提示并显示胜出的修订，方便你在覆盖前先比较。",
+    "tour.s4.title": "审阅并发布",
+    "tour.s4.summary": "让条目走完编辑工作流，阻碍与理由一目了然。",
+    "tour.s4.step.1":
+      "在条目页面查看发布面板：“可以发布”，或“暂时无法发布”并附有规则、标题和处理办法的表格。",
+    "tour.s4.step.2":
+      "在“工作流”面板选择一个操作（submit、approve、reject、publish、unpublish 或 archive）并填写理由；reject、unpublish 和 archive 必须填写理由。",
+    "tour.s4.step.3":
+      "选择“预览”以服务器端预览所选语言；当它不是读者所见内容时会有提示。",
+    "tour.s4.step.4":
+      "从菜单打开“工作流”，查看待处理事项：“审核中”的条目、未完成的翻译请求和“已排期”的项目。",
+    "tour.s5.title": "保持译文最新",
+    "tour.s5.summary": "在读者察觉之前，看清哪些语言已落后于源语言。",
+    "tour.s5.step.1":
+      "打开“翻译”，选择站点，查看“语言”表：每种语言的条目数，以及其中草稿和已发布的数量。",
+    "tour.s5.step.2":
+      "阅读页面上印出的规则，确切了解什么算“落后于源语言”，以及计算时的“截至”时间。",
+    "tour.s5.step.3":
+      "在“未完成的请求”下，找到每个条目的键，及其语言、状态、作者和最近更新时间。",
+    "tour.s5.step.4":
+      "要修复某一项，从“条目”打开该条目，在其“语言”表中选择该语言，并保存该语言的新修订。",
+    "tour.s6.title": "检查资源与替代文本",
+    "tour.s6.summary":
+      "查看站点中的每张图片和文件，在缺失的替代文本阻止发布之前发现它。",
+    "tour.s6.step.1":
+      "打开“资源”，阅读摘要：已用存储、没有替代文本的图片，以及没有被引用的文件。",
+    "tour.s6.step.2":
+      "在表格中检查每个资源的标题、类型、大小和替代文本；没有替代文本的图片带有“无替代文本”标记。",
+    "tour.s6.step.3":
+      "牢记规则：没有替代文本的图片会阻止页面发布，请在发布条目之前修复。",
+    "tour.s6.step.4":
+      "列为“没有被引用”的文件会提醒你注意，但绝不会被自动删除。",
+    "tour.intro":
+      "内容管理系统的图文导览：如何查找条目、编辑内容块、恢复旧修订、通过工作流发布、保持译文最新，以及管理资源。",
+    "signin.sso": "使用 SSO 登录",
   },
 } as const satisfies Record<Locale, Record<string, string>>;
 

@@ -32,6 +32,8 @@ CMS_API_URL=http://localhost:5150 pnpm dev     # the Loco sibling
 | `pnpm exec playwright test` | e2e over a `page.route`-stubbed API; no service needed |
 | `pnpm lint` / `pnpm format` | prettier |
 
+Optional: `PUBLIC_OIDC_SIGNIN_ENABLED=true` shows a "Sign in with SSO" link (OIDC via the auth service).
+
 Environment: `CMS_API_URL` (the CMS service) and `AUTH_API_URL` (the
 authentication service). Both are read **server-side only** — the
 browser talks to this app's own origin and nothing else.

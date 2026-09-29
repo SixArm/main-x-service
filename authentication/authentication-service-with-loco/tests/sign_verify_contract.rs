@@ -22,6 +22,8 @@
 //! Pure crypto path — **no database required**, so this runs un-gated in
 //! every `cargo test`.
 
+#![cfg(feature = "paseto")]
+
 use std::collections::BTreeMap;
 
 use authentication_service::auth;

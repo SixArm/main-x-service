@@ -26,6 +26,9 @@ importers:
       '@lilydesignsystem/svelte-theme-picker':
         specifier: ^0.1.2
         version: 0.1.2(svelte@5.57.1)
+      '@lilydesignsystem/themes':
+        specifier: 0.1.0
+        version: 0.1.0
       '@svar-ui/svelte-calendar':
         specifier: ^2.7.1
         version: 2.7.1(picomatch@4.0.5)(svelte@5.57.1)(typescript@5.9.3)
@@ -366,6 +369,10 @@ packages:
     engines: {node: '=26'}
     peerDependencies:
       svelte: ^5.0.0
+
+  '@lilydesignsystem/themes@0.1.0':
+    resolution: {integrity: sha512-Oa52SvChIe0kE7g0xqa+XUkXO4Bi6GRJmOvPjDWkk+zJ9W2O1N1DZk0l8/BEsAGUMSZZBDL+IobTfR0Ps20DmA==}
+    engines: {node: '=26'}
 
   '@playwright/test@1.63.0':
     resolution: {integrity: sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==}
@@ -1497,6 +1504,8 @@ snapshots:
     dependencies:
       '@lilydesignsystem/svelte-headless': 0.2.0(svelte@5.57.1)
       svelte: 5.57.1
+
+  '@lilydesignsystem/themes@0.1.0': {}
 
   '@playwright/test@1.63.0':
     dependencies:

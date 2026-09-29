@@ -442,3 +442,9 @@ code + tests in one PR.
       assertion actually fails without the fix before confirming it
       passes with it.
 
+- [x] CRM-T29 **KC-1: optional Keycloak bearer acceptance; PASETO as a
+      feature (2026-09-29).** `paseto` (default) and `keycloak` (off)
+      cargo features; `CRM_KEYCLOAK_*` configuration; `auth::request_claims`
+      / `auth::enforce_request`; `tests/keycloak_guard.rs` (DB-free).
+      Verifier side: `authentication-verifier` KC-1; reference:
+      organization-service.

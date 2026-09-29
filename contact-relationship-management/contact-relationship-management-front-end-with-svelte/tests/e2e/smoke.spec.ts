@@ -756,3 +756,10 @@ test.describe("signed-in smoke coverage", () => {
     ).toBeVisible();
   });
 });
+
+test("the tour renders for a signed-out visitor", async ({ page }) => {
+  await page.goto("/tour");
+  await expect(page).toHaveURL(/\/tour$/);
+  await expect(page.locator(".sections section:not(.closing)")).toHaveCount(7);
+  await expect(page.locator(".steps li")).toHaveCount(28);
+});

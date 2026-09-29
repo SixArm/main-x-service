@@ -58,3 +58,13 @@ export async function signout(fetchFn: FetchFn, sid: string): Promise<void> {
     headers: { authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * The browser-navigation entry point for federated (OIDC) sign-in: the
+ * auth service's `/api/auth/oidc/login`, carrying this app's origin as
+ * `return_url` so the post-federation bridge lands back here.
+ */
+export function oidcLoginUrl(originForReturn: string): string {
+  const params = new URLSearchParams({ return_url: originForReturn });
+  return `${AUTH_API_URL}/api/auth/oidc/login?${params.toString()}`;
+}

@@ -127,6 +127,12 @@ LOCO_API_PROXY=http://localhost:5150 npm run dev   # see vite.config.ts
 VITE_API_BASE_URL=http://localhost:5150 npm run dev
 ```
 
+Optional SSO (OIDC / Keycloak via the auth service): set
+`PUBLIC_OIDC_SIGNIN_ENABLED=true` to show "Sign in with SSO" on `/login`
+(the `/login/sso` route redirects the browser to
+`${AUTH_API_URL}/api/auth/oidc/login`; `AUTH_API_URL` defaults to
+`LOCO_API_PROXY`, then `http://localhost:5150`). See `.env.example`.
+
 Prefer `LOCO_API_PROXY` for local dev; reach for `VITE_API_BASE_URL`
 only when you deliberately want a cross-origin client.
 

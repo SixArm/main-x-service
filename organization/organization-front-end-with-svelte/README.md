@@ -37,6 +37,7 @@ pnpm dev                 # http://localhost:5173
 |---|---|---|
 | `ORGANIZATION_API_URL` | `http://localhost:5150` | Organization service REST base URL (read server-side by the BFF proxy; see `src/lib/server/config.ts`). |
 | `AUTH_API_URL` | `http://localhost:5150` | Authentication service base URL (BFF-side magic-link + session→PASETO exchange). |
+| `PUBLIC_OIDC_SIGNIN_ENABLED` | unset | Set to `true` to show "Sign in with SSO" on `/signin` and enable `/signin/sso` (needs OIDC configured on the auth service). |
 
 ## How it works
 

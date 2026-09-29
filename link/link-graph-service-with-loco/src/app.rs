@@ -40,22 +40,23 @@ use crate::reconcile;
 use crate::suggest::job as suggest_job;
 
 /// Blanket read-guard middleware (spec §9.4 / T-19). Delegates to the pure
-/// [`auth::enforce`]: with `LINK_GRAPH_REQUIRE_AUTH` off, or on a public
+/// [`auth::enforce_request`]: with `LINK_GRAPH_REQUIRE_AUTH` off, or on a public
 /// path, it passes through; otherwise a valid bearer token is required
 /// (`401`) and the token's `attrs` must satisfy the ABAC policy for a
 /// `read` on the aggregator (`403`). The per-record `case↔person`
 /// concealment (§10) stacks on top of this in the handlers.
 async fn require_auth_mw(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
-    match auth::enforce(
+    match auth::enforce_request(
         auth::require_auth(),
         &path,
         req.headers(),
-        // Per-request snapshots, so the refresh loop and the policy
-        // watcher reach the guard too — not just the handlers.
-        &auth::verifier().current(),
+        // Per-request snapshot, so the policy watcher reaches the guard
+        // too — not just the handlers.
         &auth::policy().current(),
-    ) {
+    )
+    .await
+    {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
     }

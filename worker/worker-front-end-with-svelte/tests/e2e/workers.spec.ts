@@ -409,6 +409,14 @@ test.describe("Worker front-end page-visit guard", () => {
         "/review",
     ];
 
+    // The public tour renders for an anonymous visitor: no redirect, six
+    // workflow sections plus "Before you begin", four steps each.
+    test("anonymous visit to /tour renders without redirect", async ({ page }) => {
+        await page.goto("/tour");
+        await expect(page).toHaveURL(/\/tour$/);
+        await expect(page.locator(".sections > section")).toHaveCount(8);
+    });
+
     for (const path of guarded) {
         test(`anonymous visit to ${path} redirects to /signin`, async ({ page }) => {
             await page.goto(path);

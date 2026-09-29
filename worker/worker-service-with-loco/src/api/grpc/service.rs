@@ -101,7 +101,7 @@ fn parse_uuid(raw: &str) -> Result<Uuid, Status> {
 /// [`crate::api::rest::auth::bearer_claims`]'s contract, just fed from
 /// [`MetadataMap`] rather than an HTTP [`axum::http::HeaderMap`]).
 #[allow(clippy::result_large_err)]
-fn grpc_bearer_claims(metadata: &MetadataMap) -> Result<Option<Claims>, Status> {
+async fn grpc_bearer_claims(metadata: &MetadataMap) -> Result<Option<Claims>, Status> {
     let Some(value) = metadata.get("authorization") else {
         return Ok(None);
     };
@@ -112,11 +112,12 @@ fn grpc_bearer_claims(metadata: &MetadataMap) -> Result<Option<Claims>, Status> 
         .strip_prefix("Bearer ")
         .or_else(|| header.strip_prefix("bearer "))
         .ok_or_else(|| Status::unauthenticated("expected a bearer token"))?;
-    auth::verifier()
-        .current()
-        .verify(token.trim())
+    // The same dispatch REST uses: PASETO, or Keycloak when that feature
+    // is on and configured.
+    auth::token_claims(token.trim())
+        .await
         .map(Some)
-        .map_err(|e| Status::unauthenticated(e.to_string()))
+        .map_err(|(_, reason)| Status::unauthenticated(reason))
 }
 
 /// The blanket-enforcement decision for one RPC call — the gRPC
@@ -125,15 +126,15 @@ fn grpc_bearer_claims(metadata: &MetadataMap) -> Result<Option<Claims>, Status> 
 /// Returns the verified claims, if any, so the caller can pass them
 /// into [`auth::authorize_record`].
 #[allow(clippy::result_large_err)]
-fn grpc_enforce(metadata: &MetadataMap, action: Action) -> Result<Option<Claims>, Status> {
+async fn grpc_enforce(metadata: &MetadataMap, action: Action) -> Result<Option<Claims>, Status> {
     if !auth::require_auth_from_env() {
         // Enforcement off: still surface a presented-but-invalid token
         // as an error instead of quietly treating the call as
         // anonymous — a caller that sent a bad credential almost
         // certainly meant to authenticate.
-        return grpc_bearer_claims(metadata);
+        return grpc_bearer_claims(metadata).await;
     }
-    let Some(claims) = grpc_bearer_claims(metadata)? else {
+    let Some(claims) = grpc_bearer_claims(metadata).await? else {
         return Err(Status::unauthenticated("missing authorization metadata"));
     };
     let decision = auth::policy()
@@ -251,7 +252,7 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
         &self,
         request: Request<proto::CreateWorkerRequest>,
     ) -> Result<Response<proto::Worker>, Status> {
-        grpc_enforce(request.metadata(), Action::Write)?;
+        grpc_enforce(request.metadata(), Action::Write).await?;
 
         let proto_worker = request
             .into_inner()
@@ -302,7 +303,7 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
         &self,
         request: Request<proto::GetWorkerRequest>,
     ) -> Result<Response<proto::Worker>, Status> {
-        let claims = grpc_enforce(request.metadata(), Action::Read)?;
+        let claims = grpc_enforce(request.metadata(), Action::Read).await?;
         let id = parse_uuid(&request.into_inner().id)?;
 
         let worker = self
@@ -333,7 +334,7 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
         &self,
         request: Request<proto::ListWorkersRequest>,
     ) -> Result<Response<proto::ListWorkersResponse>, Status> {
-        grpc_enforce(request.metadata(), Action::Read)?;
+        grpc_enforce(request.metadata(), Action::Read).await?;
         let req = request.into_inner();
 
         if req.offset > MAX_LIST_OFFSET {
@@ -365,7 +366,7 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
         &self,
         request: Request<proto::DeleteWorkerRequest>,
     ) -> Result<Response<proto::DeleteWorkerResponse>, Status> {
-        let claims = grpc_enforce(request.metadata(), Action::Delete)?;
+        let claims = grpc_enforce(request.metadata(), Action::Delete).await?;
         let id = parse_uuid(&request.into_inner().id)?;
 
         let worker = self

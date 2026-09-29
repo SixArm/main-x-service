@@ -22,6 +22,10 @@
     import Field from '$lib/components/Field/Field.svelte';
     import Button from '$lib/components/Button/Button.svelte';
     import { t } from '$lib/i18n.svelte';
+    import { env } from '$env/dynamic/public';
+
+    // Opt-in SSO link: a plain browser navigation, not a form/fetch.
+    const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === 'true';
 
     let email = $state('');
     let emailError = $state('');
@@ -93,4 +97,21 @@
             <Button type="submit">{t('login.submit')}</Button>
         </div>
     </Form>
+    {#if ssoEnabled}
+        <p>
+            <a class="sso-link" href="/login/sso" data-testid="sso-link"
+                >{t('signin.sso')}</a
+            >
+        </p>
+    {/if}
 {/if}
+
+<style>
+    .sso-link {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border: 1px solid currentColor;
+        border-radius: 0.25rem;
+        text-decoration: none;
+    }
+</style>

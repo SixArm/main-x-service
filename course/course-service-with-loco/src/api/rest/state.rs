@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+#[cfg(feature = "paseto")]
 use authentication_verifier::Verifier;
 use sea_orm::DatabaseConnection;
 
@@ -78,13 +79,16 @@ impl AppState {
 // restart.
 
 /// Default issuer expected in tokens (`iss`).
+#[cfg(feature = "paseto")]
 pub(crate) const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
+#[cfg(feature = "paseto")]
 pub(crate) const DEFAULT_AUDIENCE: &str = "main-x-service";
 
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.
+#[cfg(feature = "paseto")]
 pub(crate) fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
         .ok()
@@ -106,6 +110,7 @@ pub(crate) fn env_or(name: &str, default: &str) -> String {
 /// This is the env-injection path. Prefer [`boot_verifier`], which
 /// fetches the key set over HTTP at boot when `COURSE_PASETO_KEYS_URL`
 /// is set and falls back to this path otherwise.
+#[cfg(feature = "paseto")]
 pub(crate) fn verifier_from_env() -> Verifier {
     let issuer = env_or("COURSE_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("COURSE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
@@ -135,6 +140,7 @@ pub(crate) fn verifier_from_env() -> Verifier {
 /// Either way the service always boots. The fetch happens **once**;
 /// there is no refresh loop (re-fetch on key rotation is a roadmap
 /// item — spec §15).
+#[cfg(feature = "paseto")]
 pub async fn boot_verifier() -> Verifier {
     match std::env::var("COURSE_PASETO_KEYS_URL")
         .ok()
@@ -153,6 +159,7 @@ pub async fn boot_verifier() -> Verifier {
 /// info log records the source); on any transport / status / parse
 /// failure a warning is logged and the [`verifier_from_env`] path is
 /// used instead — the service always boots.
+#[cfg(feature = "paseto")]
 pub async fn verifier_from_url_or_env(url: &str) -> Verifier {
     let issuer = env_or("COURSE_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("COURSE_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
@@ -178,6 +185,7 @@ pub async fn verifier_from_url_or_env(url: &str) -> Verifier {
 
 /// A verifier with no keys: every token is rejected until a real key set
 /// is configured. Infallible — an empty `keys` array always parses.
+#[cfg(feature = "paseto")]
 fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
     let empty = serde_json::json!({ "keys": [] });
     Verifier::from_paseto_keys_value(&empty, issuer, audience).expect("empty key set always builds")
@@ -195,7 +203,7 @@ impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "paseto"))]
 mod tests {
     use super::*;
 

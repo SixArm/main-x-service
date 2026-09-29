@@ -119,6 +119,7 @@
         { href: "/workers/merge", key: "nav.merge" as const },
         { href: "/review", key: "nav.review" as const },
         { href: "/expiry", key: "nav.expiry" as const },
+        { href: "/tour", key: "nav.tour" as const },
     ] as const;
 </script>
 

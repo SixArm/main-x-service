@@ -86,3 +86,23 @@ describe("i18n", () => {
     expect(isRtl("nonsense")).toBe(false);
   });
 });
+
+describe("tour copy", () => {
+  it("has a title, summary and four steps for every workflow in every locale", () => {
+    const keys = ["start"]
+      .concat([1, 2, 3, 4, 5, 6].map((n) => `s${n}`))
+      .flatMap((s) => [
+        `tour.${s}.title`,
+        `tour.${s}.summary`,
+        ...[1, 2, 3, 4].map((n) => `tour.${s}.step.${n}`),
+      ]);
+    for (const locale of LOCALES) {
+      for (const key of keys) {
+        expect(
+          translate(locale, key as never)?.trim().length,
+          `${locale}:${key}`,
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
+});

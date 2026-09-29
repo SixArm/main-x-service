@@ -653,3 +653,10 @@ clearly described manual check confirms the acceptance criterion.
   constructs `proto::Event` via Rust struct literals, unaffected by a
   serde-only change) stayed green, 4/4; `fmt`/`clippy -D warnings`/
   `deny check`/`msrv`/`bench --no-run` all clean.
+
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `EVENT_KEYCLOAK_*` configuration; `request_claims` /
+      `claims_from_token` / `enforce_request` shared by REST and gRPC;
+      `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
+      KC-1; reference: organization-service.

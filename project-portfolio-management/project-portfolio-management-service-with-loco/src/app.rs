@@ -42,24 +42,24 @@ use crate::{
 /// batch processor is still holding. Set once by [`App::init_logger`].
 static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
-/// Blanket auth-enforcement middleware: PASETO authentication then ABAC
+/// Blanket auth-enforcement middleware: PASETO and/or Keycloak authentication then ABAC
 /// authorization. Reads the `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH` flag, the verifier,
 /// and the ABAC policy per request (all cached `OnceLock`s) and delegates
-/// to the pure [`auth::enforce`]: public paths and the disabled flag pass
+/// to the pure [`auth::enforce_request`]: public paths and the disabled flag pass
 /// through; otherwise a valid bearer token is required (`401`) and the
 /// derived action is checked against the policy (`403`). Off by default
 /// (see `auth.rs`).
 async fn require_auth_mw(req: Request, next: Next) -> Response {
-    let decision = auth::enforce(
+    let decision = auth::enforce_request(
         auth::require_auth(),
         req.method(),
         req.uri().path(),
         req.headers(),
-        // Per-request snapshots, so the refresh loop and the policy
-        // watcher reach the guard too — not just the handlers.
-        &auth::verifier().current(),
+        // Per-request snapshot, so the policy watcher reaches the guard
+        // too — not just the handlers.
         &auth::policy().current(),
-    );
+    )
+    .await;
     match decision {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),

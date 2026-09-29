@@ -858,3 +858,11 @@ code + tests in one PR.
   (svelte-check: 369 files, 0 errors, 0 warnings), `npx playwright
   test` (10 passed, run twice to confirm no flakiness), `npx vitest
   run` (28 passed, unchanged).
+
+- [x] CMS-KC1 **Optional Keycloak bearer acceptance; PASETO as a feature
+  (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo features
+  on the service; `CMS_KEYCLOAK_*` configuration; `auth::request_claims`
+  / `auth::enforce_request` used by the guard, the delivery
+  authorization and the extractors; `tests/keycloak_guard.rs` (DB-free).
+  Verifier side: `authentication-verifier` KC-1. Reference:
+  organization-service.

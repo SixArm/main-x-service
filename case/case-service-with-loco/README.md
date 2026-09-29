@@ -99,6 +99,11 @@ issued by the central
 > `CASE_PASETO_KEYS_URL` is set (fetched key set wins; falls back to the
 > `CASE_PASETO_KEYS` env key set, so the service always boots) — see
 > [spec §13](./spec/index.md).
+>
+> Optional `keycloak` cargo feature (off by default): also accept a Keycloak
+> access token as a bearer, configured by `CASE_KEYCLOAK_URL` / `_REALM` /
+> `_AUDIENCES` / `_ROLE_MAP[_FILE]` / `_REQUIRE_VERIFIED_EMAIL` (see
+> [`agents/share/runbooks/keycloak-sso.md`](../../agents/share/runbooks/keycloak-sso.md)).
 
 ## License
 

@@ -27,9 +27,9 @@
 
 use std::sync::OnceLock;
 
-use authentication_verifier::{
-    Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
-};
+use authentication_verifier::{Action, Claims, Policy, ReloadablePolicy};
+#[cfg(feature = "paseto")]
+use authentication_verifier::{ReloadableVerifier, Verifier};
 use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
@@ -37,8 +37,10 @@ use axum::http::{HeaderMap, StatusCode};
 use entity_ref::{EdgeKind, Sensitivity};
 
 /// Default token issuer expected in the `iss` claim.
+#[cfg(feature = "paseto")]
 const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default token audience expected in the `aud` claim.
+#[cfg(feature = "paseto")]
 const DEFAULT_AUDIENCE: &str = "main-x-service";
 /// The resource entity a caller must be able to **read** (via the shared
 /// ABAC policy) to see this crate's governed `subject_of` edges — the same
@@ -49,6 +51,7 @@ const GOVERNED_ENTITY: &str = "case";
 const GRAPH_ENTITY: &str = "link_graph";
 
 /// Read an env var, falling back to `default` when unset/blank.
+#[cfg(feature = "paseto")]
 fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
         .ok()
@@ -67,6 +70,7 @@ fn parse_bool(value: &str) -> bool {
 /// Build the verifier from `LINK_GRAPH_PASETO_KEYS`; an unset/blank/invalid
 /// key set yields an empty verifier that rejects every token (so the
 /// service always boots — a missing key set fails closed, not open).
+#[cfg(feature = "paseto")]
 fn build_from_env() -> Verifier {
     let issuer = env_or("LINK_GRAPH_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("LINK_GRAPH_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
@@ -87,10 +91,12 @@ fn build_from_env() -> Verifier {
 /// swaps in the boot-time fetched key set and [`spawn_key_refresh`]
 /// swaps in a re-fetched one periodically, so **a key rotation at the
 /// auth service is picked up without restarting this service**.
+#[cfg(feature = "paseto")]
 static VERIFIER: OnceLock<ReloadableVerifier> = OnceLock::new();
 
 /// The process-wide reloadable verifier. Take a snapshot per request
 /// with `verifier().current()`.
+#[cfg(feature = "paseto")]
 #[must_use]
 pub fn verifier() -> &'static ReloadableVerifier {
     VERIFIER.get_or_init(|| ReloadableVerifier::new(build_from_env()))
@@ -102,7 +108,63 @@ pub fn verifier() -> &'static ReloadableVerifier {
 /// the URL unset — the env-built verifier stands, so the service always
 /// boots. This aggregator had **no boot fetch at all** before: its key
 /// set could only ever come from the environment.
+// `async` in every feature shape so `app.rs` has one call site; only the
+// `paseto` half awaits (the key fetch).
+#[allow(clippy::unused_async)]
 pub async fn init() {
+    #[cfg(feature = "paseto")]
+    init_paseto().await;
+    #[cfg(feature = "keycloak")]
+    init_keycloak();
+}
+
+/// The process-wide Keycloak verifier, present only when
+/// `LINK_GRAPH_KEYCLOAK_URL` is set and valid.
+#[cfg(feature = "keycloak")]
+static KEYCLOAK: OnceLock<authentication_verifier::keycloak::KeycloakVerifier> = OnceLock::new();
+
+/// The Keycloak verifier, or `None` when Keycloak is not configured (or was
+/// configured badly — see [`init_keycloak`]).
+#[cfg(feature = "keycloak")]
+#[must_use]
+pub fn keycloak_verifier() -> Option<&'static authentication_verifier::keycloak::KeycloakVerifier> {
+    KEYCLOAK.get()
+}
+
+/// Build the Keycloak verifier from `LINK_GRAPH_KEYCLOAK_*`. Fail-closed and
+/// non-fatal, like the PASETO key loaders: a missing URL leaves Keycloak off;
+/// a malformed configuration logs an error and leaves it off (Keycloak tokens
+/// are then rejected), and the service still boots. Must run inside the
+/// Tokio runtime (discovery starts in the background).
+#[cfg(feature = "keycloak")]
+fn init_keycloak() {
+    use authentication_verifier::keycloak::{KeycloakSettings, KeycloakVerifier};
+    if KEYCLOAK.get().is_some() {
+        return;
+    }
+    match KeycloakSettings::from_env("LINK_GRAPH") {
+        Ok(None) => {}
+        Ok(Some(settings)) => {
+            let issuer = settings.expected_issuer();
+            match KeycloakVerifier::new(settings) {
+                Ok(verifier) => {
+                    let _ = KEYCLOAK.set(verifier);
+                    tracing::info!(%issuer, "auth: Keycloak access tokens accepted");
+                }
+                Err(error) => {
+                    tracing::error!(%error, "auth: Keycloak configuration rejected; Keycloak tokens will be refused");
+                }
+            }
+        }
+        Err(error) => {
+            tracing::error!(%error, "auth: LINK_GRAPH_KEYCLOAK_* is invalid; Keycloak tokens will be refused");
+        }
+    }
+}
+
+/// The `paseto` half of [`init`].
+#[cfg(feature = "paseto")]
+async fn init_paseto() {
     let Some(url) = std::env::var("LINK_GRAPH_PASETO_KEYS_URL")
         .ok()
         .map(|u| u.trim().to_string())
@@ -130,6 +192,7 @@ pub async fn init() {
 /// Default key-set refresh interval (seconds) when
 /// `LINK_GRAPH_PASETO_KEYS_REFRESH_SECS` is unset. One hour: rotation is
 /// infrequent, so a slow poll suffices.
+#[cfg(feature = "paseto")]
 const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
 
 /// Spawn the background loop that re-fetches the published key set from
@@ -141,6 +204,13 @@ const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
 /// [`KEY_REFRESH_DEFAULT_SECS`]); `0` disables the loop. A no-op when
 /// the URL is unset.
 pub fn spawn_key_refresh() {
+    #[cfg(feature = "paseto")]
+    spawn_paseto_key_refresh();
+}
+
+/// The `paseto` half of [`spawn_key_refresh`].
+#[cfg(feature = "paseto")]
+fn spawn_paseto_key_refresh() {
     let Some(url) = std::env::var("LINK_GRAPH_PASETO_KEYS_URL")
         .ok()
         .map(|u| u.trim().to_string())
@@ -273,10 +343,23 @@ pub fn require_auth() -> bool {
 ///
 /// `401` when the `Authorization` header is missing, is not a bearer
 /// token, or the token fails PASETO signature / issuer / audience / expiry.
+#[cfg(feature = "paseto")]
 pub fn bearer_claims(
     headers: &HeaderMap,
     verifier: &Verifier,
 ) -> Result<Claims, (StatusCode, String)> {
+    let token = bearer_token(headers)?;
+    verifier
+        .verify(token)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
+}
+
+/// The bearer token from the `Authorization` header, trimmed.
+///
+/// # Errors
+///
+/// `401` when the header is missing or is not a bearer token.
+fn bearer_token(headers: &HeaderMap) -> Result<&str, (StatusCode, String)> {
     let header = headers
         .get(AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
@@ -284,16 +367,53 @@ pub fn bearer_claims(
             StatusCode::UNAUTHORIZED,
             "missing authorization header".to_string(),
         ))?;
-    let token = header
+    header
         .strip_prefix("Bearer ")
         .or_else(|| header.strip_prefix("bearer "))
+        .map(str::trim)
         .ok_or((
             StatusCode::UNAUTHORIZED,
             "expected bearer token".to_string(),
-        ))?;
-    verifier
-        .verify(token.trim())
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
+        ))
+}
+
+/// Authenticate a request through every credential type this build
+/// accepts, against the process-wide verifiers. A token beginning `v4.` is
+/// a PASETO; anything else is offered to Keycloak when configured. Each
+/// path fails closed with `401`.
+///
+/// # Errors
+///
+/// `401` when the header is missing or not a bearer token, the token fails
+/// verification, or no verifier in this build accepts its type.
+// `async` for the Keycloak path (JWKS refresh); a PASETO-only build never awaits.
+#[allow(clippy::unused_async)]
+pub async fn request_claims(headers: &HeaderMap) -> Result<Claims, (StatusCode, String)> {
+    let token = bearer_token(headers)?;
+    #[cfg(feature = "keycloak")]
+    if !token.starts_with("v4.")
+        && let Some(keycloak) = keycloak_verifier()
+    {
+        return keycloak
+            .verify(token)
+            .await
+            .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()));
+    }
+    #[cfg(feature = "paseto")]
+    {
+        verifier()
+            .current()
+            .verify(token)
+            .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
+    }
+    #[cfg(not(feature = "paseto"))]
+    {
+        let _ = token;
+        Err((
+            StatusCode::UNAUTHORIZED,
+            "no verifier accepts this credential".to_string(),
+        ))
+    }
 }
 
 /// A read request's optional caller identity: `Some(claims)` when a valid
@@ -313,9 +433,7 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(
-            bearer_claims(&parts.headers, &verifier().current()).ok(),
-        ))
+        Ok(Self(request_claims(&parts.headers).await.ok()))
     }
 }
 
@@ -395,6 +513,7 @@ pub fn is_public_path(path: &str) -> bool {
 /// # Errors
 ///
 /// `401` for a missing/invalid token; `403` when the policy denies read.
+#[cfg(feature = "paseto")]
 pub fn enforce(
     require_auth: bool,
     path: &str,
@@ -406,12 +525,40 @@ pub fn enforce(
         return Ok(());
     }
     let claims = bearer_claims(headers, verifier)?;
-    let decision = policy.evaluate(&claims, Action::Read, GRAPH_ENTITY);
+    decide(&claims, policy)
+}
+
+/// The ABAC half of [`enforce`]: `Ok` when the policy allows `read` on the
+/// aggregator for `claims`, else `403` carrying the deciding rule.
+fn decide(claims: &Claims, policy: &Policy) -> Result<(), (StatusCode, String)> {
+    let decision = policy.evaluate(claims, Action::Read, GRAPH_ENTITY);
     if decision.allowed {
         Ok(())
     } else {
         Err((StatusCode::FORBIDDEN, decision.reason))
     }
+}
+
+/// The blanket guard the middleware runs: like [`enforce`], but the caller
+/// is authenticated through every credential type this build accepts
+/// (PASETO with `paseto`, a Keycloak access token with `keycloak`) via
+/// [`request_claims`], against the process-wide verifiers.
+///
+/// # Errors
+///
+/// `401` when enforcement is on and no accepted credential is presented;
+/// `403` when the ABAC policy denies read.
+pub async fn enforce_request(
+    require_auth: bool,
+    path: &str,
+    headers: &HeaderMap,
+    policy: &Policy,
+) -> Result<(), (StatusCode, String)> {
+    if !require_auth || is_public_path(path) {
+        return Ok(());
+    }
+    let claims = request_claims(headers).await?;
+    decide(&claims, policy)
 }
 
 /// May this caller force one reconciliation pass on demand (T-36)?
@@ -433,11 +580,11 @@ pub fn enforce(
 ///
 /// `401` for a missing/invalid bearer token; `403` when the policy
 /// denies the destructive action.
-pub fn authorize_reconcile(headers: &HeaderMap) -> Result<(), (StatusCode, String)> {
+pub async fn authorize_reconcile(headers: &HeaderMap) -> Result<(), (StatusCode, String)> {
     if !require_auth() {
         return Ok(());
     }
-    let claims = bearer_claims(headers, &verifier().current())?;
+    let claims = request_claims(headers).await?;
     let decision = policy()
         .current()
         .evaluate(&claims, Action::Destructive, GRAPH_ENTITY);
@@ -448,7 +595,7 @@ pub fn authorize_reconcile(headers: &HeaderMap) -> Result<(), (StatusCode, Strin
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "paseto"))]
 mod tests {
     use super::*;
     use std::collections::BTreeMap;

@@ -2,7 +2,7 @@
 // `tasks.md` EV-1): exchanges the session for a bearer, then calls
 // `GET /api/auth/me`. Against a mocked fetch — no real auth service.
 import { describe, expect, it, vi } from "vitest";
-import { currentUser } from "../../src/lib/server/auth";
+import { currentUser, oidcLoginUrl } from "../../src/lib/server/auth";
 
 describe("currentUser", () => {
     it("returns null when the session->bearer exchange fails", async () => {
@@ -55,5 +55,14 @@ describe("currentUser", () => {
                 headers: { authorization: "Bearer bearer-1" },
             }),
         );
+    });
+});
+
+describe("oidcLoginUrl", () => {
+    it("points at the auth service's /api/auth/oidc/login with an encoded return_url", () => {
+        const url = oidcLoginUrl("https://ppm.example.test");
+        expect(url).toContain("/api/auth/oidc/login?");
+        expect(url).toContain("return_url=https%3A%2F%2Fppm.example.test");
+        expect(new URL(url).searchParams.get("return_url")).toBe("https://ppm.example.test");
     });
 });

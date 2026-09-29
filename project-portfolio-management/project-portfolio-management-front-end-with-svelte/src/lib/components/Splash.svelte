@@ -28,7 +28,7 @@
     <p class="lead">{t("splash.hero.subtitle")}</p>
     <div class="actions">
       <a class="cta primary" href="/signin">{t("auth.signin")}</a>
-      <a class="cta secondary" href="#benefits">{t("splash.hero.secondary")}</a>
+      <a class="cta secondary" href="/tour">{t("splash.hero.tour")}</a>
     </div>
   </section>
 

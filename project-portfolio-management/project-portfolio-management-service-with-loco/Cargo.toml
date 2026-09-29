@@ -66,7 +66,7 @@ project-portfolio-management-matcher = { path = "../project-portfolio-management
 
 # Offline PASETO v4.public verification against the authentication-service Ed25519 keys (local path; monorepo 0.2 verifier).
 # The `fetch` feature adds `Verifier::from_paseto_keys_url` for the boot-time key-set fetch (`PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL`).
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
 
 # Durable event bus Phase 3 (BUS-3, following BUS-1's case-service
 # reference; agents/share/event-bus.md §5/§8): the relay's real broker
@@ -99,6 +99,14 @@ reqwest = { version = "0.13", default-features = false, features = [
 ] }
 
 [features]
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `PROJECT_PORTFOLIO_MANAGEMENT_KEYCLOAK_*` (see src/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
 # Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
 # feature to build or test; only `FluvioSink` — the real-broker producer
 # — lives behind this.
@@ -110,6 +118,9 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 loco-rs = { workspace = true, features = ["testing"] }
 # Name the `TestServer` type in shared request-test helpers.

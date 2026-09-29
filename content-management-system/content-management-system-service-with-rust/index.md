@@ -284,6 +284,7 @@ is harmless.
 |---|---|---|
 | `CMS_REQUIRE_AUTH` | off | **The activation gate.** Off means no authentication and no authorization anywhere. |
 | `CMS_PASETO_KEYS` / `_URL` | — | The published key set peers verify against, offline |
+| `CMS_KEYCLOAK_URL` / `_REALM` / `_AUDIENCES` / `_ROLE_MAP[_FILE]` | off | Also accept Keycloak access tokens (needs the `keycloak` cargo feature); unset URL leaves it off |
 | `CMS_ABAC_POLICY` / `_FILE` | built-in | The policy; hot-reloaded from the file |
 | `CMS_EVENT_TRANSPORT` | `memory` | `outbox` writes durable event rows — **required** for webhook dispatch |
 | `CMS_ARTIFACT_BACKEND` | `local` | `s3` behind the optional cargo feature |

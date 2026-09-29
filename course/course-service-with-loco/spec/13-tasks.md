@@ -197,3 +197,9 @@
     `cargo test --lib` 132/132, unchanged pass count — no behavioural
     change, doc comments only.
 
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `COURSE_KEYCLOAK_*` configuration; `request_claims` /
+      `enforce_request` used by the middleware and extractors;
+      `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
+      KC-1; reference: organization-service.

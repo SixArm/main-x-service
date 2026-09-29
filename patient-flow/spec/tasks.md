@@ -313,6 +313,13 @@ code + tests in one PR.
   Verified the assertion actually fails without the fix before
   confirming it passes with it.
 
+- [x] PF-T25 **Optional Keycloak bearer acceptance; PASETO as a feature
+  (KC-1, 2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+  features on the service; `PATIENT_FLOW_KEYCLOAK_*` configuration;
+  `auth::request_claims` / `auth::enforce_request`;
+  `tests/keycloak_guard.rs` (DB-free). Verifier side:
+  `authentication-verifier` KC-1; reference: organization-service.
+
 ## Production gates (P0 — design-only until a real deployment)
 
 - [ ] PF-T-G1 Clinical safety case (DCB0129/0160) + named CSO.

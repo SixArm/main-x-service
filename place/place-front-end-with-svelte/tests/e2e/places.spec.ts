@@ -26,6 +26,20 @@ test.describe("Place front-end anonymous home", () => {
   });
 });
 
+test.describe("Place front-end tour", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  // Pins: /tour is public and renders the opener plus six workflow sections.
+  test("tour renders for a signed-out visitor", async ({ page }) => {
+    const res = await page.goto("/tour");
+    expect(res?.status()).toBe(200);
+    expect(new URL(page.url()).pathname).toBe("/tour");
+    await expect(page.locator(".sections > section:not(.closing)")).toHaveCount(
+      7,
+    );
+  });
+});
+
 test.describe("Place front-end smoke", () => {
   // Pins: the dashboard heading plus the sidebar nav links are present.
   test("dashboard renders nav and heading", async ({ page }) => {

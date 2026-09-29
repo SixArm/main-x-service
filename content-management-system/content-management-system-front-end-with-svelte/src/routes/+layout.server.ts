@@ -1,5 +1,5 @@
 // Root sign-in gate (CMS-T31): every page except the public
-// home (splash), sign-in and verify routes requires a session. Before this, a visitor
+// home (splash), tour, sign-in and verify routes requires a session. Before this, a visitor
 // with no `locals.sessionId` reached every authoring/asset/workflow
 // view and only discovered they were signed out once an API call
 // silently failed through the BFF proxy, rather than being redirected
@@ -26,7 +26,7 @@ import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 
 /** Routes reachable with no session (prefix match). */
-const PUBLIC_PATHS = ["/signin", "/verify"];
+const PUBLIC_PATHS = ["/signin", "/verify", "/tour"];
 
 /**
  * The home page is public too, but matched exactly (a `/` prefix would

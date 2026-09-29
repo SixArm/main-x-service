@@ -94,6 +94,7 @@
     { href: "/dpo", key: "nav.dpo" },
     { href: "/engagement", key: "nav.engagement" },
     { href: "/partners", key: "nav.partners" },
+    { href: "/tour", key: "nav.tour" },
   ] as const;
 </script>
 

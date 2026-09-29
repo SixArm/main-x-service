@@ -16,7 +16,7 @@ use serde_json::{Value, json};
 /// literal.
 #[must_use]
 pub fn spec() -> Value {
-    json!({
+    let doc = json!({
         "openapi": "3.0.3",
         "info": {
             "title": "Authentication Service API",
@@ -25,7 +25,48 @@ pub fn spec() -> Value {
         },
         "paths": paths(),
         "components": components()
-    })
+    });
+    #[cfg(not(feature = "paseto"))]
+    let doc = strip_paseto(doc);
+    doc
+}
+
+/// Remove every PASETO-only item from the document for a build without the
+/// `paseto` feature: the key-set path and schemas, the token field of the
+/// login response, and the bearer scheme (the bearer-gated routes then
+/// authenticate the session cookie, so the scheme is redefined as that
+/// cookie under the same `bearer` name the operations reference).
+#[cfg(not(feature = "paseto"))]
+fn strip_paseto(mut doc: Value) -> Value {
+    if let Some(paths) = doc["paths"].as_object_mut() {
+        paths.remove("/.well-known/paseto-keys");
+        paths.remove("/api/auth/token");
+    }
+    if let Some(schemas) = doc["components"]["schemas"].as_object_mut() {
+        for name in ["PasetoKey", "PasetoKeys", "Claims"] {
+            schemas.remove(name);
+        }
+        if let Some(login) = schemas.get_mut("LoginResponse") {
+            if let Some(props) = login["properties"].as_object_mut() {
+                props.remove("token");
+            }
+            if let Some(req) = login["required"].as_array_mut() {
+                req.retain(|v| v != "token");
+            }
+        }
+    }
+    if let Some(v) = doc["paths"]["/api/auth/magic-link/{token}"]["get"].as_object_mut() {
+        v.insert("summary".into(), json!("Consume a magic link -> session"));
+        v.insert("description".into(), json!("Validates the unexpired, single-use token, marks the email verified, and records a revocable session (cookie)."));
+    }
+    doc["components"]["securitySchemes"] = json!({
+        "bearer": { "type": "apiKey", "in": "cookie", "name": "__Host-mxi_session",
+            "description": "Opaque server-side session cookie. Unsafe methods must also echo the session's CSRF token in X-CSRF-Token. This build issues no bearer tokens." }
+    });
+    doc["info"]["description"] = json!(
+        "Central single sign-on provider for the Main X Index family. Passwordless email magic-link authentication with server-side cookie sessions. This build has no token issuance. The unauthenticated issuance endpoints (signup, magic-link) always return 200 to avoid account enumeration, and are rate-limited per email (429 when exceeded)."
+    );
+    doc
 }
 
 /// The `paths` object of the `OpenAPI` document, assembled from the
@@ -410,6 +451,7 @@ mod tests {
         assert_eq!(s["openapi"], "3.0.3");
         assert!(s["info"]["title"].is_string());
         assert!(s["paths"].is_object());
+        #[cfg(feature = "paseto")]
         assert!(s["components"]["schemas"]["LoginResponse"]["properties"]["token"].is_object());
     }
 
@@ -426,6 +468,7 @@ mod tests {
         assert!(paths["/api/auth/account/export"]["get"].is_object());
         assert!(paths["/api/auth/account/audit"]["get"].is_object());
         assert!(paths["/api/auth/account"]["delete"].is_object());
+        #[cfg(feature = "paseto")]
         assert!(paths["/.well-known/paseto-keys"]["get"].is_object());
         assert!(paths["/metrics.prom"]["get"].is_object());
         assert!(paths["/api/compliance/audit/verify"]["get"].is_object());
@@ -509,6 +552,7 @@ mod tests {
         assert!(export["auth_events"]["items"]["$ref"].is_string());
     }
 
+    #[cfg(feature = "paseto")]
     #[test]
     fn claims_schema_documents_the_abac_attrs_map() {
         let s = spec();
@@ -546,6 +590,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "paseto")]
     #[test]
     fn paseto_keys_endpoint_documents_multiple_keys_for_rotation() {
         let s = spec();
@@ -572,6 +617,7 @@ mod tests {
         assert!(s["paths"]["/api/auth/magic-link"]["post"]["responses"]["429"].is_object());
     }
 
+    #[cfg(feature = "paseto")]
     #[test]
     fn bearer_security_scheme_is_present_and_applied() {
         let s = spec();
@@ -588,6 +634,7 @@ mod tests {
         assert!(s["paths"]["/api/auth/signout"]["post"]["security"][0]["bearer"].is_array());
     }
 
+    #[cfg(feature = "paseto")]
     #[test]
     fn documents_the_core_schemas() {
         let s = spec();
@@ -608,5 +655,21 @@ mod tests {
         ] {
             assert!(schemas[name].is_object(), "missing schema {name}");
         }
+    }
+
+    /// Without the `paseto` feature the document advertises no token
+    /// issuance: no key-set path, no PASETO schemas, no bearer token field.
+    #[cfg(not(feature = "paseto"))]
+    #[test]
+    fn no_paseto_build_does_not_advertise_token_issuance() {
+        let s = spec();
+        assert!(s["paths"]["/.well-known/paseto-keys"].is_null());
+        assert!(s["paths"]["/api/auth/token"].is_null());
+        assert!(s["components"]["schemas"]["PasetoKeys"].is_null());
+        assert!(s["components"]["schemas"]["PasetoKey"].is_null());
+        assert!(s["components"]["schemas"]["LoginResponse"]["properties"]["token"].is_null());
+        assert_eq!(s["components"]["securitySchemes"]["bearer"]["in"], "cookie");
+        let text = s.to_string();
+        assert!(!text.contains("paseto-keys"));
     }
 }

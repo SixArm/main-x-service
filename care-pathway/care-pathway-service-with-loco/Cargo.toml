@@ -94,7 +94,7 @@ care-pathway-matcher = { path = "../care-pathway-matcher-rust-crate" }
 # Offline PASETO v4.public verification against the authentication-service Ed25519 keys (local path; monorepo 0.2 verifier).
 # The `fetch` feature adds `Verifier::from_paseto_keys_url` for the boot-time
 # key-set fetch (`CARE_PATHWAY_PASETO_KEYS_URL`; see src/auth.rs).
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
 
 # CSV/TSV codec for the native bulk import/export API (§13 T-10;
 # src/bulk/csv.rs). Same version as organization's/case's own BLK-5.
@@ -147,6 +147,14 @@ path = "src/bin/main.rs"
 required-features = []
 
 [features]
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `CARE_PATHWAY_KEYCLOAK_*` (see src/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
 # S3-compatible artifact storage. Off by default: the local-filesystem
 # backend covers dev and test, and the SDK is a large dependency tree no
 # deployment should pay for unless it uses it.
@@ -157,6 +165,9 @@ s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).
 tempfile = "3"

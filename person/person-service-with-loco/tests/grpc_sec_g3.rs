@@ -19,6 +19,8 @@
 //! `#[ignore]`d — requires `PostgreSQL`. Run with
 //! `cargo test --test grpc_sec_g3 -- --ignored`.
 
+#![cfg(feature = "paseto")]
+
 mod common;
 
 use base64::Engine;

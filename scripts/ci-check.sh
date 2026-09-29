@@ -95,16 +95,41 @@ extra_test_features_for() {
     authentication/authentication-verifier-rust-crate)
       # `fetch` gates `from_paseto_keys_url` and its SEC-V1 HTTPS-only /
       # timeout / no-redirect / body-cap tests — dead code and untested
-      # invariants from CI's point of view without this.
-      printf -- '--features fetch'
+      # invariants from CI's point of view without this. `keycloak` gates
+      # the Keycloak verifier and (with `test-idp`) its tests/keycloak_e2e.rs
+      # (a real RS256 JWT against a local OIDC discovery + JWKS server); `paseto` is
+      # already a default feature.
+      printf -- '--features fetch,keycloak,test-idp'
+      ;;
+    organization/organization-service-with-loco|\
+    worker/worker-service-with-loco|\
+    place/place-service-with-loco|\
+    thing/thing-service-with-loco|\
+    event/event-service-with-loco|\
+    course/course-service-with-loco|\
+    care-pathway/care-pathway-service-with-loco|\
+    case/case-service-with-loco|\
+    project-portfolio-management/project-portfolio-management-service-with-loco|\
+    link/link-graph-service-with-loco|\
+    patient-flow/patient-flow-service-with-rust|\
+    workforce-planning-management/workforce-planning-management-service-with-rust|\
+    contact-relationship-management/contact-relationship-management-service-with-rust|\
+    content-management-system/content-management-system-service-with-rust)
+      # `keycloak` gates the optional Keycloak bearer path and its
+      # DB-free tests/keycloak_guard.rs (a real RS256 token through the real
+      # guard, KC-1); without it CI never compiles that code. Every service
+      # whose `keycloak_guard` test needs no database is listed here.
+      printf -- '--features keycloak'
       ;;
     person/person-service-with-loco)
       # `parquet` gates `src/bulk/parquet_format.rs` (the bulk-export
       # Parquet codec, agents/share/bulk-import-export.md §11 step 4) —
       # self-contained (no live endpoint needed, unlike this crate's `s3`
       # feature), and until now never compiled or run by CI at all
-      # (documented as a known gap in that same doc).
-      printf -- '--features parquet'
+      # (documented as a known gap in that same doc). `keycloak` gates the
+      # optional Keycloak bearer path and its DB-free tests/keycloak_guard.rs
+      # (KC-1).
+      printf -- '--features parquet,keycloak'
       ;;
     authentication/authentication-service-with-loco)
       # `oidc` gates SAML/OIDC identity federation (EV-2,

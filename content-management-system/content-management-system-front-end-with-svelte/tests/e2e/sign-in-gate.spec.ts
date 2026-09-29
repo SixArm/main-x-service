@@ -28,3 +28,13 @@ test("/signin itself stays reachable with no session", async ({ page }) => {
   expect(response?.status()).toBe(200);
   await expect(page).toHaveURL(/\/signin$/);
 });
+
+test("/tour renders with no session: six workflows, four steps each", async ({
+  page,
+}) => {
+  const response = await page.goto("/tour");
+  expect(response?.status()).toBe(200);
+  await expect(page).toHaveURL(/\/tour$/);
+  await expect(page.locator(".sections section:not(.closing)")).toHaveCount(7);
+  await expect(page.locator(".steps li")).toHaveCount(28);
+});

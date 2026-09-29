@@ -8,9 +8,13 @@
 <script lang="ts">
     import type { ActionData } from "./$types";
     import { enhance } from "$app/forms";
-    import { i18n } from "$lib/i18n.svelte";
+    import { env } from "$env/dynamic/public";
+    import { i18n, t } from "$lib/i18n.svelte";
 
     let { form }: { form: ActionData } = $props();
+    // Opt-in OIDC "Sign in with SSO": a plain <a> (browser navigation), shown
+    // only when PUBLIC_OIDC_SIGNIN_ENABLED=true. Magic link stays the default.
+    const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === "true";
 </script>
 
 <svelte:head><title>Sign in</title></svelte:head>
@@ -31,4 +35,9 @@
             <p class="banner" role="alert">Could not send the sign-in link. Please try again.</p>
         {/if}
     </form>
+{/if}
+{#if ssoEnabled}
+    <p>
+        <a class="button" href="/signin/sso">{t("signin.sso")}</a>
+    </p>
 {/if}

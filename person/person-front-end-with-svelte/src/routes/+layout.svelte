@@ -115,6 +115,7 @@
         { href: "/persons/bulk", key: "nav.bulk" },
         { href: "/review", key: "nav.review" },
         { href: "/expiry", key: "nav.expiry" },
+        { href: "/tour", key: "nav.tour" },
     ] as const;
 </script>
 

@@ -296,6 +296,87 @@ const STRINGS = {
     "splash.features.6.title": "السمات وحجم النص",
     "splash.features.6.body":
       "اختر سمة ألوان وحجم نص مريحًا، ويُحفظ اختيارك للزيارة القادمة.",
+    "nav.tour": "جولة",
+    "splash.hero.tour": "ابدأ الجولة",
+    "tour.head": "ابدأ الجولة",
+    "tour.toc": "في هذه الصفحة",
+    "tour.open": "افتح هذه الشاشة",
+    "tour.top": "العودة إلى الأعلى",
+    "tour.start.title": "قبل أن تبدأ",
+    "tour.start.summary":
+      "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
+    "tour.start.step.1":
+      "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
+    "tour.start.step.2":
+      "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
+    "tour.start.step.3":
+      "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
+    "tour.start.step.4":
+      "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
+    "tour.intro":
+      "جولة إرشادية في سجل الأحداث: ما تفعله كل شاشة وخطوات استخدامها، من تسجيل حدث إلى دمج التكرارات وإعادة الجدولة على التقويم.",
+    "tour.s1.title": "تسجيل حدث",
+    "tour.s1.summary":
+      "أنشئ حدثًا بنافذته الزمنية وحالته ونوعه ووضع الحضور. تُنبَّه إلى التكرارات المحتملة قبل حفظ الحدث.",
+    "tour.s1.step.1":
+      "اختر «حدث جديد» من القائمة، أو اضغط «حدث جديد» في قائمة الأحداث.",
+    "tour.s1.step.2":
+      "أدخل الاسم وبداية الحدث وهما مطلوبان، ثم أضف النهاية ووقت فتح الأبواب والحالة ووضع الحضور والمنطقة الزمنية. لا يمكن أن تسبق النهاية البداية، ولا أن يتأخر وقت فتح الأبواب عنها.",
+    "tour.s1.step.3":
+      "أضف اختياريًا وصفًا ورابطًا ومدة وحدود السعة وكلمات مفتاحية ولغات، ثم اضغط «إنشاء».",
+    "tour.s1.step.4":
+      "إذا عثر السجل على تكرارات محتملة، تعرضها لوحة «تكرارات محتملة» مع درجاتها. راجعها قبل إعادة الإرسال.",
+    "tour.s2.title": "العثور على الأحداث",
+    "tour.s2.summary":
+      "ابحث في السجل بالاسم أو المنظِّم أو المعرّف، ثم ضيّق القائمة بالتاريخ والحالة والنوع.",
+    "tour.s2.step.1":
+      "افتح «الأحداث» من القائمة؛ تُحمَّل القائمة مع مربع بحث وعدد الأحداث المطابقة.",
+    "tour.s2.step.2":
+      "اكتب في مربع البحث، مثل اسم أو منظِّم أو معرّف، ثم اضغط «بحث».",
+    "tour.s2.step.3":
+      "فعّل «تقريبي» لتحمّل اختلافات الإملاء، وحدّد «من» و«إلى» والحالة والنوع، ثم اضغط «تطبيق عوامل التصفية».",
+    "tour.s2.step.4": "اختر صفًا في الجدول لفتح صفحة تفاصيل ذلك الحدث.",
+    "tour.s3.title": "التحقق من التطابقات",
+    "tour.s3.summary":
+      "قيّم تفاصيل حدث افتراضي مقابل السجل دون إنشاء أي شيء، لترى ما هو موجود بالفعل.",
+    "tour.s3.step.1": "افتح «فحص التطابق» من القائمة.",
+    "tour.s3.step.2":
+      "أدخل الاسم (مطلوب)، وإن كنت تعرفها فأدخل البداية والنهاية واسم المنظِّم.",
+    "tour.s3.step.3": "اضبط العتبة بين 0.0 و1.0، ثم اضغط «البحث عن التطابقات».",
+    "tour.s3.step.4":
+      "اقرأ نتائج التطابق: يعرض كل مرشح درجته، ويوضح تفصيل الدرجة كيف تم التوصل إليها.",
+    "tour.s4.title": "دمج التكرارات",
+    "tour.s4.summary":
+      "ادمج التكرار المؤكد في الحدث الذي تحتفظ به، مع تسجيل السبب في سجل التدقيق.",
+    "tour.s4.step.1":
+      "افتح «دمج» من القائمة وأدخل معرّف الحدث الرئيسي (السجل الباقي) ومعرّف الحدث المكرر.",
+    "tour.s4.step.2":
+      "اضغط «تحميل المعاينة» لرؤية السجلين جنبًا إلى جنب. يجب إدخال المعرّفين وأن يختلفا.",
+    "tour.s4.step.3":
+      "اكتب سببًا يُسجَّل في سجل تدقيق الدمج، ثم اضغط «دمج» وأكّد الرسالة.",
+    "tour.s4.step.4":
+      "يُحذف التكرار حذفًا ناعمًا، وتعرض رسالة «اكتمل الدمج» سجل الدمج، ويفتح «عرض الحدث الرئيسي المدموج» السجل الباقي.",
+    "tour.s5.title": "التخطيط على التقويم",
+    "tour.s5.summary":
+      "اطّلع على النوافذ الزمنية للأحداث في عروض الشهر والأسبوع واليوم، وأعد الجدولة بالسحب.",
+    "tour.s5.step.1":
+      "افتح «التقويم» من القائمة لرؤية الأحداث المسجلة موضوعةً بحسب أوقات بدايتها ونهايتها.",
+    "tour.s5.step.2": "بدّل بين عروض الشهر والأسبوع واليوم.",
+    "tour.s5.step.3":
+      "اسحب حدثًا إلى فترة جديدة؛ يُحفظ التغيير في سجل الحدث عبر التحديث المعتاد، فالتقويم ليس نسخة منفصلة.",
+    "tour.s5.step.4": "اختر حدثًا لفتح صفحة تفاصيله.",
+    "tour.s6.title": "مراجعة الحدث وتعديله وتدقيقه",
+    "tour.s6.summary":
+      "افتح حدثًا واحدًا لقراءة كل ما سُجّل عنه وتصحيحه ومعرفة من غيّره وإخفاء بياناته أو تصديره.",
+    "tour.s6.step.1":
+      "في صفحة تفاصيل الحدث، اقرأ الهوية والموقع والمنظِّمين والمؤدّين والمعرّفات والعروض حيثما وُجدت.",
+    "tour.s6.step.2":
+      "اختر «تحرير» لتغيير السجل ثم «حفظ التغييرات»، أو «حذف» لحذفه حذفًا ناعمًا بعد تأكيد الرسالة.",
+    "tour.s6.step.3":
+      "اختر «التدقيق» لفتح سجل التدقيق: يعرض كل إدخال من أجرى التغيير وحمولته.",
+    "tour.s6.step.4":
+      "استخدم «إظهار المُقنَّع» لعرض النسخة المحجوبة، أو «تصدير البيانات (GDPR)» لتنزيل السجل.",
+    "signin.sso": "تسجيل الدخول عبر SSO",
   },
   "cy-001": {
     "nav.calendar": "Calendr",
@@ -523,6 +604,89 @@ const STRINGS = {
     "splash.features.6.title": "Themâu a maint testun",
     "splash.features.6.body":
       "Dewiswch thema lliw a maint testun cyfforddus, a gofir ar yr ymweliad nesaf.",
+    "nav.tour": "Taith",
+    "splash.hero.tour": "Cymerwch y daith",
+    "tour.head": "Cymerwch y daith",
+    "tour.toc": "Ar y dudalen hon",
+    "tour.open": "Agor y sgrin hon",
+    "tour.top": "Yn ôl i'r brig",
+    "tour.start.title": "Cyn i chi ddechrau",
+    "tour.start.summary":
+      "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+    "tour.start.step.1":
+      "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
+    "tour.start.step.2":
+      "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+    "tour.start.step.3":
+      "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+    "tour.start.step.4":
+      "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+    "tour.intro":
+      "Taith dywys drwy'r gofrestr Digwyddiadau: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o gofrestru digwyddiad i uno dyblygion ac aildrefnu ar y calendr.",
+    "tour.s1.title": "Cofrestru digwyddiad",
+    "tour.s1.summary":
+      "Crëwch ddigwyddiad gyda'i ffenestr amser, ei statws, ei fath a'i ddull mynychu. Caiff dyblygion tebygol eu nodi cyn cadw'r digwyddiad.",
+    "tour.s1.step.1":
+      "Dewiswch Digwyddiad newydd yn y ddewislen, neu pwyswch Digwyddiad newydd ar y rhestr Digwyddiadau.",
+    "tour.s1.step.2":
+      "Llenwch Enw a Dechrau, sy'n ofynnol, yna ychwanegwch Diwedd, Amser agor y drysau, Statws, Modd presenoldeb a Chylchfa amser. Ni all Diwedd fod cyn Dechrau, ac ni all Amser agor y drysau fod ar ôl Dechrau.",
+    "tour.s1.step.3":
+      "Ychwanegwch Disgrifiad, URL, Hyd, terfynau capasiti, Geiriau allweddol ac Ieithoedd os dymunwch, yna pwyswch Creu.",
+    "tour.s1.step.4":
+      "Os yw'r gofrestr yn canfod dyblygion tebygol, mae panel Dyblygiadau posibl yn eu rhestru gyda'u sgorau. Adolygwch nhw cyn ailgyflwyno.",
+    "tour.s2.title": "Dod o hyd i ddigwyddiadau",
+    "tour.s2.summary":
+      "Chwiliwch y gofrestr yn ôl enw, trefnydd neu ddynodwr, yna cyfyngwch y rhestr yn ôl dyddiad, statws a math.",
+    "tour.s2.step.1":
+      "Agorwch Digwyddiadau yn y ddewislen; mae'r rhestr yn llwytho gyda blwch chwilio a chyfrif o'r digwyddiadau sy'n cyfateb.",
+    "tour.s2.step.2":
+      "Teipiwch yn y blwch chwilio, er enghraifft enw, trefnydd neu ddynodwr, a phwyswch Chwilio.",
+    "tour.s2.step.3":
+      "Ticiwch Aneglur i oddef gwahaniaethau sillafu, a gosodwch O, I, Statws a Math, yna pwyswch Cymhwyso hidlwyr.",
+    "tour.s2.step.4":
+      "Dewiswch res yn y grid i agor tudalen manylion y digwyddiad hwnnw.",
+    "tour.s3.title": "Gwirio am gydweddiadau",
+    "tour.s3.summary":
+      "Sgoriwch fanylion digwyddiad damcaniaethol yn erbyn y gofrestr heb greu dim, i weld beth sydd eisoes yn bodoli.",
+    "tour.s3.step.1": "Agorwch Gwiriad cydweddu yn y ddewislen.",
+    "tour.s3.step.2":
+      "Rhowch Enw (gofynnol) ac, os ydych yn eu gwybod, Dechrau, Diwedd ac Enw'r trefnydd.",
+    "tour.s3.step.3":
+      "Gosodwch y Trothwy rhwng 0.0 ac 1.0, yna pwyswch Canfod cyfatebiaethau.",
+    "tour.s3.step.4":
+      "Darllenwch y Canlyniadau cydweddu: mae pob ymgeisydd yn dangos ei sgôr, ac mae'r Dadansoddiad sgôr yn dangos sut y cyrhaeddwyd ato.",
+    "tour.s4.title": "Uno dyblygion",
+    "tour.s4.summary":
+      "Plygwch ddyblyg cadarnhaol i'r digwyddiad rydych yn ei gadw, gyda'r rheswm wedi'i gofnodi yn y llwybr archwilio.",
+    "tour.s4.step.1":
+      "Agorwch Uno yn y ddewislen a rhowch ID y prif ddigwyddiad (y cofnod sy'n goroesi) ac ID y digwyddiad dyblyg.",
+    "tour.s4.step.2":
+      "Pwyswch Llwytho rhagolwg i weld y ddau gofnod ochr yn ochr. Rhaid rhoi'r ddau ID a rhaid iddynt fod yn wahanol.",
+    "tour.s4.step.3":
+      "Rhowch Reswm, a gofnodir yn llwybr archwilio'r uno, yna pwyswch Uno a chadarnhewch yr anogwr.",
+    "tour.s4.step.4":
+      "Caiff y dyblyg ei ddileu'n feddal, mae neges Uno wedi'i gwblhau yn dangos cofnod yr uno, ac mae Gweld y prif ddigwyddiad unedig yn agor y cofnod sy'n goroesi.",
+    "tour.s5.title": "Cynllunio ar y calendr",
+    "tour.s5.summary":
+      "Gwelwch ffenestri amser digwyddiadau mewn golygon mis, wythnos a diwrnod, ac aildrefnwch drwy lusgo.",
+    "tour.s5.step.1":
+      "Agorwch Calendr yn y ddewislen i weld digwyddiadau cofrestredig wedi'u gosod yn ôl eu hamserau dechrau a gorffen.",
+    "tour.s5.step.2": "Newidiwch rhwng y golygon mis, wythnos a diwrnod.",
+    "tour.s5.step.3":
+      "Llusgwch ddigwyddiad i slot newydd; caiff y newid ei gadw yng nghofnod y digwyddiad drwy'r diweddariad arferol, felly nid copi ar wahân yw'r calendr.",
+    "tour.s5.step.4": "Dewiswch ddigwyddiad i agor ei dudalen manylion.",
+    "tour.s6.title": "Adolygu, golygu ac archwilio digwyddiad",
+    "tour.s6.summary":
+      "Agorwch un digwyddiad i ddarllen popeth a gofnodwyd amdano, ei gywiro, gweld pwy a'i newidiodd, ei fasgio neu ei allforio.",
+    "tour.s6.step.1":
+      "Ar dudalen manylion digwyddiad, darllenwch Hunaniaeth, Lleoliad, Trefnwyr, Perfformwyr, Dynodwyr a Chynigion lle maent wedi'u cofnodi.",
+    "tour.s6.step.2":
+      "Dewiswch Golygu i newid y cofnod a Chadw newidiadau, neu Dileu i'w ddileu'n feddal ar ôl cadarnhau'r anogwr.",
+    "tour.s6.step.3":
+      "Dewiswch Archwilio i agor y Cofnod archwilio: mae pob cofnod yn dangos pwy wnaeth y newid a'i lwyth.",
+    "tour.s6.step.4":
+      "Defnyddiwch Dangos wedi'i guddio i weld y fersiwn wedi'i golygu, neu Allforio data (GDPR) i lawrlwytho'r cofnod.",
+    "signin.sso": "Mewngofnodi gydag SSO",
   },
   "en-001": {
     "nav.calendar": "Calendar",
@@ -763,6 +927,89 @@ const STRINGS = {
     "splash.features.6.title": "Themes and text size",
     "splash.features.6.body":
       "Choose a colour theme and a comfortable text size, remembered next visit.",
+    "nav.tour": "Tour",
+    "splash.hero.tour": "Take the tour",
+    "tour.head": "Take the tour",
+    "tour.toc": "On this page",
+    "tour.open": "Open this screen",
+    "tour.top": "Back to top",
+    "tour.start.title": "Before you begin",
+    "tour.start.summary":
+      "You need an account to work with real data. Signing in takes under a minute and needs no password.",
+    "tour.start.step.1":
+      "Choose Sign in at the top right and enter your email address.",
+    "tour.start.step.2":
+      "Open the magic link we email you. It works once and expires quickly.",
+    "tour.start.step.3":
+      "You return to the app signed in, with nothing to remember or reset.",
+    "tour.start.step.4":
+      "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
+    "tour.intro":
+      "A guided walkthrough of the Event registry: what each screen does and the steps to use it, from registering an event to merging duplicates and rescheduling on the calendar.",
+    "tour.s1.title": "Register an event",
+    "tour.s1.summary":
+      "Create an event with its time window, status, type and attendance mode. Likely duplicates are flagged before the event is saved.",
+    "tour.s1.step.1":
+      "Choose New event in the menu, or press New event on the Events list.",
+    "tour.s1.step.2":
+      "Fill in Name and Start, which are required, then add End, Door time, Status, Attendance mode and Time zone. End cannot be before Start, and Door time cannot be after it.",
+    "tour.s1.step.3":
+      "Optionally add a Description, URL, Duration, capacity limits, Keywords and Languages, then press Create.",
+    "tour.s1.step.4":
+      "If the registry finds likely duplicates, a Possible duplicates panel lists them with their scores. Review them before you resubmit.",
+    "tour.s2.title": "Find events",
+    "tour.s2.summary":
+      "Search the registry by name, organizer or identifier, then narrow the list by date, status and type.",
+    "tour.s2.step.1":
+      "Open Events in the menu; the list loads with a search box and a count of matching events.",
+    "tour.s2.step.2":
+      "Type in the search box, for example a name, organizer or identifier, and press Search.",
+    "tour.s2.step.3":
+      "Tick Fuzzy to tolerate spelling differences, and set From, To, Status and Type, then press Apply filters.",
+    "tour.s2.step.4":
+      "Select a row in the grid to open that event's detail page.",
+    "tour.s3.title": "Check for matches",
+    "tour.s3.summary":
+      "Score hypothetical event details against the registry without creating anything, to see what already exists.",
+    "tour.s3.step.1": "Open Match check in the menu.",
+    "tour.s3.step.2":
+      "Enter a Name (required) and, if you know them, Start, End and Organizer name.",
+    "tour.s3.step.3":
+      "Set the Threshold between 0.0 and 1.0, then press Find matches.",
+    "tour.s3.step.4":
+      "Read the Match results: each candidate shows its score, and the Score breakdown shows how it was reached.",
+    "tour.s4.title": "Merge duplicates",
+    "tour.s4.summary":
+      "Fold a confirmed duplicate into the event you are keeping, with the reason recorded in the audit trail.",
+    "tour.s4.step.1":
+      "Open Merge in the menu and enter the Main event ID (the surviving record) and the Duplicate event ID.",
+    "tour.s4.step.2":
+      "Press Load preview to see the two records side by side. The IDs must both be given and must differ.",
+    "tour.s4.step.3":
+      "Give a Reason, which is recorded in the merge audit trail, then press Merge and confirm the prompt.",
+    "tour.s4.step.4":
+      "The duplicate is soft-deleted, a Merge completed message shows the merge record, and View merged main event opens the survivor.",
+    "tour.s5.title": "Plan on the calendar",
+    "tour.s5.summary":
+      "See event time windows in month, week and day views, and reschedule by dragging.",
+    "tour.s5.step.1":
+      "Open Calendar in the menu to see registered events placed by their start and end times.",
+    "tour.s5.step.2": "Switch between the month, week and day views.",
+    "tour.s5.step.3":
+      "Drag an event to a new slot; the change is saved to the event record through the normal update, so the calendar is not a separate copy.",
+    "tour.s5.step.4": "Select an event to open its detail page.",
+    "tour.s6.title": "Review, edit and audit an event",
+    "tour.s6.summary":
+      "Open one event to read everything recorded about it, correct it, see who changed it, mask it or export it.",
+    "tour.s6.step.1":
+      "On an event's detail page, read Identity, Location, Organizers, Performers, Identifiers and Offers where they are recorded.",
+    "tour.s6.step.2":
+      "Choose Edit to change the record and Save changes, or Delete to soft-delete it after confirming the prompt.",
+    "tour.s6.step.3":
+      "Choose Audit to open the Audit log: each entry shows who made the change and its payload.",
+    "tour.s6.step.4":
+      "Use Show masked to view the redacted version, or Export data (GDPR) to download the record.",
+    "signin.sso": "Sign in with SSO",
   },
   "es-001": {
     "nav.calendar": "Calendario",
@@ -992,6 +1239,89 @@ const STRINGS = {
     "splash.features.6.title": "Temas y tamaño del texto",
     "splash.features.6.body":
       "Elige un tema de color y un tamaño de texto cómodo; se recuerdan en la próxima visita.",
+    "nav.tour": "Recorrido",
+    "splash.hero.tour": "Haz el recorrido",
+    "tour.head": "Haz el recorrido",
+    "tour.toc": "En esta página",
+    "tour.open": "Abrir esta pantalla",
+    "tour.top": "Volver arriba",
+    "tour.start.title": "Antes de empezar",
+    "tour.start.summary":
+      "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
+    "tour.start.step.1":
+      "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
+    "tour.start.step.2":
+      "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
+    "tour.start.step.3":
+      "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
+    "tour.start.step.4":
+      "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
+    "tour.intro":
+      "Un recorrido guiado por el registro de eventos: qué hace cada pantalla y los pasos para usarla, desde registrar un evento hasta fusionar duplicados y reprogramar en el calendario.",
+    "tour.s1.title": "Registrar un evento",
+    "tour.s1.summary":
+      "Crea un evento con su ventana de tiempo, estado, tipo y modalidad de asistencia. Los posibles duplicados se señalan antes de guardar el evento.",
+    "tour.s1.step.1":
+      "Elige Nuevo evento en el menú, o pulsa Nuevo evento en la lista de eventos.",
+    "tour.s1.step.2":
+      "Rellena Nombre e Inicio, que son obligatorios, y luego añade Fin, Hora de apertura, Estado, Modo de asistencia y Zona horaria. El fin no puede ser anterior al inicio, ni la hora de apertura posterior a él.",
+    "tour.s1.step.3":
+      "Si quieres, añade Descripción, URL, Duración, límites de aforo, Palabras clave e Idiomas, y pulsa Crear.",
+    "tour.s1.step.4":
+      "Si el registro encuentra posibles duplicados, un panel de Posibles duplicados los lista con sus puntuaciones. Revísalos antes de volver a enviar.",
+    "tour.s2.title": "Encontrar eventos",
+    "tour.s2.summary":
+      "Busca en el registro por nombre, organizador o identificador y acota la lista por fecha, estado y tipo.",
+    "tour.s2.step.1":
+      "Abre Eventos en el menú; la lista se carga con un cuadro de búsqueda y el número de eventos coincidentes.",
+    "tour.s2.step.2":
+      "Escribe en el cuadro de búsqueda, por ejemplo un nombre, organizador o identificador, y pulsa Buscar.",
+    "tour.s2.step.3":
+      "Marca Difusa para tolerar diferencias de ortografía, define Desde, Hasta, Estado y Tipo, y pulsa Aplicar filtros.",
+    "tour.s2.step.4":
+      "Selecciona una fila de la cuadrícula para abrir la página de detalle de ese evento.",
+    "tour.s3.title": "Comprobar coincidencias",
+    "tour.s3.summary":
+      "Puntúa los datos de un evento hipotético frente al registro sin crear nada, para ver qué existe ya.",
+    "tour.s3.step.1": "Abre Comprobar coincidencias en el menú.",
+    "tour.s3.step.2":
+      "Introduce un Nombre (obligatorio) y, si los conoces, Inicio, Fin y Nombre del organizador.",
+    "tour.s3.step.3":
+      "Fija el Umbral entre 0.0 y 1.0 y pulsa Buscar coincidencias.",
+    "tour.s3.step.4":
+      "Lee los Resultados de coincidencia: cada candidato muestra su puntuación y el Desglose de puntuación indica cómo se obtuvo.",
+    "tour.s4.title": "Fusionar duplicados",
+    "tour.s4.summary":
+      "Incorpora un duplicado confirmado en el evento que conservas, con el motivo registrado en la auditoría.",
+    "tour.s4.step.1":
+      "Abre Fusionar en el menú e introduce el ID del evento principal (el registro que se conserva) y el ID del evento duplicado.",
+    "tour.s4.step.2":
+      "Pulsa Cargar vista previa para ver los dos registros lado a lado. Ambos ID son obligatorios y deben ser distintos.",
+    "tour.s4.step.3":
+      "Indica un Motivo, que queda registrado en la auditoría de la fusión, y pulsa Fusionar y confirma el aviso.",
+    "tour.s4.step.4":
+      "El duplicado se elimina de forma lógica, un mensaje de Fusión completada muestra el registro de la fusión y Ver evento principal fusionado abre el registro superviviente.",
+    "tour.s5.title": "Planificar en el calendario",
+    "tour.s5.summary":
+      "Consulta las ventanas de tiempo de los eventos en vistas de mes, semana y día, y reprograma arrastrando.",
+    "tour.s5.step.1":
+      "Abre Calendario en el menú para ver los eventos registrados según sus horas de inicio y fin.",
+    "tour.s5.step.2": "Cambia entre las vistas de mes, semana y día.",
+    "tour.s5.step.3":
+      "Arrastra un evento a un nuevo horario; el cambio se guarda en el registro del evento mediante la actualización normal, así que el calendario no es una copia aparte.",
+    "tour.s5.step.4": "Selecciona un evento para abrir su página de detalle.",
+    "tour.s6.title": "Revisar, editar y auditar un evento",
+    "tour.s6.summary":
+      "Abre un evento para leer todo lo registrado, corregirlo, ver quién lo cambió, enmascararlo o exportarlo.",
+    "tour.s6.step.1":
+      "En la página de detalle de un evento, lee Identidad, Ubicación, Organizadores, Intérpretes, Identificadores y Ofertas donde estén registrados.",
+    "tour.s6.step.2":
+      "Elige Editar para cambiar el registro y Guardar cambios, o Eliminar para borrarlo de forma lógica tras confirmar el aviso.",
+    "tour.s6.step.3":
+      "Elige Auditoría para abrir el Registro de auditoría: cada entrada muestra quién hizo el cambio y su contenido.",
+    "tour.s6.step.4":
+      "Usa Mostrar enmascarado para ver la versión censurada, o Exportar datos (RGPD) para descargar el registro.",
+    "signin.sso": "Iniciar sesión con SSO",
   },
   "fr-001": {
     "nav.calendar": "Calendrier",
@@ -1221,6 +1551,90 @@ const STRINGS = {
     "splash.features.6.title": "Thèmes et taille du texte",
     "splash.features.6.body":
       "Choisissez un thème de couleurs et une taille de texte confortable, mémorisés pour la prochaine visite.",
+    "nav.tour": "Visite guidée",
+    "splash.hero.tour": "Faire la visite guidée",
+    "tour.head": "Faire la visite guidée",
+    "tour.toc": "Sur cette page",
+    "tour.open": "Ouvrir cet écran",
+    "tour.top": "Retour en haut",
+    "tour.start.title": "Avant de commencer",
+    "tour.start.summary":
+      "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+    "tour.start.step.1":
+      "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
+    "tour.start.step.2":
+      "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+    "tour.start.step.3":
+      "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+    "tour.start.step.4":
+      "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
+    "tour.intro":
+      "Une visite guidée du registre des événements : le rôle de chaque écran et les étapes pour l'utiliser, de l'enregistrement d'un événement à la fusion des doublons et à la replanification dans le calendrier.",
+    "tour.s1.title": "Enregistrer un événement",
+    "tour.s1.summary":
+      "Créez un événement avec sa plage horaire, son statut, son type et son mode de participation. Les doublons probables sont signalés avant l'enregistrement.",
+    "tour.s1.step.1":
+      "Choisissez Nouvel événement dans le menu, ou appuyez sur Nouvel événement dans la liste des événements.",
+    "tour.s1.step.2":
+      "Renseignez Nom et Début, obligatoires, puis ajoutez Fin, Heure d'ouverture des portes, Statut, Mode de participation et Fuseau horaire. La fin ne peut précéder le début, ni l'heure d'ouverture le suivre.",
+    "tour.s1.step.3":
+      "Ajoutez si besoin une Description, une URL, une Durée, des limites de capacité, des Mots-clés et des Langues, puis appuyez sur Créer.",
+    "tour.s1.step.4":
+      "Si le registre trouve des doublons probables, un panneau Doublons possibles les liste avec leurs scores. Examinez-les avant de soumettre à nouveau.",
+    "tour.s2.title": "Trouver des événements",
+    "tour.s2.summary":
+      "Recherchez dans le registre par nom, organisateur ou identifiant, puis affinez la liste par date, statut et type.",
+    "tour.s2.step.1":
+      "Ouvrez Événements dans le menu ; la liste se charge avec une zone de recherche et le nombre d'événements correspondants.",
+    "tour.s2.step.2":
+      "Saisissez dans la zone de recherche, par exemple un nom, un organisateur ou un identifiant, puis appuyez sur Rechercher.",
+    "tour.s2.step.3":
+      "Cochez Approximatif pour tolérer les écarts d'orthographe, réglez Du, Au, Statut et Type, puis appuyez sur Appliquer les filtres.",
+    "tour.s2.step.4":
+      "Sélectionnez une ligne de la grille pour ouvrir la page de détail de cet événement.",
+    "tour.s3.title": "Vérifier les correspondances",
+    "tour.s3.summary":
+      "Évaluez les détails d'un événement hypothétique par rapport au registre sans rien créer, pour voir ce qui existe déjà.",
+    "tour.s3.step.1": "Ouvrez Vérifier les correspondances dans le menu.",
+    "tour.s3.step.2":
+      "Saisissez un Nom (obligatoire) et, si vous les connaissez, Début, Fin et Nom de l'organisateur.",
+    "tour.s3.step.3":
+      "Réglez le Seuil entre 0.0 et 1.0, puis appuyez sur Trouver des correspondances.",
+    "tour.s3.step.4":
+      "Lisez les Résultats de correspondance : chaque candidat affiche son score et le Détail du score montre comment il a été obtenu.",
+    "tour.s4.title": "Fusionner les doublons",
+    "tour.s4.summary":
+      "Fondez un doublon confirmé dans l'événement que vous conservez, avec le motif consigné dans la piste d'audit.",
+    "tour.s4.step.1":
+      "Ouvrez Fusionner dans le menu et saisissez l'ID de l'événement principal (la fiche conservée) et l'ID de l'événement en double.",
+    "tour.s4.step.2":
+      "Appuyez sur Charger l'aperçu pour voir les deux fiches côte à côte. Les deux ID sont requis et doivent être différents.",
+    "tour.s4.step.3":
+      "Indiquez un Motif, consigné dans la piste d'audit de la fusion, puis appuyez sur Fusionner et confirmez.",
+    "tour.s4.step.4":
+      "Le doublon est supprimé logiquement, un message Fusion terminée affiche la fiche de fusion et Voir l'événement principal fusionné ouvre la fiche conservée.",
+    "tour.s5.title": "Planifier dans le calendrier",
+    "tour.s5.summary":
+      "Consultez les plages horaires des événements en vues mois, semaine et jour, et replanifiez par glisser-déposer.",
+    "tour.s5.step.1":
+      "Ouvrez Calendrier dans le menu pour voir les événements enregistrés placés selon leurs heures de début et de fin.",
+    "tour.s5.step.2": "Basculez entre les vues mois, semaine et jour.",
+    "tour.s5.step.3":
+      "Faites glisser un événement vers un nouveau créneau ; la modification est enregistrée dans la fiche par la mise à jour habituelle, le calendrier n'est donc pas une copie distincte.",
+    "tour.s5.step.4":
+      "Sélectionnez un événement pour ouvrir sa page de détail.",
+    "tour.s6.title": "Consulter, modifier et auditer un événement",
+    "tour.s6.summary":
+      "Ouvrez un événement pour lire tout ce qui y est consigné, le corriger, voir qui l'a modifié, le masquer ou l'exporter.",
+    "tour.s6.step.1":
+      "Sur la page de détail d'un événement, lisez Identité, Lieu, Organisateurs, Intervenants, Identifiants et Offres lorsqu'ils sont renseignés.",
+    "tour.s6.step.2":
+      "Choisissez Modifier pour changer la fiche puis Enregistrer les modifications, ou Supprimer pour la supprimer logiquement après confirmation.",
+    "tour.s6.step.3":
+      "Choisissez Audit pour ouvrir le Journal d'audit : chaque entrée indique qui a fait la modification et son contenu.",
+    "tour.s6.step.4":
+      "Utilisez Afficher masqué pour voir la version expurgée, ou Exporter les données (RGPD) pour télécharger la fiche.",
+    "signin.sso": "Se connecter avec SSO",
   },
   "hi-001": {
     "nav.calendar": "कैलेंडर",
@@ -1448,6 +1862,88 @@ const STRINGS = {
     "splash.features.6.title": "थीम और टेक्स्ट आकार",
     "splash.features.6.body":
       "रंग थीम और आरामदायक टेक्स्ट आकार चुनें, अगली बार भी याद रहेगा।",
+    "nav.tour": "टूर",
+    "splash.hero.tour": "टूर देखें",
+    "tour.head": "टूर देखें",
+    "tour.toc": "इस पृष्ठ पर",
+    "tour.open": "यह स्क्रीन खोलें",
+    "tour.top": "ऊपर लौटें",
+    "tour.start.title": "शुरू करने से पहले",
+    "tour.start.summary":
+      "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
+    "tour.start.step.1":
+      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.2":
+      "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
+    "tour.start.step.3":
+      "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
+    "tour.start.step.4":
+      "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
+    "tour.intro":
+      "इवेंट रजिस्ट्री का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, इवेंट दर्ज करने से लेकर डुप्लिकेट मर्ज करने और कैलेंडर पर समय बदलने तक।",
+    "tour.s1.title": "इवेंट दर्ज करना",
+    "tour.s1.summary":
+      "समय-सीमा, स्थिति, प्रकार और उपस्थिति मोड के साथ इवेंट बनाएँ। इवेंट सहेजने से पहले संभावित डुप्लिकेट चिह्नित किए जाते हैं।",
+    "tour.s1.step.1":
+      "मेनू में नया इवेंट चुनें, या इवेंट सूची में नया इवेंट दबाएँ।",
+    "tour.s1.step.2":
+      "नाम और आरंभ भरें, जो अनिवार्य हैं, फिर समाप्ति, द्वार समय, स्थिति, उपस्थिति मोड और समय क्षेत्र जोड़ें। समाप्ति आरंभ से पहले और द्वार समय आरंभ के बाद नहीं हो सकता।",
+    "tour.s1.step.3":
+      "चाहें तो विवरण, URL, अवधि, क्षमता सीमा, कीवर्ड और भाषाएँ जोड़ें, फिर बनाएँ दबाएँ।",
+    "tour.s1.step.4":
+      "यदि रजिस्ट्री को संभावित डुप्लिकेट मिलते हैं, तो संभावित डुप्लिकेट पैनल उन्हें स्कोर सहित सूचीबद्ध करता है। दोबारा जमा करने से पहले उनकी समीक्षा करें।",
+    "tour.s2.title": "इवेंट खोजना",
+    "tour.s2.summary":
+      "नाम, आयोजक या पहचानकर्ता से रजिस्ट्री खोजें, फिर तिथि, स्थिति और प्रकार से सूची सीमित करें।",
+    "tour.s2.step.1":
+      "मेनू में इवेंट खोलें; सूची खोज बॉक्स और मेल खाने वाले इवेंट की गिनती के साथ लोड होती है।",
+    "tour.s2.step.2":
+      "खोज बॉक्स में टाइप करें, जैसे नाम, आयोजक या पहचानकर्ता, और खोजें दबाएँ।",
+    "tour.s2.step.3":
+      "वर्तनी के अंतर सहने के लिए फ़ज़ी चुनें, फिर से, तक, स्थिति और प्रकार तय करें और फ़िल्टर लागू करें दबाएँ।",
+    "tour.s2.step.4":
+      "उस इवेंट का विवरण पृष्ठ खोलने के लिए ग्रिड में कोई पंक्ति चुनें।",
+    "tour.s3.title": "मिलान जाँचना",
+    "tour.s3.summary":
+      "कुछ बनाए बिना काल्पनिक इवेंट के विवरण को रजिस्ट्री के विरुद्ध स्कोर करें, ताकि देख सकें कि पहले से क्या मौजूद है।",
+    "tour.s3.step.1": "मेनू में मिलान जाँच खोलें।",
+    "tour.s3.step.2":
+      "नाम (अनिवार्य) दर्ज करें और यदि पता हो तो आरंभ, समाप्ति और आयोजक का नाम भी दें।",
+    "tour.s3.step.3": "सीमा 0.0 से 1.0 के बीच तय करें, फिर मिलान खोजें दबाएँ।",
+    "tour.s3.step.4":
+      "मिलान परिणाम पढ़ें: हर उम्मीदवार अपना स्कोर दिखाता है और स्कोर विवरण बताता है कि वह कैसे बना।",
+    "tour.s4.title": "डुप्लिकेट मर्ज करना",
+    "tour.s4.summary":
+      "पुष्ट डुप्लिकेट को उस इवेंट में मिलाएँ जिसे आप रख रहे हैं, कारण ऑडिट ट्रेल में दर्ज होता है।",
+    "tour.s4.step.1":
+      "मेनू में मर्ज खोलें और मुख्य इवेंट ID (जो रिकॉर्ड बचेगा) और डुप्लिकेट इवेंट ID दर्ज करें।",
+    "tour.s4.step.2":
+      "दोनों रिकॉर्ड साथ-साथ देखने के लिए पूर्वावलोकन लोड करें दबाएँ। दोनों ID देना अनिवार्य है और वे अलग होने चाहिए।",
+    "tour.s4.step.3":
+      "कारण दें, जो मर्ज ऑडिट ट्रेल में दर्ज होता है, फिर मर्ज दबाएँ और पुष्टि करें।",
+    "tour.s4.step.4":
+      "डुप्लिकेट सॉफ़्ट-डिलीट हो जाता है, मर्ज पूर्ण संदेश मर्ज रिकॉर्ड दिखाता है और मर्ज किया गया मुख्य इवेंट देखें बचे हुए रिकॉर्ड को खोलता है।",
+    "tour.s5.title": "कैलेंडर पर योजना बनाना",
+    "tour.s5.summary":
+      "माह, सप्ताह और दिन के दृश्यों में इवेंट की समय-सीमाएँ देखें और खींचकर समय बदलें।",
+    "tour.s5.step.1":
+      "मेनू में कैलेंडर खोलें, जहाँ दर्ज इवेंट उनके आरंभ और समाप्ति समय के अनुसार दिखते हैं।",
+    "tour.s5.step.2": "माह, सप्ताह और दिन के दृश्यों के बीच बदलें।",
+    "tour.s5.step.3":
+      "किसी इवेंट को नए स्लॉट पर खींचें; बदलाव सामान्य अपडेट के ज़रिए इवेंट रिकॉर्ड में सहेजा जाता है, इसलिए कैलेंडर कोई अलग प्रति नहीं है।",
+    "tour.s5.step.4": "किसी इवेंट का विवरण पृष्ठ खोलने के लिए उसे चुनें।",
+    "tour.s6.title": "इवेंट की समीक्षा, संपादन और ऑडिट",
+    "tour.s6.summary":
+      "एक इवेंट खोलकर उसके बारे में दर्ज सब कुछ पढ़ें, सुधारें, देखें कि किसने बदला, उसे मास्क करें या निर्यात करें।",
+    "tour.s6.step.1":
+      "इवेंट के विवरण पृष्ठ पर पहचान, स्थान, आयोजक, कलाकार, पहचानकर्ता और ऑफ़र पढ़ें, जहाँ वे दर्ज हैं।",
+    "tour.s6.step.2":
+      "रिकॉर्ड बदलने के लिए संपादित करें चुनकर बदलाव सहेजें दबाएँ, या पुष्टि के बाद सॉफ़्ट-डिलीट के लिए हटाएँ चुनें।",
+    "tour.s6.step.3":
+      "ऑडिट लॉग खोलने के लिए ऑडिट चुनें: हर प्रविष्टि दिखाती है कि बदलाव किसने किया और उसका पेलोड क्या है।",
+    "tour.s6.step.4":
+      "संपादित संस्करण देखने के लिए मास्क किया हुआ दिखाएँ, या रिकॉर्ड डाउनलोड करने के लिए डेटा निर्यात (GDPR) उपयोग करें।",
+    "signin.sso": "SSO से साइन इन करें",
   },
   "zh-cn": {
     "nav.calendar": "日历",
@@ -1659,6 +2155,82 @@ const STRINGS = {
     "splash.features.6.title": "主题与文字大小",
     "splash.features.6.body":
       "选择配色主题和舒适的文字大小，下次访问时仍会保留。",
+    "nav.tour": "导览",
+    "splash.hero.tour": "开始导览",
+    "tour.head": "开始导览",
+    "tour.toc": "本页内容",
+    "tour.open": "打开此页面",
+    "tour.top": "返回顶部",
+    "tour.start.title": "开始之前",
+    "tour.start.summary":
+      "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
+    "tour.start.step.1": "点击右上角的“登录”，输入你的邮箱地址。",
+    "tour.start.step.2":
+      "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
+    "tour.start.step.3": "你会以已登录状态回到应用，无需记忆或重置任何内容。",
+    "tour.start.step.4":
+      "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
+    "tour.intro":
+      "活动登记库的图文导览：每个页面的作用和使用步骤，从登记活动到合并重复记录、在日历上重新安排时间。",
+    "tour.s1.title": "登记活动",
+    "tour.s1.summary":
+      "创建包含时间范围、状态、类型和参与方式的活动。保存前会提示可能的重复项。",
+    "tour.s1.step.1": "在菜单中选择“新建活动”，或在活动列表中点击“新建活动”。",
+    "tour.s1.step.2":
+      "填写必填的名称和开始时间，再补充结束时间、开门时间、状态、参与方式和时区。结束时间不能早于开始时间，开门时间不能晚于开始时间。",
+    "tour.s1.step.3":
+      "可选填写描述、网址、时长、容量上限、关键词和语言，然后点击“创建”。",
+    "tour.s1.step.4":
+      "如果登记库发现可能的重复项，“可能的重复项”面板会列出它们及得分。请先核对，再重新提交。",
+    "tour.s2.title": "查找活动",
+    "tour.s2.summary":
+      "按名称、组织者或标识符搜索登记库，再按日期、状态和类型缩小列表范围。",
+    "tour.s2.step.1": "在菜单中打开“活动”；列表会加载搜索框和匹配活动的数量。",
+    "tour.s2.step.2": "在搜索框中输入名称、组织者或标识符等，然后点击“搜索”。",
+    "tour.s2.step.3":
+      "勾选“模糊”以容忍拼写差异，设置开始、结束、状态和类型，然后点击“应用筛选”。",
+    "tour.s2.step.4": "在表格中选择一行，即可打开该活动的详情页。",
+    "tour.s3.title": "检查匹配项",
+    "tour.s3.summary":
+      "在不创建任何记录的情况下，将假设的活动信息与登记库比对打分，看看已有哪些记录。",
+    "tour.s3.step.1": "在菜单中打开“匹配检查”。",
+    "tour.s3.step.2":
+      "输入名称（必填），如果知道，也填写开始时间、结束时间和组织者名称。",
+    "tour.s3.step.3": "将阈值设为 0.0 到 1.0 之间，然后点击“查找匹配”。",
+    "tour.s3.step.4":
+      "查看“匹配结果”：每个候选项都显示得分，“得分明细”说明得分的构成。",
+    "tour.s4.title": "合并重复记录",
+    "tour.s4.summary":
+      "把已确认的重复记录并入要保留的活动，并将原因记入审计记录。",
+    "tour.s4.step.1":
+      "在菜单中打开“合并”，输入主活动 ID（保留的记录）和重复活动 ID。",
+    "tour.s4.step.2":
+      "点击“加载预览”并排查看两条记录。两个 ID 都必须填写且不能相同。",
+    "tour.s4.step.3":
+      "填写“原因”（会记入合并审计记录），然后点击“合并”并确认提示。",
+    "tour.s4.step.4":
+      "重复记录会被软删除，“合并完成”消息会显示合并记录，点击“查看合并后的主活动”可打开保留的记录。",
+    "tour.s5.title": "在日历上安排",
+    "tour.s5.summary":
+      "在月、周、日视图中查看活动的时间范围，并通过拖动重新安排。",
+    "tour.s5.step.1":
+      "在菜单中打开“日历”，可看到已登记的活动按开始和结束时间排布。",
+    "tour.s5.step.2": "在月、周、日视图之间切换。",
+    "tour.s5.step.3":
+      "把活动拖到新的时段；更改会通过常规更新保存到活动记录中，因此日历不是独立的副本。",
+    "tour.s5.step.4": "选择某个活动即可打开其详情页。",
+    "tour.s6.title": "查看、编辑和审计活动",
+    "tour.s6.summary":
+      "打开一个活动，查看其全部记录、修改它、查看谁改过它、进行脱敏或导出。",
+    "tour.s6.step.1":
+      "在活动详情页中，查看已记录的身份、地点、组织者、表演者、标识符和优惠。",
+    "tour.s6.step.2":
+      "选择“编辑”修改记录并点击“保存更改”，或选择“删除”并确认提示后将其软删除。",
+    "tour.s6.step.3":
+      "选择“审计”打开审计日志：每条记录显示谁做了更改及其载荷。",
+    "tour.s6.step.4":
+      "使用“显示脱敏”查看已遮蔽的版本，或使用“导出数据 (GDPR)”下载该记录。",
+    "signin.sso": "使用 SSO 登录",
   },
 } as const;
 

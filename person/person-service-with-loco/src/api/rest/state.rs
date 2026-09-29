@@ -6,6 +6,7 @@
 //! configuration behind trait objects so handlers stay decoupled from
 //! concrete implementations.
 
+#[cfg(feature = "paseto")]
 use authentication_verifier::Verifier;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
@@ -116,13 +117,16 @@ impl AppState {
 // the key set that holder is built from.
 
 /// Default issuer expected in tokens (`iss`).
+#[cfg(feature = "paseto")]
 pub(crate) const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
+#[cfg(feature = "paseto")]
 pub(crate) const DEFAULT_AUDIENCE: &str = "main-x-service";
 
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.
+#[cfg(feature = "paseto")]
 pub(crate) fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
         .ok()
@@ -143,6 +147,7 @@ pub(crate) fn env_or(name: &str, default: &str) -> String {
 ///
 /// For the boot-time HTTP fetch of the key set
 /// (`PERSON_PASETO_KEYS_URL`), see [`verifier_from_env_or_fetch`].
+#[cfg(feature = "paseto")]
 pub(crate) fn verifier_from_env() -> Verifier {
     let issuer = env_or("PERSON_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("PERSON_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
@@ -152,6 +157,7 @@ pub(crate) fn verifier_from_env() -> Verifier {
 /// The `PERSON_PASETO_KEYS` env-key-set path with an explicit issuer /
 /// audience: parse the key-set JSON from the variable, or fall back to
 /// an empty (reject-all) set so the service always boots.
+#[cfg(feature = "paseto")]
 fn env_keys_verifier(issuer: &str, audience: &str) -> Verifier {
     let keys = std::env::var("PERSON_PASETO_KEYS")
         .ok()
@@ -177,6 +183,7 @@ fn env_keys_verifier(issuer: &str, audience: &str) -> Verifier {
 ///
 /// The fetch happens once at boot; there is no refresh loop (periodic
 /// refresh is a possible future item — spec §15).
+#[cfg(feature = "paseto")]
 pub async fn verifier_from_env_or_fetch() -> Verifier {
     let issuer = env_or("PERSON_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or("PERSON_TOKEN_AUDIENCE", DEFAULT_AUDIENCE);
@@ -192,6 +199,7 @@ pub async fn verifier_from_env_or_fetch() -> Verifier {
 /// [`Verifier::from_paseto_keys_url`] — the fetched set wins on
 /// success, the env path is the fallback on any fetch error. Never
 /// panics; the service always gets a verifier.
+#[cfg(feature = "paseto")]
 pub async fn verifier_from_url_or_env(url: Option<&str>, issuer: &str, audience: &str) -> Verifier {
     let Some(url) = url else {
         return env_keys_verifier(issuer, audience);
@@ -218,6 +226,7 @@ pub async fn verifier_from_url_or_env(url: Option<&str>, issuer: &str, audience:
 
 /// A verifier with no keys: every token is rejected until a real key set
 /// is configured. Infallible — an empty `keys` array always parses.
+#[cfg(feature = "paseto")]
 fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
     let empty = serde_json::json!({ "keys": [] });
     Verifier::from_paseto_keys_value(&empty, issuer, audience).expect("empty key set always builds")
@@ -234,7 +243,7 @@ impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "paseto"))]
 mod tests {
     use super::*;
 
