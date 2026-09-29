@@ -592,3 +592,9 @@ clearly described manual check confirms the acceptance criterion.
   `ThingRepository.list` addition) is tracked there, not duplicated
   here.
 
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `THING_KEYCLOAK_*` configuration; `request_claims` /
+      `enforce_request` used by the guard and the `AuthUser` extractor;
+      `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
+      KC-1; reference: organization-service / person-service.
