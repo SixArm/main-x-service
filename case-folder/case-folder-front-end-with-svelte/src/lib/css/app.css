@@ -23,14 +23,7 @@
     font-size: 150%;
 }
 
-/* Utility row — Lily theme/text-size/share pickers above the site header. */
-.utility-row {
-    background: var(--nhs-pale-grey);
-    border-bottom: var(--nhs-border-width) solid var(--nhs-dark-grey);
-    font-size: var(--nhs-font-size-14);
-}
-
-.utility-row .page-wrapper {
+.page-wrapper {
     display: flex;
     gap: var(--nhs-space-4);
     align-items: center;
@@ -120,7 +113,7 @@
     display: none;
     position: absolute;
     top: 100%;
-    left: var(--nhs-space-4);
+    inset-inline-start: var(--nhs-space-4);
     z-index: 50;
     flex-direction: column;
     align-items: stretch;
@@ -732,4 +725,158 @@
 .muted {
     color: var(--nhs-dark-grey);
     font-size: var(--nhs-font-size-14);
+}
+
+/* Header end group: identity, Sign in / Sign out, then the Lily PickerBar,
+   always visible (never inside the collapsed hamburger nav). The Lily theme
+   stylesheet (loaded by ThemePicker, see `defaultValue` in the layout)
+   styles the picker buttons and listboxes; this only places them. Each
+   listbox is anchored to the header's `.page-wrapper` (`position: relative`)
+   rather than to its own button, so it drops down under the header's end
+   edge, is as wide as its longest label, never pushes the page down, and
+   cannot run off either side of a narrow screen. */
+.app-header .header-end {
+    display: flex;
+    align-items: center;
+    gap: var(--nhs-space-2);
+    margin-inline-start: auto;
+}
+
+.app-header .header-end form {
+    margin: 0;
+}
+
+.app-header .auth-status {
+    font-size: var(--nhs-font-size-14);
+    white-space: nowrap;
+}
+
+.app-header .session-button {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    height: 2.5rem;
+    padding: 0 var(--nhs-space-3);
+    border: 1px solid var(--nhs-white);
+    border-radius: var(--nhs-border-radius);
+    background: transparent;
+    color: var(--nhs-white);
+    font: inherit;
+    font-size: var(--nhs-font-size-14);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.app-header .session-button:hover {
+    background: var(--nhs-dark-blue);
+    text-decoration: none;
+}
+
+.app-header .session-button.signin {
+    background: var(--nhs-white);
+    color: var(--nhs-blue);
+}
+
+.app-header .session-button.signin:hover {
+    filter: brightness(0.93);
+}
+
+.header-end .picker-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--nhs-space-1);
+}
+
+.header-end .theme-picker,
+.header-end .locale-picker,
+.header-end .text-size-picker,
+.header-end .share-picker {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* "Copied" feedback: a live region Lily renders inside the share picker's
+   root. In flow it made that root taller than the other three and knocked
+   its button out of line, so it is lifted out of flow and shown as a small
+   pill under the header instead. */
+.header-end .share-picker-status {
+    position: absolute;
+    top: 100%;
+    inset-inline-end: var(--nhs-space-4);
+    z-index: 40;
+    margin: var(--nhs-space-1) 0 0;
+    padding: var(--nhs-space-1) var(--nhs-space-2);
+    border-radius: var(--nhs-border-radius);
+    background: var(--nhs-white);
+    color: var(--nhs-black);
+    border: 1px solid var(--nhs-mid-grey);
+    font-size: var(--nhs-font-size-14);
+}
+
+.header-end .share-picker-status:empty {
+    display: none;
+}
+
+/* Lily renders each picker's trigger as a plain <button> and its list as a
+   role="listbox" (or a <ul> for share), so target the structure rather than
+   generated class names. */
+.header-end .picker-bar button {
+    box-sizing: border-box;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: 0;
+    vertical-align: middle;
+}
+
+.header-end .theme-picker [role='listbox'],
+.header-end .locale-picker [role='listbox'],
+.header-end .text-size-picker [role='listbox'],
+.header-end .share-picker-list {
+    top: 100%;
+    inset-inline-start: auto;
+    inset-inline-end: var(--nhs-space-4);
+    z-index: 60;
+    box-sizing: border-box;
+    min-width: 0;
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+}
+
+.header-end .picker-bar [role='option'] {
+    white-space: nowrap;
+}
+
+@media (max-width: 60rem) {
+    .app-header .auth-status {
+        display: none;
+    }
+}
+
+@media (max-width: 40rem) {
+    .app-header .brand-tag {
+        display: none;
+    }
+    .app-header .page-wrapper {
+        padding-inline: var(--nhs-space-2);
+        gap: var(--nhs-space-2);
+    }
+    .app-header .header-end {
+        gap: var(--nhs-space-1);
+    }
+    .header-end .picker-bar [role='option'] {
+        white-space: normal;
+    }
+    .header-end .share-picker-status {
+        inset-inline-end: var(--nhs-space-2);
+    }
+    .header-end .theme-picker [role='listbox'],
+    .header-end .locale-picker [role='listbox'],
+    .header-end .text-size-picker [role='listbox'],
+    .header-end .share-picker-list {
+        inset-inline-end: var(--nhs-space-2);
+    }
 }

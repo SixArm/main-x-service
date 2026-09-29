@@ -1,16 +1,18 @@
 // Coverage + behaviour pins for the case-folder i18n store.
 //
-// - Every one of the 13 locales must define every key in the English
+// - Every one of the 7 locales must define every key in the English
 //   catalog (a missing key is a UI bug: it would silently fall back to
 //   English for that locale).
 // - A spot-check of a non-Latin locale proves the tables are real
 //   translations, not English placeholders.
-// - isRtl must be true for the two RTL locales (ar, ur) and false for the
+// - isRtl must be true for the RTL locale (ar-001) and false for the
 //   left-to-right ones, since the layout drives <html dir> off it.
 
 import { describe, it, expect } from 'vitest';
 import {
+    DEFAULT_LOCALE,
     LOCALES,
+    LOCALE_LABELS,
     STRING_KEYS,
     STRINGS_BY_LOCALE,
     isRtl,
@@ -20,32 +22,41 @@ import {
 } from './i18n.svelte';
 
 describe('i18n catalog', () => {
-    it('supports exactly the 14 required locales', () => {
+    it('supports exactly the 7 required locales, sorted by code', () => {
         expect([...LOCALES]).toEqual([
-            'en',
-            'en_US',
-            'cy',
-            'es',
-            'fr',
-            'de',
-            'ar',
-            'ru',
-            'hi',
-            'zh',
-            'bn',
-            'pt',
-            'id',
-            'ur',
+            'ar-001',
+            'cy-001',
+            'en-001',
+            'es-001',
+            'fr-001',
+            'hi-001',
+            'zh-cn',
         ]);
+        expect(LOCALES.map((l) => LOCALE_LABELS[l])).toEqual([
+            'العربية',
+            'Cymraeg',
+            'English',
+            'Español',
+            'Français',
+            'हिन्दी',
+            '中文 - 中国',
+        ]);
+        for (const label of Object.values(LOCALE_LABELS)) {
+            expect(label).not.toMatch(/[()]/);
+        }
     });
 
-    it('normalises en_US and en-US to the en_US locale rather than collapsing to en', () => {
+    it('resolves a bare language or region variant to the supported locale', () => {
         i18n.set('en_US');
-        expect(i18n.locale).toBe('en_US');
-        i18n.set('en-US');
-        expect(i18n.locale).toBe('en_US');
-        i18n.set('en');
-        expect(i18n.locale).toBe('en');
+        expect(i18n.locale).toBe('en-001');
+        i18n.set('es-MX');
+        expect(i18n.locale).toBe('es-001');
+        i18n.set('zh');
+        expect(i18n.locale).toBe('zh-cn');
+        i18n.set('de');
+        expect(i18n.locale).toBe(DEFAULT_LOCALE);
+        i18n.set('en-001');
+        expect(i18n.locale).toBe('en-001');
     });
 
     it('every locale defines every key (full coverage)', () => {
@@ -59,23 +70,22 @@ describe('i18n catalog', () => {
         }
     });
 
-    it('spot-checks a non-Latin locale (zh) against English', () => {
+    it('spot-checks a non-Latin locale (zh-cn) against English', () => {
         // Chinese must differ from English on a representative chrome key.
-        expect(translate('nav.dashboard', 'zh')).toBe('仪表板');
-        expect(translate('nav.dashboard', 'zh')).not.toBe(
-            translate('nav.dashboard', 'en'),
+        expect(translate('nav.dashboard', 'zh-cn')).toBe('仪表板');
+        expect(translate('nav.dashboard', 'zh-cn')).not.toBe(
+            translate('nav.dashboard', 'en-001'),
         );
         // And the placeholder shape is preserved across locales.
-        expect(STRINGS_BY_LOCALE.zh['scan.matches']).toContain('{n}');
+        expect(STRINGS_BY_LOCALE['zh-cn']['scan.matches']).toContain('{n}');
     });
 
-    it('marks ar and ur as right-to-left, others as left-to-right', () => {
-        expect(isRtl('ar')).toBe(true);
-        expect(isRtl('ur')).toBe(true);
-        // Region subtags still resolve (ar-EG → ar).
+    it('marks ar-001 as right-to-left, others as left-to-right', () => {
+        expect(isRtl('ar-001')).toBe(true);
+        // Region subtags still resolve (ar-EG -> ar-001).
         expect(isRtl('ar-EG')).toBe(true);
         for (const locale of LOCALES.filter(
-            (l): l is Locale => l !== 'ar' && l !== 'ur',
+            (l): l is Locale => l !== 'ar-001',
         )) {
             expect(isRtl(locale), `${locale} should be LTR`).toBe(false);
         }
