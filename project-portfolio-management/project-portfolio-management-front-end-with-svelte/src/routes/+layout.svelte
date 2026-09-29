@@ -138,6 +138,7 @@
     { href: "/capacity", label: t("ppm.nav.capacity") },
     { href: "/reports", label: t("ppm.nav.reports") },
     { href: "/onboarding", label: "Onboarding" },
+    { href: "/tour", label: t("nav.tour") },
   ];
 
   // T-28f: reorders `navItems` around `data.view` (the deployment-declared

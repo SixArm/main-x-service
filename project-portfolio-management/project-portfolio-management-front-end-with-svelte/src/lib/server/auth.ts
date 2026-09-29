@@ -85,3 +85,15 @@ export async function currentUser(
   if (!res.ok) return null;
   return (await res.json()) as CurrentUser;
 }
+
+/**
+ * The OIDC federation entry point (EV-2, `agents/share/authentication-sessions.md`
+ * §7a) on the auth service's own origin. `originForReturn` (this app's origin)
+ * is passed as `return_url` so the post-federation bridge lands back here.
+ * A browser NAVIGATION target, not a `fetch` call — the browser itself must
+ * visit the identity provider. Pure string-building.
+ */
+export function oidcLoginUrl(originForReturn: string): string {
+  const params = new URLSearchParams({ return_url: originForReturn });
+  return `${AUTH_API_URL}/api/auth/oidc/login?${params.toString()}`;
+}
