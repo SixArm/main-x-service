@@ -154,34 +154,37 @@ the normal npm-ecosystem answer (a caret range, not a pin, so patch/minor
 bumps flow in on the next install), and is deliberately left to
 ordinary dependency-update hygiene rather than a bespoke sync job.
 
-## 8. The theme stylesheets — vendored, not published
+## 8. The theme stylesheets: the `@lilydesignsystem/themes` package
 
-Every front-end's `static/assets/themes` was **also** a symlink onto
-the sibling checkout (`../../../../../../lilydesignsystem/
-lily-design-system/themes`) — the exact same class of problem §1–§3
-solved for the picker packages, missed on the first pass because it
-surfaces differently: not a failed `pnpm install`, but `svelte-kit
-sync` throwing `ENOENT: no such file or directory, stat '…/static/
-assets/themes'` on a runner with no dangling symlink target to resolve
-(found running the `front-end` CI stage's first real PR, WEB-2).
+The 45 Lily theme stylesheets are published as
+[`@lilydesignsystem/themes`](https://www.npmjs.com/package/@lilydesignsystem/themes)
+(`dist/<theme>.css`, exported as `./*.css`). Every front-end, and the
+GitHub Pages site, depends on it at an **exact** version (`0.1.0`) and
+serves it from `static/assets/themes`, which is a symlink to
+`../../node_modules/@lilydesignsystem/themes/dist`. The URL the ThemePicker
+loads (`/assets/themes/<slug>.css`) is unchanged, and `pnpm run build` copies
+the files through Vite's static-asset handling exactly as before.
 
-There is no `lily-design-system-themes` npm package to switch to —
-these are plain CSS files, not a Svelte component. The fix is
-`vendor/lily-design-system-themes/` at this repo's root: one vendored
-copy of the 45 theme stylesheets, and every front-end's
-`static/assets/themes` symlink now points **in-repo** at it instead of
-out to the sibling checkout. `project-portfolio-management-front-end-
-with-svelte` already had its own real (non-symlinked, if stale) copy
-under its own `static/assets/themes` predating this — left untouched
-rather than folded in, since it already worked and touching a green
-project to chase consistency risked the opposite.
+History, because it explains the shape. The themes were first symlinks onto
+a sibling checkout, which broke `svelte-kit sync` on any CI runner (`ENOENT`
+on a dangling symlink, found rolling out the `front-end` CI stage, WEB-2);
+that was fixed by a **vendored** copy (`vendor/lily-design-system-themes/`)
+because no package existed yet. The package now does, so the vendored copy
+is deleted and there is nothing to re-sync by hand.
 
-This is a vendored **snapshot**, not a live link: a theme added or
-edited upstream needs a manual re-copy (`vendor/
-lily-design-system-themes/README.md` has the command). One vendored
-copy shared by fifteen front-ends, not fifteen copies — the same
-`entity-ref`/`integrity-mac` reasoning as elsewhere in this family: a
-single directory a human resyncs is a much smaller drift surface than
-one per project. Publishing a real npm package is the better answer if
-this ever needs to change often; record that decision here if it
-happens.
+Consequences worth knowing:
+
+- **The symlink dangles until `pnpm install` has run.** CI installs before
+  it checks or builds, so nothing changes there; a fresh clone needs
+  `pnpm install` before `svelte-kit sync` (which the `dev`, `check` and
+  `build` scripts already presuppose for the Lily picker packages).
+- **A theme change is a version bump**, made in one place per project:
+  `pnpm add --save-exact @lilydesignsystem/themes@<version>`. The pin is
+  exact on purpose, so a theme edit never arrives as a surprise patch bump;
+  Dependabot proposes the bump like any other dependency.
+- **The GitHub Pages site** exports via `git subtree split`, so its
+  `static/assets/themes` must resolve inside the subtree: it does, because
+  the target is its own `node_modules`, not a path outside the directory.
+- To try an in-flight theme change from a Lily checkout, use `pnpm link`
+  for that package, as for the picker packages (§ above); it touches no
+  committed file.

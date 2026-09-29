@@ -184,11 +184,43 @@ siblings' — there is no `<P>_` pattern to fit into.
 | `AUTH_ALLOWED_ORIGINS` | unset ⇒ permissive in dev, **warns** (does not fail closed) in production | CSRF/origin backstop on `POST /token`; when set, a non-matching `Origin` is rejected outright (SEC-A10) |
 | `AUTH_ATTRIBUTE_VOCABULARY` | unrestricted | Inline JSON allow-set of attribute keys→values for the operator attribute-assignment surfaces |
 | `AUTH_ATTRIBUTE_VOCABULARY_FILE` | — | Path form; inline wins |
+| `AUTH_OIDC_ISSUER_URL` | unset ⇒ OIDC federation dormant (needs the `oidc` cargo feature) | OIDC provider issuer, e.g. a Keycloak realm URL; discovery is `{issuer}/.well-known/openid-configuration` |
+| `AUTH_OIDC_CLIENT_ID` | — | This service's registered OAuth2 client id |
+| `AUTH_OIDC_CLIENT_SECRET_FILE` | — | File holding the client secret; outranks `AUTH_OIDC_CLIENT_SECRET` |
+| `AUTH_OIDC_CLIENT_SECRET` | — | Inline client secret |
+| `AUTH_OIDC_REDIRECT_URL` | — | This service's callback (`…/api/auth/oidc/callback`), exactly as registered at the provider |
+| `AUTH_OIDC_CLAIM_MAP` / `_FILE` | none | JSON claim-name → ABAC attribute key; top-level string or string-array claims only; `_FILE` wins |
+| `AUTH_OIDC_JIT_PROVISIONING` | off | `1`/`true` auto-creates an account on a first federated sign-in; default answers `403` |
+
+Front-end side (each SvelteKit app, not the service): `PUBLIC_OIDC_SIGNIN_ENABLED=true`
+shows the "Sign in with SSO" link. Setup end to end:
+[`runbooks/keycloak-sso.md`](runbooks/keycloak-sso.md).
 
 [`authentication-sessions.md`](authentication-sessions.md) is the
 design doc for the token/session vars;
 [`authorization-attributes.md`](authorization-attributes.md) §6 for
 `AUTH_ATTRIBUTE_VOCABULARY*`.
+
+## 8a. Optional Keycloak bearer acceptance (any service built with `--features keycloak`)
+
+Every value below is per service, with the service's own prefix
+(`ORGANIZATION_`, `PERSON_`, …). All ignored unless the service was built
+with the `keycloak` cargo feature; `<PREFIX>_KEYCLOAK_URL` unset ⇒ off.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `<PREFIX>_KEYCLOAK_URL` | unset ⇒ Keycloak off | Server base URL; must be `https` (loopback excepted) |
+| `<PREFIX>_KEYCLOAK_REALM` | — (required with the URL) | Realm; the token `iss` must equal `{url}/realms/{realm}` |
+| `<PREFIX>_KEYCLOAK_AUDIENCES` | — (required) | Comma-separated accepted `aud` values |
+| `<PREFIX>_KEYCLOAK_ROLE_MAP_FILE` | — | JSON role → ABAC attributes; wins over the inline form |
+| `<PREFIX>_KEYCLOAK_ROLE_MAP` | `{}` ⇒ no role grants anything | Inline JSON `{"<role>": {"<attr>": ["<value>"]}}`; client role key `"<client>:<role>"` |
+| `<PREFIX>_KEYCLOAK_REQUIRE_VERIFIED_EMAIL` | on | `false`/`0`/`no`/`off` disables the `email_verified` check |
+
+A malformed configuration logs an error and leaves Keycloak off (tokens
+refused); the service still boots. Cargo features on each service:
+`paseto` (**default on**: PASETO verification, boot key fetch, rotation
+refresh; `--no-default-features` removes it) and `keycloak` (off).
+Setup: [`runbooks/keycloak-sso.md`](runbooks/keycloak-sso.md).
 
 ## 9. Integrity MAC (all twelve crates)
 
