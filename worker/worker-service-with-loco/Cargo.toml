@@ -109,7 +109,7 @@ worker-matcher = { version = "0.7.0", path = "../worker-matcher-rust-crate" }
 # monorepo's 0.2 PASETO verifier). The `fetch` feature adds
 # `Verifier::from_paseto_keys_url` (reqwest/rustls) for the boot-time
 # key-set fetch behind `WORKER_PASETO_KEYS_URL` (spec §13 T-1b).
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
 # Shared cross-service `EntityRef` value type + the §9 EdgeKind registry
 # (agents/share/cross-service-linking.md §3, §9). Used by the entity-links
 # write side to parse/validate `to_ref` and the `kind`/endpoint pair
@@ -148,12 +148,23 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 fluvio = { version = "0.50", optional = true }
 
 [features]
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `WORKER_KEYCLOAK_*` (see src/api/rest/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
 # Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
 # feature to build or test; only `FluvioSink` — the real-broker producer
 # — lives behind this.
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 # Serialises the DB-gated audit-chain tests: they each truncate
 # `audit_log`, so running them concurrently would have one test wipe
 # another's chain mid-append.

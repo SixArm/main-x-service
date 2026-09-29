@@ -3,6 +3,7 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **KC-1 — optional Keycloak bearer acceptance; PASETO becomes a cargo feature.** *(done 2026-09-29)* `keycloak` feature (off by default) accepts Keycloak access tokens on the REST guard, extractors and gRPC via `auth::request_claims` / `token_claims` / `enforce_request`, configured by `WORKER_KEYCLOAK_*`, mapped onto the same ABAC `Claims`; `paseto` (default) gates `Verifier`, key fetch and refresh. Verified in four feature shapes; DB-free `tests/keycloak_guard.rs`. See `agents/share/runbooks/keycloak-sso.md`.
 - [x] **2026-09-07 — prost 0.13 → 0.14 / tonic 0.12 → 0.14 migration.**
   A Dependabot `prost` bump exposed that tonic 0.12 cannot compile
   against prost 0.14 generated code. tonic 0.14 split prost codegen

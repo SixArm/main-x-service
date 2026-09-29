@@ -16,6 +16,8 @@
 //! `#[ignore]`d — the router opens a database connection. Run with
 //! `cargo test --test enforcement -- --ignored`.
 
+#![cfg(feature = "paseto")]
+
 mod common;
 
 use axum::body::Body;

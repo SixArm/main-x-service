@@ -6,6 +6,7 @@
 //! trait-object fields ([`WorkerRepository`], [`EventProducer`],
 //! [`WorkerMatcher`]) keep handlers decoupled from concrete implementations.
 
+#[cfg(feature = "paseto")]
 use authentication_verifier::Verifier;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
@@ -92,11 +93,14 @@ impl AppState {
 // could only ever update one of them. The builders below still supply
 // the key set that holder starts from.
 
+#[cfg(feature = "paseto")]
 /// Default issuer expected in tokens (`iss`).
 pub(crate) const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
+#[cfg(feature = "paseto")]
 pub(crate) const DEFAULT_AUDIENCE: &str = "main-x-service";
 
+#[cfg(feature = "paseto")]
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.
@@ -107,6 +111,7 @@ pub(crate) fn env_or(name: &str, default: &str) -> String {
         .unwrap_or_else(|| default.to_string())
 }
 
+#[cfg(feature = "paseto")]
 /// Build the PASETO token verifier from the environment:
 ///
 /// - `WORKER_PASETO_KEYS` — the Ed25519 key set (JSON, OKP/Ed25519 form)
@@ -126,6 +131,7 @@ pub(crate) fn verifier_from_env() -> Verifier {
     env_keys_verifier(&issuer, &audience)
 }
 
+#[cfg(feature = "paseto")]
 /// The `WORKER_PASETO_KEYS` env-key-set path with an explicit issuer /
 /// audience: parse the key-set JSON from the variable, or fall back to
 /// an empty (reject-all) set so the service always boots.
@@ -139,6 +145,7 @@ fn env_keys_verifier(issuer: &str, audience: &str) -> Verifier {
         .unwrap_or_else(|_| empty_verifier(issuer, audience))
 }
 
+#[cfg(feature = "paseto")]
 /// Build the boot-time PASETO verifier, preferring an HTTP fetch of the
 /// key set (spec §13 T-1b fetch item). Reads:
 ///
@@ -163,6 +170,7 @@ pub async fn verifier_from_env_or_fetch() -> Verifier {
     verifier_from_url_or_env(url.as_deref(), &issuer, &audience).await
 }
 
+#[cfg(feature = "paseto")]
 /// Core of [`verifier_from_env_or_fetch`], parameterised on the URL so
 /// it is unit-testable without touching the process environment.
 /// `None` ⇒ the `WORKER_PASETO_KEYS` env path; `Some(url)` ⇒ fetch via
@@ -193,6 +201,7 @@ pub async fn verifier_from_url_or_env(url: Option<&str>, issuer: &str, audience:
     }
 }
 
+#[cfg(feature = "paseto")]
 /// A verifier with no keys: every token is rejected until a real key set
 /// is configured. Infallible — an empty `keys` array always parses.
 fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
@@ -211,7 +220,7 @@ impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "paseto"))]
 mod tests {
     use super::*;
 
