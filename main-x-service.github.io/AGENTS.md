@@ -67,14 +67,15 @@ subproject's own API — that stays in that subproject's own `spec/`.
   *and* its relative depth is only ever correct while this directory is
   nested inside the monorepo — `git subtree split` promotes it to a
   repo root one level shallower, breaking the path outright. Same
-  reasoning applies to `static/assets/themes`: it is a **vendored copy**
-  (45 real `.css` files, not a symlink) so the exported sibling repo —
-  which `git subtree split --prefix=main-x-service.github.io` derives
-  from *only this directory's* history — carries its own theme
-  stylesheets rather than a dangling reference to something outside the
-  subtree entirely. Re-copy from `vendor/lily-design-system-themes/` at
-  the monorepo root (or straight from the Lily checkout) if themes
-  change; don't hand-edit the vendored files.
+  reasoning applies to `static/assets/themes`: it is a symlink to
+  `../../node_modules/@lilydesignsystem/themes/dist` (the
+  `@lilydesignsystem/themes` package, exact version), which resolves
+  **inside this directory** once `pnpm install` has run, so the exported
+  sibling repo (`git subtree split --prefix=main-x-service.github.io`,
+  derived from only this directory's history) carries no dangling
+  reference to anything outside the subtree. To change themes, bump the
+  package version (`pnpm add --save-exact @lilydesignsystem/themes@<v>`);
+  don't edit theme CSS by hand.
 
 ## Publishing (see the spec for the full contract)
 
