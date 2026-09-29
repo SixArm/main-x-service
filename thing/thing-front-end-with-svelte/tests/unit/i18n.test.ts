@@ -8,105 +8,128 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("$app/environment", () => ({ browser: false }));
 
 import {
-    LOCALES,
-    DEFAULT_LOCALE,
-    LOCALE_LABELS,
-    STRINGS,
-    STRING_KEYS,
-    translate,
-    isRtl,
-    i18n,
-    type StringKey,
-    type Locale,
+  LOCALES,
+  DEFAULT_LOCALE,
+  LOCALE_LABELS,
+  STRINGS,
+  STRING_KEYS,
+  translate,
+  isRtl,
+  RTL_LOCALES,
+  i18n,
+  type StringKey,
+  type Locale,
 } from "../../src/lib/i18n.svelte";
 
 describe("i18n catalog", () => {
-    // English (source of truth) returns its literal strings.
-    it("returns English strings for the default locale", () => {
-        expect(translate("nav.dashboard", "en")).toBe("Dashboard");
-        expect(translate("things.title", "en")).toBe("Things");
-        expect(translate("nav.toggle", "en")).toBe("Toggle navigation");
-    });
+  // English (source of truth) returns its literal strings.
+  it("returns English strings for the default locale", () => {
+    expect(translate("nav.dashboard", "en-001")).toBe("Dashboard");
+    expect(translate("things.title", "en-001")).toBe("Things");
+    expect(translate("nav.toggle", "en-001")).toBe("Toggle navigation");
+  });
 
-    // Spanish returns its translated strings (glossary-aligned where shared).
-    it("returns Spanish strings for the es locale", () => {
-        expect(translate("nav.dashboard", "es")).toBe("Panel");
-        expect(translate("search.action", "es")).toBe("Buscar");
-        expect(translate("merge.merge", "es")).toBe("Fusionar");
-    });
+  // Spanish returns its translated strings (glossary-aligned where shared).
+  it("returns Spanish strings for the es locale", () => {
+    expect(translate("nav.dashboard", "es-001")).toBe("Panel");
+    expect(translate("search.action", "es-001")).toBe("Buscar");
+    expect(translate("merge.merge", "es-001")).toBe("Fusionar");
+  });
 
-    // An unknown locale falls back to the English table.
-    it("falls back to English for an unknown locale", () => {
-        // Force an unsupported locale through the type boundary.
-        const bogus = "xx" as unknown as Locale;
-        expect(translate("nav.dashboard", bogus)).toBe("Dashboard");
-    });
+  // An unknown locale falls back to the English table.
+  it("falls back to English for an unknown locale", () => {
+    // Force an unsupported locale through the type boundary.
+    const bogus = "xx" as unknown as Locale;
+    expect(translate("nav.dashboard", bogus)).toBe("Dashboard");
+  });
 
-    // An unknown key falls back to the key string itself (last resort).
-    it("falls back to the key for an unknown key", () => {
-        const missing = "does.not.exist" as unknown as StringKey;
-        expect(translate(missing, "fr")).toBe("does.not.exist");
-    });
+  // An unknown key falls back to the key string itself (last resort).
+  it("falls back to the key for an unknown key", () => {
+    const missing = "does.not.exist" as unknown as StringKey;
+    expect(translate(missing, "fr-001")).toBe("does.not.exist");
+  });
 
-    // DEFAULT_LOCALE is one of the supported locales.
-    it("uses a supported default locale", () => {
-        expect(LOCALES).toContain(DEFAULT_LOCALE);
-    });
+  // DEFAULT_LOCALE is one of the supported locales.
+  it("uses a supported default locale", () => {
+    expect(LOCALES).toContain(DEFAULT_LOCALE);
+  });
 
-    // Every locale must natively cover the full English key set (no gaps).
-    // Checked against the per-locale table directly so an `en`-fallback does
-    // not mask a missing translation.
-    it("covers every English key in every locale", () => {
-        for (const locale of LOCALES) {
-            const table = STRINGS[locale] as Record<string, string>;
-            for (const key of STRING_KEYS) {
-                expect(table[key], `${locale} missing ${key}`).toBeDefined();
-                expect(table[key]!.length).toBeGreaterThan(0);
-            }
-        }
-    });
+  // Every locale must natively cover the full English key set (no gaps).
+  // Checked against the per-locale table directly so an `en`-fallback does
+  // not mask a missing translation.
+  it("covers every English key in every locale", () => {
+    for (const locale of LOCALES) {
+      const table = STRINGS[locale] as Record<string, string>;
+      for (const key of STRING_KEYS) {
+        expect(table[key], `${locale} missing ${key}`).toBeDefined();
+        expect(table[key]!.length).toBeGreaterThan(0);
+      }
+    }
+  });
 
-    // The full fourteen-locale set is present after the PickerBar
-    // consolidation added `en_US`.
-    it("supports all fourteen locales", () => {
-        expect(LOCALES).toHaveLength(14);
-        for (const code of [
-            "en", "en_US", "cy", "es", "fr", "de", "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
-        ]) {
-            expect(LOCALES).toContain(code as Locale);
-        }
-        expect(LOCALE_LABELS.en_US).toBe("English (United States)");
+  // The family-wide seven-locale set, sorted by code, with labels.
+  it("supports exactly the seven expected locales, sorted by code, with labels", () => {
+    expect([...LOCALES]).toEqual([
+      "ar-001",
+      "cy-001",
+      "en-001",
+      "es-001",
+      "fr-001",
+      "hi-001",
+      "zh-cn",
+    ]);
+    expect(LOCALE_LABELS).toEqual({
+      "ar-001": "العربية",
+      "cy-001": "Cymraeg",
+      "en-001": "English",
+      "es-001": "Español",
+      "fr-001": "Français",
+      "hi-001": "हिन्दी",
+      "zh-cn": "中文 - 中国",
     });
+  });
 
-    // `en_US`/`en-US` must resolve to the distinct `en_US` locale rather
-    // than silently collapsing to `en`'s primary subtag.
-    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
-        i18n.set("en_US");
-        expect(i18n.locale).toBe("en_US");
-        i18n.set("en-US");
-        expect(i18n.locale).toBe("en_US");
-        i18n.set("en");
-        expect(i18n.locale).toBe("en");
-    });
+  // -001 locales are labelled by language alone; never parentheses.
+  it("labels -001 locales by language only and never uses parentheses", () => {
+    for (const [code, label] of Object.entries(LOCALE_LABELS)) {
+      expect(label).not.toMatch(/[()]/);
+      if (code.endsWith("-001")) expect(label).not.toContain(" - ");
+    }
+  });
 
-    // Spot-check two of the newly added locales against the shared glossary.
-    it("returns Arabic strings for the ar locale", () => {
-        expect(translate("nav.dashboard", "ar")).toBe("لوحة المعلومات");
-        expect(translate("search.action", "ar")).toBe("بحث");
-    });
+  // Legacy and regional codes resolve by primary subtag.
+  it("normalises legacy and regional codes to the supported locale of that language", () => {
+    i18n.set("en_US");
+    expect(i18n.locale).toBe("en-001");
+    i18n.set("es-MX");
+    expect(i18n.locale).toBe("es-001");
+    i18n.set("zh");
+    expect(i18n.locale).toBe("zh-cn");
+    i18n.set("ZH-CN");
+    expect(i18n.locale).toBe("zh-cn");
+    i18n.set("de");
+    expect(i18n.locale).toBe("en-001");
+  });
 
-    it("returns Chinese strings for the zh locale", () => {
-        expect(translate("nav.merge", "zh")).toBe("合并");
-        expect(translate("chrome.language", "zh")).toBe("语言");
-    });
+  // Spot-check two of the newly added locales against the shared glossary.
+  it("returns Arabic strings for the ar locale", () => {
+    expect(translate("nav.dashboard", "ar-001")).toBe("لوحة المعلومات");
+    expect(translate("search.action", "ar-001")).toBe("بحث");
+  });
 
-    // RTL detection: true for Arabic / Urdu, false otherwise.
-    it("detects right-to-left locales", () => {
-        expect(isRtl("ar")).toBe(true);
-        expect(isRtl("ur")).toBe(true);
-        expect(isRtl("en")).toBe(false);
-        expect(isRtl("zh")).toBe(false);
-        // Region subtags are tolerated (only the primary subtag matters).
-        expect(isRtl("ar-EG")).toBe(true);
-    });
+  it("returns Chinese strings for the zh locale", () => {
+    expect(translate("nav.merge", "zh-cn")).toBe("合并");
+    expect(translate("chrome.language", "zh-cn")).toBe("语言");
+  });
+
+  // RTL detection: true for Arabic only.
+  it("detects right-to-left locales", () => {
+    expect([...RTL_LOCALES]).toEqual(["ar-001"]);
+    expect(isRtl("ar-001")).toBe(true);
+    expect(isRtl("ur")).toBe(false);
+    expect(isRtl("en-001")).toBe(false);
+    expect(isRtl("zh-cn")).toBe(false);
+    // Region subtags are tolerated (only the primary subtag matters).
+    expect(isRtl("ar-EG")).toBe(true);
+  });
 });
