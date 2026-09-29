@@ -75,6 +75,7 @@ async function stubPlansApi(page: Page) {
 /** Every real route, from the file tree — static routes as literal
  *  paths, `[pid]` routes filled with the fixture `PID` above. */
 const ROUTES = [
+  "/",
   "/auditor",
   "/automations",
   "/board",

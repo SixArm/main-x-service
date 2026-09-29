@@ -6,6 +6,8 @@
  * only stylesheet required to render a Lily-styled page.
  *
  * Credit for the theme source: DaisyUI (https://daisyui.com/)
+ *
+ * Upstream tracked: DaisyUI v5-era theme palette, adapted to Lily tokens and hooks.
  * ========================================================================= */
 
 /* Theme tokens — the colour, radius, border, and depth variables consumed
@@ -17,87 +19,99 @@
 :where(:root, :root[data-theme="halloween"]) {
     color-scheme: dark;
 
-    /* Page-level surface (primary canvas). Sits behind body copy and
-       primary content areas. Lightest base shade in light themes,
-       deepest in dark themes. */
+    /* Page-level surface (primary canvas). Sits behind body copy
+       and primary content areas. Lightest base shade in light
+       themes, deepest in dark themes. */
     --color-base-100: oklch(21% 0.006 56.043);
-    /* Secondary surface — section panels, card backgrounds, sidebars,
-       table-header fills. One step away from the page surface. */
+    /* Secondary surface — section panels, card backgrounds,
+       sidebars, table-header fills. One step away from the page
+       surface. */
     --color-base-200: oklch(14% 0.004 49.25);
-    /* Tertiary surface — dividers, sunken wells, hover-row backgrounds.
-       The most muted of the three base shades. */
+    /* Tertiary surface — dividers, sunken wells, hover-row
+       backgrounds. The most muted of the three base shades. */
     --color-base-300: oklch(0% 0 0);
-    /* Primary text colour. High-contrast against base-100 to meet WCAG
-       contrast ratios for body copy. */
-    --color-base-content: oklch(84.955% 0 0);
-    /* Primary brand / action colour. Used on primary buttons, active
-       navigation items, selected states, and the focus ring. */
+    /* Primary text colour. High-contrast against base-100 to meet
+       WCAG contrast ratios for body copy. */
+    --color-base-content: oklch(84.96% 0 0);
+    /* Primary brand / action colour. Used on primary buttons,
+       active navigation items, selected states, and the focus
+       ring. */
     --color-primary: oklch(77.48% 0.204 60.62);
-    /* Foreground colour used over `--color-primary` fills (so primary
-       buttons retain a guaranteed contrast ratio). */
-    --color-primary-content: oklch(19.693% 0.004 196.779);
-    /* Secondary brand colour. Pressed/hover state for primary buttons
-       and visited links; also drives the secondary chrome family. */
+    /* Foreground colour used over `--color-primary` fills (so
+       primary buttons retain a guaranteed contrast ratio). */
+    --color-primary-content: oklch(19.69% 0.004 196.779);
+    /* Secondary brand colour. Pressed/hover state for primary
+       buttons and visited links; also drives the secondary chrome
+       family. */
     --color-secondary: oklch(45.98% 0.248 305.03);
     /* Foreground colour used over `--color-secondary` fills. */
-    --color-secondary-content: oklch(89.196% 0.049 305.03);
+    --color-secondary-content: oklch(89.2% 0.049 305.03);
     /* Accent colour — used sparingly for emphasis, the AI label,
        illustrations, and tertiary call-outs. */
     --color-accent: oklch(64.8% 0.223 136.073);
     /* Foreground colour used over `--color-accent` fills. */
     --color-accent-content: oklch(0% 0 0);
-    /* Neutral chrome surface — footer bars, code blocks, tooltips,
-       government-banner strips. Typically the theme's darkest neutral. */
-    --color-neutral: oklch(24.371% 0.046 65.681);
+    /* Neutral chrome surface — footer bars, code blocks,
+       tooltips, government-banner strips. Typically the theme's
+       darkest neutral. */
+    --color-neutral: oklch(24.37% 0.046 65.681);
     /* Foreground colour used over `--color-neutral` fills. */
-    --color-neutral-content: oklch(84.874% 0.009 65.681);
+    --color-neutral-content: oklch(84.87% 0.009 65.681);
     /* Informational status colour — informational banners, links,
        'did-you-know' callouts. */
-    --color-info: oklch(54.615% 0.215 262.88);
+    --color-info: oklch(54.62% 0.215 262.88);
     /* Foreground colour used over `--color-info` fills. */
-    --color-info-content: oklch(90.923% 0.043 262.88);
-    /* Success / confirmation colour — used on success panels, completed
-       step indicators, validation pass states, and the green RAG status. */
-    --color-success: oklch(62.705% 0.169 149.213);
+    --color-info-content: oklch(90.92% 0.043 262.88);
+    /* Success / confirmation colour — used on success panels,
+       completed step indicators, validation pass states, and the
+       green RAG status. */
+    --color-success: oklch(62.7% 0.169 149.213);
     /* Foreground colour used over `--color-success` fills. */
-    --color-success-content: oklch(12.541% 0.033 149.213);
+    --color-success-content: oklch(12.54% 0.033 149.213);
     /* Warning colour — yellow/amber band; used on phase banners,
-       in-progress states, validation warnings, and the amber RAG status. */
-    --color-warning: oklch(66.584% 0.157 58.318);
-    /* Foreground colour used over `--color-warning` fills. Often dark so
-       text remains legible on a bright yellow background. */
-    --color-warning-content: oklch(13.316% 0.031 58.318);
-    /* Error / destructive colour — used on alert dialogs, error messages,
-       validation failures, urgent care cards, and the red RAG status. */
+       in-progress states, validation warnings, and the amber RAG
+       status. */
+    --color-warning: oklch(66.58% 0.157 58.318);
+    /* Foreground colour used over `--color-warning` fills. Often
+       dark so text remains legible on a bright yellow background. */
+    --color-warning-content: oklch(13.32% 0.031 58.318);
+    /* Error / destructive colour — used on alert dialogs, error
+       messages, validation failures, urgent care cards, and the
+       red RAG status. */
     --color-error: oklch(65.72% 0.199 27.33);
     /* Foreground colour used over `--color-error` fills. */
-    --color-error-content: oklch(13.144% 0.039 27.33);
+    --color-error-content: oklch(13.14% 0.039 27.33);
     /* Smallest corner radius. Applied to chips, badges, switches,
-       and radio/checkbox containers (mapped to `--lily-radius-sm`). */
+       and radio/checkbox containers (mapped to `--lily-radius-
+       sm`). */
     --radius-selector: 1rem;
-    /* Medium corner radius. Applied to inputs, buttons, menu items,
-       tooltips, and most everyday form controls
-       (mapped to `--lily-radius-md`). */
+    /* Medium corner radius. Applied to inputs, buttons, menu
+       items, tooltips, and most everyday form controls (mapped to
+       `--lily-radius-md`). */
     --radius-field: 0.5rem;
-    /* Largest corner radius. Applied to cards, dialogs, drawers, and
-       hero blocks (mapped to `--lily-radius-lg`). */
+    /* Largest corner radius. Applied to cards, dialogs, drawers,
+       and hero blocks (mapped to `--lily-radius-lg`). */
     --radius-box: 1rem;
     /* Base size for selector-style controls (checkbox/radio glyph
        size, switch thumb diameter). Currently unused by Lily's
-       baseline component rules but available for theme extensions. */
+       baseline component rules but available for theme
+       extensions. */
     --size-selector: 0.25rem;
-    /* Base size for field-style controls (input height multiplier).
-       Currently unused by Lily's baseline component rules but
-       available for theme extensions. */
+    /* Base size for field-style controls (input height
+       multiplier). Currently unused by Lily's baseline component
+       rules but available for theme extensions. */
     --size-field: 0.25rem;
-    /* Default border width applied to inputs, buttons, dividers, table
-       cells, etc. Single source of truth for the system's stroke weight. */
+    /* Default border width applied to inputs, buttons, dividers,
+       table cells, etc. Single source of truth for the system's
+       stroke weight. */
     --border: 1px;
-    /* Depth flag (0 or 1). Lily's baseline rules read it implicitly via
-       the shadow tokens; a depth-0 theme effectively renders flat. */
+    /* Depth flag (0 or 1). Lily's baseline rules read it
+       implicitly via the shadow tokens; a depth-0 theme
+       effectively renders flat. */
     --depth: 1;
-    /* Noise flag (0 or 1). Reserved for theme extensions that want to
-       layer a subtle texture; the baseline rules do not consume it. */
+    /* Noise flag (0 or 1). Reserved for theme extensions that
+       want to layer a subtle texture; the baseline rules do not
+       consume it. */
     --noise: 0;
 }
 
@@ -224,7 +238,6 @@
         .input,
         .select,
         .option,
-        .link,
         .menu-item,
         .tab-bar-button,
         .switch-button,
@@ -495,15 +508,15 @@
      * pre-formatted data. Every Lily class ending in `-view` is a span/div
      * that renders a value the user shouldn't edit.
      *
-     * The exclusions (`theme-view`, `scroll-view`, `split-view`, `tree-view`)
+     * The exclusions (`theme-view`, `split-view`)
      * are larger containers that don't fit the chip pattern — they're
      * styled separately further down.
      * ====================================================================== */
 
     :where(
-        [class$="-view"]:not(.theme-view):not(.scroll-view):not(
+        [class$="-view"]:not(.theme-view):not(
                 .split-view
-            ):not(.tree-view)
+            )
     ) {
         display: inline-block;
         padding: 0.125rem 0.5rem;
@@ -990,7 +1003,7 @@
     /* --- Summary list (three-column key/value/action grid) ------------------ */
     :where(.summary-list) {
         display: grid;
-        grid-template-columns: max-content 1fr auto;
+        grid-template-columns: minmax(0, max-content) 1fr auto;
         column-gap: 1rem;
         row-gap: 0.5rem;
     }
@@ -1951,7 +1964,6 @@
     /* Picker baseline — inline row of selectable chips/buttons. */
     :where(
         .color-picker,
-        .theme-select,
         .five-face-rating-picker,
         .five-star-rating-picker,
         .net-promoter-score-picker,
@@ -1971,7 +1983,6 @@
     /* Picker buttons — small alt-surface chips. */
     :where(
         .color-picker-button,
-        .theme-select-button,
         .five-face-rating-picker-button,
         .five-star-rating-picker-button,
         .net-promoter-score-picker-button,
@@ -2024,7 +2035,7 @@
 
     /* Native <select> styling — drop the UA chrome and draw our own caret
        via two stacked linear-gradients. */
-    :where(.theme-select, .select, .select-with-extras, .tree-select) {
+    :where(select.theme-select, .select, .select-with-extras, .tree-select) {
         width: 100%;
         min-height: 2.5rem;
         padding: 0.5rem 2rem 0.5rem 0.75rem; /* extra right padding for caret */
@@ -2047,6 +2058,461 @@
     :where(.option, .theme-select-option) {
         background-color: var(--lily-surface);
         color: var(--lily-text);
+    }
+
+    /* The four *-picker helpers are an icon button that opens a popup,
+       so they are styled as a popup rather than a form field. No :has()
+       guard is needed any more: before the July 2026 rename these shared
+       the `.theme-select` hook with the catalog theme-select component
+       and had to be told apart. Distinct names, no collision. */
+    :where(
+        .theme-picker,
+        .locale-picker,
+        .text-size-picker,
+        .share-picker,
+        .date-time-picker
+    ) {
+        position: relative;
+        display: inline-block;
+    }
+
+    :where(
+        .theme-picker-button,
+        .locale-picker-button,
+        .text-size-picker-button,
+        .share-picker-button,
+        .date-time-picker-button
+    ) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.5rem;
+        min-height: 2.5rem;
+        padding: var(--lily-space-xs);
+        font: inherit;
+        line-height: 1;
+        color: var(--lily-text);
+        background-color: var(--lily-surface);
+        border: var(--border) solid var(--lily-border-strong);
+        border-radius: var(--lily-radius-md);
+        cursor: pointer;
+    }
+
+    /* The glyph is decorative (aria-hidden); the button's aria-label
+       carries the accessible name. Sized up a little so a single
+       character reads as an affordance.
+
+       The two glyphs do NOT have the same ink-to-em ratio, so a single
+       font-size makes them look mismatched. Measured against the
+       components' own resolved fonts: U+25D1 (half circle) inks 0.842
+       of its em box, U+1F310 (globe) inks 0.996 — the globe reads
+       1.183x larger at equal font-size. Each icon therefore carries its
+       own optical correction so the two buttons look the same size.
+
+       The ratio depends on the consumer's font stack, so the factor is
+       a custom property rather than a baked-in number: override
+       --lily-picker-icon-scale if your stack resolves these glyphs to
+       different faces than the reference measurement. */
+    :where(
+        .theme-picker-icon,
+        .locale-picker-icon,
+        .text-size-picker-icon,
+        .motion-picker-icon,
+        .share-picker-icon,
+        .date-time-picker-icon
+    ) {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: calc(1.25em * var(--lily-picker-icon-scale, 1));
+        line-height: 1;
+    }
+
+    /* U+25D1 is the reference: no correction. Baseline for every factor
+       below (re-measured 2026-09-03, plan P8-T10): in a real browser,
+       against each icon's computed font, U+25D1 inks 0.850 of its em box
+       (max ink extent; width and height are equal for this glyph). */
+    :where(.theme-picker-icon) {
+        --lily-picker-icon-scale: 1;
+    }
+
+    /* U+1F310 inks 1.000 of its em box (max extent) against U+25D1's
+       0.850, so it scales DOWN: 0.850/1.000 ≈ 0.85 (shipped as 0.845 since
+       the original measurement; the 0.6% difference is invisible). */
+    :where(.locale-picker-icon) {
+        --lily-picker-icon-scale: 0.845;
+    }
+
+    /* U+0041 "A" is a cap-height letter: it inks 0.675 of its em box in
+       WIDTH (0.720 in height, the cap height) against U+25D1's 0.850 —
+       its factor is taken on width, 0.850/0.675 ≈ 1.26, shipped as 1.25.
+       The one glyph here whose width and height differ materially. */
+    :where(.text-size-picker-icon) {
+        --lily-picker-icon-scale: 1.25;
+    }
+
+    /* U+23F8 (pause sign) is a small dingbat: measured 2026-09-03 in a
+       real browser against this icon's computed font (the same method
+       as U+25D1 / U+1F310 / "A", which it reproduced to within 1%), it
+       inks only 0.495 of its em box against U+25D1's 0.850, so it scales
+       up by 0.850/0.495. Like every factor here it is font-stack
+       dependent — override it if your stack resolves U+23F8 to a
+       different face. */
+    :where(.motion-picker-icon) {
+        --lily-picker-icon-scale: 1.72;
+    }
+
+    /* U+27A4 "➤" inks 0.850 of its em box in width (0.685 in height)
+       against U+25D1's 0.850 — the same max extent, so no correction.
+       Re-baselined 2026-09-03 (plan P8-T10): the earlier 1.268 was
+       measured under a different resolved face (against a U+25D1 of
+       0.777) and was not comparable to the other factors here. (➤
+       replaced U+21AA "↪" in July 2026.) */
+    :where(.share-picker-icon) {
+        --lily-picker-icon-scale: 1;
+    }
+
+    /* U+1F4C5 calendar takes the SAME correction as U+1F310 globe, and
+       that is an identity rather than a coincidence: a colour-emoji font
+       paints every one of its glyphs into one identical em square. On the
+       reference stack, globe, calendar, rocket and heart all measure an
+       ink box of 1.015 x 1.015 with an advance of 1.000 — indistinguishable.
+       So any emoji helper icon carries the globe's factor, and any new one
+       should too, without re-measuring.
+
+       (Measuring also confirms the U+FE0E text-presentation selector is
+       ignored here: the bare and VS-15 forms are metrically identical. It
+       stays in the source as a hint to the platforms that do honour it.) */
+    :where(.date-time-picker-icon) {
+        --lily-picker-icon-scale: 0.845;
+    }
+
+    /* The share list holds real links and a button rather than options,
+       so its items get the same padding without the option selectors. */
+    :where(.share-picker-list) > :where(.share-picker-list-item) {
+        list-style: none;
+    }
+
+    :where(.share-picker-target, .share-picker-copy) {
+        display: block;
+        width: 100%;
+        padding: var(--lily-space-xs) var(--lily-space-sm);
+        font: inherit;
+        text-align: start;
+        color: var(--lily-text);
+        background: none;
+        border: 0;
+        border-radius: var(--lily-radius-sm);
+        cursor: pointer;
+    }
+
+    :where(.share-picker-target:hover, .share-picker-copy:hover) {
+        background-color: var(--lily-surface-alt);
+    }
+
+    /* Copy feedback. Never display:none this — that silences the live
+       region for screen-reader users. */
+    :where(.share-picker-status) {
+        margin: var(--lily-space-xs) 0 0;
+        font-size: 0.875em;
+        color: var(--lily-text-muted);
+    }
+
+    :where(
+        .theme-picker-list,
+        .locale-picker-list,
+        .text-size-picker-list,
+        .share-picker-list
+    ) {
+        position: absolute;
+        z-index: 10;
+        inset-inline-start: 0;
+        min-width: max-content;
+        max-height: 60vh;
+        margin-block-start: var(--lily-space-xs);
+        padding: var(--lily-space-xs);
+        overflow-y: auto;
+        list-style: none;
+        color: var(--lily-text);
+        background-color: var(--lily-surface);
+        border: var(--border) solid var(--lily-border-strong);
+        border-radius: var(--lily-radius-md);
+        box-shadow: var(--lily-shadow-md);
+    }
+
+    /* Explicit, because the rules above would otherwise beat the UA
+       stylesheet's [hidden] { display: none }. */
+    :where(
+        .theme-picker-list,
+        .locale-picker-list,
+        .text-size-picker-list,
+        .share-picker-list
+    )[hidden] {
+        display: none;
+    }
+
+    :where(.theme-picker-list, .locale-picker-list, .text-size-picker-list)
+        > :where(
+            .theme-picker-option,
+            .locale-picker-option,
+            .text-size-picker-option
+        ) {
+        padding: var(--lily-space-xs) var(--lily-space-sm);
+        border-radius: var(--lily-radius-sm);
+        cursor: pointer;
+    }
+
+    /* data-active is the keyboard cursor (aria-activedescendant); focus
+       stays on the listbox, so this is the only visible cue for it. */
+    :where(.theme-picker-list, .locale-picker-list, .text-size-picker-list)
+        > :where([data-active]) {
+        background-color: var(--lily-surface-alt);
+        outline: var(--lily-focus-ring);
+        outline-offset: -2px;
+    }
+
+    /* aria-selected marks the applied theme/locale, which is not the
+       same thing as the keyboard cursor. Both can be visible at once. */
+    :where(.theme-picker-list, .locale-picker-list, .text-size-picker-list)
+        > :where([aria-selected="true"]) {
+        font-weight: 600;
+        background-color: var(--lily-surface-sunken);
+    }
+
+    /* Locale options inherit the select colours, same as theme options. */
+    :where(.locale-picker-option) {
+        background-color: var(--lily-surface);
+        color: var(--lily-text);
+    }
+
+    /* ----------------------------------------------------------------------
+     * date-time-picker
+     *
+     * The one helper that is a form control rather than a page-header
+     * control, so it is the only one with a text field beside its trigger
+     * and a dialog rather than a listbox. The field itself needs no rules
+     * here: `.date-time-picker-input` already matches the generic
+     * [class$="-input"] baseline further up.
+     * -------------------------------------------------------------------- */
+
+    :where(.date-time-picker-field) {
+        display: flex;
+        align-items: center;
+        gap: var(--lily-space-xs);
+    }
+
+    :where(.date-time-picker-dialog) {
+        position: absolute;
+        z-index: 10;
+        inset-inline-start: 0;
+        margin-block-start: var(--lily-space-xs);
+        padding: var(--lily-space-sm);
+        color: var(--lily-text);
+        background-color: var(--lily-surface);
+        border: var(--border) solid var(--lily-border-strong);
+        border-radius: var(--lily-radius-md);
+        box-shadow: var(--lily-shadow-md);
+    }
+
+    /* Explicit, because the rule above would otherwise beat the UA
+       stylesheet's [hidden] { display: none } — the same trap the
+       listbox popups have to step around. */
+    :where(.date-time-picker-dialog)[hidden] {
+        display: none;
+    }
+
+    :where(.date-time-picker-header) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--lily-space-xs);
+        margin-block-end: var(--lily-space-xs);
+    }
+
+    /* The month/year heading is a live region, so it must keep its box
+       even while empty — never display:none it. */
+    :where(.date-time-picker-period) {
+        flex: 1;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    /* The four navigation buttons and the footer/shortcut buttons do not
+       end in `-button`, so the generic button family never reaches them. */
+    :where(
+        .date-time-picker-previous-year,
+        .date-time-picker-previous-month,
+        .date-time-picker-previous-week,
+        .date-time-picker-previous-day,
+        .date-time-picker-next-day,
+        .date-time-picker-next-week,
+        .date-time-picker-next-month,
+        .date-time-picker-next-year,
+        .date-time-picker-shortcut,
+        .date-time-picker-clear,
+        .date-time-picker-cancel,
+        .date-time-picker-confirm
+    ) {
+        padding: var(--lily-space-xs) var(--lily-space-sm);
+        font: inherit;
+        color: var(--lily-text);
+        background-color: var(--lily-surface);
+        border: var(--border) solid var(--lily-border-strong);
+        border-radius: var(--lily-radius-sm);
+        cursor: pointer;
+    }
+
+    :where(
+        .date-time-picker-previous-year:hover,
+        .date-time-picker-previous-month:hover,
+        .date-time-picker-previous-week:hover,
+        .date-time-picker-previous-day:hover,
+        .date-time-picker-next-day:hover,
+        .date-time-picker-next-week:hover,
+        .date-time-picker-next-month:hover,
+        .date-time-picker-next-year:hover,
+        .date-time-picker-shortcut:hover,
+        .date-time-picker-clear:hover,
+        .date-time-picker-cancel:hover,
+        .date-time-picker-confirm:hover
+    ) {
+        background-color: var(--lily-surface-alt);
+    }
+
+    /* The commit action is the primary one on the dialog. */
+    :where(.date-time-picker-confirm) {
+        color: var(--color-primary-content);
+        background-color: var(--color-primary);
+        border-color: var(--color-primary);
+    }
+
+    :where(.date-time-picker-calendar) {
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+
+    :where(.date-time-picker-weekday, .date-time-picker-week-heading) {
+        padding: var(--lily-space-xs);
+        font-size: 0.8125em;
+        font-weight: 600;
+        color: var(--lily-text-muted);
+    }
+
+    /* Week numbers are reference data, not navigation: muted, and set in
+       tabular figures so the column does not shimmer as months change. */
+    :where(.date-time-picker-week) {
+        padding-inline-end: var(--lily-space-xs);
+        font-size: 0.8125em;
+        font-weight: 400;
+        font-variant-numeric: tabular-nums;
+        color: var(--lily-text-muted);
+        text-align: end;
+    }
+
+    :where(.date-time-picker-day) {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* 2rem is a compromise: WCAG 2.5.8 (AA) wants 24px, 2.5.5 (AAA)
+           wants 44px, and seven 44px columns do not fit a 320px viewport
+           alongside dialog chrome. Consumers targeting AAA should enlarge
+           these and let the dialog go full-width on small screens. */
+        min-width: 2rem;
+        min-height: 2rem;
+        padding: 0;
+        font: inherit;
+        font-variant-numeric: tabular-nums;
+        color: var(--lily-text);
+        background: none;
+        border: var(--border) solid transparent;
+        border-radius: var(--lily-radius-sm);
+        cursor: pointer;
+    }
+
+    :where(.date-time-picker-day:hover:not([data-disabled])) {
+        background-color: var(--lily-surface-alt);
+    }
+
+    /* Adjacent-month days stay legible rather than being hidden: they are
+       real, selectable dates, and blanking them makes the grid harder to
+       scan across a month boundary. */
+    :where(.date-time-picker-day[data-outside]) {
+        color: var(--lily-text-muted);
+    }
+
+    /* Today is marked with a border, the selection with a fill. Two
+       different channels, so a day that is both still reads as both. */
+    :where(.date-time-picker-day[data-today]) {
+        border-color: var(--lily-border-strong);
+        font-weight: 600;
+    }
+
+    :where(.date-time-picker-day[data-selected]) {
+        color: var(--color-primary-content);
+        background-color: var(--color-primary);
+        border-color: var(--color-primary);
+    }
+
+    :where(.date-time-picker-day[data-disabled]) {
+        color: var(--lily-text-muted);
+        cursor: not-allowed;
+        /* Struck through as well as dimmed: "unavailable" must not rest on
+           contrast alone (WCAG 1.4.1). */
+        text-decoration: line-through;
+    }
+
+    :where(.date-time-picker-time) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--lily-space-xs);
+        margin-block-start: var(--lily-space-sm);
+    }
+
+    :where(.date-time-picker-time-label) {
+        font-size: 0.8125em;
+        color: var(--lily-text-muted);
+    }
+
+    :where(.date-time-picker-time-zone) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--lily-space-xs);
+        margin-block-end: var(--lily-space-sm);
+    }
+
+    :where(.date-time-picker-time-zone-label) {
+        font-size: 0.8125em;
+        color: var(--lily-text-muted);
+    }
+
+    :where(
+        .date-time-picker-hour,
+        .date-time-picker-minute,
+        .date-time-picker-meridiem,
+        .date-time-picker-time-zone-select
+    ) {
+        padding: var(--lily-space-xs);
+        font: inherit;
+        color: var(--lily-text);
+        background-color: var(--lily-surface);
+        border: var(--border) solid var(--lily-border-strong);
+        border-radius: var(--lily-radius-sm);
+    }
+
+    :where(.date-time-picker-shortcuts) {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--lily-space-xs);
+        margin-block-start: var(--lily-space-sm);
+    }
+
+    :where(.date-time-picker-footer) {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--lily-space-xs);
+        margin-block-start: var(--lily-space-sm);
     }
 
     /* Combobox / listbox / autosuggest — non-native variant of <select>. */
@@ -2229,7 +2695,11 @@
         width: 100%;
         max-width: 100%;
         border-radius: var(--lily-radius-md);
+        /* Video chrome is black in every theme; pair the text colour with
+           it here rather than inheriting the theme's (possibly dark)
+           content colour onto a black surface. */
         background-color: black;
+        color: white;
     }
 
     /* ==========================================================================
@@ -2458,6 +2928,11 @@
         background-color: var(--color-primary);
         color: var(--color-primary-content);
     }
+    /* Links inside the call-to-action inherit its content colour —
+       otherwise the UA default link blue lands on the primary fill. */
+    :where(.call-to-action) :where(a) {
+        color: inherit;
+    }
     /* Expander / collapsible / details — boxed disclosure controls. */
     :where(.expander, .collapsible, .details) {
         display: block;
@@ -2663,4 +3138,61 @@
             border-color: var(--lily-text);
         }
     }
+}
+
+/* ============================================================================
+ * WCAG 2.2 target-size (minimum) floor — 2.5.8
+ *
+ * Every interactive Lily hook offers a >=24x24 CSS-pixel target. Links
+ * that render as short inline text (a pagination "1", a breadcrumb crumb)
+ * fail the 24px floor under typographic sizing alone, so the link-shaped
+ * hooks become inline-block with a minimum box. :where() keeps specificity
+ * at zero, so any consumer rule still wins. Shared verbatim by all themes.
+ * ========================================================================= */
+
+:where(.action-link,
+       .back-link,
+       .breadcrumb-list-item > a,
+       .pagination-list-item > a,
+       .contents-list-item > a,
+       .section-list-item > a) {
+    display: inline-block;
+    min-inline-size: 24px;
+    min-block-size: 24px;
+}
+
+:where(.pagination-list-item > a) {
+    text-align: center;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    min-block-size: 24px;
+}
+
+/* ============================================================================
+ * Overflow guards — narrow-viewport safety, shared verbatim by all themes.
+ *
+ * Content that is intrinsically wider than the viewport scrolls or wraps
+ * within its own box instead of pushing the page wider. Deliberately NOT
+ * `display: block` on <table> — that strips implicit table semantics for
+ * assistive technology; capping width and letting cell content wrap keeps
+ * both the layout and the roles. Proven in the example apps' own
+ * stylesheets before the theme layer took over component styling.
+ * ========================================================================= */
+
+:where(pre) {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+:where(table) {
+    max-width: 100%;
+}
+
+:where(th, td) {
+    overflow-wrap: anywhere;
+}
+
+:where(a, code) {
+    overflow-wrap: anywhere;
 }
