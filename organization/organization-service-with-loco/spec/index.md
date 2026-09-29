@@ -469,6 +469,12 @@ organization is not a data subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `ORGANIZATION_KEYCLOAK_*` configuration; `request_claims` /
+      `enforce_request`; `tests/keycloak_guard.rs`. Verifier side:
+      `authentication-verifier` KC-1. Reference for the other services.
+
 
 - [x] **2026-08-21 — TSV bulk format + fuzzed row decoders.**
   `BulkFormat::Tsv` is accepted for import and export alongside `jsonl`
