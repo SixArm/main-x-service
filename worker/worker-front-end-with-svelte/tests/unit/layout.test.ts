@@ -50,4 +50,19 @@ describe("+layout top-bar navigation", () => {
         expect(button.getAttribute("aria-expanded")).toBe("false");
         expect(nav!.classList.contains("open")).toBe(false);
     });
+
+    // Sign in sits immediately left of the PickerBar in the always-visible
+    // header-end group; signed in it becomes a Sign out form button.
+    it("shows Sign in (signed out) or Sign out (signed in) before the pickers", () => {
+        const out = render(Layout, { children, data: { signedIn: false } });
+        const end = out.container.querySelector(".header-end");
+        expect(end).toBeTruthy();
+        expect(end!.firstElementChild!.textContent).toContain("Sign in");
+        expect(end!.querySelector(".picker-bar")).toBeTruthy();
+        expect(out.container.querySelector("nav .picker-bar")).toBeNull();
+        cleanup();
+        const inn = render(Layout, { children, data: { signedIn: true } });
+        const form = inn.container.querySelector(".header-end form");
+        expect(form?.textContent).toContain("Sign out");
+    });
 });

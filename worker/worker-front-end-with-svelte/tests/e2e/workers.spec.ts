@@ -415,4 +415,14 @@ test.describe("Worker front-end page-visit guard", () => {
             await expect(page).toHaveURL(/\/signin(\?|$)/);
         });
     }
+
+    // Signed out, "/" is the splash (hero + sign-in CTA), not the dashboard.
+    test("anonymous visit to / shows the splash, not the dashboard", async ({ page }) => {
+        await page.goto("/");
+        await expect(
+            page.getByRole("heading", { level: 1, name: "One trusted record for every worker" }),
+        ).toBeVisible();
+        await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Dashboard" })).toHaveCount(0);
+    });
 });
