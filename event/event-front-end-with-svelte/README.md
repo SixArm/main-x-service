@@ -48,6 +48,7 @@ Open <http://localhost:5173>.
 | --- | --- | --- |
 | `EVENT_API_URL` | `http://localhost:5150` | Event Service base URL (server-side only) |
 | `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL (server-side only) |
+| `PUBLIC_OIDC_SIGNIN_ENABLED` | unset | Set to `true` to show the opt-in "Sign in with SSO" (OIDC) link on `/signin` |
 
 Set in `.env`. Both are **server-side** variables read in `src/lib/server/config.ts` — they are never bundled into the browser. The browser talks only to the app's own origin: entity-API calls go through the same-origin `/api/proxy` BFF route, which forwards them to the Event Service with a server-injected PASETO.
 
