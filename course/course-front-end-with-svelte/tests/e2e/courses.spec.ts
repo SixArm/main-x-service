@@ -14,42 +14,62 @@ test.describe("Course front-end smoke", () => {
     // Pins: "/" shows the Dashboard heading and the sidebar nav links.
     test("dashboard renders nav and heading", async ({ page }) => {
         await page.goto("/");
-        await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "Dashboard" }),
+        ).toBeVisible();
         // The nav is a hamburger dropdown at every viewport width
         // (deliberate layout design) — open it before asserting links.
         await page.getByRole("button", { name: "Toggle navigation" }).click();
         await expect(page.getByRole("link", { name: "Courses" })).toBeVisible();
-        await expect(page.getByRole("link", { name: "Match check" })).toBeVisible();
+        await expect(
+            page.getByRole("link", { name: "Match check" }),
+        ).toBeVisible();
         await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
     });
 
     // Pins: "/courses" shows the heading, the search box, and the New course link.
-    test("courses list renders search box and new course link", async ({ page }) => {
+    test("courses list renders search box and new course link", async ({
+        page,
+    }) => {
         await page.goto("/courses");
-        await expect(page.getByRole("heading", { name: "Courses" })).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "Courses" }),
+        ).toBeVisible();
         await expect(page.getByRole("searchbox")).toBeVisible();
-        await expect(page.getByRole("main").getByRole("link", { name: "New course" })).toBeVisible();
+        await expect(
+            page.getByRole("main").getByRole("link", { name: "New course" }),
+        ).toBeVisible();
     });
 
     // Pins: "/courses/new" shows the required Name field and the Create button.
     test("new course form renders required name field", async ({ page }) => {
         await page.goto("/courses/new");
-        await expect(page.getByRole("heading", { name: "New course" })).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "New course" }),
+        ).toBeVisible();
         await expect(page.getByLabel(/^Name/)).toBeVisible();
-        await expect(page.getByRole("button", { name: "Create" })).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "Create" }),
+        ).toBeVisible();
     });
 
     // Pins: "/courses/match" shows the heading and the Find matches button.
     test("match check form renders", async ({ page }) => {
         await page.goto("/courses/match");
-        await expect(page.getByRole("heading", { name: "Match check" })).toBeVisible();
-        await expect(page.getByRole("button", { name: /Find matches/ })).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "Match check" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: /Find matches/ }),
+        ).toBeVisible();
     });
 
     // Pins: "/courses/merge" shows the heading and both the Main and Duplicate ID inputs.
     test("merge form renders both ID inputs", async ({ page }) => {
         await page.goto("/courses/merge");
-        await expect(page.getByRole("heading", { name: "Merge courses" })).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "Merge courses" }),
+        ).toBeVisible();
         await expect(page.getByLabel(/Main course ID/)).toBeVisible();
         await expect(page.getByLabel(/Duplicate course ID/)).toBeVisible();
     });
@@ -59,10 +79,25 @@ test.describe("Course front-end smoke", () => {
     // download (Blob object URL + synthetic anchor), asserted through
     // Playwright's download event, with the saved bytes compared to the
     // stubbed payload so a silently-empty file cannot pass.
-    test("course detail downloads the GDPR export as JSON", async ({ page }) => {
+    test("course detail downloads the GDPR export as JSON", async ({
+        page,
+    }) => {
         const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
-        const payload = { subject: id, exported_at: "2026-09-03T00:00:00Z", records: [] };
-        const record = { id, name: "Introduction to Computer Science", course_code: "CS101", educational_level: "Undergraduate", keywords: [], instances: [], license: "CC-BY-4.0", url: "https://example.org/cs101" };
+        const payload = {
+            subject: id,
+            exported_at: "2026-09-03T00:00:00Z",
+            records: [],
+        };
+        const record = {
+            id,
+            name: "Introduction to Computer Science",
+            course_code: "CS101",
+            educational_level: "Undergraduate",
+            keywords: [],
+            instances: [],
+            license: "CC-BY-4.0",
+            url: "https://example.org/cs101",
+        };
         await page.route("**/api/courses/**", async (route) => {
             const url = route.request().url();
             const envelope = url.includes("/export")
@@ -82,15 +117,21 @@ test.describe("Course front-end smoke", () => {
         expect(download.suggestedFilename()).toBe(`course-${id}-export.json`);
         const saved = await download.path();
         expect(saved).not.toBeNull();
-        expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
-        await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
+        expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(
+            payload,
+        );
+        await expect(
+            page.getByRole("button", { name: "Export data (GDPR)" }),
+        ).toBeEnabled();
     });
 
     // Pins T-30: "/board" renders the lifecycle Kanban. Columns come
     // from the fixed `COURSE_STATUSES` list regardless of course data,
     // so an empty search result is enough to exercise the render path —
     // this is a shell/landmark check, not a drag-and-drop test.
-    test("board renders the Kanban with lifecycle column headings", async ({ page }) => {
+    test("board renders the Kanban with lifecycle column headings", async ({
+        page,
+    }) => {
         await page.route("**/api/courses/search**", async (route) => {
             await route.fulfill({
                 status: 200,
@@ -192,7 +233,9 @@ test.describe("Course front-end smoke", () => {
     // Pins T-31: "/courses/[id]" renders its identity heading plus the
     // Edit and Audit links — landmarks the existing GDPR-export test
     // never asserted (it only checks the export button).
-    test("course detail renders heading, edit link, and audit link", async ({ page }) => {
+    test("course detail renders heading, edit link, and audit link", async ({
+        page,
+    }) => {
         const id = "0c4f1e2a-0000-4000-8000-0000000000dd";
         const record = {
             id,
@@ -208,13 +251,19 @@ test.describe("Course front-end smoke", () => {
             await route.fulfill({
                 status: 200,
                 contentType: "application/json",
-                body: JSON.stringify({ success: true, data: record, error: null }),
+                body: JSON.stringify({
+                    success: true,
+                    data: record,
+                    error: null,
+                }),
             });
         });
 
         await page.goto(`/courses/${id}`);
         await expect(
-            page.getByRole("heading", { name: "Introduction to Computer Science" }),
+            page.getByRole("heading", {
+                name: "Introduction to Computer Science",
+            }),
         ).toBeVisible();
         await expect(page.getByRole("link", { name: "Edit" })).toBeVisible();
         await expect(page.getByRole("link", { name: "Audit" })).toBeVisible();
@@ -222,7 +271,9 @@ test.describe("Course front-end smoke", () => {
 
     // Pins T-31: "/courses/[id]/audit" renders its heading and at least
     // one stubbed audit entry — never visited by any test before this.
-    test("course audit page renders heading and an audit entry", async ({ page }) => {
+    test("course audit page renders heading and an audit entry", async ({
+        page,
+    }) => {
         const id = "0c4f1e2a-0000-4000-8000-0000000000ee";
         const entries = [
             {
@@ -238,12 +289,18 @@ test.describe("Course front-end smoke", () => {
             await route.fulfill({
                 status: 200,
                 contentType: "application/json",
-                body: JSON.stringify({ success: true, data: entries, error: null }),
+                body: JSON.stringify({
+                    success: true,
+                    data: entries,
+                    error: null,
+                }),
             });
         });
 
         await page.goto(`/courses/${id}/audit`);
-        await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "Audit log" }),
+        ).toBeVisible();
         await expect(page.getByText("created")).toBeVisible();
     });
 });
@@ -264,9 +321,31 @@ test.describe("Course front-end page-visit guard", () => {
     ];
 
     for (const path of guarded) {
-        test(`anonymous visit to ${path} redirects to /signin`, async ({ page }) => {
+        test(`anonymous visit to ${path} redirects to /signin`, async ({
+            page,
+        }) => {
             await page.goto(path);
             await expect(page).toHaveURL(/\/signin(\?|$)/);
         });
     }
+});
+
+// "/" is a splash page for anonymous visitors (sign-in call to action,
+// three areas of six tiles) and the dashboard only once signed in.
+test.describe("Course front-end anonymous home", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test("anonymous home shows the splash, not the dashboard", async ({
+        page,
+    }) => {
+        await page.goto("/");
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await expect(
+            page.getByRole("link", { name: "Sign in" }).first(),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: "Dashboard" }),
+        ).toHaveCount(0);
+        await expect(page.locator(".tile")).toHaveCount(18);
+    });
 });
