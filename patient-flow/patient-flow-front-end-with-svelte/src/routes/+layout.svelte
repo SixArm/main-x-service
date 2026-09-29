@@ -103,6 +103,7 @@
         { href: "/edd", key: "nav.edd" },
         { href: "/locate", key: "nav.locate" },
         { href: "/audits", key: "nav.audits" },
+    { href: "/tour", key: "nav.tour" },
     ] as const;
 </script>
 

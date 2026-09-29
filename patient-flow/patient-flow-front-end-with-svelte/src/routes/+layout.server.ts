@@ -37,8 +37,9 @@ import type { LayoutServerLoad } from "./$types";
 const PUBLIC_PATHS = ["/signin", "/verify"];
 
 /** The home page is public too (exact match): it shows the splash to an
- * anonymous visitor and the dashboard once signed in. */
-const PUBLIC_EXACT = ["/"];
+ * anonymous visitor and the dashboard once signed in. `/tour` is the
+ * public walkthrough of the app. */
+const PUBLIC_EXACT = ["/", "/tour"];
 
 export const load: LayoutServerLoad = ({ locals, url }) => {
   const isPublic =

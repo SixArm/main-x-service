@@ -32,6 +32,8 @@ npx playwright test    # e2e (stubbed API — no backend needed)
 Configure with `PATIENT_FLOW_API_URL` (the service) and
 `AUTH_API_URL` (the authentication service) — both server-side only,
 read by `src/lib/server/config.ts`; see `.env.example`.
+Set `PUBLIC_OIDC_SIGNIN_ENABLED=true` to show the opt-in "Sign in with
+SSO" link (`/signin/sso`, OIDC via the authentication service).
 
 ## Routes
 

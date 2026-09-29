@@ -123,3 +123,14 @@ describe("signout", () => {
     );
   });
 });
+
+describe("oidcLoginUrl", () => {
+  it("builds the auth service OIDC login URL with an encoded return_url", async () => {
+    const { oidcLoginUrl } = await import("../../src/lib/server/auth");
+    const url = oidcLoginUrl("http://localhost:5258");
+    expect(url).toContain("/api/auth/oidc/login?");
+    expect(url).toContain(
+      `return_url=${encodeURIComponent("http://localhost:5258")}`,
+    );
+  });
+});
