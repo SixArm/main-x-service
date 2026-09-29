@@ -8,6 +8,31 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — optional Keycloak bearer acceptance; PASETO is now a feature (KC-1, 2026-09-29)
+
+`keycloak` cargo feature (off by default): the blanket guard and the
+`AuthUser` extractor also accept an
+`Authorization: Bearer <Keycloak access token>`, verified by
+`authentication-verifier`'s `keycloak` module and mapped onto the same
+`Claims`, so ABAC, masking and audit are unchanged. Configured by
+`PLACE_KEYCLOAK_URL` / `_REALM` / `_AUDIENCES` / `_ROLE_MAP[_FILE]` /
+`_REQUIRE_VERIFIED_EMAIL`; unset URL => off; a malformed configuration logs
+an error and leaves Keycloak off (fail-closed, service still boots). A token
+beginning `v4.` is a PASETO; anything else is offered to Keycloak. An
+unmapped Keycloak role grants nothing. New `auth::request_claims` and
+`auth::enforce_request` (async) are what the middleware and extractor use;
+the sync `enforce` / `bearer_claims` remain for the PASETO tests.
+
+PASETO verification (`Verifier`, the boot key fetch, the rotation refresh)
+moved behind the `paseto` feature, **on by default**, so a default build is
+unchanged. `--no-default-features --features keycloak` builds a service with
+no PASETO code. New `tests/keycloak_guard.rs` (DB-free) pushes real RS256
+Keycloak-shaped tokens, served by a local OIDC provider
+(`authentication_verifier::test_idp`), through the real guard: editor may
+read/write but not delete/merge, admin may, unmapped roles are read-only,
+expired / wrong-audience / garbage / PASETO-shaped-junk are 401. See
+`agents/share/runbooks/keycloak-sso.md`.
+
 ### Added — `GET /api/places`, a real collection-list endpoint (T-17)
 
 Mirrors thing-service's own T-15: `GET /api/places` answered `405`

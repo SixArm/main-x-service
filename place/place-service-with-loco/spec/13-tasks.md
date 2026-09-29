@@ -3,6 +3,12 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `PLACE_KEYCLOAK_*` configuration; `request_claims` /
+      `enforce_request` in `src/api/rest/auth.rs`; `tests/keycloak_guard.rs`.
+      Verifier side: `authentication-verifier` KC-1.
+
 - [x] **2026-08-22 — Geo coordinates as exact decimals (`f64` →
   `BigDecimal`, `DOUBLE PRECISION` → `NUMERIC`).**
   `GeoCoordinates::latitude` / `longitude` / `elevation` and
