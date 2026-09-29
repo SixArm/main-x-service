@@ -17,6 +17,8 @@
 //! `config/test.yaml` / `DATABASE_URL`. Run with
 //! `cargo test --test list_search_check_duplicates_authz -- --ignored`.
 
+#![cfg(feature = "paseto")]
+
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use care_pathway_service::app::App;

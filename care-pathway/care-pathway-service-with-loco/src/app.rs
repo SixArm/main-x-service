@@ -39,22 +39,23 @@ static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
 /// Blanket `/api/*` auth-enforcement middleware. Reads the flag,
 /// verifier, and ABAC policy per request and delegates the decision to
-/// [`auth::enforce`]: when enforcement is off (the default) or the path
+/// [`auth::enforce_request`]: when enforcement is off (the default) or the path
 /// is public it is a near-noop; otherwise an absent/invalid bearer
 /// token yields `401`, and a valid token the ABAC policy denies yields
 /// `403` (see `agents/share/authorization-attributes.md`).
 async fn require_auth_mw(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
-    match auth::enforce(
+    match auth::enforce_request(
         auth::require_auth(),
         req.method(),
         &path,
         req.headers(),
-        // Per-request snapshots, so the refresh loop and the policy
-        // watcher reach the guard too — not just the handlers.
-        &auth::verifier().current(),
+        // Per-request snapshot, so the policy watcher reaches the guard
+        // too — not just the handlers.
         &auth::policy().current(),
-    ) {
+    )
+    .await
+    {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
     }

@@ -1127,6 +1127,12 @@ the evidence bundle.
 
 ## 13. Tasks (live work queue)
 
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+  (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+  features; `CARE_PATHWAY_KEYCLOAK_*` configuration; `request_claims` /
+  `enforce_request`; `tests/keycloak_guard.rs`. Verifier side:
+  `authentication-verifier` KC-1.
+
 - [ ] **UTIL-1 — Per-clinician utilisation (§6.x).** Permitted by the
   2026-08-25 decision; **blocked on two absent inputs**, so this task is
   the inputs before it is the figure.
