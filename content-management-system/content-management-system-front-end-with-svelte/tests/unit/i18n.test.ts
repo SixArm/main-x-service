@@ -22,6 +22,7 @@ describe("i18n", () => {
     expect([...LOCALES]).toEqual([
       "ar-001",
       "cy-001",
+      "de-de",
       "en-001",
       "es-001",
       "fr-001",
