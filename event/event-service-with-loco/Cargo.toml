@@ -123,7 +123,7 @@ event-matcher = { path = "../event-matcher-rust-crate" }
 # monorepo's 0.2 PASETO verifier). The `fetch` feature adds the boot-time
 # HTTP key-set fetch (`Verifier::from_paseto_keys_url`) used when
 # `EVENT_PASETO_KEYS_URL` is set.
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
 mimalloc = "0.1.52"
 
 # Durable event bus Phase 3 (BUS-3, ported from case-service's BUS-1
@@ -134,12 +134,23 @@ mimalloc = "0.1.52"
 fluvio = { version = "0.50", optional = true }
 
 [features]
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `EVENT_KEYCLOAK_*` (see src/api/rest/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
 # Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
 # feature to build or test; only `FluvioSink` — the real-broker producer
 # — lives behind this.
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 # Testing
 assertables = "10"
 tokio-test = "0.4"

@@ -542,7 +542,7 @@ organizer / performer / attendee / identifier) are documented in
 [`agents/matching.md`](agents/matching.md).
 
 The table above is the core set; auth (`EVENT_REQUIRE_AUTH`,
-`EVENT_PASETO_KEYS[_URL]`, `EVENT_ABAC_POLICY[_FILE]`), the durable
+`EVENT_PASETO_KEYS[_URL]`, `EVENT_KEYCLOAK_*` with the `keycloak` feature, `EVENT_ABAC_POLICY[_FILE]`), the durable
 event bus (`EVENT_EVENT_TRANSPORT`, `EVENT_EVENT_RELAY*`,
 `EVENT_FLUVIO_ENDPOINT`), and row-level integrity
 (`EVENT_INTEGRITY_MAC_KEY[_FILE]`) each have their own env vars,

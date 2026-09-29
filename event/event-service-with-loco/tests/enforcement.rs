@@ -16,6 +16,8 @@
 //! `#[ignore]`d — the router opens a database connection. Run with
 //! `cargo test --test enforcement -- --ignored`.
 
+#![cfg(feature = "paseto")]
+
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use base64::Engine;
