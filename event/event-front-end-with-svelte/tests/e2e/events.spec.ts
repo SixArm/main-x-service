@@ -271,3 +271,16 @@ test.describe("Event front-end page-visit guard", () => {
         });
     }
 });
+
+// Pins the anonymous home page: a visitor with no session sees the splash
+// (hero heading + sign-in call to action), not the dashboard.
+test.describe("Event front-end anonymous home", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test("anonymous / renders the splash with a sign-in link", async ({ page }) => {
+        await page.goto("/");
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Dashboard" })).toHaveCount(0);
+    });
+});
