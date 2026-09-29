@@ -68,9 +68,9 @@
 
 use std::sync::OnceLock;
 
-use authentication_verifier::{
-    Action, Claims, Policy, ReloadablePolicy, ReloadableVerifier, Verifier,
-};
+use authentication_verifier::{Action, Claims, Policy, ReloadablePolicy};
+#[cfg(feature = "paseto")]
+use authentication_verifier::{ReloadableVerifier, Verifier};
 use axum::extract::FromRequestParts;
 use axum::http::header::AUTHORIZATION;
 use axum::http::request::Parts;
@@ -95,17 +95,21 @@ pub const ENTITY: &str = "portfolio";
 pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/import"];
 
 /// Default issuer expected in tokens (`iss`).
+#[cfg(feature = "paseto")]
 const DEFAULT_ISSUER: &str = "authentication-service";
 /// Default audience expected in tokens (`aud`).
+#[cfg(feature = "paseto")]
 const DEFAULT_AUDIENCE: &str = "main-x-service";
 
 /// The process-wide token verifier, seeded by [`init`] at boot (or, if
 /// [`init`] never ran — e.g. in unit tests — built lazily from the
 /// environment on first use). Shared behind an `Arc` and read-only.
+#[cfg(feature = "paseto")]
 static VERIFIER: OnceLock<ReloadableVerifier> = OnceLock::new();
 
 /// The process-wide token verifier (see [`VERIFIER`] and the module
 /// docs). Shared behind an `Arc` and read-only.
+#[cfg(feature = "paseto")]
 #[must_use]
 pub fn verifier() -> &'static ReloadableVerifier {
     VERIFIER.get_or_init(|| ReloadableVerifier::new(build_from_env()))
@@ -119,7 +123,19 @@ pub fn verifier() -> &'static ReloadableVerifier {
 /// unset/blank, the verifier is built from the environment exactly as
 /// before, so the service always boots. Idempotent: a no-op when the
 /// verifier is already built.
+// `async` in every feature shape so `app.rs` has one call site; only the
+// `paseto` half awaits (the key fetch).
+#[allow(clippy::unused_async)]
 pub async fn init() {
+    #[cfg(feature = "paseto")]
+    init_paseto().await;
+    #[cfg(feature = "keycloak")]
+    init_keycloak();
+}
+
+/// Seed the PASETO [`verifier`] (the `paseto` half of [`init`]).
+#[cfg(feature = "paseto")]
+async fn init_paseto() {
     let built = match std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -140,9 +156,54 @@ pub async fn init() {
     verifier().store(built);
 }
 
+/// The process-wide Keycloak verifier, present only when
+/// `PROJECT_PORTFOLIO_MANAGEMENT_KEYCLOAK_URL` is set and valid.
+#[cfg(feature = "keycloak")]
+static KEYCLOAK: OnceLock<authentication_verifier::keycloak::KeycloakVerifier> = OnceLock::new();
+
+/// The Keycloak verifier, or `None` when Keycloak is not configured (or was
+/// configured badly — see [`init_keycloak`]).
+#[cfg(feature = "keycloak")]
+#[must_use]
+pub fn keycloak_verifier() -> Option<&'static authentication_verifier::keycloak::KeycloakVerifier> {
+    KEYCLOAK.get()
+}
+
+/// Build the Keycloak verifier from `PROJECT_PORTFOLIO_MANAGEMENT_KEYCLOAK_*`.
+/// Fail-closed and non-fatal, like the PASETO key loaders: a missing URL
+/// leaves Keycloak off; a malformed configuration logs an error and leaves
+/// it off (Keycloak tokens are then rejected), and the service still boots.
+/// Must run inside the Tokio runtime (discovery starts in the background).
+#[cfg(feature = "keycloak")]
+fn init_keycloak() {
+    use authentication_verifier::keycloak::{KeycloakSettings, KeycloakVerifier};
+    if KEYCLOAK.get().is_some() {
+        return;
+    }
+    match KeycloakSettings::from_env("PROJECT_PORTFOLIO_MANAGEMENT") {
+        Ok(None) => {}
+        Ok(Some(settings)) => {
+            let issuer = settings.expected_issuer();
+            match KeycloakVerifier::new(settings) {
+                Ok(verifier) => {
+                    let _ = KEYCLOAK.set(verifier);
+                    tracing::info!(%issuer, "auth: Keycloak access tokens accepted");
+                }
+                Err(error) => {
+                    tracing::error!(%error, "auth: Keycloak configuration rejected; Keycloak tokens will be refused");
+                }
+            }
+        }
+        Err(error) => {
+            tracing::error!(%error, "auth: PROJECT_PORTFOLIO_MANAGEMENT_KEYCLOAK_* is invalid; Keycloak tokens will be refused");
+        }
+    }
+}
+
 /// Default key-set refresh interval (seconds) when
 /// `PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_REFRESH_SECS` is unset. One
 /// hour: rotation is infrequent, so a slow poll suffices.
+#[cfg(feature = "paseto")]
 const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
 
 /// Spawn the background loop that re-fetches the published key set from
@@ -156,6 +217,13 @@ const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
 /// the URL is unset, since an env-supplied key set has nothing to
 /// re-fetch.
 pub fn spawn_key_refresh() {
+    #[cfg(feature = "paseto")]
+    spawn_paseto_key_refresh();
+}
+
+/// The `paseto` half of [`spawn_key_refresh`].
+#[cfg(feature = "paseto")]
+fn spawn_paseto_key_refresh() {
     let Some(url) = std::env::var("PROJECT_PORTFOLIO_MANAGEMENT_PASETO_KEYS_URL")
         .ok()
         .map(|u| u.trim().to_string())
@@ -201,6 +269,7 @@ pub fn spawn_key_refresh() {
 /// panic, so the caller always boots. Pure dependency injection (URL,
 /// issuer, audience and fallback are all passed in), so it is testable
 /// against a local HTTP listener without touching the process global.
+#[cfg(feature = "paseto")]
 pub async fn fetch_or(url: &str, issuer: &str, audience: &str, fallback: Verifier) -> Verifier {
     match Verifier::from_paseto_keys_url(url, issuer, audience).await {
         Ok(fetched) => {
@@ -396,6 +465,7 @@ fn is_public_path(path: &str) -> bool {
 /// (missing/malformed/expired/tampered). `403` when the token is valid
 /// but the ABAC policy denies the derived action (the message names
 /// the deciding rule, per `authorization-attributes.md` §5).
+#[cfg(feature = "paseto")]
 pub fn enforce(
     require_auth: bool,
     method: &Method,
@@ -408,7 +478,18 @@ pub fn enforce(
         return Ok(());
     }
     let claims = bearer_claims(headers, verifier)?;
-    let decision = policy.evaluate(&claims, derive_action(method, path), ENTITY);
+    decide(&claims, method, path, policy)
+}
+
+/// The ABAC half of [`enforce`]: `Ok` when the policy allows the request's
+/// derived action for `claims`, else `403` carrying the deciding rule.
+fn decide(
+    claims: &Claims,
+    method: &Method,
+    path: &str,
+    policy: &Policy,
+) -> Result<(), (StatusCode, String)> {
+    let decision = policy.evaluate(claims, derive_action(method, path), ENTITY);
     if decision.allowed {
         Ok(())
     } else {
@@ -416,9 +497,33 @@ pub fn enforce(
     }
 }
 
+/// The blanket guard the middleware runs: like [`enforce`], but the caller
+/// is authenticated through every credential type this build accepts
+/// (PASETO with `paseto`, a Keycloak access token with `keycloak`) via
+/// [`request_claims`], against the process-wide verifiers.
+///
+/// # Errors
+///
+/// `401` when enforcement is on and no accepted credential is presented;
+/// `403` when the ABAC policy denies the derived action.
+pub async fn enforce_request(
+    require_auth: bool,
+    method: &Method,
+    path: &str,
+    headers: &HeaderMap,
+    policy: &Policy,
+) -> Result<(), (StatusCode, String)> {
+    if !require_auth || is_public_path(path) {
+        return Ok(());
+    }
+    let claims = request_claims(headers).await?;
+    decide(&claims, method, path, policy)
+}
+
 /// Read env var `name`, treating unset/blank as absent and falling back
 /// to `default`. Used for the issuer/audience so a blank value doesn't
 /// override the sensible default.
+#[cfg(feature = "paseto")]
 fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
         .ok()
@@ -430,6 +535,7 @@ fn env_or(name: &str, default: &str) -> String {
 /// audience, and the published key set. A missing/blank/unparseable key
 /// set yields an empty key set (every token rejected) so the service still
 /// boots without credentials configured.
+#[cfg(feature = "paseto")]
 fn build_from_env() -> Verifier {
     let issuer = env_or("PROJECT_PORTFOLIO_MANAGEMENT_TOKEN_ISSUER", DEFAULT_ISSUER);
     let audience = env_or(
@@ -447,6 +553,7 @@ fn build_from_env() -> Verifier {
 
 /// A verifier with no keys: rejects every token until a real key set is
 /// configured. Infallible — an empty `keys` array always parses.
+#[cfg(feature = "paseto")]
 fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
     let empty = serde_json::json!({ "keys": [] });
     Verifier::from_paseto_keys_value(&empty, issuer, audience).expect("empty key set always builds")
@@ -460,10 +567,23 @@ fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
 /// `401` when the `Authorization` header is missing, is not a bearer
 /// token, or the token fails PASETO signature / issuer / audience / expiry
 /// verification.
+#[cfg(feature = "paseto")]
 pub fn bearer_claims(
     headers: &HeaderMap,
     verifier: &Verifier,
 ) -> Result<Claims, (StatusCode, String)> {
+    let token = bearer_token(headers)?;
+    verifier
+        .verify(token)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
+}
+
+/// The bearer token from the `Authorization` header, trimmed.
+///
+/// # Errors
+///
+/// `401` when the header is missing or is not a bearer token.
+fn bearer_token(headers: &HeaderMap) -> Result<&str, (StatusCode, String)> {
     let header = headers
         .get(AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
@@ -471,16 +591,53 @@ pub fn bearer_claims(
             StatusCode::UNAUTHORIZED,
             "missing authorization header".to_string(),
         ))?;
-    let token = header
+    header
         .strip_prefix("Bearer ")
         .or_else(|| header.strip_prefix("bearer "))
+        .map(str::trim)
         .ok_or((
             StatusCode::UNAUTHORIZED,
             "expected bearer token".to_string(),
-        ))?;
-    verifier
-        .verify(token.trim())
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
+        ))
+}
+
+/// Authenticate a request through every credential type this build
+/// accepts, against the process-wide verifiers. A token beginning `v4.` is
+/// a PASETO; anything else is offered to Keycloak when configured. Each
+/// path fails closed with `401`.
+///
+/// # Errors
+///
+/// `401` when the header is missing or not a bearer token, the token fails
+/// verification, or no verifier in this build accepts its type.
+// `async` for the Keycloak path (JWKS refresh); a PASETO-only build never awaits.
+#[allow(clippy::unused_async)]
+pub async fn request_claims(headers: &HeaderMap) -> Result<Claims, (StatusCode, String)> {
+    let token = bearer_token(headers)?;
+    #[cfg(feature = "keycloak")]
+    if !token.starts_with("v4.")
+        && let Some(keycloak) = keycloak_verifier()
+    {
+        return keycloak
+            .verify(token)
+            .await
+            .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()));
+    }
+    #[cfg(feature = "paseto")]
+    {
+        verifier()
+            .current()
+            .verify(token)
+            .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
+    }
+    #[cfg(not(feature = "paseto"))]
+    {
+        let _ = token;
+        Err((
+            StatusCode::UNAUTHORIZED,
+            "no verifier accepts this credential".to_string(),
+        ))
+    }
 }
 
 /// A request whose bearer token passed PASETO signature / issuer /
@@ -496,7 +653,7 @@ impl<S: Send + Sync> FromRequestParts<S> for AuthUser {
     type Rejection = (StatusCode, String);
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        bearer_claims(&parts.headers, &verifier().current()).map(AuthUser)
+        request_claims(&parts.headers).await.map(AuthUser)
     }
 }
 
@@ -574,9 +731,7 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
     type Rejection = std::convert::Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Self(
-            bearer_claims(&parts.headers, &verifier().current()).ok(),
-        ))
+        Ok(Self(request_claims(&parts.headers).await.ok()))
     }
 }
 
@@ -585,7 +740,7 @@ impl<S: Send + Sync> FromRequestParts<S> for MaybeAuthUser {
 /// matching key set, so the whole verification path (valid / missing /
 /// non-bearer / expired / tampered / empty-keys) and the on/off/public-path
 /// enforcement matrix are exercised without the auth service or a database.
-#[cfg(test)]
+#[cfg(all(test, feature = "paseto"))]
 mod tests {
     use super::*;
     use base64::Engine;

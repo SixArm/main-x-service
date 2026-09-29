@@ -751,6 +751,12 @@ HIPAA/NHS/GDPR posture for audit and access controls.
 
 ## 13. Tasks (live work queue)
 
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `PROJECT_PORTFOLIO_MANAGEMENT_KEYCLOAK_*` configuration;
+      `request_claims` / `enforce_request`; `tests/keycloak_guard.rs`.
+      Verifier side: `authentication-verifier` KC-1.
+
 - [x] **SEC-PPM-1 (M) Record-level ABAC on `list` / `search` /
   `check-duplicates`, matching the single-record `GET /{pid}` path.**
   *(resolved 2026-09-05.)* `agents/share/security.md` invariant 5 states

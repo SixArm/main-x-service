@@ -9,6 +9,7 @@
 //! `#[ignore]`d — boots the app, so it needs PostgreSQL via
 //! `config/test.yaml` / `DATABASE_URL`. Run with
 //! `cargo test --test saved_views -- --ignored`.
+#![cfg(feature = "paseto")]
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
