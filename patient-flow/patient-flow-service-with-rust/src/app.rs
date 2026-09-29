@@ -26,24 +26,17 @@ use std::path::Path;
 use crate::{auth, controllers, models::_entities::prelude::*, tasks};
 
 /// Blanket auth-enforcement middleware: reads `PATIENT_FLOW_REQUIRE_AUTH`
-/// per request and delegates to the pure [`auth::enforce`] (public
+/// per request and delegates to [`auth::enforce_request`] (public
 /// paths and the disabled flag pass through; otherwise a valid bearer
-/// PASETO is required (`401`) and its `attrs` must satisfy the ABAC
+/// PASETO (or Keycloak access token) is required (`401`) and its `attrs` must satisfy the ABAC
 /// policy for the derived action (`403`)). Off by default — see
 /// `auth.rs` and `agents/share/security.md` §4.
 async fn require_auth_mw(req: Request, next: Next) -> Response {
     let path = req.uri().path().to_string();
     let method = req.method().clone();
     let policy = auth::policy().current();
-    let verifier = auth::verifier().current();
-    match auth::enforce(
-        auth::require_auth(),
-        &method,
-        &path,
-        req.headers(),
-        &verifier,
-        &policy,
-    ) {
+    match auth::enforce_request(auth::require_auth(), &method, &path, req.headers(), &policy).await
+    {
         Ok(()) => next.run(req).await,
         Err((status, msg)) => (status, msg).into_response(),
     }

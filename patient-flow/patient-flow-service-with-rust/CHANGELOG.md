@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — optional Keycloak bearer acceptance; PASETO is now a feature (KC-1, PF-T25, 2026-09-29)
+
+`keycloak` cargo feature (off by default): the blanket guard and the
+`AuthUser` / `MaybeAuthUser` extractors also accept an
+`Authorization: Bearer <Keycloak access token>`, verified by
+`authentication-verifier`'s `keycloak` module and mapped onto the same
+`Claims`, so ABAC, masking and audit are unchanged. Configured by
+`PATIENT_FLOW_KEYCLOAK_URL` / `_REALM` / `_AUDIENCES` / `_ROLE_MAP[_FILE]` /
+`_REQUIRE_VERIFIED_EMAIL`; unset URL => off; a malformed configuration logs
+an error and leaves Keycloak off (fail-closed, service still boots). A token
+beginning `v4.` is a PASETO; anything else is offered to Keycloak. An
+unmapped Keycloak role grants nothing. New `auth::request_claims` and
+`auth::enforce_request` (async) are what the middleware and extractors use;
+the sync `enforce` / `bearer_claims` remain for the PASETO tests.
+
+PASETO verification (`Verifier`, the boot key fetch, the rotation refresh)
+moved behind the `paseto` feature, **on by default**, so a default build is
+unchanged. `--no-default-features --features keycloak` builds a service with
+no PASETO code. New `tests/keycloak_guard.rs` (DB-free) pushes real RS256
+Keycloak-shaped tokens, served by a local OIDC provider
+(`authentication_verifier::test_idp`), through the real guard. See
+`agents/share/runbooks/keycloak-sso.md`.
+
 ### Added — exact key-set allowlist on the time-analysis response (PF-T21)
 
 `tests/requests/flows.rs::full_journey_request_to_deep_clean` asserted

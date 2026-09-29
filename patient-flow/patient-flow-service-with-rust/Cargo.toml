@@ -57,7 +57,17 @@ reqwest = { version = "0.12", default-features = false, features = [
 entity-ref = { path = "../../link/entity-ref-rust-crate" }
 
 # Offline PASETO v4.public verification + the shared ABAC engine.
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
+
+[features]
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `PATIENT_FLOW_KEYCLOAK_*` (see src/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
 
 [[bin]]
 name = "patient-flow-service"
@@ -65,6 +75,9 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 loco-rs = { workspace = true, features = ["testing"] }
 # Name the `TestServer` type in shared request-test helpers (same
 # version loco's testing feature uses internally).

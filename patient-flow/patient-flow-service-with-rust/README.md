@@ -63,7 +63,8 @@ Patient Flow is a **consumer application**: patients, staff, places,
 and the trust are records in the sibling person / worker / place /
 organization services, referenced by EntityRef URN. Auth is the
 central authentication-service (offline PASETO verification; blanket
-guard `PATIENT_FLOW_REQUIRE_AUTH`, default off).
+guard `PATIENT_FLOW_REQUIRE_AUTH`, default off; optional Keycloak access
+tokens behind the `keycloak` cargo feature, `PATIENT_FLOW_KEYCLOAK_*`).
 
 ## Docs
 
