@@ -69,15 +69,7 @@
     .hero {
         padding: clamp(2rem, 6vw, 4.5rem) clamp(1.25rem, 5vw, 4rem);
         border-radius: calc(var(--nhs-border-radius) * 2);
-        background: linear-gradient(
-            135deg,
-            var(--color-primary, var(--nhs-blue)),
-            color-mix(
-                in oklch,
-                var(--color-primary, var(--nhs-blue)) 45%,
-                var(--nhs-white)
-            )
-        );
+        background: var(--color-primary, var(--nhs-blue));
         color: var(--color-primary-content, #fff);
         text-align: center;
     }
