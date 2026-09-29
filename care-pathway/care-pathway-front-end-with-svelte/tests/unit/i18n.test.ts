@@ -93,3 +93,31 @@ describe("i18n catalog", () => {
     expect(i18n.locale).toBe("en-001");
   });
 });
+
+// /tour is a public walkthrough: every locale must carry the intro, six
+// workflow sections of exactly four steps, and the generic opener, so the
+// page never renders a raw key.
+describe("tour catalog", () => {
+  const keys = [
+    "nav.tour",
+    "splash.hero.tour",
+    "tour.head",
+    "tour.toc",
+    "tour.open",
+    "tour.top",
+    "tour.intro",
+    ...["start", "s1", "s2", "s3", "s4", "s5", "s6"].flatMap((s) => [
+      `tour.${s}.title`,
+      `tour.${s}.summary`,
+      ...[1, 2, 3, 4].map((n) => `tour.${s}.step.${n}`),
+    ]),
+  ];
+  it("has every tour key non-empty in all 7 locales", () => {
+    for (const locale of LOCALES) {
+      for (const k of keys) {
+        const v = (STRINGS_BY_LOCALE[locale] as Record<string, string>)[k];
+        expect(v, `${locale} ${k}`).toBeTruthy();
+      }
+    }
+  });
+});

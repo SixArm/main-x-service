@@ -102,6 +102,7 @@
     { href: "/time", key: "nav.time" as const },
     { href: "/bulk", key: "nav.bulk" as const },
     { href: "/review-queue", key: "nav.reviewQueue" as const },
+    { href: "/tour", key: "nav.tour" as const },
   ];
 </script>
 

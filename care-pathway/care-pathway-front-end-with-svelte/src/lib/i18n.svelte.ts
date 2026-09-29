@@ -361,6 +361,91 @@ const STRINGS = {
       "تقيس عروض المجموعات والرحلات الوقت المنقضي عبر كل مسار.",
     "splash.features.6.title": "سجل تدقيق لكل مسار",
     "splash.features.6.body": "افتح أي مسار لترى سجل تغييراته كاملًا.",
+    "nav.tour": "جولة",
+    "splash.hero.tour": "ابدأ الجولة",
+    "tour.head": "ابدأ الجولة",
+    "tour.toc": "في هذه الصفحة",
+    "tour.open": "افتح هذه الشاشة",
+    "tour.top": "العودة إلى الأعلى",
+    "tour.start.title": "قبل أن تبدأ",
+    "tour.start.summary":
+      "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
+    "tour.start.step.1":
+      "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
+    "tour.start.step.2":
+      "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
+    "tour.start.step.3":
+      "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
+    "tour.start.step.4":
+      "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
+    "tour.intro":
+      "جولة إرشادية في سجل مسارات الرعاية: ما تفعله كل شاشة وخطوات استخدامها، من تسجيل مسار إلى قياس مدة انتظار المرضى عليه. تضم القائمة أيضًا عروض الرؤى وغانت والتسلسل.",
+    "tour.s1.title": "تسجيل مسار رعاية",
+    "tour.s1.summary":
+      "أنشئ سجل مسار ببيئة الرعاية والجهة المقدِّمة ورموز الحالات والتدخلات والمعرّفات. يُكتشف غياب الاسم قبل حفظ أي شيء.",
+    "tour.s1.step.1": "افتح «مسار رعاية جديد» من القائمة.",
+    "tour.s1.step.2":
+      "املأ حقل «الاسم» المطلوب، ثم بيئة الرعاية ورمز المسار ومعرّف الجهة المقدِّمة واسمها.",
+    "tour.s1.step.3":
+      "أضف رموز الحالات المستهدفة والمعرّفات بأزرار الإضافة، واذكر التدخلات والكلمات المفتاحية واللغات مفصولة بفواصل.",
+    "tour.s1.step.4":
+      "اضغط «إنشاء». يُفتح المسار الجديد، وينبّهك النموذج إذا رفضت الخدمة أي شيء.",
+    "tour.s2.title": "البحث عن المسارات وقراءتها",
+    "tour.s2.summary":
+      "ابحث في السجل بالاسم، وافتح أي مسار لقراءة سجله الكامل، واطّلع على ما تغيّر مؤخرًا.",
+    "tour.s2.step.1":
+      "سجّل الدخول وافتح «المسارات»، الصفحة الرئيسية؛ تُدرج فيها كل المسارات المسجلة.",
+    "tour.s2.step.2":
+      "اكتب جزءًا من الاسم في مربع البحث واضغط «بحث»؛ واضغط «مسح» للعودة إلى القائمة الكاملة.",
+    "tour.s2.step.3":
+      "افتح مسارًا لقراءة بيئة الرعاية والجهة المقدِّمة ورموز الحالات والتدخلات والكلمات المفتاحية واللغات والمعرّفات.",
+    "tour.s2.step.4":
+      "اختر «عرض النشاط الأخير» في القائمة لرؤية أحدث التغييرات في السجل، أو «تحرير» في المسار لتصحيحه.",
+    "tour.s3.title": "فحص التكرارات والدمج والتدقيق",
+    "tour.s3.summary":
+      "اعثر على المسارات التي تصف الشيء نفسه، وادمج أحدها في الآخر، واحتفظ بسجل كامل لكل تغيير.",
+    "tour.s3.step.1":
+      "افتح المسار الذي تريد الاحتفاظ به واختر «فحص التكرارات».",
+    "tour.s3.step.2":
+      "اقرأ قائمة «التكرارات المحتملة»، أو الملاحظة التي تفيد بأن أيًّا منها لا يتجاوز عتبة التطابق.",
+    "tour.s3.step.3":
+      "لتكرار حقيقي اختر «الدمج في هذا السجل» ثم «تأكيد الدمج»؛ و«إلغاء» يتراجع دون تغيير شيء.",
+    "tour.s3.step.4":
+      "اختر «عرض سجل التدقيق» في أي مسار لرؤية سجل تغييراته الكامل.",
+    "tour.s4.title": "تتبّع التسجيلات على اللوحة",
+    "tour.s4.summary":
+      "شاهد الأشخاص المسجَّلين في مسار واحد كبطاقات في أعمدة الحالة، وانقلهم عبر دورة حياتهم، وارسم كل رحلة يدويًا.",
+    "tour.s4.step.1":
+      "افتح «لوحة» واختر مسارًا في المحدِّد؛ تظهر حالاته المسجَّلة كبطاقات.",
+    "tour.s4.step.2":
+      "الأعمدة هي Active وOn hold وCompleted وDiscontinued؛ اسحب بطاقة إلى عمود آخر لتغيير حالتها.",
+    "tour.s4.step.3":
+      "إذا رفضت الخدمة نقلة لأنها غير مسموحة، يظهر خطأ وتعيد اللوحة تحميل الحالة المخزَّنة.",
+    "tour.s4.step.4":
+      "أسفل اللوحة، ضمن «Record a segment»، اختر حالة ثم استخدم «Start clock» و«Stop clock»، أو املأ Stage وCategory وStarted at لتسجيل مقطع من الرحلة (هذه اللوحة بالإنجليزية فقط).",
+    "tour.s5.title": "قياس الوقت على المسار",
+    "tour.s5.summary":
+      "اسأل كم من الوقت التقويمي الذي يقضيه المرضى على المسار هو رعاية فعلية، وأين يذهب الباقي.",
+    "tour.s5.step.1":
+      "افتح «الوقت» واختر مسارًا، واختياريًا معيار وصول لتقييم المجموعة وفقه.",
+    "tour.s5.step.2":
+      "ضيّق المجموعة بمرشحَي «يحتوي على» و«يستبعد»، وحدّد «مقارنة بالمكمّل» إن رغبت، ثم اضغط «تطبيق الفلتر».",
+    "tour.s5.step.3":
+      "اقرأ بطاقات المجموعة (الوقت المضيف للقيمة، وزمن الإنجاز، والامتثال للمعيار)، وخريطة العملية، وتنويعات الرحلة، والرحلات المتوقفة.",
+    "tour.s5.step.4":
+      "ضمن «رحلة واحدة» اختر تسجيلًا واحدًا لترى حصته المضيفة للقيمة وتغطيته وزمن إنجازه وتسليماته وجدولًا زمنيًا مرسومًا بمقياس.",
+    "tour.s6.title": "الاستيراد والتصدير والمراجعة الجماعية",
+    "tour.s6.summary":
+      "حمّل ملفًا من المسارات أو استخرج مجموعة مصفّاة كمهمة في الخلفية، ثم احسم أي تكرارات مرشحة وضعها الاستيراد في قائمة الانتظار.",
+    "tour.s6.step.1":
+      "افتح «جماعي»، وضمن «استيراد» اختر ملفًا (JSONL أو CSV أو TSV) وصيغته المطابقة.",
+    "tour.s6.step.2":
+      "حدّد «تشغيل تجريبي» للمعاينة دون حفظ، ثم اضغط «بدء الاستيراد»؛ تعرض لوحة المهمة التقدّم والصفوف المنشأة والمحدَّثة والمنتظرة للمراجعة والخاطئة.",
+    "tour.s6.step.3":
+      "ضمن «تصدير» اختر الصيغة والتعتيم (معتَّم افتراضيًا؛ الكامل يتطلب تفويضًا مرتفعًا) واستعلام بحث وحدًّا اختياريَّين، ثم اضغط «بدء التصدير».",
+    "tour.s6.step.4":
+      "افتح «المراجعات» لقائمة مراجعة التكرارات: صفِّ حسب الحالة، ثم اختر «تأكيد التكرار» أو «رفض» لكل زوج (يظهر تنبيه إن كان شخص آخر قد حسم الزوج).",
+    "signin.sso": "تسجيل الدخول عبر SSO",
   },
   "cy-001": {
     "nav.pathways": "Llwybrau",
@@ -649,6 +734,91 @@ const STRINGS = {
     "splash.features.6.title": "Llwybr archwilio i bob llwybr",
     "splash.features.6.body":
       "Agorwch unrhyw lwybr i weld ei hanes newidiadau llawn.",
+    "nav.tour": "Taith",
+    "splash.hero.tour": "Cymerwch y daith",
+    "tour.head": "Cymerwch y daith",
+    "tour.toc": "Ar y dudalen hon",
+    "tour.open": "Agor y sgrin hon",
+    "tour.top": "Yn ôl i'r brig",
+    "tour.start.title": "Cyn i chi ddechrau",
+    "tour.start.summary":
+      "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+    "tour.start.step.1":
+      "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
+    "tour.start.step.2":
+      "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+    "tour.start.step.3":
+      "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+    "tour.start.step.4":
+      "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+    "tour.intro":
+      "Taith dywys drwy'r gofrestr Llwybrau Gofal: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o gofrestru llwybr i fesur pa mor hir y mae cleifion yn aros arno. Mae'r ddewislen hefyd yn cynnwys golygon Mewnwelediadau, Gantt a Dilyniant.",
+    "tour.s1.title": "Cofrestru llwybr gofal",
+    "tour.s1.summary":
+      "Crëwch gofnod llwybr gyda'i leoliad gofal, darparwr, codau cyflwr, ymyriadau a dynodwyr. Caiff enw coll ei ddal cyn cadw dim.",
+    "tour.s1.step.1": "Agorwch Llwybr gofal newydd o'r ddewislen.",
+    "tour.s1.step.2":
+      "Llenwch yr Enw gofynnol, yna'r Lleoliad gofal, Cod y llwybr, Id y darparwr ac Enw'r darparwr.",
+    "tour.s1.step.3":
+      "Ychwanegwch Godau cyflwr targed a Dynodwyr gyda'r botymau ychwanegu, a rhestrwch Ymyriadau, Geiriau allweddol ac Ieithoedd wedi'u gwahanu gan goma.",
+    "tour.s1.step.4":
+      "Pwyswch Creu. Mae eich llwybr newydd yn agor, ac mae'r ffurflen yn dweud os yw'r gwasanaeth yn gwrthod unrhyw beth.",
+    "tour.s2.title": "Dod o hyd i lwybrau a'u darllen",
+    "tour.s2.summary":
+      "Chwiliwch y gofrestr yn ôl enw, agorwch unrhyw lwybr i ddarllen ei gofnod llawn, a gweld beth sydd wedi newid yn ddiweddar.",
+    "tour.s2.step.1":
+      "Mewngofnodwch ac agorwch Llwybrau, y dudalen gartref; rhestrir pob llwybr cofrestredig yno.",
+    "tour.s2.step.2":
+      "Teipiwch rhan o enw yn y blwch chwilio a phwyso Chwilio; pwyswch Clirio i ddychwelyd i'r rhestr lawn.",
+    "tour.s2.step.3":
+      "Agorwch lwybr i ddarllen ei leoliad gofal, darparwr, codau cyflwr, ymyriadau, geiriau allweddol, ieithoedd a dynodwyr.",
+    "tour.s2.step.4":
+      "Dewiswch Dangos gweithgaredd diweddar ar y rhestr i weld y newidiadau diweddaraf ar draws y gofrestr, neu Golygu ar lwybr i'w gywiro.",
+    "tour.s3.title": "Gwirio dyblygiadau, uno ac archwilio",
+    "tour.s3.summary":
+      "Dewch o hyd i lwybrau sy'n disgrifio'r un peth, unwch un i mewn i'r llall, a chadwch hanes llawn o bob newid.",
+    "tour.s3.step.1":
+      "Agorwch y llwybr rydych am ei gadw a dewis Gwirio dyblygiadau.",
+    "tour.s3.step.2":
+      "Darllenwch y rhestr Dyblygiadau posibl, neu'r nodyn nad oes yr un uwchlaw'r trothwy cyfatebiaeth.",
+    "tour.s3.step.3":
+      "Ar gyfer gwir ddyblygiad dewiswch Uno i mewn i'r cofnod hwn, yna Cadarnhau uno; mae Diddymu yn camu'n ôl heb newid dim.",
+    "tour.s3.step.4":
+      "Dewiswch Dangos llwybr archwilio ar unrhyw lwybr i weld ei hanes llawn o newidiadau.",
+    "tour.s4.title": "Olrhain cofrestriadau ar y bwrdd",
+    "tour.s4.summary":
+      "Gwelwch y bobl sydd wedi'u cofrestru ar un llwybr fel cardiau mewn colofnau statws, symudwch nhw drwy eu cylch bywyd, a mapiwch bob taith â llaw.",
+    "tour.s4.step.1":
+      "Agorwch Bwrdd a dewis llwybr yn y dewisydd; mae ei achosion cofrestredig yn ymddangos fel cardiau.",
+    "tour.s4.step.2":
+      "Y colofnau yw Active, On hold, Completed a Discontinued; llusgwch gerdyn i golofn arall i newid ei statws.",
+    "tour.s4.step.3":
+      "Os yw'r gwasanaeth yn gwrthod symudiad am nad yw'n cael ei ganiatáu, mae gwall yn ymddangos ac mae'r bwrdd yn ail-lwytho'r statws sydd wedi'i storio.",
+    "tour.s4.step.4":
+      "O dan y bwrdd, dan Record a segment, dewiswch achos, yna defnyddiwch Start clock a Stop clock, neu llenwch Stage, Category a Started at i logio segment o'r daith (dim ond yn Saesneg y mae'r panel hwn).",
+    "tour.s5.title": "Mesur amser ar lwybr",
+    "tour.s5.summary":
+      "Gofynnwch faint o'r amser calendr y mae cleifion yn ei dreulio ar lwybr sy'n ofal mewn gwirionedd, ac i ble mae'r gweddill yn mynd.",
+    "tour.s5.step.1":
+      "Agorwch Amser, dewiswch lwybr, ac yn ddewisol Safon mynediad i sgorio'r garfan yn ei herbyn.",
+    "tour.s5.step.2":
+      "Culhewch y garfan gyda hidlyddion Yn cynnwys ac Yn eithrio, ticiwch Cymharu â'r cyflenwad os dymunwch, yna pwyswch Gosod hidlydd.",
+    "tour.s5.step.3":
+      "Darllenwch deils y garfan (amser ychwanegu gwerth, amser arweiniol, cydymffurfio â'r safon), y map proses, amrywiadau taith a theithiau sydd wedi aros.",
+    "tour.s5.step.4":
+      "O dan Un daith dewiswch un cofrestriad i weld ei gyfran ychwanegu gwerth, cwmpas, amser arweiniol, trosglwyddiadau ac amserlen wedi'i thynnu i raddfa.",
+    "tour.s6.title": "Mewnforio, allforio ac adolygu swmp",
+    "tour.s6.summary":
+      "Llwythwch ffeil o lwybrau neu echdynnwch set wedi'i hidlo fel swydd gefndir, yna setlwch unrhyw ddyblygiadau ymgeisiol a osododd mewnforio mewn ciw.",
+    "tour.s6.step.1":
+      "Agorwch Swmp, ac o dan Mewnforio dewiswch ffeil (JSONL, CSV neu TSV) a'i Fformat cyfatebol.",
+    "tour.s6.step.2":
+      "Ticiwch Rhediad prawf i ragolwg heb gadw, yna pwyswch Dechrau mewnforio; mae'r panel Swydd yn dangos cynnydd a rhesi a grëwyd, a ddiweddarwyd, a osodwyd i'w hadolygu neu a fethodd.",
+    "tour.s6.step.3":
+      "O dan Allforio dewiswch Fformat, Masgio (Masgiedig yn ddiofyn; mae Llawn angen awdurdodiad uwch), ymholiad chwilio a Therfyn dewisol, yna pwyswch Dechrau allforio.",
+    "tour.s6.step.4":
+      "Agorwch Adolygiadau ar gyfer y ciw adolygu dyblygiadau: hidlwch yn ôl statws, yna dewiswch Cadarnhau dyblygiad neu Gwrthod ar bob pâr (mae pâr y mae rhywun arall eisoes wedi penderfynu arno yn dangos hysbysiad).",
+    "signin.sso": "Mewngofnodi gydag SSO",
   },
   "en-001": {
     "nav.pathways": "Pathways",
@@ -939,6 +1109,91 @@ const STRINGS = {
     "splash.features.6.title": "Per-pathway audit trail",
     "splash.features.6.body":
       "Open any pathway to see its full change history.",
+    "nav.tour": "Tour",
+    "splash.hero.tour": "Take the tour",
+    "tour.head": "Take the tour",
+    "tour.toc": "On this page",
+    "tour.open": "Open this screen",
+    "tour.top": "Back to top",
+    "tour.start.title": "Before you begin",
+    "tour.start.summary":
+      "You need an account to work with real data. Signing in takes under a minute and needs no password.",
+    "tour.start.step.1":
+      "Choose Sign in at the top right and enter your email address.",
+    "tour.start.step.2":
+      "Open the magic link we email you. It works once and expires quickly.",
+    "tour.start.step.3":
+      "You return to the app signed in, with nothing to remember or reset.",
+    "tour.start.step.4":
+      "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
+    "tour.intro":
+      "A guided walkthrough of the Care Pathways registry: what each screen does and the steps to use it, from registering a pathway to measuring how long patients wait on it. The menu also holds Insights, Gantt and Sequence views.",
+    "tour.s1.title": "Register a care pathway",
+    "tour.s1.summary":
+      "Create a pathway record with its care setting, provider, condition codes, interventions and identifiers. A missing name is caught before anything is saved.",
+    "tour.s1.step.1": "Open New care pathway from the menu.",
+    "tour.s1.step.2":
+      "Fill in the required Name, then the Care setting, Pathway code, Provider id and Provider name.",
+    "tour.s1.step.3":
+      "Add Target condition codes and Identifiers with the add buttons, and list Interventions, Keywords and Languages separated by commas.",
+    "tour.s1.step.4":
+      "Press Create. Your new pathway opens, and the form tells you if the service rejects anything.",
+    "tour.s2.title": "Find and read pathways",
+    "tour.s2.summary":
+      "Search the registry by name, open any pathway to read its full record, and see what changed recently.",
+    "tour.s2.step.1":
+      "Sign in and open Pathways, the home page; every registered pathway is listed there.",
+    "tour.s2.step.2":
+      "Type part of a name in the search box and press Search; press Clear to return to the full list.",
+    "tour.s2.step.3":
+      "Open a pathway to read its care setting, provider, condition codes, interventions, keywords, languages and identifiers.",
+    "tour.s2.step.4":
+      "Choose Show recent activity on the list to see the latest changes across the registry, or Edit on a pathway to correct it.",
+    "tour.s3.title": "Check duplicates, merge and audit",
+    "tour.s3.summary":
+      "Find pathways that describe the same thing, fold one into another, and keep a full history of every change.",
+    "tour.s3.step.1":
+      "Open the pathway you want to keep and choose Check duplicates.",
+    "tour.s3.step.2":
+      "Read the Potential duplicates list, or the note that none is above the match threshold.",
+    "tour.s3.step.3":
+      "For a true duplicate choose Merge into this record, then Confirm merge; Cancel backs out without changing anything.",
+    "tour.s3.step.4":
+      "Choose Show audit trail on any pathway to see its full history of changes.",
+    "tour.s4.title": "Track enrolments on the board",
+    "tour.s4.summary":
+      "See the people enrolled on one pathway as cards in status columns, move them through their lifecycle, and map each journey by hand.",
+    "tour.s4.step.1":
+      "Open Board and pick a pathway in the selector; its enrolled instances appear as cards.",
+    "tour.s4.step.2":
+      "Columns are Active, On hold, Completed and Discontinued; drag a card to another column to change its status.",
+    "tour.s4.step.3":
+      "If the service refuses a move as not allowed, an error appears and the board reloads the stored status.",
+    "tour.s4.step.4":
+      "Below the board, under Record a segment, pick an instance, then use Start clock and Stop clock, or fill in Stage, Category and Started at to log a segment of the journey (this panel is in English only).",
+    "tour.s5.title": "Measure time on a pathway",
+    "tour.s5.summary":
+      "Ask how much of the calendar time patients spend on a pathway is actually care, and where the rest goes.",
+    "tour.s5.step.1":
+      "Open Time, choose a pathway, and optionally an Access standard to score the cohort against.",
+    "tour.s5.step.2":
+      "Narrow the cohort with Contains and Excludes filters, tick Compare against the complement if wanted, then press Apply filter.",
+    "tour.s5.step.3":
+      "Read the cohort tiles (value-adding time, lead time, standard compliance), the process map, journey variants and stalled journeys.",
+    "tour.s5.step.4":
+      "Under One journey pick a single enrolment to see its value-adding share, coverage, lead time, handoffs and a timeline drawn to scale.",
+    "tour.s6.title": "Bulk import, export and review",
+    "tour.s6.summary":
+      "Load a file of pathways or extract a filtered set as a background job, then settle any candidate duplicates an import queued.",
+    "tour.s6.step.1":
+      "Open Bulk, and under Import choose a file (JSONL, CSV or TSV) and its matching Format.",
+    "tour.s6.step.2":
+      "Tick Dry run to preview without saving, then press Start import; the Job panel shows progress and rows created, upserted, queued for review or errored.",
+    "tour.s6.step.3":
+      "Under Export choose a Format, Masking (Masked by default; Full needs elevated authorisation), an optional search query and Limit, then press Start export.",
+    "tour.s6.step.4":
+      "Open Reviews for the Duplicate review queue: filter by status, then choose Confirm duplicate or Reject on each pair (a pair someone else already decided shows a notice).",
+    "signin.sso": "Sign in with SSO",
   },
   "es-001": {
     "nav.pathways": "Vías",
@@ -1225,6 +1480,91 @@ const STRINGS = {
     "splash.features.6.title": "Auditoría por vía",
     "splash.features.6.body":
       "Abre cualquier vía para ver su historial completo de cambios.",
+    "nav.tour": "Recorrido",
+    "splash.hero.tour": "Haz el recorrido",
+    "tour.head": "Haz el recorrido",
+    "tour.toc": "En esta página",
+    "tour.open": "Abrir esta pantalla",
+    "tour.top": "Volver arriba",
+    "tour.start.title": "Antes de empezar",
+    "tour.start.summary":
+      "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
+    "tour.start.step.1":
+      "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
+    "tour.start.step.2":
+      "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
+    "tour.start.step.3":
+      "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
+    "tour.start.step.4":
+      "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
+    "tour.intro":
+      "Un recorrido guiado por el registro de vías de atención: qué hace cada pantalla y los pasos para usarla, desde registrar una vía hasta medir cuánto esperan los pacientes en ella. El menú incluye además las vistas Análisis, Gantt y Secuencia.",
+    "tour.s1.title": "Registrar una vía de atención",
+    "tour.s1.summary":
+      "Crea el registro de una vía con su entorno de atención, proveedor, códigos de condición, intervenciones e identificadores. Un nombre ausente se detecta antes de guardar nada.",
+    "tour.s1.step.1": "Abre Nueva vía de atención desde el menú.",
+    "tour.s1.step.2":
+      "Rellena el Nombre obligatorio y después Entorno de atención, Código de vía, Id del proveedor y Nombre del proveedor.",
+    "tour.s1.step.3":
+      "Añade Códigos de afección objetivo e Identificadores con los botones de añadir, y escribe Intervenciones, Palabras clave e Idiomas separados por comas.",
+    "tour.s1.step.4":
+      "Pulsa Crear. Se abre tu nueva vía y el formulario te avisa si el servicio rechaza algo.",
+    "tour.s2.title": "Buscar y consultar vías",
+    "tour.s2.summary":
+      "Busca en el registro por nombre, abre cualquier vía para leer su registro completo y consulta qué ha cambiado recientemente.",
+    "tour.s2.step.1":
+      "Inicia sesión y abre Vías, la página de inicio; allí aparecen todas las vías registradas.",
+    "tour.s2.step.2":
+      "Escribe parte de un nombre en el cuadro de búsqueda y pulsa Buscar; pulsa Limpiar para volver a la lista completa.",
+    "tour.s2.step.3":
+      "Abre una vía para leer su entorno de atención, proveedor, códigos de condición, intervenciones, palabras clave, idiomas e identificadores.",
+    "tour.s2.step.4":
+      "Elige Mostrar actividad reciente en la lista para ver los últimos cambios del registro, o Editar en una vía para corregirla.",
+    "tour.s3.title": "Comprobar duplicados, fusionar y auditar",
+    "tour.s3.summary":
+      "Encuentra vías que describen lo mismo, fusiona una en otra y conserva el historial completo de cada cambio.",
+    "tour.s3.step.1":
+      "Abre la vía que quieres conservar y elige Comprobar duplicados.",
+    "tour.s3.step.2":
+      "Lee la lista Posibles duplicados, o la nota de que ninguno supera el umbral de coincidencia.",
+    "tour.s3.step.3":
+      "Para un duplicado real elige Fusionar en este registro y luego Confirmar fusión; Cancelar sale sin cambiar nada.",
+    "tour.s3.step.4":
+      "Elige Mostrar registro de auditoría en cualquier vía para ver su historial completo de cambios.",
+    "tour.s4.title": "Seguir las inscripciones en el tablero",
+    "tour.s4.summary":
+      "Mira a las personas inscritas en una vía como tarjetas en columnas de estado, muévelas por su ciclo de vida y traza cada recorrido a mano.",
+    "tour.s4.step.1":
+      "Abre Tablero y elige una vía en el selector; sus instancias inscritas aparecen como tarjetas.",
+    "tour.s4.step.2":
+      "Las columnas son Active, On hold, Completed y Discontinued; arrastra una tarjeta a otra columna para cambiar su estado.",
+    "tour.s4.step.3":
+      "Si el servicio rechaza un movimiento por no estar permitido, aparece un error y el tablero recarga el estado almacenado.",
+    "tour.s4.step.4":
+      "Bajo el tablero, en Record a segment, elige una instancia y usa Start clock y Stop clock, o rellena Stage, Category y Started at para registrar un tramo del recorrido (este panel solo está en inglés).",
+    "tour.s5.title": "Medir el tiempo en una vía",
+    "tour.s5.summary":
+      "Pregunta qué parte del tiempo natural que los pacientes pasan en una vía es atención real y a dónde va el resto.",
+    "tour.s5.step.1":
+      "Abre Tiempo, elige una vía y, si quieres, un Access standard con el que puntuar la cohorte.",
+    "tour.s5.step.2":
+      "Acota la cohorte con los filtros Contiene y Excluye, marca Comparar con el complemento si quieres y pulsa Aplicar filtro.",
+    "tour.s5.step.3":
+      "Lee los paneles de la cohorte (tiempo de valor añadido, tiempo de espera total, cumplimiento del estándar), el mapa de proceso, las variantes de recorrido y los recorridos estancados.",
+    "tour.s5.step.4":
+      "En One journey elige una inscripción para ver su proporción de valor añadido, cobertura, tiempo total, traspasos y una línea de tiempo a escala.",
+    "tour.s6.title": "Importación, exportación y revisión masivas",
+    "tour.s6.summary":
+      "Carga un archivo de vías o extrae un conjunto filtrado como tarea en segundo plano y resuelve después los posibles duplicados que la importación puso en cola.",
+    "tour.s6.step.1":
+      "Abre Masivo y, en Importación, elige un archivo (JSONL, CSV o TSV) y su Formato correspondiente.",
+    "tour.s6.step.2":
+      "Marca Simulación para previsualizar sin guardar y pulsa Iniciar importación; el panel Tarea muestra el progreso y las filas creadas, actualizadas, en cola de revisión o con error.",
+    "tour.s6.step.3":
+      "En Exportación elige un Formato, Enmascaramiento (Enmascarado por defecto; Completo requiere autorización elevada), una consulta de búsqueda y un Límite opcionales, y pulsa Iniciar exportación.",
+    "tour.s6.step.4":
+      "Abre Revisiones para la cola de revisión de duplicados: filtra por estado y elige Confirmar duplicado o Rechazar en cada par (un par ya decidido por otra persona muestra un aviso).",
+    "signin.sso": "Iniciar sesión con SSO",
   },
   "fr-001": {
     "nav.pathways": "Parcours",
@@ -1513,6 +1853,91 @@ const STRINGS = {
     "splash.features.6.title": "Piste d'audit par parcours",
     "splash.features.6.body":
       "Ouvrez n'importe quel parcours pour voir tout son historique de modifications.",
+    "nav.tour": "Visite guidée",
+    "splash.hero.tour": "Faire la visite guidée",
+    "tour.head": "Faire la visite guidée",
+    "tour.toc": "Sur cette page",
+    "tour.open": "Ouvrir cet écran",
+    "tour.top": "Retour en haut",
+    "tour.start.title": "Avant de commencer",
+    "tour.start.summary":
+      "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+    "tour.start.step.1":
+      "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
+    "tour.start.step.2":
+      "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+    "tour.start.step.3":
+      "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+    "tour.start.step.4":
+      "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
+    "tour.intro":
+      "Une visite guidée du registre des parcours de soins : le rôle de chaque écran et les étapes pour l'utiliser, de l'enregistrement d'un parcours à la mesure du temps d'attente des patients. Le menu propose aussi les vues Analyses, Gantt et Séquence.",
+    "tour.s1.title": "Enregistrer un parcours de soins",
+    "tour.s1.summary":
+      "Créez la fiche d'un parcours avec son cadre de soins, son prestataire, ses codes de pathologie, ses interventions et ses identifiants. Un nom manquant est repéré avant tout enregistrement.",
+    "tour.s1.step.1": "Ouvrez Nouveau parcours de soins dans le menu.",
+    "tour.s1.step.2":
+      "Renseignez le Nom obligatoire, puis le Cadre de soins, le Code du parcours, l'Id du prestataire et son nom.",
+    "tour.s1.step.3":
+      "Ajoutez des Codes de pathologie cibles et des Identifiants avec les boutons d'ajout, et saisissez Interventions, Mots-clés et Langues séparés par des virgules.",
+    "tour.s1.step.4":
+      "Appuyez sur Créer. Votre nouveau parcours s'ouvre, et le formulaire vous signale tout refus du service.",
+    "tour.s2.title": "Trouver et consulter des parcours",
+    "tour.s2.summary":
+      "Recherchez dans le registre par nom, ouvrez un parcours pour lire sa fiche complète et voyez ce qui a changé récemment.",
+    "tour.s2.step.1":
+      "Connectez-vous et ouvrez Parcours, la page d'accueil ; tous les parcours enregistrés y sont listés.",
+    "tour.s2.step.2":
+      "Saisissez une partie d'un nom dans la zone de recherche et appuyez sur Rechercher ; Effacer ramène à la liste complète.",
+    "tour.s2.step.3":
+      "Ouvrez un parcours pour lire son cadre de soins, son prestataire, ses codes de pathologie, ses interventions, mots-clés, langues et identifiants.",
+    "tour.s2.step.4":
+      "Choisissez Afficher l'activité récente dans la liste pour voir les derniers changements du registre, ou Modifier sur un parcours pour le corriger.",
+    "tour.s3.title": "Vérifier les doublons, fusionner et auditer",
+    "tour.s3.summary":
+      "Repérez les parcours qui décrivent la même chose, fusionnez-les et conservez l'historique complet de chaque changement.",
+    "tour.s3.step.1":
+      "Ouvrez le parcours à conserver et choisissez Vérifier les doublons.",
+    "tour.s3.step.2":
+      "Lisez la liste Doublons potentiels, ou la note indiquant qu'aucun ne dépasse le seuil de correspondance.",
+    "tour.s3.step.3":
+      "Pour un vrai doublon, choisissez Fusionner dans cet enregistrement puis Confirmer la fusion ; Annuler quitte sans rien modifier.",
+    "tour.s3.step.4":
+      "Choisissez Afficher le journal d'audit sur un parcours pour voir son historique complet de modifications.",
+    "tour.s4.title": "Suivre les inscriptions sur le tableau",
+    "tour.s4.summary":
+      "Voyez les personnes inscrites sur un parcours sous forme de cartes en colonnes de statut, faites-les avancer dans leur cycle de vie et cartographiez chaque trajet à la main.",
+    "tour.s4.step.1":
+      "Ouvrez Tableau et choisissez un parcours dans le sélecteur ; ses instances inscrites apparaissent en cartes.",
+    "tour.s4.step.2":
+      "Les colonnes sont Active, On hold, Completed et Discontinued ; faites glisser une carte vers une autre colonne pour changer son statut.",
+    "tour.s4.step.3":
+      "Si le service refuse un déplacement non autorisé, une erreur s'affiche et le tableau recharge le statut enregistré.",
+    "tour.s4.step.4":
+      "Sous le tableau, dans Record a segment, choisissez une instance puis utilisez Start clock et Stop clock, ou renseignez Stage, Category et Started at pour consigner un segment du trajet (ce panneau n'existe qu'en anglais).",
+    "tour.s5.title": "Mesurer le temps sur un parcours",
+    "tour.s5.summary":
+      "Demandez quelle part du temps écoulé que les patients passent sur un parcours est réellement du soin, et où passe le reste.",
+    "tour.s5.step.1":
+      "Ouvrez Temps, choisissez un parcours et, si vous le souhaitez, un Access standard pour évaluer la cohorte.",
+    "tour.s5.step.2":
+      "Restreignez la cohorte avec les filtres Contient et Exclut, cochez Comparer au complément si besoin, puis appuyez sur Appliquer le filtre.",
+    "tour.s5.step.3":
+      "Lisez les tuiles de la cohorte (temps à valeur ajoutée, délai total, conformité au standard), la carte de processus, les variantes de trajet et les trajets bloqués.",
+    "tour.s5.step.4":
+      "Sous One journey, choisissez une inscription pour voir sa part à valeur ajoutée, sa couverture, son délai total, ses transferts et une frise à l'échelle.",
+    "tour.s6.title": "Import, export et revue en lots",
+    "tour.s6.summary":
+      "Chargez un fichier de parcours ou extrayez un ensemble filtré en tâche de fond, puis réglez les doublons candidats qu'un import a mis en file.",
+    "tour.s6.step.1":
+      "Ouvrez Lots puis, sous Import, choisissez un fichier (JSONL, CSV ou TSV) et son Format correspondant.",
+    "tour.s6.step.2":
+      "Cochez Simulation pour prévisualiser sans enregistrer, puis appuyez sur Démarrer l'import ; le panneau Tâche affiche la progression et les lignes créées, mises à jour, en attente de revue ou en erreur.",
+    "tour.s6.step.3":
+      "Sous Export, choisissez un Format, le Masquage (Masqué par défaut ; Complet exige une autorisation élevée), une requête de recherche et une Limite facultatives, puis appuyez sur Démarrer l'export.",
+    "tour.s6.step.4":
+      "Ouvrez Vérifications pour la file de revue des doublons : filtrez par statut, puis choisissez Confirmer le doublon ou Rejeter pour chaque paire (une paire déjà tranchée par quelqu'un d'autre affiche un avis).",
+    "signin.sso": "Se connecter avec SSO",
   },
   "hi-001": {
     "nav.pathways": "पाथवे",
@@ -1799,6 +2224,91 @@ const STRINGS = {
     "splash.features.6.title": "प्रति-मार्ग ऑडिट ट्रेल",
     "splash.features.6.body":
       "किसी भी मार्ग को खोलकर उसका पूरा परिवर्तन इतिहास देखें।",
+    "nav.tour": "टूर",
+    "splash.hero.tour": "टूर देखें",
+    "tour.head": "टूर देखें",
+    "tour.toc": "इस पृष्ठ पर",
+    "tour.open": "यह स्क्रीन खोलें",
+    "tour.top": "ऊपर लौटें",
+    "tour.start.title": "शुरू करने से पहले",
+    "tour.start.summary":
+      "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
+    "tour.start.step.1":
+      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.2":
+      "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
+    "tour.start.step.3":
+      "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
+    "tour.start.step.4":
+      "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
+    "tour.intro":
+      "देखभाल मार्ग रजिस्ट्री का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, मार्ग दर्ज करने से लेकर यह नापने तक कि मरीज़ों को उस पर कितना इंतज़ार करना पड़ता है। मेनू में इनसाइट्स, गैंट और अनुक्रम दृश्य भी हैं।",
+    "tour.s1.title": "देखभाल मार्ग दर्ज करना",
+    "tour.s1.summary":
+      "देखभाल सेटिंग, प्रदाता, स्थिति कोड, हस्तक्षेप और पहचानकर्ताओं के साथ मार्ग का रिकॉर्ड बनाएँ। नाम न होने पर कुछ भी सहेजने से पहले पकड़ लिया जाता है।",
+    "tour.s1.step.1": "मेनू से नया देखभाल मार्ग खोलें।",
+    "tour.s1.step.2":
+      "आवश्यक नाम भरें, फिर देखभाल सेटिंग, मार्ग कोड, प्रदाता आईडी और प्रदाता का नाम भरें।",
+    "tour.s1.step.3":
+      "जोड़ें बटनों से लक्षित स्थिति कोड और पहचानकर्ता जोड़ें, और हस्तक्षेप, कीवर्ड और भाषाएँ अल्पविराम से अलग करके लिखें।",
+    "tour.s1.step.4":
+      "बनाएँ दबाएँ। आपका नया मार्ग खुल जाता है, और सेवा कुछ अस्वीकार करे तो फ़ॉर्म बता देता है।",
+    "tour.s2.title": "मार्ग खोजना और पढ़ना",
+    "tour.s2.summary":
+      "रजिस्ट्री में नाम से खोजें, किसी भी मार्ग का पूरा रिकॉर्ड पढ़ने के लिए उसे खोलें, और देखें कि हाल में क्या बदला।",
+    "tour.s2.step.1":
+      "साइन इन करें और होम पेज पाथवे खोलें; सभी दर्ज मार्ग वहीं सूचीबद्ध हैं।",
+    "tour.s2.step.2":
+      "खोज बॉक्स में नाम का कुछ हिस्सा लिखें और खोजें दबाएँ; पूरी सूची पर लौटने के लिए साफ़ करें दबाएँ।",
+    "tour.s2.step.3":
+      "किसी मार्ग को खोलकर उसकी देखभाल सेटिंग, प्रदाता, स्थिति कोड, हस्तक्षेप, कीवर्ड, भाषाएँ और पहचानकर्ता पढ़ें।",
+    "tour.s2.step.4":
+      "रजिस्ट्री के ताज़ा बदलाव देखने के लिए सूची में हाल की गतिविधि दिखाएँ चुनें, या किसी मार्ग को सुधारने के लिए संपादित करें चुनें।",
+    "tour.s3.title": "डुप्लिकेट जाँचना, मर्ज करना और ऑडिट",
+    "tour.s3.summary":
+      "वही चीज़ बताने वाले मार्ग खोजें, एक को दूसरे में मिलाएँ, और हर बदलाव का पूरा इतिहास रखें।",
+    "tour.s3.step.1":
+      "जिस मार्ग को रखना है उसे खोलें और डुप्लिकेट जाँचें चुनें।",
+    "tour.s3.step.2":
+      "संभावित डुप्लिकेट सूची पढ़ें, या वह नोट जो बताता है कि कोई भी मिलान सीमा से ऊपर नहीं है।",
+    "tour.s3.step.3":
+      "असली डुप्लिकेट के लिए इस रिकॉर्ड में मर्ज करें चुनें, फिर मर्ज की पुष्टि करें; रद्द करें बिना कुछ बदले वापस ले जाता है।",
+    "tour.s3.step.4":
+      "किसी भी मार्ग पर ऑडिट ट्रेल दिखाएँ चुनकर उसके बदलावों का पूरा इतिहास देखें।",
+    "tour.s4.title": "बोर्ड पर नामांकन ट्रैक करना",
+    "tour.s4.summary":
+      "एक मार्ग पर नामांकित लोगों को स्थिति स्तंभों में कार्ड के रूप में देखें, उन्हें जीवनचक्र में आगे बढ़ाएँ, और हर यात्रा को हाथ से मैप करें।",
+    "tour.s4.step.1":
+      "बोर्ड खोलें और चयनकर्ता में मार्ग चुनें; उसके नामांकित इंस्टेंस कार्ड के रूप में दिखते हैं।",
+    "tour.s4.step.2":
+      "स्तंभ Active, On hold, Completed और Discontinued हैं; स्थिति बदलने के लिए कार्ड को दूसरे स्तंभ में खींचें।",
+    "tour.s4.step.3":
+      "यदि सेवा किसी चाल को अनुमति न होने के कारण अस्वीकार करे, तो त्रुटि दिखती है और बोर्ड संग्रहीत स्थिति फिर से लोड करता है।",
+    "tour.s4.step.4":
+      "बोर्ड के नीचे Record a segment में इंस्टेंस चुनें, फिर Start clock और Stop clock इस्तेमाल करें, या यात्रा का एक खंड दर्ज करने के लिए Stage, Category और Started at भरें (यह पैनल केवल अंग्रेज़ी में है)।",
+    "tour.s5.title": "मार्ग पर समय नापना",
+    "tour.s5.summary":
+      "पूछें कि मरीज़ मार्ग पर जो कैलेंडर समय बिताते हैं उसका कितना हिस्सा वास्तव में देखभाल है, और बाकी कहाँ जाता है।",
+    "tour.s5.step.1":
+      "समय खोलें, मार्ग चुनें, और चाहें तो समूह को जाँचने के लिए एक Access standard चुनें।",
+    "tour.s5.step.2":
+      "इसमें शामिल है और बाहर रखता है फ़िल्टर से समूह को सीमित करें, चाहें तो पूरक से तुलना करें पर टिक करें, फिर फ़िल्टर लागू करें दबाएँ।",
+    "tour.s5.step.3":
+      "समूह टाइलें (मूल्य-वर्धक समय, लीड टाइम, मानक अनुपालन), प्रक्रिया मानचित्र, यात्रा वेरिएंट और ठहरी हुई यात्राएँ पढ़ें।",
+    "tour.s5.step.4":
+      "One journey में एक नामांकन चुनकर उसका मूल्य-वर्धक हिस्सा, कवरेज, लीड टाइम, हैंडऑफ़ और पैमाने पर बनी समयरेखा देखें।",
+    "tour.s6.title": "थोक इंपोर्ट, एक्सपोर्ट और समीक्षा",
+    "tour.s6.summary":
+      "मार्गों की फ़ाइल लोड करें या फ़िल्टर किया हुआ सेट बैकग्राउंड जॉब के रूप में निकालें, फिर इंपोर्ट द्वारा कतार में रखे गए संभावित डुप्लिकेट निपटाएँ।",
+    "tour.s6.step.1":
+      "थोक खोलें और इंपोर्ट में फ़ाइल (JSONL, CSV या TSV) और उसका सही फ़ॉर्मैट चुनें।",
+    "tour.s6.step.2":
+      "सहेजे बिना पूर्वावलोकन के लिए ड्राई रन पर टिक करें, फिर इंपोर्ट शुरू करें दबाएँ; जॉब पैनल प्रगति और बनाई, अपसर्ट की, समीक्षा के लिए कतार में रखी या त्रुटिपूर्ण पंक्तियाँ दिखाता है।",
+    "tour.s6.step.3":
+      "एक्सपोर्ट में फ़ॉर्मैट, मास्किंग (डिफ़ॉल्ट रूप से मास्क्ड; पूर्ण के लिए उच्च प्राधिकरण चाहिए), और वैकल्पिक खोज क्वेरी व सीमा चुनें, फिर एक्सपोर्ट शुरू करें दबाएँ।",
+    "tour.s6.step.4":
+      "डुप्लिकेट समीक्षा कतार के लिए समीक्षाएँ खोलें: स्थिति से फ़िल्टर करें, फिर हर जोड़ी पर डुप्लिकेट की पुष्टि करें या अस्वीकार करें चुनें (जिस जोड़ी पर कोई और निर्णय ले चुका हो, उस पर सूचना दिखती है)।",
+    "signin.sso": "SSO से साइन इन करें",
   },
   "zh-cn": {
     "nav.pathways": "路径",
@@ -2054,7 +2564,7 @@ const STRINGS = {
       "批量导入导出路径，任何失败的行都有可下载的报告。",
     "splash.features.1.title": "结构化路径记录",
     "splash.features.1.body":
-      "名称、编码、机构、护理场所、病症编码和干预措施集于一张表单。",
+      "名称、编码、机构、护理场所、病症代码和干预措施集于一张表单。",
     "splash.features.2.title": "重复检查与合并",
     "splash.features.2.body":
       "已存储的匹配项连同分数一并列出，重复记录可合并到主记录。",
@@ -2066,6 +2576,86 @@ const STRINGS = {
     "splash.features.5.body": "队列和历程视图衡量每条路径所用的时间。",
     "splash.features.6.title": "每条路径的审计记录",
     "splash.features.6.body": "打开任意路径即可查看其完整变更历史。",
+    "nav.tour": "导览",
+    "splash.hero.tour": "开始导览",
+    "tour.head": "开始导览",
+    "tour.toc": "本页内容",
+    "tour.open": "打开此页面",
+    "tour.top": "返回顶部",
+    "tour.start.title": "开始之前",
+    "tour.start.summary":
+      "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
+    "tour.start.step.1": "点击右上角的“登录”，输入你的邮箱地址。",
+    "tour.start.step.2":
+      "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
+    "tour.start.step.3": "你会以已登录状态回到应用，无需记忆或重置任何内容。",
+    "tour.start.step.4":
+      "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
+    "tour.intro":
+      "护理路径登记库的图文导览：每个页面的作用和使用步骤，从登记一条路径到衡量患者在其上的等待时间。菜单中还有洞察、甘特和顺序视图。",
+    "tour.s1.title": "登记护理路径",
+    "tour.s1.summary":
+      "创建包含护理环境、提供方、病症代码、干预措施和标识符的路径记录。缺少名称会在保存之前被发现。",
+    "tour.s1.step.1": "从菜单中打开“新建护理路径”。",
+    "tour.s1.step.2":
+      "填写必填的“名称”，然后填写护理环境、路径编码、提供方 ID 和提供方名称。",
+    "tour.s1.step.3":
+      "用添加按钮加入目标病症代码和标识符，干预措施、关键词和语言用逗号分隔填写。",
+    "tour.s1.step.4":
+      "点击“创建”。新路径随即打开，如果服务拒绝了任何内容，表单会提示你。",
+    "tour.s2.title": "查找和查看路径",
+    "tour.s2.summary":
+      "按名称搜索登记库，打开任意路径查看完整记录，并了解最近的变更。",
+    "tour.s2.step.1": "登录后打开首页“路径”，所有已登记的路径都列在那里。",
+    "tour.s2.step.2":
+      "在搜索框中输入名称的一部分并点击“搜索”；点击“清除”返回完整列表。",
+    "tour.s2.step.3":
+      "打开某条路径，查看其护理环境、提供方、病症代码、干预措施、关键词、语言和标识符。",
+    "tour.s2.step.4":
+      "在列表中选择“显示近期活动”查看登记库的最新变更，或在路径上选择“编辑”进行修正。",
+    "tour.s3.title": "检查重复、合并与审计",
+    "tour.s3.summary":
+      "找出描述同一事物的路径，将其中一条并入另一条，并完整保留每次变更的历史。",
+    "tour.s3.step.1": "打开要保留的路径，选择“检查重复项”。",
+    "tour.s3.step.2":
+      "查看“潜在重复项”列表，或说明没有任何一项超过匹配阈值的提示。",
+    "tour.s3.step.3":
+      "对真正的重复项，选择“合并到此记录”，再选“确认合并”；“取消”会退出而不改动任何内容。",
+    "tour.s3.step.4": "在任意路径上选择“显示审计跟踪”，查看其完整的变更历史。",
+    "tour.s4.title": "在看板上跟踪入组",
+    "tour.s4.summary":
+      "以状态列中的卡片查看某条路径上的入组人员，推动他们经历生命周期，并手动绘制每段旅程。",
+    "tour.s4.step.1":
+      "打开“看板”，在选择器中选一条路径；其入组实例会显示为卡片。",
+    "tour.s4.step.2":
+      "列包括 Active、On hold、Completed 和 Discontinued；将卡片拖到另一列即可更改其状态。",
+    "tour.s4.step.3":
+      "如果服务因不允许而拒绝某次移动，会显示错误，看板会重新加载已存储的状态。",
+    "tour.s4.step.4":
+      "在看板下方的 Record a segment 中选一个实例，然后使用 Start clock 和 Stop clock，或填写 Stage、Category 和 Started at 来记录旅程的一个片段（该面板仅有英文）。",
+    "tour.s5.title": "衡量路径上的时间",
+    "tour.s5.summary":
+      "了解患者在路径上度过的日历时间中有多少真正用于护理，其余时间去了哪里。",
+    "tour.s5.step.1":
+      "打开“时间”，选择一条路径，也可选择一个 Access standard 来评估该队列。",
+    "tour.s5.step.2":
+      "用“包含”和“排除”筛选缩小队列，需要时勾选“与补集比较”，然后点击“应用筛选”。",
+    "tour.s5.step.3":
+      "查看队列卡片（增值时间、前置时间、标准达标率）、流程图、旅程变体和停滞的旅程。",
+    "tour.s5.step.4":
+      "在“单个旅程”中选择一次入组，查看其增值占比、覆盖率、前置时间、交接次数和按比例绘制的时间线。",
+    "tour.s6.title": "批量导入、导出与审核",
+    "tour.s6.summary":
+      "将路径文件作为后台任务加载，或导出筛选后的集合，然后处理导入时排队的候选重复项。",
+    "tour.s6.step.1":
+      "打开“批量”，在“导入”下选择文件（JSONL、CSV 或 TSV）及对应的格式。",
+    "tour.s6.step.2":
+      "勾选“试运行”可预览而不保存，然后点击“开始导入”；任务面板会显示进度，以及已创建、已更新、待审核和出错的行数。",
+    "tour.s6.step.3":
+      "在“导出”下选择格式、遮蔽方式（默认遮蔽；完整需要更高授权），以及可选的搜索查询和上限，然后点击“开始导出”。",
+    "tour.s6.step.4":
+      "打开“审核”进入重复审核队列：按状态筛选，然后对每一对选择“确认重复”或“拒绝”（若已有他人决定，会显示提示）。",
+    "signin.sso": "使用 SSO 登录",
   },
 } as const;
 
