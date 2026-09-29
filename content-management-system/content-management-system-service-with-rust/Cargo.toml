@@ -82,7 +82,7 @@ ammonia = { version = "4" }
 entity-ref = { path = "../../link/entity-ref-rust-crate" }
 
 # Offline PASETO v4.public verification + the shared ABAC engine.
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
 
 # S3-compatible object storage for asset bytes, behind the optional
 # `s3` feature so a deployment using local storage pays nothing for it
@@ -98,7 +98,14 @@ aws-sdk-s3 = { version = "1", optional = true, default-features = false, feature
 aws-credential-types = { version = "1", optional = true }
 
 [features]
-default = []
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `CMS_KEYCLOAK_*` (see src/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
 s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 
 [[bin]]
@@ -107,6 +114,9 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 loco-rs = { workspace = true, features = ["testing"] }
 axum-test = { version = "21.1.0" }
 # Test helpers name loco_rs::TestServer (loco-rs's own re-export of its

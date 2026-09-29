@@ -64,12 +64,11 @@ struct DeliveryParams {
 /// With `CMS_REQUIRE_AUTH` off this is a no-op, exactly like the rest of
 /// the service — the family's default-off posture, pinned by the
 /// exposure test in `auth.rs`.
-fn authorize(site: &sites::Model, headers: &HeaderMap) -> Result<(), (StatusCode, String)> {
+async fn authorize(site: &sites::Model, headers: &HeaderMap) -> Result<(), (StatusCode, String)> {
     if !crate::auth::require_auth() || site.visibility == "public" {
         return Ok(());
     }
-    let verifier = crate::auth::verifier().current();
-    crate::auth::bearer_claims(headers, &verifier).map(|_| ())
+    crate::auth::request_claims(headers).await.map(|_| ())
 }
 
 /// Turn an authorization refusal into a response.
@@ -344,7 +343,7 @@ async fn page(
     let Ok(site) = records::find_site_by_key(&ctx.db, &site_key).await else {
         return Ok(StatusCode::NOT_FOUND.into_response());
     };
-    if let Err(refusal) = authorize(&site, &headers) {
+    if let Err(refusal) = authorize(&site, &headers).await {
         return Ok(refuse(refusal));
     }
     let public = site.visibility == "public";
@@ -477,7 +476,7 @@ async fn menu(
     let Ok(site) = records::find_site_by_key(&ctx.db, &site_key).await else {
         return Ok(StatusCode::NOT_FOUND.into_response());
     };
-    if let Err(refusal) = authorize(&site, &headers) {
+    if let Err(refusal) = authorize(&site, &headers).await {
         return Ok(refuse(refusal));
     }
     let Some(menu) = menus::Entity::find()
@@ -550,7 +549,7 @@ async fn sitemap(
     let Ok(site) = records::find_site_by_key(&ctx.db, &site_key).await else {
         return Ok(StatusCode::NOT_FOUND.into_response());
     };
-    if let Err(refusal) = authorize(&site, &headers) {
+    if let Err(refusal) = authorize(&site, &headers).await {
         return Ok(refuse(refusal));
     }
 
@@ -637,7 +636,7 @@ async fn feed(
     let Ok(site) = records::find_site_by_key(&ctx.db, &site_key).await else {
         return Ok(StatusCode::NOT_FOUND.into_response());
     };
-    if let Err(refusal) = authorize(&site, &headers) {
+    if let Err(refusal) = authorize(&site, &headers).await {
         return Ok(refuse(refusal));
     }
 
