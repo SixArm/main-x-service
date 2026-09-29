@@ -47,7 +47,7 @@ test("sign-in submits the email and confirms the link was sent", async ({
   page,
 }) => {
   await page.goto("/signin", { waitUntil: "networkidle" });
-  await page.getByLabel("Email").fill(EMAIL);
+  await page.getByLabel("Email", { exact: true }).fill(EMAIL);
   await page.getByRole("button", { name: "Email me a magic link" }).click();
   await expect(page.getByText(/a magic link is on its way/)).toBeVisible();
 });
@@ -59,10 +59,12 @@ test("sign-in shows a distinct message when the auth service rate-limits the req
   page,
 }) => {
   await page.goto("/signin", { waitUntil: "networkidle" });
-  await page.getByLabel("Email").fill(RATE_LIMITED_EMAIL);
+  await page.getByLabel("Email", { exact: true }).fill(RATE_LIMITED_EMAIL);
   await page.getByRole("button", { name: "Email me a magic link" }).click();
   await expect(
-    page.getByText("Too many requests. Please wait a few minutes and try again."),
+    page.getByText(
+      "Too many requests. Please wait a few minutes and try again.",
+    ),
   ).toBeVisible();
   await expect(page.getByText("Request failed")).not.toBeVisible();
 });
@@ -71,10 +73,12 @@ test("sign-up shows a distinct message when the auth service rate-limits the req
   page,
 }) => {
   await page.goto("/signup", { waitUntil: "networkidle" });
-  await page.getByLabel("Email").fill(RATE_LIMITED_EMAIL);
+  await page.getByLabel("Email", { exact: true }).fill(RATE_LIMITED_EMAIL);
   await page.getByRole("button", { name: "Send magic link" }).click();
   await expect(
-    page.getByText("Too many requests. Please wait a few minutes and try again."),
+    page.getByText(
+      "Too many requests. Please wait a few minutes and try again.",
+    ),
   ).toBeVisible();
   await expect(page.getByText("Sign up failed")).not.toBeVisible();
 });
@@ -92,8 +96,12 @@ test("verify route consumes the token and lands on the signed-in dashboard", asy
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
   await expect(page.getByRole("main").getByText(EMAIL)).toBeVisible();
+  // Sign out is offered twice: in the header and on the dashboard.
   await expect(
-    page.getByRole("button", { name: "Sign out" }),
+    page.getByRole("banner").getByRole("button", { name: "Sign out" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("main").getByRole("button", { name: "Sign out" }),
   ).toBeVisible();
 });
 
@@ -128,12 +136,20 @@ test("verify route shows a friendly error when the auth service is unreachable, 
   ).toBeVisible();
 });
 
-test("home page shows the signed-out state without a session", async ({
+test("home page shows the splash with a sign-in call to action without a session", async ({
   page,
 }) => {
   await page.goto("/", { waitUntil: "networkidle" });
-  await expect(page.getByText("You are not signed in.")).toBeVisible();
   await expect(
-    page.getByRole("main").getByRole("link", { name: "Sign in" }),
+    page.getByRole("heading", {
+      level: 1,
+      name: "One sign-in for the whole index",
+    }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("main").getByRole("link", { name: "Sign in" }).first(),
+  ).toHaveAttribute("href", "/signin");
+  await expect(page.getByText("You are not signed in.")).toHaveCount(0);
+  // The account dashboard is not rendered for an anonymous visitor.
+  await expect(page.getByRole("heading", { name: "Account" })).toHaveCount(0);
 });
