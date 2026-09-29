@@ -51,6 +51,7 @@ The browser calls the same-origin BFF proxy at `/api/proxy` — there is no publ
 | --- | --- | --- |
 | `COURSE_API_URL` | `http://localhost:8084` (the code's own fallback matches this, T-28) | Course Service base URL — the proxy injects a server-exchanged PASETO and forwards |
 | `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link login + session→PASETO exchange |
+| `PUBLIC_OIDC_SIGNIN_ENABLED` | unset | Set to `true` to show the opt-in "Sign in with SSO" link (OIDC via the auth service); unset hides it and `/signin/sso` returns 404 |
 
 Set in `.env` (`cp .env.example .env` gets the right defaults). Both are read server-side in `src/lib/server/config.ts` and are never exposed to the client bundle.
 

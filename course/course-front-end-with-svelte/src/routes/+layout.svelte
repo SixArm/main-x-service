@@ -108,6 +108,7 @@
         { href: "/courses/merge", labelKey: "nav.merge" },
         { href: "/calendar", labelKey: "nav.calendar" },
         { href: "/board", labelKey: "nav.board" },
+        { href: "/tour", labelKey: "nav.tour" },
     ];
 </script>
 
