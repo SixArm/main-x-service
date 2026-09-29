@@ -119,6 +119,7 @@ same-origin `/api/proxy`. The BFF (`src/lib/server/config.ts`) reads:
 |---|---|---|
 | `WORKER_API_URL` | `http://localhost:5150` | Worker Service base URL — the proxy forwards here |
 | `AUTH_API_URL` | `http://localhost:5150` | Authentication Service base URL — magic-link + session→PASETO exchange |
+| `PUBLIC_OIDC_SIGNIN_ENABLED` | unset | `true` shows the opt-in "Sign in with SSO" link; unset hides it and `/signin/sso` 404s |
 
 See [`.env.example`](.env.example) and [`README.md`](README.md#configuration).
 

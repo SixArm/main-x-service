@@ -20,18 +20,19 @@
     "lint": "prettier --check src"
   },
   "dependencies": {
+    "@lilydesignsystem/svelte-headless": "^0.2.0",
+    "@lilydesignsystem/svelte-locale-picker": "^0.1.2",
+    "@lilydesignsystem/svelte-picker-bar": "^0.1.0",
+    "@lilydesignsystem/svelte-share-picker": "^0.1.2",
+    "@lilydesignsystem/svelte-text-size-picker": "^0.1.2",
+    "@lilydesignsystem/svelte-theme-picker": "^0.1.2",
+    "@lilydesignsystem/themes": "0.1.0",
     "@svar-ui/svelte-calendar": "^2.7.1",
     "@svar-ui/svelte-filemanager": "^2.6.0",
     "@svar-ui/svelte-filter": "^2.6.1",
     "@svar-ui/svelte-gantt": "^2.7.3",
     "@svar-ui/svelte-grid": "^2.7.3",
-    "@svar-ui/svelte-kanban": "^2.6.0",
-    "@lilydesignsystem/svelte-headless": "^0.2.0",
-    "@lilydesignsystem/svelte-locale-picker": "^0.1.1",
-    "@lilydesignsystem/svelte-picker-bar": "^0.1.0",
-    "@lilydesignsystem/svelte-share-picker": "^0.1.1",
-    "@lilydesignsystem/svelte-text-size-picker": "^0.1.1",
-    "@lilydesignsystem/svelte-theme-picker": "^0.1.1"
+    "@svar-ui/svelte-kanban": "^2.6.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
