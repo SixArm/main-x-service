@@ -155,6 +155,7 @@
         { href: '/history', key: 'nav.history' },
         { href: '/alerts', key: 'nav.alerts' },
         { href: '/reports', key: 'nav.reports' },
+        { href: '/tour', key: 'nav.tour' },
     ];
 
     // Mark a nav link as the current page for `aria-current`. The

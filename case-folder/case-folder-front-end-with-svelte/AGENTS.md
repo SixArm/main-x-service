@@ -26,7 +26,7 @@ inferring from the code.
 | `src/lib/store/nhs.ts`                  | Modulus 11 + formatter (pre-flight only; API revalidates)       |
 | `src/lib/components/`                   | Lily headless primitives + `FolderGrid` SVAR wrapper            |
 | `src/lib/css/`                          | `nhs.css` (theme-invariant NHS tokens + components) + `app.css` |
-| `static/assets/themes/`                 | Symlink onto `vendor/lily-design-system-themes/` at the repo root (a vendored copy, not the sibling checkout — see §8a), swapped at runtime by `PickerBar`'s `ThemePicker` |
+| `static/assets/themes/`                 | Symlink onto `node_modules/@lilydesignsystem/themes/dist` (the published `@lilydesignsystem/themes` package, exact version), swapped at runtime by `PickerBar`'s `ThemePicker` |
 | `svelte.config.js`                      | SvelteKit config (Lily packages are registry deps, not aliased) |
 
 ## Working rules
@@ -111,17 +111,18 @@ is fatal for CI, even though it's fine for local dev).
   lily-design-system-svelte-helpers/<package>` rather than editing
   `package.json` — per-developer, touches no committed file, and
   `pnpm unlink <package>` restores the registry version.
-- Themes come from `vendor/lily-design-system-themes/` at the monorepo
-  root — a **vendored snapshot** of the Lily theme catalogue, not a
-  live link to the sibling checkout (same reasoning as the packages:
-  the old symlink pointed outside the repo and broke CI with `ENOENT`).
-  `static/assets/themes/` is a symlink onto that in-repo copy; each
-  theme defines DaisyUI `--color-*` tokens, and `src/lib/css/nhs.css`
-  bridges the base `--nhs-*` colour tokens onto the active `--color-*`
-  so themes restyle the app. Theme-invariant tokens (spacing,
-  typography, layout) stay in `src/lib/css/nhs.css` under `:root`.
-  Re-sync the vendored copy per that directory's own `README.md` if
-  Lily adds or edits a theme — don't edit the vendored CSS by hand.
+- Themes come from the published `@lilydesignsystem/themes` package (exact
+  version in `package.json`), not a vendored copy or the sibling checkout
+  (both were replaced: the old symlink pointed outside the repo and broke CI
+  with `ENOENT`). `static/assets/themes/` is a symlink to
+  `node_modules/@lilydesignsystem/themes/dist` (it dangles until `pnpm
+  install`); each theme defines DaisyUI `--color-*` tokens, and
+  `src/lib/css/nhs.css` bridges the base `--nhs-*` colour tokens onto the
+  active `--color-*` so themes restyle the app. Theme-invariant tokens
+  (spacing, typography, layout) stay in `src/lib/css/nhs.css` under `:root`.
+  To pick up a theme change, bump the package version
+  (`pnpm add --save-exact @lilydesignsystem/themes@<v>`); don't edit theme
+  CSS by hand.
 
 ### 9. CI gate
 
@@ -235,11 +236,10 @@ All required green:
   — the JSON API back-end this client talks to. **Start the API
   before running the dev server.**
 - `~/git/lilydesignsystem/lily-design-system/` — upstream source of the
-  six Lily npm packages this app depends on (§8a) and of
-  `vendor/lily-design-system-themes/`'s vendored snapshot. **Not**
-  required to exist for install/dev/build/check — only needed if
-  you're developing an in-flight Lily change via `pnpm link` or
-  re-syncing the vendored themes.
+  six Lily npm packages this app depends on (§8a) and of the
+  `@lilydesignsystem/themes` package. **Not** required to exist for
+  install/dev/build/check — only needed if you're developing an in-flight
+  Lily change via `pnpm link`.
 - The five upstream Main-X-Services live under
   `~/git/sixarm/main-x-service/` (only relevant if you're testing
   against real services rather than the Loco app's in-process stubs).

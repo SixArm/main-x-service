@@ -23,6 +23,8 @@ export async function load({ url, fetch }) {
     // The home page (`/`) doubles as the signed-out splash, so an anonymous
     // visitor may see it rather than being bounced to `/login`.
     const anonymousHome = url.pathname === '/';
+    // The tour (`/tour`) is a public walkthrough, open signed out or in.
+    const publicTour = url.pathname === '/tour';
 
     let user = null;
     let signedOut = false;
@@ -47,7 +49,7 @@ export async function load({ url, fetch }) {
     }
 
     cache.clearUser();
-    if (signedOut && !publicRoute && !anonymousHome)
+    if (signedOut && !publicRoute && !anonymousHome && !publicTour)
         throw redirect(307, '/login');
     // Anonymous (a definite 401) or the probe failed: the home page shows
     // the splash and skips the dashboard's API reads.
