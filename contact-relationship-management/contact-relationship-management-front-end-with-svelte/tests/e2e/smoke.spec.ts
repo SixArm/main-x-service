@@ -5,7 +5,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Every page but /signin and /verify is gated on a session (CRM-T26),
+ * Every page but / (the splash), /signin and /verify is gated on a session (CRM-T26),
  * so the smoke suite injects a fake `__Host-mxi_session` cookie
  * directly into the browser context before each test — the server
  * only checks the cookie's *presence*, never its validity
@@ -80,7 +80,7 @@ const DEAL = {
  *    open it. Open only when collapsed, which is correct either way.
  */
 async function chooseLocale(page: Page, label: string) {
-  const button = page.locator("nav.top .locale-picker-button");
+  const button = page.locator("header.topbar .locale-picker-button");
   const list = page.locator("ul.locale-picker-list");
   if ((await button.getAttribute("aria-expanded")) !== "true") {
     await button.click();
@@ -104,11 +104,16 @@ test.describe("sign-in gate (CRM-T26)", () => {
     await expect(page).toHaveURL(/\/signin$/);
   });
 
-  test("a signed-out visitor is redirected from the dashboard too", async ({
+  test("a signed-out visitor sees the splash page at /, with a sign-in link and no dashboard", async ({
     page,
   }) => {
     await page.goto("/");
-    await expect(page).toHaveURL(/\/signin$/);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByTestId("tile-winrate")).toHaveCount(0);
+    await expect(
+      page.locator("header.topbar").getByRole("link", { name: "Sign in" }),
+    ).toHaveAttribute("href", "/signin");
   });
 
   test("/signin itself stays reachable with no session", async ({ page }) => {
@@ -276,9 +281,10 @@ test.describe("signed-in smoke coverage", () => {
     );
     await page.goto("/tickets");
     await expect(page.getByTestId("breached")).toBeVisible();
-    await expect(page.locator("nav.top")).toContainText("Tickets");
-    await chooseLocale(page, "Deutsch");
-    await expect(page.locator("nav.top")).toContainText("Kontakte");
+    await page.getByRole("button", { name: "Toggle navigation" }).click();
+    await expect(page.locator("nav.primary-nav")).toContainText("Tickets");
+    await chooseLocale(page, "Español");
+    await expect(page.locator("nav.primary-nav")).toContainText("Contactos");
     await chooseLocale(page, "العربية");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   });
@@ -396,7 +402,9 @@ test.describe("signed-in smoke coverage", () => {
     // wrapper — `@svar-ui/calendar-store` silently drops an all-day
     // event whose `end` is not strictly after `start` (see the fix in
     // +page.svelte), and the wrapper alone renders regardless.
-    await expect(calendar.getByText("meeting: QBR", { exact: false })).toBeVisible();
+    await expect(
+      calendar.getByText("meeting: QBR", { exact: false }),
+    ).toBeVisible();
   });
 
   test("executive area renders the pack, hygiene findings, and trends", async ({

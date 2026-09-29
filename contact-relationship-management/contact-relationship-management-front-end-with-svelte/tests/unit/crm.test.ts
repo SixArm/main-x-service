@@ -1,5 +1,5 @@
 // Unit tests: the money formatter's masked/absent honesty, the API
-// path map (contract mirror), and the 13-locale i18n parity pin.
+// path map (contract mirror), and the seven-locale i18n parity pin.
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,7 @@ import { money } from "../../src/lib/api/crm";
 import {
   DEFAULT_LOCALE,
   LOCALES,
+  LOCALE_LABELS,
   STRING_KEYS,
   STRINGS_BY_LOCALE,
   i18n,
@@ -37,21 +38,45 @@ describe("i18n", () => {
     }
   });
 
-  it("translates with en fallback and flags RTL locales", () => {
-    expect(translate("nav.contacts", "de")).toBe("Kontakte");
-    expect(translate("nav.contacts", DEFAULT_LOCALE)).toBe("Contacts");
-    expect(isRtl("ar")).toBe(true);
-    expect(isRtl("ur")).toBe(true);
-    expect(isRtl("en")).toBe(false);
+  it("supports exactly the seven family locales, sorted, no parentheses", () => {
+    expect([...LOCALES]).toEqual([
+      "ar-001",
+      "cy-001",
+      "en-001",
+      "es-001",
+      "fr-001",
+      "hi-001",
+      "zh-cn",
+    ]);
+    expect(DEFAULT_LOCALE).toBe("en-001");
+    for (const label of Object.values(LOCALE_LABELS)) {
+      expect(label).not.toMatch(/[()]/);
+    }
+    expect(LOCALE_LABELS["zh-cn"]).toBe("中文 - 中国");
   });
 
-  it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+  it("translates with en fallback and flags RTL locales", () => {
+    expect(translate("nav.contacts", "es-001")).toBe("Contactos");
+    expect(translate("nav.contacts", DEFAULT_LOCALE)).toBe("Contacts");
+    expect(translate("nav.contacts", "xx" as never)).toBe("Contacts");
+    expect(translate("share.copy_link", "en-001")).toBe("Copy Link");
+    expect(isRtl("ar-001")).toBe(true);
+    expect(isRtl("ar")).toBe(true);
+    expect(isRtl("en-001")).toBe(false);
+    expect(isRtl("zh-cn")).toBe(false);
+  });
+
+  it("normalises legacy and regional codes by primary language", () => {
     i18n.set("en_US");
-    expect(i18n.locale).toBe("en_US");
-    i18n.set("en-US");
-    expect(i18n.locale).toBe("en_US");
-    i18n.set("en");
-    expect(i18n.locale).toBe("en");
+    expect(i18n.locale).toBe("en-001");
+    i18n.set("es-MX");
+    expect(i18n.locale).toBe("es-001");
+    i18n.set("zh");
+    expect(i18n.locale).toBe("zh-cn");
+    i18n.set("zh-CN");
+    expect(i18n.locale).toBe("zh-cn");
+    i18n.set("de");
+    expect(i18n.locale).toBe("en-001");
   });
 });
 
