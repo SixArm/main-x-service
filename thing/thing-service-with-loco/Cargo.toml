@@ -56,7 +56,7 @@ tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
 
 # OpenAPI Documentation
 utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
-utoipa-swagger-ui = { version = "9", features = ["axum"] }
+utoipa-swagger-ui = { version = "10", features = ["axum"] }
 
 # Data Streaming
 
