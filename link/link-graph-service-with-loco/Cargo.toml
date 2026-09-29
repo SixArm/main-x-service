@@ -103,7 +103,7 @@ person-matcher = { version = "0.6.1", path = "../../person/person-matcher-rust-c
 # set only (no `fetch` feature — boot-time URL fetch is a follow-up).
 # `fetch` adds `Verifier::from_paseto_keys_url` for the boot-time key-set
 # fetch and the rotation refresh loop (see src/auth.rs).
-authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", features = ["fetch"] }
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
 
 # Lazy verify-on-read (spec T-10 / design §5.1): a one-shot GET to a
 # record's source service to resolve unknown presence. Only the status
@@ -124,6 +124,14 @@ futures-util = { version = "0.3", optional = true, default-features = false, fea
 ] }
 
 [features]
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `LINK_GRAPH_KEYCLOAK_*` (see src/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
 # Off by default. The read-only-to-world posture and the `apply_event`/
 # `apply_event_idempotent` seam need no feature; only the real Fluvio
 # producer connection lives behind this.
@@ -135,6 +143,9 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 loco-rs = { workspace = true, features = ["testing"] }
 serial_test = { version = "3.5.0" }
 tokio = { version = "1.53", default-features = false, features = [

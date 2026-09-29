@@ -13,6 +13,7 @@
 //!
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test concealment -- --ignored`.
+#![cfg(feature = "paseto")]
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;

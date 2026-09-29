@@ -12,6 +12,12 @@
 
 ### Contracts & scaffold
 
+- [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
+      (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
+      features; `LINK_GRAPH_KEYCLOAK_*` configuration; `request_claims` /
+      `enforce_request`; `tests/keycloak_guard.rs`. Verifier side:
+      `authentication-verifier` KC-1. Outbound peer calls unchanged.
+
 - [x] T-1: Scaffold the loco service skeleton (Cargo.toml, `src/`,
   `migrations/` + loco `migration/` bridge, config). Read-only-to-world:
   no write controllers. **Done** — Dockerfile / docker-compose deferred.

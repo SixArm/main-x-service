@@ -49,7 +49,9 @@ async fn force_reconcile(
     State(ctx): State<AppContext>,
     headers: axum::http::HeaderMap,
 ) -> Result<Response> {
-    auth::authorize_reconcile(&headers).map_err(auth_rejection)?;
+    auth::authorize_reconcile(&headers)
+        .await
+        .map_err(auth_rejection)?;
     let Some(source) = HttpAuthoritativeSource::from_env_for(&entity) else {
         return Err(Error::CustomError(
             StatusCode::NOT_FOUND,

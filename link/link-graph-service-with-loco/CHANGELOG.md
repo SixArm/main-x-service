@@ -14,6 +14,29 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — optional Keycloak bearer acceptance; PASETO is now a feature (KC-1, 2026-09-29)
+
+`keycloak` cargo feature (off by default): the blanket read guard, the
+forced-reconcile authorisation and the `MaybeAuthUser` extractor also accept
+an `Authorization: Bearer <Keycloak access token>`, verified by
+`authentication-verifier`'s `keycloak` module and mapped onto the same
+`Claims`, so ABAC and `subject_of` concealment are unchanged. Configured by
+`LINK_GRAPH_KEYCLOAK_URL` / `_REALM` / `_AUDIENCES` / `_ROLE_MAP[_FILE]` /
+`_REQUIRE_VERIFIED_EMAIL`; unset URL => off; a malformed configuration logs
+an error and leaves Keycloak off (fail-closed, service still boots). A token
+beginning `v4.` is a PASETO; anything else is offered to Keycloak. New
+`auth::request_claims` and `auth::enforce_request` (async) are what the
+middleware and extractor use; `authorize_reconcile` is now async; the sync
+`enforce` / `bearer_claims` remain for the PASETO tests. Outbound
+reconciliation / probe / suggestion calls are unchanged (a static bearer
+from the environment; no verifier involved).
+
+PASETO verification (`Verifier`, the boot key fetch, the rotation refresh)
+moved behind the `paseto` feature, **on by default**, so a default build is
+unchanged. New `tests/keycloak_guard.rs` (DB-free) pushes real RS256
+Keycloak-shaped tokens through the real guard. See
+`agents/share/runbooks/keycloak-sso.md`.
+
 ### Added — governance no-leak coverage for `/neighbors` and `/single-view` (T-27)
 
 `tests/concealment.rs` proved the `subject_of` concealment invariant
