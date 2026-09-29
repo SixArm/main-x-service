@@ -58,3 +58,13 @@ export async function signout(fetchFn: FetchFn, sid: string): Promise<void> {
     headers: { authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * The auth service's OIDC login URL (EV-2, `authentication-sessions.md`
+ * §7a). A BROWSER NAVIGATION target, not a BFF `fetch`: the browser itself
+ * must visit the identity provider and come back to `originForReturn`.
+ */
+export function oidcLoginUrl(originForReturn: string): string {
+  const params = new URLSearchParams({ return_url: originForReturn });
+  return `${AUTH_API_URL}/api/auth/oidc/login?${params.toString()}`;
+}

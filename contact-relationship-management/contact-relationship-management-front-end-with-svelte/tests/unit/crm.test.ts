@@ -149,3 +149,40 @@ describe("api path map", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("tour", () => {
+  const TOUR_KEYS = [
+    "nav.tour",
+    "tour.head",
+    "tour.intro",
+    ...[1, 2, 3, 4, 5, 6].flatMap((n) => [
+      `tour.s${n}.title`,
+      `tour.s${n}.summary`,
+      ...[1, 2, 3, 4].map((k) => `tour.s${n}.step.${k}`),
+    ]),
+  ];
+
+  it("has six workflow sections of four steps in every locale", () => {
+    for (const locale of LOCALES) {
+      for (const key of TOUR_KEYS) {
+        expect(
+          STRINGS_BY_LOCALE[locale][
+            key as keyof (typeof STRINGS_BY_LOCALE)["en-001"]
+          ],
+          `${locale} missing ${key}`,
+        ).toBeTruthy();
+      }
+    }
+  });
+
+  it("is public: the root layout gate exempts /tour", async () => {
+    const { load } = await import("../../src/routes/+layout.server");
+    const run = (path: string) =>
+      load({
+        locals: { sessionId: null },
+        url: new URL(`http://localhost${path}`),
+      } as unknown as Parameters<typeof load>[0]);
+    expect(run("/tour")).toEqual({ signedIn: false });
+    expect(() => run("/contacts")).toThrow();
+  });
+});
