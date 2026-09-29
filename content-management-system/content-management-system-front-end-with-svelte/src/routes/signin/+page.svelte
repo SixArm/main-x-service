@@ -8,7 +8,12 @@
   import type { ActionData } from "./$types";
   import { enhance } from "$app/forms";
 
+  import { t } from "$lib/i18n.svelte";
+  import { env } from "$env/dynamic/public";
+
   let { form }: { form: ActionData } = $props();
+  // Opt-in OIDC SSO (EV-2): a plain <a> browser navigation, not a form action.
+  const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === "true";
 </script>
 
 <svelte:head><title>Sign in — Content Management System</title></svelte:head>
@@ -31,6 +36,11 @@
     {#if form?.error}
       <p class="error" role="alert">
         Could not send the sign-in link. Please try again.
+      </p>
+    {/if}
+    {#if ssoEnabled}
+      <p>
+        <a class="btn" href="/signin/sso">{t("signin.sso")}</a>
       </p>
     {/if}
   </div>

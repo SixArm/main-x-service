@@ -41,12 +41,13 @@
     ]
   },
   "dependencies": {
-    "@svar-ui/svelte-grid": "^2.7.3",
-    "@lilydesignsystem/svelte-headless": "^0.2.0",
-    "@lilydesignsystem/svelte-locale-picker": "^0.1.1",
+    "@lilydesignsystem/svelte-headless": "0.2.0",
+    "@lilydesignsystem/svelte-locale-picker": "^0.1.2",
     "@lilydesignsystem/svelte-picker-bar": "^0.1.0",
-    "@lilydesignsystem/svelte-share-picker": "^0.1.1",
-    "@lilydesignsystem/svelte-text-size-picker": "^0.1.1",
-    "@lilydesignsystem/svelte-theme-picker": "^0.1.1"
+    "@lilydesignsystem/svelte-share-picker": "^0.1.2",
+    "@lilydesignsystem/svelte-text-size-picker": "^0.1.2",
+    "@lilydesignsystem/svelte-theme-picker": "^0.1.2",
+    "@lilydesignsystem/themes": "0.1.0",
+    "@svar-ui/svelte-grid": "^2.7.3"
   }
 }

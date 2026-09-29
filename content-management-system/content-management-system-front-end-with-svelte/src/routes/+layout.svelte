@@ -24,6 +24,7 @@
     { href: "/translations", key: "nav.translations" },
     { href: "/insights", key: "nav.insights" },
     { href: "/settings", key: "nav.settings" },
+    { href: "/tour", key: "nav.tour" },
   ] as const;
 
   // Share destinations for the Lily SharePicker. Lily ships no
