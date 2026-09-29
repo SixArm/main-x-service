@@ -3,12 +3,21 @@
    whiteboard); everything else stays quiet so state reads first. */
 
 :root {
-  --bg: #f5f6f8;
-  --panel: #ffffff;
-  --ink: #1a2330;
-  --muted: #5b6774;
-  --line: #dde2e8;
-  --accent: #1b5fae;
+  /* App tokens, mapped onto the Lily theme tokens (`--color-*`) that the
+     ThemePicker's stylesheet defines, so choosing a theme restyles the
+     whole app. The fallbacks apply until a theme stylesheet has loaded. */
+  --bg: var(--color-base-200, #f5f6f8);
+  --panel: var(--color-base-100, #ffffff);
+  --ink: var(--color-base-content, #1a2330);
+  --muted: color-mix(
+    in oklab,
+    var(--color-base-content, #5b6774) 62%,
+    var(--color-base-100, #ffffff)
+  );
+  --line: var(--color-base-300, #dde2e8);
+  --accent: var(--color-primary, #1b5fae);
+  --accent-fg: var(--color-primary-content, #ffffff);
+  --radius: 6px;
   /* Bed states */
   --state-available: #1d8a4e;
   --state-reserved: #b57e10;
@@ -83,21 +92,6 @@ h1 {
 h2 {
   font-size: 1.1rem;
   margin: 1.25rem 0 0.5rem;
-}
-
-/* Top navigation */
-nav.top {
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  padding: 0.6rem 1.25rem;
-  display: flex;
-  gap: 1.1rem;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-nav.top .brand {
-  font-weight: 700;
-  color: var(--ink);
 }
 
 /* Panels & tables */
@@ -194,7 +188,7 @@ th {
 }
 .bed-card.state-closed {
   border-left-color: var(--state-closed);
-  background: #faf3f4;
+  background: color-mix(in oklab, var(--state-closed) 8%, var(--panel));
 }
 .bed-card .head {
   display: flex;
@@ -241,17 +235,17 @@ th {
 .chip.warn {
   border-color: var(--state-awaiting);
   color: var(--state-awaiting);
-  background: #fdf3ec;
+  background: color-mix(in oklab, var(--state-awaiting) 10%, var(--panel));
 }
 .chip.danger {
   border-color: var(--state-closed);
   color: var(--state-closed);
-  background: #fbeef0;
+  background: color-mix(in oklab, var(--state-closed) 10%, var(--panel));
 }
 .chip.ok {
   border-color: var(--state-available);
   color: var(--state-available);
-  background: #eef7f1;
+  background: color-mix(in oklab, var(--state-available) 10%, var(--panel));
 }
 .chip.red-day {
   background: var(--red-day);
@@ -266,7 +260,7 @@ th {
 .chip.infection {
   border-color: #7a3ea1;
   color: #7a3ea1;
-  background: #f6effa;
+  background: color-mix(in oklab, #7a3ea1 10%, var(--panel));
 }
 .chip.infection.confirmed {
   background: #7a3ea1;
@@ -292,7 +286,7 @@ button:hover {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 input,
 select {
@@ -300,7 +294,8 @@ select {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
-  background: #fff;
+  background: var(--panel);
+  color: var(--ink);
 }
 form.row {
   display: flex;

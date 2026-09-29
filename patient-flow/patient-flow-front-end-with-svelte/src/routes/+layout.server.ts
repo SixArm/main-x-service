@@ -33,11 +33,16 @@
 import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 
-/** Routes reachable with no session. */
+/** Routes reachable with no session (prefix match). */
 const PUBLIC_PATHS = ["/signin", "/verify"];
+
+/** The home page is public too (exact match): it shows the splash to an
+ * anonymous visitor and the dashboard once signed in. */
+const PUBLIC_EXACT = ["/"];
 
 export const load: LayoutServerLoad = ({ locals, url }) => {
   const isPublic =
+    PUBLIC_EXACT.includes(url.pathname) ||
     PUBLIC_PATHS.some((path) => url.pathname.startsWith(path)) ||
     url.pathname.endsWith("/kiosk");
   if (!isPublic && locals.sessionId === null) {

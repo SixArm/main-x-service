@@ -290,11 +290,17 @@ test.describe("sign-in gate (PF-T22)", () => {
     await expect(page).toHaveURL(/\/signin$/);
   });
 
-  test("a signed-out visitor is redirected from the home page too", async ({
+  test("a signed-out visitor sees the splash on the home page, not a redirect", async ({
     page,
   }) => {
     await page.goto("/");
-    await expect(page).toHaveURL(/\/signin$/);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: /one live picture/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Sign in" }).first(),
+    ).toHaveAttribute("href", "/signin");
   });
 
   test("/signin itself stays reachable with no session", async ({ page }) => {
