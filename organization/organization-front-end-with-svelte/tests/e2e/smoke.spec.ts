@@ -156,11 +156,18 @@ async function stubApi(page: Page) {
       return route.fulfill({ json: ORG_DUP });
     }
     if (path === `/api/organizations/${PID}/masked` && method === "GET") {
-      return route.fulfill({ json: { ...ORG, name: "***REDACTED***", telephone: null, email: null } });
+      return route.fulfill({
+        json: { ...ORG, name: "***REDACTED***", telephone: null, email: null },
+      });
     }
     if (path === `/api/organizations/${PID}/export` && method === "GET") {
       return route.fulfill({
-        json: { subject: PID, exported_at: "2026-09-06T00:00:00Z", masked: false, organization: ORG },
+        json: {
+          subject: PID,
+          exported_at: "2026-09-06T00:00:00Z",
+          masked: false,
+          organization: ORG,
+        },
       });
     }
     if (path === `/api/organizations/${PID}` && method === "PUT") {
@@ -177,7 +184,33 @@ test.beforeEach(async ({ page }) => {
   await stubApi(page);
 });
 
+/** Present the httpOnly session cookie so `/` renders the signed-in dashboard. */
+async function signIn(page: Page) {
+  await page.context().addCookies([
+    {
+      name: "__Host-mxi_session",
+      value: "test-session",
+      url: "http://localhost:4173",
+      httpOnly: true,
+      secure: true,
+    },
+  ]);
+}
+
+test("anonymous home shows the splash with a sign-in call to action", async ({
+  page,
+}) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(page.locator("h1")).toContainText("One trusted record");
+  await expect(
+    page.getByRole("link", { name: "Sign in" }).first(),
+  ).toBeVisible();
+  // The organization list is not fetched or shown when signed out.
+  await expect(page.getByText("Acme, Inc.")).not.toBeVisible();
+});
+
 test("list page renders the seeded organization", async ({ page }) => {
+  await signIn(page);
   await page.goto("/", { waitUntil: "networkidle" });
   await expect(
     page.getByRole("heading", { name: "Organizations" }),
@@ -201,13 +234,17 @@ test("detail page renders the fetched organization", async ({ page }) => {
 // GET /api/organizations/{pid}/masked and back, rather than redacting
 // client-side — the two stubs return visibly different names so the
 // test can tell which endpoint actually answered.
-test("detail page toggles between the plain and masked view", async ({ page }) => {
+test("detail page toggles between the plain and masked view", async ({
+  page,
+}) => {
   await page.goto(`/${PID}`, { waitUntil: "networkidle" });
   await expect(page.getByRole("heading", { name: "Acme, Inc." })).toBeVisible();
   await expect(page.getByText("Showing the masked view")).not.toBeVisible();
 
   await page.getByRole("button", { name: "Show masked" }).click();
-  await expect(page.getByRole("heading", { name: "***REDACTED***" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "***REDACTED***" }),
+  ).toBeVisible();
   await expect(page.getByText("Showing the masked view")).toBeVisible();
 
   await page.getByRole("button", { name: "Show full" }).click();
@@ -248,13 +285,19 @@ test("detail page audit panel shows loading then entries", async ({ page }) => {
     await new Promise((resolve) => setTimeout(resolve, 300));
     return route.fulfill({
       json: [
-        { action: "created", actor: "tester", created_at: "2026-08-01T09:00:00Z" },
+        {
+          action: "created",
+          actor: "tester",
+          created_at: "2026-08-01T09:00:00Z",
+        },
         { action: "updated", actor: null, created_at: "2026-08-02T10:00:00Z" },
       ],
     });
   });
   await page.goto(`/${PID}`, { waitUntil: "networkidle" });
-  await expect(page.getByRole("heading", { name: "Audit trail" })).not.toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Audit trail" }),
+  ).not.toBeVisible();
 
   await page.getByRole("button", { name: "Show audit trail" }).click();
   await expect(page.getByText("Loading audit trail…")).toBeVisible();
@@ -263,7 +306,9 @@ test("detail page audit panel shows loading then entries", async ({ page }) => {
   await expect(page.getByText("—")).toBeVisible(); // null actor on the second row
 
   await page.getByRole("button", { name: "Hide audit trail" }).click();
-  await expect(page.getByRole("heading", { name: "Audit trail" })).not.toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Audit trail" }),
+  ).not.toBeVisible();
 });
 
 test("detail page audit panel shows an empty state", async ({ page }) => {
@@ -319,9 +364,7 @@ test("review board offers a keyboard-reachable table with the same item", async 
   // Provenance is visible at a glance in the queue, not only in the
   // detail panel.
   await expect(list.getByText("Import")).toBeVisible();
-  await expect(
-    list.getByRole("button", { name: /^Compare/ }),
-  ).toBeVisible();
+  await expect(list.getByRole("button", { name: /^Compare/ })).toBeVisible();
 });
 
 test("review board compares a pair on demand with a live score breakdown", async ({
@@ -403,7 +446,7 @@ test("merge page pre-fills both IDs from the query string", async ({
 });
 
 test("the nav offers Merge from another page", async ({ page }) => {
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/new", { waitUntil: "networkidle" });
   // The primary nav is always collapsed behind the hamburger.
   await page.getByRole("button", { name: "Toggle navigation" }).click();
   await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
