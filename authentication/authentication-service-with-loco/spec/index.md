@@ -1249,6 +1249,20 @@ only by that subject.
       OIDC tests green. Front end: `pnpm run check` (0 errors), `pnpm
       exec vitest run` (32/32, +4 new), `pnpm run build`, `pnpm run
       lint` all clean.
+- [x] **KC-1 (2026-09-29) — `paseto` Cargo feature (default on).**
+      PASETO v4.public issuance is optional: `rusty_paseto` /
+      `ed25519-dalek` are optional deps behind `paseto`, which is a
+      default feature so default behaviour is byte-for-byte unchanged.
+      Without it: no `POST /api/auth/token`, no
+      `GET /.well-known/paseto-keys` (both 404), no `token` in the
+      magic-link body, and openapi advertises none of them; bearer-gated
+      routes authenticate the session cookie (+ CSRF on unsafe methods)
+      via `AuthUser`'s alternate impl (`src/auth/session.rs`). No
+      `keycloak` feature: this crate federates Keycloak via `oidc`.
+      Verified in all four shapes (default / `--no-default-features` /
+      `+oidc` / both) for clippy `-D warnings` and `cargo test`; the
+      DB-gated request suites that mint bearers are `cfg(feature =
+      "paseto")` and stay `#[ignore]`d.
 - [x] **EV-2 (2026-09-19) — SAML 2.0 SP evaluated and deferred (not
       merely unscheduled).** Surveyed the Rust SAML ecosystem for a
       crate clearing the same bar `openidconnect` cleared for the OIDC

@@ -28,6 +28,7 @@ use loco_rs::testing::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serial_test::serial;
 
+#[cfg(feature = "paseto")]
 use super::prepare_data;
 
 // ---------------------------------------------------------------------------
@@ -184,6 +185,7 @@ async fn magic_link_for_unknown_email_still_returns_200() {
 
 /// Pins redemption: a valid token yields a verifying RS256 access token,
 /// marks the email verified, and is single-use (second redeem → 401).
+#[cfg(feature = "paseto")]
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -367,6 +369,7 @@ async fn invalid_magic_link_token_is_rejected() {
 
 /// Pins `/me` with a valid bearer token returns the current user's
 /// public fields (pid / email / name).
+#[cfg(feature = "paseto")]
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -398,6 +401,7 @@ async fn can_get_current_user() {
 /// claim, which is a snapshot from mint time. Assigns attrs **after**
 /// the bearer was minted, so a stale-claim implementation would fail
 /// this while the live-DB-read one (the actual implementation) passes.
+#[cfg(feature = "paseto")]
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -440,6 +444,7 @@ async fn me_without_bearer_token_is_unauthorized() {
 
 /// Pins local revocation: after signout the JWT still verifies
 /// cryptographically, but `/me` rejects the revoked session with 401.
+#[cfg(feature = "paseto")]
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -471,6 +476,7 @@ async fn signout_revokes_the_session() {
 
 /// Pins that the public JWKS endpoint serves the RSA signing key and the
 /// published `kid` matches the one stamped into token headers.
+#[cfg(feature = "paseto")]
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -633,6 +639,7 @@ async fn auth_events_are_recorded_and_queryable() {
 
 /// Pins the GDPR Art. 15 export: it returns the subject's user row,
 /// sessions, and audit events — and never any password / api key / token.
+#[cfg(feature = "paseto")]
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -727,6 +734,7 @@ async fn account_export_and_delete_require_a_bearer_token() {
 /// soft-deleted + anonymised (tombstone email/name), the original email
 /// no longer resolves, all sessions are revoked, an `account_erased`
 /// audit row is written, and post-erasure `/me` + export return 401.
+#[cfg(feature = "paseto")]
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -830,6 +838,7 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
 /// way to exercise a real HTTP round trip through the mounted
 /// middleware in this crate; the DB-free half of T-13's acceptance
 /// (`resolve_version`'s own unit tests) lives in `src/version.rs`.
+#[cfg(feature = "paseto")]
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -906,9 +915,15 @@ fn route_table_covers_the_magic_link_surface() {
         );
     }
 
-    let keys = authentication_service::controllers::paseto_keys::routes();
-    assert_eq!(keys.prefix.as_deref(), Some("/.well-known"));
-    assert!(keys.handlers.iter().any(|h| h.uri == "/paseto-keys"));
+    #[cfg(feature = "paseto")]
+    {
+        let keys = authentication_service::controllers::paseto_keys::routes();
+        assert_eq!(keys.prefix.as_deref(), Some("/.well-known"));
+        assert!(keys.handlers.iter().any(|h| h.uri == "/paseto-keys"));
+    }
+    // No `paseto` feature: no token exchange route in the table.
+    #[cfg(not(feature = "paseto"))]
+    assert!(!uris.contains(&"/token"));
 }
 
 /// Pins (DB-free) that the docs routes expose the `OpenAPI` JSON and the

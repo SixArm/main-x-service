@@ -10,6 +10,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — `paseto` Cargo feature (default on): PASETO issuance is now optional (repo `tasks.md` KC-1)
+
+A default build is unchanged. Building with `--no-default-features`
+compiles PASETO v4.public issuance out entirely: the `rusty_paseto` and
+`ed25519-dalek` dependencies become optional, `POST /api/auth/token` and
+`GET /.well-known/paseto-keys` are absent (404), the magic-link response
+body carries no `token`, and `/api-docs/openapi.json` no longer
+advertises the key set, the PASETO schemas or the bearer scheme. The
+service still boots and serves signup, magic links, cookie sessions,
+`--features oidc` federation, admin attributes, the GDPR routes and
+audit verification. Because no bearer token exists in that shape, the
+routes that a bearer gates (`me`, `signout`, audit, GDPR account, admin
+attributes, compliance verify) authenticate the `__Host-mxi_session`
+cookie instead (`src/auth/session.rs`), with the session's CSRF token
+required in `X-CSRF-Token` on unsafe methods. Code moved: the signing /
+key / verify code now lives in `src/auth/paseto.rs` (public paths
+`auth::keys`, `auth::sign_access_token`, … unchanged).
+
+There is deliberately **no `keycloak` feature** in this crate: it is the
+token *issuer*, not a verifier. Keycloak (or any OIDC IdP) is federated
+here through the existing `oidc` feature
+(`agents/share/runbooks/keycloak-sso.md`); the peer-side Keycloak bearer
+verification lives in the verifier crate's `keycloak` feature.
+
 ### Added — `GET /api/auth/me` now returns the caller's own ABAC attrs (T-28f, repo `tasks.md` EV-1)
 
 `CurrentResponse` gains `attrs` — the caller's live `users.attributes`

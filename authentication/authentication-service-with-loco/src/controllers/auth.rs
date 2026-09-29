@@ -213,6 +213,7 @@ fn constant_work_hash() -> String {
 ///   that proof it is trusted only in development; in production it is
 ///   refused, so a legacy session can no longer bypass **both** the CSRF and
 ///   the origin checks.
+#[cfg(feature = "paseto")]
 fn csrf_token_gate(
     is_production: bool,
     origin_ok: bool,
@@ -239,6 +240,7 @@ fn csrf_token_gate(
 /// `AUTH_ALLOWED_ORIGINS` is unset in production. A production deployment
 /// should set it so cross-origin `POST /token` callers are rejected even
 /// with `SameSite` cookies.
+#[cfg(feature = "paseto")]
 fn warn_missing_allowed_origins() {
     static ONCE: std::sync::Once = std::sync::Once::new();
     ONCE.call_once(|| {
@@ -449,6 +451,9 @@ async fn verify(
     // delivered to the client in the readable `__Host-mxi_csrf` cookie,
     // echoed back in `X-CSRF-Token` on mutating cookie-authed requests.
     let csrf_token = crate::csrf::generate_token();
+    // No token issuance without the `paseto` feature: the session cookie
+    // is the only credential and the response body carries no token.
+    #[cfg(feature = "paseto")]
     let (access_token, _sid, _exp) = crate::auth::sign_access_token(
         &user.pid.to_string(),
         &user.email,
@@ -457,6 +462,8 @@ async fn verify(
         user.attrs(),
     )
     .map_err(|e| Error::string(&e.to_string()))?;
+    #[cfg(not(feature = "paseto"))]
+    let access_token = String::new();
 
     // Session establishment copies the user's ABAC attributes into the
     // session payload (shared authorization-attributes.md §6), so token
@@ -520,6 +527,7 @@ async fn verify(
 /// can offer — such a session is refused in production without it, so it
 /// cannot bypass both the CSRF and the origin checks. Unset allow-list stays
 /// permissive in development and warns once in production.
+#[cfg(feature = "paseto")]
 #[debug_handler]
 async fn token(headers: axum::http::HeaderMap, State(ctx): State<AppContext>) -> Result<Response> {
     // SEC-A10: compute the origin decision once. `origin_ok` = an `Origin`
@@ -798,12 +806,16 @@ async fn delete_account(
 /// system-wide audit feed, and the bearer-gated GDPR account routes
 /// (export / per-subject audit / erasure).
 pub fn routes() -> Routes {
-    Routes::new()
+    let routes = Routes::new()
         .prefix("/api/auth")
         .add("/signup", post(signup))
         .add("/magic-link", post(request_magic_link))
-        .add("/magic-link/{token}", get(verify))
-        .add("/token", post(token))
+        .add("/magic-link/{token}", get(verify));
+    // Session -> PASETO exchange exists only with the `paseto` feature;
+    // without it the route is absent (404).
+    #[cfg(feature = "paseto")]
+    let routes = routes.add("/token", post(token));
+    routes
         .add("/me", get(me))
         .add("/signout", post(signout))
         .add("/audit/recent", get(recent_audit))
@@ -814,10 +826,11 @@ pub fn routes() -> Routes {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        choose_frontend, claims_have_admin, constant_work_hash, csrf_token_gate, log_magic_link_url,
-    };
+    #[cfg(feature = "paseto")]
+    use super::csrf_token_gate;
+    use super::{choose_frontend, claims_have_admin, constant_work_hash, log_magic_link_url};
     use crate::auth::Claims;
+    #[cfg(feature = "paseto")]
     use axum::http::StatusCode;
     use loco_rs::environment::Environment;
     use std::collections::BTreeMap;
@@ -826,6 +839,7 @@ mod tests {
     /// token must echo it; a legacy (token-less) session must prove
     /// same-origin, and — critically — **cannot bypass both** the CSRF and
     /// the origin checks in production.
+    #[cfg(feature = "paseto")]
     #[test]
     fn csrf_gate_matrix() {
         // A token-carrying session: correct token allows, wrong/absent 403.

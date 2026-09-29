@@ -70,7 +70,7 @@ impl Hooks for App {
     }
 
     /// App initializers. None are needed; key material is lazily loaded
-    /// on first use (see [`crate::auth::keys`]) rather than via an
+    /// on first use (see `crate::auth::keys`, `paseto` feature) rather than via an
     /// initializer.
     ///
     /// # Errors
@@ -89,9 +89,12 @@ impl Hooks for App {
             .add_route(controllers::auth::routes())
             .add_route(controllers::compliance::routes())
             .add_route(controllers::admin::routes())
-            .add_route(controllers::paseto_keys::routes())
             .add_route(controllers::docs::routes())
             .add_route(controllers::metrics::routes());
+        // The published PASETO key set exists only with the `paseto`
+        // feature; without it `/.well-known/paseto-keys` is a 404.
+        #[cfg(feature = "paseto")]
+        let routes = routes.add_route(controllers::paseto_keys::routes());
         // EV-2: SAML/OIDC identity federation, opt-in via the `oidc`
         // Cargo feature (see `src/oidc.rs`).
         #[cfg(feature = "oidc")]
