@@ -1,0 +1,1 @@
+function t(n){return!n||n.value===null?null:`${Math.round(n.value*100)}%`}function c(n){return n?`${n.numerator}/${n.denominator}`:null}function f(n,u="—"){const r=t(n);if(r===null)return u;const e=c(n);return e?`${r} (${e})`:r}function i(n,u,r="—"){return u===0?r:`${Math.round(n/u*100)}%`}function l(n){return n==null?null:n.toFixed(1)}export{i as a,l as m,f as p};
