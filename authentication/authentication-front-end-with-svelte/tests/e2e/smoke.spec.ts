@@ -153,3 +153,10 @@ test("home page shows the splash with a sign-in call to action without a session
   // The account dashboard is not rendered for an anonymous visitor.
   await expect(page.getByRole("heading", { name: "Account" })).toHaveCount(0);
 });
+
+test("the tour is public and renders signed out", async ({ page }) => {
+  const res = await page.goto("/tour", { waitUntil: "networkidle" });
+  expect(res?.status()).toBe(200);
+  expect(new URL(page.url()).pathname).toBe("/tour");
+  await expect(page.locator("section:has(.steps)")).toHaveCount(7);
+});

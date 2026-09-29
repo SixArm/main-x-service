@@ -96,10 +96,14 @@
     // collapsed menu only offers Home and, for visitors, Sign up.
     const navItems: { href: string; key: StringKey }[] = $derived(
         data.user
-            ? [{ href: "/", key: "nav.home" }]
+            ? [
+                  { href: "/", key: "nav.home" },
+                  { href: "/tour", key: "nav.tour" },
+              ]
             : [
                   { href: "/", key: "nav.home" },
                   { href: "/signup", key: "nav.signup" },
+                  { href: "/tour", key: "nav.tour" },
               ],
     );
 </script>
