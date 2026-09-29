@@ -451,3 +451,15 @@ test("the nav offers Merge from another page", async ({ page }) => {
   await page.getByRole("button", { name: "Toggle navigation" }).click();
   await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
 });
+
+test("the tour renders anonymously with seven sections of four steps", async ({
+  page,
+}) => {
+  const res = await page.goto("/tour", { waitUntil: "networkidle" });
+  expect(res?.status()).toBe(200);
+  expect(new URL(page.url()).pathname).toBe("/tour");
+  await expect(page.locator(".tour section[id]")).toHaveCount(7);
+  await expect(page.locator(".tour ol.steps")).toHaveCount(7);
+  await expect(page.locator(".tour ol.steps li")).toHaveCount(28);
+  await expect(page.locator("body")).not.toContainText("tour.s1");
+});
