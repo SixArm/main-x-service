@@ -1,16 +1,15 @@
 <script lang="ts">
     // Root layout — the chrome wrapped around every route.
     //
-    // Renders the NHS-themed utility row (the Lily PickerBar — theme,
-    // locale, text-size, and share pickers as one row — plus the
-    // signed-in identity / sign-out control), the branded top header
-    // with primary navigation (hamburger-collapsible on narrow viewports),
-    // the full-width main content slot, and the footer. The primary
-    // navigation shows on every real route (including the dashboard at
-    // `/`, even before the auth probe resolves or when the API is
-    // unreachable); only the `/login` and `/auth/callback` routes render
-    // bare (`isBareRoute`). The signed-in identity / sign-out block stays
-    // gated on `user`.
+    // Renders the branded top header: hamburger-collapsible primary
+    // navigation, the brand, and (always visible, at the header's end) a
+    // Sign in link or Sign out button followed by the Lily PickerBar —
+    // theme, locale, text-size, and share pickers as one row. Then the
+    // full-width main content slot and the footer. The primary navigation
+    // shows on every real route (including the home page at `/`, even
+    // before the auth probe resolves or when the API is unreachable); only
+    // the `/login` and `/auth/callback` routes render bare (`isBareRoute`).
+    // The signed-in identity and Sign out control are gated on `user`.
     //
     // State:
     //   user — derived from the cache; set by `+layout.ts` after the
@@ -64,16 +63,14 @@
 
     // The i18n store is the single source of truth for the locale: this
     // effect mirrors the chosen locale onto <html lang>/<html dir> (rtl for
-    // ar/ur, ltr otherwise). SSR-guarded so a load-time render never touches
+    // ar-001, ltr otherwise). SSR-guarded so a load-time render never touches
     // the DOM.
     $effect(() => {
         if (!browser) return;
         const locale = i18n.locale;
-        // `lang` must read BCP 47 ("en-US"), while `i18n.locale` uses an
-        // underscore for a region subtag ("en_US"); this must agree with
-        // what PickerBar's LocalePicker itself writes via its own
-        // `bcp47LocaleTag`, since both write the same attribute.
-        document.documentElement.setAttribute('lang', locale.replace('_', '-'));
+        // `i18n.locale` is already a BCP 47 tag ("en-001", "zh-cn"), which
+        // is what PickerBar's LocalePicker writes too, so they agree.
+        document.documentElement.setAttribute('lang', locale);
         document.documentElement.setAttribute(
             'dir',
             isRtl(locale) ? 'rtl' : 'ltr',
@@ -87,39 +84,39 @@
     // `page.data.title` convention, set per-route by each route's load
     // function so it stays in sync with that page's own content without
     // SharePicker having to read the DOM).
-    const SHARE_TARGETS: ShareTarget[] = [
+    const SHARE_TARGETS: ShareTarget[] = $derived([
         {
             id: 'email',
-            label: 'Email',
+            label: t('share.email'),
             href: (url, title) =>
                 `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
             newTab: false,
         },
         {
             id: 'linkedin',
-            label: 'LinkedIn',
+            label: t('share.linkedin'),
             href: (url) =>
                 `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
         },
         {
             id: 'reddit',
-            label: 'Reddit',
+            label: t('share.reddit'),
             href: (url, title) =>
                 `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
         },
         {
             id: 'bluesky',
-            label: 'Bluesky',
+            label: t('share.bluesky'),
             href: (url, title) =>
                 `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
         },
         {
             id: 'mastodon',
-            label: 'Mastodon',
+            label: t('share.mastodon'),
             href: (url, title) =>
                 `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
         },
-    ];
+    ]);
 
     // The `page.data.title` convention: each route's own load function
     // (`+page.ts`/`+page.server.ts`) returns a plain `title` string that
@@ -172,56 +169,6 @@
 
 <SkipLink href="#content" label={t('layout.skipToContent')} />
 
-<div class="utility-row">
-    <div class="page-wrapper">
-        <PickerBar
-            labels={{
-                theme: t('chrome.theme'),
-                locale: t('chrome.language'),
-                textSize: t('nav.text_size'),
-                share: t('nav.share'),
-            }}
-            themesUrl="/assets/themes/"
-            themeProps={{
-                defaultValue:
-                    'united-kingdom-national-health-service-england-for-practitioners',
-                storageKey: 'case-folder:theme',
-                class: 'utility-row-picker',
-            }}
-            locales={[...LOCALES]}
-            localeProps={{
-                value: i18n.locale,
-                localeLabels: LOCALE_LABELS,
-                applyDir: false,
-                onChange: (code: string) => i18n.set(code),
-                class: 'utility-row-picker',
-            }}
-            textSizeProps={{
-                storageKey: 'case-folder:text-size',
-                class: 'utility-row-picker',
-            }}
-            shareTargets={SHARE_TARGETS}
-            shareProps={{
-                title: pageTitle,
-                copyLabel: t('share.copy_link'),
-                copiedLabel: t('share.copied'),
-                copyFailedLabel: t('share.copy_failed'),
-                class: 'utility-row-picker',
-            }}
-        />
-        {#if user}
-            <span class="auth-status">
-                {t('auth.signedInAs')}
-                <strong>{user.name}</strong>{#if user.role}
-                    ({user.role}){/if}
-                <button type="button" class="signout" onclick={signOut}
-                    >{t('auth.signOut')}</button
-                >
-            </span>
-        {/if}
-    </div>
-</div>
-
 <Header label={t('layout.siteHeader')} class="app-header">
     <div class="page-wrapper">
         {#if !isBareRoute}
@@ -238,7 +185,7 @@
         {/if}
         <div class="brand">
             <h1>{t('brand.name')}</h1>
-            <span class="brand-tag">{t('brand.tagline')}</span>
+            <span class="brand-tag tagline">{t('brand.tagline')}</span>
         </div>
         {#if !isBareRoute}
             <NavigationMenu
@@ -257,6 +204,56 @@
                 {/each}
             </NavigationMenu>
         {/if}
+        <div class="header-end">
+            {#if user}
+                <span class="auth-status">
+                    <strong>{user.name}</strong>{#if user.role}
+                        ({user.role}){/if}
+                </span>
+                <button type="button" class="session-button" onclick={signOut}
+                    >{t('auth.signout')}</button
+                >
+            {:else if !isBareRoute}
+                <a class="session-button signin" href="/login"
+                    >{t('auth.signin')}</a
+                >
+            {/if}
+            <PickerBar
+                labels={{
+                    theme: t('chrome.theme'),
+                    locale: t('chrome.language'),
+                    textSize: t('nav.text_size'),
+                    share: t('nav.share'),
+                }}
+                themesUrl="/assets/themes/"
+                themeProps={{
+                    storageKey: 'lily-theme',
+                    // Without a default no theme stylesheet loads until the
+                    // user picks one, leaving the pickers (which Lily's
+                    // theme CSS styles) unstyled on first visit. Follow the
+                    // OS light/dark preference, else fall back to "light".
+                    detectFromSystem: true,
+                    defaultValue: 'light',
+                }}
+                locales={[...LOCALES]}
+                localeProps={{
+                    value: i18n.locale,
+                    localeLabels: LOCALE_LABELS,
+                    applyDir: false,
+                    onChange: (code: string) => i18n.set(code),
+                }}
+                textSizeProps={{
+                    storageKey: 'case-folder:text-size',
+                }}
+                shareTargets={SHARE_TARGETS}
+                shareProps={{
+                    title: pageTitle,
+                    copyLabel: t('share.copy_link'),
+                    copiedLabel: t('share.copied'),
+                    copyFailedLabel: t('share.copy_failed'),
+                }}
+            />
+        </div>
     </div>
 </Header>
 

@@ -41,39 +41,39 @@
   // `page.data.title` convention, set per-route by each route's load
   // function so it stays in sync with that page's own <svelte:head>
   // <title> without SharePicker having to read the DOM).
-  const SHARE_TARGETS: ShareTarget[] = [
+  const SHARE_TARGETS: ShareTarget[] = $derived([
     {
       id: "email",
-      label: "Email",
+      label: t("share.email"),
       href: (url, title) =>
         `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
       newTab: false,
     },
     {
       id: "linkedin",
-      label: "LinkedIn",
+      label: t("share.linkedin"),
       href: (url) =>
         `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
     },
     {
       id: "reddit",
-      label: "Reddit",
+      label: t("share.reddit"),
       href: (url, title) =>
         `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
     },
     {
       id: "bluesky",
-      label: "Bluesky",
+      label: t("share.bluesky"),
       href: (url, title) =>
         `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
     },
     {
       id: "mastodon",
-      label: "Mastodon",
+      label: t("share.mastodon"),
       href: (url, title) =>
         `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
     },
-  ];
+  ]);
 
   // `data.signedIn` is resolved server-side from the httpOnly session
   // cookie (`+layout.server.ts`).
@@ -91,15 +91,14 @@
   let menuOpen = $state(false);
 
   // The i18n store is the single source of truth for the locale; mirror it
-  // onto `<html lang>` / `<html dir>` (RTL for ar/ur) whenever it changes.
+  // onto `<html lang>` / `<html dir>` (RTL for ar-001) whenever it changes.
   // SSR-guarded — `document` is only touched in the browser.
   $effect(() => {
     const locale = i18n.locale;
     if (!browser || typeof document === "undefined") return;
-    // `lang` must read BCP47-hyphenated ("en-US"), while `i18n.locale` uses
-    // an underscore for a region subtag ("en_US"); this must agree with
-    // what PickerBar's LocalePicker itself writes via its own
-    // `bcp47LocaleTag`, since both write the same attribute.
+    // `lang` must read BCP47-hyphenated; the locale codes already are
+    // ("ar-001", "zh-cn"), and this must agree with what PickerBar's
+    // LocalePicker itself writes, since both write the same attribute.
     document.documentElement.lang = locale.replace("_", "-");
     document.documentElement.dir = isRtl(locale) ? "rtl" : "ltr";
   });
@@ -171,7 +170,9 @@
           <li>
             <a
               href={item.href}
-              aria-current={page.url.pathname === item.href ? "page" : undefined}
+              aria-current={page.url.pathname === item.href
+                ? "page"
+                : undefined}
               onclick={() => (menuOpen = false)}
             >
               {item.label}
@@ -179,60 +180,56 @@
           </li>
         {/each}
       </ul>
-
-      <div class="chrome">
-        <PickerBar
-          labels={{
-            theme: t("chrome.theme"),
-            locale: t("chrome.language"),
-            textSize: t("nav.text_size"),
-            share: t("nav.share"),
-          }}
-          themesUrl="/assets/themes/"
-          themeProps={{ storageKey: "lily-theme" }}
-          locales={[...LOCALES]}
-          localeProps={{
-            value: i18n.locale,
-            localeLabels: LOCALE_LABELS,
-            applyDir: false,
-            onChange: (code: string) => i18n.set(code),
-          }}
-          textSizeProps={{
-            storageKey: "lily-text-size",
-          }}
-          shareTargets={SHARE_TARGETS}
-          shareProps={{
-            title: pageTitle,
-            copyLabel: t("share.copy_link"),
-            copiedLabel: t("share.copied"),
-            copyFailedLabel: t("share.copy_failed"),
-          }}
-        />
-      </div>
-
-      <div class="session">
-      <div class="session-title small muted">{t("session.title")}</div>
+    </nav>
+    <div class="header-end">
       {#if signedIn}
-        <p class="small" data-testid="session-status">{t("session.tokenAttached")}</p>
-        <!-- Sign-out posts to the root page's `signout` action
+        <!-- Sign-out posts to the root page's \`signout\` action
              (BFF: revokes server-side + clears the cookie). -->
         <form method="POST" action="/?/signout" use:enhance>
-          <button class="button danger small" type="submit">
-            {t("session.clearToken")}
+          <button type="submit" class="session-button">
+            {t("auth.signout")}
           </button>
         </form>
       {:else}
-        <p class="small" data-testid="session-status">{t("session.noToken")}</p>
         <!-- Per-app magic-link login on this app's own origin. -->
-        <a class="button primary small signin" href="/signin">
-          {t("session.signIn")}
-        </a>
+        <a class="session-button signin" href="/signin">{t("auth.signin")}</a>
       {/if}
-      <p class="small muted">
-        {t("session.hint")}
-      </p>
+      <PickerBar
+        labels={{
+          theme: t("chrome.theme"),
+          locale: t("chrome.language"),
+          textSize: t("nav.text_size"),
+          share: t("nav.share"),
+        }}
+        themesUrl="/assets/themes/"
+        themeProps={{
+          storageKey: "lily-theme",
+          // Without a default no theme stylesheet loads until the user
+          // picks one, leaving the pickers (which Lily's theme CSS styles)
+          // unstyled on first visit. Follow the OS light/dark preference,
+          // else fall back to "light".
+          detectFromSystem: true,
+          defaultValue: "light",
+        }}
+        locales={[...LOCALES]}
+        localeProps={{
+          value: i18n.locale,
+          localeLabels: LOCALE_LABELS,
+          applyDir: false,
+          onChange: (code: string) => i18n.set(code),
+        }}
+        textSizeProps={{
+          storageKey: "lily-text-size",
+        }}
+        shareTargets={SHARE_TARGETS}
+        shareProps={{
+          title: pageTitle,
+          copyLabel: t("share.copy_link"),
+          copiedLabel: t("share.copied"),
+          copyFailedLabel: t("share.copy_failed"),
+        }}
+      />
     </div>
-    </nav>
   </header>
   <main>{@render children()}</main>
 </div>
@@ -280,8 +277,12 @@
     background: currentColor;
     content: "";
   }
-  .hamburger-box::before { transform: translateY(-5px); }
-  .hamburger-box::after { transform: translateY(3px); }
+  .hamburger-box::before {
+    transform: translateY(-5px);
+  }
+  .hamburger-box::after {
+    transform: translateY(3px);
+  }
   .primary-nav {
     /* Always collapsed behind the hamburger: hidden by default at every
        width, shown only when the toggle adds `.open`. Rendered as a dropdown
@@ -290,7 +291,7 @@
     display: none;
     position: absolute;
     top: 100%;
-    left: 1.5rem;
+    inset-inline-start: 1.5rem;
     z-index: 20;
     flex-direction: column;
     align-items: stretch;
@@ -302,7 +303,9 @@
     border-radius: var(--mxi-radius);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   }
-  .primary-nav.open { display: flex; }
+  .primary-nav.open {
+    display: flex;
+  }
   .primary-nav ul {
     list-style: none;
     display: flex;
@@ -318,7 +321,9 @@
     border-radius: var(--mxi-radius);
     color: inherit;
   }
-  .primary-nav a:hover { background: var(--mxi-color-bg); }
+  .primary-nav a:hover {
+    background: var(--mxi-color-bg);
+  }
   .primary-nav a[aria-current="page"] {
     background: var(--mxi-color-primary);
     color: var(--mxi-color-primary-fg);
@@ -328,49 +333,134 @@
     width: 100%;
     padding: 1.5rem 2rem;
   }
-  .chrome {
+  .header-end {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-  .chrome :global(.picker-bar) {
-    display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    margin-inline-start: auto;
   }
-  .chrome :global(.theme-picker-button),
-  .chrome :global(.locale-picker-button),
-  .chrome :global(.text-size-picker-button),
-  .chrome :global(.share-picker-button) {
-    padding: 0.375rem 0.5rem;
-    font-size: 0.875rem;
-    color: var(--mxi-color-fg);
-    background: var(--mxi-color-bg, transparent);
-    border: 1px solid var(--mxi-color-border);
-    border-radius: 0.25rem;
-    cursor: pointer;
-  }
-  .session {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--mxi-color-border);
-  }
-  .session-title {
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .session form {
+  .header-end form {
     margin: 0;
   }
-  .session .signin {
-    display: block;
-    width: 100%;
-    text-align: center;
+  .session-button {
+    display: inline-flex;
+    align-items: center;
+    height: 2.5rem;
+    padding: 0 0.875rem;
+    border: 1px solid var(--mxi-color-border);
+    border-radius: var(--mxi-radius);
+    background: transparent;
+    color: var(--mxi-color-fg);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
     text-decoration: none;
+    cursor: pointer;
+  }
+  .session-button:hover {
+    background: var(--mxi-color-bg);
+    text-decoration: none;
+  }
+  .session-button.signin {
+    border-color: var(--mxi-color-primary);
+    background: var(--mxi-color-primary);
+    color: var(--mxi-color-primary-fg);
+  }
+  .session-button.signin:hover {
+    background: var(--mxi-color-primary);
+    filter: brightness(1.1);
+  }
+
+  /* Lily PickerBar. The Lily theme stylesheet (loaded by ThemePicker, see
+     `defaultValue` below) styles the picker buttons and listboxes; this
+     only places them. Each listbox is anchored to the header (`.topbar`
+     is `position: relative`) rather than to its own button, so it drops
+     down under the header's end edge, is as wide as its longest label
+     (the theme names are long), never pushes the page down, and cannot
+     run off either side of a narrow screen. */
+  .header-end :global(.picker-bar) {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .header-end :global(.theme-picker),
+  .header-end :global(.locale-picker),
+  .header-end :global(.text-size-picker),
+  .header-end :global(.share-picker) {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+  }
+  /* "Copied" feedback: a live region Lily renders inside the share
+     picker's root. In flow it made that root taller than the other
+     three and knocked its button out of line with them, so it is lifted
+     out of flow and shown as a small pill under the header instead. */
+  .header-end :global(.share-picker-status) {
+    position: absolute;
+    top: 100%;
+    inset-inline-end: 1.5rem;
+    z-index: 40;
+    margin: 0.25rem 0 0;
+    padding: 0.25rem 0.625rem;
+    border-radius: var(--mxi-radius);
+    background: var(--mxi-color-surface);
+    border: 1px solid var(--mxi-color-border);
+    font-size: 0.8125rem;
+  }
+  .header-end :global(.share-picker-status:empty) {
+    display: none;
+  }
+  .header-end :global(.theme-picker-button),
+  .header-end :global(.locale-picker-button),
+  .header-end :global(.text-size-picker-button),
+  .header-end :global(.share-picker-button) {
+    box-sizing: border-box;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: 0;
+    vertical-align: middle;
+  }
+  .header-end :global(.theme-picker-list),
+  .header-end :global(.locale-picker-list),
+  .header-end :global(.text-size-picker-list),
+  .header-end :global(.share-picker-list) {
+    top: 100%;
+    inset-inline-start: auto;
+    inset-inline-end: 1.5rem;
+    z-index: 40;
+    box-sizing: border-box;
+    min-width: 0;
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+  }
+  .header-end :global(.theme-picker-option),
+  .header-end :global(.locale-picker-option),
+  .header-end :global(.text-size-picker-option) {
+    white-space: nowrap;
+  }
+  @media (max-width: 40rem) {
+    .topbar {
+      padding-inline: 0.75rem;
+      gap: 0.5rem;
+    }
+    .header-end {
+      gap: 0.375rem;
+    }
+    .header-end :global(.theme-picker-option),
+    .header-end :global(.locale-picker-option),
+    .header-end :global(.text-size-picker-option) {
+      white-space: normal;
+    }
+    .header-end :global(.share-picker-status) {
+      inset-inline-end: 0.75rem;
+    }
+    .header-end :global(.theme-picker-list),
+    .header-end :global(.locale-picker-list),
+    .header-end :global(.text-size-picker-list),
+    .header-end :global(.share-picker-list) {
+      inset-inline-end: 0.75rem;
+    }
   }
 </style>

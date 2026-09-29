@@ -9,8 +9,13 @@ import { SESSION_COOKIE } from "$lib/server/session";
 // `page.data.title` convention (see `+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title
 // without reading the DOM.
-export const load: PageServerLoad = () => {
-  return { title: "Care pathways — Main X" };
+export const load: PageServerLoad = ({ locals }) => {
+  return {
+    title:
+      locals.sessionId !== null
+        ? "Care pathways — Main X"
+        : "Main X · Care Pathways",
+  };
 };
 
 export const actions: Actions = {

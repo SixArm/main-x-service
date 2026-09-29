@@ -5,6 +5,9 @@ import { test, expect, type Page } from "@playwright/test";
 // (wrong path / method) surfaces as an unhandled 404 request and a failing
 // assertion, without needing the Rust service. Unstubbed calls are 404-loud.
 
+// Mirrors `SESSION_COOKIE` in `src/lib/server/session.ts`.
+const SESSION_COOKIE = "__Host-mxi_session";
+
 const PID = "11111111-1111-4111-8111-111111111111";
 const INSTANCE_PID = "33333333-3333-4333-8333-333333333333";
 const SUBJECT = "person:44444444-4444-4444-8444-444444444444";
@@ -168,7 +171,28 @@ test.beforeEach(async ({ page }) => {
   await stubApi(page);
 });
 
-test("registry grid renders the seeded pathway", async ({ page }) => {
+test("anonymous home is the splash page with a sign-in call to action", async ({
+  page,
+}) => {
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByTestId("pathway-grid")).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Sign in" }).first(),
+  ).toHaveAttribute("href", "/signin");
+});
+
+test("registry grid renders the seeded pathway", async ({ page, context }) => {
+  // The registry (Dashboard) is the signed-in home; an opaque session
+  // cookie is enough for the BFF layout load to report `signedIn`.
+  await context.addCookies([
+    {
+      name: SESSION_COOKIE,
+      value: "e2e-session",
+      url: "http://localhost:4173",
+      secure: true, // required by the `__Host-` prefix
+    },
+  ]);
   await page.goto("/", { waitUntil: "networkidle" });
   await expect(
     page.getByRole("heading", { name: "Care pathways" }),

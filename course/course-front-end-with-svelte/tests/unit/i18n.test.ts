@@ -17,86 +17,91 @@ import {
 } from "../../src/lib/i18n.svelte.js";
 
 describe("i18n catalog", () => {
-    it("translates known keys for en and es", () => {
-        expect(translate("nav.dashboard", "en")).toBe("Dashboard");
-        expect(translate("nav.merge", "en")).toBe("Merge");
-        expect(translate("courses.title", "en")).toBe("Courses");
+    it("translates known keys for en-001 and es-001", () => {
+        expect(translate("nav.dashboard", "en-001")).toBe("Dashboard");
+        expect(translate("nav.merge", "en-001")).toBe("Merge");
+        expect(translate("courses.title", "en-001")).toBe("Courses");
 
-        expect(translate("nav.dashboard", "es")).toBe("Panel");
-        expect(translate("nav.merge", "es")).toBe("Fusionar");
-        expect(translate("courses.title", "es")).toBe("Cursos");
+        expect(translate("nav.dashboard", "es-001")).toBe("Panel");
+        expect(translate("nav.merge", "es-001")).toBe("Fusionar");
+        expect(translate("courses.title", "es-001")).toBe("Cursos");
     });
 
     it("uses the agreed glossary translations across locales", () => {
         // Toggle navigation must stay verbatim (en) — a layout test asserts it.
-        expect(translate("nav.toggle", "en")).toBe("Toggle navigation");
-        expect(translate("nav.toggle", "cy")).toBe("Toglo'r llywio");
-        expect(translate("nav.toggle", "fr")).toBe("Basculer la navigation");
-        expect(translate("nav.dashboard", "de")).toBe("Übersicht");
-        expect(translate("chrome.language", "cy")).toBe("Iaith");
+        expect(translate("nav.toggle", "en-001")).toBe("Toggle navigation");
+        expect(translate("nav.toggle", "cy-001")).toBe("Toglo'r llywio");
+        expect(translate("nav.toggle", "fr-001")).toBe(
+            "Basculer la navigation",
+        );
+        expect(translate("chrome.language", "cy-001")).toBe("Iaith");
+        expect(translate("share.copy_link", "en-001")).toBe("Copy Link");
     });
 
-    it("falls back locale → en → key", () => {
-        // Unknown locale falls back to the English table.
+    it("falls back locale → en-001 → key", () => {
         // @ts-expect-error — intentionally passing an unsupported locale.
         expect(translate("courses.title", "xx")).toBe("Courses");
-        // Unknown key falls back to the key string itself.
-        expect(translate("nonexistent.key" as StringKey, "en")).toBe("nonexistent.key");
-        expect(DEFAULT_LOCALE).toBe("en");
+        expect(translate("nonexistent.key" as StringKey, "en-001")).toBe(
+            "nonexistent.key",
+        );
+        expect(DEFAULT_LOCALE).toBe("en-001");
     });
 
-    it("offers all 14 locales", () => {
-        expect(LOCALES.length).toBe(14);
+    it("offers exactly the seven expected locales, sorted by code", () => {
+        expect(LOCALES.length).toBe(7);
         expect([...LOCALES]).toEqual([
-            "en", "en_US", "cy", "es", "fr", "de",
-            "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
+            "ar-001",
+            "cy-001",
+            "en-001",
+            "es-001",
+            "fr-001",
+            "hi-001",
+            "zh-cn",
         ]);
         expect(LOCALE_LABELS).toEqual({
-            en: "English",
-            en_US: "English (United States)",
-            cy: "Cymraeg",
-            es: "Español",
-            fr: "Français",
-            de: "Deutsch",
-            ar: "العربية",
-            ru: "Русский",
-            hi: "हिन्दी",
-            zh: "中文",
-            bn: "বাংলা",
-            pt: "Português",
-            id: "Bahasa Indonesia",
-            ur: "اردو",
+            "ar-001": "العربية",
+            "cy-001": "Cymraeg",
+            "en-001": "English",
+            "es-001": "Español",
+            "fr-001": "Français",
+            "hi-001": "हिन्दी",
+            "zh-cn": "中文 - 中国",
         });
+        for (const label of Object.values(LOCALE_LABELS)) {
+            expect(label).not.toMatch(/[()]/);
+        }
     });
 
-    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
-        expect(i18n.set !== undefined).toBe(true);
+    it("resolves regional and legacy codes by primary language", () => {
         i18n.set("en_US");
-        expect(i18n.locale).toBe("en_US");
-        i18n.set("en-US");
-        expect(i18n.locale).toBe("en_US");
-        i18n.set("en");
-        expect(i18n.locale).toBe("en");
+        expect(i18n.locale).toBe("en-001");
+        i18n.set("es-MX");
+        expect(i18n.locale).toBe("es-001");
+        i18n.set("zh");
+        expect(i18n.locale).toBe("zh-cn");
+        i18n.set("zh-CN");
+        expect(i18n.locale).toBe("zh-cn");
+        i18n.set("de");
+        expect(i18n.locale).toBe("en-001");
     });
 
-    it("spot-checks new locales against the glossary", () => {
-        expect(translate("nav.dashboard", "ar")).toBe("لوحة المعلومات");
-        expect(translate("nav.merge", "ar")).toBe("دمج");
-        expect(translate("nav.dashboard", "zh")).toBe("仪表板");
-        expect(translate("nav.matchCheck", "zh")).toBe("匹配检查");
-        expect(translate("chrome.language", "ru")).toBe("Язык");
+    it("spot-checks locales against the glossary", () => {
+        expect(translate("nav.dashboard", "ar-001")).toBe("لوحة المعلومات");
+        expect(translate("nav.merge", "ar-001")).toBe("دمج");
+        expect(translate("nav.dashboard", "zh-cn")).toBe("仪表板");
+        expect(translate("nav.matchCheck", "zh-cn")).toBe("匹配检查");
     });
 
-    it("marks ar/ur as RTL and the rest as LTR", () => {
+    it("marks ar-001 as RTL and the rest as LTR", () => {
+        expect(isRtl("ar-001")).toBe(true);
         expect(isRtl("ar")).toBe(true);
-        expect(isRtl("ur")).toBe(true);
         expect(isRtl("ar-EG")).toBe(true);
-        expect(isRtl("en")).toBe(false);
-        expect(isRtl("zh")).toBe(false);
-        expect(isRtl("hi")).toBe(false);
+        expect(isRtl("en-001")).toBe(false);
+        expect(isRtl("zh-cn")).toBe(false);
+        expect(isRtl("hi-001")).toBe(false);
     });
 
-    it("every locale covers the full en key set", () => {
+    it("every locale covers the full en-001 key set", () => {
         expect(STRING_KEYS.length).toBeGreaterThan(0);
         for (const locale of LOCALES) {
             const table = STRINGS_BY_LOCALE[locale];
@@ -105,9 +110,10 @@ describe("i18n catalog", () => {
                     Object.prototype.hasOwnProperty.call(table, key),
                     `${locale} missing ${key}`,
                 ).toBe(true);
-                expect(typeof table[key], `${locale} ${key} not a string`).toBe("string");
+                expect(typeof table[key], `${locale} ${key} not a string`).toBe(
+                    "string",
+                );
             }
-            // No extra keys beyond the en universe.
             expect(Object.keys(table).length).toBe(STRING_KEYS.length);
         }
     });

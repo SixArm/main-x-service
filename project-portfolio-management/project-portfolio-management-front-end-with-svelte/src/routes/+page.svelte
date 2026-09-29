@@ -1,24 +1,21 @@
 <!--
-  Landing route (`/`) — redirects to `data.landingRoute`
-  (`+layout.server.ts`): `/plans` by default (the four collections were
-  unified into one recursive plans collection), or a deployment-declared
-  `view` ABAC attribute's route (T-28f, repo `tasks.md` EV-1) when one is
-  set and recognised, e.g. `view=executive` -> `/executive`.
+  Home (/) — a welcoming splash page for visitors who are not signed in;
+  once signed in, the dashboard, which sends the caller to their landing
+  route (T-28f: `/plans`, or the route of a deployment-declared `view`
+  ABAC attribute). `signedIn` and `landingRoute` come from the root
+  layout's server load (httpOnly session cookie), so nothing fires for an
+  anonymous visitor.
 -->
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
-  import { t } from "$lib/i18n.svelte";
+  import Dashboard from "$lib/components/Dashboard.svelte";
+  import Splash from "$lib/components/Splash.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
-
-  onMount(() => {
-    void goto(data.landingRoute, { replaceState: true });
-  });
 </script>
 
-<svelte:head><title>{t("brand.name")}</title></svelte:head>
-
-<h1>{t("list.title")}</h1>
-<p><a href="/plans">{t("list.title")}</a></p>
+{#if data.signedIn}
+  <Dashboard landingRoute={data.landingRoute} />
+{:else}
+  <Splash />
+{/if}

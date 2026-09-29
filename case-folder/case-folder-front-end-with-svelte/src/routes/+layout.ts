@@ -20,6 +20,9 @@ function isPublic(pathname: string): boolean {
 
 export async function load({ url, fetch }) {
     const publicRoute = isPublic(url.pathname);
+    // The home page (`/`) doubles as the signed-out splash, so an anonymous
+    // visitor may see it rather than being bounced to `/login`.
+    const anonymousHome = url.pathname === '/';
 
     let user = null;
     let signedOut = false;
@@ -40,10 +43,13 @@ export async function load({ url, fetch }) {
         cache.setUser(user);
         // Already signed in — keep the login page out of reach.
         if (publicRoute) throw redirect(307, '/');
-        return {};
+        return { signedIn: true };
     }
 
     cache.clearUser();
-    if (signedOut && !publicRoute) throw redirect(307, '/login');
-    return {};
+    if (signedOut && !publicRoute && !anonymousHome)
+        throw redirect(307, '/login');
+    // Anonymous (a definite 401) or the probe failed: the home page shows
+    // the splash and skips the dashboard's API reads.
+    return { signedIn: false };
 }

@@ -9,8 +9,9 @@ import { SESSION_COOKIE } from "$lib/server/session";
 // `page.data.title` convention (see `+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title
 // without reading the DOM.
-export const load: PageServerLoad = () => {
-  return { title: "Cases — Main X" };
+// Signed-out visitors see the splash, so the title differs by state.
+export const load: PageServerLoad = ({ locals }) => {
+  return { title: locals.sessionId ? "Cases — Main X" : "Main X · Cases" };
 };
 
 export const actions: Actions = {

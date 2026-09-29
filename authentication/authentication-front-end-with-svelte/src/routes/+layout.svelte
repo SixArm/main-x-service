@@ -18,6 +18,7 @@
     import "../app.css";
     import { browser } from "$app/environment";
     import { page } from "$app/state";
+    import { enhance } from "$app/forms";
     import { i18n, t, isRtl, LOCALES, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
@@ -31,39 +32,39 @@
     // `page.data.title` convention, set per-route by each route's load
     // function so it stays in sync with that page's own <svelte:head>
     // <title> without SharePicker having to read the DOM).
-    const SHARE_TARGETS: ShareTarget[] = [
+    const SHARE_TARGETS: ShareTarget[] = $derived([
         {
             id: "email",
-            label: "Email",
+            label: t("share.email"),
             href: (url, title) =>
                 `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`,
             newTab: false,
         },
         {
             id: "linkedin",
-            label: "LinkedIn",
+            label: t("share.linkedin"),
             href: (url) =>
                 `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
         },
         {
             id: "reddit",
-            label: "Reddit",
+            label: t("share.reddit"),
             href: (url, title) =>
                 `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`,
         },
         {
             id: "bluesky",
-            label: "Bluesky",
+            label: t("share.bluesky"),
             href: (url, title) =>
                 `https://bsky.app/intent/compose?text=${encodeURIComponent(`${title} ${url}`)}`,
         },
         {
             id: "mastodon",
-            label: "Mastodon",
+            label: t("share.mastodon"),
             href: (url, title) =>
                 `https://mastodonshare.com/?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`,
         },
-    ];
+    ]);
 
     // The routed page content + the layout load data (server-resolved
     // signed-in user from the httpOnly session cookie).
@@ -83,7 +84,7 @@
     $effect(() => {
         const locale = i18n.locale;
         if (!browser || typeof document === "undefined") return;
-        document.documentElement.lang = locale.replace("_", "-");
+        document.documentElement.lang = locale;
         document.documentElement.dir = isRtl(locale) ? "rtl" : "ltr";
     });
 
@@ -91,11 +92,16 @@
     let menuOpen = $state(false);
 
     // Top-bar nav entries; `key` is an i18n key so labels follow the locale.
-    const navItems: { href: string; key: StringKey }[] = [
-        { href: "/", key: "nav.home" },
-        { href: "/signin", key: "nav.signin" },
-        { href: "/signup", key: "nav.signup" },
-    ];
+    // Sign in / Sign out live in the always-visible header end, so the
+    // collapsed menu only offers Home and, for visitors, Sign up.
+    const navItems: { href: string; key: StringKey }[] = $derived(
+        data.user
+            ? [{ href: "/", key: "nav.home" }]
+            : [
+                  { href: "/", key: "nav.home" },
+                  { href: "/signup", key: "nav.signup" },
+              ],
+    );
 </script>
 
 <div class="layout">
@@ -110,7 +116,10 @@
         >
             <span class="hamburger-box" aria-hidden="true"></span>
         </button>
-        <a href="/" class="brand">{t("brand")}</a>
+        <a href="/" class="brand"
+            >{t("brand")}
+            <span class="muted small tagline">{t("brand.tagline")}</span></a
+        >
         <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
             <ul>
                 {#each navItems as item (item.href)}
@@ -126,46 +135,65 @@
                     </li>
                 {/each}
             </ul>
-            <div class="chrome">
-                <PickerBar
-                    labels={{
-                        theme: t("nav.theme"),
-                        locale: t("nav.locale"),
-                        textSize: t("nav.text_size"),
-                        share: t("nav.share"),
-                    }}
-                    themesUrl="/assets/themes/"
-                    themeProps={{
-                        storageKey: "lily-theme",
-                    }}
-                    locales={[...LOCALES]}
-                    localeProps={{
-                        value: i18n.locale,
-                        localeLabels: LOCALE_LABELS,
-                        applyDir: false,
-                        onChange: (code: string) => i18n.set(code),
-                    }}
-                    textSizeProps={{
-                        storageKey: "lily-text-size",
-                    }}
-                    shareTargets={SHARE_TARGETS}
-                    shareProps={{
-                        title: pageTitle,
-                        copyLabel: t("share.copy_link"),
-                        copiedLabel: t("share.copied"),
-                        copyFailedLabel: t("share.copy_failed"),
-                    }}
-                />
-                <!-- Signed-in badge: shown only when a session is present
-                     (resolved server-side from the httpOnly cookie). -->
-                {#if data.user}
-                    <div class="who">
-                        <small>{t("session.signedInAs")}</small>
-                        <div>{data.user.email}</div>
-                    </div>
-                {/if}
-            </div>
+            <!-- Signed-in badge: shown only when a session is present
+                 (resolved server-side from the httpOnly cookie). -->
+            {#if data.user}
+                <div class="who">
+                    <small>{t("session.signedInAs")}</small>
+                    <div>{data.user.email}</div>
+                </div>
+            {/if}
         </nav>
+        <div class="header-end">
+            {#if data.user}
+                <!-- Sign-out posts to the root page's `signout` action
+                     (BFF: revokes server-side + clears the cookie). -->
+                <form method="POST" action="/?/signout" use:enhance>
+                    <button type="submit" class="session-button"
+                        >{t("auth.signout")}</button
+                    >
+                </form>
+            {:else}
+                <a class="session-button signin" href="/signin"
+                    >{t("auth.signin")}</a
+                >
+            {/if}
+            <PickerBar
+                labels={{
+                    theme: t("nav.theme"),
+                    locale: t("nav.locale"),
+                    textSize: t("nav.text_size"),
+                    share: t("nav.share"),
+                }}
+                themesUrl="/assets/themes/"
+                themeProps={{
+                    storageKey: "lily-theme",
+                    // Without a default no theme stylesheet loads until the
+                    // user picks one, leaving the pickers (which Lily's theme
+                    // CSS styles) unstyled on first visit. Follow the OS
+                    // light/dark preference, else fall back to "light".
+                    detectFromSystem: true,
+                    defaultValue: "light",
+                }}
+                locales={[...LOCALES]}
+                localeProps={{
+                    value: i18n.locale,
+                    localeLabels: LOCALE_LABELS,
+                    applyDir: false,
+                    onChange: (code: string) => i18n.set(code),
+                }}
+                textSizeProps={{
+                    storageKey: "lily-text-size",
+                }}
+                shareTargets={SHARE_TARGETS}
+                shareProps={{
+                    title: pageTitle,
+                    copyLabel: t("share.copy_link"),
+                    copiedLabel: t("share.copied"),
+                    copyFailedLabel: t("share.copy_failed"),
+                }}
+            />
+        </div>
     </header>
     <main>
         <!-- Render the active route into the content column. -->
@@ -261,29 +289,138 @@
         color: var(--mxi-color-primary-fg);
         font-weight: 600;
     }
-    .chrome {
+    .header-end {
         display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.75rem;
-    }
-    .chrome :global(.picker-bar) {
-        display: flex;
-        flex-wrap: wrap;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.75rem;
+        margin-inline-start: auto;
     }
-    .chrome :global(.theme-picker-button),
-    .chrome :global(.locale-picker-button),
-    .chrome :global(.text-size-picker-button),
-    .chrome :global(.share-picker-button) {
-        padding: 0.375rem 0.5rem;
-        font-size: 0.875rem;
-        color: var(--mxi-color-fg);
-        background: var(--mxi-color-bg, transparent);
+    .header-end form {
+        margin: 0;
+    }
+    .session-button {
+        display: inline-flex;
+        align-items: center;
+        height: 2.5rem;
+        padding: 0 0.875rem;
         border: 1px solid var(--mxi-color-border);
-        border-radius: 0.25rem;
+        border-radius: var(--mxi-radius);
+        background: transparent;
+        color: var(--mxi-color-fg);
+        font: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1;
+        white-space: nowrap;
+        text-decoration: none;
         cursor: pointer;
+    }
+    .session-button:hover {
+        background: var(--mxi-color-bg);
+        text-decoration: none;
+    }
+    .session-button.signin {
+        border-color: var(--mxi-color-primary);
+        background: var(--mxi-color-primary);
+        color: var(--mxi-color-primary-fg);
+    }
+    .session-button.signin:hover {
+        background: var(--mxi-color-primary);
+        filter: brightness(1.1);
+    }
+
+    /* Lily PickerBar. The Lily theme stylesheet (loaded by ThemePicker, see
+       `defaultValue` below) styles the picker buttons and listboxes; this
+       only places them. Each listbox is anchored to the header (`.topbar`
+       is `position: relative`) rather than to its own button, so it drops
+       down under the header's end edge, is as wide as its longest label
+       (the theme names are long), never pushes the page down, and cannot
+       run off either side of a narrow screen. */
+    .header-end :global(.picker-bar) {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+    }
+    .header-end :global(.theme-picker),
+    .header-end :global(.locale-picker),
+    .header-end :global(.text-size-picker),
+    .header-end :global(.share-picker) {
+        position: static;
+        display: inline-flex;
+        align-items: center;
+    }
+    /* "Copied" feedback: a live region Lily renders inside the share
+       picker's root. In flow it made that root taller than the other
+       three and knocked its button out of line with them, so it is lifted
+       out of flow and shown as a small pill under the header instead. */
+    .header-end :global(.share-picker-status) {
+        position: absolute;
+        top: 100%;
+        inset-inline-end: 1.5rem;
+        z-index: 40;
+        margin: 0.25rem 0 0;
+        padding: 0.25rem 0.625rem;
+        border-radius: var(--mxi-radius);
+        background: var(--mxi-color-surface);
+        border: 1px solid var(--mxi-color-border);
+        font-size: 0.8125rem;
+    }
+    .header-end :global(.share-picker-status:empty) {
+        display: none;
+    }
+    .header-end :global(.theme-picker-button),
+    .header-end :global(.locale-picker-button),
+    .header-end :global(.text-size-picker-button),
+    .header-end :global(.share-picker-button) {
+        box-sizing: border-box;
+        width: 2.5rem;
+        height: 2.5rem;
+        margin: 0;
+        vertical-align: middle;
+    }
+    .header-end :global(.theme-picker-list),
+    .header-end :global(.locale-picker-list),
+    .header-end :global(.text-size-picker-list),
+    .header-end :global(.share-picker-list) {
+        top: 100%;
+        inset-inline-start: auto;
+        inset-inline-end: 1.5rem;
+        z-index: 40;
+        box-sizing: border-box;
+        min-width: 0;
+        width: max-content;
+        max-width: calc(100vw - 2rem);
+    }
+    .header-end :global(.theme-picker-option),
+    .header-end :global(.locale-picker-option),
+    .header-end :global(.text-size-picker-option) {
+        white-space: nowrap;
+    }
+    @media (max-width: 40rem) {
+        .tagline {
+            display: none;
+        }
+        .topbar {
+            padding-inline: 0.75rem;
+            gap: 0.5rem;
+        }
+        .header-end {
+            gap: 0.375rem;
+        }
+        .header-end :global(.theme-picker-option),
+        .header-end :global(.locale-picker-option),
+        .header-end :global(.text-size-picker-option) {
+            white-space: normal;
+        }
+        .header-end :global(.share-picker-status) {
+            inset-inline-end: 0.75rem;
+        }
+        .header-end :global(.theme-picker-list),
+        .header-end :global(.locale-picker-list),
+        .header-end :global(.text-size-picker-list),
+        .header-end :global(.share-picker-list) {
+            inset-inline-end: 0.75rem;
+        }
     }
     .who {
         font-size: 0.85rem;

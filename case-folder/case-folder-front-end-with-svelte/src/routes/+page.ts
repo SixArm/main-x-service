@@ -1,4 +1,7 @@
-// Dashboard (`/`) load function.
+// Home (`/`) load function.
+//
+// Signed out: returns just a title (the page renders the splash).
+// Signed in: the dashboard load —
 //
 // Fetches every projection the dashboard renders in one parallel batch
 // and hydrates the rune-reactive cache so the page (and any sibling
@@ -10,7 +13,10 @@ import { api } from '$lib/api/client';
 import { cache } from '$lib/store/cache.svelte';
 import { error } from '@sveltejs/kit';
 
-export async function load({ fetch }) {
+export async function load({ fetch, parent }) {
+    // A definitely-signed-out visitor sees the splash: no API reads.
+    const { signedIn } = await parent();
+    if (!signedIn) return { title: 'Case Tracking · NHS paper records' };
     try {
         // Fire all five reads concurrently — they are independent, so the
         // page is gated only on the slowest one rather than their sum.

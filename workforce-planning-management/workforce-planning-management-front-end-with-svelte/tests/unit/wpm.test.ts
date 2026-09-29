@@ -1,11 +1,12 @@
 // Unit tests: the money formatter's masked/absent honesty, the API
-// path map (contract mirror), and the 13-locale i18n parity pin.
+// path map (contract mirror), and the 7-locale i18n parity pin.
 
 import { describe, expect, it, vi } from "vitest";
 
 import { money } from "../../src/lib/api/wpm";
 import {
   DEFAULT_LOCALE,
+  LOCALE_LABELS,
   LOCALES,
   STRING_KEYS,
   STRINGS_BY_LOCALE,
@@ -40,21 +41,43 @@ describe("i18n", () => {
   });
 
   it("translates with en fallback and flags RTL locales", () => {
-    expect(translate("nav.employees", "de")).toBe("Mitarbeiter");
+    expect(translate("nav.employees", "fr-001")).toBe("Employés");
+    expect(translate("nav.employees", "xx" as never)).toBe("Employees");
     expect(translate("nav.employees", DEFAULT_LOCALE)).toBe("Employees");
+    expect(isRtl("ar-001")).toBe(true);
     expect(isRtl("ar")).toBe(true);
-    expect(isRtl("ur")).toBe(true);
-    expect(isRtl("en")).toBe(false);
+    expect(isRtl("en-001")).toBe(false);
     expect(isRtl("es-MX")).toBe(false);
   });
 
-  it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
+  it("supports exactly the seven family locales, sorted, labelled without parentheses", () => {
+    expect([...LOCALES]).toEqual([
+      "ar-001",
+      "cy-001",
+      "en-001",
+      "es-001",
+      "fr-001",
+      "hi-001",
+      "zh-cn",
+    ]);
+    expect(DEFAULT_LOCALE).toBe("en-001");
+    expect(LOCALE_LABELS["zh-cn"]).toBe("中文 - 中国");
+    for (const label of Object.values(LOCALE_LABELS)) {
+      expect(label).not.toMatch(/[()]/);
+    }
+  });
+
+  it("resolves region and legacy codes by primary language", () => {
     i18n.set("en_US");
-    expect(i18n.locale).toBe("en_US");
+    expect(i18n.locale).toBe("en-001");
     i18n.set("en-US");
-    expect(i18n.locale).toBe("en_US");
-    i18n.set("en");
-    expect(i18n.locale).toBe("en");
+    expect(i18n.locale).toBe("en-001");
+    i18n.set("zh");
+    expect(i18n.locale).toBe("zh-cn");
+    i18n.set("ar");
+    expect(i18n.locale).toBe("ar-001");
+    i18n.set("de");
+    expect(i18n.locale).toBe("en-001");
   });
 });
 

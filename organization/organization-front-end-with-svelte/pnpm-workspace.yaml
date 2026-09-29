@@ -1,2 +1,7 @@
 allowBuilds:
   esbuild: true
+# Lily's 0.1.1 pickers pass `baseClass` to headless IconButton/Listbox, a
+# prop added in headless 0.2.0, yet declare `^0.1.0`; resolve the nested
+# headless to 0.2.0 or the picker buttons/lists lose their CSS classes.
+overrides:
+  "@lilydesignsystem/svelte-headless": "0.2.0"

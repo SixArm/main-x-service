@@ -9,8 +9,13 @@ import { CSRF_COOKIE, SESSION_COOKIE } from "$lib/server/session";
 // `page.data.title` convention (see `../+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title
 // without reading the DOM.
-export const load: PageServerLoad = () => {
-  return { title: "Main X Auth" };
+// Signed-out visitors see the splash, signed-in ones the account dashboard.
+export const load: PageServerLoad = ({ locals }) => {
+  return {
+    title: locals.sessionId
+      ? "Account · Main X Auth"
+      : "Main X Auth · Single sign-on for the Main X Index",
+  };
 };
 
 export const actions: Actions = {

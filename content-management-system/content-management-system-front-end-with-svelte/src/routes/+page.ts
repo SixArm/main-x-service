@@ -5,5 +5,6 @@
 import type { PageLoad } from "./$types";
 
 export const load: PageLoad = () => {
-  return { title: "Content Management System" };
+  // Sensible for both states: the splash and the dashboard share it.
+  return { title: "Main X · CMS" };
 };

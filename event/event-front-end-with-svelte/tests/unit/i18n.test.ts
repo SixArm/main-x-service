@@ -21,83 +21,77 @@ import {
 } from "../../src/lib/i18n.svelte";
 
 describe("i18n catalog", () => {
-    it("supports exactly the 14 expected locales with the default first", () => {
-        expect(LOCALES).toEqual([
-            "en", "en_US", "cy", "es", "fr", "de",
-            "ar", "ru", "hi", "zh", "bn", "pt", "id", "ur",
+    it("supports exactly the seven expected locales, sorted by code, default en-001", () => {
+        expect([...LOCALES]).toEqual([
+            "ar-001", "cy-001", "en-001", "es-001", "fr-001", "hi-001", "zh-cn",
         ]);
-        expect(LOCALES).toHaveLength(14);
-        expect(DEFAULT_LOCALE).toBe("en");
+        expect(DEFAULT_LOCALE).toBe("en-001");
     });
 
-    it("has a human label for every locale", () => {
+    it("has a human label for every locale, language only for -001, no parentheses", () => {
         expect(LOCALE_LABELS).toEqual({
-            en: "English",
-            en_US: "English (United States)",
-            cy: "Cymraeg",
-            es: "Español",
-            fr: "Français",
-            de: "Deutsch",
-            ar: "العربية",
-            ru: "Русский",
-            hi: "हिन्दी",
-            zh: "中文",
-            bn: "বাংলা",
-            pt: "Português",
-            id: "Bahasa Indonesia",
-            ur: "اردو",
+            "ar-001": "العربية",
+            "cy-001": "Cymraeg",
+            "en-001": "English",
+            "es-001": "Español",
+            "fr-001": "Français",
+            "hi-001": "हिन्दी",
+            "zh-cn": "中文 - 中国",
         });
+        for (const label of Object.values(LOCALE_LABELS)) {
+            expect(label).not.toMatch(/[()]/);
+        }
     });
 
-    it("normalises en_US and en-US to the en_US locale rather than collapsing to en", () => {
-        expect(i18n.set !== undefined).toBe(true);
+    it("normalises bare and regional tags to the supported locale by primary subtag", () => {
         i18n.set("en_US");
-        expect(i18n.locale).toBe("en_US");
-        i18n.set("en-US");
-        expect(i18n.locale).toBe("en_US");
-        i18n.set("en");
-        expect(i18n.locale).toBe("en");
+        expect(i18n.locale).toBe("en-001");
+        i18n.set("es-MX");
+        expect(i18n.locale).toBe("es-001");
+        i18n.set("zh-cn");
+        expect(i18n.locale).toBe("zh-cn");
+        i18n.set("ZH-cn");
+        expect(i18n.locale).toBe("zh-cn");
+        i18n.set("de");
+        expect(i18n.locale).toBe("en-001");
     });
 
-    it("marks ar/ur as RTL and everything else as LTR", () => {
-        expect(isRtl("ar")).toBe(true);
-        expect(isRtl("ur")).toBe(true);
-        expect(isRtl("en")).toBe(false);
-        expect(isRtl("zh")).toBe(false);
-        expect(isRtl("de")).toBe(false);
+    it("marks ar-001 as RTL and everything else as LTR", () => {
+        expect(isRtl("ar-001")).toBe(true);
+        expect(isRtl("en-001")).toBe(false);
+        expect(isRtl("zh-cn")).toBe(false);
     });
 
     it("spot-checks new-locale translations for a couple of keys", () => {
-        expect(translate("nav.dashboard", "ar")).toBe("لوحة المعلومات");
-        expect(translate("search.submit", "ar")).toBe("بحث");
-        expect(translate("nav.dashboard", "zh")).toBe("仪表板");
-        expect(translate("merge.merge", "zh")).toBe("合并");
+        expect(translate("nav.dashboard", "ar-001")).toBe("لوحة المعلومات");
+        expect(translate("search.submit", "ar-001")).toBe("بحث");
+        expect(translate("nav.dashboard", "zh-cn")).toBe("仪表板");
+        expect(translate("merge.merge", "zh-cn")).toBe("合并");
     });
 
     it("returns the correct English strings for sample keys", () => {
-        expect(translate("nav.dashboard", "en")).toBe("Dashboard");
-        expect(translate("search.submit", "en")).toBe("Search");
-        expect(translate("form.required", "en")).toBe("Required");
+        expect(translate("nav.dashboard", "en-001")).toBe("Dashboard");
+        expect(translate("search.submit", "en-001")).toBe("Search");
+        expect(translate("form.required", "en-001")).toBe("Required");
     });
 
     it("returns the correct Spanish strings for the same keys", () => {
-        expect(translate("nav.dashboard", "es")).toBe("Panel");
-        expect(translate("search.submit", "es")).toBe("Buscar");
-        expect(translate("form.required", "es")).toBe("Obligatorio");
+        expect(translate("nav.dashboard", "es-001")).toBe("Panel");
+        expect(translate("search.submit", "es-001")).toBe("Buscar");
+        expect(translate("form.required", "es-001")).toBe("Obligatorio");
     });
 
     it("uses the glossary translations across the other locales", () => {
-        expect(translate("nav.merge", "cy")).toBe("Uno");
-        expect(translate("nav.merge", "fr")).toBe("Fusionner");
-        expect(translate("nav.merge", "de")).toBe("Zusammenführen");
-        expect(translate("nav.toggle", "en")).toBe("Toggle navigation");
+        expect(translate("nav.merge", "cy-001")).toBe("Uno");
+        expect(translate("nav.merge", "fr-001")).toBe("Fusionner");
+        expect(translate("nav.toggle", "en-001")).toBe("Toggle navigation");
     });
 
     it("falls back to English for a missing translation, then to the key", () => {
         // An unknown locale falls through to the English table.
         expect(translate("nav.dashboard", "xx" as never)).toBe("Dashboard");
         // An unknown key falls through to the key string itself.
-        expect(translate("does.not.exist" as StringKey, "en")).toBe("does.not.exist");
+        expect(translate("does.not.exist" as StringKey, "en-001")).toBe("does.not.exist");
     });
 
     it("every locale covers the full English key set", () => {
@@ -164,6 +158,6 @@ function translateAllEnKeys(): Record<string, string> {
         "results.title", "results.none", "results.breakdown",
     ];
     const out: Record<string, string> = {};
-    for (const k of keys) out[k] = translate(k, "en");
+    for (const k of keys) out[k] = translate(k, "en-001");
     return out;
 }

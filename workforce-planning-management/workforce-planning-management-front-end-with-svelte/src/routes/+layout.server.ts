@@ -24,7 +24,11 @@ import type { LayoutServerLoad } from "./$types";
 const PUBLIC_PATHS = ["/signin", "/verify"];
 
 export const load: LayoutServerLoad = ({ locals, url }) => {
-  const isPublic = PUBLIC_PATHS.some((path) => url.pathname.startsWith(path));
+  // The home page is public too: signed out it renders the welcome
+  // splash (no data fetching); signed in it renders the dashboard.
+  const isPublic =
+    url.pathname === "/" ||
+    PUBLIC_PATHS.some((path) => url.pathname.startsWith(path));
   if (!isPublic && locals.sessionId === null) {
     redirect(303, "/signin");
   }

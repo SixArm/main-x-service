@@ -5,7 +5,22 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const LOGIN_EMAIL = process.env.E2E_LOGIN_EMAIL ?? 'records@example.nhs.uk';
 
-test('a protected route redirects to /login when signed out', async ({ page }) => {
+test('signed out, / shows the splash with a sign-in call to action', async ({
+    page,
+}) => {
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(
+        page.getByRole('link', { name: 'Sign in' }).first(),
+    ).toHaveAttribute('href', '/login');
+    // The dashboard is not rendered for an anonymous visitor.
+    await expect(page.getByText('Folder register')).toHaveCount(0);
+});
+
+test('a protected route redirects to /login when signed out', async ({
+    page,
+}) => {
     await page.goto('/folders');
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
@@ -24,7 +39,7 @@ test('sign in via magic link, then sign out', async ({ page }) => {
     await magicLink.click();
 
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByText(/Signed in as/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/login$/);

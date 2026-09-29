@@ -91,8 +91,35 @@ async function stubApi(page: Page) {
   });
 }
 
-test.beforeEach(async ({ page }) => {
+// The signed-in home is the cases dashboard; an anonymous visitor gets the
+// splash. The BFF only checks the session cookie's presence server-side (the
+// stubbed backend accepts anything), so seed one for every test but the
+// splash one, which clears it.
+test.beforeEach(async ({ page, context }) => {
+  await context.addCookies([
+    {
+      name: "__Host-mxi_session",
+      value: "e2e-session",
+      domain: "localhost",
+      path: "/",
+      secure: true,
+    },
+  ]);
   await stubApi(page);
+});
+
+// Pins: an anonymous visitor sees the splash (no dashboard, no API fetch),
+// with a sign-in link in the header and a hero call to action.
+test("anonymous home shows the splash", async ({ page, context }) => {
+  await context.clearCookies();
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(
+    page.getByRole("heading", { level: 1, name: /One clear record/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Sign in" }).first(),
+  ).toBeVisible();
+  await expect(page.getByText("Housing benefit appeal")).toHaveCount(0);
 });
 
 // Pins: the list route fetches and shows the seeded case title.

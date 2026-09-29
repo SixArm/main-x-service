@@ -7,13 +7,24 @@
    so it gets the colour; everything else stays quiet. */
 
 :root {
-  --bg: #f5f6f8;
-  --panel: #ffffff;
-  --ink: #1a2330;
-  --muted: #5b6774;
-  --line: #dde2e8;
-  --accent: #1b5fae;
-  /* Editorial states */
+  /* Design tokens, mapped onto the Lily theme tokens (`--color-*`) that the
+     active theme stylesheet defines, with the original values as fallbacks
+     for first paint (before a theme loads). This is what makes selecting a
+     theme in ThemePicker restyle the whole app, not just Lily components. */
+  --bg: var(--color-base-200, #f5f6f8);
+  --panel: var(--color-base-100, #ffffff);
+  --ink: var(--color-base-content, #1a2330);
+  --muted: color-mix(
+    in oklch,
+    var(--color-base-content, #5b6774) 62%,
+    var(--color-base-100, #ffffff)
+  );
+  --line: var(--color-base-300, #dde2e8);
+  --accent: var(--color-primary, #1b5fae);
+  --accent-fg: var(--color-primary-content, #ffffff);
+  --radius: var(--radius-field, 6px);
+  /* Editorial states: semantic colours, deliberately not themed away,
+     since a state must read the same in every theme. */
   --state-draft: #5b6774;
   --state-in-review: #b57e10;
   --state-approved: #0e7f8a;
@@ -22,6 +33,8 @@
   /* Advisory */
   --stale: #c05621;
   --finding: #8a1d2d;
+  color: var(--ink);
+  background: var(--bg);
 }
 
 * {
@@ -61,7 +74,7 @@ body {
     "Segoe UI",
     Roboto,
     sans-serif;
-  font-size: 15px;
+  font-size: 0.9375rem;
   line-height: 1.45;
 }
 
@@ -88,26 +101,11 @@ h2 {
   margin: 1.25rem 0 0.5rem;
 }
 
-/* Top navigation */
-nav.top {
-  background: var(--panel);
-  border-bottom: 1px solid var(--line);
-  padding: 0.6rem 1.25rem;
-  display: flex;
-  gap: 1.1rem;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-nav.top .brand {
-  font-weight: 700;
-  color: var(--ink);
-}
-
 /* Panels & tables */
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: calc(var(--radius) + 2px);
   padding: 0.9rem 1rem;
   margin-bottom: 1rem;
 }
@@ -140,7 +138,7 @@ th {
 .tile {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: calc(var(--radius) + 2px);
   padding: 0.7rem 0.9rem;
 }
 .tile .value {
@@ -168,19 +166,19 @@ th {
   white-space: nowrap;
 }
 .chip.warn {
-  border-color: var(--state-awaiting);
-  color: var(--state-awaiting);
-  background: #fdf3ec;
+  border-color: var(--stale);
+  color: var(--stale);
+  background: color-mix(in oklch, var(--stale) 12%, var(--panel));
 }
 .chip.danger {
-  border-color: var(--state-closed);
-  color: var(--state-closed);
-  background: #fbeef0;
+  border-color: var(--finding);
+  color: var(--finding);
+  background: color-mix(in oklch, var(--finding) 12%, var(--panel));
 }
 .chip.ok {
-  border-color: var(--state-available);
-  color: var(--state-available);
-  background: #eef7f1;
+  border-color: var(--state-published);
+  color: var(--state-published);
+  background: color-mix(in oklch, var(--state-published) 12%, var(--panel));
 }
 /* Forms & buttons */
 button,
@@ -201,7 +199,7 @@ button:hover {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 input,
 select {
@@ -209,7 +207,8 @@ select {
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
-  background: #fff;
+  background: var(--panel);
+  color: var(--ink);
 }
 form.row {
   display: flex;

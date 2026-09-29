@@ -10,7 +10,7 @@ import { SESSION_COOKIE } from "$lib/server/session";
 // route's own <svelte:head><title>{t("brand.name")}</title> so
 // SharePicker gets the right title without reading the DOM.
 export const load: PageServerLoad = () => {
-  return { title: "Main X · Cases" };
+  return { title: "Main X · Plans" };
 };
 
 export const actions: Actions = {

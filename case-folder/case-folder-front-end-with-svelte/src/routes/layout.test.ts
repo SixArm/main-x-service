@@ -82,3 +82,30 @@ describe('+layout signed-in role suffix', () => {
         expect(status?.textContent).not.toContain('(');
     });
 });
+
+// The header end carries the session control: a Sign in link when signed
+// out (except on the bare /login route), a Sign out button when signed in.
+describe('+layout session control', () => {
+    it('shows a Sign in link to /login when signed out', () => {
+        const { container } = render(Layout, { children });
+        const link = container.querySelector('.header-end a.signin');
+        expect(link?.getAttribute('href')).toBe('/login');
+        expect(
+            container.querySelector('.header-end button.session-button'),
+        ).toBeNull();
+    });
+
+    it('shows a Sign out button (and no Sign in link) when signed in', () => {
+        cache.setUser({
+            email: 'op@example.test',
+            name: 'Test Operator',
+            role: null,
+        });
+        const { container } = render(Layout, { children });
+        const button = container.querySelector(
+            '.header-end button.session-button',
+        );
+        expect(button?.textContent?.trim()).toBe('Sign out');
+        expect(container.querySelector('.header-end a.signin')).toBeNull();
+    });
+});
