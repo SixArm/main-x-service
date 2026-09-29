@@ -20,7 +20,8 @@ function memoryStorage() {
   const entries = new Map<string, string>();
   return {
     getItem: (key: string) => entries.get(key) ?? null,
-    setItem: (key: string, value: string) => void entries.set(key, String(value)),
+    setItem: (key: string, value: string) =>
+      void entries.set(key, String(value)),
     removeItem: (key: string) => void entries.delete(key),
     clear: () => entries.clear(),
   };
@@ -48,24 +49,24 @@ afterEach(() => {
 
 describe("locale key migration", () => {
   it("adopts the pre-rename locale and re-persists it under the new key", async () => {
-    localStorage.setItem(LEGACY, "fr");
+    localStorage.setItem(LEGACY, "fr-001");
 
     const { i18n } = await freshI18n();
 
-    expect(i18n.locale).toBe("fr");
-    expect(localStorage.getItem(CURRENT)).toBe("fr");
+    expect(i18n.locale).toBe("fr-001");
+    expect(localStorage.getItem(CURRENT)).toBe("fr-001");
     expect(localStorage.getItem(LEGACY)).toBeNull();
   });
 
   it("prefers the current key when both are present", async () => {
-    localStorage.setItem(CURRENT, "de");
-    localStorage.setItem(LEGACY, "fr");
+    localStorage.setItem(CURRENT, "es-001");
+    localStorage.setItem(LEGACY, "fr-001");
 
     const { i18n } = await freshI18n();
 
-    expect(i18n.locale).toBe("de");
+    expect(i18n.locale).toBe("es-001");
     // The stale key is left alone: the current one already answered.
-    expect(localStorage.getItem(CURRENT)).toBe("de");
+    expect(localStorage.getItem(CURRENT)).toBe("es-001");
   });
 
   it("falls back to the default when neither key is set", async () => {

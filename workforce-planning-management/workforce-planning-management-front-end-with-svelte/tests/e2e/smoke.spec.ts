@@ -70,7 +70,7 @@ const MASKED_EMPLOYEE = {
  *    open it. Open only when collapsed, which is correct either way.
  */
 async function chooseLocale(page: Page, label: string) {
-  const button = page.locator("nav.top .locale-picker-button");
+  const button = page.locator("header.topbar .locale-picker-button");
   const list = page.locator("ul.locale-picker-list");
   if ((await button.getAttribute("aria-expanded")) !== "true") {
     await button.click();
@@ -94,11 +94,18 @@ test.describe("sign-in gate (WPM-T38)", () => {
     await expect(page).toHaveURL(/\/signin$/);
   });
 
-  test("a signed-out visitor is redirected from the dashboard too", async ({
+  test("a signed-out visitor sees the welcome splash at / (no redirect, no dashboard)", async ({
     page,
   }) => {
     await page.goto("/");
-    await expect(page).toHaveURL(/\/signin$/);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.locator("h1")).toContainText(
+      "Every stage of the employee lifecycle",
+    );
+    await expect(page.getByTestId("tile-active")).toHaveCount(0);
+    await expect(
+      page.locator("header.topbar a.session-button.signin"),
+    ).toBeVisible();
   });
 
   test("/signin itself stays reachable with no session", async ({ page }) => {
@@ -209,9 +216,9 @@ test.describe("signed-in smoke coverage", () => {
     page,
   }) => {
     await page.goto("/employees");
-    await expect(page.locator("nav.top")).toContainText("Employees");
-    await chooseLocale(page, "Deutsch");
-    await expect(page.locator("nav.top")).toContainText("Mitarbeiter");
+    await expect(page.locator("header.topbar")).toContainText("Employees");
+    await chooseLocale(page, "Français");
+    await expect(page.locator("header.topbar")).toContainText("Employés");
     await chooseLocale(page, "العربية");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   });
