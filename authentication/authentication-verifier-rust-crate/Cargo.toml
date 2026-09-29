@@ -13,26 +13,47 @@ categories = ["authentication", "web-programming"]
 include = ["src/**/*", "LICENSE.md", "README.md", "CHANGELOG.md"]
 
 [features]
-default = []
+# PASETO stays on by default, so every existing consumer is unchanged.
+default = ["paseto"]
+# PASETO v4.public verification (`Verifier`, `ReloadableVerifier`). Disable
+# with `default-features = false` for a Keycloak-only deployment.
+paseto = ["dep:rusty_paseto", "dep:base64"]
 # Pull the PASETO public keys over HTTP at boot (`Verifier::from_paseto_keys_url`).
-fetch = ["dep:reqwest"]
+fetch = ["paseto", "dep:reqwest"]
+# Verify Keycloak (OIDC) access tokens and map them onto `Claims`, via
+# `axum-keycloak-auth` (the engine `loco-keycloak-auth` wraps). Off by default.
+keycloak = ["dep:axum-keycloak-auth"]
+# A local OIDC provider (`test_idp::TestIdp`) so a service can test a Keycloak
+# token through its real guard without a Keycloak container. TESTS ONLY: its
+# signing key is public. Use as a dev-dependency feature, never in a release.
+test-idp = ["keycloak", "dep:jsonwebtoken", "dep:tokio"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 thiserror = "2"
-base64 = "0.23"
-rusty_paseto = { version = "0.10.0", default-features = false, features = ["v4_public", "serde_json"] }
+base64 = { version = "0.23", optional = true }
+rusty_paseto = { version = "0.10.0", default-features = false, features = ["v4_public", "serde_json"], optional = true }
 reqwest = { version = "0.13", default-features = false, features = [
   "rustls",
   "json",
 ], optional = true }
 
+# Keycloak/OIDC access-token verification (feature `keycloak`). rustls, like
+# the rest of the family: no native-tls / OpenSSL.
+axum-keycloak-auth = { version = "0.8.3", default-features = false, features = ["rustls-tls"], optional = true }
+
+jsonwebtoken = { version = "9.3", optional = true }
+tokio = { version = "1", features = ["net", "io-util", "rt"], optional = true }
+
 [dev-dependencies]
+time = "0.3"
 criterion = { version = "0.8", features = ["html_reports"] }
 ed25519-dalek = "3.0.0"
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "net", "io-util"] }
 
 [[bench]]
 name = "verify_and_authorize"
 harness = false
+# The bench mints and verifies PASETO tokens.
+required-features = ["paseto"]

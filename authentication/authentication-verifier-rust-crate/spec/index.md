@@ -268,9 +268,21 @@ fixed here.
 ## 7. Non-functional requirements
 
 - `#![forbid(unsafe_code)]`.
-- Dependency-light core: a PASETO v4 library (e.g. `rusty_paseto`),
-  `serde`, `serde_json`, `thiserror`; `reqwest` only behind `fetch`.
-- No async in the core path; `from_paseto_keys_url` is the only async fn.
+- Dependency-light core: `serde`, `serde_json`, `thiserror`. A PASETO v4
+  library (`rusty_paseto`) and `base64` only behind `paseto` (default
+  on); `reqwest` only behind `fetch`; `axum-keycloak-auth` only behind
+  `keycloak` (off by default).
+- No async in the PASETO core path; `from_paseto_keys_url` and
+  `KeycloakVerifier::verify` are the only async fns.
+- **Feature contract (KC-1).** `Claims` and the `abac` engine are always
+  present. `paseto` (default) provides `Verifier`/`ReloadableVerifier`;
+  `keycloak` provides `keycloak::{KeycloakVerifier, KeycloakSettings,
+  claims_from_token}`. A service may enable either or both; a Keycloak
+  token is mapped onto the same `Claims`, so authorization is
+  identical. Keycloak verification is fail-closed: HTTPS-only URL
+  (loopback excepted), issuer must equal `{url}/realms/{realm}`, at
+  least one audience, verified email when an email is present, and
+  roles become attributes only via an explicit `role_map`.
 
 ## 8. Architecture
 
@@ -342,6 +354,15 @@ party. `Decision.reason` deliberately names only the rule index, never
 attribute values, so it is safe for 403 bodies and audit trails.
 
 ## 13. Tasks (live work queue)
+
+- [x] **KC-1: `keycloak` feature + `paseto` as a feature (2026-09-29).**
+      `paseto` (default on) gates `rusty_paseto`/`Verifier`; `keycloak`
+      (off) adds `keycloak::KeycloakVerifier` on `axum-keycloak-auth`
+      (not `loco-keycloak-auth`, which is typed against loco 0.15).
+      Tests: `keycloak` unit tests plus `tests/keycloak_e2e.rs`
+      (real RS256 JWTs against a local OIDC discovery + JWKS server).
+      Not published: the crate is still consumed in-tree by `path`.
+      Service adoption (`<ENTITY>_KEYCLOAK_*`) is tracked per service.
 
 - [x] **PASETO v4.public pivot (code follow-up).** *(2026-06-17 —
       shipped as v0.2.0)* Replaced the
