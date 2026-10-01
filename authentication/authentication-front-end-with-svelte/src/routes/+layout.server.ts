@@ -4,7 +4,7 @@
 // browser ever holding a token.
 
 import type { LayoutServerLoad } from "./$types";
-import { currentUser } from "$lib/server/auth";
+import { currentUser } from "#lib/server/auth.js";
 
 export const load: LayoutServerLoad = async ({ locals, fetch }) => {
   const user = locals.sessionId

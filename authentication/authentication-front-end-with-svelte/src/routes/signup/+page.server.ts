@@ -3,7 +3,7 @@
 // optional name, and the UI locale; no credential is held client-side.
 
 import type { Actions, PageServerLoad } from "./$types";
-import { signup } from "$lib/server/auth";
+import { signup } from "#lib/server/auth.js";
 
 // `page.data.title` convention (see `../+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title

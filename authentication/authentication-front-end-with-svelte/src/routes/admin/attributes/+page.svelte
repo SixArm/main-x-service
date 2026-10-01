@@ -10,7 +10,7 @@
 <script lang="ts">
     import type { PageData, ActionData } from "./$types";
     import { enhance } from "$app/forms";
-    import { t } from "$lib/i18n.svelte";
+    import { t } from "#lib/i18n.svelte.js";
 
     let { data, form }: { data: PageData; form: ActionData } = $props();
 

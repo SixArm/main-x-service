@@ -7,7 +7,7 @@
 <script lang="ts">
     import type { ActionData } from "./$types";
     import { enhance } from "$app/forms";
-    import { i18n, t } from "$lib/i18n.svelte";
+    import { i18n, t } from "#lib/i18n.svelte.js";
 
     let { form }: { form: ActionData } = $props();
 </script>

@@ -2,12 +2,12 @@
 // browser code). The SvelteKit server holds the session cookie and does
 // all token handling here; the browser never sees an access token.
 
-import { env } from "$env/dynamic/private";
+import { AUTH_API_URL } from "$app/env/private";
 import { SESSION_COOKIE } from "./session";
-import type { CurrentUser } from "$lib/api/types";
+import type { CurrentUser } from "#lib/api/types.js";
 
 /** Authentication-service base URL (server-side; loco dev default 5150). */
-const AUTH_API_URL = env.AUTH_API_URL ?? "http://localhost:5150";
+const AUTH_API_URL = AUTH_API_URL ?? "http://localhost:5150";
 
 type FetchFn = typeof fetch;
 

@@ -14,7 +14,7 @@ import { redirect } from "@sveltejs/kit";
  * mutation. `locals.sessionId` is presence-only (set from the httpOnly
  * cookie, never re-validated here) — a UX convenience in front of the
  * auth service's real enforcement, not a substitute for it. Mirrors the
- * person/worker/thing/event/course reference (`$lib/server/session.ts`,
+ * person/worker/thing/event/course reference (`#lib/server/session.ts`,
  * repo `tasks.md` PRO-H10).
  *
  * Declared as a TypeScript assertion function (rather than plain `void`,

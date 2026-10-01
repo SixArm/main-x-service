@@ -6,7 +6,7 @@
 -->
 <script lang="ts">
     import type { PageData } from "./$types";
-    import { t } from "$lib/i18n.svelte";
+    import { t } from "#lib/i18n.svelte.js";
 
     let { data }: { data: PageData } = $props();
 

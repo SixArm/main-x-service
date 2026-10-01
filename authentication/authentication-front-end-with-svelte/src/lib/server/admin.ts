@@ -5,11 +5,11 @@
 // The admin API itself requires the caller to carry `access=admin`
 // (403 otherwise) — this module just plumbs the request.
 
-import { env } from "$env/dynamic/private";
+import { AUTH_API_URL } from "$app/env/private";
 import { exchangeToken } from "./auth";
-import type { UserAttributes } from "$lib/api/types";
+import type { UserAttributes } from "#lib/api/types.js";
 
-const AUTH_API_URL = env.AUTH_API_URL ?? "http://localhost:5150";
+const AUTH_API_URL = AUTH_API_URL ?? "http://localhost:5150";
 
 type FetchFn = typeof fetch;
 
@@ -22,10 +22,8 @@ export type AdminResult<T> =
  *  message, falling back to the status text. */
 async function errorMessage(res: Response): Promise<string> {
   try {
-    const body = (await res.json()) as {
-      description?: string;
-      error?: string;
-    };
+    const body = (await res.json()) as { description?: string; error?: string };
+
     return body.description ?? body.error ?? res.statusText;
   } catch {
     return res.statusText;

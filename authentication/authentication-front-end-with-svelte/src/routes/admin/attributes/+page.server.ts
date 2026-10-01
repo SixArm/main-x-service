@@ -7,13 +7,13 @@
 // Page-visit guard (AFE-1 / PRO-H10): this page's entire purpose is
 // submitting a PUT, so an anonymous visitor is redirected to /signin
 // rather than shown an in-page "sign in" message — see
-// `$lib/server/session.ts::requireSignedIn` for the policy rationale.
+// `#lib/server/session.ts::requireSignedIn` for the policy rationale.
 
 import type { Actions, PageServerLoad } from "./$types";
 import { fail } from "@sveltejs/kit";
-import { getUserAttributes, putUserAttributes } from "$lib/server/admin";
-import { requireSignedIn } from "$lib/server/session";
-import type { UserAttributes } from "$lib/api/types";
+import { getUserAttributes, putUserAttributes } from "#lib/server/admin.js";
+import { requireSignedIn } from "#lib/server/session.js";
+import type { UserAttributes } from "#lib/api/types.js";
 
 // `page.data.title` convention (see `../../+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title
