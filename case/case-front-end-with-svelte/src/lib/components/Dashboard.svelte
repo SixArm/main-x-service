@@ -15,10 +15,10 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import { CaseRepository } from "$lib/api/cases";
-  import SearchBox from "$lib/components/SearchBox.svelte";
-  import type { CaseRef } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import { CaseRepository } from "#lib/api/cases.js";
+  import SearchBox from "#lib/components/SearchBox.svelte";
+  import type { CaseRef } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const repo = CaseRepository.withFetch();
 

@@ -12,9 +12,9 @@
         Willow as FilterTheme,
         createArrayFilter,
     } from "@svar-ui/svelte-filter";
-    import { CaseRepository } from "$lib/api/cases";
-    import type { CaseRef } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte";
+    import { CaseRepository } from "#lib/api/cases.js";
+    import type { CaseRef } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CaseRepository.withFetch();
 

@@ -11,9 +11,9 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { onMount } from "svelte";
-  import { CaseRepository } from "$lib/api/cases";
-  import type { AuditEntry } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import { CaseRepository } from "#lib/api/cases.js";
+  import type { AuditEntry } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const repo = CaseRepository.withFetch();
   const pid = page.params.pid ?? "";

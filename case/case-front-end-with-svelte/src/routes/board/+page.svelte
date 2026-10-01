@@ -12,9 +12,9 @@
   import { onMount } from "svelte";
   import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
   import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-  import { CaseRepository } from "$lib/api/cases";
-  import type { Case } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import { CaseRepository } from "#lib/api/cases.js";
+  import type { Case } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const repo = CaseRepository.withFetch();
 

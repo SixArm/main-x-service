@@ -16,7 +16,7 @@
 // drives the UI strings, `<html lang>`, and `<html dir>` (right-to-left
 // for `ar-001`).
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales for which the UI is translated, sorted alphabetically by code
@@ -71,6 +71,7 @@ export const RTL_LOCALES = ["ar-001"] as const satisfies readonly Locale[];
  */
 export function isRtl(locale: string): boolean {
   const primary = normaliseLocale(locale);
+
   return (
     primary !== null && (RTL_LOCALES as readonly string[]).includes(primary)
   );
@@ -267,7 +268,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -316,48 +318,79 @@ const STRINGS = {
     "tour.open": "افتح هذه الشاشة",
     "tour.top": "العودة إلى الأعلى",
     "tour.start.title": "قبل أن تبدأ",
-    "tour.start.summary": "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
-    "tour.start.step.1": "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
-    "tour.start.step.2": "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
-    "tour.start.step.3": "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
-    "tour.start.step.4": "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
-    "tour.intro": "جولة إرشادية في سجل القضايا: ما تفعله كل شاشة وخطوات استخدامها، من فتح قضية إلى دمج التكرارات ومراجعة سجلها.",
+    "tour.start.summary":
+      "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
+    "tour.start.step.1":
+      "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
+    "tour.start.step.2":
+      "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
+    "tour.start.step.3":
+      "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
+    "tour.start.step.4":
+      "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
+    "tour.intro":
+      "جولة إرشادية في سجل القضايا: ما تفعله كل شاشة وخطوات استخدامها، من فتح قضية إلى دمج التكرارات ومراجعة سجلها.",
     "tour.s1.title": "فتح قضية",
-    "tour.s1.summary": "سجّل القضية مرة واحدة في سجل مشترك، مع جهتها ورقمها ونوعها وحالتها ومعرّفاتها.",
+    "tour.s1.summary":
+      "سجّل القضية مرة واحدة في سجل مشترك، مع جهتها ورقمها ونوعها وحالتها ومعرّفاتها.",
     "tour.s1.step.1": "افتح «قضية جديدة» من القائمة.",
-    "tour.s1.step.2": "أدخل «العنوان»، وهو الحقل الوحيد المطلوب، ثم اختر «نوع القضية» و«الحالة» و«الأولوية».",
-    "tour.s1.step.3": "أضف «معرف الجهة» و«اسم الجهة» و«رقم القضية» و«تاريخ الفتح» وأي موضوعات أو كلمات مفتاحية أو معرّفات.",
-    "tour.s1.step.4": "اختر «إنشاء» للحفظ. ستنتقل إلى صفحة القضية الجديدة، حيث يتيح لك «تحرير» تعديلها لاحقًا.",
+    "tour.s1.step.2":
+      "أدخل «العنوان»، وهو الحقل الوحيد المطلوب، ثم اختر «نوع القضية» و«الحالة» و«الأولوية».",
+    "tour.s1.step.3":
+      "أضف «معرف الجهة» و«اسم الجهة» و«رقم القضية» و«تاريخ الفتح» وأي موضوعات أو كلمات مفتاحية أو معرّفات.",
+    "tour.s1.step.4":
+      "اختر «إنشاء» للحفظ. ستنتقل إلى صفحة القضية الجديدة، حيث يتيح لك «تحرير» تعديلها لاحقًا.",
     "tour.s2.title": "العثور على قضية",
-    "tour.s2.summary": "ابحث بالعنوان أو الموضوع أو الجهة أو المعرّف، ثم افتح القضية المطلوبة.",
-    "tour.s2.step.1": "سجّل الدخول وافتح «القضايا» من القائمة؛ ستعرض كل القضايا النشطة فوق مربع البحث.",
-    "tour.s2.step.2": "اكتب عنوانًا أو موضوعًا أو جهة أو معرّفًا ثم اختر «بحث».",
-    "tour.s2.step.3": "فعّل «تقريبي» لتحمّل الأخطاء الإملائية، أو «صوتي» لمطابقة الأسماء المتشابهة نطقًا.",
-    "tour.s2.step.4": "اختر نتيجة لفتح صفحتها. كما تعرض شبكة في /cases كل القضايا وتتيح التصفية بحسب «العنوان».",
+    "tour.s2.summary":
+      "ابحث بالعنوان أو الموضوع أو الجهة أو المعرّف، ثم افتح القضية المطلوبة.",
+    "tour.s2.step.1":
+      "سجّل الدخول وافتح «القضايا» من القائمة؛ ستعرض كل القضايا النشطة فوق مربع البحث.",
+    "tour.s2.step.2":
+      "اكتب عنوانًا أو موضوعًا أو جهة أو معرّفًا ثم اختر «بحث».",
+    "tour.s2.step.3":
+      "فعّل «تقريبي» لتحمّل الأخطاء الإملائية، أو «صوتي» لمطابقة الأسماء المتشابهة نطقًا.",
+    "tour.s2.step.4":
+      "اختر نتيجة لفتح صفحتها. كما تعرض شبكة في /cases كل القضايا وتتيح التصفية بحسب «العنوان».",
     "tour.s3.title": "تتبّع العمل على اللوحة",
-    "tour.s3.summary": "اطّلع على كل قضية مصنفة بحسب الحالة وحرّك العمل بالسحب.",
+    "tour.s3.summary":
+      "اطّلع على كل قضية مصنفة بحسب الحالة وحرّك العمل بالسحب.",
     "tour.s3.step.1": "افتح «اللوحة» من القائمة.",
-    "tour.s3.step.2": "اقرأ الأعمدة: Open وInProgress وPending وOnHold وResolved وClosed، ويضم كل منها قضاياه على شكل بطاقات.",
-    "tour.s3.step.3": "اسحب بطاقة إلى عمود آخر لتغيير حالة تلك القضية؛ يُحفظ التغيير فورًا.",
-    "tour.s3.step.4": "إذا رُفض التغيير، تُعاد تحميل اللوحة وتعرض الحالة الفعلية للقضية.",
+    "tour.s3.step.2":
+      "اقرأ الأعمدة: Open وInProgress وPending وOnHold وResolved وClosed، ويضم كل منها قضاياه على شكل بطاقات.",
+    "tour.s3.step.3":
+      "اسحب بطاقة إلى عمود آخر لتغيير حالة تلك القضية؛ يُحفظ التغيير فورًا.",
+    "tour.s3.step.4":
+      "إذا رُفض التغيير، تُعاد تحميل اللوحة وتعرض الحالة الفعلية للقضية.",
     "tour.s4.title": "فحص التكرارات والدمج",
-    "tour.s4.summary": "اكتشف سجلًا ثانيًا للقضية نفسها ثم ادمجه في السجل الذي تحتفظ به.",
-    "tour.s4.step.1": "في صفحة القضية، اختر «فحص التكرارات» لعرض القضايا المخزّنة التي تتجاوز درجتها عتبة المطابقة، مع درجة كل منها ومستوى الثقة.",
-    "tour.s4.step.2": "افتح «دمج» من القائمة وأدخل «معرف القضية الرئيسية» التي تبقى و«معرف القضية المكررة».",
-    "tour.s4.step.3": "أضف «السبب» إن شئت، ثم اختر «تحميل المعاينة» لمقارنة الرئيسية بالمكررة، ثم اختر «دمج» وأكّد.",
-    "tour.s4.step.4": "تُدمج المكررة في القضية الرئيسية وتُحذف حذفًا مؤقتًا؛ وتعرض «عمليات الدمج الأخيرة» وقت كل عملية ومن أجراها.",
+    "tour.s4.summary":
+      "اكتشف سجلًا ثانيًا للقضية نفسها ثم ادمجه في السجل الذي تحتفظ به.",
+    "tour.s4.step.1":
+      "في صفحة القضية، اختر «فحص التكرارات» لعرض القضايا المخزّنة التي تتجاوز درجتها عتبة المطابقة، مع درجة كل منها ومستوى الثقة.",
+    "tour.s4.step.2":
+      "افتح «دمج» من القائمة وأدخل «معرف القضية الرئيسية» التي تبقى و«معرف القضية المكررة».",
+    "tour.s4.step.3":
+      "أضف «السبب» إن شئت، ثم اختر «تحميل المعاينة» لمقارنة الرئيسية بالمكررة، ثم اختر «دمج» وأكّد.",
+    "tour.s4.step.4":
+      "تُدمج المكررة في القضية الرئيسية وتُحذف حذفًا مؤقتًا؛ وتعرض «عمليات الدمج الأخيرة» وقت كل عملية ومن أجراها.",
     "tour.s5.title": "تسجيل من تخصه القضية",
-    "tour.s5.summary": "اربط القضية بالشخص المعني بها بالإحالة إليه، دون نسخ بياناته.",
-    "tour.s5.step.1": "افتح قضية من «القضايا» وابحث عن لوحة «الشخص موضوع هذه القضية» في صفحتها.",
-    "tour.s5.step.2": "أدخل مرجع «الشخص» بصيغة person:<uuid>؛ ويمكنك اختياريًا ضبط «درجة الثقة» (من 0 إلى 1) و«المصدر» و«ساري من» و«ساري حتى».",
+    "tour.s5.summary":
+      "اربط القضية بالشخص المعني بها بالإحالة إليه، دون نسخ بياناته.",
+    "tour.s5.step.1":
+      "افتح قضية من «القضايا» وابحث عن لوحة «الشخص موضوع هذه القضية» في صفحتها.",
+    "tour.s5.step.2":
+      "أدخل مرجع «الشخص» بصيغة person:<uuid>؛ ويمكنك اختياريًا ضبط «درجة الثقة» (من 0 إلى 1) و«المصدر» و«ساري من» و«ساري حتى».",
     "tour.s5.step.3": "اختر «تسجيل الشخص» فيظهر الرابط في اللوحة.",
-    "tour.s5.step.4": "للتراجع، اختر «سحب» وأكّد. يُدقَّق كلا الإجراءين ويتطلبان الصلاحية نفسها اللازمة للقضية.",
+    "tour.s5.step.4":
+      "للتراجع، اختر «سحب» وأكّد. يُدقَّق كلا الإجراءين ويتطلبان الصلاحية نفسها اللازمة للقضية.",
     "tour.s6.title": "مراجعة سجل التدقيق",
-    "tour.s6.summary": "اطّلع على ما جرى للقضية ومتى، أو تابع النشاط الأخير في كل القضايا.",
-    "tour.s6.step.1": "افتح «النشاط» من القائمة لعرض «أحدث إدخالات التدقيق» و«أحدث الأحداث».",
+    "tour.s6.summary":
+      "اطّلع على ما جرى للقضية ومتى، أو تابع النشاط الأخير في كل القضايا.",
+    "tour.s6.step.1":
+      "افتح «النشاط» من القائمة لعرض «أحدث إدخالات التدقيق» و«أحدث الأحداث».",
     "tour.s6.step.2": "اقرأ كل إدخال لمعرفة ما تغيّر ومن أجرى التغيير.",
     "tour.s6.step.3": "للتركيز على قضية واحدة، افتحها واختر «عرض سجل التدقيق».",
-    "tour.s6.step.4": "اختر «العودة إلى القضية» للرجوع. تُضاف الإدخالات فقط ولا تُعدَّل، فلا يمكن إعادة كتابة السجل خفية.",
+    "tour.s6.step.4":
+      "اختر «العودة إلى القضية» للرجوع. تُضاف الإدخالات فقط ولا تُعدَّل، فلا يمكن إعادة كتابة السجل خفية.",
     "signin.sso": "تسجيل الدخول عبر SSO",
   },
   "cy-001": {
@@ -543,7 +576,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -593,48 +627,82 @@ const STRINGS = {
     "tour.open": "Agor y sgrin hon",
     "tour.top": "Yn ôl i'r brig",
     "tour.start.title": "Cyn i chi ddechrau",
-    "tour.start.summary": "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
-    "tour.start.step.1": "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
-    "tour.start.step.2": "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
-    "tour.start.step.3": "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
-    "tour.start.step.4": "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
-    "tour.intro": "Taith dywys drwy'r gofrestr Achosion: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o agor achos i uno dyblygiadau ac adolygu ei hanes.",
+    "tour.start.summary":
+      "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+    "tour.start.step.1":
+      "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
+    "tour.start.step.2":
+      "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+    "tour.start.step.3":
+      "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+    "tour.start.step.4":
+      "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+    "tour.intro":
+      "Taith dywys drwy'r gofrestr Achosion: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o agor achos i uno dyblygiadau ac adolygu ei hanes.",
     "tour.s1.title": "Agor achos",
-    "tour.s1.summary": "Cofrestrwch achos unwaith mewn cofnod a rennir, gyda'i asiantaeth, rhif achos, math, statws a dynodwyr.",
+    "tour.s1.summary":
+      "Cofrestrwch achos unwaith mewn cofnod a rennir, gyda'i asiantaeth, rhif achos, math, statws a dynodwyr.",
     "tour.s1.step.1": "Agorwch Achos newydd o'r ddewislen.",
-    "tour.s1.step.2": "Rhowch Teitl, yr unig faes gofynnol, yna dewiswch y Math o achos, y Statws a'r Flaenoriaeth.",
-    "tour.s1.step.3": "Ychwanegwch ID ac Enw asiantaeth, y Rhif achos, y Dyddiad agor, ac unrhyw bynciau, geiriau allweddol neu ddynodwyr.",
-    "tour.s1.step.4": "Dewiswch Creu i'w gadw. Cewch eich tywys i dudalen yr achos newydd, lle mae Golygu yn caniatáu ichi ei newid yn nes ymlaen.",
+    "tour.s1.step.2":
+      "Rhowch Teitl, yr unig faes gofynnol, yna dewiswch y Math o achos, y Statws a'r Flaenoriaeth.",
+    "tour.s1.step.3":
+      "Ychwanegwch ID ac Enw asiantaeth, y Rhif achos, y Dyddiad agor, ac unrhyw bynciau, geiriau allweddol neu ddynodwyr.",
+    "tour.s1.step.4":
+      "Dewiswch Creu i'w gadw. Cewch eich tywys i dudalen yr achos newydd, lle mae Golygu yn caniatáu ichi ei newid yn nes ymlaen.",
     "tour.s2.title": "Dod o hyd i achos",
-    "tour.s2.summary": "Chwiliwch yn ôl teitl, pwnc, asiantaeth neu ddynodwr, yna agorwch yr achos sydd ei angen arnoch.",
-    "tour.s2.step.1": "Mewngofnodwch ac agorwch Achosion o'r ddewislen; mae'n rhestru pob achos gweithredol uwchben blwch chwilio.",
-    "tour.s2.step.2": "Teipiwch deitl, pwnc, asiantaeth neu ddynodwr a dewiswch Chwilio.",
-    "tour.s2.step.3": "Ticiwch Aneglur i oddef camsillafu, neu Ffonetig i gyfateb enwau sy'n swnio'n debyg.",
-    "tour.s2.step.4": "Dewiswch ganlyniad i agor ei dudalen. Mae grid yn /cases hefyd yn rhestru pob achos ac yn gadael ichi hidlo yn ôl Teitl.",
+    "tour.s2.summary":
+      "Chwiliwch yn ôl teitl, pwnc, asiantaeth neu ddynodwr, yna agorwch yr achos sydd ei angen arnoch.",
+    "tour.s2.step.1":
+      "Mewngofnodwch ac agorwch Achosion o'r ddewislen; mae'n rhestru pob achos gweithredol uwchben blwch chwilio.",
+    "tour.s2.step.2":
+      "Teipiwch deitl, pwnc, asiantaeth neu ddynodwr a dewiswch Chwilio.",
+    "tour.s2.step.3":
+      "Ticiwch Aneglur i oddef camsillafu, neu Ffonetig i gyfateb enwau sy'n swnio'n debyg.",
+    "tour.s2.step.4":
+      "Dewiswch ganlyniad i agor ei dudalen. Mae grid yn /cases hefyd yn rhestru pob achos ac yn gadael ichi hidlo yn ôl Teitl.",
     "tour.s3.title": "Dilyn gwaith ar y bwrdd",
-    "tour.s3.summary": "Gwelwch bob achos wedi'i grwpio yn ôl statws a symudwch waith yn ei flaen trwy lusgo.",
+    "tour.s3.summary":
+      "Gwelwch bob achos wedi'i grwpio yn ôl statws a symudwch waith yn ei flaen trwy lusgo.",
     "tour.s3.step.1": "Agorwch Bwrdd o'r ddewislen.",
-    "tour.s3.step.2": "Darllenwch y colofnau: Open, InProgress, Pending, OnHold, Resolved a Closed, pob un yn dal ei achosion fel cardiau.",
-    "tour.s3.step.3": "Llusgwch gerdyn i golofn arall i newid statws yr achos hwnnw; caiff y newid ei gadw ar unwaith.",
-    "tour.s3.step.4": "Os caiff newid ei wrthod, mae'r bwrdd yn ail-lwytho ac yn dangos y statws sydd gan yr achos mewn gwirionedd.",
+    "tour.s3.step.2":
+      "Darllenwch y colofnau: Open, InProgress, Pending, OnHold, Resolved a Closed, pob un yn dal ei achosion fel cardiau.",
+    "tour.s3.step.3":
+      "Llusgwch gerdyn i golofn arall i newid statws yr achos hwnnw; caiff y newid ei gadw ar unwaith.",
+    "tour.s3.step.4":
+      "Os caiff newid ei wrthod, mae'r bwrdd yn ail-lwytho ac yn dangos y statws sydd gan yr achos mewn gwirionedd.",
     "tour.s4.title": "Gwirio dyblygiadau ac uno",
-    "tour.s4.summary": "Daliwch ail gofnod ar gyfer yr un achos, yna plygwch ef i'r un rydych yn ei gadw.",
-    "tour.s4.step.1": "Ar dudalen achos, dewiswch Gwirio dyblygiadau i restru achosion sydd wedi'u storio sy'n sgorio uwchlaw'r trothwy paru, pob un gyda'i sgôr a'i hyder.",
-    "tour.s4.step.2": "Agorwch Uno o'r ddewislen a rhowch ID y prif achos, sy'n goroesi, ac ID yr achos dyblyg.",
-    "tour.s4.step.3": "Ychwanegwch Reswm os dymunwch, dewiswch Llwytho rhagolwg i gymharu'r Prif a'r Dyblyg, yna dewiswch Uno a chadarnhau.",
-    "tour.s4.step.4": "Caiff y dyblyg ei blygu i'r prif achos a'i ddileu'n feddal; mae Unoiadau diweddar yn rhestru pryd digwyddodd pob uniad a phwy a'i gwnaeth.",
+    "tour.s4.summary":
+      "Daliwch ail gofnod ar gyfer yr un achos, yna plygwch ef i'r un rydych yn ei gadw.",
+    "tour.s4.step.1":
+      "Ar dudalen achos, dewiswch Gwirio dyblygiadau i restru achosion sydd wedi'u storio sy'n sgorio uwchlaw'r trothwy paru, pob un gyda'i sgôr a'i hyder.",
+    "tour.s4.step.2":
+      "Agorwch Uno o'r ddewislen a rhowch ID y prif achos, sy'n goroesi, ac ID yr achos dyblyg.",
+    "tour.s4.step.3":
+      "Ychwanegwch Reswm os dymunwch, dewiswch Llwytho rhagolwg i gymharu'r Prif a'r Dyblyg, yna dewiswch Uno a chadarnhau.",
+    "tour.s4.step.4":
+      "Caiff y dyblyg ei blygu i'r prif achos a'i ddileu'n feddal; mae Unoiadau diweddar yn rhestru pryd digwyddodd pob uniad a phwy a'i gwnaeth.",
     "tour.s5.title": "Cofnodi pwy yw testun achos",
-    "tour.s5.summary": "Cysylltwch achos â'r person y mae'n ymwneud ag ef trwy gyfeirnod, heb gopïo ei fanylion.",
-    "tour.s5.step.1": "Agorwch achos o Achosion a chwiliwch am y panel Testun yr achos hwn ar ei dudalen.",
-    "tour.s5.step.2": "Rhowch gyfeirnod Person ar y ffurf person:<uuid>; gallwch osod Hyder (0 i 1), Tarddiad, Dilys o a Dilys hyd hefyd.",
-    "tour.s5.step.3": "Dewiswch Cofnodi'r testun ac mae'r cyswllt yn ymddangos yn y panel.",
-    "tour.s5.step.4": "I'w ddadwneud, dewiswch Tynnu'n ôl a chadarnhau. Caiff y ddau weithred eu harchwilio ac mae angen yr un awdurdodiad â'r achos ei hun.",
+    "tour.s5.summary":
+      "Cysylltwch achos â'r person y mae'n ymwneud ag ef trwy gyfeirnod, heb gopïo ei fanylion.",
+    "tour.s5.step.1":
+      "Agorwch achos o Achosion a chwiliwch am y panel Testun yr achos hwn ar ei dudalen.",
+    "tour.s5.step.2":
+      "Rhowch gyfeirnod Person ar y ffurf person:<uuid>; gallwch osod Hyder (0 i 1), Tarddiad, Dilys o a Dilys hyd hefyd.",
+    "tour.s5.step.3":
+      "Dewiswch Cofnodi'r testun ac mae'r cyswllt yn ymddangos yn y panel.",
+    "tour.s5.step.4":
+      "I'w ddadwneud, dewiswch Tynnu'n ôl a chadarnhau. Caiff y ddau weithred eu harchwilio ac mae angen yr un awdurdodiad â'r achos ei hun.",
     "tour.s6.title": "Adolygu'r hanes archwilio",
-    "tour.s6.summary": "Gwelwch beth ddigwyddodd i achos a phryd, neu gwyliwch weithgarwch diweddar ar draws pob achos.",
-    "tour.s6.step.1": "Agorwch Gweithgarwch o'r ddewislen i weld Cofnodion archwilio diweddar a Digwyddiadau diweddar.",
-    "tour.s6.step.2": "Darllenwch bob cofnod i weld beth newidiodd a phwy wnaeth y newid.",
-    "tour.s6.step.3": "I ganolbwyntio ar un achos, agorwch ef a dewiswch Gweld hanes archwilio.",
-    "tour.s6.step.4": "Dewiswch Yn ôl i'r achos i ddychwelyd. Dim ond ychwanegu at gofnodion a wneir, felly ni ellir ailysgrifennu hanes yn dawel.",
+    "tour.s6.summary":
+      "Gwelwch beth ddigwyddodd i achos a phryd, neu gwyliwch weithgarwch diweddar ar draws pob achos.",
+    "tour.s6.step.1":
+      "Agorwch Gweithgarwch o'r ddewislen i weld Cofnodion archwilio diweddar a Digwyddiadau diweddar.",
+    "tour.s6.step.2":
+      "Darllenwch bob cofnod i weld beth newidiodd a phwy wnaeth y newid.",
+    "tour.s6.step.3":
+      "I ganolbwyntio ar un achos, agorwch ef a dewiswch Gweld hanes archwilio.",
+    "tour.s6.step.4":
+      "Dewiswch Yn ôl i'r achos i ddychwelyd. Dim ond ychwanegu at gofnodion a wneir, felly ni ellir ailysgrifennu hanes yn dawel.",
     "signin.sso": "Mewngofnodi gydag SSO",
   },
   "de-de": {
@@ -811,19 +879,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Jeder Fall, ein Datensatz",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -832,74 +907,121 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "splash.hero.title": "Ein klarer Datensatz für jeden Fall",
-    "splash.hero.subtitle": "Erfassen Sie Fälle einmal, finden Sie sie sofort und erkennen Sie Duplikate, bevor sie sich vervielfachen, mit jeder Änderung im Audit-Protokoll festgehalten.",
-    "splash.benefits.1.body": "Halten Sie jeden Fall in einem gemeinsamen Datensatz fest statt in verstreuten Tabellen und Akten.",
+    "splash.hero.subtitle":
+      "Erfassen Sie Fälle einmal, finden Sie sie sofort und erkennen Sie Duplikate, bevor sie sich vervielfachen, mit jeder Änderung im Audit-Protokoll festgehalten.",
+    "splash.benefits.1.body":
+      "Halten Sie jeden Fall in einem gemeinsamen Datensatz fest statt in verstreuten Tabellen und Akten.",
     "splash.benefits.2.title": "Schnell gefunden",
-    "splash.benefits.2.body": "Suchen Sie nach Titel, Thema, Behörde oder Kennung, auch bei Tippfehlern oder ähnlich klingenden Namen.",
+    "splash.benefits.2.body":
+      "Suchen Sie nach Titel, Thema, Behörde oder Kennung, auch bei Tippfehlern oder ähnlich klingenden Namen.",
     "splash.benefits.3.title": "Doppelte Fälle verhindern",
-    "splash.benefits.3.body": "Wahrscheinliche Duplikate werden zur Prüfung markiert, damit nicht unbemerkt ein zweiter Datensatz entsteht.",
+    "splash.benefits.3.body":
+      "Wahrscheinliche Duplikate werden zur Prüfung markiert, damit nicht unbemerkt ein zweiter Datensatz entsteht.",
     "splash.benefits.4.title": "Arbeitslast auf einen Blick",
-    "splash.benefits.4.body": "Ein Board gruppiert jeden Fall nach Status, sodass Sie sehen, wo sich Arbeit staut.",
+    "splash.benefits.4.body":
+      "Ein Board gruppiert jeden Fall nach Status, sodass Sie sehen, wo sich Arbeit staut.",
     "splash.benefits.5.title": "Klare Verantwortlichkeit",
-    "splash.benefits.5.body": "Jede Änderung wird festgehalten, sodass Sie stets sehen können, was mit einem Fall wann geschehen ist.",
+    "splash.benefits.5.body":
+      "Jede Änderung wird festgehalten, sodass Sie stets sehen können, was mit einem Fall wann geschehen ist.",
     "splash.benefits.6.title": "Fälle mit Personen verknüpfen",
-    "splash.benefits.6.body": "Halten Sie fest, um wen es in einem Fall geht, indem Sie auf den Personendatensatz verweisen, ohne Angaben zu kopieren.",
+    "splash.benefits.6.body":
+      "Halten Sie fest, um wen es in einem Fall geht, indem Sie auf den Personendatensatz verweisen, ohne Angaben zu kopieren.",
     "splash.features.1.title": "Vollständige Falldatensätze",
-    "splash.features.1.body": "Titel, Behörde, Fallnummer, Typ, Status, Priorität, Themen und Kennungen in einem Formular.",
+    "splash.features.1.body":
+      "Titel, Behörde, Fallnummer, Typ, Status, Priorität, Themen und Kennungen in einem Formular.",
     "splash.features.2.title": "Volltextsuche",
-    "splash.features.2.body": "Unscharfe und phonetische Optionen finden Fälle trotz Schreibfehlern und alternativen Namen.",
+    "splash.features.2.body":
+      "Unscharfe und phonetische Optionen finden Fälle trotz Schreibfehlern und alternativen Namen.",
     "splash.features.3.title": "Duplikatprüfung",
-    "splash.features.3.body": "Vergleichen Sie einen Fall mit gespeicherten und prüfen Sie die bewerteten Treffer vor dem Speichern.",
+    "splash.features.3.body":
+      "Vergleichen Sie einen Fall mit gespeicherten und prüfen Sie die bewerteten Treffer vor dem Speichern.",
     "splash.features.4.title": "Fälle zusammenführen",
-    "splash.features.4.body": "Führen Sie ein bestätigtes Duplikat in den bleibenden Datensatz ein und sehen Sie letzte Zusammenführungen.",
+    "splash.features.4.body":
+      "Führen Sie ein bestätigtes Duplikat in den bleibenden Datensatz ein und sehen Sie letzte Zusammenführungen.",
     "splash.features.5.title": "Statusboard",
-    "splash.features.5.body": "Ziehen Sie eine Karte in eine andere Spalte, um den Status eines Falls zu ändern.",
+    "splash.features.5.body":
+      "Ziehen Sie eine Karte in eine andere Spalte, um den Status eines Falls zu ändern.",
     "splash.features.6.title": "Audit-Protokoll",
-    "splash.features.6.body": "Sehen Sie den Verlauf eines Falls oder die jüngste Aktivität über alle Fälle, neueste zuerst.",
-    "tour.intro": "Ein geführter Rundgang durch das Fallregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Eröffnung eines Falls über das Zusammenführen von Duplikaten bis zur Prüfung seines Verlaufs.",
+    "splash.features.6.body":
+      "Sehen Sie den Verlauf eines Falls oder die jüngste Aktivität über alle Fälle, neueste zuerst.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das Fallregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Eröffnung eines Falls über das Zusammenführen von Duplikaten bis zur Prüfung seines Verlaufs.",
     "tour.s1.title": "Einen Fall eröffnen",
-    "tour.s1.summary": "Erfassen Sie einen Fall einmal in einem gemeinsamen Datensatz, mit Behörde, Fallnummer, Typ, Status und Kennungen.",
+    "tour.s1.summary":
+      "Erfassen Sie einen Fall einmal in einem gemeinsamen Datensatz, mit Behörde, Fallnummer, Typ, Status und Kennungen.",
     "tour.s1.step.1": "Öffnen Sie im Menü „Neuer Fall“.",
-    "tour.s1.step.2": "Geben Sie einen Titel ein, das einzige Pflichtfeld, und wählen Sie dann Falltyp, Status und Priorität.",
-    "tour.s1.step.3": "Ergänzen Sie Behörden-ID und -namen, Fallnummer, Eröffnungsdatum sowie Themen, Schlüsselwörter oder Kennungen.",
-    "tour.s1.step.4": "Wählen Sie „Erstellen“, um zu speichern. Sie gelangen auf die Seite des neuen Falls, wo Sie ihn später mit „Bearbeiten“ ändern können.",
+    "tour.s1.step.2":
+      "Geben Sie einen Titel ein, das einzige Pflichtfeld, und wählen Sie dann Falltyp, Status und Priorität.",
+    "tour.s1.step.3":
+      "Ergänzen Sie Behörden-ID und -namen, Fallnummer, Eröffnungsdatum sowie Themen, Schlüsselwörter oder Kennungen.",
+    "tour.s1.step.4":
+      "Wählen Sie „Erstellen“, um zu speichern. Sie gelangen auf die Seite des neuen Falls, wo Sie ihn später mit „Bearbeiten“ ändern können.",
     "tour.s2.title": "Einen Fall finden",
-    "tour.s2.summary": "Suchen Sie nach Titel, Thema, Behörde oder Kennung und öffnen Sie den gesuchten Fall.",
-    "tour.s2.step.1": "Melden Sie sich an und öffnen Sie im Menü „Fälle“; über einem Suchfeld werden alle aktiven Fälle aufgelistet.",
-    "tour.s2.step.2": "Geben Sie einen Titel, ein Thema, eine Behörde oder eine Kennung ein und wählen Sie „Suchen“.",
-    "tour.s2.step.3": "Setzen Sie „Unscharf“, um Tippfehler zu tolerieren, oder „Phonetisch“, um ähnlich klingende Namen zu finden.",
-    "tour.s2.step.4": "Wählen Sie ein Ergebnis, um seine Seite zu öffnen. Eine Tabelle unter /cases listet ebenfalls jeden Fall und lässt sich nach Titel filtern.",
+    "tour.s2.summary":
+      "Suchen Sie nach Titel, Thema, Behörde oder Kennung und öffnen Sie den gesuchten Fall.",
+    "tour.s2.step.1":
+      "Melden Sie sich an und öffnen Sie im Menü „Fälle“; über einem Suchfeld werden alle aktiven Fälle aufgelistet.",
+    "tour.s2.step.2":
+      "Geben Sie einen Titel, ein Thema, eine Behörde oder eine Kennung ein und wählen Sie „Suchen“.",
+    "tour.s2.step.3":
+      "Setzen Sie „Unscharf“, um Tippfehler zu tolerieren, oder „Phonetisch“, um ähnlich klingende Namen zu finden.",
+    "tour.s2.step.4":
+      "Wählen Sie ein Ergebnis, um seine Seite zu öffnen. Eine Tabelle unter /cases listet ebenfalls jeden Fall und lässt sich nach Titel filtern.",
     "tour.s3.title": "Arbeit auf dem Board verfolgen",
-    "tour.s3.summary": "Sehen Sie jeden Fall nach Status gruppiert und bringen Sie die Arbeit per Ziehen voran.",
+    "tour.s3.summary":
+      "Sehen Sie jeden Fall nach Status gruppiert und bringen Sie die Arbeit per Ziehen voran.",
     "tour.s3.step.1": "Öffnen Sie im Menü „Board“.",
-    "tour.s3.step.2": "Lesen Sie die Spalten: Open, InProgress, Pending, OnHold, Resolved und Closed (offen, in Bearbeitung, ausstehend, angehalten, gelöst, geschlossen), jeweils mit ihren Fällen als Karten.",
-    "tour.s3.step.3": "Ziehen Sie eine Karte in eine andere Spalte, um den Status dieses Falls zu ändern; die Änderung wird sofort gespeichert.",
-    "tour.s3.step.4": "Wird eine Änderung abgelehnt, lädt das Board neu und zeigt den Status, den der Fall tatsächlich hat.",
+    "tour.s3.step.2":
+      "Lesen Sie die Spalten: Open, InProgress, Pending, OnHold, Resolved und Closed (offen, in Bearbeitung, ausstehend, angehalten, gelöst, geschlossen), jeweils mit ihren Fällen als Karten.",
+    "tour.s3.step.3":
+      "Ziehen Sie eine Karte in eine andere Spalte, um den Status dieses Falls zu ändern; die Änderung wird sofort gespeichert.",
+    "tour.s3.step.4":
+      "Wird eine Änderung abgelehnt, lädt das Board neu und zeigt den Status, den der Fall tatsächlich hat.",
     "tour.s4.title": "Duplikate prüfen und zusammenführen",
-    "tour.s4.summary": "Erkennen Sie einen zweiten Datensatz zum selben Fall und führen Sie ihn in den ein, den Sie behalten.",
-    "tour.s4.step.1": "Wählen Sie auf der Seite eines Falls „Duplikate prüfen“, um gespeicherte Fälle aufzulisten, die über dem Abgleichschwellenwert liegen, jeweils mit Bewertung und Konfidenz.",
-    "tour.s4.step.2": "Öffnen Sie im Menü „Zusammenführen“ und geben Sie die „ID des Hauptfalls“ (bleibt bestehen) und die „ID des Duplikats“ ein.",
-    "tour.s4.step.3": "Ergänzen Sie optional einen „Grund“, wählen Sie „Vorschau laden“, um Hauptfall und Duplikat zu vergleichen, dann „Zusammenführen“ und bestätigen Sie.",
-    "tour.s4.step.4": "Das Duplikat wird in den Hauptfall eingeführt und weich gelöscht; „Letzte Zusammenführungen“ listet auf, wann jede Zusammenführung stattfand und wer sie vorgenommen hat.",
+    "tour.s4.summary":
+      "Erkennen Sie einen zweiten Datensatz zum selben Fall und führen Sie ihn in den ein, den Sie behalten.",
+    "tour.s4.step.1":
+      "Wählen Sie auf der Seite eines Falls „Duplikate prüfen“, um gespeicherte Fälle aufzulisten, die über dem Abgleichschwellenwert liegen, jeweils mit Bewertung und Konfidenz.",
+    "tour.s4.step.2":
+      "Öffnen Sie im Menü „Zusammenführen“ und geben Sie die „ID des Hauptfalls“ (bleibt bestehen) und die „ID des Duplikats“ ein.",
+    "tour.s4.step.3":
+      "Ergänzen Sie optional einen „Grund“, wählen Sie „Vorschau laden“, um Hauptfall und Duplikat zu vergleichen, dann „Zusammenführen“ und bestätigen Sie.",
+    "tour.s4.step.4":
+      "Das Duplikat wird in den Hauptfall eingeführt und weich gelöscht; „Letzte Zusammenführungen“ listet auf, wann jede Zusammenführung stattfand und wer sie vorgenommen hat.",
     "tour.s5.title": "Festhalten, um wen es in einem Fall geht",
-    "tour.s5.summary": "Verknüpfen Sie einen Fall per Verweis mit der Person, um die es geht, ohne ihre Angaben zu kopieren.",
-    "tour.s5.step.1": "Öffnen Sie einen Fall unter „Fälle“ und suchen Sie auf seiner Seite das Feld „Betroffene Person dieses Falls“.",
-    "tour.s5.step.2": "Geben Sie die Personenreferenz als person:<uuid> ein; legen Sie optional Konfidenz (0 bis 1), Herkunft, „Gültig ab“ und „Gültig bis“ fest.",
-    "tour.s5.step.3": "Wählen Sie „Person erfassen“, und die Verknüpfung erscheint im Feld.",
-    "tour.s5.step.4": "Zum Rückgängigmachen wählen Sie „Zurückziehen“ und bestätigen. Beide Aktionen werden protokolliert und erfordern dieselbe Berechtigung wie der Fall selbst.",
+    "tour.s5.summary":
+      "Verknüpfen Sie einen Fall per Verweis mit der Person, um die es geht, ohne ihre Angaben zu kopieren.",
+    "tour.s5.step.1":
+      "Öffnen Sie einen Fall unter „Fälle“ und suchen Sie auf seiner Seite das Feld „Betroffene Person dieses Falls“.",
+    "tour.s5.step.2":
+      "Geben Sie die Personenreferenz als person:<uuid> ein; legen Sie optional Konfidenz (0 bis 1), Herkunft, „Gültig ab“ und „Gültig bis“ fest.",
+    "tour.s5.step.3":
+      "Wählen Sie „Person erfassen“, und die Verknüpfung erscheint im Feld.",
+    "tour.s5.step.4":
+      "Zum Rückgängigmachen wählen Sie „Zurückziehen“ und bestätigen. Beide Aktionen werden protokolliert und erfordern dieselbe Berechtigung wie der Fall selbst.",
     "tour.s6.title": "Das Audit-Protokoll prüfen",
-    "tour.s6.summary": "Sehen Sie, was mit einem Fall wann geschehen ist, oder beobachten Sie die jüngste Aktivität über alle Fälle.",
-    "tour.s6.step.1": "Öffnen Sie im Menü „Aktivität“, um die jüngsten Audit-Einträge und die jüngsten Ereignisse zu sehen.",
-    "tour.s6.step.2": "Lesen Sie jeden Eintrag, um zu sehen, was sich geändert hat und wer die Änderung vorgenommen hat.",
-    "tour.s6.step.3": "Um sich auf einen Fall zu konzentrieren, öffnen Sie ihn und wählen Sie „Audit-Verlauf anzeigen“.",
-    "tour.s6.step.4": "Wählen Sie „Zurück zum Fall“, um zurückzukehren. Einträge werden nur angehängt, der Verlauf lässt sich also nicht unbemerkt umschreiben.",
+    "tour.s6.summary":
+      "Sehen Sie, was mit einem Fall wann geschehen ist, oder beobachten Sie die jüngste Aktivität über alle Fälle.",
+    "tour.s6.step.1":
+      "Öffnen Sie im Menü „Aktivität“, um die jüngsten Audit-Einträge und die jüngsten Ereignisse zu sehen.",
+    "tour.s6.step.2":
+      "Lesen Sie jeden Eintrag, um zu sehen, was sich geändert hat und wer die Änderung vorgenommen hat.",
+    "tour.s6.step.3":
+      "Um sich auf einen Fall zu konzentrieren, öffnen Sie ihn und wählen Sie „Audit-Verlauf anzeigen“.",
+    "tour.s6.step.4":
+      "Wählen Sie „Zurück zum Fall“, um zurückzukehren. Einträge werden nur angehängt, der Verlauf lässt sich also nicht unbemerkt umschreiben.",
   },
   "en-001": {
     "nav.board": "Board",
@@ -1094,7 +1216,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -1144,48 +1267,82 @@ const STRINGS = {
     "tour.open": "Open this screen",
     "tour.top": "Back to top",
     "tour.start.title": "Before you begin",
-    "tour.start.summary": "You need an account to work with real data. Signing in takes under a minute and needs no password.",
-    "tour.start.step.1": "Choose Sign in at the top right and enter your email address.",
-    "tour.start.step.2": "Open the magic link we email you. It works once and expires quickly.",
-    "tour.start.step.3": "You return to the app signed in, with nothing to remember or reset.",
-    "tour.start.step.4": "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
-    "tour.intro": "A guided walkthrough of the Cases registry: what each screen does and the steps to use it, from opening a case to merging duplicates and reviewing its history.",
+    "tour.start.summary":
+      "You need an account to work with real data. Signing in takes under a minute and needs no password.",
+    "tour.start.step.1":
+      "Choose Sign in at the top right and enter your email address.",
+    "tour.start.step.2":
+      "Open the magic link we email you. It works once and expires quickly.",
+    "tour.start.step.3":
+      "You return to the app signed in, with nothing to remember or reset.",
+    "tour.start.step.4":
+      "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
+    "tour.intro":
+      "A guided walkthrough of the Cases registry: what each screen does and the steps to use it, from opening a case to merging duplicates and reviewing its history.",
     "tour.s1.title": "Open a case",
-    "tour.s1.summary": "Register a case once in a shared record, with its agency, case number, type, status and identifiers.",
+    "tour.s1.summary":
+      "Register a case once in a shared record, with its agency, case number, type, status and identifiers.",
     "tour.s1.step.1": "Open New case from the menu.",
-    "tour.s1.step.2": "Enter a Title, the only required field, then choose the Case type, Status and Priority.",
-    "tour.s1.step.3": "Add the Agency id and name, the Case number, the Opened date, and any subjects, keywords or identifiers.",
-    "tour.s1.step.4": "Select Create to save it. You land on the new case's page, where Edit lets you change it later.",
+    "tour.s1.step.2":
+      "Enter a Title, the only required field, then choose the Case type, Status and Priority.",
+    "tour.s1.step.3":
+      "Add the Agency id and name, the Case number, the Opened date, and any subjects, keywords or identifiers.",
+    "tour.s1.step.4":
+      "Select Create to save it. You land on the new case's page, where Edit lets you change it later.",
     "tour.s2.title": "Find a case",
-    "tour.s2.summary": "Search by title, subject, agency or identifier, then open the case you need.",
-    "tour.s2.step.1": "Sign in and open Cases from the menu; it lists every active case above a search box.",
-    "tour.s2.step.2": "Type a title, subject, agency or identifier and select Search.",
-    "tour.s2.step.3": "Tick Fuzzy to tolerate typos, or Phonetic to match names that sound alike.",
-    "tour.s2.step.4": "Select a result to open its page. A grid at /cases also lists every case and lets you filter by Title.",
+    "tour.s2.summary":
+      "Search by title, subject, agency or identifier, then open the case you need.",
+    "tour.s2.step.1":
+      "Sign in and open Cases from the menu; it lists every active case above a search box.",
+    "tour.s2.step.2":
+      "Type a title, subject, agency or identifier and select Search.",
+    "tour.s2.step.3":
+      "Tick Fuzzy to tolerate typos, or Phonetic to match names that sound alike.",
+    "tour.s2.step.4":
+      "Select a result to open its page. A grid at /cases also lists every case and lets you filter by Title.",
     "tour.s3.title": "Track work on the board",
-    "tour.s3.summary": "See every case grouped by status and move work along by dragging.",
+    "tour.s3.summary":
+      "See every case grouped by status and move work along by dragging.",
     "tour.s3.step.1": "Open Board from the menu.",
-    "tour.s3.step.2": "Read the columns: Open, InProgress, Pending, OnHold, Resolved and Closed, each holding its cases as cards.",
-    "tour.s3.step.3": "Drag a card to another column to change that case's status; the change is saved straight away.",
-    "tour.s3.step.4": "If a change is rejected, the board reloads and shows the status the case really has.",
+    "tour.s3.step.2":
+      "Read the columns: Open, InProgress, Pending, OnHold, Resolved and Closed, each holding its cases as cards.",
+    "tour.s3.step.3":
+      "Drag a card to another column to change that case's status; the change is saved straight away.",
+    "tour.s3.step.4":
+      "If a change is rejected, the board reloads and shows the status the case really has.",
     "tour.s4.title": "Check duplicates and merge",
-    "tour.s4.summary": "Catch a second record for the same case, then fold it into the one you keep.",
-    "tour.s4.step.1": "On a case's page, select Check duplicates to list stored cases that score above the match threshold, each with its score and confidence.",
-    "tour.s4.step.2": "Open Merge from the menu and enter the Main case id, which survives, and the Duplicate case id.",
-    "tour.s4.step.3": "Optionally add a Reason, select Load preview to compare Main and Duplicate, then select Merge and confirm.",
-    "tour.s4.step.4": "The duplicate is folded into the main case and soft-deleted; Recent merges lists when each merge happened and who made it.",
+    "tour.s4.summary":
+      "Catch a second record for the same case, then fold it into the one you keep.",
+    "tour.s4.step.1":
+      "On a case's page, select Check duplicates to list stored cases that score above the match threshold, each with its score and confidence.",
+    "tour.s4.step.2":
+      "Open Merge from the menu and enter the Main case id, which survives, and the Duplicate case id.",
+    "tour.s4.step.3":
+      "Optionally add a Reason, select Load preview to compare Main and Duplicate, then select Merge and confirm.",
+    "tour.s4.step.4":
+      "The duplicate is folded into the main case and soft-deleted; Recent merges lists when each merge happened and who made it.",
     "tour.s5.title": "Record who a case is about",
-    "tour.s5.summary": "Link a case to the person it concerns by reference, without copying their details.",
-    "tour.s5.step.1": "Open a case from Cases and find the Subject of this case panel on its page.",
-    "tour.s5.step.2": "Enter the Person reference as person:<uuid>; optionally set Confidence (0 to 1), Provenance, Valid from and Valid to.",
-    "tour.s5.step.3": "Select Record subject and the link appears in the panel.",
-    "tour.s5.step.4": "To undo it, select Withdraw and confirm. Both actions are audited and need the same authorisation as the case itself.",
+    "tour.s5.summary":
+      "Link a case to the person it concerns by reference, without copying their details.",
+    "tour.s5.step.1":
+      "Open a case from Cases and find the Subject of this case panel on its page.",
+    "tour.s5.step.2":
+      "Enter the Person reference as person:<uuid>; optionally set Confidence (0 to 1), Provenance, Valid from and Valid to.",
+    "tour.s5.step.3":
+      "Select Record subject and the link appears in the panel.",
+    "tour.s5.step.4":
+      "To undo it, select Withdraw and confirm. Both actions are audited and need the same authorisation as the case itself.",
     "tour.s6.title": "Review the audit trail",
-    "tour.s6.summary": "See what happened to a case and when, or watch recent activity across every case.",
-    "tour.s6.step.1": "Open Activity from the menu to see Recent audit entries and Recent events.",
-    "tour.s6.step.2": "Read each entry to see what changed and who made the change.",
-    "tour.s6.step.3": "To focus on one case, open it and select View audit trail.",
-    "tour.s6.step.4": "Select Back to case to return. Entries are only ever appended, so history cannot be quietly rewritten.",
+    "tour.s6.summary":
+      "See what happened to a case and when, or watch recent activity across every case.",
+    "tour.s6.step.1":
+      "Open Activity from the menu to see Recent audit entries and Recent events.",
+    "tour.s6.step.2":
+      "Read each entry to see what changed and who made the change.",
+    "tour.s6.step.3":
+      "To focus on one case, open it and select View audit trail.",
+    "tour.s6.step.4":
+      "Select Back to case to return. Entries are only ever appended, so history cannot be quietly rewritten.",
     "signin.sso": "Sign in with SSO",
   },
   "es-001": {
@@ -1376,7 +1533,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -1426,48 +1584,82 @@ const STRINGS = {
     "tour.open": "Abrir esta pantalla",
     "tour.top": "Volver arriba",
     "tour.start.title": "Antes de empezar",
-    "tour.start.summary": "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
-    "tour.start.step.1": "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
-    "tour.start.step.2": "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
-    "tour.start.step.3": "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
-    "tour.start.step.4": "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
-    "tour.intro": "Un recorrido guiado por el registro de casos: qué hace cada pantalla y los pasos para usarla, desde abrir un caso hasta fusionar duplicados y revisar su historial.",
+    "tour.start.summary":
+      "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
+    "tour.start.step.1":
+      "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
+    "tour.start.step.2":
+      "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
+    "tour.start.step.3":
+      "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
+    "tour.start.step.4":
+      "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
+    "tour.intro":
+      "Un recorrido guiado por el registro de casos: qué hace cada pantalla y los pasos para usarla, desde abrir un caso hasta fusionar duplicados y revisar su historial.",
     "tour.s1.title": "Abrir un caso",
-    "tour.s1.summary": "Registra un caso una sola vez en un registro compartido, con su agencia, número de caso, tipo, estado e identificadores.",
+    "tour.s1.summary":
+      "Registra un caso una sola vez en un registro compartido, con su agencia, número de caso, tipo, estado e identificadores.",
     "tour.s1.step.1": "Abre «Nuevo caso» en el menú.",
-    "tour.s1.step.2": "Escribe un «Título», el único campo obligatorio, y elige el «Tipo de caso», el «Estado» y la «Prioridad».",
-    "tour.s1.step.3": "Añade el «ID de agencia» y el «Nombre de agencia», el «Número de caso», la «Fecha de apertura» y los temas, palabras clave o identificadores que haya.",
-    "tour.s1.step.4": "Selecciona «Crear» para guardarlo. Llegas a la página del nuevo caso, donde «Editar» permite cambiarlo más tarde.",
+    "tour.s1.step.2":
+      "Escribe un «Título», el único campo obligatorio, y elige el «Tipo de caso», el «Estado» y la «Prioridad».",
+    "tour.s1.step.3":
+      "Añade el «ID de agencia» y el «Nombre de agencia», el «Número de caso», la «Fecha de apertura» y los temas, palabras clave o identificadores que haya.",
+    "tour.s1.step.4":
+      "Selecciona «Crear» para guardarlo. Llegas a la página del nuevo caso, donde «Editar» permite cambiarlo más tarde.",
     "tour.s2.title": "Encontrar un caso",
-    "tour.s2.summary": "Busca por título, tema, agencia o identificador y abre el caso que necesitas.",
-    "tour.s2.step.1": "Inicia sesión y abre «Casos» en el menú; muestra todos los casos activos sobre un cuadro de búsqueda.",
-    "tour.s2.step.2": "Escribe un título, tema, agencia o identificador y selecciona «Buscar».",
-    "tour.s2.step.3": "Marca «Aproximada» para tolerar erratas, o «Fonética» para encontrar nombres que suenan parecido.",
-    "tour.s2.step.4": "Selecciona un resultado para abrir su página. Una cuadrícula en /cases también lista todos los casos y permite filtrar por «Título».",
+    "tour.s2.summary":
+      "Busca por título, tema, agencia o identificador y abre el caso que necesitas.",
+    "tour.s2.step.1":
+      "Inicia sesión y abre «Casos» en el menú; muestra todos los casos activos sobre un cuadro de búsqueda.",
+    "tour.s2.step.2":
+      "Escribe un título, tema, agencia o identificador y selecciona «Buscar».",
+    "tour.s2.step.3":
+      "Marca «Aproximada» para tolerar erratas, o «Fonética» para encontrar nombres que suenan parecido.",
+    "tour.s2.step.4":
+      "Selecciona un resultado para abrir su página. Una cuadrícula en /cases también lista todos los casos y permite filtrar por «Título».",
     "tour.s3.title": "Seguir el trabajo en el tablero",
-    "tour.s3.summary": "Ve cada caso agrupado por estado y avanza el trabajo arrastrando.",
+    "tour.s3.summary":
+      "Ve cada caso agrupado por estado y avanza el trabajo arrastrando.",
     "tour.s3.step.1": "Abre «Tablero» en el menú.",
-    "tour.s3.step.2": "Lee las columnas: Open, InProgress, Pending, OnHold, Resolved y Closed, cada una con sus casos como tarjetas.",
-    "tour.s3.step.3": "Arrastra una tarjeta a otra columna para cambiar el estado de ese caso; el cambio se guarda al instante.",
-    "tour.s3.step.4": "Si se rechaza un cambio, el tablero se recarga y muestra el estado real del caso.",
+    "tour.s3.step.2":
+      "Lee las columnas: Open, InProgress, Pending, OnHold, Resolved y Closed, cada una con sus casos como tarjetas.",
+    "tour.s3.step.3":
+      "Arrastra una tarjeta a otra columna para cambiar el estado de ese caso; el cambio se guarda al instante.",
+    "tour.s3.step.4":
+      "Si se rechaza un cambio, el tablero se recarga y muestra el estado real del caso.",
     "tour.s4.title": "Comprobar duplicados y fusionar",
-    "tour.s4.summary": "Detecta un segundo registro del mismo caso y fúndelo con el que conservas.",
-    "tour.s4.step.1": "En la página de un caso, selecciona «Comprobar duplicados» para listar los casos guardados que superan el umbral de coincidencia, cada uno con su puntuación y confianza.",
-    "tour.s4.step.2": "Abre «Fusionar» en el menú e introduce el «ID del caso principal», que sobrevive, y el «ID del caso duplicado».",
-    "tour.s4.step.3": "Si quieres, añade un «Motivo», selecciona «Cargar vista previa» para comparar Principal y Duplicado, y luego «Fusionar» y confirma.",
-    "tour.s4.step.4": "El duplicado se fusiona con el caso principal y se elimina de forma lógica; «Fusiones recientes» indica cuándo se hizo cada fusión y quién la hizo.",
+    "tour.s4.summary":
+      "Detecta un segundo registro del mismo caso y fúndelo con el que conservas.",
+    "tour.s4.step.1":
+      "En la página de un caso, selecciona «Comprobar duplicados» para listar los casos guardados que superan el umbral de coincidencia, cada uno con su puntuación y confianza.",
+    "tour.s4.step.2":
+      "Abre «Fusionar» en el menú e introduce el «ID del caso principal», que sobrevive, y el «ID del caso duplicado».",
+    "tour.s4.step.3":
+      "Si quieres, añade un «Motivo», selecciona «Cargar vista previa» para comparar Principal y Duplicado, y luego «Fusionar» y confirma.",
+    "tour.s4.step.4":
+      "El duplicado se fusiona con el caso principal y se elimina de forma lógica; «Fusiones recientes» indica cuándo se hizo cada fusión y quién la hizo.",
     "tour.s5.title": "Registrar de quién trata un caso",
-    "tour.s5.summary": "Vincula un caso con la persona a la que se refiere mediante una referencia, sin copiar sus datos.",
-    "tour.s5.step.1": "Abre un caso desde «Casos» y busca el panel «Persona objeto de este caso» en su página.",
-    "tour.s5.step.2": "Introduce la referencia de «Persona» como person:<uuid>; opcionalmente indica «Confianza» (0 a 1), «Procedencia», «Válido desde» y «Válido hasta».",
-    "tour.s5.step.3": "Selecciona «Registrar persona» y el vínculo aparece en el panel.",
-    "tour.s5.step.4": "Para deshacerlo, selecciona «Retirar» y confirma. Ambas acciones se auditan y requieren la misma autorización que el propio caso.",
+    "tour.s5.summary":
+      "Vincula un caso con la persona a la que se refiere mediante una referencia, sin copiar sus datos.",
+    "tour.s5.step.1":
+      "Abre un caso desde «Casos» y busca el panel «Persona objeto de este caso» en su página.",
+    "tour.s5.step.2":
+      "Introduce la referencia de «Persona» como person:<uuid>; opcionalmente indica «Confianza» (0 a 1), «Procedencia», «Válido desde» y «Válido hasta».",
+    "tour.s5.step.3":
+      "Selecciona «Registrar persona» y el vínculo aparece en el panel.",
+    "tour.s5.step.4":
+      "Para deshacerlo, selecciona «Retirar» y confirma. Ambas acciones se auditan y requieren la misma autorización que el propio caso.",
     "tour.s6.title": "Revisar el historial de auditoría",
-    "tour.s6.summary": "Consulta qué le ocurrió a un caso y cuándo, o sigue la actividad reciente de todos los casos.",
-    "tour.s6.step.1": "Abre «Actividad» en el menú para ver «Entradas de auditoría recientes» y «Eventos recientes».",
-    "tour.s6.step.2": "Lee cada entrada para ver qué cambió y quién hizo el cambio.",
-    "tour.s6.step.3": "Para centrarte en un caso, ábrelo y selecciona «Ver historial de auditoría».",
-    "tour.s6.step.4": "Selecciona «Volver al caso» para regresar. Las entradas solo se añaden, así que el historial no puede reescribirse a escondidas.",
+    "tour.s6.summary":
+      "Consulta qué le ocurrió a un caso y cuándo, o sigue la actividad reciente de todos los casos.",
+    "tour.s6.step.1":
+      "Abre «Actividad» en el menú para ver «Entradas de auditoría recientes» y «Eventos recientes».",
+    "tour.s6.step.2":
+      "Lee cada entrada para ver qué cambió y quién hizo el cambio.",
+    "tour.s6.step.3":
+      "Para centrarte en un caso, ábrelo y selecciona «Ver historial de auditoría».",
+    "tour.s6.step.4":
+      "Selecciona «Volver al caso» para regresar. Las entradas solo se añaden, así que el historial no puede reescribirse a escondidas.",
     "signin.sso": "Iniciar sesión con SSO",
   },
   "fr-001": {
@@ -1658,7 +1850,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -1708,48 +1901,82 @@ const STRINGS = {
     "tour.open": "Ouvrir cet écran",
     "tour.top": "Retour en haut",
     "tour.start.title": "Avant de commencer",
-    "tour.start.summary": "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
-    "tour.start.step.1": "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
-    "tour.start.step.2": "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
-    "tour.start.step.3": "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
-    "tour.start.step.4": "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
-    "tour.intro": "Une visite guidée du registre des affaires : le rôle de chaque écran et les étapes pour l'utiliser, de l'ouverture d'une affaire à la fusion des doublons et à la consultation de son historique.",
+    "tour.start.summary":
+      "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+    "tour.start.step.1":
+      "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
+    "tour.start.step.2":
+      "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+    "tour.start.step.3":
+      "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+    "tour.start.step.4":
+      "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
+    "tour.intro":
+      "Une visite guidée du registre des affaires : le rôle de chaque écran et les étapes pour l'utiliser, de l'ouverture d'une affaire à la fusion des doublons et à la consultation de son historique.",
     "tour.s1.title": "Ouvrir une affaire",
-    "tour.s1.summary": "Enregistrez une affaire une seule fois dans une fiche partagée, avec son agence, son numéro, son type, son statut et ses identifiants.",
+    "tour.s1.summary":
+      "Enregistrez une affaire une seule fois dans une fiche partagée, avec son agence, son numéro, son type, son statut et ses identifiants.",
     "tour.s1.step.1": "Ouvrez « Nouvelle affaire » dans le menu.",
-    "tour.s1.step.2": "Saisissez un « Titre », seul champ obligatoire, puis choisissez le « Type d'affaire », le « Statut » et la « Priorité ».",
-    "tour.s1.step.3": "Ajoutez l'« ID de l'agence » et le « Nom de l'agence », le « Numéro d'affaire », la « Date d'ouverture », ainsi que les sujets, mots-clés ou identifiants éventuels.",
-    "tour.s1.step.4": "Sélectionnez « Créer » pour l'enregistrer. Vous arrivez sur la page de la nouvelle affaire, où « Modifier » permet de la changer plus tard.",
+    "tour.s1.step.2":
+      "Saisissez un « Titre », seul champ obligatoire, puis choisissez le « Type d'affaire », le « Statut » et la « Priorité ».",
+    "tour.s1.step.3":
+      "Ajoutez l'« ID de l'agence » et le « Nom de l'agence », le « Numéro d'affaire », la « Date d'ouverture », ainsi que les sujets, mots-clés ou identifiants éventuels.",
+    "tour.s1.step.4":
+      "Sélectionnez « Créer » pour l'enregistrer. Vous arrivez sur la page de la nouvelle affaire, où « Modifier » permet de la changer plus tard.",
     "tour.s2.title": "Trouver une affaire",
-    "tour.s2.summary": "Recherchez par titre, sujet, agence ou identifiant, puis ouvrez l'affaire voulue.",
-    "tour.s2.step.1": "Connectez-vous et ouvrez « Affaires » dans le menu ; toutes les affaires actives y sont listées au-dessus d'un champ de recherche.",
-    "tour.s2.step.2": "Saisissez un titre, un sujet, une agence ou un identifiant et sélectionnez « Rechercher ».",
-    "tour.s2.step.3": "Cochez « Approximative » pour tolérer les fautes de frappe, ou « Phonétique » pour trouver des noms qui se prononcent de façon proche.",
-    "tour.s2.step.4": "Sélectionnez un résultat pour ouvrir sa page. Une grille à l'adresse /cases liste aussi toutes les affaires et permet de filtrer par « Titre ».",
+    "tour.s2.summary":
+      "Recherchez par titre, sujet, agence ou identifiant, puis ouvrez l'affaire voulue.",
+    "tour.s2.step.1":
+      "Connectez-vous et ouvrez « Affaires » dans le menu ; toutes les affaires actives y sont listées au-dessus d'un champ de recherche.",
+    "tour.s2.step.2":
+      "Saisissez un titre, un sujet, une agence ou un identifiant et sélectionnez « Rechercher ».",
+    "tour.s2.step.3":
+      "Cochez « Approximative » pour tolérer les fautes de frappe, ou « Phonétique » pour trouver des noms qui se prononcent de façon proche.",
+    "tour.s2.step.4":
+      "Sélectionnez un résultat pour ouvrir sa page. Une grille à l'adresse /cases liste aussi toutes les affaires et permet de filtrer par « Titre ».",
     "tour.s3.title": "Suivre le travail sur le tableau",
-    "tour.s3.summary": "Voyez chaque affaire regroupée par statut et faites avancer le travail par glisser-déposer.",
+    "tour.s3.summary":
+      "Voyez chaque affaire regroupée par statut et faites avancer le travail par glisser-déposer.",
     "tour.s3.step.1": "Ouvrez « Tableau » dans le menu.",
-    "tour.s3.step.2": "Parcourez les colonnes : Open, InProgress, Pending, OnHold, Resolved et Closed, chacune contenant ses affaires sous forme de cartes.",
-    "tour.s3.step.3": "Faites glisser une carte vers une autre colonne pour changer le statut de l'affaire ; le changement est enregistré immédiatement.",
-    "tour.s3.step.4": "Si un changement est refusé, le tableau se recharge et affiche le statut réel de l'affaire.",
+    "tour.s3.step.2":
+      "Parcourez les colonnes : Open, InProgress, Pending, OnHold, Resolved et Closed, chacune contenant ses affaires sous forme de cartes.",
+    "tour.s3.step.3":
+      "Faites glisser une carte vers une autre colonne pour changer le statut de l'affaire ; le changement est enregistré immédiatement.",
+    "tour.s3.step.4":
+      "Si un changement est refusé, le tableau se recharge et affiche le statut réel de l'affaire.",
     "tour.s4.title": "Vérifier les doublons et fusionner",
-    "tour.s4.summary": "Repérez une seconde fiche pour la même affaire, puis fusionnez-la dans celle que vous conservez.",
-    "tour.s4.step.1": "Sur la page d'une affaire, sélectionnez « Vérifier les doublons » pour lister les affaires enregistrées dépassant le seuil de correspondance, chacune avec son score et sa confiance.",
-    "tour.s4.step.2": "Ouvrez « Fusionner » dans le menu et saisissez l'« ID de l'affaire principale », qui subsiste, et l'« ID de l'affaire en double ».",
-    "tour.s4.step.3": "Ajoutez éventuellement un « Motif », sélectionnez « Charger l'aperçu » pour comparer l'affaire principale et celle en double, puis « Fusionner » et confirmez.",
-    "tour.s4.step.4": "L'affaire en double est fusionnée dans l'affaire principale puis supprimée logiquement ; « Fusions récentes » indique quand chaque fusion a eu lieu et qui l'a faite.",
+    "tour.s4.summary":
+      "Repérez une seconde fiche pour la même affaire, puis fusionnez-la dans celle que vous conservez.",
+    "tour.s4.step.1":
+      "Sur la page d'une affaire, sélectionnez « Vérifier les doublons » pour lister les affaires enregistrées dépassant le seuil de correspondance, chacune avec son score et sa confiance.",
+    "tour.s4.step.2":
+      "Ouvrez « Fusionner » dans le menu et saisissez l'« ID de l'affaire principale », qui subsiste, et l'« ID de l'affaire en double ».",
+    "tour.s4.step.3":
+      "Ajoutez éventuellement un « Motif », sélectionnez « Charger l'aperçu » pour comparer l'affaire principale et celle en double, puis « Fusionner » et confirmez.",
+    "tour.s4.step.4":
+      "L'affaire en double est fusionnée dans l'affaire principale puis supprimée logiquement ; « Fusions récentes » indique quand chaque fusion a eu lieu et qui l'a faite.",
     "tour.s5.title": "Enregistrer la personne concernée",
-    "tour.s5.summary": "Reliez une affaire à la personne concernée par référence, sans recopier ses données.",
-    "tour.s5.step.1": "Ouvrez une affaire depuis « Affaires » et repérez le panneau « Personne concernée par ce dossier » sur sa page.",
-    "tour.s5.step.2": "Saisissez la référence de « Personne » sous la forme person:<uuid> ; vous pouvez aussi renseigner « Confiance » (0 à 1), « Provenance », « Valide à partir du » et « Valide jusqu'au ».",
-    "tour.s5.step.3": "Sélectionnez « Enregistrer la personne » et le lien apparaît dans le panneau.",
-    "tour.s5.step.4": "Pour l'annuler, sélectionnez « Retirer » et confirmez. Les deux actions sont auditées et exigent la même autorisation que l'affaire elle-même.",
+    "tour.s5.summary":
+      "Reliez une affaire à la personne concernée par référence, sans recopier ses données.",
+    "tour.s5.step.1":
+      "Ouvrez une affaire depuis « Affaires » et repérez le panneau « Personne concernée par ce dossier » sur sa page.",
+    "tour.s5.step.2":
+      "Saisissez la référence de « Personne » sous la forme person:<uuid> ; vous pouvez aussi renseigner « Confiance » (0 à 1), « Provenance », « Valide à partir du » et « Valide jusqu'au ».",
+    "tour.s5.step.3":
+      "Sélectionnez « Enregistrer la personne » et le lien apparaît dans le panneau.",
+    "tour.s5.step.4":
+      "Pour l'annuler, sélectionnez « Retirer » et confirmez. Les deux actions sont auditées et exigent la même autorisation que l'affaire elle-même.",
     "tour.s6.title": "Consulter l'historique d'audit",
-    "tour.s6.summary": "Voyez ce qui est arrivé à une affaire et quand, ou suivez l'activité récente de toutes les affaires.",
-    "tour.s6.step.1": "Ouvrez « Activité » dans le menu pour voir les « Entrées d'audit récentes » et les « Événements récents ».",
-    "tour.s6.step.2": "Lisez chaque entrée pour voir ce qui a changé et qui a fait le changement.",
-    "tour.s6.step.3": "Pour vous concentrer sur une affaire, ouvrez-la et sélectionnez « Voir l'historique d'audit ».",
-    "tour.s6.step.4": "Sélectionnez « Retour à l'affaire » pour revenir. Les entrées ne font que s'ajouter, l'historique ne peut donc pas être réécrit discrètement.",
+    "tour.s6.summary":
+      "Voyez ce qui est arrivé à une affaire et quand, ou suivez l'activité récente de toutes les affaires.",
+    "tour.s6.step.1":
+      "Ouvrez « Activité » dans le menu pour voir les « Entrées d'audit récentes » et les « Événements récents ».",
+    "tour.s6.step.2":
+      "Lisez chaque entrée pour voir ce qui a changé et qui a fait le changement.",
+    "tour.s6.step.3":
+      "Pour vous concentrer sur une affaire, ouvrez-la et sélectionnez « Voir l'historique d'audit ».",
+    "tour.s6.step.4":
+      "Sélectionnez « Retour à l'affaire » pour revenir. Les entrées ne font que s'ajouter, l'historique ne peut donc pas être réécrit discrètement.",
     "signin.sso": "Se connecter avec SSO",
   },
   "hi-001": {
@@ -1936,7 +2163,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -1986,48 +2214,81 @@ const STRINGS = {
     "tour.open": "यह स्क्रीन खोलें",
     "tour.top": "ऊपर लौटें",
     "tour.start.title": "शुरू करने से पहले",
-    "tour.start.summary": "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
-    "tour.start.step.1": "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
-    "tour.start.step.2": "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
-    "tour.start.step.3": "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
-    "tour.start.step.4": "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
-    "tour.intro": "मामला रजिस्ट्री का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, मामला खोलने से लेकर डुप्लिकेट विलय करने और इतिहास देखने तक।",
+    "tour.start.summary":
+      "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
+    "tour.start.step.1":
+      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.2":
+      "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
+    "tour.start.step.3":
+      "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
+    "tour.start.step.4":
+      "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
+    "tour.intro":
+      "मामला रजिस्ट्री का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, मामला खोलने से लेकर डुप्लिकेट विलय करने और इतिहास देखने तक।",
     "tour.s1.title": "मामला खोलना",
-    "tour.s1.summary": "किसी मामले को एजेंसी, मामला संख्या, प्रकार, स्थिति और पहचानकर्ताओं के साथ एक साझा रिकॉर्ड में एक बार दर्ज करें।",
+    "tour.s1.summary":
+      "किसी मामले को एजेंसी, मामला संख्या, प्रकार, स्थिति और पहचानकर्ताओं के साथ एक साझा रिकॉर्ड में एक बार दर्ज करें।",
     "tour.s1.step.1": "मेनू से «नया मामला» खोलें।",
-    "tour.s1.step.2": "«शीर्षक» भरें, जो एकमात्र आवश्यक फ़ील्ड है, फिर «मामले का प्रकार», «स्थिति» और «प्राथमिकता» चुनें।",
-    "tour.s1.step.3": "«एजेंसी ID» और «एजेंसी का नाम», «मामला संख्या», «खोलने की तिथि» तथा कोई भी विषय, कीवर्ड या पहचानकर्ता जोड़ें।",
-    "tour.s1.step.4": "सहेजने के लिए «बनाएँ» चुनें। आप नए मामले के पृष्ठ पर पहुँचेंगे, जहाँ «संपादित करें» से बाद में बदलाव कर सकते हैं।",
+    "tour.s1.step.2":
+      "«शीर्षक» भरें, जो एकमात्र आवश्यक फ़ील्ड है, फिर «मामले का प्रकार», «स्थिति» और «प्राथमिकता» चुनें।",
+    "tour.s1.step.3":
+      "«एजेंसी ID» और «एजेंसी का नाम», «मामला संख्या», «खोलने की तिथि» तथा कोई भी विषय, कीवर्ड या पहचानकर्ता जोड़ें।",
+    "tour.s1.step.4":
+      "सहेजने के लिए «बनाएँ» चुनें। आप नए मामले के पृष्ठ पर पहुँचेंगे, जहाँ «संपादित करें» से बाद में बदलाव कर सकते हैं।",
     "tour.s2.title": "मामला खोजना",
-    "tour.s2.summary": "शीर्षक, विषय, एजेंसी या पहचानकर्ता से खोजें, फिर जो मामला चाहिए उसे खोलें।",
-    "tour.s2.step.1": "साइन इन करें और मेनू से «मामले» खोलें; यह खोज बॉक्स के ऊपर सभी सक्रिय मामले दिखाता है।",
-    "tour.s2.step.2": "शीर्षक, विषय, एजेंसी या पहचानकर्ता लिखें और «खोजें» चुनें।",
-    "tour.s2.step.3": "टाइपिंग की गलतियों के लिए «अस्पष्ट खोज» या मिलते-जुलते उच्चारण वाले नामों के लिए «ध्वन्यात्मक» चुनें।",
-    "tour.s2.step.4": "किसी परिणाम को चुनकर उसका पृष्ठ खोलें। /cases पर एक ग्रिड भी सभी मामले दिखाती है और «शीर्षक» से फ़िल्टर करने देती है।",
+    "tour.s2.summary":
+      "शीर्षक, विषय, एजेंसी या पहचानकर्ता से खोजें, फिर जो मामला चाहिए उसे खोलें।",
+    "tour.s2.step.1":
+      "साइन इन करें और मेनू से «मामले» खोलें; यह खोज बॉक्स के ऊपर सभी सक्रिय मामले दिखाता है।",
+    "tour.s2.step.2":
+      "शीर्षक, विषय, एजेंसी या पहचानकर्ता लिखें और «खोजें» चुनें।",
+    "tour.s2.step.3":
+      "टाइपिंग की गलतियों के लिए «अस्पष्ट खोज» या मिलते-जुलते उच्चारण वाले नामों के लिए «ध्वन्यात्मक» चुनें।",
+    "tour.s2.step.4":
+      "किसी परिणाम को चुनकर उसका पृष्ठ खोलें। /cases पर एक ग्रिड भी सभी मामले दिखाती है और «शीर्षक» से फ़िल्टर करने देती है।",
     "tour.s3.title": "बोर्ड पर काम को ट्रैक करना",
-    "tour.s3.summary": "हर मामला स्थिति के अनुसार समूहित देखें और खींचकर काम आगे बढ़ाएँ।",
+    "tour.s3.summary":
+      "हर मामला स्थिति के अनुसार समूहित देखें और खींचकर काम आगे बढ़ाएँ।",
     "tour.s3.step.1": "मेनू से «बोर्ड» खोलें।",
-    "tour.s3.step.2": "कॉलम पढ़ें: Open, InProgress, Pending, OnHold, Resolved और Closed, हर एक में उसके मामले कार्ड के रूप में हैं।",
-    "tour.s3.step.3": "किसी मामले की स्थिति बदलने के लिए उसके कार्ड को दूसरे कॉलम में खींचें; बदलाव तुरंत सहेज लिया जाता है।",
-    "tour.s3.step.4": "यदि कोई बदलाव अस्वीकार हो जाए, तो बोर्ड फिर से लोड होकर मामले की वास्तविक स्थिति दिखाता है।",
+    "tour.s3.step.2":
+      "कॉलम पढ़ें: Open, InProgress, Pending, OnHold, Resolved और Closed, हर एक में उसके मामले कार्ड के रूप में हैं।",
+    "tour.s3.step.3":
+      "किसी मामले की स्थिति बदलने के लिए उसके कार्ड को दूसरे कॉलम में खींचें; बदलाव तुरंत सहेज लिया जाता है।",
+    "tour.s3.step.4":
+      "यदि कोई बदलाव अस्वीकार हो जाए, तो बोर्ड फिर से लोड होकर मामले की वास्तविक स्थिति दिखाता है।",
     "tour.s4.title": "डुप्लिकेट जाँचना और विलय करना",
-    "tour.s4.summary": "एक ही मामले का दूसरा रिकॉर्ड पकड़ें, फिर उसे उस रिकॉर्ड में मिला दें जिसे आप रखना चाहते हैं।",
-    "tour.s4.step.1": "किसी मामले के पृष्ठ पर «डुप्लिकेट जाँचें» चुनें; मिलान सीमा से ऊपर स्कोर वाले संग्रहीत मामले अपने स्कोर और विश्वास के साथ दिखेंगे।",
-    "tour.s4.step.2": "मेनू से «विलय» खोलें और «मुख्य मामले की ID» (जो बचा रहेगा) तथा «डुप्लिकेट मामले की ID» भरें।",
-    "tour.s4.step.3": "चाहें तो «कारण» जोड़ें, मुख्य और डुप्लिकेट की तुलना के लिए «पूर्वावलोकन लोड करें» चुनें, फिर «विलय करें» चुनकर पुष्टि करें।",
-    "tour.s4.step.4": "डुप्लिकेट मुख्य मामले में मिल जाता है और सॉफ़्ट-डिलीट हो जाता है; «हाल के विलय» में हर विलय का समय और करने वाला दिखता है।",
+    "tour.s4.summary":
+      "एक ही मामले का दूसरा रिकॉर्ड पकड़ें, फिर उसे उस रिकॉर्ड में मिला दें जिसे आप रखना चाहते हैं।",
+    "tour.s4.step.1":
+      "किसी मामले के पृष्ठ पर «डुप्लिकेट जाँचें» चुनें; मिलान सीमा से ऊपर स्कोर वाले संग्रहीत मामले अपने स्कोर और विश्वास के साथ दिखेंगे।",
+    "tour.s4.step.2":
+      "मेनू से «विलय» खोलें और «मुख्य मामले की ID» (जो बचा रहेगा) तथा «डुप्लिकेट मामले की ID» भरें।",
+    "tour.s4.step.3":
+      "चाहें तो «कारण» जोड़ें, मुख्य और डुप्लिकेट की तुलना के लिए «पूर्वावलोकन लोड करें» चुनें, फिर «विलय करें» चुनकर पुष्टि करें।",
+    "tour.s4.step.4":
+      "डुप्लिकेट मुख्य मामले में मिल जाता है और सॉफ़्ट-डिलीट हो जाता है; «हाल के विलय» में हर विलय का समय और करने वाला दिखता है।",
     "tour.s5.title": "दर्ज करना कि मामला किसके बारे में है",
-    "tour.s5.summary": "किसी मामले को संबंधित व्यक्ति से उसके ब्योरे की प्रतिलिपि बनाए बिना, संदर्भ द्वारा जोड़ें।",
-    "tour.s5.step.1": "«मामले» से कोई मामला खोलें और उसके पृष्ठ पर «इस मामले का विषय व्यक्ति» पैनल देखें।",
-    "tour.s5.step.2": "«व्यक्ति» का संदर्भ person:<uuid> रूप में भरें; चाहें तो «विश्वास» (0 से 1), «स्रोत», «इस तिथि से मान्य» और «इस तिथि तक मान्य» भी भरें।",
+    "tour.s5.summary":
+      "किसी मामले को संबंधित व्यक्ति से उसके ब्योरे की प्रतिलिपि बनाए बिना, संदर्भ द्वारा जोड़ें।",
+    "tour.s5.step.1":
+      "«मामले» से कोई मामला खोलें और उसके पृष्ठ पर «इस मामले का विषय व्यक्ति» पैनल देखें।",
+    "tour.s5.step.2":
+      "«व्यक्ति» का संदर्भ person:<uuid> रूप में भरें; चाहें तो «विश्वास» (0 से 1), «स्रोत», «इस तिथि से मान्य» और «इस तिथि तक मान्य» भी भरें।",
     "tour.s5.step.3": "«व्यक्ति दर्ज करें» चुनें और लिंक पैनल में दिखाई देगा।",
-    "tour.s5.step.4": "इसे पलटने के लिए «वापस लें» चुनकर पुष्टि करें। दोनों कार्रवाइयों का ऑडिट होता है और उनके लिए मामले जितनी ही अनुमति चाहिए।",
+    "tour.s5.step.4":
+      "इसे पलटने के लिए «वापस लें» चुनकर पुष्टि करें। दोनों कार्रवाइयों का ऑडिट होता है और उनके लिए मामले जितनी ही अनुमति चाहिए।",
     "tour.s6.title": "ऑडिट इतिहास देखना",
-    "tour.s6.summary": "देखें कि किसी मामले के साथ क्या और कब हुआ, या सभी मामलों की हाल की गतिविधि देखें।",
-    "tour.s6.step.1": "मेनू से «गतिविधि» खोलें और «हाल की ऑडिट प्रविष्टियाँ» तथा «हाल की घटनाएँ» देखें।",
-    "tour.s6.step.2": "हर प्रविष्टि पढ़ें और देखें कि क्या बदला और बदलाव किसने किया।",
-    "tour.s6.step.3": "किसी एक मामले पर ध्यान देने के लिए उसे खोलें और «ऑडिट इतिहास देखें» चुनें।",
-    "tour.s6.step.4": "लौटने के लिए «मामले पर वापस जाएँ» चुनें। प्रविष्टियाँ केवल जुड़ती हैं, इसलिए इतिहास चुपचाप दोबारा नहीं लिखा जा सकता।",
+    "tour.s6.summary":
+      "देखें कि किसी मामले के साथ क्या और कब हुआ, या सभी मामलों की हाल की गतिविधि देखें।",
+    "tour.s6.step.1":
+      "मेनू से «गतिविधि» खोलें और «हाल की ऑडिट प्रविष्टियाँ» तथा «हाल की घटनाएँ» देखें।",
+    "tour.s6.step.2":
+      "हर प्रविष्टि पढ़ें और देखें कि क्या बदला और बदलाव किसने किया।",
+    "tour.s6.step.3":
+      "किसी एक मामले पर ध्यान देने के लिए उसे खोलें और «ऑडिट इतिहास देखें» चुनें।",
+    "tour.s6.step.4":
+      "लौटने के लिए «मामले पर वापस जाएँ» चुनें। प्रविष्टियाँ केवल जुड़ती हैं, इसलिए इतिहास चुपचाप दोबारा नहीं लिखा जा सकता।",
     "signin.sso": "SSO से साइन इन करें",
   },
   "zh-cn": {
@@ -2206,7 +2467,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "splash.hero.title": "每个案件，一份清晰记录",
@@ -2254,48 +2516,67 @@ const STRINGS = {
     "tour.open": "打开此页面",
     "tour.top": "返回顶部",
     "tour.start.title": "开始之前",
-    "tour.start.summary": "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
+    "tour.start.summary":
+      "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
     "tour.start.step.1": "点击右上角的“登录”，输入你的邮箱地址。",
-    "tour.start.step.2": "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
+    "tour.start.step.2":
+      "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
     "tour.start.step.3": "你会以已登录状态回到应用，无需记忆或重置任何内容。",
-    "tour.start.step.4": "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
-    "tour.intro": "案件登记库的图文导览：每个页面的作用和使用步骤，从开立案件到合并重复记录、查看案件历史。",
+    "tour.start.step.4":
+      "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
+    "tour.intro":
+      "案件登记库的图文导览：每个页面的作用和使用步骤，从开立案件到合并重复记录、查看案件历史。",
     "tour.s1.title": "开立案件",
-    "tour.s1.summary": "在共享记录中一次性登记案件，包含机构、案件编号、类型、状态和标识符。",
+    "tour.s1.summary":
+      "在共享记录中一次性登记案件，包含机构、案件编号、类型、状态和标识符。",
     "tour.s1.step.1": "从菜单中打开“新建案件”。",
-    "tour.s1.step.2": "填写“标题”（唯一必填项），然后选择“案件类型”“状态”和“优先级”。",
-    "tour.s1.step.3": "添加“机构 ID”和“机构名称”、“案件编号”、“开立日期”，以及任何主题、关键词或标识符。",
-    "tour.s1.step.4": "选择“创建”保存。随后进入新案件的页面，之后可通过“编辑”修改。",
+    "tour.s1.step.2":
+      "填写“标题”（唯一必填项），然后选择“案件类型”“状态”和“优先级”。",
+    "tour.s1.step.3":
+      "添加“机构 ID”和“机构名称”、“案件编号”、“开立日期”，以及任何主题、关键词或标识符。",
+    "tour.s1.step.4":
+      "选择“创建”保存。随后进入新案件的页面，之后可通过“编辑”修改。",
     "tour.s2.title": "查找案件",
     "tour.s2.summary": "按标题、主题、机构或标识符搜索，然后打开所需案件。",
     "tour.s2.step.1": "登录后从菜单打开“案件”；搜索框上方会列出所有有效案件。",
     "tour.s2.step.2": "输入标题、主题、机构或标识符，然后选择“搜索”。",
-    "tour.s2.step.3": "勾选“模糊”可容忍拼写错误，勾选“语音”可匹配发音相近的名称。",
-    "tour.s2.step.4": "选择一条结果打开其页面。/cases 处的表格也会列出所有案件，并可按“标题”筛选。",
+    "tour.s2.step.3":
+      "勾选“模糊”可容忍拼写错误，勾选“语音”可匹配发音相近的名称。",
+    "tour.s2.step.4":
+      "选择一条结果打开其页面。/cases 处的表格也会列出所有案件，并可按“标题”筛选。",
     "tour.s3.title": "在看板上跟踪工作",
     "tour.s3.summary": "查看按状态分组的所有案件，并通过拖拽推进工作。",
     "tour.s3.step.1": "从菜单中打开“看板”。",
-    "tour.s3.step.2": "查看各列：Open、InProgress、Pending、OnHold、Resolved 和 Closed，每列以卡片形式显示其案件。",
+    "tour.s3.step.2":
+      "查看各列：Open、InProgress、Pending、OnHold、Resolved 和 Closed，每列以卡片形式显示其案件。",
     "tour.s3.step.3": "将卡片拖到另一列即可更改该案件的状态；更改会立即保存。",
     "tour.s3.step.4": "如果更改被拒绝，看板会重新加载并显示案件的真实状态。",
     "tour.s4.title": "检查重复并合并",
     "tour.s4.summary": "发现同一案件的第二条记录，再将其并入保留的记录。",
-    "tour.s4.step.1": "在案件页面选择“检查重复”，列出得分高于匹配阈值的已有案件及其得分和置信度。",
-    "tour.s4.step.2": "从菜单打开“合并”，输入保留的“主案件 ID”和“重复案件 ID”。",
-    "tour.s4.step.3": "可选填“原因”，选择“加载预览”对比主案件和重复案件，然后选择“合并”并确认。",
-    "tour.s4.step.4": "重复案件被并入主案件并被软删除；“最近的合并”会列出每次合并的时间和操作人。",
+    "tour.s4.step.1":
+      "在案件页面选择“检查重复”，列出得分高于匹配阈值的已有案件及其得分和置信度。",
+    "tour.s4.step.2":
+      "从菜单打开“合并”，输入保留的“主案件 ID”和“重复案件 ID”。",
+    "tour.s4.step.3":
+      "可选填“原因”，选择“加载预览”对比主案件和重复案件，然后选择“合并”并确认。",
+    "tour.s4.step.4":
+      "重复案件被并入主案件并被软删除；“最近的合并”会列出每次合并的时间和操作人。",
     "tour.s5.title": "记录案件涉及的当事人",
     "tour.s5.summary": "通过引用将案件关联到相关当事人，而无需复制其详细信息。",
-    "tour.s5.step.1": "从“案件”打开一个案件，在其页面找到“本案件涉及的当事人”面板。",
-    "tour.s5.step.2": "按 person:<uuid> 的格式输入“当事人”引用；可选设置“置信度”（0 到 1）、“来源”、“生效日期”和“失效日期”。",
+    "tour.s5.step.1":
+      "从“案件”打开一个案件，在其页面找到“本案件涉及的当事人”面板。",
+    "tour.s5.step.2":
+      "按 person:<uuid> 的格式输入“当事人”引用；可选设置“置信度”（0 到 1）、“来源”、“生效日期”和“失效日期”。",
     "tour.s5.step.3": "选择“记录当事人”，关联即会出现在面板中。",
-    "tour.s5.step.4": "如需撤销，选择“撤回”并确认。两项操作都会被审计，并需要与案件本身相同的授权。",
+    "tour.s5.step.4":
+      "如需撤销，选择“撤回”并确认。两项操作都会被审计，并需要与案件本身相同的授权。",
     "tour.s6.title": "查看审计记录",
     "tour.s6.summary": "查看案件何时发生了什么，或关注所有案件的最新活动。",
     "tour.s6.step.1": "从菜单打开“活动”，查看“最近的审计记录”和“最近的事件”。",
     "tour.s6.step.2": "阅读每条记录，了解改动了什么以及是谁改的。",
     "tour.s6.step.3": "要聚焦某个案件，请打开它并选择“查看审计记录”。",
-    "tour.s6.step.4": "选择“返回案件”即可返回。记录只增不改，因此历史无法被悄悄改写。",
+    "tour.s6.step.4":
+      "选择“返回案件”即可返回。记录只增不改，因此历史无法被悄悄改写。",
     "signin.sso": "使用 SSO 登录",
   },
 } as const;

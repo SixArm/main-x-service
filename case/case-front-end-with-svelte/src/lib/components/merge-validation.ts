@@ -8,7 +8,7 @@
 // renders the message in the selected locale; the caller passes it to
 // `translate` / `t`.
 
-import type { StringKey } from "$lib/i18n.svelte";
+import type { StringKey } from "#lib/i18n.svelte.js";
 
 /**
  * Validate a merge request's ids before issuing the POST.

@@ -7,10 +7,10 @@
 -->
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import CaseForm from "$lib/components/CaseForm.svelte";
-  import { CaseRepository } from "$lib/api/cases";
-  import type { Case } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import CaseForm from "#lib/components/CaseForm.svelte";
+  import { CaseRepository } from "#lib/api/cases.js";
+  import type { Case } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const repo = CaseRepository.withFetch();
   // Empty seed — only the required title, blank.

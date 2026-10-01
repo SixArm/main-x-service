@@ -23,12 +23,12 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import { CaseRepository } from "$lib/api/cases";
-  import { ApiError } from "$lib/api/client";
-  import { SUBJECT_OF } from "$lib/api/types";
-  import type { EntityLink } from "$lib/api/types";
-  import { validateLink } from "$lib/components/link-validation";
-  import { t, translate } from "$lib/i18n.svelte";
+  import { CaseRepository } from "#lib/api/cases.js";
+  import { ApiError } from "#lib/api/client.js";
+  import { SUBJECT_OF } from "#lib/api/types.js";
+  import type { EntityLink } from "#lib/api/types.js";
+  import { validateLink } from "#lib/components/link-validation.js";
+  import { t, translate } from "#lib/i18n.svelte.js";
 
   interface Props {
     /** Persistent id of the case whose links this panel manages. */

@@ -10,7 +10,7 @@
 // English sentence, so the panel renders the message in the selected
 // locale via `t` / `translate`.
 
-import type { StringKey } from "$lib/i18n.svelte";
+import type { StringKey } from "#lib/i18n.svelte.js";
 
 /**
  * A person `EntityRef` URN: the literal type token `person`, a colon, and

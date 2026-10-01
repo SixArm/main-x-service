@@ -14,10 +14,10 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { CaseRepository } from "$lib/api/cases";
-  import LinksPanel from "$lib/components/LinksPanel.svelte";
-  import type { Case, ScoredRef } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import { CaseRepository } from "#lib/api/cases.js";
+  import LinksPanel from "#lib/components/LinksPanel.svelte";
+  import type { Case, ScoredRef } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const repo = CaseRepository.withFetch();
   // Route param; `?? ""` satisfies strict typing (params may be undefined).

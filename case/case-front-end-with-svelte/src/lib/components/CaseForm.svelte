@@ -26,15 +26,15 @@
     ALL_PRIORITIES,
     ALL_SCHEMES,
     ALL_STATUSES,
-  } from "$lib/api/types";
+  } from "#lib/api/types.js";
   import type {
     Case,
     CaseStatus,
     CaseType,
     IdentifierScheme,
     Priority,
-  } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   let {
     initial,

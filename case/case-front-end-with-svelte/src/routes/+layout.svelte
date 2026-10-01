@@ -1,28 +1,11 @@
-<!--
-  Root layout — chrome shared by every route.
-
-  Purpose:
-    Renders the top navigation bar (hamburger nav, brand, and an
-    always-visible header end: Sign in / Sign out + the Lily PickerBar)
-    plus the routed page.
-
-  $props:
-    - children: Snippet — the routed page content (`{@render children()}`).
-    - data: LayoutData — `signedIn` resolved server-side from the httpOnly
-            session cookie (`+layout.server.ts`).
-
-  Session affordance: per-app magic-link login on this app's own `/signin`;
-  sign-out posts to the root page's `signout` action (BFF: revokes the
-  session server-side + clears the cookie). The browser never holds a token.
--->
 <script lang="ts">
   import "../app.css";
-  import { browser } from "$app/environment";
+  import { browser } from '$app/env';
   import { page } from "$app/state";
   import { enhance } from "$app/forms";
   import type { Snippet } from "svelte";
   import type { LayoutData } from "./$types";
-  import { i18n, t, isRtl, LOCALES, LOCALE_LABELS, type StringKey } from "$lib/i18n.svelte";
+  import { i18n, t, isRtl, LOCALES, LOCALE_LABELS, type StringKey } from "#lib/i18n.svelte.js";
   import PickerBar from "@lilydesignsystem/svelte-picker-bar";
   import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
@@ -110,6 +93,24 @@
   const signedIn = $derived(data.signedIn);
 </script>
 
+<!--
+  Root layout — chrome shared by every route.
+
+  Purpose:
+    Renders the top navigation bar (hamburger nav, brand, and an
+    always-visible header end: Sign in / Sign out + the Lily PickerBar)
+    plus the routed page.
+
+  $props:
+    - children: Snippet — the routed page content (`{@render children()}`).
+    - data: LayoutData — `signedIn` resolved server-side from the httpOnly
+            session cookie (`+layout.server.ts`).
+
+  Session affordance: per-app magic-link login on this app's own `/signin`;
+  sign-out posts to the root page's `signout` action (BFF: revokes the
+  session server-side + clears the cookie). The browser never holds a token.
+-->
+
 <div class="layout">
   <header class="topbar">
     <button
@@ -118,10 +119,9 @@
       aria-expanded={menuOpen}
       aria-controls="primary-nav"
       aria-label={t("nav.toggle")}
-      onclick={() => (menuOpen = !menuOpen)}
-    >
-      <span class="hamburger-box" aria-hidden="true"></span>
-    </button>
+      onclick={() => menuOpen = !menuOpen}
+    ><span class="hamburger-box" aria-hidden="true"></span></button>
+
     <a href="/" class="brand">{t("brand.name")}</a>
     <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
       <ul>
@@ -130,10 +130,8 @@
             <a
               href={item.href}
               aria-current={page.url.pathname === item.href ? "page" : undefined}
-              onclick={() => (menuOpen = false)}
-            >
-              {t(item.key)}
-            </a>
+              onclick={() => menuOpen = false}
+            >{t(item.key)}</a>
           </li>
         {/each}
       </ul>

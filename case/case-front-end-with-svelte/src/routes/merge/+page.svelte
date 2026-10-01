@@ -25,11 +25,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { CaseRepository } from "$lib/api/cases";
-  import { ApiError } from "$lib/api/client";
-  import { validateMerge } from "$lib/components/merge-validation";
-  import type { Case, MergeRecordRow, MergeResponse } from "$lib/api/types";
-  import { t, translate } from "$lib/i18n.svelte";
+  import { CaseRepository } from "#lib/api/cases.js";
+  import { ApiError } from "#lib/api/client.js";
+  import { validateMerge } from "#lib/components/merge-validation.js";
+  import type { Case, MergeRecordRow, MergeResponse } from "#lib/api/types.js";
+  import { t, translate } from "#lib/i18n.svelte.js";
 
   const repo = CaseRepository.withFetch();
 
