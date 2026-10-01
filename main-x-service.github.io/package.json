@@ -21,13 +21,13 @@
     "@lilydesignsystem/themes": "0.1.0"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.0",
-    "@sveltejs/kit": "^2.55.0",
-    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.70.3",
+    "@sveltejs/vite-plugin-svelte": "^5.1.1",
     "svelte": "^5.57.1",
-    "svelte-check": "^4.2.0",
+    "svelte-check": "^4.7.6",
     "typescript": "^6.0.3",
-    "vite": "^6.2.0"
+    "vite": "^6.4.3"
   },
   "repository": {
     "type": "git",
