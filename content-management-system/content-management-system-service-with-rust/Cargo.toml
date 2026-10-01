@@ -22,7 +22,7 @@ include = ["src/**/*", "README.md"]
 # and this family issues PASETO v4.public rather than JWT — see
 # agents/share/jwt.md. Dropping it removes the vulnerable crate from the
 # dependency graph rather than suppressing the advisory.
-loco-rs = { version = "1.1.0", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
+loco-rs = { version = "1.2.0", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
 
 [dependencies]
 loco-rs = { workspace = true }
@@ -46,7 +46,7 @@ sea-orm = { version = "2.0", features = [
   "macros",
 ] }
 chrono = { version = "0.4" }
-uuid = { version = "1.24", features = ["v4", "serde"] }
+uuid = { version = "1.26", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }
 prometheus = { version = "0.14" }
 # Upstream display-name lookups (`http` client mode only; stub is the

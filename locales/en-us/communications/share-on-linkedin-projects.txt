@@ -1,0 +1,13 @@
+Title: Main X Index — a federated identity index for healthcare and government records (Rust, Loco, PostgreSQL)
+
+Main X Index is a family of Rust services that form a federated identity index — separate registries for people, workers, places, organizations, care pathways, government cases, and more, each with its own matching engine, full-text search, and audit trail, linked together by a shared cross-service graph.
+
+I started it to answer a question that comes up constantly in healthcare and government systems: how do you know two records — a patient here, a claimant there — refer to the same real person, across services that were never designed to share a database? Rather than one monolith, each entity gets its own crate: its own matcher (Jaro-Winkler, deterministic short-circuits, phonetic scoring), its own PostgreSQL-backed registry on Loco/Axum, its own SvelteKit operator front-end. A read-only aggregator stitches the cross-service graph together asynchronously, so no service ever blocks on another.
+
+My role has covered the whole stack: the matching algorithms, the attribute-based authorization model, PASETO-based cross-service authentication (deliberately not JWT), FHIR R5 exposure, and the compliance scaffolding — audit trails, SBOMs, IEC 62304 traceability — that this kind of data actually demands. It's still growing; the newest pieces are time-based process analysis and enterprise identity federation.
+
+If you've built record-matching or deduplication systems, or worked the HIPAA/GDPR side of a registry like this, I'd love to compare notes — especially on where a probabilistic match should stay a suggestion rather than become an automatic merge.
+
+Link and screenshots attached below. Tagging collaborators who've contributed to specific services.
+
+Skills: Rust, PostgreSQL, Record Linkage, HL7 FHIR, Data Governance
