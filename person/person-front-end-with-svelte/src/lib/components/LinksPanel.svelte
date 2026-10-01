@@ -22,16 +22,16 @@
 -->
 <script lang="ts">
     import { onMount } from "svelte";
-    import { PersonRepository } from "$lib/api/persons.js";
-    import type { CreateLinkRequest, EntityLink } from "$lib/api/types.js";
+    import { PersonRepository } from "#lib/api/persons.js";
+    import type { CreateLinkRequest, EntityLink } from "#lib/api/types.js";
     import {
         PERSON_LINK_KINDS,
         refPlaceholder,
         validateToRef,
         expectedTargetType,
         type PersonLinkKind,
-    } from "$lib/links.js";
-    import { t } from "$lib/i18n.svelte.js";
+    } from "#lib/links.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let { personId }: { personId: string } = $props();
 

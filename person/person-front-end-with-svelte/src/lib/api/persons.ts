@@ -1,5 +1,5 @@
 import { ApiClient } from "./client.js";
-import { dryRunFormValue, type BulkImportFormat } from "$lib/bulk.js";
+import { dryRunFormValue, type BulkImportFormat } from "#lib/bulk.js";
 import type {
   AuditEntry,
   BatchDeduplicationRequest,
@@ -19,7 +19,7 @@ import type {
   ReviewQueueListResponse,
   ReviewStatus,
 } from "./types.js";
-import { API_BASE_URL } from "$lib/config.js";
+import { API_BASE_URL } from "#lib/config.js";
 
 /** Parameters for {@link PersonRepository.search}. */
 export interface SearchOptions {

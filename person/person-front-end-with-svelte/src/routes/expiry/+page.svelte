@@ -10,9 +10,9 @@
     import { goto } from "$app/navigation";
     import { Calendar, Willow } from "@svar-ui/svelte-calendar";
     import type { CalendarInstanceApi } from "@svar-ui/svelte-calendar";
-    import { PersonRepository } from "$lib/api/persons";
-    import type { Person } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte.js";
+    import { PersonRepository } from "#lib/api/persons.js";
+    import type { Person } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = PersonRepository.withFetch();
 

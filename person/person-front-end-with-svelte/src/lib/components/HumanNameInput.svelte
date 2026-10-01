@@ -14,10 +14,10 @@
     - givenJoined ($derived) — the given[] array rendered as a single string.
 -->
 <script lang="ts">
-    import type { HumanName } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
+    import type { HumanName } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
 
     let {
         name = $bindable(),

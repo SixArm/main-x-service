@@ -29,9 +29,9 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
-    import { PersonRepository } from "$lib/api/persons.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { AuditEntry } from "$lib/api/types.js";
+    import { PersonRepository } from "#lib/api/persons.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { AuditEntry } from "#lib/api/types.js";
 
     /** Page size for the initial load and each "load more" click. */
     const PAGE_SIZE = 100;

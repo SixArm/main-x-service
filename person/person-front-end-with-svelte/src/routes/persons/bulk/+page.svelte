@@ -21,11 +21,11 @@
 -->
 <script lang="ts">
     import { onDestroy, onMount } from "svelte";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { PersonRepository } from "$lib/api/persons.js";
-    import { ApiError } from "$lib/api/client.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { PersonRepository } from "#lib/api/persons.js";
+    import { ApiError } from "#lib/api/client.js";
+    import { t } from "#lib/i18n.svelte.js";
     import {
         BULK_IMPORT_FORMATS,
         BULK_FORMATS,
@@ -37,8 +37,8 @@
         type BulkFormat,
         type BulkImportFormat,
         type MaskingProfile,
-    } from "$lib/bulk.js";
-    import type { BulkJobView } from "$lib/api/types.js";
+    } from "#lib/bulk.js";
+    import type { BulkJobView } from "#lib/api/types.js";
 
     const repo = PersonRepository.withFetch();
 

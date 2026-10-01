@@ -20,12 +20,12 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { PersonRepository } from "$lib/api/persons.js";
-    import { ApiError } from "$lib/api/client.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { MergeResponse, Person } from "$lib/api/types.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { PersonRepository } from "#lib/api/persons.js";
+    import { ApiError } from "#lib/api/client.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { MergeResponse, Person } from "#lib/api/types.js";
 
     const repo = PersonRepository.withFetch();
 

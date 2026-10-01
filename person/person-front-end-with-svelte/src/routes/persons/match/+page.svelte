@@ -11,12 +11,12 @@
     - error / loading — request lifecycle.
 -->
 <script lang="ts">
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { PersonRepository } from "$lib/api/persons.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { Gender, MatchRequest, MatchResult } from "$lib/api/types.js";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { PersonRepository } from "#lib/api/persons.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { Gender, MatchRequest, MatchResult } from "#lib/api/types.js";
 
     const repo = PersonRepository.withFetch();
 

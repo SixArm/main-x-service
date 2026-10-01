@@ -15,10 +15,10 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import PersonForm from "$lib/components/PersonForm.svelte";
-    import { PersonRepository } from "$lib/api/persons.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { Person } from "$lib/api/types.js";
+    import PersonForm from "#lib/components/PersonForm.svelte";
+    import { PersonRepository } from "#lib/api/persons.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { Person } from "#lib/api/types.js";
 
     const repo = PersonRepository.withFetch();
     let person = $state<Person | null>(null);

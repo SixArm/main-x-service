@@ -412,7 +412,7 @@ export interface ReviewQueueItem {
    * `MatchScoreBreakdown` serialized verbatim (a flat object of seven
    * `f64` keys), or `null` when none was recorded. Typed `unknown`
    * because the server sends `Option<serde_json::Value>` and makes no
-   * schema promise; `breakdownRows()` in `$lib/review` narrows it.
+   * schema promise; `breakdownRows()` in `#lib/review.js` narrows it.
    */
   score_breakdown?: unknown;
   /** Current disposition. */
@@ -494,7 +494,7 @@ export interface BulkJobView {
   entity: string;
   /** File format token (`jsonl` / `csv` / `parquet`). */
   format: string;
-  /** Lifecycle status; see `BULK_JOB_STATUSES` in `$lib/bulk`. */
+  /** Lifecycle status; see `BULK_JOB_STATUSES` in `#lib/bulk.js`. */
   status: string;
   /** Total record rows, once the worker has counted them. */
   rows_total: number | null;

@@ -12,11 +12,11 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import SearchBox from "$lib/components/SearchBox.svelte";
-    import PersonGrid from "$lib/components/PersonGrid.svelte";
-    import { PersonRepository } from "$lib/api/persons.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { Person } from "$lib/api/types.js";
+    import SearchBox from "#lib/components/SearchBox.svelte";
+    import PersonGrid from "#lib/components/PersonGrid.svelte";
+    import { PersonRepository } from "#lib/api/persons.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { Person } from "#lib/api/types.js";
 
     let query = $state("");
     let persons = $state<Person[]>([]);
