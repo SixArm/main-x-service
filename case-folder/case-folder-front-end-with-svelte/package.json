@@ -28,7 +28,7 @@
     "@playwright/test": "^1.63.0",
     "@sveltejs/adapter-auto": "^4.0.0",
     "@sveltejs/kit": "^2.70.3",
-    "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/svelte": "^5.4.2",
     "@types/node": "^22.20.4",
