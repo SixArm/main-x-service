@@ -109,7 +109,6 @@ extra_test_features_for() {
     course/course-service-with-loco|\
     care-pathway/care-pathway-service-with-loco|\
     case/case-service-with-loco|\
-    project-portfolio-management/project-portfolio-management-service-with-loco|\
     link/link-graph-service-with-loco|\
     patient-flow/patient-flow-service-with-rust|\
     workforce-planning-management/workforce-planning-management-service-with-rust|\

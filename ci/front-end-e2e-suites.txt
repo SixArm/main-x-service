@@ -22,7 +22,6 @@ organization/organization-front-end-with-svelte
 patient-flow/patient-flow-front-end-with-svelte
 person/person-front-end-with-svelte
 place/place-front-end-with-svelte
-project-portfolio-management/project-portfolio-management-front-end-with-svelte
 thing/thing-front-end-with-svelte
 worker/worker-front-end-with-svelte
 workforce-planning-management/workforce-planning-management-front-end-with-svelte

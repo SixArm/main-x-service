@@ -41,7 +41,6 @@ event/event-service-with-loco
 link/link-graph-service-with-loco
 patient-flow/patient-flow-service-with-rust
 place/place-service-with-loco
-project-portfolio-management/project-portfolio-management-service-with-loco
 thing/thing-service-with-loco
 #
 # The last eight were enrolled together on 2026-08-01, after every

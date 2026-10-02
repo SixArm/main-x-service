@@ -45,7 +45,6 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 - [organization-service](organization/organization-service-with-loco/spec/index.md): Organization registry (schema.org/Organization); family FHIR reference implementation
 - [care-pathway-service](care-pathway/care-pathway-service-with-loco/spec/index.md): Clinical care-pathway registry
 - [case-service](case/case-service-with-loco/spec/index.md): Governmental case-tracking registry
-- [project-portfolio-management-service](project-portfolio-management/project-portfolio-management-service-with-loco/spec/index.md): Plan registry — one recursive tree; a full PM suite (goals/tasks/issues/timeline/burndown)
 
 ## Matcher crates (dependency-light comparison libraries)
 
@@ -58,7 +57,6 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 - [organization-matcher](organization/organization-matcher-rust-crate/spec/index.md): Organization matching (name, address, LEI/DUNS/GLN/…)
 - [care-pathway-matcher](care-pathway/care-pathway-matcher-rust-crate/spec/index.md): Clinical care-pathway matching
 - [case-matcher](case/case-matcher-rust-crate/spec/index.md): Governmental case matching
-- [project-portfolio-management-matcher](project-portfolio-management/project-portfolio-management-matcher-rust-crate/spec/index.md): Plan matching (no kind gate)
 
 ## Library crates (peer-side, not services or matchers)
 
@@ -86,7 +84,6 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 - [organization-front-end-with-svelte](organization/organization-front-end-with-svelte/spec/index.md): Operator UI for Organization
 - [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/spec/index.md): Operator UI for care pathways
 - [case-front-end-with-svelte](case/case-front-end-with-svelte/spec/index.md): Operator UI for governmental cases
-- [project-portfolio-management-front-end-with-svelte](project-portfolio-management/project-portfolio-management-front-end-with-svelte/spec/index.md): Operator UI plus Kanban/Gantt/burndown project-management views
 
 ## Consumer applications (build on the registries)
 

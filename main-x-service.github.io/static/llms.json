@@ -201,8 +201,6 @@
           "description": "Governmental case-tracking registry"
         },
         {
-          "title": "project-portfolio-management-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-service-with-loco/spec/index.md",
           "description": "Plan registry \u2014 one recursive tree; a full PM suite (goals/tasks/issues/timeline/burndown)"
         }
       ]
@@ -256,8 +254,6 @@
           "description": "Governmental case matching"
         },
         {
-          "title": "project-portfolio-management-matcher",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-matcher-rust-crate/spec/index.md",
           "description": "Plan matching (no kind gate)"
         }
       ]
@@ -356,8 +352,6 @@
           "description": "Operator UI for governmental cases"
         },
         {
-          "title": "project-portfolio-management-front-end-with-svelte",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-front-end-with-svelte/spec/index.md",
           "description": "Operator UI plus Kanban/Gantt/burndown project-management views"
         }
       ]

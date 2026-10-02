@@ -37,7 +37,7 @@
 # and authentication, 5160 for link-graph):
 #
 #   8081 person        8085 event          8089 case
-#   8082 worker         8086 course         8090 portfolio
+#   8082 worker         8086 course         (8090 was portfolio — extracted)
 #   8083 place          8087 organization   8091 authentication
 #   8084 thing           8088 care-pathway   8092 link-graph
 
@@ -385,45 +385,6 @@ services:
     ports: ["8089:5150"]
     depends_on:
       case-migrate:
-        condition: service_completed_successfully
-    healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-    networks: [mxi-family]
-
-  # ---- portfolio (project-portfolio-management) ------------------------
-  portfolio-migrate:
-    build:
-      context: ../..
-      dockerfile: project-portfolio-management/project-portfolio-management-service-with-loco/Dockerfile
-    image: mxi-family-portfolio-service
-    entrypoint: ["/app/project-portfolio-management-service"]
-    command: ["db", "migrate", "-e", "production"]
-    environment:
-      <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/portfolio
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks: [mxi-family]
-
-  portfolio-service:
-    build:
-      context: ../..
-      dockerfile: project-portfolio-management/project-portfolio-management-service-with-loco/Dockerfile
-    image: mxi-family-portfolio-service
-    # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/project-portfolio-management-service", "start", "--server-and-worker"]
-    restart: unless-stopped
-    environment:
-      <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/portfolio
-    ports: ["8090:5150"]
-    depends_on:
-      portfolio-migrate:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]

@@ -49,7 +49,6 @@ discipline, including the anti-patterns.
 | [organization-service](organization/organization-service-with-loco/) | Organization (schema.org/Organization) | [spec](organization/organization-service-with-loco/spec/index.md) · [index](organization/organization-service-with-loco/index.md) |
 | [care-pathway-service](care-pathway/care-pathway-service-with-loco/) | Care pathway (clinical pathway) | [spec](care-pathway/care-pathway-service-with-loco/spec/index.md) · [index](care-pathway/care-pathway-service-with-loco/index.md) |
 | [case-service](case/case-service-with-loco/) | Case (governmental case tracking) | [spec](case/case-service-with-loco/spec/index.md) · [index](case/case-service-with-loco/index.md) |
-| [project-portfolio-management-service](project-portfolio-management/project-portfolio-management-service-with-loco/) | Plan (one recursive tree; `kind` is a label, not a gate) | [spec](project-portfolio-management/project-portfolio-management-service-with-loco/spec/index.md) · [index](project-portfolio-management/project-portfolio-management-service-with-loco/index.md) |
 
 What each service actually carries — the honest per-crate capability
 matrix — is in [overview.md](agents/share/overview.md); duplicating it
@@ -74,7 +73,6 @@ the corresponding service crate's matching layer.
 | [organization-matcher](organization/organization-matcher-rust-crate/) | Organization | [spec](organization/organization-matcher-rust-crate/spec/index.md) · [index](organization/organization-matcher-rust-crate/index.md) |
 | [care-pathway-matcher](care-pathway/care-pathway-matcher-rust-crate/) | Care pathway | [spec](care-pathway/care-pathway-matcher-rust-crate/spec/index.md) · [index](care-pathway/care-pathway-matcher-rust-crate/index.md) |
 | [case-matcher](case/case-matcher-rust-crate/) | Case | [spec](case/case-matcher-rust-crate/spec/index.md) · [index](case/case-matcher-rust-crate/index.md) |
-| [project-portfolio-management-matcher](project-portfolio-management/project-portfolio-management-matcher-rust-crate/) | Plan | [spec](project-portfolio-management/project-portfolio-management-matcher-rust-crate/spec/index.md) · [index](project-portfolio-management/project-portfolio-management-matcher-rust-crate/index.md) |
 
 Each matcher's components, weights, and deterministic short-circuits
 are in its own `spec/`; [overview.md](agents/share/overview.md)
@@ -113,7 +111,6 @@ accepted (see `feedback_front_end_drift` memory) — no shared package.
 | [organization-front-end-with-svelte](organization/organization-front-end-with-svelte/)                                                 | [organization-service](organization/organization-service-with-loco/)                                                 | [spec](organization/organization-front-end-with-svelte/spec/index.md)                                 | [CHANGELOG](organization/organization-front-end-with-svelte/CHANGELOG.md)                                 |
 | [care-pathway-front-end-with-svelte](care-pathway/care-pathway-front-end-with-svelte/)                                                 | [care-pathway-service](care-pathway/care-pathway-service-with-loco/)                                                 | [spec](care-pathway/care-pathway-front-end-with-svelte/spec/index.md)                                 | [CHANGELOG](care-pathway/care-pathway-front-end-with-svelte/CHANGELOG.md)                                 |
 | [case-front-end-with-svelte](case/case-front-end-with-svelte/)                                                                         | [case-service](case/case-service-with-loco/)                                                                         | [spec](case/case-front-end-with-svelte/spec/index.md)                                                 | [CHANGELOG](case/case-front-end-with-svelte/CHANGELOG.md)                                                 |
-| [project-portfolio-management-front-end-with-svelte](project-portfolio-management/project-portfolio-management-front-end-with-svelte/) | [project-portfolio-management-service](project-portfolio-management/project-portfolio-management-service-with-loco/) | [spec](project-portfolio-management/project-portfolio-management-front-end-with-svelte/spec/index.md) | [CHANGELOG](project-portfolio-management/project-portfolio-management-front-end-with-svelte/CHANGELOG.md) |
 
 ### Consumer applications
 
@@ -147,6 +144,14 @@ entity. They are not matcher-backed and have no front-end of their own.
 | Service                                                                         | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Spec                                                    |
 | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | [link-graph-service-with-loco](link/link-graph-service-with-loco/spec/index.md) | **Read-model aggregator** for cross-service entity linking — consumes every entity's event stream (+ the new `linked`/`unlinked` events) and serves the queryable cross-service graph (`neighbors` / `single-view` / freshness). The read side of the hybrid topology in [cross-service-linking.md](agents/share/cross-service-linking.md); each entity service owns its own link **writes** (`entity_links` + events). v1 edges: `same_identity` (person↔worker), `works_at`/`member_of` (person→org), `employed_by` (worker→org), `subject_of` (case→person). | [spec](link/link-graph-service-with-loco/spec/index.md) |
+
+### Extracted subprojects
+
+`project-portfolio-management` (the Plan registry, its matcher, and its
+front-end) was extracted with full history into its own repository,
+[https://github.com/project-portfolio-management/project-portfolio-management](https://github.com/project-portfolio-management/project-portfolio-management), and is no longer
+in this monorepo. It still consumes `authentication-verifier` and
+`integrity-mac` from here via pinned git dependencies.
 
 ### GitHub Pages
 

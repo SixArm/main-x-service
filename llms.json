@@ -50,8 +50,7 @@
         { "title": "authentication-service", "url": "authentication/authentication-service-with-loco/spec/index.md", "description": "Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance" },
         { "title": "organization-service", "url": "organization/organization-service-with-loco/spec/index.md", "description": "Organization registry (schema.org/Organization); family FHIR reference implementation" },
         { "title": "care-pathway-service", "url": "care-pathway/care-pathway-service-with-loco/spec/index.md", "description": "Clinical care-pathway registry" },
-        { "title": "case-service", "url": "case/case-service-with-loco/spec/index.md", "description": "Governmental case-tracking registry" },
-        { "title": "project-portfolio-management-service", "url": "project-portfolio-management/project-portfolio-management-service-with-loco/spec/index.md", "description": "Plan registry — one recursive tree; a full PM suite (goals/tasks/issues/timeline/burndown)" }
+        { "title": "case-service", "url": "case/case-service-with-loco/spec/index.md", "description": "Governmental case-tracking registry" }
       ]
     },
     {
@@ -65,8 +64,7 @@
         { "title": "course-matcher", "url": "course/course-matcher-rust-crate/spec/index.md", "description": "Course matching (name, code, level, keywords)" },
         { "title": "organization-matcher", "url": "organization/organization-matcher-rust-crate/spec/index.md", "description": "Organization matching (name, address, LEI/DUNS/GLN/…)" },
         { "title": "care-pathway-matcher", "url": "care-pathway/care-pathway-matcher-rust-crate/spec/index.md", "description": "Clinical care-pathway matching" },
-        { "title": "case-matcher", "url": "case/case-matcher-rust-crate/spec/index.md", "description": "Governmental case matching" },
-        { "title": "project-portfolio-management-matcher", "url": "project-portfolio-management/project-portfolio-management-matcher-rust-crate/spec/index.md", "description": "Plan matching (no kind gate)" }
+        { "title": "case-matcher", "url": "case/case-matcher-rust-crate/spec/index.md", "description": "Governmental case matching" }
       ]
     },
     {
@@ -101,8 +99,7 @@
         { "title": "authentication-front-end-with-svelte", "url": "authentication/authentication-front-end-with-svelte/spec/index.md", "description": "Passwordless magic-link sign up/in/out UI" },
         { "title": "organization-front-end-with-svelte", "url": "organization/organization-front-end-with-svelte/spec/index.md", "description": "Operator UI for Organization" },
         { "title": "care-pathway-front-end-with-svelte", "url": "care-pathway/care-pathway-front-end-with-svelte/spec/index.md", "description": "Operator UI for care pathways" },
-        { "title": "case-front-end-with-svelte", "url": "case/case-front-end-with-svelte/spec/index.md", "description": "Operator UI for governmental cases" },
-        { "title": "project-portfolio-management-front-end-with-svelte", "url": "project-portfolio-management/project-portfolio-management-front-end-with-svelte/spec/index.md", "description": "Operator UI plus Kanban/Gantt/burndown project-management views" }
+        { "title": "case-front-end-with-svelte", "url": "case/case-front-end-with-svelte/spec/index.md", "description": "Operator UI for governmental cases" }
       ]
     },
     {

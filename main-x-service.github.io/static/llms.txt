@@ -47,7 +47,6 @@ Each crate is self-contained (own REST API, own persistence, own matching algori
 - [organization-service](https://github.com/SixArm/main-x-service/blob/main/organization/organization-service-with-loco/spec/index.md): Organization registry (schema.org/Organization); family FHIR reference implementation
 - [care-pathway-service](https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-service-with-loco/spec/index.md): Clinical care-pathway registry
 - [case-service](https://github.com/SixArm/main-x-service/blob/main/case/case-service-with-loco/spec/index.md): Governmental case-tracking registry
-- [project-portfolio-management-service](https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-service-with-loco/spec/index.md): Plan registry — one recursive tree; a full PM suite (goals/tasks/issues/timeline/burndown)
 
 ## Matcher crates (dependency-light comparison libraries)
 
@@ -60,7 +59,6 @@ Each crate is self-contained (own REST API, own persistence, own matching algori
 - [organization-matcher](https://github.com/SixArm/main-x-service/blob/main/organization/organization-matcher-rust-crate/spec/index.md): Organization matching (name, address, LEI/DUNS/GLN/…)
 - [care-pathway-matcher](https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-matcher-rust-crate/spec/index.md): Clinical care-pathway matching
 - [case-matcher](https://github.com/SixArm/main-x-service/blob/main/case/case-matcher-rust-crate/spec/index.md): Governmental case matching
-- [project-portfolio-management-matcher](https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-matcher-rust-crate/spec/index.md): Plan matching (no kind gate)
 
 ## Library crates (peer-side, not services or matchers)
 
@@ -88,7 +86,6 @@ Each crate is self-contained (own REST API, own persistence, own matching algori
 - [organization-front-end-with-svelte](https://github.com/SixArm/main-x-service/blob/main/organization/organization-front-end-with-svelte/spec/index.md): Operator UI for Organization
 - [care-pathway-front-end-with-svelte](https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-front-end-with-svelte/spec/index.md): Operator UI for care pathways
 - [case-front-end-with-svelte](https://github.com/SixArm/main-x-service/blob/main/case/case-front-end-with-svelte/spec/index.md): Operator UI for governmental cases
-- [project-portfolio-management-front-end-with-svelte](https://github.com/SixArm/main-x-service/blob/main/project-portfolio-management/project-portfolio-management-front-end-with-svelte/spec/index.md): Operator UI plus Kanban/Gantt/burndown project-management views
 
 ## Consumer applications (build on the registries)
 
