@@ -43,7 +43,7 @@ reqwest = { version = "0.13", default-features = false, features = [
 # the rest of the family: no native-tls / OpenSSL.
 axum-keycloak-auth = { version = "0.8.3", default-features = false, features = ["rustls-tls"], optional = true }
 
-jsonwebtoken = { version = "9.3", optional = true }
+jsonwebtoken = { version = "11.1", optional = true }
 tokio = { version = "1", features = ["net", "io-util", "rt"], optional = true }
 
 [dev-dependencies]
