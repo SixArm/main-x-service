@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { isHttpError, isRedirect } from '@sveltejs/kit';
-import { oidcLoginUrl } from '$lib/server/auth';
+import { oidcLoginUrl } from '#lib/server/auth.js';
 
 const mockEnv: { PUBLIC_OIDC_SIGNIN_ENABLED?: string } = {};
-vi.mock('$env/dynamic/public', () => ({ env: mockEnv }));
+vi.mock('$app/env/public', () => ({
+    get PUBLIC_OIDC_SIGNIN_ENABLED() {
+        return mockEnv.PUBLIC_OIDC_SIGNIN_ENABLED;
+    },
+}));
 
 describe('oidcLoginUrl', () => {
     it('targets the auth service OIDC login with an encoded return_url', () => {

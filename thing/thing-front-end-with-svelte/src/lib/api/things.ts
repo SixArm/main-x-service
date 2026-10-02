@@ -13,7 +13,7 @@ import type {
   ReviewStatus,
   Thing,
 } from "./types.js";
-import { API_BASE_URL } from "$lib/config.js";
+import { API_BASE_URL } from "#lib/config.js";
 
 /**
  * Query parameters for `GET /api/things/review-queue`.

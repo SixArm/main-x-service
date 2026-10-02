@@ -6,15 +6,15 @@
     // separate reporting store. Covers move throughput (24h / 7d), cabinet
     // utilisation, the in-transit list, and a per-worker activity tally.
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Icon from '$lib/components/Icon/Icon.svelte';
-    import Separator from '$lib/components/Separator/Separator.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
-    import { t, tf } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Icon from '#lib/components/Icon/Icon.svelte';
+    import Separator from '#lib/components/Separator/Separator.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
 

@@ -7,12 +7,12 @@
   the results/error/loading flags.
 -->
 <script lang="ts">
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { EventRepository } from "$lib/api/events.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { MatchRequest, MatchResult } from "$lib/api/types.js";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { EventRepository } from "#lib/api/events.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { MatchRequest, MatchResult } from "#lib/api/types.js";
 
     const repo = EventRepository.withFetch();
 

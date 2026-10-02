@@ -1,6 +1,6 @@
 // Minimal typed fetch wrapper over the BFF proxy.
 
-import { API_BASE_URL } from "$lib/config";
+import { API_BASE_URL } from "#lib/config.js";
 
 /** Error carrying the upstream status + parsed body, for page handling. */
 export class ApiError extends Error {

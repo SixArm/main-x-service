@@ -7,7 +7,7 @@ import type {
   MergeRequest,
   MergeResponse,
 } from "./types.js";
-import { API_BASE_URL } from "$lib/config.js";
+import { API_BASE_URL } from "#lib/config.js";
 
 /**
  * Parameters for {@link EventRepository.search}. `q` is the free-text

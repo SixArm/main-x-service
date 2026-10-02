@@ -8,9 +8,9 @@
 -->
 <script lang="ts">
     import { onMount } from "svelte";
-    import { EventRepository } from "$lib/api/events.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { AuditEntry } from "$lib/api/types.js";
+    import { EventRepository } from "#lib/api/events.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { AuditEntry } from "#lib/api/types.js";
 
     let healthStatus = $state<"ok" | "down" | "loading">("loading");
     let healthMessage = $state<string | null>(null);

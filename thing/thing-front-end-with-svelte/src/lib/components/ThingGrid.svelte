@@ -20,8 +20,8 @@
         Willow as FilterTheme,
         createArrayFilter,
     } from "@svar-ui/svelte-filter";
-    import type { Thing } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import type { Thing } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let {
         things,

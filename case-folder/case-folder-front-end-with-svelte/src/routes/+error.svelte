@@ -4,9 +4,9 @@
     // thrown message and a hint about the `/api` proxy / running the backend.
 
     import { page } from '$app/state';
-    import Alert from '$lib/components/Alert/Alert.svelte';
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import Alert from '#lib/components/Alert/Alert.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 </script>
 
 <BackLink href="/">{t('error.backToDashboard')}</BackLink>

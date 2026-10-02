@@ -5,12 +5,12 @@
     // who moved it, reason) and cross-links to the patient's other
     // folders supplied by the load function.
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import Separator from '$lib/components/Separator/Separator.svelte';
-    import SummaryList from '$lib/components/SummaryList/SummaryList.svelte';
-    import SummaryListItem from '$lib/components/SummaryListItem/SummaryListItem.svelte';
-    import { t, tf, statusLabel } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import Separator from '#lib/components/Separator/Separator.svelte';
+    import SummaryList from '#lib/components/SummaryList/SummaryList.svelte';
+    import SummaryListItem from '#lib/components/SummaryListItem/SummaryListItem.svelte';
+    import { t, tf, statusLabel } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
     const move = $derived(data.move);

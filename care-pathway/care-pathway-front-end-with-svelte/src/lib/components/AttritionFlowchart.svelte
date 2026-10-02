@@ -8,8 +8,8 @@
   shown as a note under the box, not hidden.
 -->
 <script lang="ts">
-  import type { AttritionStep } from "$lib/api/tba";
-  import { layoutAttrition } from "$lib/analytics-transforms";
+  import type { AttritionStep } from "#lib/api/tba.js";
+  import { layoutAttrition } from "#lib/analytics-transforms.js";
 
   interface Props {
     steps: AttritionStep[];

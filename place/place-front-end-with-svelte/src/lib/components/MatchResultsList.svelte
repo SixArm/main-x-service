@@ -8,8 +8,8 @@
     - title (string) — heading text. Default "Match results".
 -->
 <script lang="ts">
-    import type { MatchResult } from "$lib/api/types.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
+    import type { MatchResult } from "#lib/api/types.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
 
     let {
         results,

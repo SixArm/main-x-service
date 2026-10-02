@@ -20,7 +20,7 @@
     import { onMount } from "svelte";
     import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
     import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-    import { CarePathwayRepository } from "$lib/api/care-pathways";
+    import { CarePathwayRepository } from "#lib/api/care-pathways.js";
     import {
         CATEGORIES,
         STAGES,
@@ -30,14 +30,14 @@
         type SegmentPayload,
         type Stage,
         type Waste,
-    } from "$lib/api/tba";
+    } from "#lib/api/tba.js";
     import {
         INSTANCE_STATUSES,
         type InstanceStatus,
         type PathwayInstance,
         type PathwayRef,
-    } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte";
+    } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CarePathwayRepository.withFetch();
     const tba = TbaRepository.withFetch();

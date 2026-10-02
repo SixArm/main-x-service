@@ -12,7 +12,7 @@
     recordRedGreen,
     transferStay,
     updateStay,
-  } from "$lib/api/flow";
+  } from "#lib/api/flow.js";
 
   let { data } = $props();
   let detail = $derived(data.detail);

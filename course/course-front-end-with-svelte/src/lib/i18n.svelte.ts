@@ -13,7 +13,7 @@
 // drives the UI strings, `<html lang>`, and `<html dir>` (right-to-left
 // for `ar-001`).
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales for which the UI is translated, sorted alphabetically by code
@@ -68,6 +68,7 @@ export const RTL_LOCALES = ["ar-001"] as const satisfies readonly Locale[];
  */
 export function isRtl(locale: string): boolean {
   const primary = normaliseLocale(locale);
+
   return (
     primary !== null && (RTL_LOCALES as readonly string[]).includes(primary)
   );
@@ -281,7 +282,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -605,7 +607,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -917,19 +920,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Weniger Dubletten",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -938,74 +948,123 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "splash.hero.title": "Ein verlässlicher Datensatz für jeden Kurs",
-    "splash.hero.subtitle": "Erfassen Sie Kurse einmal, finden Sie sie sofort und verhindern Sie Duplikate, bevor sie entstehen, mit integriertem, lückenlosem Audit-Protokoll.",
-    "splash.benefits.1.body": "Der Abgleich meldet ein wahrscheinliches Duplikat, sobald ein Kurs angelegt wird.",
+    "splash.hero.subtitle":
+      "Erfassen Sie Kurse einmal, finden Sie sie sofort und verhindern Sie Duplikate, bevor sie entstehen, mit integriertem, lückenlosem Audit-Protokoll.",
+    "splash.benefits.1.body":
+      "Der Abgleich meldet ein wahrscheinliches Duplikat, sobald ein Kurs angelegt wird.",
     "splash.benefits.2.title": "Jeden Kurs schnell finden",
-    "splash.benefits.2.body": "Volltext- und unscharfe Suche findet Kurse trotz Tippfehlern und Schreibvarianten.",
+    "splash.benefits.2.body":
+      "Volltext- und unscharfe Suche findet Kurse trotz Tippfehlern und Schreibvarianten.",
     "splash.benefits.3.title": "Sichere Entscheidungen",
-    "splash.benefits.3.body": "Jeder Treffer zeigt seine Bewertung und eine Aufschlüsselung nach Feldern, sodass Prüfende genau sehen, warum.",
+    "splash.benefits.3.body":
+      "Jeder Treffer zeigt seine Bewertung und eine Aufschlüsselung nach Feldern, sodass Prüfende genau sehen, warum.",
     "splash.benefits.4.title": "Ein verlässlicher Katalog",
-    "splash.benefits.4.body": "Kurscodes und Kennungen sorgen dafür, dass es genau einen Datensatz pro Kurs gibt.",
+    "splash.benefits.4.body":
+      "Kurscodes und Kennungen sorgen dafür, dass es genau einen Datensatz pro Kurs gibt.",
     "splash.benefits.5.title": "Nichts bleibt unprotokolliert",
-    "splash.benefits.5.body": "Jede Änderung wird protokolliert, sodass Sie stets belegen können, wer wann was getan hat.",
+    "splash.benefits.5.body":
+      "Jede Änderung wird protokolliert, sodass Sie stets belegen können, wer wann was getan hat.",
     "splash.benefits.6.title": "Passt zu Ihren Systemen",
-    "splash.benefits.6.body": "Eine dokumentierte REST-API fügt sich in die Werkzeuge ein, die Sie bereits betreiben.",
+    "splash.benefits.6.body":
+      "Eine dokumentierte REST-API fügt sich in die Werkzeuge ein, die Sie bereits betreiben.",
     "splash.features.1.title": "Suchen und durchstöbern",
-    "splash.features.1.body": "Suchen Sie nach Name oder Kennung, auf Wunsch unscharf, in einer sortierbaren Tabelle.",
+    "splash.features.1.body":
+      "Suchen Sie nach Name oder Kennung, auf Wunsch unscharf, in einer sortierbaren Tabelle.",
     "splash.features.2.title": "Kursdatensätze",
-    "splash.features.2.body": "Kurscode, Niveau, Credits, Kennungen, Schlüsselwörter und Lerninhalte, mit Live-Prüfung.",
+    "splash.features.2.body":
+      "Kurscode, Niveau, Credits, Kennungen, Schlüsselwörter und Lerninhalte, mit Live-Prüfung.",
     "splash.features.3.title": "Abgleich prüfen",
-    "splash.features.3.body": "Bewerten Sie einen Kandidatenkurs anhand des Katalogs und sehen Sie die Gründe.",
+    "splash.features.3.body":
+      "Bewerten Sie einen Kandidatenkurs anhand des Katalogs und sehen Sie die Gründe.",
     "splash.features.4.title": "Kurse zusammenführen",
-    "splash.features.4.body": "Führen Sie bestätigte Duplikate zu einem Datensatz zusammen, ohne den Verlauf zu verlieren.",
+    "splash.features.4.body":
+      "Führen Sie bestätigte Duplikate zu einem Datensatz zusammen, ohne den Verlauf zu verlieren.",
     "splash.features.5.title": "Lebenszyklus-Board",
-    "splash.features.5.body": "Ziehen Sie Kurse zwischen Entwurf, Veröffentlicht, Archiviert und Eingestellt.",
+    "splash.features.5.body":
+      "Ziehen Sie Kurse zwischen Entwurf, Veröffentlicht, Archiviert und Eingestellt.",
     "splash.features.6.title": "Terminkalender",
-    "splash.features.6.body": "Sehen Sie jede Kursinstanz mit ihren Terminen im Kalender.",
-    "tour.intro": "Ein geführter Rundgang durch das Kursregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Kurses über das Zusammenführen von Duplikaten bis zur Verfolgung seines Lebenszyklus.",
+    "splash.features.6.body":
+      "Sehen Sie jede Kursinstanz mit ihren Terminen im Kalender.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das Kursregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Kurses über das Zusammenführen von Duplikaten bis zur Verfolgung seines Lebenszyklus.",
     "tour.s1.title": "Einen Kurs erfassen",
-    "tour.s1.summary": "Legen Sie einen Kursdatensatz mit Code, Niveau, Credits, Kennungen und Lerninhalten an. Wahrscheinliche Duplikate werden markiert, bevor Sie speichern.",
-    "tour.s1.step.1": "Melden Sie sich an, öffnen Sie das Menü und wählen Sie „Neuer Kurs“ (oder „Neuer Kurs“ auf der Seite „Kurse“).",
-    "tour.s1.step.2": "Füllen Sie den Namen aus, dann Kurscode (anbieterbezogen, etwa CS101), Status, Bildungsniveau und Anzahl der Credits.",
-    "tour.s1.step.3": "Ergänzen Sie Schlüsselwörter, Vermittelt (Kompetenzen), Alternative Namen, „Identisch mit“-URLs und mit der Schaltfläche „+ Bezeichner hinzufügen“ eine oder mehrere Kennungen.",
-    "tour.s1.step.4": "Wählen Sie „Erstellen“. Erscheint „Duplikate erkannt“, prüfen Sie die „Mögliche Duplikate“, bevor Sie erneut absenden; andernfalls gelangen Sie zum neuen Kurs.",
+    "tour.s1.summary":
+      "Legen Sie einen Kursdatensatz mit Code, Niveau, Credits, Kennungen und Lerninhalten an. Wahrscheinliche Duplikate werden markiert, bevor Sie speichern.",
+    "tour.s1.step.1":
+      "Melden Sie sich an, öffnen Sie das Menü und wählen Sie „Neuer Kurs“ (oder „Neuer Kurs“ auf der Seite „Kurse“).",
+    "tour.s1.step.2":
+      "Füllen Sie den Namen aus, dann Kurscode (anbieterbezogen, etwa CS101), Status, Bildungsniveau und Anzahl der Credits.",
+    "tour.s1.step.3":
+      "Ergänzen Sie Schlüsselwörter, Vermittelt (Kompetenzen), Alternative Namen, „Identisch mit“-URLs und mit der Schaltfläche „+ Bezeichner hinzufügen“ eine oder mehrere Kennungen.",
+    "tour.s1.step.4":
+      "Wählen Sie „Erstellen“. Erscheint „Duplikate erkannt“, prüfen Sie die „Mögliche Duplikate“, bevor Sie erneut absenden; andernfalls gelangen Sie zum neuen Kurs.",
     "tour.s2.title": "Einen Kurs finden und öffnen",
-    "tour.s2.summary": "Durchsuchen Sie den Katalog nach Name oder Kennung und öffnen Sie einen Kurs, um alles zu sehen, was darüber erfasst ist.",
-    "tour.s2.step.1": "Öffnen Sie im Menü „Kurse“. Die Tabelle listet jeden Kurs mit ID, Name, Kurscode, Niveau, Status und primärer Kennung.",
-    "tour.s2.step.2": "Geben Sie einen Namen oder eine Kennung in das Suchfeld ein und wählen Sie „Suchen“; setzen Sie „Unscharf“, um Tippfehler und Schreibvarianten zu tolerieren.",
-    "tour.s2.step.3": "Prüfen Sie die Datensatzzahl über der Tabelle und wählen Sie eine Zeile, um die Detailseite dieses Kurses zu öffnen.",
-    "tour.s2.step.4": "Lesen Sie auf der Detailseite Identität, Bezeichner, Vermittelt, Schlüsselwörter und Instanzen und ändern Sie mit „Bearbeiten“ oder sehen Sie mit „Audit“ den Verlauf.",
+    "tour.s2.summary":
+      "Durchsuchen Sie den Katalog nach Name oder Kennung und öffnen Sie einen Kurs, um alles zu sehen, was darüber erfasst ist.",
+    "tour.s2.step.1":
+      "Öffnen Sie im Menü „Kurse“. Die Tabelle listet jeden Kurs mit ID, Name, Kurscode, Niveau, Status und primärer Kennung.",
+    "tour.s2.step.2":
+      "Geben Sie einen Namen oder eine Kennung in das Suchfeld ein und wählen Sie „Suchen“; setzen Sie „Unscharf“, um Tippfehler und Schreibvarianten zu tolerieren.",
+    "tour.s2.step.3":
+      "Prüfen Sie die Datensatzzahl über der Tabelle und wählen Sie eine Zeile, um die Detailseite dieses Kurses zu öffnen.",
+    "tour.s2.step.4":
+      "Lesen Sie auf der Detailseite Identität, Bezeichner, Vermittelt, Schlüsselwörter und Instanzen und ändern Sie mit „Bearbeiten“ oder sehen Sie mit „Audit“ den Verlauf.",
     "tour.s3.title": "Auf Duplikate prüfen",
-    "tour.s3.summary": "Beschreiben Sie einen Kurs und bewerten Sie ihn anhand des Katalogs, mit einer Aufschlüsselung nach Feldern, die zeigt, warum jeder Kandidat passt.",
-    "tour.s3.step.1": "Öffnen Sie im Menü „Abgleich prüfen“; diese Ansicht speichert nichts.",
-    "tour.s3.step.2": "Tragen Sie ein, was Sie wissen: Name, Kurscode, Anbieter-ID, Bildungsniveau, Schlüsselwörter, Vermittelt, „Identisch mit“-URLs oder Bezeichner.",
-    "tour.s3.step.3": "Wählen Sie „Übereinstimmungen finden“. Kandidaten stehen unter „Abgleichergebnisse“, jeweils mit Bewertung; mit der „Anzeigeschwelle“ (0,0 bis 1,0) blenden Sie schwache aus.",
-    "tour.s3.step.4": "Öffnen Sie bei einem Kandidaten die Bewertungsaufschlüsselung, um die Bewertungen für Name, Kurscode, Anbieter, Niveau, Schlüsselwörter und Lerninhalte zu sehen, oder einen deterministischen Treffer bei Kennung, Anbieter plus Code oder „Identisch mit“-URL.",
+    "tour.s3.summary":
+      "Beschreiben Sie einen Kurs und bewerten Sie ihn anhand des Katalogs, mit einer Aufschlüsselung nach Feldern, die zeigt, warum jeder Kandidat passt.",
+    "tour.s3.step.1":
+      "Öffnen Sie im Menü „Abgleich prüfen“; diese Ansicht speichert nichts.",
+    "tour.s3.step.2":
+      "Tragen Sie ein, was Sie wissen: Name, Kurscode, Anbieter-ID, Bildungsniveau, Schlüsselwörter, Vermittelt, „Identisch mit“-URLs oder Bezeichner.",
+    "tour.s3.step.3":
+      "Wählen Sie „Übereinstimmungen finden“. Kandidaten stehen unter „Abgleichergebnisse“, jeweils mit Bewertung; mit der „Anzeigeschwelle“ (0,0 bis 1,0) blenden Sie schwache aus.",
+    "tour.s3.step.4":
+      "Öffnen Sie bei einem Kandidaten die Bewertungsaufschlüsselung, um die Bewertungen für Name, Kurscode, Anbieter, Niveau, Schlüsselwörter und Lerninhalte zu sehen, oder einen deterministischen Treffer bei Kennung, Anbieter plus Code oder „Identisch mit“-URL.",
     "tour.s4.title": "Bestätigte Duplikate zusammenführen",
-    "tour.s4.summary": "Führen Sie einen doppelten Kurs in den bleibenden Datensatz ein, mit Zusammenführungsdatensatz und ohne je etwas endgültig zu löschen.",
-    "tour.s4.step.1": "Öffnen Sie im Menü „Zusammenführen“ (Anmeldung erforderlich). Geben Sie die „ID des Hauptkurses“ (der bleibende Datensatz) und die „ID des Duplikatkurses“ (wird weich gelöscht) ein.",
-    "tour.s4.step.2": "Ergänzen Sie optional einen „Grund“ wie „Bestätigtes Duplikat“; er wird im Audit-Protokoll der Zusammenführung festgehalten.",
-    "tour.s4.step.3": "Wählen Sie „Vorschau laden“, um Haupt- und Duplikatkurs nebeneinander zu sehen und zu prüfen, ob es das richtige Paar ist.",
-    "tour.s4.step.4": "Wählen Sie „Zusammenführen“ und bestätigen Sie. „Zusammenführung abgeschlossen“ zeigt den neuen Zusammenführungsdatensatz mit einem Link zu „Zusammengeführten Hauptkurs anzeigen“.",
+    "tour.s4.summary":
+      "Führen Sie einen doppelten Kurs in den bleibenden Datensatz ein, mit Zusammenführungsdatensatz und ohne je etwas endgültig zu löschen.",
+    "tour.s4.step.1":
+      "Öffnen Sie im Menü „Zusammenführen“ (Anmeldung erforderlich). Geben Sie die „ID des Hauptkurses“ (der bleibende Datensatz) und die „ID des Duplikatkurses“ (wird weich gelöscht) ein.",
+    "tour.s4.step.2":
+      "Ergänzen Sie optional einen „Grund“ wie „Bestätigtes Duplikat“; er wird im Audit-Protokoll der Zusammenführung festgehalten.",
+    "tour.s4.step.3":
+      "Wählen Sie „Vorschau laden“, um Haupt- und Duplikatkurs nebeneinander zu sehen und zu prüfen, ob es das richtige Paar ist.",
+    "tour.s4.step.4":
+      "Wählen Sie „Zusammenführen“ und bestätigen Sie. „Zusammenführung abgeschlossen“ zeigt den neuen Zusammenführungsdatensatz mit einem Link zu „Zusammengeführten Hauptkurs anzeigen“.",
     "tour.s5.title": "Kurse durch ihren Lebenszyklus führen",
-    "tour.s5.summary": "Sehen Sie jeden Kurs als Karte in einer Spalte pro Status und ändern Sie den Status eines Kurses per Ziehen.",
-    "tour.s5.step.1": "Öffnen Sie im Menü „Board“. Die Spalten durchlaufen den Lebenszyklus: Entwurf, Veröffentlicht, Archiviert und Eingestellt.",
-    "tour.s5.step.2": "Jede Karte zeigt Kursnamen und Kurscode, sodass Sie den richtigen Kurs auf einen Blick erkennen.",
-    "tour.s5.step.3": "Ziehen Sie eine Karte in eine andere Spalte, um den Status dieses Kurses zu ändern; die Änderung wird sofort im Kursdatensatz gespeichert.",
-    "tour.s5.step.4": "Danach lädt das Board vom Dienst neu, sodass eine Karte, deren Änderung nicht gespeichert werden konnte, dorthin zurückkehrt, wo der Datensatz tatsächlich steht, und ein Fehler angezeigt wird.",
+    "tour.s5.summary":
+      "Sehen Sie jeden Kurs als Karte in einer Spalte pro Status und ändern Sie den Status eines Kurses per Ziehen.",
+    "tour.s5.step.1":
+      "Öffnen Sie im Menü „Board“. Die Spalten durchlaufen den Lebenszyklus: Entwurf, Veröffentlicht, Archiviert und Eingestellt.",
+    "tour.s5.step.2":
+      "Jede Karte zeigt Kursnamen und Kurscode, sodass Sie den richtigen Kurs auf einen Blick erkennen.",
+    "tour.s5.step.3":
+      "Ziehen Sie eine Karte in eine andere Spalte, um den Status dieses Kurses zu ändern; die Änderung wird sofort im Kursdatensatz gespeichert.",
+    "tour.s5.step.4":
+      "Danach lädt das Board vom Dienst neu, sodass eine Karte, deren Änderung nicht gespeichert werden konnte, dorthin zurückkehrt, wo der Datensatz tatsächlich steht, und ein Fehler angezeigt wird.",
     "tour.s6.title": "Kursinstanzen im Kalender sehen",
-    "tour.s6.summary": "Jedes geplante Angebot jedes Kurses nach Datum angeordnet, schreibgeschützt, mit Klick zum zugehörigen Kurs.",
-    "tour.s6.step.1": "Öffnen Sie im Menü „Kalender“. Er öffnet sich in der Monatsansicht.",
-    "tour.s6.step.2": "Der Terminzeitraum jeder Kursinstanz erscheint als ganztägige Spanne, beschriftet mit dem Instanznamen oder, falls keiner vorhanden ist, dem Kursnamen.",
-    "tour.s6.step.3": "Einzelne Sitzungen erscheinen als zeitgebundene Ereignisse an ihren jeweiligen Tagen, mit der Sitzungsbezeichnung, sofern gesetzt.",
-    "tour.s6.step.4": "Wählen Sie einen beliebigen Eintrag, um den zugehörigen Kurs zu öffnen, wo der Abschnitt „Instanzen“ Termine, Modus und Kapazität auflistet.",
+    "tour.s6.summary":
+      "Jedes geplante Angebot jedes Kurses nach Datum angeordnet, schreibgeschützt, mit Klick zum zugehörigen Kurs.",
+    "tour.s6.step.1":
+      "Öffnen Sie im Menü „Kalender“. Er öffnet sich in der Monatsansicht.",
+    "tour.s6.step.2":
+      "Der Terminzeitraum jeder Kursinstanz erscheint als ganztägige Spanne, beschriftet mit dem Instanznamen oder, falls keiner vorhanden ist, dem Kursnamen.",
+    "tour.s6.step.3":
+      "Einzelne Sitzungen erscheinen als zeitgebundene Ereignisse an ihren jeweiligen Tagen, mit der Sitzungsbezeichnung, sofern gesetzt.",
+    "tour.s6.step.4":
+      "Wählen Sie einen beliebigen Eintrag, um den zugehörigen Kurs zu öffnen, wo der Abschnitt „Instanzen“ Termine, Modus und Kapazität auflistet.",
   },
   "en-001": {
     "nav.calendar": "Calendar",
@@ -1217,7 +1276,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -1543,7 +1603,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -1870,7 +1931,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -2196,7 +2258,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -2513,7 +2576,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "splash.hero.title": "每门课程，一份可信记录",

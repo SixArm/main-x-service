@@ -3,7 +3,7 @@
   // border; occupied beds show the patient row and journey chips;
   // empty beds show their cycle position and (optionally) the cleaning
   // actions. Pure presentational — actions are callbacks.
-  import type { BedCard } from "$lib/api/types";
+  import type { BedCard } from "#lib/api/types.js";
 
   let {
     card,

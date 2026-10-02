@@ -11,10 +11,10 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import CourseForm from "$lib/components/CourseForm.svelte";
-    import { CourseRepository } from "$lib/api/courses.js";
-    import type { Course } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import CourseForm from "#lib/components/CourseForm.svelte";
+    import { CourseRepository } from "#lib/api/courses.js";
+    import type { Course } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
     let course = $state<Course | null>(null);

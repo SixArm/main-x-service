@@ -14,7 +14,7 @@
 // bundles a locale picker alongside theme/text-size/share; `i18n.set()`
 // is its `onChange` handler.
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales for which the UI is translated, sorted alphabetically by code
@@ -352,7 +352,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -722,7 +723,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -1042,19 +1044,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Weniger Dubletten",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -1063,74 +1072,123 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "splash.hero.title": "Ein verlässlicher Datensatz für jeden Ort",
-    "splash.hero.subtitle": "Erfassen Sie Orte einmal, finden Sie sie sofort und verhindern Sie Dubletten, bevor sie entstehen, mit integrierten Adressen, Koordinaten und lückenlosem Audit-Protokoll.",
-    "splash.benefits.1.body": "Eine wahrscheinliche Dublette wird markiert, sobald ein neuer Ort angelegt wird.",
+    "splash.hero.subtitle":
+      "Erfassen Sie Orte einmal, finden Sie sie sofort und verhindern Sie Dubletten, bevor sie entstehen, mit integrierten Adressen, Koordinaten und lückenlosem Audit-Protokoll.",
+    "splash.benefits.1.body":
+      "Eine wahrscheinliche Dublette wird markiert, sobald ein neuer Ort angelegt wird.",
     "splash.benefits.2.title": "Jeden Ort schnell finden",
-    "splash.benefits.2.body": "Unscharfe und phonetische Suche findet Orte trotz Tippfehlern und Schreibvarianten.",
+    "splash.benefits.2.body":
+      "Unscharfe und phonetische Suche findet Orte trotz Tippfehlern und Schreibvarianten.",
     "splash.benefits.3.title": "Adressen, denen Sie vertrauen können",
-    "splash.benefits.3.body": "Postadressen und Koordinaten werden vor dem Speichern auf plausible Werte geprüft.",
+    "splash.benefits.3.body":
+      "Postadressen und Koordinaten werden vor dem Speichern auf plausible Werte geprüft.",
     "splash.benefits.4.title": "Saubere Zusammenführungen",
-    "splash.benefits.4.body": "Führen Sie zwei Datensätze zu einem zusammen und behalten Sie eine Momentaufnahme dessen, was verschoben wurde.",
+    "splash.benefits.4.body":
+      "Führen Sie zwei Datensätze zu einem zusammen und behalten Sie eine Momentaufnahme dessen, was verschoben wurde.",
     "splash.benefits.5.title": "Nachvollziehbare Bewertungen",
-    "splash.benefits.5.body": "Jeder Treffer zeigt seine Bewertungsaufschlüsselung, sodass Sie ihn beurteilen können, bevor Sie entscheiden.",
+    "splash.benefits.5.body":
+      "Jeder Treffer zeigt seine Bewertungsaufschlüsselung, sodass Sie ihn beurteilen können, bevor Sie entscheiden.",
     "splash.benefits.6.title": "Jede Änderung ist protokolliert",
-    "splash.benefits.6.body": "Sehen Sie, wer einen Ort wann geändert hat und wie er zuvor aussah.",
+    "splash.benefits.6.body":
+      "Sehen Sie, wer einen Ort wann geändert hat und wie er zuvor aussah.",
     "splash.features.1.title": "Erfassen und bearbeiten",
-    "splash.features.1.body": "Namen, Ortstypen, Adressen und Koordinaten, schon bei der Eingabe geprüft.",
+    "splash.features.1.body":
+      "Namen, Ortstypen, Adressen und Koordinaten, schon bei der Eingabe geprüft.",
     "splash.features.2.title": "Suchen und filtern",
-    "splash.features.2.body": "Eine schnelle Tabelle mit Volltext-, unscharfer und phonetischer Suche über alle Orte.",
+    "splash.features.2.body":
+      "Eine schnelle Tabelle mit Volltext-, unscharfer und phonetischer Suche über alle Orte.",
     "splash.features.3.title": "Ortsdetails",
-    "splash.features.3.body": "Identität, Adresse, Koordinaten, Bezeichner, Öffnungszeiten und Ausstattung in einer Ansicht.",
+    "splash.features.3.body":
+      "Identität, Adresse, Koordinaten, Bezeichner, Öffnungszeiten und Ausstattung in einer Ansicht.",
     "splash.features.4.title": "Abgleich prüfen",
-    "splash.features.4.body": "Bewerten Sie einen hypothetischen Ort anhand des Index, bevor Sie ihn anlegen.",
+    "splash.features.4.body":
+      "Bewerten Sie einen hypothetischen Ort anhand des Index, bevor Sie ihn anlegen.",
     "splash.features.5.title": "Orte zusammenführen",
-    "splash.features.5.body": "Wählen Sie einen Hauptdatensatz und ein Duplikat und führen Sie beide mit vollständigem Verlauf zusammen.",
+    "splash.features.5.body":
+      "Wählen Sie einen Hauptdatensatz und ein Duplikat und führen Sie beide mit vollständigem Verlauf zusammen.",
     "splash.features.6.title": "Überprüfungsboard",
-    "splash.features.6.body": "Bearbeiten Sie gespeicherte Duplikatkandidaten und vergleichen Sie Paare nebeneinander.",
-    "tour.intro": "Ein geführter Rundgang durch das Ortsregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Ortes bis zum Zusammenführen von Dubletten.",
+    "splash.features.6.body":
+      "Bearbeiten Sie gespeicherte Duplikatkandidaten und vergleichen Sie Paare nebeneinander.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das Ortsregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Ortes bis zum Zusammenführen von Dubletten.",
     "tour.s1.title": "Einen Ort erfassen",
-    "tour.s1.summary": "Legen Sie einen Datensatz mit Name, Ortstyp, Adresse und Koordinaten an. Probleme werden markiert, bevor etwas gespeichert wird.",
-    "tour.s1.step.1": "Öffnen Sie in der oberen Leiste „Neuer Ort“ und geben Sie den Namen ein (Pflicht), dazu optional Alternativer Name, Ortstyp, Beschreibung, Telefon, Website und GLN.",
-    "tour.s1.step.2": "Setzen Sie „Adresse einbeziehen“, um Straße, Stadt / Ort, Region / Bundesland, Postleitzahl und Land auszufüllen, und „Koordinaten einbeziehen“ für Breitengrad, Längengrad und Höhe.",
-    "tour.s1.step.3": "Beheben Sie angezeigte Fehler: Die GLN muss 13 Ziffern haben, der Breitengrad reicht von -90 bis 90 und der Längengrad von -180 bis 180.",
-    "tour.s1.step.4": "Wählen Sie „Erstellen“. Findet der Dienst wahrscheinliche Dubletten, werden sie unter „Mögliche Duplikate“ aufgelistet, damit Sie sie vor dem erneuten Absenden prüfen können.",
+    "tour.s1.summary":
+      "Legen Sie einen Datensatz mit Name, Ortstyp, Adresse und Koordinaten an. Probleme werden markiert, bevor etwas gespeichert wird.",
+    "tour.s1.step.1":
+      "Öffnen Sie in der oberen Leiste „Neuer Ort“ und geben Sie den Namen ein (Pflicht), dazu optional Alternativer Name, Ortstyp, Beschreibung, Telefon, Website und GLN.",
+    "tour.s1.step.2":
+      "Setzen Sie „Adresse einbeziehen“, um Straße, Stadt / Ort, Region / Bundesland, Postleitzahl und Land auszufüllen, und „Koordinaten einbeziehen“ für Breitengrad, Längengrad und Höhe.",
+    "tour.s1.step.3":
+      "Beheben Sie angezeigte Fehler: Die GLN muss 13 Ziffern haben, der Breitengrad reicht von -90 bis 90 und der Längengrad von -180 bis 180.",
+    "tour.s1.step.4":
+      "Wählen Sie „Erstellen“. Findet der Dienst wahrscheinliche Dubletten, werden sie unter „Mögliche Duplikate“ aufgelistet, damit Sie sie vor dem erneuten Absenden prüfen können.",
     "tour.s2.title": "Einen Ort finden und öffnen",
-    "tour.s2.summary": "Durchsuchen Sie das Register nach Name, Ort oder Bezeichner und öffnen Sie eine Zeile für den vollständigen Datensatz.",
-    "tour.s2.step.1": "Öffnen Sie „Orte“ und tippen Sie in das Suchfeld, zum Beispiel einen Namen, einen Ort oder einen Bezeichner, und wählen Sie „Suchen“.",
-    "tour.s2.step.2": "Schalten Sie „Unscharf“ ein, um Tippfehler zu tolerieren, oder „Phonetisch (Soundex)“, um ähnlich klingende Orte zu finden; beides gilt ab der nächsten Suche.",
-    "tour.s2.step.3": "Schalten Sie „Sensible Felder maskieren“ ein, um mit geschwärzten sensiblen Angaben zu stöbern; die Ergebnisse werden sofort aktualisiert.",
-    "tour.s2.step.4": "Wählen Sie eine Zeile, um diesen Ort zu öffnen. Mit „Neuer Ort“ oben auf der Seite legen Sie jederzeit einen neuen an.",
+    "tour.s2.summary":
+      "Durchsuchen Sie das Register nach Name, Ort oder Bezeichner und öffnen Sie eine Zeile für den vollständigen Datensatz.",
+    "tour.s2.step.1":
+      "Öffnen Sie „Orte“ und tippen Sie in das Suchfeld, zum Beispiel einen Namen, einen Ort oder einen Bezeichner, und wählen Sie „Suchen“.",
+    "tour.s2.step.2":
+      "Schalten Sie „Unscharf“ ein, um Tippfehler zu tolerieren, oder „Phonetisch (Soundex)“, um ähnlich klingende Orte zu finden; beides gilt ab der nächsten Suche.",
+    "tour.s2.step.3":
+      "Schalten Sie „Sensible Felder maskieren“ ein, um mit geschwärzten sensiblen Angaben zu stöbern; die Ergebnisse werden sofort aktualisiert.",
+    "tour.s2.step.4":
+      "Wählen Sie eine Zeile, um diesen Ort zu öffnen. Mit „Neuer Ort“ oben auf der Seite legen Sie jederzeit einen neuen an.",
     "tour.s3.title": "Auf Übereinstimmungen prüfen",
-    "tour.s3.summary": "Bewerten Sie einen hypothetischen Ort anhand des Index, bevor Sie ihn anlegen.",
-    "tour.s3.step.1": "Öffnen Sie „Abgleich prüfen“ und geben Sie den Namen des Ortes ein, bei dem Sie unsicher sind.",
-    "tour.s3.step.2": "Ergänzen Sie optional die Adresse und setzen Sie „Geokoordinaten einbeziehen“, um Breiten- und Längengrad hinzuzufügen, die in die Bewertung einfließen.",
-    "tour.s3.step.3": "Legen Sie einen „Schwellenwert“ zwischen 0,0 und 1,0 fest und wählen Sie „Übereinstimmungen finden“.",
-    "tour.s3.step.4": "Lesen Sie die „Abgleichergebnisse“: Jeder Kandidat zeigt seine Qualität und eine Bewertungsaufschlüsselung nach Name, Geo, Adresse und Bezeichner und vermerkt einen phonetischen oder deterministischen (GLN-)Treffer.",
+    "tour.s3.summary":
+      "Bewerten Sie einen hypothetischen Ort anhand des Index, bevor Sie ihn anlegen.",
+    "tour.s3.step.1":
+      "Öffnen Sie „Abgleich prüfen“ und geben Sie den Namen des Ortes ein, bei dem Sie unsicher sind.",
+    "tour.s3.step.2":
+      "Ergänzen Sie optional die Adresse und setzen Sie „Geokoordinaten einbeziehen“, um Breiten- und Längengrad hinzuzufügen, die in die Bewertung einfließen.",
+    "tour.s3.step.3":
+      "Legen Sie einen „Schwellenwert“ zwischen 0,0 und 1,0 fest und wählen Sie „Übereinstimmungen finden“.",
+    "tour.s3.step.4":
+      "Lesen Sie die „Abgleichergebnisse“: Jeder Kandidat zeigt seine Qualität und eine Bewertungsaufschlüsselung nach Name, Geo, Adresse und Bezeichner und vermerkt einen phonetischen oder deterministischen (GLN-)Treffer.",
     "tour.s4.title": "Die Überprüfungswarteschlange bearbeiten",
-    "tour.s4.summary": "Gehen Sie gespeicherte Duplikatkandidaten durch und halten Sie für jedes Paar ein Urteil fest. Dafür müssen Sie angemeldet sein.",
-    "tour.s4.step.1": "Öffnen Sie „Überprüfung“ und wählen Sie „Scan starten“, um Kandidatenpaare in die Warteschlange aufzunehmen; grenzen Sie die Liste nach Status und Seitengröße ein.",
-    "tour.s4.step.2": "Paare sehen Sie auf dem „Board“, wo Sie eine offene Karte ziehen können, oder in der Liste „Warteschlange“ mit den Spalten Bewertung, Qualität und Methode.",
-    "tour.s4.step.3": "Wählen Sie „Vergleichen“, um Datensatz A und Datensatz B nebeneinander zu sehen, samt Bewertungsaufschlüsselung nach Komponenten.",
-    "tour.s4.step.4": "Wählen Sie „Dublette bestätigen“ oder „Ablehnen“; nur offene Einträge können entschieden werden. Bestätigen hält nur das Urteil fest; zum Zusammenführen wählen Sie „A behalten, B hineinführen“ oder „B behalten, A hineinführen“.",
+    "tour.s4.summary":
+      "Gehen Sie gespeicherte Duplikatkandidaten durch und halten Sie für jedes Paar ein Urteil fest. Dafür müssen Sie angemeldet sein.",
+    "tour.s4.step.1":
+      "Öffnen Sie „Überprüfung“ und wählen Sie „Scan starten“, um Kandidatenpaare in die Warteschlange aufzunehmen; grenzen Sie die Liste nach Status und Seitengröße ein.",
+    "tour.s4.step.2":
+      "Paare sehen Sie auf dem „Board“, wo Sie eine offene Karte ziehen können, oder in der Liste „Warteschlange“ mit den Spalten Bewertung, Qualität und Methode.",
+    "tour.s4.step.3":
+      "Wählen Sie „Vergleichen“, um Datensatz A und Datensatz B nebeneinander zu sehen, samt Bewertungsaufschlüsselung nach Komponenten.",
+    "tour.s4.step.4":
+      "Wählen Sie „Dublette bestätigen“ oder „Ablehnen“; nur offene Einträge können entschieden werden. Bestätigen hält nur das Urteil fest; zum Zusammenführen wählen Sie „A behalten, B hineinführen“ oder „B behalten, A hineinführen“.",
     "tour.s5.title": "Zwei Orte zusammenführen",
-    "tour.s5.summary": "Führen Sie ein bestätigtes Duplikat in den Datensatz ein, den Sie behalten möchten, mit Begründung und vollständigem Audit-Protokoll.",
-    "tour.s5.step.1": "Öffnen Sie „Zusammenführen“ und geben Sie die „ID des Hauptorts“ (der bleibende Datensatz) und die „ID des Duplikat-Orts“ (wird weich gelöscht) ein. Beide müssen verschieden sein.",
-    "tour.s5.step.2": "Wählen Sie „Vorschau laden“, um beide Datensätze als „Haupt“ und „Duplikat“ beschriftet zu sehen, bevor sich etwas ändert.",
-    "tour.s5.step.3": "Geben Sie einen „Grund“ ein, der im Audit-Protokoll der Zusammenführung festgehalten wird, wählen Sie „Zusammenführen“ und bestätigen Sie die Rückfrage.",
-    "tour.s5.step.4": "Eine Abschlussmeldung zeigt den neuen Zusammenführungsdatensatz und verweist auf „Zusammengeführten Hauptort anzeigen“.",
+    "tour.s5.summary":
+      "Führen Sie ein bestätigtes Duplikat in den Datensatz ein, den Sie behalten möchten, mit Begründung und vollständigem Audit-Protokoll.",
+    "tour.s5.step.1":
+      "Öffnen Sie „Zusammenführen“ und geben Sie die „ID des Hauptorts“ (der bleibende Datensatz) und die „ID des Duplikat-Orts“ (wird weich gelöscht) ein. Beide müssen verschieden sein.",
+    "tour.s5.step.2":
+      "Wählen Sie „Vorschau laden“, um beide Datensätze als „Haupt“ und „Duplikat“ beschriftet zu sehen, bevor sich etwas ändert.",
+    "tour.s5.step.3":
+      "Geben Sie einen „Grund“ ein, der im Audit-Protokoll der Zusammenführung festgehalten wird, wählen Sie „Zusammenführen“ und bestätigen Sie die Rückfrage.",
+    "tour.s5.step.4":
+      "Eine Abschlussmeldung zeigt den neuen Zusammenführungsdatensatz und verweist auf „Zusammengeführten Hauptort anzeigen“.",
     "tour.s6.title": "Einen Ort prüfen, exportieren und nachverfolgen",
-    "tour.s6.summary": "Öffnen Sie einen Ort, um alles zu sehen, was darüber gespeichert ist, ihn maskiert anzuzeigen, für eine Datenauskunft zu exportieren und seinen Verlauf zu lesen.",
-    "tour.s6.step.1": "Öffnen Sie in „Orte“ einen Ort und sehen Sie Identität, Adresse, Geokoordinaten, Bezeichner, Öffnungszeiten und Ausstattung in einer Ansicht, soweit erfasst.",
-    "tour.s6.step.2": "Wählen Sie „Maskiert anzeigen“, um den Datensatz mit geschwärzten sensiblen Feldern neu zu laden, und „Vollständig anzeigen“, um zurückzuschalten.",
-    "tour.s6.step.3": "Wählen Sie „Daten exportieren (DSGVO)“, um die Daten des Ortes als JSON-Datei herunterzuladen, oder „Bearbeiten“ und „Löschen“, um ihn zu ändern oder weich zu löschen; „Löschen“ fragt vorher nach.",
-    "tour.s6.step.4": "Wählen Sie „Audit“, um das Audit-Protokoll zu öffnen: Jeder Eintrag zeigt, wer die Änderung wann vorgenommen hat, mit aufklappbaren Nutzdaten.",
+    "tour.s6.summary":
+      "Öffnen Sie einen Ort, um alles zu sehen, was darüber gespeichert ist, ihn maskiert anzuzeigen, für eine Datenauskunft zu exportieren und seinen Verlauf zu lesen.",
+    "tour.s6.step.1":
+      "Öffnen Sie in „Orte“ einen Ort und sehen Sie Identität, Adresse, Geokoordinaten, Bezeichner, Öffnungszeiten und Ausstattung in einer Ansicht, soweit erfasst.",
+    "tour.s6.step.2":
+      "Wählen Sie „Maskiert anzeigen“, um den Datensatz mit geschwärzten sensiblen Feldern neu zu laden, und „Vollständig anzeigen“, um zurückzuschalten.",
+    "tour.s6.step.3":
+      "Wählen Sie „Daten exportieren (DSGVO)“, um die Daten des Ortes als JSON-Datei herunterzuladen, oder „Bearbeiten“ und „Löschen“, um ihn zu ändern oder weich zu löschen; „Löschen“ fragt vorher nach.",
+    "tour.s6.step.4":
+      "Wählen Sie „Audit“, um das Audit-Protokoll zu öffnen: Jeder Eintrag zeigt, wer die Änderung wann vorgenommen hat, mit aufklappbaren Nutzdaten.",
   },
   "en-001": {
     "nav.review": "Review",
@@ -1428,7 +1486,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -1801,7 +1860,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -2174,7 +2234,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -2545,7 +2606,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -2895,7 +2957,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "nav.tour": "导览",

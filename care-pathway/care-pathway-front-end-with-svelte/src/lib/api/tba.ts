@@ -12,7 +12,7 @@
 // move already produces the data — a clinical journey has to be mapped
 // by hand, so the UI needs a way to record one.
 
-import { API_BASE_URL } from "$lib/config";
+import { API_BASE_URL } from "#lib/config.js";
 import { ApiClient } from "./client";
 
 // ---- vocabularies (mirroring the service's closed sets) ----

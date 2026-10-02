@@ -10,7 +10,7 @@
 //
 // English-first, like the other PPM views.
 
-import { API_BASE_URL } from "$lib/config";
+import { API_BASE_URL } from "#lib/config.js";
 import { ApiClient } from "./client";
 
 // ---- wire shapes (mirroring the service responses) ----

@@ -17,8 +17,8 @@
         Willow as FilterTheme,
         createArrayFilter,
     } from "@svar-ui/svelte-filter";
-    import type { Place } from "$lib/api/types.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
+    import type { Place } from "#lib/api/types.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
 
     let {
         places,

@@ -10,7 +10,7 @@
     //   label — string, required. Accessible label for the number field.
     //   class — string, optional.
 
-    import Icon from '$lib/components/Icon/Icon.svelte';
+    import Icon from '#lib/components/Icon/Icon.svelte';
 
     let {
         value = $bindable(1),

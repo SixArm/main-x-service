@@ -4,9 +4,9 @@
   this page to answer.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
-  import * as cms from "$lib/api/cms";
-  import type { ContentType, Entry, Site } from "$lib/api/cms";
+  import { t } from "#lib/i18n.svelte.js";
+  import * as cms from "#lib/api/cms.js";
+  import type { ContentType, Entry, Site } from "#lib/api/cms.js";
 
   let sites = $state<Site[] | null>(null);
   let site = $state<string | null>(null);

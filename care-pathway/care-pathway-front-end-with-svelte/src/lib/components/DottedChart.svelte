@@ -11,8 +11,8 @@
   once the caller has explicitly asked for it.
 -->
 <script lang="ts">
-  import type { EventLogRow } from "$lib/api/tba";
-  import { dottedChartPoints } from "$lib/analytics-transforms";
+  import type { EventLogRow } from "#lib/api/tba.js";
+  import { dottedChartPoints } from "#lib/analytics-transforms.js";
 
   interface Props {
     rows: EventLogRow[];

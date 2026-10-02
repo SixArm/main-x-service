@@ -15,15 +15,15 @@
 -->
 <script lang="ts">
   import { untrack } from "svelte";
-  import { ALL_KINDS, ALL_SCHEMES, ALL_STATUSES } from "$lib/api/types";
+  import { ALL_KINDS, ALL_SCHEMES, ALL_STATUSES } from "#lib/api/types.js";
   import type {
     IdentifierScheme,
     Plan,
     PlanIdentifier,
     PlanKind,
     PlanStatus,
-  } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   let {
     initial,

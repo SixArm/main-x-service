@@ -2,7 +2,7 @@ import type { ApiErrorBody, ApiResponse } from "./types.js";
 
 /**
  * Name of the browser-readable CSRF double-submit cookie. Must match
- * `CSRF_COOKIE` in `$lib/server/session.ts` — duplicated here (rather
+ * `CSRF_COOKIE` in `#lib/server/session.ts` — duplicated here (rather
  * than imported) because that module is server-only and SvelteKit
  * refuses to bundle it into browser code.
  */

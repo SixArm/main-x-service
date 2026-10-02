@@ -24,8 +24,8 @@
 // change required. See place-service's own `spec/13-tasks.md` for the
 // tracked follow-up.
 
-import type { StringKey } from "$lib/i18n.svelte";
-import type { ReviewQueueItem, ReviewStatus } from "$lib/api/types.js";
+import type { StringKey } from "#lib/i18n.svelte.js";
+import type { ReviewQueueItem, ReviewStatus } from "#lib/api/types.js";
 
 /**
  * The four stored dispositions, in the order the board's columns and the

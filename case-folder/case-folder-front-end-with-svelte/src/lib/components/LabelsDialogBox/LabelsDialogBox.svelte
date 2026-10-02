@@ -25,10 +25,10 @@
     //   onprint   — ({ selected, copies }) => void.
     //   onclose   — () => void.
 
-    import TextInput from '$lib/components/TextInput/TextInput.svelte';
-    import Button from '$lib/components/Button/Button.svelte';
-    import InputCount from '$lib/components/InputCount/InputCount.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import TextInput from '#lib/components/TextInput/TextInput.svelte';
+    import Button from '#lib/components/Button/Button.svelte';
+    import InputCount from '#lib/components/InputCount/InputCount.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let {
         open = $bindable(true),

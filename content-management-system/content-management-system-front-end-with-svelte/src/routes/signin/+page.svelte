@@ -1,21 +1,21 @@
+<script lang="ts">
+  import type { ActionData } from "./$types";
+  import { enhance } from "$app/forms";
+
+  import { t } from "#lib/i18n.svelte.js";
+  import { PUBLIC_OIDC_SIGNIN_ENABLED } from '$app/env/public';
+
+  let { form }: { form: ActionData } = $props();
+  // Opt-in OIDC SSO (EV-2): a plain <a> browser navigation, not a form action.
+  const ssoEnabled = PUBLIC_OIDC_SIGNIN_ENABLED === "true";
+</script>
+
 <!--
   Sign-in page (BFF, per-app magic-link login, CMS-T25). Posts to the
   `default` server action, which calls the authentication service
   server-side with a return URL pointing back at THIS app's /verify.
   No token is held in the browser.
 -->
-<script lang="ts">
-  import type { ActionData } from "./$types";
-  import { enhance } from "$app/forms";
-
-  import { t } from "$lib/i18n.svelte";
-  import { env } from "$env/dynamic/public";
-
-  let { form }: { form: ActionData } = $props();
-  // Opt-in OIDC SSO (EV-2): a plain <a> browser navigation, not a form action.
-  const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === "true";
-</script>
-
 <svelte:head><title>Sign in — Content Management System</title></svelte:head>
 
 <h1>Sign in</h1>

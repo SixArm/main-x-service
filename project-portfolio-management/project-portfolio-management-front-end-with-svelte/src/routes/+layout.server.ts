@@ -6,8 +6,8 @@
 // choice only; every route stays reachable by URL regardless.
 
 import type { LayoutServerLoad } from "./$types";
-import { currentUser } from "$lib/server/auth";
-import { KNOWN_NAV_HREFS, landingRouteForView, viewAttr } from "$lib/nav";
+import { currentUser } from "#lib/server/auth.js";
+import { KNOWN_NAV_HREFS, landingRouteForView, viewAttr } from "#lib/nav.js";
 
 const DEFAULT_LANDING_ROUTE = "/plans";
 

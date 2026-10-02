@@ -24,7 +24,7 @@ import type {
     User,
     Volume,
     Worker,
-} from '$lib/store/types';
+} from '#lib/store/types.js';
 import type { components } from './schema';
 
 const DEFAULT_BASE = '';

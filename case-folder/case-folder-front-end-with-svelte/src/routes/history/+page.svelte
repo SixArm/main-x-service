@@ -8,14 +8,14 @@
     // State: `query` (mirrors the URL term) + the debounce timer handle.
 
     import { goto } from '$app/navigation';
-    import { cache } from '$lib/store/cache.svelte';
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
 
@@ -36,7 +36,7 @@
             const target = next
                 ? `/history?q=${encodeURIComponent(next)}`
                 : '/history';
-            goto(target, { keepFocus: true, replaceState: true });
+            goto(target, { reset: false, replaceState: true });
         }, 200);
     }
 </script>

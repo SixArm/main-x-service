@@ -9,10 +9,10 @@
       than one address form is on the page. Default "addr".
 -->
 <script lang="ts">
-    import type { PostalAddress } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
+    import type { PostalAddress } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
 
     let {
         address = $bindable(),

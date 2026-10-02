@@ -5,13 +5,13 @@
     // status, last moved, notes), a "Move this folder" shortcut, and the
     // full move history. Data comes from the load function's page data.
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import SummaryList from '$lib/components/SummaryList/SummaryList.svelte';
-    import SummaryListItem from '$lib/components/SummaryListItem/SummaryListItem.svelte';
-    import Separator from '$lib/components/Separator/Separator.svelte';
-    import UnitedKingdomNationalHealthServiceNumberView from '$lib/components/UnitedKingdomNationalHealthServiceNumberView/UnitedKingdomNationalHealthServiceNumberView.svelte';
-    import { t, statusLabel } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import SummaryList from '#lib/components/SummaryList/SummaryList.svelte';
+    import SummaryListItem from '#lib/components/SummaryListItem/SummaryListItem.svelte';
+    import Separator from '#lib/components/Separator/Separator.svelte';
+    import UnitedKingdomNationalHealthServiceNumberView from '#lib/components/UnitedKingdomNationalHealthServiceNumberView/UnitedKingdomNationalHealthServiceNumberView.svelte';
+    import { t, statusLabel } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
     const folder = $derived(data.folder);

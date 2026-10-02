@@ -8,8 +8,8 @@
     - title (string, default "Match results"): section heading.
 -->
 <script lang="ts">
-    import type { MatchResult } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import type { MatchResult } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let {
         results,

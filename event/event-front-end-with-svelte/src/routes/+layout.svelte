@@ -1,35 +1,7 @@
-<!--
-  Root layout — app shell shared by every route: a top bar with brand, an
-  always-visible hamburger toggle that collapses the primary navigation into
-  a dropdown panel at every width, an always-visible end group (Sign in /
-  Sign out + the Lily theme/locale/text-size/share PickerBar), plus a <main>
-  slot for page content.
-
-  Props:
-    - children (Snippet): the active route's rendered page.
-
-  Notes:
-    - Reads `page.url.pathname` to highlight the active nav link.
-    - Theme selection persists via PickerBar's theme sub-picker's own
-      storageKey ("lily-theme").
-    - Text-size selection persists via PickerBar's text-size sub-picker's
-      own storageKey ("lily-text-size"), applied as `data-text-size` on
-      <html> (see app.css).
-    - PickerBar's `shareProps.title` reads the `page.data.title` convention
-      (set per-route by each route's load function) so it stays in sync
-      with that page's own <svelte:head><title> without reading the DOM.
-    - The locale switcher is PickerBar's bundled LocalePicker (Lily ships
-      the four pickers — theme/locale/text-size/share — as one mandatory
-      bundle, so the locale picker cannot be omitted). The i18n store
-      (`$lib/i18n.svelte.js`) remains the single source of truth for the
-      active locale; PickerBar's locale sub-picker is wired with
-      `applyDir={false}` and `onChange={(code) => i18n.set(code)}` so
-      lang/dir mirroring onto <html> stays in this file's `$effect` below.
--->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
-    import { browser } from "$app/environment";
+    import { browser } from "$app/env";
     import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
@@ -39,7 +11,7 @@
         t,
         LOCALES,
         LOCALE_LABELS,
-    } from "$lib/i18n.svelte.js";
+    } from "#lib/i18n.svelte.js";
     import PickerBar from "@lilydesignsystem/svelte-picker-bar";
     import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
@@ -133,6 +105,35 @@
     });
 </script>
 
+<!--
+  Root layout — app shell shared by every route: a top bar with brand, an
+  always-visible hamburger toggle that collapses the primary navigation into
+  a dropdown panel at every width, an always-visible end group (Sign in /
+  Sign out + the Lily theme/locale/text-size/share PickerBar), plus a <main>
+  slot for page content.
+
+  Props:
+    - children (Snippet): the active route's rendered page.
+
+  Notes:
+    - Reads `page.url.pathname` to highlight the active nav link.
+    - Theme selection persists via PickerBar's theme sub-picker's own
+      storageKey ("lily-theme").
+    - Text-size selection persists via PickerBar's text-size sub-picker's
+      own storageKey ("lily-text-size"), applied as `data-text-size` on
+      <html> (see app.css).
+    - PickerBar's `shareProps.title` reads the `page.data.title` convention
+      (set per-route by each route's load function) so it stays in sync
+      with that page's own <svelte:head><title> without reading the DOM.
+    - The locale switcher is PickerBar's bundled LocalePicker (Lily ships
+      the four pickers — theme/locale/text-size/share — as one mandatory
+      bundle, so the locale picker cannot be omitted). The i18n store
+      (`#lib/i18n.svelte.js`) remains the single source of truth for the
+      active locale; PickerBar's locale sub-picker is wired with
+      `applyDir={false}` and `onChange={(code) => i18n.set(code)}` so
+      lang/dir mirroring onto <html> stays in this file's `$effect` below.
+-->
+
 <div class="layout">
     <header class="topbar">
         <button
@@ -142,13 +143,14 @@
             aria-controls="primary-nav"
             aria-label={t("nav.toggle")}
             onclick={() => (menuOpen = !menuOpen)}
+            ><span class="hamburger-box" aria-hidden="true"></span></button
         >
-            <span class="hamburger-box" aria-hidden="true"></span>
-        </button>
-        <a href="/" class="brand"
-            >{t("brand")}
-            <span class="muted small tagline">{t("brand.tagline")}</span></a
-        >
+
+        <a href="/" class="brand">
+            {t("brand")}
+            <span class="muted small tagline">{t("brand.tagline")}</span>
+        </a>
+
         <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
             <ul>
                 {#each navItems as item}
@@ -159,9 +161,8 @@
                                 ? "page"
                                 : null}
                             onclick={() => (menuOpen = false)}
+                            >{t(item.label)}</a
                         >
-                            {t(item.label)}
-                        </a>
                     </li>
                 {/each}
             </ul>

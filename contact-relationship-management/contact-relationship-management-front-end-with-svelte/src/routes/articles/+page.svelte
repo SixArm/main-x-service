@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { articleStatus, listArticles } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
-  import type { Article } from "$lib/api/crm";
+  import { articleStatus, listArticles } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
+  import type { Article } from "#lib/api/crm.js";
 
   let articles = $state<Article[] | null>(null);
   let query = $state("");

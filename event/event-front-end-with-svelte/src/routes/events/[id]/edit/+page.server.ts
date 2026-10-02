@@ -1,7 +1,7 @@
 // Page-visit guard (PRO-H10): this page's only purpose is submitting an
 // edit — redirect an unauthenticated visitor to /signin rather than
 // render a form whose submit would fail. See
-// `$lib/server/session.ts::requireSignedIn` for the policy rationale.
+// `#lib/server/session.ts::requireSignedIn` for the policy rationale.
 //
 // Also returns the `page.data.title` convention value (see
 // `../../../+layout.svelte`), mirroring this route's own
@@ -9,7 +9,7 @@
 // reading the DOM.
 
 import type { PageServerLoad } from "./$types";
-import { requireSignedIn } from "$lib/server/session";
+import { requireSignedIn } from "#lib/server/session.js";
 
 export const load: PageServerLoad = ({ locals, params }) => {
   requireSignedIn(locals);

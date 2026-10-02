@@ -6,8 +6,8 @@
   API call.
 -->
 <script lang="ts">
-  import Dashboard from "$lib/components/Dashboard.svelte";
-  import Splash from "$lib/components/Splash.svelte";
+  import Dashboard from "#lib/components/Dashboard.svelte";
+  import Splash from "#lib/components/Splash.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();

@@ -15,7 +15,7 @@
        per-component score breakdown from `POST /api/organizations/match`.
        The stored review-queue item never carries `score_breakdown` on the
        wire (the service's `ReviewQueueItem` struct omits the column it
-       stores it under — see `$lib/review`'s doc comment), so the panel
+       stores it under — see `#lib/review`'s doc comment), so the panel
        recomputes it against the loaded pair instead of trusting a value
        that never arrives.
 
@@ -37,24 +37,24 @@
 <script lang="ts">
     import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
     import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-    import { OrganizationRepository } from "$lib/api/organizations";
-    import type { ReviewQueueOptions } from "$lib/api/organizations";
+    import { OrganizationRepository } from "#lib/api/organizations.js";
+    import type { ReviewQueueOptions } from "#lib/api/organizations.js";
     import type {
         MatchBreakdown,
         Organization,
         ReviewDecision,
         ReviewQueueItem,
         ReviewStatus,
-    } from "$lib/api/types";
+    } from "#lib/api/types.js";
     import {
         REVIEW_LIMITS,
         REVIEW_STATUSES,
         breakdownRows,
         canDecide,
         mergeHref,
-    } from "$lib/review";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { StringKey } from "$lib/i18n.svelte";
+    } from "#lib/review.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { StringKey } from "#lib/i18n.svelte.js";
 
     const repo = OrganizationRepository.withFetch();
 

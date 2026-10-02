@@ -12,9 +12,9 @@
 -->
 <script lang="ts">
     import { onMount } from "svelte";
-    import { OrganizationRepository } from "$lib/api/organizations";
-    import { t } from "$lib/i18n.svelte";
-    import type { OrgRef } from "$lib/api/types";
+    import { OrganizationRepository } from "#lib/api/organizations.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { OrgRef } from "#lib/api/types.js";
 
     const repo = OrganizationRepository.withFetch();
 

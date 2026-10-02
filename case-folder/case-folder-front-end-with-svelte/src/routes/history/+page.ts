@@ -4,8 +4,8 @@
 // fetches the matching move-event log, hydrates the cache, and echoes
 // the query back to the page. 503 on failure.
 
-import { api } from '$lib/api/client';
-import { cache } from '$lib/store/cache.svelte';
+import { api } from '#lib/api/client.js';
+import { cache } from '#lib/store/cache.svelte.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch, url }) {

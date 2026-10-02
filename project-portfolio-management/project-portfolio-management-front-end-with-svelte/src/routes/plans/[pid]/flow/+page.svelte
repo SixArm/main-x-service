@@ -19,7 +19,7 @@
 -->
 <script lang="ts">
   import { page } from "$app/state";
-  import CumulativeFlow from "$lib/components/CumulativeFlow.svelte";
+  import CumulativeFlow from "#lib/components/CumulativeFlow.svelte";
   import {
     TbaClient,
     days,
@@ -32,7 +32,7 @@
     type CumulativeFlow as CumulativeFlowData,
     type PlanFlow,
     type PlanTimeAnalysis,
-  } from "$lib/api/tba";
+  } from "#lib/api/tba.js";
 
   const pid = page.params.pid ?? "";
   const tba = TbaClient.withFetch();

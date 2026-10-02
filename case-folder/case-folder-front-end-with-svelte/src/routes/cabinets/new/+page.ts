@@ -3,8 +3,8 @@
 // Hydrates buildings and rooms so the create form can offer a room
 // picker (grouped by building) for the cabinet's parent place. 503 on failure.
 
-import { api } from '$lib/api/client';
-import { cache } from '$lib/store/cache.svelte';
+import { api } from '#lib/api/client.js';
+import { cache } from '#lib/store/cache.svelte.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch }) {

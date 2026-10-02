@@ -13,9 +13,9 @@
         Willow as FilterTheme,
         createArrayFilter,
     } from "@svar-ui/svelte-filter";
-    import { CarePathwayRepository } from "$lib/api/care-pathways";
-    import type { PathwayRef } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte";
+    import { CarePathwayRepository } from "#lib/api/care-pathways.js";
+    import type { PathwayRef } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CarePathwayRepository.withFetch();
 

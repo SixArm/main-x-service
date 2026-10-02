@@ -10,10 +10,10 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import EventForm from "$lib/components/EventForm.svelte";
-    import { EventRepository } from "$lib/api/events.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { Event } from "$lib/api/types.js";
+    import EventForm from "#lib/components/EventForm.svelte";
+    import { EventRepository } from "#lib/api/events.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { Event } from "#lib/api/types.js";
 
     const repo = EventRepository.withFetch();
     let event = $state<Event | null>(null);

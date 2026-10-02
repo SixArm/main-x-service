@@ -1,8 +1,8 @@
 // Resource-bound wrapper over ApiClient for the care-pathway endpoints.
 
-import { API_BASE_URL } from "$lib/config";
-import { dryRunFormValue } from "$lib/bulk";
-import type { BulkImportFormat } from "$lib/bulk";
+import { API_BASE_URL } from "#lib/config.js";
+import { dryRunFormValue } from "#lib/bulk.js";
+import type { BulkImportFormat } from "#lib/bulk.js";
 import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
 import type {

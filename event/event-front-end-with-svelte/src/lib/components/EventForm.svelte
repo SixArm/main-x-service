@@ -15,16 +15,16 @@
     - submitLabel / keywordsRaw / languagesRaw ($derived): derived display values.
 -->
 <script lang="ts">
-    import type { Event } from "$lib/api/types.js";
+    import type { Event } from "#lib/api/types.js";
     import {
         ATTENDANCE_MODES,
         EVENT_STATUSES,
         EVENT_TYPES,
-    } from "$lib/api/types.js";
-    import { createForm } from "$lib/forms/form.svelte.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { t, translate } from "$lib/i18n.svelte.js";
+    } from "#lib/api/types.js";
+    import { createForm } from "#lib/forms/form.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { t, translate } from "#lib/i18n.svelte.js";
 
     let props: {
         initial: Event;

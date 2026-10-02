@@ -15,11 +15,11 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import SearchBox from "$lib/components/SearchBox.svelte";
-    import PlaceGrid from "$lib/components/PlaceGrid.svelte";
-    import { PlaceRepository } from "$lib/api/places.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { Place } from "$lib/api/types.js";
+    import SearchBox from "#lib/components/SearchBox.svelte";
+    import PlaceGrid from "#lib/components/PlaceGrid.svelte";
+    import { PlaceRepository } from "#lib/api/places.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { Place } from "#lib/api/types.js";
 
     let query = $state("");
     let places = $state<Place[]>([]);

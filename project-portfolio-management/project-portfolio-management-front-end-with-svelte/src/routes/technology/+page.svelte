@@ -7,7 +7,7 @@
   other PPM views.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
   import {
     PpmClient,
@@ -15,7 +15,7 @@
     type TechnologyRadar,
     type TechDebtRegister,
     type FlowMetrics,
-  } from "$lib/api/ppm";
+  } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   let risk = $state<DependencyRisk | null>(null);

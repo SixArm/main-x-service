@@ -8,8 +8,8 @@
   positions more easily than a sunburst does).
 -->
 <script lang="ts">
-  import type { VariantsReport } from "$lib/api/tba";
-  import { STOPPED, sankeyFromVariants } from "$lib/analytics-transforms";
+  import type { VariantsReport } from "#lib/api/tba.js";
+  import { STOPPED, sankeyFromVariants } from "#lib/analytics-transforms.js";
 
   interface Props {
     report: VariantsReport;

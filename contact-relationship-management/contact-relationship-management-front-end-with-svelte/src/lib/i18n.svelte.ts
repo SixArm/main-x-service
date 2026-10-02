@@ -12,7 +12,7 @@
 // Chinese for China (`zh-cn`). `-001` is the UN M.49 code for "world": a
 // language with no regional variant.
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales the UI is translated into, sorted alphabetically by code (the
@@ -57,6 +57,7 @@ export const RTL_LOCALES = ["ar-001"] as const satisfies readonly Locale[];
 /** Whether `locale` is written right-to-left. */
 export function isRtl(locale: string): boolean {
   const resolved = normaliseLocale(locale);
+
   return (
     resolved !== null && (RTL_LOCALES as readonly string[]).includes(resolved)
   );
@@ -157,7 +158,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -210,48 +212,81 @@ const STRINGS = {
     "tour.open": "افتح هذه الشاشة",
     "tour.top": "العودة إلى الأعلى",
     "tour.start.title": "قبل أن تبدأ",
-    "tour.start.summary": "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
-    "tour.start.step.1": "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
-    "tour.start.step.2": "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
-    "tour.start.step.3": "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
-    "tour.start.step.4": "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
-    "tour.intro": "جولة إرشادية في نظام إدارة علاقات العملاء: ما تفعله كل شاشة وخطوات استخدامها، من التحقق من موافقة جهة اتصال إلى تشغيل حملة والوفاء بمواعيد الدعم.",
+    "tour.start.summary":
+      "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
+    "tour.start.step.1":
+      "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
+    "tour.start.step.2":
+      "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
+    "tour.start.step.3":
+      "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
+    "tour.start.step.4":
+      "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
+    "tour.intro":
+      "جولة إرشادية في نظام إدارة علاقات العملاء: ما تفعله كل شاشة وخطوات استخدامها، من التحقق من موافقة جهة اتصال إلى تشغيل حملة والوفاء بمواعيد الدعم.",
     "tour.s1.title": "إدارة جهة اتصال وموافقتها",
-    "tour.s1.summary": "افتح جهة اتصال لترى علاقتها كاملة في مكان واحد وسجّل ما وافقت عليه.",
-    "tour.s1.step.1": "افتح جهات الاتصال واستخدم شريط التصفية لتضييق الجدول حسب الاسم أو الحالة أو موافقة تسويقية.",
-    "tour.s1.step.2": "حدّد صفًا لفتح صفحة جهة الاتصال التي تعرض الجدول الزمني والصفقات والتذاكر معًا.",
-    "tour.s1.step.3": "ضمن موافقة تسويقية اختر منح الموافقة أو سحب لتسجيل قرار جهة الاتصال، وتُعاد تحميل الصفحة بالحالة الجديدة.",
-    "tour.s1.step.4": "استخدم تنزيل بياناتي لجلب سجلات جهة الاتصال، أو محو (إخفاء الهوية) لإزالتها؛ ولا يظهر زر المحو إلا إذا لم تكن لديها صفقات أو تذاكر مفتوحة.",
+    "tour.s1.summary":
+      "افتح جهة اتصال لترى علاقتها كاملة في مكان واحد وسجّل ما وافقت عليه.",
+    "tour.s1.step.1":
+      "افتح جهات الاتصال واستخدم شريط التصفية لتضييق الجدول حسب الاسم أو الحالة أو موافقة تسويقية.",
+    "tour.s1.step.2":
+      "حدّد صفًا لفتح صفحة جهة الاتصال التي تعرض الجدول الزمني والصفقات والتذاكر معًا.",
+    "tour.s1.step.3":
+      "ضمن موافقة تسويقية اختر منح الموافقة أو سحب لتسجيل قرار جهة الاتصال، وتُعاد تحميل الصفحة بالحالة الجديدة.",
+    "tour.s1.step.4":
+      "استخدم تنزيل بياناتي لجلب سجلات جهة الاتصال، أو محو (إخفاء الهوية) لإزالتها؛ ولا يظهر زر المحو إلا إذا لم تكن لديها صفقات أو تذاكر مفتوحة.",
     "tour.s2.title": "تقييم العملاء المحتملين وفرزهم",
-    "tour.s2.summary": "اعرف أي العملاء المحتملين يستحقون اتصالًا ولماذا، ثم انقلهم عبر دورة حياتهم.",
-    "tour.s2.step.1": "افتح العملاء المحتملون لترى الطابور مع النقاط والاسم والمصدر والحالة لكل منهم، وصفّه بشريط التصفية.",
-    "tour.s2.step.2": "حدّد عميلًا محتملًا واختر تفصيل النقاط لترى مجموع النقاط وتصنيفه والنقاط التي أضافتها كل قاعدة.",
-    "tour.s2.step.3": "اختر اللوحة لعرض العملاء المحتملين في أعمدة: جديد، تم التواصل، مؤهل، تم التحويل، غير مؤهل.",
-    "tour.s2.step.4": "اسحب بطاقة إلى عمود آخر لتغيير حالتها؛ وإذا رفضت الخدمة انتقالًا غير مسموح تُعاد اللوحة إلى الحالة المخزنة.",
+    "tour.s2.summary":
+      "اعرف أي العملاء المحتملين يستحقون اتصالًا ولماذا، ثم انقلهم عبر دورة حياتهم.",
+    "tour.s2.step.1":
+      "افتح العملاء المحتملون لترى الطابور مع النقاط والاسم والمصدر والحالة لكل منهم، وصفّه بشريط التصفية.",
+    "tour.s2.step.2":
+      "حدّد عميلًا محتملًا واختر تفصيل النقاط لترى مجموع النقاط وتصنيفه والنقاط التي أضافتها كل قاعدة.",
+    "tour.s2.step.3":
+      "اختر اللوحة لعرض العملاء المحتملين في أعمدة: جديد، تم التواصل، مؤهل، تم التحويل، غير مؤهل.",
+    "tour.s2.step.4":
+      "اسحب بطاقة إلى عمود آخر لتغيير حالتها؛ وإذا رفضت الخدمة انتقالًا غير مسموح تُعاد اللوحة إلى الحالة المخزنة.",
     "tour.s3.title": "تشغيل مسار الصفقات",
     "tour.s3.summary": "انقل الصفقات عبر مراحل المسار وشاهد التوقعات تتبعها.",
-    "tour.s3.step.1": "افتح الصفقات واختر مسارًا من القائمة المنسدلة؛ كل عمود مرحلة عليها احتمال الفوز.",
-    "tour.s3.step.2": "اقرأ سطر التوقعات فوق اللوحة، وهو يعرض الإجمالي الذي يحسبه الخادم لكل عملة.",
-    "tour.s3.step.3": "اسحب بطاقة صفقة إلى مرحلة أخرى لنقلها؛ وعند إسقاطها على مرحلة خسارة يُسجَّل سبب مع الانتقال.",
-    "tour.s3.step.4": "مرّر إلى جدول القمع لترى عدد الصفقات التي دخلت كل مرحلة ونسبة التحويل من المرحلة السابقة.",
+    "tour.s3.step.1":
+      "افتح الصفقات واختر مسارًا من القائمة المنسدلة؛ كل عمود مرحلة عليها احتمال الفوز.",
+    "tour.s3.step.2":
+      "اقرأ سطر التوقعات فوق اللوحة، وهو يعرض الإجمالي الذي يحسبه الخادم لكل عملة.",
+    "tour.s3.step.3":
+      "اسحب بطاقة صفقة إلى مرحلة أخرى لنقلها؛ وعند إسقاطها على مرحلة خسارة يُسجَّل سبب مع الانتقال.",
+    "tour.s3.step.4":
+      "مرّر إلى جدول القمع لترى عدد الصفقات التي دخلت كل مرحلة ونسبة التحويل من المرحلة السابقة.",
     "tour.s4.title": "تشغيل حملة وقراءة عائدها",
     "tour.s4.summary": "أرسل حملة إلى مستلميها وشاهد ما حققته.",
-    "tour.s4.step.1": "افتح الحملات لترى اسم كل حملة وحالتها والمستلمين: المستلمون، ثم المُسلَّم، ثم المفتوح، ثم المنقور.",
-    "tour.s4.step.2": "للحملة المسودة أو المجدولة اختر تشغيل (محاكاة)؛ تُجدوَل المسودة أولًا ثم تُشغَّل.",
+    "tour.s4.step.1":
+      "افتح الحملات لترى اسم كل حملة وحالتها والمستلمين: المستلمون، ثم المُسلَّم، ثم المفتوح، ثم المنقور.",
+    "tour.s4.step.2":
+      "للحملة المسودة أو المجدولة اختر تشغيل (محاكاة)؛ تُجدوَل المسودة أولًا ثم تُشغَّل.",
     "tour.s4.step.3": "اختر القمع في أي حملة لفتح صف الملخص الخاص بها.",
-    "tour.s4.step.4": "اقرأ عدد العملاء المحتملين والإيرادات المحققة ونسبة العائد على الاستثمار مع الأرقام التي تقف خلفها لتحكم على النتيجة بصدق.",
+    "tour.s4.step.4":
+      "اقرأ عدد العملاء المحتملين والإيرادات المحققة ونسبة العائد على الاستثمار مع الأرقام التي تقف خلفها لتحكم على النتيجة بصدق.",
     "tour.s5.title": "إدارة طابور الدعم وفق اتفاقيات مستوى الخدمة",
-    "tour.s5.summary": "عالج التذاكر حسب الأولوية والتقط ما يوشك أن يتجاوز موعده.",
-    "tour.s5.step.1": "افتح التذاكر لترى الأولوية والحالة ووقت الرد المستحق لكل تذكرة، وصفّ الطابور بشريط التصفية.",
-    "tour.s5.step.2": "راقب عدد تم الخرق أعلى الطابور لمعرفة التذاكر التي فاتها موعدها فعلًا.",
-    "tour.s5.step.3": "حدّد تذكرة لفتح لوحتها، ثم اختر زر سهم مثل → pending أو → resolved لنقلها إلى حالتها التالية.",
-    "tour.s5.step.4": "اختر اللوحة للعمل على التذاكر نفسها في أعمدة مفتوحة ومعلقة ومحلولة ومغلقة، مع سحب البطاقات بينها.",
+    "tour.s5.summary":
+      "عالج التذاكر حسب الأولوية والتقط ما يوشك أن يتجاوز موعده.",
+    "tour.s5.step.1":
+      "افتح التذاكر لترى الأولوية والحالة ووقت الرد المستحق لكل تذكرة، وصفّ الطابور بشريط التصفية.",
+    "tour.s5.step.2":
+      "راقب عدد تم الخرق أعلى الطابور لمعرفة التذاكر التي فاتها موعدها فعلًا.",
+    "tour.s5.step.3":
+      "حدّد تذكرة لفتح لوحتها، ثم اختر زر سهم مثل → pending أو → resolved لنقلها إلى حالتها التالية.",
+    "tour.s5.step.4":
+      "اختر اللوحة للعمل على التذاكر نفسها في أعمدة مفتوحة ومعلقة ومحلولة ومغلقة، مع سحب البطاقات بينها.",
     "tour.s6.title": "مراجعة النتائج والخصوصية",
-    "tour.s6.summary": "راجع الأرقام المهمة للمديرين وقادة المبيعات ومسؤول حماية البيانات.",
-    "tour.s6.step.1": "افتح لوحة التحكم لترى معدل الفوز والصفقات المفتوحة والتذاكر المفتوحة والتوقعات في لمحة.",
-    "tour.s6.step.2": "افتح التنفيذية لتطلع على ملخص الفترة والصفقات الراكدة ونتائج سلامة المسار واتجاه التوقعات.",
-    "tour.s6.step.3": "افتح التفاعل والمتابعات لتجد جهات الاتصال التي لم يتواصل معها أحد مؤخرًا والمتابعات المتأخرة أو المستحقة خلال 30 يومًا.",
-    "tour.s6.step.4": "افتح حماية البيانات لترى الموافقات حسب المصدر وحسب الحساب وأي صفوف جهات اتصال تشترك في الشخص نفسه.",
+    "tour.s6.summary":
+      "راجع الأرقام المهمة للمديرين وقادة المبيعات ومسؤول حماية البيانات.",
+    "tour.s6.step.1":
+      "افتح لوحة التحكم لترى معدل الفوز والصفقات المفتوحة والتذاكر المفتوحة والتوقعات في لمحة.",
+    "tour.s6.step.2":
+      "افتح التنفيذية لتطلع على ملخص الفترة والصفقات الراكدة ونتائج سلامة المسار واتجاه التوقعات.",
+    "tour.s6.step.3":
+      "افتح التفاعل والمتابعات لتجد جهات الاتصال التي لم يتواصل معها أحد مؤخرًا والمتابعات المتأخرة أو المستحقة خلال 30 يومًا.",
+    "tour.s6.step.4":
+      "افتح حماية البيانات لترى الموافقات حسب المصدر وحسب الحساب وأي صفوف جهات اتصال تشترك في الشخص نفسه.",
     "signin.sso": "تسجيل الدخول عبر SSO",
   },
   "cy-001": {
@@ -344,7 +379,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -397,48 +433,84 @@ const STRINGS = {
     "tour.open": "Agor y sgrin hon",
     "tour.top": "Yn ôl i'r brig",
     "tour.start.title": "Cyn i chi ddechrau",
-    "tour.start.summary": "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
-    "tour.start.step.1": "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
-    "tour.start.step.2": "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
-    "tour.start.step.3": "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
-    "tour.start.step.4": "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
-    "tour.intro": "Taith dywys drwy'r CRM: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o wirio caniatâd cyswllt i redeg ymgyrch a chwrdd â therfynau amser cymorth.",
+    "tour.start.summary":
+      "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+    "tour.start.step.1":
+      "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
+    "tour.start.step.2":
+      "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+    "tour.start.step.3":
+      "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+    "tour.start.step.4":
+      "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+    "tour.intro":
+      "Taith dywys drwy'r CRM: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o wirio caniatâd cyswllt i redeg ymgyrch a chwrdd â therfynau amser cymorth.",
     "tour.s1.title": "Rheoli cyswllt a'i ganiatâd",
-    "tour.s1.summary": "Agorwch gyswllt i weld ei berthynas gyfan mewn un lle, a chofnodwch yr hyn y mae wedi cytuno iddo.",
-    "tour.s1.step.1": "Agorwch Cysylltiadau a defnyddiwch y bar hidlo i gyfyngu'r grid yn ôl Enw, Statws neu Caniatâd marchnata.",
-    "tour.s1.step.2": "Dewiswch res i agor tudalen y cyswllt, sy'n dangos ei linell amser, Bargeinion a Thocynnau gyda'i gilydd.",
-    "tour.s1.step.3": "O dan Caniatâd marchnata, dewiswch Rhoi caniatâd neu Tynnu'n ôl i gofnodi penderfyniad y cyswllt; mae'r dudalen yn ail-lwytho gyda'r cyflwr newydd.",
-    "tour.s1.step.4": "Defnyddiwch Lawrlwytho fy nata i nôl cofnodion y cyswllt, neu Dileu (dienw) i'w dileu; dim ond pan nad oes gan y cyswllt fargeinion na thocynnau agored y mae'r botwm dileu'n ymddangos.",
+    "tour.s1.summary":
+      "Agorwch gyswllt i weld ei berthynas gyfan mewn un lle, a chofnodwch yr hyn y mae wedi cytuno iddo.",
+    "tour.s1.step.1":
+      "Agorwch Cysylltiadau a defnyddiwch y bar hidlo i gyfyngu'r grid yn ôl Enw, Statws neu Caniatâd marchnata.",
+    "tour.s1.step.2":
+      "Dewiswch res i agor tudalen y cyswllt, sy'n dangos ei linell amser, Bargeinion a Thocynnau gyda'i gilydd.",
+    "tour.s1.step.3":
+      "O dan Caniatâd marchnata, dewiswch Rhoi caniatâd neu Tynnu'n ôl i gofnodi penderfyniad y cyswllt; mae'r dudalen yn ail-lwytho gyda'r cyflwr newydd.",
+    "tour.s1.step.4":
+      "Defnyddiwch Lawrlwytho fy nata i nôl cofnodion y cyswllt, neu Dileu (dienw) i'w dileu; dim ond pan nad oes gan y cyswllt fargeinion na thocynnau agored y mae'r botwm dileu'n ymddangos.",
     "tour.s2.title": "Sgorio a threfnu arweinion",
-    "tour.s2.summary": "Gwelwch pa arweinion sy'n haeddu galwad, a pham, yna symudwch nhw drwy eu cylch bywyd.",
-    "tour.s2.step.1": "Agorwch Arweinion i weld y ciw gyda Sgôr, Enw, Ffynhonnell a Statws pob arweiniad; hidlwch ef gyda'r bar hidlo.",
-    "tour.s2.step.2": "Dewiswch arweiniad a dewiswch Dadansoddiad sgôr i weld y sgôr gyfan, ei label a'r pwyntiau a gyfrannodd pob rheol.",
-    "tour.s2.step.3": "Dewiswch Bwrdd i weld yr arweinion fel colofnau: New, Contacted, Qualified, Converted a Disqualified.",
-    "tour.s2.step.4": "Llusgwch gerdyn i golofn arall i newid ei statws; os yw'r gwasanaeth yn gwrthod symudiad anghyfreithlon, mae'r bwrdd yn ail-lwytho i'r cyflwr sydd wedi'i storio.",
+    "tour.s2.summary":
+      "Gwelwch pa arweinion sy'n haeddu galwad, a pham, yna symudwch nhw drwy eu cylch bywyd.",
+    "tour.s2.step.1":
+      "Agorwch Arweinion i weld y ciw gyda Sgôr, Enw, Ffynhonnell a Statws pob arweiniad; hidlwch ef gyda'r bar hidlo.",
+    "tour.s2.step.2":
+      "Dewiswch arweiniad a dewiswch Dadansoddiad sgôr i weld y sgôr gyfan, ei label a'r pwyntiau a gyfrannodd pob rheol.",
+    "tour.s2.step.3":
+      "Dewiswch Bwrdd i weld yr arweinion fel colofnau: New, Contacted, Qualified, Converted a Disqualified.",
+    "tour.s2.step.4":
+      "Llusgwch gerdyn i golofn arall i newid ei statws; os yw'r gwasanaeth yn gwrthod symudiad anghyfreithlon, mae'r bwrdd yn ail-lwytho i'r cyflwr sydd wedi'i storio.",
     "tour.s3.title": "Rhedeg y biblinell bargeinion",
-    "tour.s3.summary": "Symudwch fargeinion ar draws camau'r biblinell a gwyliwch y rhagolwg yn dilyn.",
-    "tour.s3.step.1": "Agorwch Bargeinion a dewiswch biblinell o'r gwymplen; mae pob colofn yn gam, wedi'i labelu â'i debygolrwydd o ennill.",
-    "tour.s3.step.2": "Darllenwch y llinell Rhagolwg uwchben y bwrdd, sy'n dangos cyfanswm y gweinydd ar gyfer pob arian cyfred.",
-    "tour.s3.step.3": "Llusgwch gerdyn bargen i gam arall i'w symud; mae ei ollwng ar gam a gollwyd yn cofnodi rheswm gyda'r symudiad.",
-    "tour.s3.step.4": "Sgroliwch i lawr i'r tabl Funnel i weld faint o fargeinion a ddaeth i mewn i bob cam a'r trawsnewid o'r cam blaenorol.",
+    "tour.s3.summary":
+      "Symudwch fargeinion ar draws camau'r biblinell a gwyliwch y rhagolwg yn dilyn.",
+    "tour.s3.step.1":
+      "Agorwch Bargeinion a dewiswch biblinell o'r gwymplen; mae pob colofn yn gam, wedi'i labelu â'i debygolrwydd o ennill.",
+    "tour.s3.step.2":
+      "Darllenwch y llinell Rhagolwg uwchben y bwrdd, sy'n dangos cyfanswm y gweinydd ar gyfer pob arian cyfred.",
+    "tour.s3.step.3":
+      "Llusgwch gerdyn bargen i gam arall i'w symud; mae ei ollwng ar gam a gollwyd yn cofnodi rheswm gyda'r symudiad.",
+    "tour.s3.step.4":
+      "Sgroliwch i lawr i'r tabl Funnel i weld faint o fargeinion a ddaeth i mewn i bob cam a'r trawsnewid o'r cam blaenorol.",
     "tour.s4.title": "Rhedeg ymgyrch a darllen ei ROI",
-    "tour.s4.summary": "Anfonwch ymgyrch at ei derbynwyr a gwelwch beth enillodd.",
-    "tour.s4.step.1": "Agorwch Ymgyrchoedd i weld Enw, Statws a Derbynwyr pob ymgyrch, wedi'u dangos fel derbynwyr, danfonwyd, agorwyd a chliciwyd.",
-    "tour.s4.step.2": "Ar gyfer ymgyrch ddrafft neu wedi'i threfnu, dewiswch Rhedeg (efelychiad); caiff drafft ei threfnu yn gyntaf, yna ei rhedeg.",
-    "tour.s4.step.3": "Dewiswch Twndis ar unrhyw ymgyrch i agor ei rhes grynodeb.",
-    "tour.s4.step.4": "Darllenwch nifer yr Arweinion, yr incwm a enillwyd a'r ganran ROI, gyda'r rhifau y tu ôl iddi, fel y gallwch farnu'r canlyniad yn onest.",
+    "tour.s4.summary":
+      "Anfonwch ymgyrch at ei derbynwyr a gwelwch beth enillodd.",
+    "tour.s4.step.1":
+      "Agorwch Ymgyrchoedd i weld Enw, Statws a Derbynwyr pob ymgyrch, wedi'u dangos fel derbynwyr, danfonwyd, agorwyd a chliciwyd.",
+    "tour.s4.step.2":
+      "Ar gyfer ymgyrch ddrafft neu wedi'i threfnu, dewiswch Rhedeg (efelychiad); caiff drafft ei threfnu yn gyntaf, yna ei rhedeg.",
+    "tour.s4.step.3":
+      "Dewiswch Twndis ar unrhyw ymgyrch i agor ei rhes grynodeb.",
+    "tour.s4.step.4":
+      "Darllenwch nifer yr Arweinion, yr incwm a enillwyd a'r ganran ROI, gyda'r rhifau y tu ôl iddi, fel y gallwch farnu'r canlyniad yn onest.",
     "tour.s5.title": "Gweithio'r ciw cymorth yn erbyn SLAs",
-    "tour.s5.summary": "Trafodwch docynnau yn ôl blaenoriaeth a dalwch y rhai sydd ar fin torri eu terfyn amser.",
-    "tour.s5.step.1": "Agorwch Tocynnau i weld Blaenoriaeth, Statws ac amser Ymateb erbyn pob tocyn; hidlwch y ciw gyda'r bar hidlo.",
-    "tour.s5.step.2": "Gwyliwch y cyfrif Torrwyd ar frig y ciw am docynnau sydd eisoes wedi methu terfyn amser.",
-    "tour.s5.step.3": "Dewiswch docyn i agor ei banel, yna dewiswch fotwm saeth fel → pending neu → resolved i'w symud i'w statws nesaf.",
-    "tour.s5.step.4": "Dewiswch Bwrdd i weithio'r un tocynnau fel colofnau Open, Pending, Resolved a Closed, gan lusgo cardiau rhyngddynt.",
+    "tour.s5.summary":
+      "Trafodwch docynnau yn ôl blaenoriaeth a dalwch y rhai sydd ar fin torri eu terfyn amser.",
+    "tour.s5.step.1":
+      "Agorwch Tocynnau i weld Blaenoriaeth, Statws ac amser Ymateb erbyn pob tocyn; hidlwch y ciw gyda'r bar hidlo.",
+    "tour.s5.step.2":
+      "Gwyliwch y cyfrif Torrwyd ar frig y ciw am docynnau sydd eisoes wedi methu terfyn amser.",
+    "tour.s5.step.3":
+      "Dewiswch docyn i agor ei banel, yna dewiswch fotwm saeth fel → pending neu → resolved i'w symud i'w statws nesaf.",
+    "tour.s5.step.4":
+      "Dewiswch Bwrdd i weithio'r un tocynnau fel colofnau Open, Pending, Resolved a Closed, gan lusgo cardiau rhyngddynt.",
     "tour.s6.title": "Adolygu canlyniadau a phreifatrwydd",
-    "tour.s6.summary": "Gwiriwch y rhifau sy'n bwysig i reolwyr, arweinwyr gwerthu a'r swyddog diogelu data.",
-    "tour.s6.step.1": "Agorwch y Dangosfwrdd i weld y Win rate, Bargeinion agored, Tocynnau agored a Rhagolwg ar un olwg.",
-    "tour.s6.step.2": "Agorwch Gweithredol am grynodeb y cyfnod, Stale deals, canfyddiadau Pipeline hygiene a'r Forecast trend.",
-    "tour.s6.step.3": "Agorwch Ymgysylltu a Dilyniannau i ddod o hyd i gysylltiadau nad oes neb wedi cysylltu â nhw'n ddiweddar a'r dilyniannau sydd wedi mynd heibio neu i'w cwblhau o fewn 30 diwrnod.",
-    "tour.s6.step.4": "Agorwch DPO i weld caniatâd yn ôl ffynhonnell ac yn ôl cyfrif, ac unrhyw resi cyswllt sy'n rhannu'r un person.",
+    "tour.s6.summary":
+      "Gwiriwch y rhifau sy'n bwysig i reolwyr, arweinwyr gwerthu a'r swyddog diogelu data.",
+    "tour.s6.step.1":
+      "Agorwch y Dangosfwrdd i weld y Win rate, Bargeinion agored, Tocynnau agored a Rhagolwg ar un olwg.",
+    "tour.s6.step.2":
+      "Agorwch Gweithredol am grynodeb y cyfnod, Stale deals, canfyddiadau Pipeline hygiene a'r Forecast trend.",
+    "tour.s6.step.3":
+      "Agorwch Ymgysylltu a Dilyniannau i ddod o hyd i gysylltiadau nad oes neb wedi cysylltu â nhw'n ddiweddar a'r dilyniannau sydd wedi mynd heibio neu i'w cwblhau o fewn 30 diwrnod.",
+    "tour.s6.step.4":
+      "Agorwch DPO i weld caniatâd yn ôl ffynhonnell ac yn ôl cyfrif, ac unrhyw resi cyswllt sy'n rhannu'r un person.",
     "signin.sso": "Mewngofnodi gydag SSO",
   },
   "de-de": {
@@ -518,19 +590,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Eine Sicht pro Kunde",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -539,77 +618,126 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "brand.tagline": "Jede Kundenbeziehung an einem Ort",
     "nav.toggle": "Navigation umschalten",
     "nav.theme": "Thema",
     "splash.hero.title": "Jeden Kunden kennen, jeden Vorgang abschließen",
-    "splash.hero.subtitle": "Verwalten Sie Kontakte, Deals, Kampagnen und Support-Tickets in einem Arbeitsbereich, mit respektierter Einwilligung und jeder Aktion im Protokoll.",
-    "splash.benefits.1.body": "Zeitleiste, Deals und Tickets eines Kontakts stehen zusammen, sodass niemand zweimal fragen muss.",
+    "splash.hero.subtitle":
+      "Verwalten Sie Kontakte, Deals, Kampagnen und Support-Tickets in einem Arbeitsbereich, mit respektierter Einwilligung und jeder Aktion im Protokoll.",
+    "splash.benefits.1.body":
+      "Zeitleiste, Deals und Tickets eines Kontakts stehen zusammen, sodass niemand zweimal fragen muss.",
     "splash.benefits.2.title": "Einwilligung zuerst",
-    "splash.benefits.2.body": "Marketing geht nur an Kontakte, die zugestimmt haben, und ein Widerruf der Einwilligung wirkt sofort.",
+    "splash.benefits.2.body":
+      "Marketing geht nur an Kontakte, die zugestimmt haben, und ein Widerruf der Einwilligung wirkt sofort.",
     "splash.benefits.3.title": "Auf das Wesentliche konzentrieren",
-    "splash.benefits.3.body": "Lead-Scores legen ihre Herleitung offen, sodass Ihr Team weiß, warum sich ein Anruf lohnt.",
+    "splash.benefits.3.body":
+      "Lead-Scores legen ihre Herleitung offen, sodass Ihr Team weiß, warum sich ein Anruf lohnt.",
     "splash.benefits.4.title": "Ehrliche Zahlen",
-    "splash.benefits.4.body": "Erfolgsquoten zeigen die Anzahl hinter dem Prozentwert, und fehlende Daten werden als fehlend angezeigt.",
+    "splash.benefits.4.body":
+      "Erfolgsquoten zeigen die Anzahl hinter dem Prozentwert, und fehlende Daten werden als fehlend angezeigt.",
     "splash.benefits.5.title": "Support pünktlich",
-    "splash.benefits.5.body": "Live-Countdowns zeigen, welche Tickets kurz vor ihrer Frist stehen und welche sie schon überschritten haben.",
+    "splash.benefits.5.body":
+      "Live-Countdowns zeigen, welche Tickets kurz vor ihrer Frist stehen und welche sie schon überschritten haben.",
     "splash.benefits.6.title": "Keine doppelten Identitäten",
-    "splash.benefits.6.body": "Kontakte und Konten verweisen auf die gemeinsamen Personen- und Organisationsregister, statt sie zu kopieren.",
+    "splash.benefits.6.body":
+      "Kontakte und Konten verweisen auf die gemeinsamen Personen- und Organisationsregister, statt sie zu kopieren.",
     "splash.features.1.title": "Kontakte und Konten",
-    "splash.features.1.body": "Durchsuchen Sie Personen und Organisationen, mit Einwilligung und Zeitleiste jedes Kontakts auf einer Seite.",
+    "splash.features.1.body":
+      "Durchsuchen Sie Personen und Organisationen, mit Einwilligung und Zeitleiste jedes Kontakts auf einer Seite.",
     "splash.features.2.title": "Lead-Scoring",
-    "splash.features.2.body": "Verfolgen Sie Leads von ihrer Quelle an, mit Score und einer Aufschlüsselung dessen, was ihn ergeben hat.",
+    "splash.features.2.body":
+      "Verfolgen Sie Leads von ihrer Quelle an, mit Score und einer Aufschlüsselung dessen, was ihn ergeben hat.",
     "splash.features.3.title": "Deal-Board",
-    "splash.features.3.body": "Ziehen Sie Deals durch die Pipeline-Phasen und sehen Sie, wie sich die Prognose vom Server aktualisiert.",
+    "splash.features.3.body":
+      "Ziehen Sie Deals durch die Pipeline-Phasen und sehen Sie, wie sich die Prognose vom Server aktualisiert.",
     "splash.features.4.title": "Kampagnen und ROI",
-    "splash.features.4.body": "Planen Sie Kampagnen, verfolgen Sie den Trichter von den Empfängern bis zu den Ergebnissen und sehen Sie den Ertrag jeder einzelnen.",
+    "splash.features.4.body":
+      "Planen Sie Kampagnen, verfolgen Sie den Trichter von den Empfängern bis zu den Ergebnissen und sehen Sie den Ertrag jeder einzelnen.",
     "splash.features.5.title": "Tickets mit SLAs",
-    "splash.features.5.body": "Bearbeiten Sie eine Support-Warteschlange nach Priorität, mit herunterzählenden Antwortfristen an jedem Ticket.",
+    "splash.features.5.body":
+      "Bearbeiten Sie eine Support-Warteschlange nach Priorität, mit herunterzählenden Antwortfristen an jedem Ticket.",
     "splash.features.6.title": "Wissensdatenbank",
-    "splash.features.6.body": "Schreiben, versionieren und veröffentlichen Sie Hilfeartikel und durchsuchen Sie sie, um Tickets schneller zu beantworten.",
-    "tour.intro": "Ein geführter Rundgang durch das CRM: was jede Ansicht leistet und wie Sie sie nutzen, von der Prüfung der Einwilligung eines Kontakts über die Durchführung einer Kampagne bis zur Einhaltung von Support-Fristen.",
+    "splash.features.6.body":
+      "Schreiben, versionieren und veröffentlichen Sie Hilfeartikel und durchsuchen Sie sie, um Tickets schneller zu beantworten.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das CRM: was jede Ansicht leistet und wie Sie sie nutzen, von der Prüfung der Einwilligung eines Kontakts über die Durchführung einer Kampagne bis zur Einhaltung von Support-Fristen.",
     "tour.s1.title": "Einen Kontakt und seine Einwilligung verwalten",
-    "tour.s1.summary": "Öffnen Sie einen Kontakt, um seine gesamte Beziehung an einem Ort zu sehen, und halten Sie fest, wozu er zugestimmt hat.",
-    "tour.s1.step.1": "Öffnen Sie „Kontakte“ und grenzen Sie die Tabelle mit der Filterleiste nach Name, Status oder Marketing-Einwilligung ein.",
-    "tour.s1.step.2": "Wählen Sie eine Zeile, um die Kontaktseite zu öffnen, die Zeitleiste, Deals und Tickets zusammen zeigt.",
-    "tour.s1.step.3": "Wählen Sie unter „Marketing-Einwilligung“ „Einwilligung erteilen“ oder „Widerrufen“, um die Entscheidung des Kontakts festzuhalten; die Seite lädt mit dem neuen Zustand neu.",
-    "tour.s1.step.4": "Mit „Meine Daten herunterladen“ rufen Sie die Datensätze des Kontakts ab, mit „Löschen (anonymisieren)“ entfernen Sie sie; die Löschen-Schaltfläche erscheint nur, wenn der Kontakt keine offenen Deals oder Tickets hat.",
+    "tour.s1.summary":
+      "Öffnen Sie einen Kontakt, um seine gesamte Beziehung an einem Ort zu sehen, und halten Sie fest, wozu er zugestimmt hat.",
+    "tour.s1.step.1":
+      "Öffnen Sie „Kontakte“ und grenzen Sie die Tabelle mit der Filterleiste nach Name, Status oder Marketing-Einwilligung ein.",
+    "tour.s1.step.2":
+      "Wählen Sie eine Zeile, um die Kontaktseite zu öffnen, die Zeitleiste, Deals und Tickets zusammen zeigt.",
+    "tour.s1.step.3":
+      "Wählen Sie unter „Marketing-Einwilligung“ „Einwilligung erteilen“ oder „Widerrufen“, um die Entscheidung des Kontakts festzuhalten; die Seite lädt mit dem neuen Zustand neu.",
+    "tour.s1.step.4":
+      "Mit „Meine Daten herunterladen“ rufen Sie die Datensätze des Kontakts ab, mit „Löschen (anonymisieren)“ entfernen Sie sie; die Löschen-Schaltfläche erscheint nur, wenn der Kontakt keine offenen Deals oder Tickets hat.",
     "tour.s2.title": "Leads bewerten und priorisieren",
-    "tour.s2.summary": "Sehen Sie, welche Leads einen Anruf verdienen und warum, und führen Sie sie dann durch ihren Lebenszyklus.",
-    "tour.s2.step.1": "Öffnen Sie „Leads“, um die Warteschlange mit Score, Name, Quelle und Status jedes Leads zu sehen; filtern Sie sie mit der Filterleiste.",
-    "tour.s2.step.2": "Wählen Sie einen Lead und dann „Score-Aufschlüsselung“, um den Gesamtscore, sein Label und die von jeder Regel beigesteuerten Punkte zu sehen.",
-    "tour.s2.step.3": "Wählen Sie „Board“, um die Leads als Spalten zu sehen: „New“, „Contacted“, „Qualified“, „Converted“ und „Disqualified“ (neu, kontaktiert, qualifiziert, konvertiert, disqualifiziert).",
-    "tour.s2.step.4": "Ziehen Sie eine Karte in eine andere Spalte, um ihren Status zu ändern; verweigert der Dienst eine unzulässige Verschiebung, lädt das Board den gespeicherten Zustand neu.",
+    "tour.s2.summary":
+      "Sehen Sie, welche Leads einen Anruf verdienen und warum, und führen Sie sie dann durch ihren Lebenszyklus.",
+    "tour.s2.step.1":
+      "Öffnen Sie „Leads“, um die Warteschlange mit Score, Name, Quelle und Status jedes Leads zu sehen; filtern Sie sie mit der Filterleiste.",
+    "tour.s2.step.2":
+      "Wählen Sie einen Lead und dann „Score-Aufschlüsselung“, um den Gesamtscore, sein Label und die von jeder Regel beigesteuerten Punkte zu sehen.",
+    "tour.s2.step.3":
+      "Wählen Sie „Board“, um die Leads als Spalten zu sehen: „New“, „Contacted“, „Qualified“, „Converted“ und „Disqualified“ (neu, kontaktiert, qualifiziert, konvertiert, disqualifiziert).",
+    "tour.s2.step.4":
+      "Ziehen Sie eine Karte in eine andere Spalte, um ihren Status zu ändern; verweigert der Dienst eine unzulässige Verschiebung, lädt das Board den gespeicherten Zustand neu.",
     "tour.s3.title": "Die Deal-Pipeline betreiben",
-    "tour.s3.summary": "Bewegen Sie Deals durch die Pipeline-Phasen und sehen Sie, wie die Prognose folgt.",
-    "tour.s3.step.1": "Öffnen Sie „Deals“ und wählen Sie eine Pipeline aus der Auswahlliste; jede Spalte ist eine Phase, beschriftet mit ihrer Gewinnwahrscheinlichkeit.",
-    "tour.s3.step.2": "Lesen Sie die Zeile „Prognose“ über dem Board, die die vom Server berechnete Summe je Währung zeigt.",
-    "tour.s3.step.3": "Ziehen Sie eine Deal-Karte in eine andere Phase, um sie zu verschieben; beim Ablegen in einer Verloren-Phase wird mit der Verschiebung ein Grund festgehalten.",
-    "tour.s3.step.4": "Scrollen Sie nach unten zur Tabelle „Trichter“, um zu sehen, wie viele Deals jede Phase erreicht haben und wie hoch die Konversion von der vorherigen Phase ist.",
+    "tour.s3.summary":
+      "Bewegen Sie Deals durch die Pipeline-Phasen und sehen Sie, wie die Prognose folgt.",
+    "tour.s3.step.1":
+      "Öffnen Sie „Deals“ und wählen Sie eine Pipeline aus der Auswahlliste; jede Spalte ist eine Phase, beschriftet mit ihrer Gewinnwahrscheinlichkeit.",
+    "tour.s3.step.2":
+      "Lesen Sie die Zeile „Prognose“ über dem Board, die die vom Server berechnete Summe je Währung zeigt.",
+    "tour.s3.step.3":
+      "Ziehen Sie eine Deal-Karte in eine andere Phase, um sie zu verschieben; beim Ablegen in einer Verloren-Phase wird mit der Verschiebung ein Grund festgehalten.",
+    "tour.s3.step.4":
+      "Scrollen Sie nach unten zur Tabelle „Trichter“, um zu sehen, wie viele Deals jede Phase erreicht haben und wie hoch die Konversion von der vorherigen Phase ist.",
     "tour.s4.title": "Eine Kampagne durchführen und ihren ROI lesen",
-    "tour.s4.summary": "Senden Sie eine Kampagne an ihre Empfänger und sehen Sie, was sie eingebracht hat.",
-    "tour.s4.step.1": "Öffnen Sie „Kampagnen“, um Name, Status und Empfänger jeder Kampagne zu sehen, dargestellt als Empfänger, zugestellt, geöffnet und angeklickt.",
-    "tour.s4.step.2": "Wählen Sie bei einer Entwurfs- oder geplanten Kampagne „Ausführen (simuliert)“; ein Entwurf wird zuerst geplant und dann ausgeführt.",
-    "tour.s4.step.3": "Wählen Sie bei einer beliebigen Kampagne „Trichter“, um ihre Zusammenfassungszeile zu öffnen.",
-    "tour.s4.step.4": "Lesen Sie die Lead-Anzahl, den gewonnenen Umsatz und den ROI in Prozent samt den Zahlen dahinter, damit Sie das Ergebnis ehrlich beurteilen können.",
+    "tour.s4.summary":
+      "Senden Sie eine Kampagne an ihre Empfänger und sehen Sie, was sie eingebracht hat.",
+    "tour.s4.step.1":
+      "Öffnen Sie „Kampagnen“, um Name, Status und Empfänger jeder Kampagne zu sehen, dargestellt als Empfänger, zugestellt, geöffnet und angeklickt.",
+    "tour.s4.step.2":
+      "Wählen Sie bei einer Entwurfs- oder geplanten Kampagne „Ausführen (simuliert)“; ein Entwurf wird zuerst geplant und dann ausgeführt.",
+    "tour.s4.step.3":
+      "Wählen Sie bei einer beliebigen Kampagne „Trichter“, um ihre Zusammenfassungszeile zu öffnen.",
+    "tour.s4.step.4":
+      "Lesen Sie die Lead-Anzahl, den gewonnenen Umsatz und den ROI in Prozent samt den Zahlen dahinter, damit Sie das Ergebnis ehrlich beurteilen können.",
     "tour.s5.title": "Die Support-Warteschlange nach SLAs bearbeiten",
-    "tour.s5.summary": "Bearbeiten Sie Tickets nach Priorität und erkennen Sie die, die ihre Frist zu reißen drohen.",
-    "tour.s5.step.1": "Öffnen Sie „Tickets“, um Priorität, Status und Antwort-fällig-Zeit jedes Tickets zu sehen; filtern Sie die Warteschlange mit der Filterleiste.",
-    "tour.s5.step.2": "Beobachten Sie die Anzahl „Verletzt“ oben in der Warteschlange für Tickets, die eine Frist bereits verpasst haben.",
-    "tour.s5.step.3": "Wählen Sie ein Ticket, um sein Feld zu öffnen, und dann eine Pfeilschaltfläche wie „→ pending“ oder „→ resolved“, um es in den nächsten Status zu versetzen.",
-    "tour.s5.step.4": "Wählen Sie „Board“, um dieselben Tickets als Spalten „Open“, „Pending“, „Resolved“ und „Closed“ zu bearbeiten und Karten dazwischen zu ziehen.",
+    "tour.s5.summary":
+      "Bearbeiten Sie Tickets nach Priorität und erkennen Sie die, die ihre Frist zu reißen drohen.",
+    "tour.s5.step.1":
+      "Öffnen Sie „Tickets“, um Priorität, Status und Antwort-fällig-Zeit jedes Tickets zu sehen; filtern Sie die Warteschlange mit der Filterleiste.",
+    "tour.s5.step.2":
+      "Beobachten Sie die Anzahl „Verletzt“ oben in der Warteschlange für Tickets, die eine Frist bereits verpasst haben.",
+    "tour.s5.step.3":
+      "Wählen Sie ein Ticket, um sein Feld zu öffnen, und dann eine Pfeilschaltfläche wie „→ pending“ oder „→ resolved“, um es in den nächsten Status zu versetzen.",
+    "tour.s5.step.4":
+      "Wählen Sie „Board“, um dieselben Tickets als Spalten „Open“, „Pending“, „Resolved“ und „Closed“ zu bearbeiten und Karten dazwischen zu ziehen.",
     "tour.s6.title": "Ergebnisse und Datenschutz prüfen",
-    "tour.s6.summary": "Prüfen Sie die Zahlen, die Führungskräften, Vertriebsleitung und Datenschutzbeauftragten wichtig sind.",
-    "tour.s6.step.1": "Öffnen Sie die „CRM-Übersicht“, um Erfolgsquote, offene Deals, offene Tickets und Prognose auf einen Blick zu sehen.",
-    "tour.s6.step.2": "Öffnen Sie „Führung“ für die Periodenzusammenfassung, veraltete Deals, Befunde zur Pipeline-Hygiene und den Prognoseverlauf.",
-    "tour.s6.step.3": "Öffnen Sie „Engagement“ und „Wiedervorlagen“, um Kontakte zu finden, die zuletzt niemand angesprochen hat, und die Wiedervorlagen, die überfällig oder in den nächsten 30 Tagen fällig sind.",
-    "tour.s6.step.4": "Öffnen Sie „DPO“, um die Einwilligung nach Quelle und nach Konto sowie Kontaktzeilen zu sehen, die dieselbe Person teilen.",
+    "tour.s6.summary":
+      "Prüfen Sie die Zahlen, die Führungskräften, Vertriebsleitung und Datenschutzbeauftragten wichtig sind.",
+    "tour.s6.step.1":
+      "Öffnen Sie die „CRM-Übersicht“, um Erfolgsquote, offene Deals, offene Tickets und Prognose auf einen Blick zu sehen.",
+    "tour.s6.step.2":
+      "Öffnen Sie „Führung“ für die Periodenzusammenfassung, veraltete Deals, Befunde zur Pipeline-Hygiene und den Prognoseverlauf.",
+    "tour.s6.step.3":
+      "Öffnen Sie „Engagement“ und „Wiedervorlagen“, um Kontakte zu finden, die zuletzt niemand angesprochen hat, und die Wiedervorlagen, die überfällig oder in den nächsten 30 Tagen fällig sind.",
+    "tour.s6.step.4":
+      "Öffnen Sie „DPO“, um die Einwilligung nach Quelle und nach Konto sowie Kontaktzeilen zu sehen, die dieselbe Person teilen.",
   },
   "en-001": {
     "nav.engagement": "Engagement",
@@ -701,7 +829,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -754,48 +883,83 @@ const STRINGS = {
     "tour.open": "Open this screen",
     "tour.top": "Back to top",
     "tour.start.title": "Before you begin",
-    "tour.start.summary": "You need an account to work with real data. Signing in takes under a minute and needs no password.",
-    "tour.start.step.1": "Choose Sign in at the top right and enter your email address.",
-    "tour.start.step.2": "Open the magic link we email you. It works once and expires quickly.",
-    "tour.start.step.3": "You return to the app signed in, with nothing to remember or reset.",
-    "tour.start.step.4": "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
-    "tour.intro": "A guided walkthrough of the CRM: what each screen does and the steps to use it, from checking a contact's consent to running a campaign and meeting support deadlines.",
+    "tour.start.summary":
+      "You need an account to work with real data. Signing in takes under a minute and needs no password.",
+    "tour.start.step.1":
+      "Choose Sign in at the top right and enter your email address.",
+    "tour.start.step.2":
+      "Open the magic link we email you. It works once and expires quickly.",
+    "tour.start.step.3":
+      "You return to the app signed in, with nothing to remember or reset.",
+    "tour.start.step.4":
+      "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
+    "tour.intro":
+      "A guided walkthrough of the CRM: what each screen does and the steps to use it, from checking a contact's consent to running a campaign and meeting support deadlines.",
     "tour.s1.title": "Manage a contact and their consent",
-    "tour.s1.summary": "Open a contact to see their whole relationship in one place, and record what they have agreed to.",
-    "tour.s1.step.1": "Open Contacts and use the filter bar to narrow the grid by Name, Status or Marketing consent.",
-    "tour.s1.step.2": "Select a row to open the contact page, which shows their timeline, Deals and Tickets together.",
-    "tour.s1.step.3": "Under Marketing consent, choose Grant consent or Withdraw to record the contact's decision; the page reloads with the new state.",
-    "tour.s1.step.4": "Use Download my data to fetch the contact's records, or Erase (anonymise) to remove them; the erase button only appears when the contact has no open deals or tickets.",
+    "tour.s1.summary":
+      "Open a contact to see their whole relationship in one place, and record what they have agreed to.",
+    "tour.s1.step.1":
+      "Open Contacts and use the filter bar to narrow the grid by Name, Status or Marketing consent.",
+    "tour.s1.step.2":
+      "Select a row to open the contact page, which shows their timeline, Deals and Tickets together.",
+    "tour.s1.step.3":
+      "Under Marketing consent, choose Grant consent or Withdraw to record the contact's decision; the page reloads with the new state.",
+    "tour.s1.step.4":
+      "Use Download my data to fetch the contact's records, or Erase (anonymise) to remove them; the erase button only appears when the contact has no open deals or tickets.",
     "tour.s2.title": "Score and triage leads",
-    "tour.s2.summary": "See which leads deserve a call, and why, then move them through their lifecycle.",
-    "tour.s2.step.1": "Open Leads to see the queue with each lead's Score, Name, Source and Status; filter it with the filter bar.",
-    "tour.s2.step.2": "Select a lead and choose Score breakdown to see the total score, its label and the points each rule contributed.",
-    "tour.s2.step.3": "Choose Board to see the leads as columns: New, Contacted, Qualified, Converted and Disqualified.",
-    "tour.s2.step.4": "Drag a card to another column to change its status; if the service refuses an illegal move, the board reloads to the stored state.",
+    "tour.s2.summary":
+      "See which leads deserve a call, and why, then move them through their lifecycle.",
+    "tour.s2.step.1":
+      "Open Leads to see the queue with each lead's Score, Name, Source and Status; filter it with the filter bar.",
+    "tour.s2.step.2":
+      "Select a lead and choose Score breakdown to see the total score, its label and the points each rule contributed.",
+    "tour.s2.step.3":
+      "Choose Board to see the leads as columns: New, Contacted, Qualified, Converted and Disqualified.",
+    "tour.s2.step.4":
+      "Drag a card to another column to change its status; if the service refuses an illegal move, the board reloads to the stored state.",
     "tour.s3.title": "Run the deal pipeline",
-    "tour.s3.summary": "Move deals across pipeline stages and watch the forecast follow.",
-    "tour.s3.step.1": "Open Deals and choose a pipeline from the drop-down; each column is a stage, labelled with its win probability.",
-    "tour.s3.step.2": "Read the Forecast line above the board, which shows the server-calculated total for each currency.",
-    "tour.s3.step.3": "Drag a deal card to another stage to move it; dropping it on a lost stage records a reason with the move.",
-    "tour.s3.step.4": "Scroll down to the Funnel table to see how many deals entered each stage and the conversion from the previous stage.",
+    "tour.s3.summary":
+      "Move deals across pipeline stages and watch the forecast follow.",
+    "tour.s3.step.1":
+      "Open Deals and choose a pipeline from the drop-down; each column is a stage, labelled with its win probability.",
+    "tour.s3.step.2":
+      "Read the Forecast line above the board, which shows the server-calculated total for each currency.",
+    "tour.s3.step.3":
+      "Drag a deal card to another stage to move it; dropping it on a lost stage records a reason with the move.",
+    "tour.s3.step.4":
+      "Scroll down to the Funnel table to see how many deals entered each stage and the conversion from the previous stage.",
     "tour.s4.title": "Run a campaign and read its ROI",
-    "tour.s4.summary": "Send a campaign to its recipients and see what it earned.",
-    "tour.s4.step.1": "Open Campaigns to see each campaign's Name, Status and Recipients, shown as recipients, delivered, opened and clicked.",
-    "tour.s4.step.2": "For a draft or scheduled campaign, choose Run (simulated); a draft is scheduled first, then run.",
+    "tour.s4.summary":
+      "Send a campaign to its recipients and see what it earned.",
+    "tour.s4.step.1":
+      "Open Campaigns to see each campaign's Name, Status and Recipients, shown as recipients, delivered, opened and clicked.",
+    "tour.s4.step.2":
+      "For a draft or scheduled campaign, choose Run (simulated); a draft is scheduled first, then run.",
     "tour.s4.step.3": "Choose Funnel on any campaign to open its summary row.",
-    "tour.s4.step.4": "Read the Leads count, the won revenue and the ROI percentage, with the numbers behind it, so you can judge the result honestly.",
+    "tour.s4.step.4":
+      "Read the Leads count, the won revenue and the ROI percentage, with the numbers behind it, so you can judge the result honestly.",
     "tour.s5.title": "Work the support queue against SLAs",
-    "tour.s5.summary": "Handle tickets by priority and catch the ones about to breach their deadline.",
-    "tour.s5.step.1": "Open Tickets to see each ticket's Priority, Status and Response due time; filter the queue with the filter bar.",
-    "tour.s5.step.2": "Watch the Breached count at the top of the queue for tickets that have already missed a deadline.",
-    "tour.s5.step.3": "Select a ticket to open its panel, then choose an arrow button such as → pending or → resolved to move it to its next status.",
-    "tour.s5.step.4": "Choose Board to work the same tickets as Open, Pending, Resolved and Closed columns, dragging cards between them.",
+    "tour.s5.summary":
+      "Handle tickets by priority and catch the ones about to breach their deadline.",
+    "tour.s5.step.1":
+      "Open Tickets to see each ticket's Priority, Status and Response due time; filter the queue with the filter bar.",
+    "tour.s5.step.2":
+      "Watch the Breached count at the top of the queue for tickets that have already missed a deadline.",
+    "tour.s5.step.3":
+      "Select a ticket to open its panel, then choose an arrow button such as → pending or → resolved to move it to its next status.",
+    "tour.s5.step.4":
+      "Choose Board to work the same tickets as Open, Pending, Resolved and Closed columns, dragging cards between them.",
     "tour.s6.title": "Review results and privacy",
-    "tour.s6.summary": "Check the numbers that matter to managers, sales leaders and the data protection officer.",
-    "tour.s6.step.1": "Open the Dashboard to see the Win rate, Open deals, Open tickets and Forecast at a glance.",
-    "tour.s6.step.2": "Open Executive for the period summary, Stale deals, Pipeline hygiene findings and the Forecast trend.",
-    "tour.s6.step.3": "Open Engagement and Follow-ups to find contacts nobody has touched lately and the follow-ups that are overdue or due in the next 30 days.",
-    "tour.s6.step.4": "Open DPO to see consent by source and by account, and any contact rows that share the same person.",
+    "tour.s6.summary":
+      "Check the numbers that matter to managers, sales leaders and the data protection officer.",
+    "tour.s6.step.1":
+      "Open the Dashboard to see the Win rate, Open deals, Open tickets and Forecast at a glance.",
+    "tour.s6.step.2":
+      "Open Executive for the period summary, Stale deals, Pipeline hygiene findings and the Forecast trend.",
+    "tour.s6.step.3":
+      "Open Engagement and Follow-ups to find contacts nobody has touched lately and the follow-ups that are overdue or due in the next 30 days.",
+    "tour.s6.step.4":
+      "Open DPO to see consent by source and by account, and any contact rows that share the same person.",
     "signin.sso": "Sign in with SSO",
   },
   "es-001": {
@@ -889,7 +1053,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -942,48 +1107,84 @@ const STRINGS = {
     "tour.open": "Abrir esta pantalla",
     "tour.top": "Volver arriba",
     "tour.start.title": "Antes de empezar",
-    "tour.start.summary": "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
-    "tour.start.step.1": "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
-    "tour.start.step.2": "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
-    "tour.start.step.3": "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
-    "tour.start.step.4": "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
-    "tour.intro": "Un recorrido guiado por el CRM: qué hace cada pantalla y los pasos para usarla, desde comprobar el consentimiento de un contacto hasta lanzar una campaña y cumplir los plazos de soporte.",
+    "tour.start.summary":
+      "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
+    "tour.start.step.1":
+      "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
+    "tour.start.step.2":
+      "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
+    "tour.start.step.3":
+      "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
+    "tour.start.step.4":
+      "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
+    "tour.intro":
+      "Un recorrido guiado por el CRM: qué hace cada pantalla y los pasos para usarla, desde comprobar el consentimiento de un contacto hasta lanzar una campaña y cumplir los plazos de soporte.",
     "tour.s1.title": "Gestionar un contacto y su consentimiento",
-    "tour.s1.summary": "Abre un contacto para ver toda su relación en un solo lugar y registra lo que ha aceptado.",
-    "tour.s1.step.1": "Abre Contactos y usa la barra de filtros para acotar la tabla por Nombre, Estado o Consentimiento de marketing.",
-    "tour.s1.step.2": "Selecciona una fila para abrir la página del contacto, que muestra juntos su cronología, Oportunidades y Tickets.",
-    "tour.s1.step.3": "En Consentimiento de marketing elige Otorgar consentimiento o Retirar para registrar la decisión del contacto; la página se recarga con el nuevo estado.",
-    "tour.s1.step.4": "Usa Descargar mis datos para obtener los registros del contacto, o Borrar (anonimizar) para eliminarlo; el botón de borrar solo aparece si el contacto no tiene oportunidades ni tickets abiertos.",
+    "tour.s1.summary":
+      "Abre un contacto para ver toda su relación en un solo lugar y registra lo que ha aceptado.",
+    "tour.s1.step.1":
+      "Abre Contactos y usa la barra de filtros para acotar la tabla por Nombre, Estado o Consentimiento de marketing.",
+    "tour.s1.step.2":
+      "Selecciona una fila para abrir la página del contacto, que muestra juntos su cronología, Oportunidades y Tickets.",
+    "tour.s1.step.3":
+      "En Consentimiento de marketing elige Otorgar consentimiento o Retirar para registrar la decisión del contacto; la página se recarga con el nuevo estado.",
+    "tour.s1.step.4":
+      "Usa Descargar mis datos para obtener los registros del contacto, o Borrar (anonimizar) para eliminarlo; el botón de borrar solo aparece si el contacto no tiene oportunidades ni tickets abiertos.",
     "tour.s2.title": "Puntuar y clasificar prospectos",
-    "tour.s2.summary": "Descubre qué prospectos merecen una llamada y por qué, y llévalos por su ciclo de vida.",
-    "tour.s2.step.1": "Abre Prospectos para ver la cola con la Puntuación, el Nombre, el Origen y el Estado de cada uno; fíltrala con la barra de filtros.",
-    "tour.s2.step.2": "Selecciona un prospecto y elige Desglose de puntuación para ver la puntuación total, su etiqueta y los puntos que aportó cada regla.",
-    "tour.s2.step.3": "Elige Tablero para ver los prospectos en columnas: New, Contacted, Qualified, Converted y Disqualified.",
-    "tour.s2.step.4": "Arrastra una tarjeta a otra columna para cambiar su estado; si el servicio rechaza un movimiento ilegal, el tablero se recarga con el estado guardado.",
+    "tour.s2.summary":
+      "Descubre qué prospectos merecen una llamada y por qué, y llévalos por su ciclo de vida.",
+    "tour.s2.step.1":
+      "Abre Prospectos para ver la cola con la Puntuación, el Nombre, el Origen y el Estado de cada uno; fíltrala con la barra de filtros.",
+    "tour.s2.step.2":
+      "Selecciona un prospecto y elige Desglose de puntuación para ver la puntuación total, su etiqueta y los puntos que aportó cada regla.",
+    "tour.s2.step.3":
+      "Elige Tablero para ver los prospectos en columnas: New, Contacted, Qualified, Converted y Disqualified.",
+    "tour.s2.step.4":
+      "Arrastra una tarjeta a otra columna para cambiar su estado; si el servicio rechaza un movimiento ilegal, el tablero se recarga con el estado guardado.",
     "tour.s3.title": "Gestionar el embudo de oportunidades",
-    "tour.s3.summary": "Mueve oportunidades entre las etapas del embudo y observa cómo cambia el pronóstico.",
-    "tour.s3.step.1": "Abre Oportunidades y elige un embudo en la lista desplegable; cada columna es una etapa, etiquetada con su probabilidad de ganar.",
-    "tour.s3.step.2": "Lee la línea Pronóstico sobre el tablero, que muestra el total calculado por el servidor para cada moneda.",
-    "tour.s3.step.3": "Arrastra una tarjeta de oportunidad a otra etapa para moverla; soltarla en una etapa perdida registra un motivo con el movimiento.",
-    "tour.s3.step.4": "Desplázate hasta la tabla Funnel para ver cuántas oportunidades entraron en cada etapa y la conversión desde la etapa anterior.",
+    "tour.s3.summary":
+      "Mueve oportunidades entre las etapas del embudo y observa cómo cambia el pronóstico.",
+    "tour.s3.step.1":
+      "Abre Oportunidades y elige un embudo en la lista desplegable; cada columna es una etapa, etiquetada con su probabilidad de ganar.",
+    "tour.s3.step.2":
+      "Lee la línea Pronóstico sobre el tablero, que muestra el total calculado por el servidor para cada moneda.",
+    "tour.s3.step.3":
+      "Arrastra una tarjeta de oportunidad a otra etapa para moverla; soltarla en una etapa perdida registra un motivo con el movimiento.",
+    "tour.s3.step.4":
+      "Desplázate hasta la tabla Funnel para ver cuántas oportunidades entraron en cada etapa y la conversión desde la etapa anterior.",
     "tour.s4.title": "Lanzar una campaña y leer su ROI",
-    "tour.s4.summary": "Envía una campaña a sus destinatarios y comprueba qué logró.",
-    "tour.s4.step.1": "Abre Campañas para ver el Nombre, el Estado y los Destinatarios de cada campaña, mostrados como destinatarios, entregados, abiertos y clics.",
-    "tour.s4.step.2": "En una campaña en borrador o programada, elige Ejecutar (simulado); un borrador se programa primero y luego se ejecuta.",
-    "tour.s4.step.3": "Elige Embudo en cualquier campaña para abrir su fila de resumen.",
-    "tour.s4.step.4": "Lee el número de Prospectos, los ingresos ganados y el porcentaje de ROI, con las cifras que lo respaldan, para juzgar el resultado con honestidad.",
+    "tour.s4.summary":
+      "Envía una campaña a sus destinatarios y comprueba qué logró.",
+    "tour.s4.step.1":
+      "Abre Campañas para ver el Nombre, el Estado y los Destinatarios de cada campaña, mostrados como destinatarios, entregados, abiertos y clics.",
+    "tour.s4.step.2":
+      "En una campaña en borrador o programada, elige Ejecutar (simulado); un borrador se programa primero y luego se ejecuta.",
+    "tour.s4.step.3":
+      "Elige Embudo en cualquier campaña para abrir su fila de resumen.",
+    "tour.s4.step.4":
+      "Lee el número de Prospectos, los ingresos ganados y el porcentaje de ROI, con las cifras que lo respaldan, para juzgar el resultado con honestidad.",
     "tour.s5.title": "Atender la cola de soporte según los SLA",
-    "tour.s5.summary": "Gestiona los tickets por prioridad y detecta los que están a punto de incumplir su plazo.",
-    "tour.s5.step.1": "Abre Tickets para ver la Prioridad, el Estado y la columna «Respuesta antes de» de cada ticket; filtra la cola con la barra de filtros.",
-    "tour.s5.step.2": "Vigila el recuento de Incumplido en la parte superior de la cola para ver los tickets que ya han superado un plazo.",
-    "tour.s5.step.3": "Selecciona un ticket para abrir su panel y elige un botón de flecha como → pending o → resolved para pasarlo a su siguiente estado.",
-    "tour.s5.step.4": "Elige Tablero para trabajar los mismos tickets como columnas Open, Pending, Resolved y Closed, arrastrando tarjetas entre ellas.",
+    "tour.s5.summary":
+      "Gestiona los tickets por prioridad y detecta los que están a punto de incumplir su plazo.",
+    "tour.s5.step.1":
+      "Abre Tickets para ver la Prioridad, el Estado y la columna «Respuesta antes de» de cada ticket; filtra la cola con la barra de filtros.",
+    "tour.s5.step.2":
+      "Vigila el recuento de Incumplido en la parte superior de la cola para ver los tickets que ya han superado un plazo.",
+    "tour.s5.step.3":
+      "Selecciona un ticket para abrir su panel y elige un botón de flecha como → pending o → resolved para pasarlo a su siguiente estado.",
+    "tour.s5.step.4":
+      "Elige Tablero para trabajar los mismos tickets como columnas Open, Pending, Resolved y Closed, arrastrando tarjetas entre ellas.",
     "tour.s6.title": "Revisar resultados y privacidad",
-    "tour.s6.summary": "Consulta las cifras que importan a gerentes, responsables de ventas y al delegado de protección de datos.",
-    "tour.s6.step.1": "Abre el Panel para ver de un vistazo la Win rate, las Oportunidades abiertas, los Tickets abiertos y el Pronóstico.",
-    "tour.s6.step.2": "Abre Ejecutivo para el resumen del periodo, las Stale deals, los hallazgos de Pipeline hygiene y la Forecast trend.",
-    "tour.s6.step.3": "Abre Compromiso y Seguimientos para encontrar contactos que nadie ha tocado últimamente y los seguimientos vencidos o previstos en los próximos 30 días.",
-    "tour.s6.step.4": "Abre DPO para ver el consentimiento por origen y por cuenta, y las filas de contactos que comparten la misma persona.",
+    "tour.s6.summary":
+      "Consulta las cifras que importan a gerentes, responsables de ventas y al delegado de protección de datos.",
+    "tour.s6.step.1":
+      "Abre el Panel para ver de un vistazo la Win rate, las Oportunidades abiertas, los Tickets abiertos y el Pronóstico.",
+    "tour.s6.step.2":
+      "Abre Ejecutivo para el resumen del periodo, las Stale deals, los hallazgos de Pipeline hygiene y la Forecast trend.",
+    "tour.s6.step.3":
+      "Abre Compromiso y Seguimientos para encontrar contactos que nadie ha tocado últimamente y los seguimientos vencidos o previstos en los próximos 30 días.",
+    "tour.s6.step.4":
+      "Abre DPO para ver el consentimiento por origen y por cuenta, y las filas de contactos que comparten la misma persona.",
     "signin.sso": "Iniciar sesión con SSO",
   },
   "fr-001": {
@@ -1078,7 +1279,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -1131,48 +1333,84 @@ const STRINGS = {
     "tour.open": "Ouvrir cet écran",
     "tour.top": "Retour en haut",
     "tour.start.title": "Avant de commencer",
-    "tour.start.summary": "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
-    "tour.start.step.1": "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
-    "tour.start.step.2": "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
-    "tour.start.step.3": "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
-    "tour.start.step.4": "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
-    "tour.intro": "Une visite guidée du CRM : le rôle de chaque écran et les étapes pour l'utiliser, de la vérification du consentement d'un contact au lancement d'une campagne et au respect des délais du support.",
+    "tour.start.summary":
+      "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+    "tour.start.step.1":
+      "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
+    "tour.start.step.2":
+      "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+    "tour.start.step.3":
+      "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+    "tour.start.step.4":
+      "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
+    "tour.intro":
+      "Une visite guidée du CRM : le rôle de chaque écran et les étapes pour l'utiliser, de la vérification du consentement d'un contact au lancement d'une campagne et au respect des délais du support.",
     "tour.s1.title": "Gérer un contact et son consentement",
-    "tour.s1.summary": "Ouvrez un contact pour voir toute sa relation au même endroit et enregistrez ce qu'il a accepté.",
-    "tour.s1.step.1": "Ouvrez Contacts et utilisez la barre de filtres pour réduire la grille par Nom, Statut ou Consentement marketing.",
-    "tour.s1.step.2": "Sélectionnez une ligne pour ouvrir la page du contact, qui affiche ensemble sa chronologie, ses Affaires et ses Tickets.",
-    "tour.s1.step.3": "Sous Consentement marketing, choisissez Accorder le consentement ou Retirer pour enregistrer la décision du contact ; la page se recharge avec le nouvel état.",
-    "tour.s1.step.4": "Utilisez Télécharger mes données pour récupérer les enregistrements du contact, ou Effacer (anonymiser) pour le supprimer ; le bouton d'effacement n'apparaît que si le contact n'a aucune affaire ni aucun ticket ouvert.",
+    "tour.s1.summary":
+      "Ouvrez un contact pour voir toute sa relation au même endroit et enregistrez ce qu'il a accepté.",
+    "tour.s1.step.1":
+      "Ouvrez Contacts et utilisez la barre de filtres pour réduire la grille par Nom, Statut ou Consentement marketing.",
+    "tour.s1.step.2":
+      "Sélectionnez une ligne pour ouvrir la page du contact, qui affiche ensemble sa chronologie, ses Affaires et ses Tickets.",
+    "tour.s1.step.3":
+      "Sous Consentement marketing, choisissez Accorder le consentement ou Retirer pour enregistrer la décision du contact ; la page se recharge avec le nouvel état.",
+    "tour.s1.step.4":
+      "Utilisez Télécharger mes données pour récupérer les enregistrements du contact, ou Effacer (anonymiser) pour le supprimer ; le bouton d'effacement n'apparaît que si le contact n'a aucune affaire ni aucun ticket ouvert.",
     "tour.s2.title": "Noter et trier les prospects",
-    "tour.s2.summary": "Voyez quels prospects méritent un appel, et pourquoi, puis faites-les avancer dans leur cycle de vie.",
-    "tour.s2.step.1": "Ouvrez Prospects pour voir la file avec le Score, le Nom, la Source et le Statut de chacun ; filtrez-la avec la barre de filtres.",
-    "tour.s2.step.2": "Sélectionnez un prospect et choisissez Détail du score pour voir le score total, son libellé et les points apportés par chaque règle.",
-    "tour.s2.step.3": "Choisissez Tableau pour voir les prospects en colonnes : New, Contacted, Qualified, Converted et Disqualified.",
-    "tour.s2.step.4": "Faites glisser une carte vers une autre colonne pour changer son statut ; si le service refuse un déplacement illégal, le tableau se recharge avec l'état enregistré.",
+    "tour.s2.summary":
+      "Voyez quels prospects méritent un appel, et pourquoi, puis faites-les avancer dans leur cycle de vie.",
+    "tour.s2.step.1":
+      "Ouvrez Prospects pour voir la file avec le Score, le Nom, la Source et le Statut de chacun ; filtrez-la avec la barre de filtres.",
+    "tour.s2.step.2":
+      "Sélectionnez un prospect et choisissez Détail du score pour voir le score total, son libellé et les points apportés par chaque règle.",
+    "tour.s2.step.3":
+      "Choisissez Tableau pour voir les prospects en colonnes : New, Contacted, Qualified, Converted et Disqualified.",
+    "tour.s2.step.4":
+      "Faites glisser une carte vers une autre colonne pour changer son statut ; si le service refuse un déplacement illégal, le tableau se recharge avec l'état enregistré.",
     "tour.s3.title": "Piloter le pipeline des affaires",
-    "tour.s3.summary": "Déplacez les affaires d'une étape à l'autre du pipeline et regardez la prévision suivre.",
-    "tour.s3.step.1": "Ouvrez Affaires et choisissez un pipeline dans la liste déroulante ; chaque colonne est une étape, libellée avec sa probabilité de gain.",
-    "tour.s3.step.2": "Lisez la ligne Prévision au-dessus du tableau, qui affiche le total calculé par le serveur pour chaque devise.",
-    "tour.s3.step.3": "Faites glisser une carte d'affaire vers une autre étape pour la déplacer ; la déposer sur une étape perdue enregistre un motif avec le déplacement.",
-    "tour.s3.step.4": "Descendez jusqu'au tableau Funnel pour voir combien d'affaires sont entrées à chaque étape et la conversion depuis l'étape précédente.",
+    "tour.s3.summary":
+      "Déplacez les affaires d'une étape à l'autre du pipeline et regardez la prévision suivre.",
+    "tour.s3.step.1":
+      "Ouvrez Affaires et choisissez un pipeline dans la liste déroulante ; chaque colonne est une étape, libellée avec sa probabilité de gain.",
+    "tour.s3.step.2":
+      "Lisez la ligne Prévision au-dessus du tableau, qui affiche le total calculé par le serveur pour chaque devise.",
+    "tour.s3.step.3":
+      "Faites glisser une carte d'affaire vers une autre étape pour la déplacer ; la déposer sur une étape perdue enregistre un motif avec le déplacement.",
+    "tour.s3.step.4":
+      "Descendez jusqu'au tableau Funnel pour voir combien d'affaires sont entrées à chaque étape et la conversion depuis l'étape précédente.",
     "tour.s4.title": "Lancer une campagne et lire son ROI",
-    "tour.s4.summary": "Envoyez une campagne à ses destinataires et voyez ce qu'elle a rapporté.",
-    "tour.s4.step.1": "Ouvrez Campagnes pour voir le Nom, le Statut et les Destinataires de chaque campagne, affichés sous la forme destinataires, délivrés, ouverts et cliqués.",
-    "tour.s4.step.2": "Pour une campagne en brouillon ou planifiée, choisissez Lancer (simulé) ; un brouillon est d'abord planifié, puis lancé.",
-    "tour.s4.step.3": "Choisissez Entonnoir sur une campagne pour ouvrir sa ligne de synthèse.",
-    "tour.s4.step.4": "Lisez le nombre de Prospects, le chiffre d'affaires gagné et le pourcentage de ROI, avec les chiffres qui le sous-tendent, pour juger le résultat honnêtement.",
+    "tour.s4.summary":
+      "Envoyez une campagne à ses destinataires et voyez ce qu'elle a rapporté.",
+    "tour.s4.step.1":
+      "Ouvrez Campagnes pour voir le Nom, le Statut et les Destinataires de chaque campagne, affichés sous la forme destinataires, délivrés, ouverts et cliqués.",
+    "tour.s4.step.2":
+      "Pour une campagne en brouillon ou planifiée, choisissez Lancer (simulé) ; un brouillon est d'abord planifié, puis lancé.",
+    "tour.s4.step.3":
+      "Choisissez Entonnoir sur une campagne pour ouvrir sa ligne de synthèse.",
+    "tour.s4.step.4":
+      "Lisez le nombre de Prospects, le chiffre d'affaires gagné et le pourcentage de ROI, avec les chiffres qui le sous-tendent, pour juger le résultat honnêtement.",
     "tour.s5.title": "Traiter la file du support selon les SLA",
-    "tour.s5.summary": "Traitez les tickets par priorité et repérez ceux qui vont dépasser leur échéance.",
-    "tour.s5.step.1": "Ouvrez Tickets pour voir la Priorité, le Statut et l'heure de Réponse due de chaque ticket ; filtrez la file avec la barre de filtres.",
-    "tour.s5.step.2": "Surveillez le compteur Dépassé en haut de la file pour repérer les tickets qui ont déjà manqué une échéance.",
-    "tour.s5.step.3": "Sélectionnez un ticket pour ouvrir son panneau, puis choisissez un bouton fléché comme → pending ou → resolved pour le passer à son statut suivant.",
-    "tour.s5.step.4": "Choisissez Tableau pour traiter les mêmes tickets en colonnes Open, Pending, Resolved et Closed, en faisant glisser les cartes entre elles.",
+    "tour.s5.summary":
+      "Traitez les tickets par priorité et repérez ceux qui vont dépasser leur échéance.",
+    "tour.s5.step.1":
+      "Ouvrez Tickets pour voir la Priorité, le Statut et l'heure de Réponse due de chaque ticket ; filtrez la file avec la barre de filtres.",
+    "tour.s5.step.2":
+      "Surveillez le compteur Dépassé en haut de la file pour repérer les tickets qui ont déjà manqué une échéance.",
+    "tour.s5.step.3":
+      "Sélectionnez un ticket pour ouvrir son panneau, puis choisissez un bouton fléché comme → pending ou → resolved pour le passer à son statut suivant.",
+    "tour.s5.step.4":
+      "Choisissez Tableau pour traiter les mêmes tickets en colonnes Open, Pending, Resolved et Closed, en faisant glisser les cartes entre elles.",
     "tour.s6.title": "Consulter les résultats et la confidentialité",
-    "tour.s6.summary": "Vérifiez les chiffres qui comptent pour les managers, les responsables commerciaux et le délégué à la protection des données.",
-    "tour.s6.step.1": "Ouvrez le Tableau de bord pour voir d'un coup d'œil le Win rate, les Affaires ouvertes, les Tickets ouverts et la Prévision.",
-    "tour.s6.step.2": "Ouvrez Direction pour la synthèse de la période, les Stale deals, les constats de Pipeline hygiene et la Forecast trend.",
-    "tour.s6.step.3": "Ouvrez Engagement et Relances pour trouver les contacts que personne n'a touchés récemment et les relances en retard ou à venir dans les 30 jours.",
-    "tour.s6.step.4": "Ouvrez DPO pour voir le consentement par source et par compte, ainsi que les lignes de contact qui partagent la même personne.",
+    "tour.s6.summary":
+      "Vérifiez les chiffres qui comptent pour les managers, les responsables commerciaux et le délégué à la protection des données.",
+    "tour.s6.step.1":
+      "Ouvrez le Tableau de bord pour voir d'un coup d'œil le Win rate, les Affaires ouvertes, les Tickets ouverts et la Prévision.",
+    "tour.s6.step.2":
+      "Ouvrez Direction pour la synthèse de la période, les Stale deals, les constats de Pipeline hygiene et la Forecast trend.",
+    "tour.s6.step.3":
+      "Ouvrez Engagement et Relances pour trouver les contacts que personne n'a touchés récemment et les relances en retard ou à venir dans les 30 jours.",
+    "tour.s6.step.4":
+      "Ouvrez DPO pour voir le consentement par source et par compte, ainsi que les lignes de contact qui partagent la même personne.",
     "signin.sso": "Se connecter avec SSO",
   },
   "hi-001": {
@@ -1266,7 +1504,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -1319,48 +1558,84 @@ const STRINGS = {
     "tour.open": "यह स्क्रीन खोलें",
     "tour.top": "ऊपर लौटें",
     "tour.start.title": "शुरू करने से पहले",
-    "tour.start.summary": "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
-    "tour.start.step.1": "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
-    "tour.start.step.2": "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
-    "tour.start.step.3": "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
-    "tour.start.step.4": "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
-    "tour.intro": "सीआरएम का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, किसी संपर्क की सहमति जाँचने से लेकर अभियान चलाने और सहायता की समय-सीमा पूरी करने तक।",
+    "tour.start.summary":
+      "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
+    "tour.start.step.1":
+      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.2":
+      "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
+    "tour.start.step.3":
+      "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
+    "tour.start.step.4":
+      "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
+    "tour.intro":
+      "सीआरएम का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, किसी संपर्क की सहमति जाँचने से लेकर अभियान चलाने और सहायता की समय-सीमा पूरी करने तक।",
     "tour.s1.title": "संपर्क और उसकी सहमति सँभालें",
-    "tour.s1.summary": "किसी संपर्क को खोलकर उसका पूरा रिश्ता एक जगह देखें और दर्ज करें कि उसने किस बात के लिए हामी भरी है।",
-    "tour.s1.step.1": "संपर्क खोलें और फ़िल्टर बार से ग्रिड को नाम, स्थिति या विपणन सहमति के आधार पर छाँटें।",
-    "tour.s1.step.2": "किसी पंक्ति को चुनें तो संपर्क का पेज खुलता है, जिसमें उसकी समयरेखा, डील और टिकट एक साथ दिखते हैं।",
-    "tour.s1.step.3": "विपणन सहमति के नीचे सहमति दें या वापस लें चुनकर संपर्क का निर्णय दर्ज करें; पेज नई स्थिति के साथ फिर लोड होता है।",
-    "tour.s1.step.4": "संपर्क के रिकॉर्ड पाने के लिए मेरा डेटा डाउनलोड करें, या उसे हटाने के लिए मिटाएँ (गुमनाम करें) चुनें; मिटाने का बटन तभी दिखता है जब संपर्क की कोई डील या टिकट खुला न हो।",
+    "tour.s1.summary":
+      "किसी संपर्क को खोलकर उसका पूरा रिश्ता एक जगह देखें और दर्ज करें कि उसने किस बात के लिए हामी भरी है।",
+    "tour.s1.step.1":
+      "संपर्क खोलें और फ़िल्टर बार से ग्रिड को नाम, स्थिति या विपणन सहमति के आधार पर छाँटें।",
+    "tour.s1.step.2":
+      "किसी पंक्ति को चुनें तो संपर्क का पेज खुलता है, जिसमें उसकी समयरेखा, डील और टिकट एक साथ दिखते हैं।",
+    "tour.s1.step.3":
+      "विपणन सहमति के नीचे सहमति दें या वापस लें चुनकर संपर्क का निर्णय दर्ज करें; पेज नई स्थिति के साथ फिर लोड होता है।",
+    "tour.s1.step.4":
+      "संपर्क के रिकॉर्ड पाने के लिए मेरा डेटा डाउनलोड करें, या उसे हटाने के लिए मिटाएँ (गुमनाम करें) चुनें; मिटाने का बटन तभी दिखता है जब संपर्क की कोई डील या टिकट खुला न हो।",
     "tour.s2.title": "लीड को स्कोर और छाँटें",
-    "tour.s2.summary": "देखें कि किन लीड को कॉल करना चाहिए और क्यों, फिर उन्हें उनके जीवन-चक्र में आगे बढ़ाएँ।",
-    "tour.s2.step.1": "लीड खोलें और हर लीड का स्कोर, नाम, स्रोत और स्थिति कतार में देखें; फ़िल्टर बार से उसे छाँटें।",
-    "tour.s2.step.2": "कोई लीड चुनें और स्कोर विवरण चुनें, ताकि कुल स्कोर, उसका लेबल और हर नियम से मिले अंक दिखें।",
-    "tour.s2.step.3": "बोर्ड चुनें, जिसमें लीड कॉलम के रूप में दिखती हैं: New, Contacted, Qualified, Converted और Disqualified।",
-    "tour.s2.step.4": "स्थिति बदलने के लिए कार्ड को दूसरे कॉलम में खींचें; यदि सेवा किसी अवैध बदलाव को अस्वीकार करे, तो बोर्ड सहेजी हुई स्थिति पर लौट आता है।",
+    "tour.s2.summary":
+      "देखें कि किन लीड को कॉल करना चाहिए और क्यों, फिर उन्हें उनके जीवन-चक्र में आगे बढ़ाएँ।",
+    "tour.s2.step.1":
+      "लीड खोलें और हर लीड का स्कोर, नाम, स्रोत और स्थिति कतार में देखें; फ़िल्टर बार से उसे छाँटें।",
+    "tour.s2.step.2":
+      "कोई लीड चुनें और स्कोर विवरण चुनें, ताकि कुल स्कोर, उसका लेबल और हर नियम से मिले अंक दिखें।",
+    "tour.s2.step.3":
+      "बोर्ड चुनें, जिसमें लीड कॉलम के रूप में दिखती हैं: New, Contacted, Qualified, Converted और Disqualified।",
+    "tour.s2.step.4":
+      "स्थिति बदलने के लिए कार्ड को दूसरे कॉलम में खींचें; यदि सेवा किसी अवैध बदलाव को अस्वीकार करे, तो बोर्ड सहेजी हुई स्थिति पर लौट आता है।",
     "tour.s3.title": "डील पाइपलाइन चलाएँ",
-    "tour.s3.summary": "डील को पाइपलाइन के चरणों में आगे बढ़ाएँ और पूर्वानुमान को साथ बदलते देखें।",
-    "tour.s3.step.1": "डील खोलें और ड्रॉप-डाउन से पाइपलाइन चुनें; हर कॉलम एक चरण है, जिस पर जीत की संभावना लिखी होती है।",
-    "tour.s3.step.2": "बोर्ड के ऊपर पूर्वानुमान पंक्ति पढ़ें, जो हर मुद्रा के लिए सर्वर द्वारा गणना किया गया कुल दिखाती है।",
-    "tour.s3.step.3": "डील कार्ड को दूसरे चरण में खींचकर उसे आगे बढ़ाएँ; हारे हुए चरण पर छोड़ने पर इस बदलाव के साथ कारण दर्ज होता है।",
-    "tour.s3.step.4": "नीचे Funnel तालिका तक स्क्रॉल करें और देखें कि हर चरण में कितनी डील आईं और पिछले चरण से रूपांतरण कितना रहा।",
+    "tour.s3.summary":
+      "डील को पाइपलाइन के चरणों में आगे बढ़ाएँ और पूर्वानुमान को साथ बदलते देखें।",
+    "tour.s3.step.1":
+      "डील खोलें और ड्रॉप-डाउन से पाइपलाइन चुनें; हर कॉलम एक चरण है, जिस पर जीत की संभावना लिखी होती है।",
+    "tour.s3.step.2":
+      "बोर्ड के ऊपर पूर्वानुमान पंक्ति पढ़ें, जो हर मुद्रा के लिए सर्वर द्वारा गणना किया गया कुल दिखाती है।",
+    "tour.s3.step.3":
+      "डील कार्ड को दूसरे चरण में खींचकर उसे आगे बढ़ाएँ; हारे हुए चरण पर छोड़ने पर इस बदलाव के साथ कारण दर्ज होता है।",
+    "tour.s3.step.4":
+      "नीचे Funnel तालिका तक स्क्रॉल करें और देखें कि हर चरण में कितनी डील आईं और पिछले चरण से रूपांतरण कितना रहा।",
     "tour.s4.title": "अभियान चलाएँ और उसका आरओआई पढ़ें",
-    "tour.s4.summary": "अभियान को उसके प्राप्तकर्ताओं तक भेजें और देखें कि उससे क्या मिला।",
-    "tour.s4.step.1": "अभियान खोलें और हर अभियान का नाम, स्थिति और प्राप्तकर्ता देखें, जो प्राप्तकर्ता, पहुँचे, खोले गए और क्लिक हुए के रूप में दिखते हैं।",
-    "tour.s4.step.2": "ड्राफ़्ट या निर्धारित अभियान के लिए चलाएं (नकली) चुनें; ड्राफ़्ट को पहले निर्धारित किया जाता है, फिर चलाया जाता है।",
-    "tour.s4.step.3": "किसी भी अभियान पर फ़नल चुनें ताकि उसकी सारांश पंक्ति खुले।",
-    "tour.s4.step.4": "लीड की संख्या, जीती हुई आय और आरओआई प्रतिशत उसके पीछे की संख्याओं के साथ पढ़ें, ताकि आप नतीजे को ईमानदारी से आँक सकें।",
+    "tour.s4.summary":
+      "अभियान को उसके प्राप्तकर्ताओं तक भेजें और देखें कि उससे क्या मिला।",
+    "tour.s4.step.1":
+      "अभियान खोलें और हर अभियान का नाम, स्थिति और प्राप्तकर्ता देखें, जो प्राप्तकर्ता, पहुँचे, खोले गए और क्लिक हुए के रूप में दिखते हैं।",
+    "tour.s4.step.2":
+      "ड्राफ़्ट या निर्धारित अभियान के लिए चलाएं (नकली) चुनें; ड्राफ़्ट को पहले निर्धारित किया जाता है, फिर चलाया जाता है।",
+    "tour.s4.step.3":
+      "किसी भी अभियान पर फ़नल चुनें ताकि उसकी सारांश पंक्ति खुले।",
+    "tour.s4.step.4":
+      "लीड की संख्या, जीती हुई आय और आरओआई प्रतिशत उसके पीछे की संख्याओं के साथ पढ़ें, ताकि आप नतीजे को ईमानदारी से आँक सकें।",
     "tour.s5.title": "सहायता कतार को SLA के अनुसार सँभालें",
-    "tour.s5.summary": "टिकट प्राथमिकता के अनुसार निपटाएँ और उन्हें पकड़ें जिनकी समय-सीमा टूटने वाली है।",
-    "tour.s5.step.1": "टिकट खोलें और हर टिकट की प्राथमिकता, स्थिति और प्रतिक्रिया देय समय देखें; फ़िल्टर बार से कतार को छाँटें।",
-    "tour.s5.step.2": "कतार के ऊपर उल्लंघन की गिनती देखें, जो उन टिकटों की है जो समय-सीमा पहले ही चूक चुके हैं।",
-    "tour.s5.step.3": "किसी टिकट को चुनकर उसका पैनल खोलें, फिर उसे अगली स्थिति में ले जाने के लिए → pending या → resolved जैसा तीर वाला बटन चुनें।",
-    "tour.s5.step.4": "बोर्ड चुनें और वही टिकट Open, Pending, Resolved और Closed कॉलम में देखें, कार्ड को उनके बीच खींचते हुए।",
+    "tour.s5.summary":
+      "टिकट प्राथमिकता के अनुसार निपटाएँ और उन्हें पकड़ें जिनकी समय-सीमा टूटने वाली है।",
+    "tour.s5.step.1":
+      "टिकट खोलें और हर टिकट की प्राथमिकता, स्थिति और प्रतिक्रिया देय समय देखें; फ़िल्टर बार से कतार को छाँटें।",
+    "tour.s5.step.2":
+      "कतार के ऊपर उल्लंघन की गिनती देखें, जो उन टिकटों की है जो समय-सीमा पहले ही चूक चुके हैं।",
+    "tour.s5.step.3":
+      "किसी टिकट को चुनकर उसका पैनल खोलें, फिर उसे अगली स्थिति में ले जाने के लिए → pending या → resolved जैसा तीर वाला बटन चुनें।",
+    "tour.s5.step.4":
+      "बोर्ड चुनें और वही टिकट Open, Pending, Resolved और Closed कॉलम में देखें, कार्ड को उनके बीच खींचते हुए।",
     "tour.s6.title": "नतीजे और गोपनीयता की समीक्षा करें",
-    "tour.s6.summary": "प्रबंधकों, बिक्री प्रमुखों और डेटा संरक्षण अधिकारी के लिए ज़रूरी आँकड़े जाँचें।",
-    "tour.s6.step.1": "डैशबोर्ड खोलें और एक नज़र में Win rate, खुली डील, खुले टिकट और पूर्वानुमान देखें।",
-    "tour.s6.step.2": "अवधि का सारांश, Stale deals, Pipeline hygiene के निष्कर्ष और Forecast trend देखने के लिए कार्यकारी खोलें।",
-    "tour.s6.step.3": "सहभागिता और फ़ॉलो-अप खोलें और वे संपर्क खोजें जिनसे हाल में किसी ने बात नहीं की, तथा वे फ़ॉलो-अप जो अतिदेय हैं या अगले 30 दिनों में देय हैं।",
-    "tour.s6.step.4": "स्रोत और खाते के अनुसार सहमति, और एक ही व्यक्ति साझा करने वाली संपर्क पंक्तियाँ देखने के लिए DPO खोलें।",
+    "tour.s6.summary":
+      "प्रबंधकों, बिक्री प्रमुखों और डेटा संरक्षण अधिकारी के लिए ज़रूरी आँकड़े जाँचें।",
+    "tour.s6.step.1":
+      "डैशबोर्ड खोलें और एक नज़र में Win rate, खुली डील, खुले टिकट और पूर्वानुमान देखें।",
+    "tour.s6.step.2":
+      "अवधि का सारांश, Stale deals, Pipeline hygiene के निष्कर्ष और Forecast trend देखने के लिए कार्यकारी खोलें।",
+    "tour.s6.step.3":
+      "सहभागिता और फ़ॉलो-अप खोलें और वे संपर्क खोजें जिनसे हाल में किसी ने बात नहीं की, तथा वे फ़ॉलो-अप जो अतिदेय हैं या अगले 30 दिनों में देय हैं।",
+    "tour.s6.step.4":
+      "स्रोत और खाते के अनुसार सहमति, और एक ही व्यक्ति साझा करने वाली संपर्क पंक्तियाँ देखने के लिए DPO खोलें।",
     "signin.sso": "SSO से साइन इन करें",
   },
   "zh-cn": {
@@ -1449,7 +1724,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "brand.tagline": "每一段客户关系，尽在一处",
@@ -1497,48 +1773,75 @@ const STRINGS = {
     "tour.open": "打开此页面",
     "tour.top": "返回顶部",
     "tour.start.title": "开始之前",
-    "tour.start.summary": "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
+    "tour.start.summary":
+      "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
     "tour.start.step.1": "点击右上角的“登录”，输入你的邮箱地址。",
-    "tour.start.step.2": "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
+    "tour.start.step.2":
+      "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
     "tour.start.step.3": "你会以已登录状态回到应用，无需记忆或重置任何内容。",
-    "tour.start.step.4": "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
-    "tour.intro": "CRM 的图文导览：每个页面的作用和使用步骤，从查看联系人的同意状态，到运行营销活动和按时完成支持工单。",
+    "tour.start.step.4":
+      "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
+    "tour.intro":
+      "CRM 的图文导览：每个页面的作用和使用步骤，从查看联系人的同意状态，到运行营销活动和按时完成支持工单。",
     "tour.s1.title": "管理联系人及其同意",
-    "tour.s1.summary": "打开联系人，在一处查看其完整的往来关系，并记录其同意了什么。",
-    "tour.s1.step.1": "打开联系人，用筛选栏按名称、状态或营销同意缩小表格范围。",
-    "tour.s1.step.2": "选中一行打开联系人页面，页面会一并显示其时间线、商机和工单。",
-    "tour.s1.step.3": "在营销同意下选择授予同意或撤回，记录联系人的决定；页面会以新状态重新加载。",
-    "tour.s1.step.4": "用下载我的数据获取该联系人的记录，或用删除(匿名化)将其移除；只有联系人没有未结商机或工单时才会出现删除按钮。",
+    "tour.s1.summary":
+      "打开联系人，在一处查看其完整的往来关系，并记录其同意了什么。",
+    "tour.s1.step.1":
+      "打开联系人，用筛选栏按名称、状态或营销同意缩小表格范围。",
+    "tour.s1.step.2":
+      "选中一行打开联系人页面，页面会一并显示其时间线、商机和工单。",
+    "tour.s1.step.3":
+      "在营销同意下选择授予同意或撤回，记录联系人的决定；页面会以新状态重新加载。",
+    "tour.s1.step.4":
+      "用下载我的数据获取该联系人的记录，或用删除(匿名化)将其移除；只有联系人没有未结商机或工单时才会出现删除按钮。",
     "tour.s2.title": "为线索评分并分流",
-    "tour.s2.summary": "看清哪些线索值得打电话以及原因，再推动它们走完生命周期。",
-    "tour.s2.step.1": "打开线索，在队列中查看每条线索的评分、名称、来源和状态，并用筛选栏过滤。",
-    "tour.s2.step.2": "选中一条线索并选择评分明细，即可看到总分、标签以及每条规则贡献的分数。",
-    "tour.s2.step.3": "选择看板，以列的形式查看线索：New、Contacted、Qualified、Converted 和 Disqualified。",
-    "tour.s2.step.4": "把卡片拖到另一列即可更改其状态；若服务拒绝不合法的移动，看板会恢复为已保存的状态。",
+    "tour.s2.summary":
+      "看清哪些线索值得打电话以及原因，再推动它们走完生命周期。",
+    "tour.s2.step.1":
+      "打开线索，在队列中查看每条线索的评分、名称、来源和状态，并用筛选栏过滤。",
+    "tour.s2.step.2":
+      "选中一条线索并选择评分明细，即可看到总分、标签以及每条规则贡献的分数。",
+    "tour.s2.step.3":
+      "选择看板，以列的形式查看线索：New、Contacted、Qualified、Converted 和 Disqualified。",
+    "tour.s2.step.4":
+      "把卡片拖到另一列即可更改其状态；若服务拒绝不合法的移动，看板会恢复为已保存的状态。",
     "tour.s3.title": "管理商机管道",
     "tour.s3.summary": "在管道各阶段之间移动商机，并观察预测随之变化。",
-    "tour.s3.step.1": "打开商机，从下拉列表中选择管道；每一列是一个阶段，并标有赢单概率。",
+    "tour.s3.step.1":
+      "打开商机，从下拉列表中选择管道；每一列是一个阶段，并标有赢单概率。",
     "tour.s3.step.2": "查看看板上方的预测一行，它显示服务器按币种计算的合计。",
-    "tour.s3.step.3": "把商机卡片拖到另一阶段即可移动；拖到丢单阶段时，会随移动记录一个原因。",
-    "tour.s3.step.4": "向下滚动到 Funnel 表，查看每个阶段进入了多少商机，以及相对上一阶段的转化率。",
+    "tour.s3.step.3":
+      "把商机卡片拖到另一阶段即可移动；拖到丢单阶段时，会随移动记录一个原因。",
+    "tour.s3.step.4":
+      "向下滚动到 Funnel 表，查看每个阶段进入了多少商机，以及相对上一阶段的转化率。",
     "tour.s4.title": "运行营销活动并解读回报",
     "tour.s4.summary": "把活动发送给收件人，看看它带来了什么。",
-    "tour.s4.step.1": "打开营销活动，查看每个活动的名称、状态和收件人，按收件人、已送达、已打开、已点击显示。",
-    "tour.s4.step.2": "对草稿或已排期的活动，选择运行（模拟）；草稿会先排期，再运行。",
+    "tour.s4.step.1":
+      "打开营销活动，查看每个活动的名称、状态和收件人，按收件人、已送达、已打开、已点击显示。",
+    "tour.s4.step.2":
+      "对草稿或已排期的活动，选择运行（模拟）；草稿会先排期，再运行。",
     "tour.s4.step.3": "在任一活动上选择漏斗，打开其汇总行。",
-    "tour.s4.step.4": "查看线索数、赢得的收入和投资回报率百分比及其背后的数字，以便如实评判结果。",
+    "tour.s4.step.4":
+      "查看线索数、赢得的收入和投资回报率百分比及其背后的数字，以便如实评判结果。",
     "tour.s5.title": "按 SLA 处理支持队列",
     "tour.s5.summary": "按优先级处理工单，并抓住即将超时的那些。",
-    "tour.s5.step.1": "打开工单，查看每张工单的优先级、状态和应答期限；用筛选栏过滤队列。",
+    "tour.s5.step.1":
+      "打开工单，查看每张工单的优先级、状态和应答期限；用筛选栏过滤队列。",
     "tour.s5.step.2": "留意队列顶部的已超时数量，它表示已经错过期限的工单。",
-    "tour.s5.step.3": "选中一张工单打开其面板，再选择 → pending 或 → resolved 之类的箭头按钮，把它移到下一个状态。",
-    "tour.s5.step.4": "选择看板，把同样的工单按 Open、Pending、Resolved、Closed 列来处理，并在列之间拖动卡片。",
+    "tour.s5.step.3":
+      "选中一张工单打开其面板，再选择 → pending 或 → resolved 之类的箭头按钮，把它移到下一个状态。",
+    "tour.s5.step.4":
+      "选择看板，把同样的工单按 Open、Pending、Resolved、Closed 列来处理，并在列之间拖动卡片。",
     "tour.s6.title": "查看结果与隐私",
     "tour.s6.summary": "查看经理、销售负责人和数据保护官关心的数据。",
-    "tour.s6.step.1": "打开仪表盘，一眼查看 Win rate、进行中的商机、未结工单和预测。",
-    "tour.s6.step.2": "打开高管，查看本期汇总、Stale deals、Pipeline hygiene 检查结果和 Forecast trend。",
-    "tour.s6.step.3": "打开互动和跟进，找出近期无人联系的联系人，以及已逾期或未来 30 天内到期的跟进。",
-    "tour.s6.step.4": "打开数据保护，按来源和按客户查看同意情况，以及共用同一个人的联系人行。",
+    "tour.s6.step.1":
+      "打开仪表盘，一眼查看 Win rate、进行中的商机、未结工单和预测。",
+    "tour.s6.step.2":
+      "打开高管，查看本期汇总、Stale deals、Pipeline hygiene 检查结果和 Forecast trend。",
+    "tour.s6.step.3":
+      "打开互动和跟进，找出近期无人联系的联系人，以及已逾期或未来 30 天内到期的跟进。",
+    "tour.s6.step.4":
+      "打开数据保护，按来源和按客户查看同意情况，以及共用同一个人的联系人行。",
     "signin.sso": "使用 SSO 登录",
   },
 } as const;
@@ -1568,6 +1871,7 @@ function normaliseLocale(raw: string | null | undefined): Locale | null {
   const byPrimary = (LOCALES as readonly string[]).find(
     (l) => l.split("-")[0] === primary,
   );
+
   return (byPrimary as Locale | undefined) ?? null;
 }
 

@@ -12,10 +12,10 @@
   round trip rather than to replace its answer.
 -->
 <script lang="ts">
-  import { BLOCK_KINDS, blank, insertAt, move, problems, removeAt, replaceAt } from "$lib/blocks";
-  import type { BlockKind } from "$lib/blocks";
-  import type { Block } from "$lib/api/cms";
-  import { t } from "$lib/i18n.svelte";
+  import { BLOCK_KINDS, blank, insertAt, move, problems, removeAt, replaceAt } from "#lib/blocks.js";
+  import type { BlockKind } from "#lib/blocks.js";
+  import type { Block } from "#lib/api/cms.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   let { blocks = $bindable() }: { blocks: Block[] } = $props();
 

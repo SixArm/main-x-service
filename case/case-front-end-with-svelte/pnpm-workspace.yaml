@@ -1,5 +1,8 @@
 allowBuilds:
   esbuild: true
+minimumReleaseAgeExclude:
+  - "@sveltejs/adapter-auto@8.0.0"
+  - "@sveltejs/kit@3.0.0"
 overrides:
   # svelte-theme-picker/locale/share/text-size 0.1.1 pass `baseClass` to
   # headless IconButton/Listbox, which only exists from headless 0.2.0, yet

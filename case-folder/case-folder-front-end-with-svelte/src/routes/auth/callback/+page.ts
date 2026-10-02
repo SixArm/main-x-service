@@ -6,8 +6,8 @@
 // any failure, returns an `error` string for the page to display instead
 // of throwing, so the user sees a friendly message rather than +error.
 
-import { api, ApiError } from '$lib/api/client';
-import { cache } from '$lib/store/cache.svelte';
+import { api, ApiError } from '#lib/api/client.js';
+import { cache } from '#lib/store/cache.svelte.js';
 import { redirect } from '@sveltejs/kit';
 
 export async function load({ url, fetch }) {

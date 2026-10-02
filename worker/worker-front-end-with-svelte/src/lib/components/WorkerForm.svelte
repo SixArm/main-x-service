@@ -16,12 +16,12 @@
   State: `form` is a createForm() handle holding value/errors/submitting.
 -->
 <script lang="ts">
-    import type { Gender, Worker } from "$lib/api/types.js";
-    import { createForm } from "$lib/forms/form.svelte.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
+    import type { Gender, Worker } from "#lib/api/types.js";
+    import { createForm } from "#lib/forms/form.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
     import HumanNameInput from "./HumanNameInput.svelte";
-    import { t } from "$lib/i18n.svelte.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let props: {
         initial: Worker;

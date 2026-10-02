@@ -8,10 +8,10 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import PlanForm from "$lib/components/PlanForm.svelte";
-  import { PlanRepository } from "$lib/api/plans";
-  import type { Plan } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import PlanForm from "#lib/components/PlanForm.svelte";
+  import { PlanRepository } from "#lib/api/plans.js";
+  import type { Plan } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const pid = page.params.pid ?? "";
   const repo = PlanRepository.withFetch();

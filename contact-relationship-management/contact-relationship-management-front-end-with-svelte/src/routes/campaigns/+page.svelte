@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { campaignFunnel, campaignStatus, listCampaigns, money, runCampaign } from "$lib/api/crm";
-  import { i18n, t } from "$lib/i18n.svelte";
-  import type { Campaign, Ratio } from "$lib/api/crm";
+  import { campaignFunnel, campaignStatus, listCampaigns, money, runCampaign } from "#lib/api/crm.js";
+  import { i18n, t } from "#lib/i18n.svelte.js";
+  import type { Campaign, Ratio } from "#lib/api/crm.js";
 
   let campaigns = $state<Campaign[] | null>(null);
   let funnel = $state<{ pid: string; leads: number; won_revenue_minor: number; roi: Ratio } | null>(null);

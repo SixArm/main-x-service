@@ -1,36 +1,13 @@
-<!--
-  Root layout — chrome shared by every route.
-
-  Purpose:
-    Renders the top navigation bar (brand, nav, session panel) plus the
-    routed page.
-
-  $props:
-    - children: Snippet — the routed page content (`{@render children()}`).
-    - data: LayoutData — `signedIn` resolved server-side from the httpOnly
-            session cookie, `view` from the caller's ABAC attrs
-            (`+layout.server.ts`).
-
-  Session affordance: per-app magic-link login on this app's own `/signin`;
-  sign-out posts to the root page's `signout` action (BFF: revokes the
-  session server-side + clears the cookie). The browser never holds a token.
-
-  Nav ordering (T-28f, repo `tasks.md` EV-1): `data.view` (a
-  deployment-declared ABAC attribute, e.g. `view=executive`) moves the
-  matching nav item to the front, via the pure `orderNavForView` helper
-  (`$lib/nav.ts`) — presentation only; every route stays reachable by URL
-  regardless. `view` absent ⇒ `navItems` unchanged, byte for byte.
--->
 <script lang="ts">
   import "../app.css";
-  import { browser } from "$app/environment";
+  import { browser } from '$app/env';
   import { page } from "$app/state";
   import { enhance } from "$app/forms";
   import type { Snippet } from "svelte";
   import type { LayoutData } from "./$types";
-  import { i18n, t, isRtl, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte";
-  import { COLLECTIONS } from "$lib/api/types";
-  import { orderNavForView } from "$lib/nav";
+  import { i18n, t, isRtl, LOCALES, LOCALE_LABELS } from "#lib/i18n.svelte.js";
+  import { COLLECTIONS } from "#lib/api/types.js";
+  import { orderNavForView } from "#lib/nav.js";
   import PickerBar from "@lilydesignsystem/svelte-picker-bar";
   import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
@@ -152,6 +129,30 @@
   const signedIn = $derived(data.signedIn);
 </script>
 
+<!--
+  Root layout — chrome shared by every route.
+
+  Purpose:
+    Renders the top navigation bar (brand, nav, session panel) plus the
+    routed page.
+
+  $props:
+    - children: Snippet — the routed page content (`{@render children()}`).
+    - data: LayoutData — `signedIn` resolved server-side from the httpOnly
+            session cookie, `view` from the caller's ABAC attrs
+            (`+layout.server.ts`).
+
+  Session affordance: per-app magic-link login on this app's own `/signin`;
+  sign-out posts to the root page's `signout` action (BFF: revokes the
+  session server-side + clears the cookie). The browser never holds a token.
+
+  Nav ordering (T-28f, repo `tasks.md` EV-1): `data.view` (a
+  deployment-declared ABAC attribute, e.g. `view=executive`) moves the
+  matching nav item to the front, via the pure `orderNavForView` helper
+  (`#lib/nav.ts`) — presentation only; every route stays reachable by URL
+  regardless. `view` absent ⇒ `navItems` unchanged, byte for byte.
+-->
+
 <div class="layout">
   <header class="topbar">
     <button
@@ -160,10 +161,9 @@
       aria-expanded={menuOpen}
       aria-controls="primary-nav"
       aria-label={t("nav.toggle")}
-      onclick={() => (menuOpen = !menuOpen)}
-    >
-      <span class="hamburger-box" aria-hidden="true"></span>
-    </button>
+      onclick={() => menuOpen = !menuOpen}
+    ><span class="hamburger-box" aria-hidden="true"></span></button>
+
     <a href="/" class="brand">{t("brand.name")}</a>
     <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
       <ul>
@@ -171,13 +171,9 @@
           <li>
             <a
               href={item.href}
-              aria-current={page.url.pathname === item.href
-                ? "page"
-                : undefined}
-              onclick={() => (menuOpen = false)}
-            >
-              {item.label}
-            </a>
+              aria-current={page.url.pathname === item.href ? "page" : undefined}
+              onclick={() => menuOpen = false}
+            >{item.label}</a>
           </li>
         {/each}
       </ul>

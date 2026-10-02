@@ -9,17 +9,17 @@
     //   showLabels — controls the LabelsDialogBox open state.
     //   printNote  — confirmation copy after a (simulated) print.
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import Alert from '$lib/components/Alert/Alert.svelte';
-    import Icon from '$lib/components/Icon/Icon.svelte';
-    import LabelsDialogBox from '$lib/components/LabelsDialogBox/LabelsDialogBox.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
-    import { t, tf, statusLabel } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import Alert from '#lib/components/Alert/Alert.svelte';
+    import Icon from '#lib/components/Icon/Icon.svelte';
+    import LabelsDialogBox from '#lib/components/LabelsDialogBox/LabelsDialogBox.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf, statusLabel } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
 

@@ -13,7 +13,7 @@ import type {
   ReviewQueueListResponse,
   ReviewStatus,
 } from "./types.js";
-import { API_BASE_URL } from "$lib/config.js";
+import { API_BASE_URL } from "#lib/config.js";
 
 /** Parameters for {@link PlaceRepository.listReviewQueue}. */
 export interface ReviewQueueOptions {

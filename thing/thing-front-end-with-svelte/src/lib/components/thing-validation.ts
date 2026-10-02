@@ -2,7 +2,7 @@
 // from ThingForm.svelte so it can be unit-tested without mounting a Svelte
 // component. Implements FR-4 (spec/06-functional-requirements.md): `name`
 // required; the URL-shaped fields must be absolute http(s) URLs when present.
-import type { Thing } from "$lib/api/types.js";
+import type { Thing } from "#lib/api/types.js";
 
 /** Field name → human-readable validation message. */
 export type FieldErrors = Record<string, string>;

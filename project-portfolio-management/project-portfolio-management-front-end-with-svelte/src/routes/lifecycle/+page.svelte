@@ -9,7 +9,7 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import { CapabilityClient, type LifecycleFunnel } from "$lib/api/capabilities";
+  import { CapabilityClient, type LifecycleFunnel } from "#lib/api/capabilities.js";
 
   const api = CapabilityClient.withFetch();
   let view = $state<LifecycleFunnel | null>(null);

@@ -14,18 +14,18 @@
   as undefined when blank so they're omitted from the query.
 -->
 <script lang="ts">
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import ThingIdentifierInput from "$lib/components/ThingIdentifierInput.svelte";
-    import { ThingRepository } from "$lib/api/things.js";
-    import { describeApiError } from "$lib/api/errorHandling.js";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import ThingIdentifierInput from "#lib/components/ThingIdentifierInput.svelte";
+    import { ThingRepository } from "#lib/api/things.js";
+    import { describeApiError } from "#lib/api/errorHandling.js";
     import type {
         MatchRequest,
         MatchResult,
         ThingIdentifier,
-    } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
 

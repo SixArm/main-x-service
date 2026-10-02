@@ -6,16 +6,16 @@
     // 24h moves), the full folder register grid, the five most recent
     // moves, and per-cabinet utilisation. Render-only; no local state.
 
-    import { cache } from '$lib/store/cache.svelte';
+    import { cache } from '#lib/store/cache.svelte.js';
 
-    import Card from '$lib/components/Card/Card.svelte';
-    import Banner from '$lib/components/Banner/Banner.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import Separator from '$lib/components/Separator/Separator.svelte';
-    import SummaryList from '$lib/components/SummaryList/SummaryList.svelte';
-    import SummaryListItem from '$lib/components/SummaryListItem/SummaryListItem.svelte';
-    import FolderGrid from '$lib/components/FolderGrid.svelte';
-    import { t, tf } from '$lib/i18n.svelte';
+    import Card from '#lib/components/Card/Card.svelte';
+    import Banner from '#lib/components/Banner/Banner.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import Separator from '#lib/components/Separator/Separator.svelte';
+    import SummaryList from '#lib/components/SummaryList/SummaryList.svelte';
+    import SummaryListItem from '#lib/components/SummaryListItem/SummaryListItem.svelte';
+    import FolderGrid from '#lib/components/FolderGrid.svelte';
+    import { t, tf } from '#lib/i18n.svelte.js';
 
     const stats = $derived(cache.stats);
     const folders = $derived(cache.folders);

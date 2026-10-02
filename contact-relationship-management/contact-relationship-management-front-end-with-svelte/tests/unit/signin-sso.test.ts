@@ -4,7 +4,11 @@ import { isHttpError, isRedirect } from "@sveltejs/kit";
 
 const mockEnv: { PUBLIC_OIDC_SIGNIN_ENABLED?: string } = {};
 
-vi.mock("$env/dynamic/public", () => ({ env: mockEnv }));
+vi.mock("$app/env/public", () => ({
+    get PUBLIC_OIDC_SIGNIN_ENABLED() {
+        return mockEnv.PUBLIC_OIDC_SIGNIN_ENABLED;
+    },
+}));
 
 describe("oidcLoginUrl", () => {
   it("builds the auth service OIDC login URL with an encoded return_url", async () => {

@@ -12,10 +12,10 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import PlaceForm from "$lib/components/PlaceForm.svelte";
-    import { PlaceRepository } from "$lib/api/places.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { Place } from "$lib/api/types.js";
+    import PlaceForm from "#lib/components/PlaceForm.svelte";
+    import { PlaceRepository } from "#lib/api/places.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { Place } from "#lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
     let place = $state<Place | null>(null);

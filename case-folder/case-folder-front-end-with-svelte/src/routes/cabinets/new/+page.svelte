@@ -9,15 +9,15 @@
     // roomId defaults to the first cached room for convenience.
 
     import { goto } from '$app/navigation';
-    import { cache } from '$lib/store/cache.svelte';
-    import { ApiError } from '$lib/api/client';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import { ApiError } from '#lib/api/client.js';
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Alert from '$lib/components/Alert/Alert.svelte';
-    import Form from '$lib/components/Form/Form.svelte';
-    import Field from '$lib/components/Field/Field.svelte';
-    import Button from '$lib/components/Button/Button.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Alert from '#lib/components/Alert/Alert.svelte';
+    import Form from '#lib/components/Form/Form.svelte';
+    import Field from '#lib/components/Field/Field.svelte';
+    import Button from '#lib/components/Button/Button.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let label = $state('');
     let roomId = $state<string>(cache.rooms[0]?.id ?? '');

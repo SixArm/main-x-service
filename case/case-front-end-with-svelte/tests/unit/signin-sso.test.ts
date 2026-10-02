@@ -9,7 +9,11 @@ import { isHttpError, isRedirect } from "@sveltejs/kit";
 
 const mockEnv: { PUBLIC_OIDC_SIGNIN_ENABLED?: string } = {};
 
-vi.mock("$env/dynamic/public", () => ({ env: mockEnv }));
+vi.mock("$app/env/public", () => ({
+    get PUBLIC_OIDC_SIGNIN_ENABLED() {
+        return mockEnv.PUBLIC_OIDC_SIGNIN_ENABLED;
+    },
+}));
 
 describe("GET /signin/sso", () => {
     beforeEach(() => {

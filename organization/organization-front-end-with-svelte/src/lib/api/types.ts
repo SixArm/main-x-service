@@ -172,7 +172,7 @@ export interface MergeRecordRow {
  * Per-component scores from `organization_matcher::MatchBreakdown`.
  * `undefined`/`null` means the component was skipped because one or both
  * records lacked the data, so it did not contribute to the weighted sum
- * (never rendered as zero — see `$lib/review`'s `breakdownRows`).
+ * (never rendered as zero — see `#lib/review`'s `breakdownRows`).
  */
 export interface MatchBreakdown {
   name_score?: number | null;

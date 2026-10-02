@@ -5,13 +5,13 @@
   download. English-first, like the other PPM views.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
   import {
     PpmClient,
     type AuditTrail,
     type AuditorFindings,
-  } from "$lib/api/ppm";
+  } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   let trail = $state<AuditTrail | null>(null);

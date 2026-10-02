@@ -20,12 +20,12 @@
 -->
 <script lang="ts">
   import { page } from "$app/state";
-  import { t } from "$lib/i18n.svelte";
-  import * as cms from "$lib/api/cms";
-  import { ApiError } from "$lib/api/client";
-  import { actor, staleness, when } from "$lib/format";
-  import BlockEditor from "$lib/components/BlockEditor.svelte";
-  import StateBadge from "$lib/components/StateBadge.svelte";
+  import { t } from "#lib/i18n.svelte.js";
+  import * as cms from "#lib/api/cms.js";
+  import { ApiError } from "#lib/api/client.js";
+  import { actor, staleness, when } from "#lib/format.js";
+  import BlockEditor from "#lib/components/BlockEditor.svelte";
+  import StateBadge from "#lib/components/StateBadge.svelte";
   import type {
     Block,
     Diff,
@@ -36,7 +36,7 @@
     Revision,
     RevisionSummary,
     Variant,
-  } from "$lib/api/cms";
+  } from "#lib/api/cms.js";
 
   const pid = $derived(page.params.pid ?? "");
 

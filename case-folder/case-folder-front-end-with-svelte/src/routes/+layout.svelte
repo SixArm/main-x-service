@@ -20,22 +20,22 @@
     //   signOut() — best-effort logout, then clears the cache and routes
     //               to /login regardless of the API outcome.
 
-    import '$lib/css/nhs.css';
-    import '$lib/css/app.css';
+    import '#lib/css/nhs.css';
+    import '#lib/css/app.css';
     import { page } from '$app/state';
     import { goto } from '$app/navigation';
-    import { browser } from '$app/environment';
+    import { browser } from '$app/env';
 
-    import SkipLink from '$lib/components/SkipLink/SkipLink.svelte';
-    import Header from '$lib/components/Header/Header.svelte';
-    import Footer from '$lib/components/Footer/Footer.svelte';
-    import NavigationMenu from '$lib/components/NavigationMenu/NavigationMenu.svelte';
+    import SkipLink from '#lib/components/SkipLink/SkipLink.svelte';
+    import Header from '#lib/components/Header/Header.svelte';
+    import Footer from '#lib/components/Footer/Footer.svelte';
+    import NavigationMenu from '#lib/components/NavigationMenu/NavigationMenu.svelte';
 
     import PickerBar from '@lilydesignsystem/svelte-picker-bar';
     import type { ShareTarget } from '@lilydesignsystem/svelte-share-picker';
 
-    import { cache } from '$lib/store/cache.svelte';
-    import { api } from '$lib/api/client';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import { api } from '#lib/api/client.js';
     import {
         i18n,
         t,
@@ -43,7 +43,7 @@
         LOCALES,
         LOCALE_LABELS,
         type StringKey,
-    } from '$lib/i18n.svelte';
+    } from '#lib/i18n.svelte.js';
 
     let { children } = $props();
 
@@ -180,9 +180,8 @@
                 aria-controls="primary-navigation"
                 aria-label={t('nav.toggle')}
                 onclick={() => (menuOpen = !menuOpen)}
+                ><span class="nav-toggle-box" aria-hidden="true"></span></button
             >
-                <span class="nav-toggle-box" aria-hidden="true"></span>
-            </button>
         {/if}
         <div class="brand">
             <h1>{t('brand.name')}</h1>
@@ -198,10 +197,8 @@
                     <a
                         href={link.href}
                         aria-current={isCurrent(link.href) ? 'page' : undefined}
-                        onclick={() => (menuOpen = false)}
+                        onclick={() => (menuOpen = false)}>{t(link.key)}</a
                     >
-                        {t(link.key)}
-                    </a>
                 {/each}
             </NavigationMenu>
         {/if}

@@ -5,7 +5,7 @@
 // client-side.
 
 import type { Actions, PageServerLoad } from "./$types";
-import { requestMagicLink } from "$lib/server/auth";
+import { requestMagicLink } from "#lib/server/auth.js";
 
 // `page.data.title` convention (see `../+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title

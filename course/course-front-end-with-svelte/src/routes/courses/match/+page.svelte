@@ -14,19 +14,19 @@
     - loading / error — request status.
 -->
 <script lang="ts">
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import CourseIdentifierInput from "$lib/components/CourseIdentifierInput.svelte";
-    import { CourseRepository } from "$lib/api/courses.js";
-    import { EDUCATIONAL_LEVEL_OPTIONS } from "$lib/api/types.js";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import CourseIdentifierInput from "#lib/components/CourseIdentifierInput.svelte";
+    import { CourseRepository } from "#lib/api/courses.js";
+    import { EDUCATIONAL_LEVEL_OPTIONS } from "#lib/api/types.js";
     import type {
         CourseIdentifier,
         EducationalLevel,
         MatchRequest,
         MatchResult,
-    } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
 

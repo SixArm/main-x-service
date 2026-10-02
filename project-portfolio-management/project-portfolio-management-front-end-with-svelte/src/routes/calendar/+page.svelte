@@ -6,8 +6,8 @@
 -->
 <script lang="ts">
   import { Calendar, Willow } from "@svar-ui/svelte-calendar";
-  import { PpmClient, type MilestoneCalendar } from "$lib/api/ppm";
-  import { t } from "$lib/i18n.svelte";
+  import { PpmClient, type MilestoneCalendar } from "#lib/api/ppm.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const ppm = PpmClient.withFetch();
   let calendar = $state<MilestoneCalendar | null>(null);

@@ -13,7 +13,7 @@
 // chosen locale persists to localStorage and drives the whole UI's
 // language as well as the `<html lang>` and `<html dir>` attributes.
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales for which the UI is translated, sorted alphabetically by code
@@ -348,7 +348,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -398,48 +399,79 @@ const STRINGS = {
     "tour.open": "افتح هذه الشاشة",
     "tour.top": "العودة إلى الأعلى",
     "tour.start.title": "قبل أن تبدأ",
-    "tour.start.summary": "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
-    "tour.start.step.1": "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
-    "tour.start.step.2": "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
-    "tour.start.step.3": "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
-    "tour.start.step.4": "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
-    "tour.intro": "جولة إرشادية في سجل العاملين: ما تفعله كل شاشة وخطوات استخدامها، من تسجيل عامل إلى مراجعة التكرارات وتتبّع انتهاء صلاحية الوثائق.",
+    "tour.start.summary":
+      "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
+    "tour.start.step.1":
+      "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
+    "tour.start.step.2":
+      "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
+    "tour.start.step.3":
+      "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
+    "tour.start.step.4":
+      "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
+    "tour.intro":
+      "جولة إرشادية في سجل العاملين: ما تفعله كل شاشة وخطوات استخدامها، من تسجيل عامل إلى مراجعة التكرارات وتتبّع انتهاء صلاحية الوثائق.",
     "tour.s1.title": "تسجيل عامل",
-    "tour.s1.summary": "أنشئ سجلًا باسم منظَّم وتاريخ ميلاد وجنس ومعرّف ضريبي. تُكتشف الأخطاء قبل حفظ أي شيء، ويُرصد التكرار المحتمل فورًا.",
+    "tour.s1.summary":
+      "أنشئ سجلًا باسم منظَّم وتاريخ ميلاد وجنس ومعرّف ضريبي. تُكتشف الأخطاء قبل حفظ أي شيء، ويُرصد التكرار المحتمل فورًا.",
     "tour.s1.step.1": "سجّل الدخول، ثم اختر «عامل جديد» من شريط التنقل العلوي.",
-    "tour.s1.step.2": "أدخل اسم العائلة والأسماء الأولى (مفصولة بمسافات)، ثم اختياريًا تاريخ الميلاد والنوع والرقم الضريبي.",
-    "tour.s1.step.3": "اختر «إنشاء». يُشار إلى أي اسم ناقص أو تاريخ ميلاد في المستقبل بجوار الحقل، ولا يُحفظ شيء حتى يُصحَّح.",
-    "tour.s1.step.4": "إذا وجد السجل تكرارات محتملة فسيعرضها تحت «تكرارات محتملة»؛ راجعها قبل إعادة الإرسال. عند النجاح تنتقل إلى صفحة العامل الجديد.",
+    "tour.s1.step.2":
+      "أدخل اسم العائلة والأسماء الأولى (مفصولة بمسافات)، ثم اختياريًا تاريخ الميلاد والنوع والرقم الضريبي.",
+    "tour.s1.step.3":
+      "اختر «إنشاء». يُشار إلى أي اسم ناقص أو تاريخ ميلاد في المستقبل بجوار الحقل، ولا يُحفظ شيء حتى يُصحَّح.",
+    "tour.s1.step.4":
+      "إذا وجد السجل تكرارات محتملة فسيعرضها تحت «تكرارات محتملة»؛ راجعها قبل إعادة الإرسال. عند النجاح تنتقل إلى صفحة العامل الجديد.",
     "tour.s2.title": "العثور على عامل",
-    "tour.s2.summary": "ابحث في السجل بالاسم أو المعرّف، مع التسامح مع الأخطاء الإملائية وتنويعات التهجئة، وافتح أي سجل لترى كل ما يُحفظ عن العامل.",
+    "tour.s2.summary":
+      "ابحث في السجل بالاسم أو المعرّف، مع التسامح مع الأخطاء الإملائية وتنويعات التهجئة، وافتح أي سجل لترى كل ما يُحفظ عن العامل.",
     "tour.s2.step.1": "اختر «العمال» من شريط التنقل العلوي لفتح القائمة.",
-    "tour.s2.step.2": "اكتب اسمًا أو معرّفًا في مربع البحث («ابحث بالاسم أو المعرّف…») ثم اختر «بحث».",
-    "tour.s2.step.3": "فعّل «تقريبي» للتسامح مع الأخطاء، أو «صوتي (Soundex)» لمطابقة الأسماء المتشابهة نطقًا؛ ويظهر عدد النتائج فوق القائمة.",
-    "tour.s2.step.4": "افتح صفًّا لترى صفحة العامل: الهوية والمعرّفات والعناوين والاتصالات وجهات الطوارئ. «تحرير» يغيّر السجل، و«حذف» يحذفه حذفًا ناعمًا بعد تأكيد.",
+    "tour.s2.step.2":
+      "اكتب اسمًا أو معرّفًا في مربع البحث («ابحث بالاسم أو المعرّف…») ثم اختر «بحث».",
+    "tour.s2.step.3":
+      "فعّل «تقريبي» للتسامح مع الأخطاء، أو «صوتي (Soundex)» لمطابقة الأسماء المتشابهة نطقًا؛ ويظهر عدد النتائج فوق القائمة.",
+    "tour.s2.step.4":
+      "افتح صفًّا لترى صفحة العامل: الهوية والمعرّفات والعناوين والاتصالات وجهات الطوارئ. «تحرير» يغيّر السجل، و«حذف» يحذفه حذفًا ناعمًا بعد تأكيد.",
     "tour.s3.title": "التحقق من التطابقات",
-    "tour.s3.summary": "قارن مرشحًا بالسجل قبل تسجيل أي شخص، واحصل على نتائج مقيَّمة تشرح نفسها.",
+    "tour.s3.summary":
+      "قارن مرشحًا بالسجل قبل تسجيل أي شخص، واحصل على نتائج مقيَّمة تشرح نفسها.",
     "tour.s3.step.1": "اختر «فحص التطابق» من شريط التنقل العلوي.",
-    "tour.s3.step.2": "املأ ما تعرفه: اسم العائلة، الاسم الأول (مفصولاً بمسافات)، تاريخ الميلاد، النوع والرقم الضريبي.",
-    "tour.s3.step.3": "اضبط «العتبة» بين 0.0 و1.0 (القيمة الأعلى تُبقي التطابقات الأقوى فقط)، ثم اختر «البحث عن التطابقات».",
-    "tour.s3.step.4": "اقرأ «نتائج التطابق»: يعرض كل مرشح درجته وجودته، ويوضح «تفصيل النتيجة» مساهمة كل حقل.",
+    "tour.s3.step.2":
+      "املأ ما تعرفه: اسم العائلة، الاسم الأول (مفصولاً بمسافات)، تاريخ الميلاد، النوع والرقم الضريبي.",
+    "tour.s3.step.3":
+      "اضبط «العتبة» بين 0.0 و1.0 (القيمة الأعلى تُبقي التطابقات الأقوى فقط)، ثم اختر «البحث عن التطابقات».",
+    "tour.s3.step.4":
+      "اقرأ «نتائج التطابق»: يعرض كل مرشح درجته وجودته، ويوضح «تفصيل النتيجة» مساهمة كل حقل.",
     "tour.s4.title": "مراجعة التكرارات ودمجها",
-    "tour.s4.summary": "عالج أزواج التكرار المشتبه بها، وقرّر في كل منها والأدلة أمامك، ثم ادمج التكرارات المؤكدة في سجل واحد باقٍ.",
-    "tour.s4.step.1": "اختر «المراجعة» ثم «تشغيل الفحص» لفحص السجل بحثًا عن أزواج تكرار مشتبه بها. استخدم مرشّح «الحالة» لتضييق الطابور.",
-    "tour.s4.step.2": "تصفّح «اللوحة» (قيد الانتظار، مؤكَّد، مرفوض، مدمج تلقائيًا) أو جدول «القائمة»، ثم اختر «مقارنة» لرؤية السجلين جنبًا إلى جنب مع «تفصيل النتيجة».",
-    "tour.s4.step.3": "اختر «تأكيد التكرار» أو «رفض» (وسحب بطاقة قيد الانتظار يسجّل القرار أيضًا). لا يمكن البتّ إلا في العناصر قيد الانتظار، والتأكيد يسجّل الحكم دون دمج.",
-    "tour.s4.step.4": "بالنسبة لزوج مؤكد، اختر «الإبقاء على أ ودمج ب فيه» (أو «الإبقاء على ب ودمج أ فيه») لفتح «دمج» مع تعبئة المعرّفين. أضف «السبب»، ثم «تحميل المعاينة»، ثم «دمج»؛ يُحذف المكرَّر حذفًا ناعمًا ويُسجَّل الدمج.",
+    "tour.s4.summary":
+      "عالج أزواج التكرار المشتبه بها، وقرّر في كل منها والأدلة أمامك، ثم ادمج التكرارات المؤكدة في سجل واحد باقٍ.",
+    "tour.s4.step.1":
+      "اختر «المراجعة» ثم «تشغيل الفحص» لفحص السجل بحثًا عن أزواج تكرار مشتبه بها. استخدم مرشّح «الحالة» لتضييق الطابور.",
+    "tour.s4.step.2":
+      "تصفّح «اللوحة» (قيد الانتظار، مؤكَّد، مرفوض، مدمج تلقائيًا) أو جدول «القائمة»، ثم اختر «مقارنة» لرؤية السجلين جنبًا إلى جنب مع «تفصيل النتيجة».",
+    "tour.s4.step.3":
+      "اختر «تأكيد التكرار» أو «رفض» (وسحب بطاقة قيد الانتظار يسجّل القرار أيضًا). لا يمكن البتّ إلا في العناصر قيد الانتظار، والتأكيد يسجّل الحكم دون دمج.",
+    "tour.s4.step.4":
+      "بالنسبة لزوج مؤكد، اختر «الإبقاء على أ ودمج ب فيه» (أو «الإبقاء على ب ودمج أ فيه») لفتح «دمج» مع تعبئة المعرّفين. أضف «السبب»، ثم «تحميل المعاينة»، ثم «دمج»؛ يُحذف المكرَّر حذفًا ناعمًا ويُسجَّل الدمج.",
     "tour.s5.title": "تتبّع انتهاء صلاحية الوثائق",
-    "tour.s5.summary": "شاهد على تقويم متى تنتهي صلاحية وثائق هوية كل عامل، وانتقل مباشرة إلى السجل الذي يحتاج انتباهًا.",
+    "tour.s5.summary":
+      "شاهد على تقويم متى تنتهي صلاحية وثائق هوية كل عامل، وانتقل مباشرة إلى السجل الذي يحتاج انتباهًا.",
     "tour.s5.step.1": "اختر «انتهاء الصلاحية» من شريط التنقل العلوي.",
-    "tour.s5.step.2": "يعرض تقويم شهري للقراءة فقط كل تاريخ انتهاء لوثائق الهوية المحفوظة للعاملين كحدث ليوم كامل.",
-    "tour.s5.step.3": "اختر أحد الإدخالات لفتح صفحة ذلك العامل، حيث يمكنك مراجعة الوثائق واستخدام «تحرير» لتحديثها.",
-    "tour.s5.step.4": "إذا ظهر إشعار «عرض حتى … من … عامل» فالتقويم يعرض جزءًا فقط؛ استخدم بحث «العمال» للعثور على الباقي.",
+    "tour.s5.step.2":
+      "يعرض تقويم شهري للقراءة فقط كل تاريخ انتهاء لوثائق الهوية المحفوظة للعاملين كحدث ليوم كامل.",
+    "tour.s5.step.3":
+      "اختر أحد الإدخالات لفتح صفحة ذلك العامل، حيث يمكنك مراجعة الوثائق واستخدام «تحرير» لتحديثها.",
+    "tour.s5.step.4":
+      "إذا ظهر إشعار «عرض حتى … من … عامل» فالتقويم يعرض جزءًا فقط؛ استخدم بحث «العمال» للعثور على الباقي.",
     "tour.s6.title": "التدقيق والخصوصية والروابط",
-    "tour.s6.summary": "من صفحة أي عامل يمكنك معرفة من غيّر السجل، وعرضه مع إخفاء الحقول الحساسة، وتصديره، وربطه بسجلات في خدمات أخرى.",
+    "tour.s6.summary":
+      "من صفحة أي عامل يمكنك معرفة من غيّر السجل، وعرضه مع إخفاء الحقول الحساسة، وتصديره، وربطه بسجلات في خدمات أخرى.",
     "tour.s6.step.1": "افتح عاملًا من قائمة «العمال».",
-    "tour.s6.step.2": "اختر «تدقيق» لفتح سجل التدقيق: كل تغيير على السجل ومن أجراه ومحتواه. ويعيدك «العودة إلى العامل».",
-    "tour.s6.step.3": "استخدم «إظهار المُقنَّع» لعرض السجل مع حجب بعض الحقول (و«إظهار الكامل» للعودة)، و«تصدير البيانات (GDPR)» لتنزيل بيانات العامل كملف JSON.",
-    "tour.s6.step.4": "في «الروابط بين الخدمات» أكّد رابطًا من نوع «الهوية نفسها» (شخص) أو «موظف لدى» (مؤسسة) مع مرجع الهدف والدور والثقة وتواريخ الصلاحية الاختيارية. و«سحب» يزيله.",
+    "tour.s6.step.2":
+      "اختر «تدقيق» لفتح سجل التدقيق: كل تغيير على السجل ومن أجراه ومحتواه. ويعيدك «العودة إلى العامل».",
+    "tour.s6.step.3":
+      "استخدم «إظهار المُقنَّع» لعرض السجل مع حجب بعض الحقول (و«إظهار الكامل» للعودة)، و«تصدير البيانات (GDPR)» لتنزيل بيانات العامل كملف JSON.",
+    "tour.s6.step.4":
+      "في «الروابط بين الخدمات» أكّد رابطًا من نوع «الهوية نفسها» (شخص) أو «موظف لدى» (مؤسسة) مع مرجع الهدف والدور والثقة وتواريخ الصلاحية الاختيارية. و«سحب» يزيله.",
     "signin.sso": "تسجيل الدخول عبر SSO",
   },
   "cy-001": {
@@ -717,7 +749,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -767,48 +800,80 @@ const STRINGS = {
     "tour.open": "Agor y sgrin hon",
     "tour.top": "Yn ôl i'r brig",
     "tour.start.title": "Cyn i chi ddechrau",
-    "tour.start.summary": "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
-    "tour.start.step.1": "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
-    "tour.start.step.2": "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
-    "tour.start.step.3": "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
-    "tour.start.step.4": "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
-    "tour.intro": "Taith dywys drwy'r gofrestr Gweithwyr: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o gofrestru gweithiwr i adolygu dyblygion a thracio dyddiadau dod i ben credydau.",
+    "tour.start.summary":
+      "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+    "tour.start.step.1":
+      "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
+    "tour.start.step.2":
+      "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+    "tour.start.step.3":
+      "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+    "tour.start.step.4":
+      "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+    "tour.intro":
+      "Taith dywys drwy'r gofrestr Gweithwyr: beth mae pob sgrin yn ei wneud a'r camau i'w defnyddio, o gofrestru gweithiwr i adolygu dyblygion a thracio dyddiadau dod i ben credydau.",
     "tour.s1.title": "Cofrestru gweithiwr",
-    "tour.s1.summary": "Crëwch gofnod gydag enw strwythuredig, dyddiad geni, rhyw a rhif treth. Caiff camgymeriadau eu nodi cyn cadw dim, a chaiff dyblygion tebygol eu dal ar unwaith.",
-    "tour.s1.step.1": "Mewngofnodwch, yna dewiswch Gweithiwr newydd yn y llywio uchaf.",
-    "tour.s1.step.2": "Rhowch yr Cyfenw a'r Enwau cyntaf (wedi'u gwahanu gan fylchau), yna, os dymunwch, y Dyddiad geni, Rhyw a'r ID Treth.",
-    "tour.s1.step.3": "Dewiswch Creu. Caiff enw sydd ar goll neu ddyddiad geni yn y dyfodol ei nodi wrth ymyl y maes, ac ni chaiff dim ei gadw nes ei gywiro.",
-    "tour.s1.step.4": "Os bydd y gofrestr yn dod o hyd i ddyblygion tebygol, fe'u rhestrir dan Dyblygiadau posibl; adolygwch nhw cyn ailgyflwyno. Os bydd yn llwyddo, cewch eich tywys i dudalen y gweithiwr newydd.",
+    "tour.s1.summary":
+      "Crëwch gofnod gydag enw strwythuredig, dyddiad geni, rhyw a rhif treth. Caiff camgymeriadau eu nodi cyn cadw dim, a chaiff dyblygion tebygol eu dal ar unwaith.",
+    "tour.s1.step.1":
+      "Mewngofnodwch, yna dewiswch Gweithiwr newydd yn y llywio uchaf.",
+    "tour.s1.step.2":
+      "Rhowch yr Cyfenw a'r Enwau cyntaf (wedi'u gwahanu gan fylchau), yna, os dymunwch, y Dyddiad geni, Rhyw a'r ID Treth.",
+    "tour.s1.step.3":
+      "Dewiswch Creu. Caiff enw sydd ar goll neu ddyddiad geni yn y dyfodol ei nodi wrth ymyl y maes, ac ni chaiff dim ei gadw nes ei gywiro.",
+    "tour.s1.step.4":
+      "Os bydd y gofrestr yn dod o hyd i ddyblygion tebygol, fe'u rhestrir dan Dyblygiadau posibl; adolygwch nhw cyn ailgyflwyno. Os bydd yn llwyddo, cewch eich tywys i dudalen y gweithiwr newydd.",
     "tour.s2.title": "Dod o hyd i weithiwr",
-    "tour.s2.summary": "Chwiliwch y gofrestr yn ôl enw neu ddynodwr, goddefwch deipos ac amrywiadau sillafu, ac agorwch unrhyw gofnod i weld popeth a gedwir am y gweithiwr.",
+    "tour.s2.summary":
+      "Chwiliwch y gofrestr yn ôl enw neu ddynodwr, goddefwch deipos ac amrywiadau sillafu, ac agorwch unrhyw gofnod i weld popeth a gedwir am y gweithiwr.",
     "tour.s2.step.1": "Dewiswch Gweithwyr yn y llywio uchaf i agor y rhestr.",
-    "tour.s2.step.2": "Teipiwch enw neu ddynodwr yn y blwch chwilio (\"Chwilio yn ôl enw, dynodwr…\") a dewiswch Chwilio.",
-    "tour.s2.step.3": "Trowch Niwlog ymlaen i oddef teipos, neu Ffonetig (Soundex) i baru enwau sy'n swnio'n debyg; dangosir nifer y canlyniadau uwchben y rhestr.",
-    "tour.s2.step.4": "Agorwch res i weld tudalen y gweithiwr: hunaniaeth, dynodwyr, cyfeiriadau, teleffoni a chysylltiadau brys. Mae Golygu yn newid y cofnod; mae Dileu yn ei ddileu'n feddal ar ôl cadarnhad.",
+    "tour.s2.step.2":
+      'Teipiwch enw neu ddynodwr yn y blwch chwilio ("Chwilio yn ôl enw, dynodwr…") a dewiswch Chwilio.',
+    "tour.s2.step.3":
+      "Trowch Niwlog ymlaen i oddef teipos, neu Ffonetig (Soundex) i baru enwau sy'n swnio'n debyg; dangosir nifer y canlyniadau uwchben y rhestr.",
+    "tour.s2.step.4":
+      "Agorwch res i weld tudalen y gweithiwr: hunaniaeth, dynodwyr, cyfeiriadau, teleffoni a chysylltiadau brys. Mae Golygu yn newid y cofnod; mae Dileu yn ei ddileu'n feddal ar ôl cadarnhad.",
     "tour.s3.title": "Gwirio am gyfatebiadau",
-    "tour.s3.summary": "Cymharwch ymgeisydd â'r gofrestr cyn cofrestru neb, a chael canlyniadau wedi'u sgorio sy'n esbonio eu hunain.",
+    "tour.s3.summary":
+      "Cymharwch ymgeisydd â'r gofrestr cyn cofrestru neb, a chael canlyniadau wedi'u sgorio sy'n esbonio eu hunain.",
     "tour.s3.step.1": "Dewiswch Gwiriad cydweddu yn y llywio uchaf.",
-    "tour.s3.step.2": "Llenwch yr hyn a wyddoch: Cyfenw, Enw cyntaf (wedi'u gwahanu gan fylchau), Dyddiad geni, Rhyw a ID Treth.",
-    "tour.s3.step.3": "Gosodwch y Trothwy rhwng 0.0 ac 1.0 (mae gwerth uwch yn cadw'r cyfatebiaethau cryfaf yn unig), yna dewiswch Canfod cydweddiadau.",
-    "tour.s3.step.4": "Darllenwch y Canlyniadau cydweddu: mae pob ymgeisydd yn dangos ei sgôr a'i ansawdd, ac mae Dadansoddiad sgôr yn dangos cyfraniad pob maes.",
+    "tour.s3.step.2":
+      "Llenwch yr hyn a wyddoch: Cyfenw, Enw cyntaf (wedi'u gwahanu gan fylchau), Dyddiad geni, Rhyw a ID Treth.",
+    "tour.s3.step.3":
+      "Gosodwch y Trothwy rhwng 0.0 ac 1.0 (mae gwerth uwch yn cadw'r cyfatebiaethau cryfaf yn unig), yna dewiswch Canfod cydweddiadau.",
+    "tour.s3.step.4":
+      "Darllenwch y Canlyniadau cydweddu: mae pob ymgeisydd yn dangos ei sgôr a'i ansawdd, ac mae Dadansoddiad sgôr yn dangos cyfraniad pob maes.",
     "tour.s4.title": "Adolygu ac uno dyblygion",
-    "tour.s4.summary": "Gweithiwch drwy barau dyblyg a amheuir, penderfynwch ar bob un gyda'r dystiolaeth wrth eich ochr, yna unwch ddyblygion cadarnhaol yn un cofnod sy'n goroesi.",
-    "tour.s4.step.1": "Dewiswch Adolygu a dewiswch Rhedeg sgan i wirio'r gofrestr am barau dyblyg a amheuir. Defnyddiwch yr hidlydd Statws i gyfyngu'r ciw.",
-    "tour.s4.step.2": "Pori'r Bwrdd (Yn aros, Wedi'i gadarnhau, Wedi'i wrthod, Wedi'i uno'n awtomatig) neu dabl y Rhes, yna dewiswch Cymharu i weld y ddau gofnod ochr yn ochr gyda'u Dadansoddiad sgôr.",
-    "tour.s4.step.3": "Dewiswch Cadarnhau'r dyblyg neu Gwrthod (mae llusgo cerdyn sy'n aros hefyd yn cofnodi'r penderfyniad). Dim ond eitemau sy'n aros y gellir penderfynu arnynt, ac mae cadarnhau'n cofnodi'r dyfarniad heb uno.",
-    "tour.s4.step.4": "Ar gyfer pâr cadarnhaol, dewiswch Cadw A, uno B iddo (neu Cadw B, uno A iddo) i agor Uno gyda'r ddau ID wedi'u llenwi. Ychwanegwch Reswm, Llwytho rhagolwg, yna Uno; caiff y dyblyg ei ddileu'n feddal a chofnodir yr uno.",
+    "tour.s4.summary":
+      "Gweithiwch drwy barau dyblyg a amheuir, penderfynwch ar bob un gyda'r dystiolaeth wrth eich ochr, yna unwch ddyblygion cadarnhaol yn un cofnod sy'n goroesi.",
+    "tour.s4.step.1":
+      "Dewiswch Adolygu a dewiswch Rhedeg sgan i wirio'r gofrestr am barau dyblyg a amheuir. Defnyddiwch yr hidlydd Statws i gyfyngu'r ciw.",
+    "tour.s4.step.2":
+      "Pori'r Bwrdd (Yn aros, Wedi'i gadarnhau, Wedi'i wrthod, Wedi'i uno'n awtomatig) neu dabl y Rhes, yna dewiswch Cymharu i weld y ddau gofnod ochr yn ochr gyda'u Dadansoddiad sgôr.",
+    "tour.s4.step.3":
+      "Dewiswch Cadarnhau'r dyblyg neu Gwrthod (mae llusgo cerdyn sy'n aros hefyd yn cofnodi'r penderfyniad). Dim ond eitemau sy'n aros y gellir penderfynu arnynt, ac mae cadarnhau'n cofnodi'r dyfarniad heb uno.",
+    "tour.s4.step.4":
+      "Ar gyfer pâr cadarnhaol, dewiswch Cadw A, uno B iddo (neu Cadw B, uno A iddo) i agor Uno gyda'r ddau ID wedi'u llenwi. Ychwanegwch Reswm, Llwytho rhagolwg, yna Uno; caiff y dyblyg ei ddileu'n feddal a chofnodir yr uno.",
     "tour.s5.title": "Tracio dyddiadau dod i ben credydau",
-    "tour.s5.summary": "Gwelwch ar galendr pryd mae dogfennau adnabod pob gweithiwr yn dod i ben, a neidiwch yn syth i'r cofnod sydd angen sylw.",
+    "tour.s5.summary":
+      "Gwelwch ar galendr pryd mae dogfennau adnabod pob gweithiwr yn dod i ben, a neidiwch yn syth i'r cofnod sydd angen sylw.",
     "tour.s5.step.1": "Dewiswch Dyddiadau dod i ben yn y llywio uchaf.",
-    "tour.s5.step.2": "Mae calendr misol darllen-yn-unig yn dangos pob dyddiad dod i ben dogfen adnabod a gedwir ar gyfer gweithwyr fel cofnod diwrnod cyfan.",
-    "tour.s5.step.3": "Dewiswch gofnod i agor tudalen y gweithiwr hwnnw, lle gallwch wirio'r dogfennau a defnyddio Golygu i'w diweddaru.",
-    "tour.s5.step.4": "Os yw hysbysiad yn dweud \"Yn dangos hyd at … o … o weithwyr\", dim ond rhan o'r data y mae'r calendr yn ei ddangos; defnyddiwch chwiliad Gweithwyr i ddod o hyd i'r gweddill.",
+    "tour.s5.step.2":
+      "Mae calendr misol darllen-yn-unig yn dangos pob dyddiad dod i ben dogfen adnabod a gedwir ar gyfer gweithwyr fel cofnod diwrnod cyfan.",
+    "tour.s5.step.3":
+      "Dewiswch gofnod i agor tudalen y gweithiwr hwnnw, lle gallwch wirio'r dogfennau a defnyddio Golygu i'w diweddaru.",
+    "tour.s5.step.4":
+      "Os yw hysbysiad yn dweud \"Yn dangos hyd at … o … o weithwyr\", dim ond rhan o'r data y mae'r calendr yn ei ddangos; defnyddiwch chwiliad Gweithwyr i ddod o hyd i'r gweddill.",
     "tour.s6.title": "Archwilio, preifatrwydd a dolenni",
-    "tour.s6.summary": "O dudalen unrhyw weithiwr gallwch weld pwy newidiodd y cofnod, ei weld gyda meysydd sensitif wedi'u cuddio, ei allforio, a'i gysylltu â chofnodion mewn gwasanaethau eraill.",
+    "tour.s6.summary":
+      "O dudalen unrhyw weithiwr gallwch weld pwy newidiodd y cofnod, ei weld gyda meysydd sensitif wedi'u cuddio, ei allforio, a'i gysylltu â chofnodion mewn gwasanaethau eraill.",
     "tour.s6.step.1": "Agorwch weithiwr o'r rhestr Gweithwyr.",
-    "tour.s6.step.2": "Dewiswch Archwilio i agor y Cofnod archwilio: pob newid i'r cofnod, pwy a'i gwnaeth a'i gynnwys. Mae Yn ôl i'r gweithiwr yn eich dychwelyd.",
-    "tour.s6.step.3": "Defnyddiwch Dangos wedi'i guddio i weld y cofnod gyda rhai meysydd wedi'u cuddio (mae Dangos llawn yn troi'n ôl), ac Allforio data (GDPR) i lawrlwytho data'r gweithiwr fel ffeil JSON.",
-    "tour.s6.step.4": "Yn Cysylltiadau traws-wasanaeth, Honni cyswllt o'r math Yr un hunaniaeth (→ person) neu Cyflogir gan (→ sefydliad), gyda chyfeirnod targed, rôl, hyder a dyddiadau dilysrwydd dewisol. Mae Tynnu'n ôl yn ei ddileu.",
+    "tour.s6.step.2":
+      "Dewiswch Archwilio i agor y Cofnod archwilio: pob newid i'r cofnod, pwy a'i gwnaeth a'i gynnwys. Mae Yn ôl i'r gweithiwr yn eich dychwelyd.",
+    "tour.s6.step.3":
+      "Defnyddiwch Dangos wedi'i guddio i weld y cofnod gyda rhai meysydd wedi'u cuddio (mae Dangos llawn yn troi'n ôl), ac Allforio data (GDPR) i lawrlwytho data'r gweithiwr fel ffeil JSON.",
+    "tour.s6.step.4":
+      "Yn Cysylltiadau traws-wasanaeth, Honni cyswllt o'r math Yr un hunaniaeth (→ person) neu Cyflogir gan (→ sefydliad), gyda chyfeirnod targed, rôl, hyder a dyddiadau dilysrwydd dewisol. Mae Tynnu'n ôl yn ei ddileu.",
     "signin.sso": "Mewngofnodi gydag SSO",
   },
   "de-de": {
@@ -1073,19 +1138,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Weniger Dubletten",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -1094,74 +1166,120 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "splash.hero.title": "Ein verlässlicher Datensatz für jeden Mitarbeiter",
-    "splash.hero.subtitle": "Erfassen Sie Ihre Belegschaft einmal, finden Sie jeden sofort, behalten Sie Ablaufdaten von Nachweisen im Blick und verhindern Sie Dubletten, bevor sie entstehen, mit integriertem Datenschutz und lückenlosem Audit-Protokoll.",
-    "splash.benefits.1.body": "Der Echtzeit-Abgleich meldet eine wahrscheinliche Dublette, sobald ein Mitarbeiter hinzugefügt wird.",
+    "splash.hero.subtitle":
+      "Erfassen Sie Ihre Belegschaft einmal, finden Sie jeden sofort, behalten Sie Ablaufdaten von Nachweisen im Blick und verhindern Sie Dubletten, bevor sie entstehen, mit integriertem Datenschutz und lückenlosem Audit-Protokoll.",
+    "splash.benefits.1.body":
+      "Der Echtzeit-Abgleich meldet eine wahrscheinliche Dublette, sobald ein Mitarbeiter hinzugefügt wird.",
     "splash.benefits.2.title": "Jeden schnell finden",
-    "splash.benefits.2.body": "Unscharfe und phonetische Suche findet Mitarbeiter trotz Tippfehlern, Spitznamen und Schreibvarianten.",
+    "splash.benefits.2.body":
+      "Unscharfe und phonetische Suche findet Mitarbeiter trotz Tippfehlern, Spitznamen und Schreibvarianten.",
     "splash.benefits.3.title": "Sichere Entscheidungen",
-    "splash.benefits.3.body": "Jeder Treffer zeigt seine Bewertung und eine Aufschlüsselung nach Feldern, sodass Prüfende genau sehen, warum.",
+    "splash.benefits.3.body":
+      "Jeder Treffer zeigt seine Bewertung und eine Aufschlüsselung nach Feldern, sodass Prüfende genau sehen, warum.",
     "splash.benefits.4.title": "Datenschutz von Anfang an",
-    "splash.benefits.4.body": "Sensible Felder sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.benefits.4.body":
+      "Sensible Felder sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.benefits.5.title": "Nichts bleibt unprotokolliert",
-    "splash.benefits.5.body": "Jede Änderung wird protokolliert, sodass Sie stets belegen können, wer wann was getan hat.",
+    "splash.benefits.5.body":
+      "Jede Änderung wird protokolliert, sodass Sie stets belegen können, wer wann was getan hat.",
     "splash.benefits.6.title": "Passt zu Ihren Systemen",
-    "splash.benefits.6.body": "Standardschnittstellen für REST und FHIR fügen sich in die Werkzeuge ein, die Sie bereits betreiben.",
+    "splash.benefits.6.body":
+      "Standardschnittstellen für REST und FHIR fügen sich in die Werkzeuge ein, die Sie bereits betreiben.",
     "splash.features.1.title": "Erfassen und bearbeiten",
-    "splash.features.1.body": "Strukturierte Namen, Kennungen, Adressen, Telekommunikationsdaten und Notfallkontakte, schon bei der Eingabe geprüft.",
+    "splash.features.1.body":
+      "Strukturierte Namen, Kennungen, Adressen, Telekommunikationsdaten und Notfallkontakte, schon bei der Eingabe geprüft.",
     "splash.features.2.title": "Abgleich prüfen",
-    "splash.features.2.body": "Vergleichen Sie einen Kandidaten mit dem Register und erhalten Sie bewertete, erklärte Ergebnisse.",
+    "splash.features.2.body":
+      "Vergleichen Sie einen Kandidaten mit dem Register und erhalten Sie bewertete, erklärte Ergebnisse.",
     "splash.features.3.title": "Datensätze zusammenführen",
-    "splash.features.3.body": "Führen Sie bestätigte Dubletten zu einem Datensatz zusammen, ohne den Verlauf zu verlieren.",
+    "splash.features.3.body":
+      "Führen Sie bestätigte Dubletten zu einem Datensatz zusammen, ohne den Verlauf zu verlieren.",
     "splash.features.4.title": "Überprüfungswarteschlange",
-    "splash.features.4.body": "Bearbeiten Sie vermutete Dublettenpaare auf einem Board, nebeneinander.",
+    "splash.features.4.body":
+      "Bearbeiten Sie vermutete Dublettenpaare auf einem Board, nebeneinander.",
     "splash.features.5.title": "Kalender der Nachweisabläufe",
-    "splash.features.5.body": "Sehen Sie im Kalender, wann die Nachweise der einzelnen Mitarbeiter ablaufen, und springen Sie direkt zum Datensatz.",
+    "splash.features.5.body":
+      "Sehen Sie im Kalender, wann die Nachweise der einzelnen Mitarbeiter ablaufen, und springen Sie direkt zum Datensatz.",
     "splash.features.6.title": "Dienstübergreifende Verknüpfungen",
-    "splash.features.6.body": "Verbinden Sie einen Mitarbeiter über Dienste hinweg mit seinem Personendatensatz oder seinem Arbeitgeber.",
-    "tour.intro": "Ein geführter Rundgang durch das Mitarbeiterregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Mitarbeiters über die Prüfung von Dubletten bis zur Überwachung ablaufender Nachweise.",
+    "splash.features.6.body":
+      "Verbinden Sie einen Mitarbeiter über Dienste hinweg mit seinem Personendatensatz oder seinem Arbeitgeber.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das Mitarbeiterregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Mitarbeiters über die Prüfung von Dubletten bis zur Überwachung ablaufender Nachweise.",
     "tour.s1.title": "Einen Mitarbeiter erfassen",
-    "tour.s1.summary": "Legen Sie einen Datensatz mit strukturiertem Namen, Geburtsdatum, Geschlecht und Steuer-ID an. Fehler werden vor dem Speichern markiert, und wahrscheinliche Dubletten werden sofort erkannt.",
-    "tour.s1.step.1": "Melden Sie sich an und wählen Sie in der oberen Navigation „Neuer Mitarbeiter“.",
-    "tour.s1.step.2": "Geben Sie den Nachnamen und die Vornamen (durch Leerzeichen getrennt) ein, optional dazu Geburtsdatum, Geschlecht und Steuer-ID.",
-    "tour.s1.step.3": "Wählen Sie „Erstellen“. Ein fehlender Name oder ein Geburtsdatum in der Zukunft wird am Feld markiert, und es wird nichts gespeichert, bevor der Fehler behoben ist.",
-    "tour.s1.step.4": "Findet das Register wahrscheinliche Dubletten, listet es diese unter „Mögliche Duplikate“ auf; prüfen Sie sie, bevor Sie erneut absenden. Bei Erfolg gelangen Sie zur Seite des neuen Mitarbeiters.",
+    "tour.s1.summary":
+      "Legen Sie einen Datensatz mit strukturiertem Namen, Geburtsdatum, Geschlecht und Steuer-ID an. Fehler werden vor dem Speichern markiert, und wahrscheinliche Dubletten werden sofort erkannt.",
+    "tour.s1.step.1":
+      "Melden Sie sich an und wählen Sie in der oberen Navigation „Neuer Mitarbeiter“.",
+    "tour.s1.step.2":
+      "Geben Sie den Nachnamen und die Vornamen (durch Leerzeichen getrennt) ein, optional dazu Geburtsdatum, Geschlecht und Steuer-ID.",
+    "tour.s1.step.3":
+      "Wählen Sie „Erstellen“. Ein fehlender Name oder ein Geburtsdatum in der Zukunft wird am Feld markiert, und es wird nichts gespeichert, bevor der Fehler behoben ist.",
+    "tour.s1.step.4":
+      "Findet das Register wahrscheinliche Dubletten, listet es diese unter „Mögliche Duplikate“ auf; prüfen Sie sie, bevor Sie erneut absenden. Bei Erfolg gelangen Sie zur Seite des neuen Mitarbeiters.",
     "tour.s2.title": "Einen Mitarbeiter finden",
-    "tour.s2.summary": "Durchsuchen Sie das Register nach Name oder Kennung, auch bei Tippfehlern und Schreibvarianten, und öffnen Sie einen Datensatz, um alles zu sehen, was über den Mitarbeiter gespeichert ist.",
-    "tour.s2.step.1": "Wählen Sie in der oberen Navigation „Mitarbeiter“, um die Liste zu öffnen.",
-    "tour.s2.step.2": "Geben Sie einen Namen oder eine Kennung in das Suchfeld ein („Nach Name, Bezeichner suchen…“) und wählen Sie „Suchen“.",
-    "tour.s2.step.3": "Schalten Sie „Unscharf“ ein, um Tippfehler zu tolerieren, oder „Phonetisch (Soundex)“, um ähnlich klingende Namen zu finden; die Trefferzahl steht über der Liste.",
-    "tour.s2.step.4": "Öffnen Sie eine Zeile, um die Seite des Mitarbeiters zu sehen: Identität, Kennungen, Adressen, Telekommunikationsdaten und Notfallkontakte. „Bearbeiten“ ändert den Datensatz; „Löschen“ löscht ihn nach einer Bestätigung weich.",
+    "tour.s2.summary":
+      "Durchsuchen Sie das Register nach Name oder Kennung, auch bei Tippfehlern und Schreibvarianten, und öffnen Sie einen Datensatz, um alles zu sehen, was über den Mitarbeiter gespeichert ist.",
+    "tour.s2.step.1":
+      "Wählen Sie in der oberen Navigation „Mitarbeiter“, um die Liste zu öffnen.",
+    "tour.s2.step.2":
+      "Geben Sie einen Namen oder eine Kennung in das Suchfeld ein („Nach Name, Bezeichner suchen…“) und wählen Sie „Suchen“.",
+    "tour.s2.step.3":
+      "Schalten Sie „Unscharf“ ein, um Tippfehler zu tolerieren, oder „Phonetisch (Soundex)“, um ähnlich klingende Namen zu finden; die Trefferzahl steht über der Liste.",
+    "tour.s2.step.4":
+      "Öffnen Sie eine Zeile, um die Seite des Mitarbeiters zu sehen: Identität, Kennungen, Adressen, Telekommunikationsdaten und Notfallkontakte. „Bearbeiten“ ändert den Datensatz; „Löschen“ löscht ihn nach einer Bestätigung weich.",
     "tour.s3.title": "Auf Übereinstimmungen prüfen",
-    "tour.s3.summary": "Vergleichen Sie einen Kandidaten mit dem Register, bevor Sie jemanden erfassen, und erhalten Sie bewertete Ergebnisse, die sich selbst erklären.",
+    "tour.s3.summary":
+      "Vergleichen Sie einen Kandidaten mit dem Register, bevor Sie jemanden erfassen, und erhalten Sie bewertete Ergebnisse, die sich selbst erklären.",
     "tour.s3.step.1": "Wählen Sie in der oberen Navigation „Abgleich prüfen“.",
-    "tour.s3.step.2": "Tragen Sie ein, was Sie wissen: Nachname, Vornamen (durch Leerzeichen getrennt), Geburtsdatum, Geschlecht und Steuer-ID.",
-    "tour.s3.step.3": "Legen Sie den „Schwellenwert“ zwischen 0,0 und 1,0 fest (ein höherer Wert behält nur stärkere Treffer) und wählen Sie „Übereinstimmungen finden“.",
-    "tour.s3.step.4": "Lesen Sie die „Abgleichergebnisse“: Jeder Kandidat zeigt Bewertung und Qualität, die „Bewertungsaufschlüsselung“ zeigt, wie jedes Feld beigetragen hat.",
+    "tour.s3.step.2":
+      "Tragen Sie ein, was Sie wissen: Nachname, Vornamen (durch Leerzeichen getrennt), Geburtsdatum, Geschlecht und Steuer-ID.",
+    "tour.s3.step.3":
+      "Legen Sie den „Schwellenwert“ zwischen 0,0 und 1,0 fest (ein höherer Wert behält nur stärkere Treffer) und wählen Sie „Übereinstimmungen finden“.",
+    "tour.s3.step.4":
+      "Lesen Sie die „Abgleichergebnisse“: Jeder Kandidat zeigt Bewertung und Qualität, die „Bewertungsaufschlüsselung“ zeigt, wie jedes Feld beigetragen hat.",
     "tour.s4.title": "Dubletten prüfen und zusammenführen",
-    "tour.s4.summary": "Bearbeiten Sie vermutete Dublettenpaare, entscheiden Sie jedes einzeln mit den Belegen daneben und führen Sie bestätigte Dubletten zu einem verbleibenden Datensatz zusammen.",
-    "tour.s4.step.1": "Wählen Sie „Überprüfung“ und dann „Scan starten“, um das Register auf vermutete Dublettenpaare zu prüfen. Mit dem Statusfilter grenzen Sie die Warteschlange ein.",
-    "tour.s4.step.2": "Durchsuchen Sie das „Board“ (Offen, Bestätigt, Abgelehnt, Automatisch zusammengeführt) oder die Tabelle „Warteschlange“ und wählen Sie „Vergleichen“, um beide Datensätze samt „Bewertungsaufschlüsselung“ nebeneinander zu sehen.",
-    "tour.s4.step.3": "Wählen Sie „Dublette bestätigen“ oder „Ablehnen“ (auch das Ziehen einer offenen Karte hält die Entscheidung fest). Nur offene Einträge können entschieden werden, und Bestätigen hält das Urteil fest, ohne zusammenzuführen.",
-    "tour.s4.step.4": "Für ein bestätigtes Paar wählen Sie „A behalten, B hineinführen“ (oder „B behalten, A hineinführen“), um „Zusammenführen“ mit beiden Kennungen ausgefüllt zu öffnen. Geben Sie einen „Grund“ an, wählen Sie „Vorschau laden“ und dann „Zusammenführen“; die Dublette wird weich gelöscht und die Zusammenführung protokolliert.",
+    "tour.s4.summary":
+      "Bearbeiten Sie vermutete Dublettenpaare, entscheiden Sie jedes einzeln mit den Belegen daneben und führen Sie bestätigte Dubletten zu einem verbleibenden Datensatz zusammen.",
+    "tour.s4.step.1":
+      "Wählen Sie „Überprüfung“ und dann „Scan starten“, um das Register auf vermutete Dublettenpaare zu prüfen. Mit dem Statusfilter grenzen Sie die Warteschlange ein.",
+    "tour.s4.step.2":
+      "Durchsuchen Sie das „Board“ (Offen, Bestätigt, Abgelehnt, Automatisch zusammengeführt) oder die Tabelle „Warteschlange“ und wählen Sie „Vergleichen“, um beide Datensätze samt „Bewertungsaufschlüsselung“ nebeneinander zu sehen.",
+    "tour.s4.step.3":
+      "Wählen Sie „Dublette bestätigen“ oder „Ablehnen“ (auch das Ziehen einer offenen Karte hält die Entscheidung fest). Nur offene Einträge können entschieden werden, und Bestätigen hält das Urteil fest, ohne zusammenzuführen.",
+    "tour.s4.step.4":
+      "Für ein bestätigtes Paar wählen Sie „A behalten, B hineinführen“ (oder „B behalten, A hineinführen“), um „Zusammenführen“ mit beiden Kennungen ausgefüllt zu öffnen. Geben Sie einen „Grund“ an, wählen Sie „Vorschau laden“ und dann „Zusammenführen“; die Dublette wird weich gelöscht und die Zusammenführung protokolliert.",
     "tour.s5.title": "Ablaufende Nachweise überwachen",
-    "tour.s5.summary": "Sehen Sie im Kalender, wann die Ausweisdokumente der einzelnen Mitarbeiter ablaufen, und springen Sie direkt zum Datensatz, der Aufmerksamkeit braucht.",
+    "tour.s5.summary":
+      "Sehen Sie im Kalender, wann die Ausweisdokumente der einzelnen Mitarbeiter ablaufen, und springen Sie direkt zum Datensatz, der Aufmerksamkeit braucht.",
     "tour.s5.step.1": "Wählen Sie in der oberen Navigation „Abläufe“.",
-    "tour.s5.step.2": "Ein schreibgeschützter Monatskalender zeigt jedes bei Mitarbeitern gespeicherte Ablaufdatum eines Ausweisdokuments als ganztägigen Eintrag.",
-    "tour.s5.step.3": "Wählen Sie einen Eintrag, um die Seite des Mitarbeiters zu öffnen, wo Sie die Dokumente prüfen und mit „Bearbeiten“ aktualisieren können.",
-    "tour.s5.step.4": "Lautet ein Hinweis „Zeigt bis zu … von … Mitarbeitern“, ist der Kalender nur ein Ausschnitt; nutzen Sie die Mitarbeitersuche, um den Rest zu finden.",
+    "tour.s5.step.2":
+      "Ein schreibgeschützter Monatskalender zeigt jedes bei Mitarbeitern gespeicherte Ablaufdatum eines Ausweisdokuments als ganztägigen Eintrag.",
+    "tour.s5.step.3":
+      "Wählen Sie einen Eintrag, um die Seite des Mitarbeiters zu öffnen, wo Sie die Dokumente prüfen und mit „Bearbeiten“ aktualisieren können.",
+    "tour.s5.step.4":
+      "Lautet ein Hinweis „Zeigt bis zu … von … Mitarbeitern“, ist der Kalender nur ein Ausschnitt; nutzen Sie die Mitarbeitersuche, um den Rest zu finden.",
     "tour.s6.title": "Audit, Datenschutz und Verknüpfungen",
-    "tour.s6.summary": "Auf der Seite jedes Mitarbeiters sehen Sie, wer den Datensatz geändert hat, können ihn mit maskierten sensiblen Feldern anzeigen, exportieren und mit Datensätzen in anderen Diensten verknüpfen.",
+    "tour.s6.summary":
+      "Auf der Seite jedes Mitarbeiters sehen Sie, wer den Datensatz geändert hat, können ihn mit maskierten sensiblen Feldern anzeigen, exportieren und mit Datensätzen in anderen Diensten verknüpfen.",
     "tour.s6.step.1": "Öffnen Sie einen Mitarbeiter aus der Mitarbeiterliste.",
-    "tour.s6.step.2": "Wählen Sie „Audit“, um das Audit-Protokoll zu öffnen: jede Änderung am Datensatz, wer sie vorgenommen hat und ihre Nutzdaten. „Zurück zum Mitarbeiter“ bringt Sie zurück.",
-    "tour.s6.step.3": "Mit „Maskiert anzeigen“ sehen Sie den Datensatz mit teilweise geschwärzten Feldern („Vollständig anzeigen“ schaltet zurück), und mit „Daten exportieren (DSGVO)“ laden Sie die Daten des Mitarbeiters als JSON-Datei herunter.",
-    "tour.s6.step.4": "Unter „Dienstübergreifende Verknüpfungen“ sichern Sie mit „Verknüpfung zusichern“ eine Verknüpfung der Art „Gleiche Identität“ (zu einer Person) oder „Beschäftigt bei“ (zu einer Organisation) zu, mit Zielreferenz, optionaler Rolle, Konfidenz und Gültigkeitsdaten. „Zurückziehen“ entfernt sie.",
+    "tour.s6.step.2":
+      "Wählen Sie „Audit“, um das Audit-Protokoll zu öffnen: jede Änderung am Datensatz, wer sie vorgenommen hat und ihre Nutzdaten. „Zurück zum Mitarbeiter“ bringt Sie zurück.",
+    "tour.s6.step.3":
+      "Mit „Maskiert anzeigen“ sehen Sie den Datensatz mit teilweise geschwärzten Feldern („Vollständig anzeigen“ schaltet zurück), und mit „Daten exportieren (DSGVO)“ laden Sie die Daten des Mitarbeiters als JSON-Datei herunter.",
+    "tour.s6.step.4":
+      "Unter „Dienstübergreifende Verknüpfungen“ sichern Sie mit „Verknüpfung zusichern“ eine Verknüpfung der Art „Gleiche Identität“ (zu einer Person) oder „Beschäftigt bei“ (zu einer Organisation) zu, mit Zielreferenz, optionaler Rolle, Konfidenz und Gültigkeitsdaten. „Zurückziehen“ entfernt sie.",
   },
   "en-001": {
     "detail.loading": "Loading…",
@@ -1451,7 +1569,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -1501,48 +1620,79 @@ const STRINGS = {
     "tour.open": "Open this screen",
     "tour.top": "Back to top",
     "tour.start.title": "Before you begin",
-    "tour.start.summary": "You need an account to work with real data. Signing in takes under a minute and needs no password.",
-    "tour.start.step.1": "Choose Sign in at the top right and enter your email address.",
-    "tour.start.step.2": "Open the magic link we email you. It works once and expires quickly.",
-    "tour.start.step.3": "You return to the app signed in, with nothing to remember or reset.",
-    "tour.start.step.4": "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
-    "tour.intro": "A guided walkthrough of the Worker registry: what each screen does and the steps to use it, from registering a worker to reviewing duplicates and tracking credential expiries.",
+    "tour.start.summary":
+      "You need an account to work with real data. Signing in takes under a minute and needs no password.",
+    "tour.start.step.1":
+      "Choose Sign in at the top right and enter your email address.",
+    "tour.start.step.2":
+      "Open the magic link we email you. It works once and expires quickly.",
+    "tour.start.step.3":
+      "You return to the app signed in, with nothing to remember or reset.",
+    "tour.start.step.4":
+      "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
+    "tour.intro":
+      "A guided walkthrough of the Worker registry: what each screen does and the steps to use it, from registering a worker to reviewing duplicates and tracking credential expiries.",
     "tour.s1.title": "Register a worker",
-    "tour.s1.summary": "Create a record with a structured name, birth date, gender and tax ID. Mistakes are flagged before anything is saved, and likely duplicates are caught on the spot.",
+    "tour.s1.summary":
+      "Create a record with a structured name, birth date, gender and tax ID. Mistakes are flagged before anything is saved, and likely duplicates are caught on the spot.",
     "tour.s1.step.1": "Sign in, then choose New worker in the top navigation.",
-    "tour.s1.step.2": "Enter the Family name and the Given names (separated by spaces), then optionally the Birth date, Gender and Tax ID.",
-    "tour.s1.step.3": "Select Create. A missing name or a birth date in the future is flagged next to the field, and nothing is saved until it is fixed.",
-    "tour.s1.step.4": "If the registry finds likely duplicates, it lists them under Possible duplicates; review them before resubmitting. On success you land on the new worker's page.",
+    "tour.s1.step.2":
+      "Enter the Family name and the Given names (separated by spaces), then optionally the Birth date, Gender and Tax ID.",
+    "tour.s1.step.3":
+      "Select Create. A missing name or a birth date in the future is flagged next to the field, and nothing is saved until it is fixed.",
+    "tour.s1.step.4":
+      "If the registry finds likely duplicates, it lists them under Possible duplicates; review them before resubmitting. On success you land on the new worker's page.",
     "tour.s2.title": "Find a worker",
-    "tour.s2.summary": "Search the registry by name or identifier, forgive typos and spelling variants, and open any record to see everything held about that worker.",
+    "tour.s2.summary":
+      "Search the registry by name or identifier, forgive typos and spelling variants, and open any record to see everything held about that worker.",
     "tour.s2.step.1": "Choose Workers in the top navigation to open the list.",
-    "tour.s2.step.2": "Type a name or identifier into the search box (\"Search by name, identifier…\") and select Search.",
-    "tour.s2.step.3": "Turn on Fuzzy to tolerate typos, or Phonetic (Soundex) to match names that sound alike; the result count is shown above the list.",
-    "tour.s2.step.4": "Open a row to see the worker's page: identity, identifiers, addresses, telecom and emergency contacts. Edit changes the record; Delete soft-deletes it after a confirmation.",
+    "tour.s2.step.2":
+      'Type a name or identifier into the search box ("Search by name, identifier…") and select Search.',
+    "tour.s2.step.3":
+      "Turn on Fuzzy to tolerate typos, or Phonetic (Soundex) to match names that sound alike; the result count is shown above the list.",
+    "tour.s2.step.4":
+      "Open a row to see the worker's page: identity, identifiers, addresses, telecom and emergency contacts. Edit changes the record; Delete soft-deletes it after a confirmation.",
     "tour.s3.title": "Check for matches",
-    "tour.s3.summary": "Compare a candidate against the registry before you register anyone, and get scored results that explain themselves.",
+    "tour.s3.summary":
+      "Compare a candidate against the registry before you register anyone, and get scored results that explain themselves.",
     "tour.s3.step.1": "Choose Match check in the top navigation.",
-    "tour.s3.step.2": "Fill in what you know: Family, Given (space-separated), Birth date, Gender and Tax ID.",
-    "tour.s3.step.3": "Set the Threshold between 0.0 and 1.0 (a higher value keeps only stronger matches), then select Find matches.",
-    "tour.s3.step.4": "Read Match results: each candidate shows its score and quality, and Score breakdown shows how each field contributed.",
+    "tour.s3.step.2":
+      "Fill in what you know: Family, Given (space-separated), Birth date, Gender and Tax ID.",
+    "tour.s3.step.3":
+      "Set the Threshold between 0.0 and 1.0 (a higher value keeps only stronger matches), then select Find matches.",
+    "tour.s3.step.4":
+      "Read Match results: each candidate shows its score and quality, and Score breakdown shows how each field contributed.",
     "tour.s4.title": "Review and merge duplicates",
-    "tour.s4.summary": "Work through suspected duplicate pairs, decide each one with the evidence beside you, then combine confirmed duplicates into a single surviving record.",
-    "tour.s4.step.1": "Choose Review and select Run scan to check the registry for suspected duplicate pairs. Use the Status filter to narrow the queue.",
-    "tour.s4.step.2": "Browse the Board (Pending, Confirmed, Rejected, Auto-merged) or the Queue table, then select Compare to see both records side by side with their Score breakdown.",
-    "tour.s4.step.3": "Select Confirm duplicate or Reject (dragging a pending card also records the decision). Only pending items can be decided, and confirming records the verdict without merging.",
-    "tour.s4.step.4": "For a confirmed pair, choose Keep A, merge B into it (or Keep B, merge A into it) to open Merge with both IDs filled in. Add a Reason, Load preview, then Merge; the duplicate is soft-deleted and the merge is recorded.",
+    "tour.s4.summary":
+      "Work through suspected duplicate pairs, decide each one with the evidence beside you, then combine confirmed duplicates into a single surviving record.",
+    "tour.s4.step.1":
+      "Choose Review and select Run scan to check the registry for suspected duplicate pairs. Use the Status filter to narrow the queue.",
+    "tour.s4.step.2":
+      "Browse the Board (Pending, Confirmed, Rejected, Auto-merged) or the Queue table, then select Compare to see both records side by side with their Score breakdown.",
+    "tour.s4.step.3":
+      "Select Confirm duplicate or Reject (dragging a pending card also records the decision). Only pending items can be decided, and confirming records the verdict without merging.",
+    "tour.s4.step.4":
+      "For a confirmed pair, choose Keep A, merge B into it (or Keep B, merge A into it) to open Merge with both IDs filled in. Add a Reason, Load preview, then Merge; the duplicate is soft-deleted and the merge is recorded.",
     "tour.s5.title": "Track credential expiries",
-    "tour.s5.summary": "See on a calendar when each worker's identity documents expire, and jump straight to the record that needs attention.",
+    "tour.s5.summary":
+      "See on a calendar when each worker's identity documents expire, and jump straight to the record that needs attention.",
     "tour.s5.step.1": "Choose Expiries in the top navigation.",
-    "tour.s5.step.2": "A read-only month calendar shows every identity-document expiry date held for workers as an all-day entry.",
-    "tour.s5.step.3": "Select an entry to open that worker's page, where you can check the documents and use Edit to update them.",
-    "tour.s5.step.4": "If a notice reads \"Showing up to … of … workers\", the calendar is a partial window; use Workers search to find the rest.",
+    "tour.s5.step.2":
+      "A read-only month calendar shows every identity-document expiry date held for workers as an all-day entry.",
+    "tour.s5.step.3":
+      "Select an entry to open that worker's page, where you can check the documents and use Edit to update them.",
+    "tour.s5.step.4":
+      'If a notice reads "Showing up to … of … workers", the calendar is a partial window; use Workers search to find the rest.',
     "tour.s6.title": "Audit, privacy and links",
-    "tour.s6.summary": "From any worker's page you can see who changed the record, view it with sensitive fields masked, export it, and connect it to records in other services.",
+    "tour.s6.summary":
+      "From any worker's page you can see who changed the record, view it with sensitive fields masked, export it, and connect it to records in other services.",
     "tour.s6.step.1": "Open a worker from the Workers list.",
-    "tour.s6.step.2": "Select Audit to open the Audit log: every change to the record, who made it and its payload. Back to worker returns you.",
-    "tour.s6.step.3": "Use Show masked to view the record with some fields redacted (Show full switches back), and Export data (GDPR) to download the worker's data as a JSON file.",
-    "tour.s6.step.4": "In Cross-service links, Assert a link of kind Same identity (to a person) or Employed by (to an organization), with a target reference, optional role, confidence and validity dates. Withdraw removes it.",
+    "tour.s6.step.2":
+      "Select Audit to open the Audit log: every change to the record, who made it and its payload. Back to worker returns you.",
+    "tour.s6.step.3":
+      "Use Show masked to view the record with some fields redacted (Show full switches back), and Export data (GDPR) to download the worker's data as a JSON file.",
+    "tour.s6.step.4":
+      "In Cross-service links, Assert a link of kind Same identity (to a person) or Employed by (to an organization), with a target reference, optional role, confidence and validity dates. Withdraw removes it.",
     "signin.sso": "Sign in with SSO",
   },
   "es-001": {
@@ -1822,7 +1972,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -1872,48 +2023,82 @@ const STRINGS = {
     "tour.open": "Abrir esta pantalla",
     "tour.top": "Volver arriba",
     "tour.start.title": "Antes de empezar",
-    "tour.start.summary": "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
-    "tour.start.step.1": "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
-    "tour.start.step.2": "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
-    "tour.start.step.3": "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
-    "tour.start.step.4": "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
-    "tour.intro": "Un recorrido guiado por el registro de trabajadores: qué hace cada pantalla y los pasos para usarla, desde registrar a un trabajador hasta revisar duplicados y seguir los vencimientos de credenciales.",
+    "tour.start.summary":
+      "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
+    "tour.start.step.1":
+      "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
+    "tour.start.step.2":
+      "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
+    "tour.start.step.3":
+      "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
+    "tour.start.step.4":
+      "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
+    "tour.intro":
+      "Un recorrido guiado por el registro de trabajadores: qué hace cada pantalla y los pasos para usarla, desde registrar a un trabajador hasta revisar duplicados y seguir los vencimientos de credenciales.",
     "tour.s1.title": "Registrar a un trabajador",
-    "tour.s1.summary": "Crea un registro con nombre estructurado, fecha de nacimiento, género e ID fiscal. Los errores se señalan antes de guardar nada y los posibles duplicados se detectan al instante.",
-    "tour.s1.step.1": "Inicia sesión y elige Nuevo trabajador en la navegación superior.",
-    "tour.s1.step.2": "Escribe el Apellido y los Nombres (separados por espacios) y, si quieres, la Fecha de nacimiento, el Género y el ID fiscal.",
-    "tour.s1.step.3": "Selecciona Crear. Un nombre que falta o una fecha de nacimiento futura se señala junto al campo y no se guarda nada hasta corregirlo.",
-    "tour.s1.step.4": "Si el registro encuentra posibles duplicados, los lista en Posibles duplicados; revísalos antes de reenviar. Si todo va bien, llegas a la página del nuevo trabajador.",
+    "tour.s1.summary":
+      "Crea un registro con nombre estructurado, fecha de nacimiento, género e ID fiscal. Los errores se señalan antes de guardar nada y los posibles duplicados se detectan al instante.",
+    "tour.s1.step.1":
+      "Inicia sesión y elige Nuevo trabajador en la navegación superior.",
+    "tour.s1.step.2":
+      "Escribe el Apellido y los Nombres (separados por espacios) y, si quieres, la Fecha de nacimiento, el Género y el ID fiscal.",
+    "tour.s1.step.3":
+      "Selecciona Crear. Un nombre que falta o una fecha de nacimiento futura se señala junto al campo y no se guarda nada hasta corregirlo.",
+    "tour.s1.step.4":
+      "Si el registro encuentra posibles duplicados, los lista en Posibles duplicados; revísalos antes de reenviar. Si todo va bien, llegas a la página del nuevo trabajador.",
     "tour.s2.title": "Encontrar a un trabajador",
-    "tour.s2.summary": "Busca en el registro por nombre o identificador, tolera erratas y variantes de ortografía, y abre cualquier registro para ver todo lo que se guarda del trabajador.",
-    "tour.s2.step.1": "Elige Trabajadores en la navegación superior para abrir la lista.",
-    "tour.s2.step.2": "Escribe un nombre o identificador en el cuadro de búsqueda («Buscar por nombre, identificador…») y selecciona Buscar.",
-    "tour.s2.step.3": "Activa Difusa para tolerar erratas, o Fonética (Soundex) para encontrar nombres que suenan igual; el número de resultados aparece sobre la lista.",
-    "tour.s2.step.4": "Abre una fila para ver la página del trabajador: identidad, identificadores, direcciones, telecomunicaciones y contactos de emergencia. Editar cambia el registro; Eliminar lo elimina de forma suave tras una confirmación.",
+    "tour.s2.summary":
+      "Busca en el registro por nombre o identificador, tolera erratas y variantes de ortografía, y abre cualquier registro para ver todo lo que se guarda del trabajador.",
+    "tour.s2.step.1":
+      "Elige Trabajadores en la navegación superior para abrir la lista.",
+    "tour.s2.step.2":
+      "Escribe un nombre o identificador en el cuadro de búsqueda («Buscar por nombre, identificador…») y selecciona Buscar.",
+    "tour.s2.step.3":
+      "Activa Difusa para tolerar erratas, o Fonética (Soundex) para encontrar nombres que suenan igual; el número de resultados aparece sobre la lista.",
+    "tour.s2.step.4":
+      "Abre una fila para ver la página del trabajador: identidad, identificadores, direcciones, telecomunicaciones y contactos de emergencia. Editar cambia el registro; Eliminar lo elimina de forma suave tras una confirmación.",
     "tour.s3.title": "Comprobar coincidencias",
-    "tour.s3.summary": "Compara a un candidato con el registro antes de registrar a nadie y obtén resultados puntuados que se explican solos.",
-    "tour.s3.step.1": "Elige Comprobar coincidencias en la navegación superior.",
-    "tour.s3.step.2": "Rellena lo que sepas: Apellido, Nombre (separados por espacios), Fecha de nacimiento, Género e ID fiscal.",
-    "tour.s3.step.3": "Fija el Umbral entre 0.0 y 1.0 (un valor más alto conserva solo las coincidencias más fuertes) y selecciona Buscar coincidencias.",
-    "tour.s3.step.4": "Lee los Resultados de coincidencia: cada candidato muestra su puntuación y calidad, y el Desglose de puntuación indica cuánto aportó cada campo.",
+    "tour.s3.summary":
+      "Compara a un candidato con el registro antes de registrar a nadie y obtén resultados puntuados que se explican solos.",
+    "tour.s3.step.1":
+      "Elige Comprobar coincidencias en la navegación superior.",
+    "tour.s3.step.2":
+      "Rellena lo que sepas: Apellido, Nombre (separados por espacios), Fecha de nacimiento, Género e ID fiscal.",
+    "tour.s3.step.3":
+      "Fija el Umbral entre 0.0 y 1.0 (un valor más alto conserva solo las coincidencias más fuertes) y selecciona Buscar coincidencias.",
+    "tour.s3.step.4":
+      "Lee los Resultados de coincidencia: cada candidato muestra su puntuación y calidad, y el Desglose de puntuación indica cuánto aportó cada campo.",
     "tour.s4.title": "Revisar y fusionar duplicados",
-    "tour.s4.summary": "Recorre los pares de posibles duplicados, decide cada uno con la evidencia al lado y luego combina los duplicados confirmados en un único registro superviviente.",
-    "tour.s4.step.1": "Elige Revisión y selecciona Ejecutar análisis para buscar en el registro pares de posibles duplicados. Usa el filtro Estado para acotar la cola.",
-    "tour.s4.step.2": "Recorre el Tablero (Pendiente, Confirmado, Rechazado, Fusionado automáticamente) o la tabla Cola y selecciona Comparar para ver ambos registros lado a lado con su Desglose de puntuación.",
-    "tour.s4.step.3": "Selecciona Confirmar duplicado o Rechazar (arrastrar una tarjeta pendiente también registra la decisión). Solo se pueden decidir los elementos pendientes, y confirmar registra el veredicto sin fusionar.",
-    "tour.s4.step.4": "Para un par confirmado, elige Conservar A y fusionar B en él (o Conservar B y fusionar A en él) para abrir Fusionar con ambos ID rellenados. Añade un Motivo, Cargar vista previa y luego Fusionar; el duplicado se elimina de forma suave y la fusión queda registrada.",
+    "tour.s4.summary":
+      "Recorre los pares de posibles duplicados, decide cada uno con la evidencia al lado y luego combina los duplicados confirmados en un único registro superviviente.",
+    "tour.s4.step.1":
+      "Elige Revisión y selecciona Ejecutar análisis para buscar en el registro pares de posibles duplicados. Usa el filtro Estado para acotar la cola.",
+    "tour.s4.step.2":
+      "Recorre el Tablero (Pendiente, Confirmado, Rechazado, Fusionado automáticamente) o la tabla Cola y selecciona Comparar para ver ambos registros lado a lado con su Desglose de puntuación.",
+    "tour.s4.step.3":
+      "Selecciona Confirmar duplicado o Rechazar (arrastrar una tarjeta pendiente también registra la decisión). Solo se pueden decidir los elementos pendientes, y confirmar registra el veredicto sin fusionar.",
+    "tour.s4.step.4":
+      "Para un par confirmado, elige Conservar A y fusionar B en él (o Conservar B y fusionar A en él) para abrir Fusionar con ambos ID rellenados. Añade un Motivo, Cargar vista previa y luego Fusionar; el duplicado se elimina de forma suave y la fusión queda registrada.",
     "tour.s5.title": "Seguir los vencimientos de credenciales",
-    "tour.s5.summary": "Consulta en un calendario cuándo vencen los documentos de identidad de cada trabajador y salta directamente al registro que necesita atención.",
+    "tour.s5.summary":
+      "Consulta en un calendario cuándo vencen los documentos de identidad de cada trabajador y salta directamente al registro que necesita atención.",
     "tour.s5.step.1": "Elige Vencimientos en la navegación superior.",
-    "tour.s5.step.2": "Un calendario mensual de solo lectura muestra como evento de día completo cada fecha de vencimiento de documentos de identidad guardada para los trabajadores.",
-    "tour.s5.step.3": "Selecciona una entrada para abrir la página de ese trabajador, donde puedes revisar los documentos y usar Editar para actualizarlos.",
-    "tour.s5.step.4": "Si un aviso dice «Mostrando hasta … de … trabajadores», el calendario es solo una ventana parcial; usa la búsqueda de Trabajadores para encontrar el resto.",
+    "tour.s5.step.2":
+      "Un calendario mensual de solo lectura muestra como evento de día completo cada fecha de vencimiento de documentos de identidad guardada para los trabajadores.",
+    "tour.s5.step.3":
+      "Selecciona una entrada para abrir la página de ese trabajador, donde puedes revisar los documentos y usar Editar para actualizarlos.",
+    "tour.s5.step.4":
+      "Si un aviso dice «Mostrando hasta … de … trabajadores», el calendario es solo una ventana parcial; usa la búsqueda de Trabajadores para encontrar el resto.",
     "tour.s6.title": "Auditoría, privacidad y vínculos",
-    "tour.s6.summary": "Desde la página de cualquier trabajador puedes ver quién cambió el registro, verlo con los campos sensibles enmascarados, exportarlo y conectarlo con registros de otros servicios.",
+    "tour.s6.summary":
+      "Desde la página de cualquier trabajador puedes ver quién cambió el registro, verlo con los campos sensibles enmascarados, exportarlo y conectarlo con registros de otros servicios.",
     "tour.s6.step.1": "Abre un trabajador desde la lista de Trabajadores.",
-    "tour.s6.step.2": "Selecciona Auditoría para abrir el Registro de auditoría: cada cambio del registro, quién lo hizo y su contenido. Volver al trabajador te devuelve.",
-    "tour.s6.step.3": "Usa Mostrar enmascarado para ver el registro con algunos campos ocultos (Mostrar completo vuelve atrás) y Exportar datos (RGPD) para descargar los datos del trabajador como archivo JSON.",
-    "tour.s6.step.4": "En Enlaces entre servicios, Afirmar enlace con el tipo Misma identidad (→ persona) o Empleado por (→ organización), con referencia de destino y, opcionalmente, rol, confianza y fechas de validez. Retirar lo quita.",
+    "tour.s6.step.2":
+      "Selecciona Auditoría para abrir el Registro de auditoría: cada cambio del registro, quién lo hizo y su contenido. Volver al trabajador te devuelve.",
+    "tour.s6.step.3":
+      "Usa Mostrar enmascarado para ver el registro con algunos campos ocultos (Mostrar completo vuelve atrás) y Exportar datos (RGPD) para descargar los datos del trabajador como archivo JSON.",
+    "tour.s6.step.4":
+      "En Enlaces entre servicios, Afirmar enlace con el tipo Misma identidad (→ persona) o Empleado por (→ organización), con referencia de destino y, opcionalmente, rol, confianza y fechas de validez. Retirar lo quita.",
     "signin.sso": "Iniciar sesión con SSO",
   },
   "fr-001": {
@@ -2191,7 +2376,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -2241,48 +2427,82 @@ const STRINGS = {
     "tour.open": "Ouvrir cet écran",
     "tour.top": "Retour en haut",
     "tour.start.title": "Avant de commencer",
-    "tour.start.summary": "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
-    "tour.start.step.1": "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
-    "tour.start.step.2": "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
-    "tour.start.step.3": "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
-    "tour.start.step.4": "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
-    "tour.intro": "Une visite guidée du registre des travailleurs : le rôle de chaque écran et les étapes pour l'utiliser, de l'enregistrement d'un travailleur à la revue des doublons et au suivi des expirations de justificatifs.",
+    "tour.start.summary":
+      "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+    "tour.start.step.1":
+      "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
+    "tour.start.step.2":
+      "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+    "tour.start.step.3":
+      "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+    "tour.start.step.4":
+      "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
+    "tour.intro":
+      "Une visite guidée du registre des travailleurs : le rôle de chaque écran et les étapes pour l'utiliser, de l'enregistrement d'un travailleur à la revue des doublons et au suivi des expirations de justificatifs.",
     "tour.s1.title": "Enregistrer un travailleur",
-    "tour.s1.summary": "Créez une fiche avec un nom structuré, une date de naissance, un genre et un identifiant fiscal. Les erreurs sont signalées avant tout enregistrement et les doublons probables sont repérés immédiatement.",
-    "tour.s1.step.1": "Connectez-vous, puis choisissez Nouveau travailleur dans la navigation du haut.",
-    "tour.s1.step.2": "Saisissez le Nom de famille et les Prénoms (séparés par des espaces), puis éventuellement la Date de naissance, le Genre et l'Identifiant fiscal.",
-    "tour.s1.step.3": "Sélectionnez Créer. Un nom manquant ou une date de naissance dans le futur est signalé à côté du champ, et rien n'est enregistré tant que ce n'est pas corrigé.",
-    "tour.s1.step.4": "Si le registre trouve des doublons probables, il les liste sous Doublons possibles ; examinez-les avant de renvoyer. En cas de succès, vous arrivez sur la page du nouveau travailleur.",
+    "tour.s1.summary":
+      "Créez une fiche avec un nom structuré, une date de naissance, un genre et un identifiant fiscal. Les erreurs sont signalées avant tout enregistrement et les doublons probables sont repérés immédiatement.",
+    "tour.s1.step.1":
+      "Connectez-vous, puis choisissez Nouveau travailleur dans la navigation du haut.",
+    "tour.s1.step.2":
+      "Saisissez le Nom de famille et les Prénoms (séparés par des espaces), puis éventuellement la Date de naissance, le Genre et l'Identifiant fiscal.",
+    "tour.s1.step.3":
+      "Sélectionnez Créer. Un nom manquant ou une date de naissance dans le futur est signalé à côté du champ, et rien n'est enregistré tant que ce n'est pas corrigé.",
+    "tour.s1.step.4":
+      "Si le registre trouve des doublons probables, il les liste sous Doublons possibles ; examinez-les avant de renvoyer. En cas de succès, vous arrivez sur la page du nouveau travailleur.",
     "tour.s2.title": "Trouver un travailleur",
-    "tour.s2.summary": "Recherchez dans le registre par nom ou identifiant, en tolérant fautes de frappe et variantes d'orthographe, puis ouvrez une fiche pour voir tout ce qui est conservé sur le travailleur.",
-    "tour.s2.step.1": "Choisissez Travailleurs dans la navigation du haut pour ouvrir la liste.",
-    "tour.s2.step.2": "Saisissez un nom ou un identifiant dans la zone de recherche (« Rechercher par nom, identifiant… ») et sélectionnez Rechercher.",
-    "tour.s2.step.3": "Activez Approximative pour tolérer les fautes de frappe, ou Phonétique (Soundex) pour trouver les noms qui se prononcent pareil ; le nombre de résultats s'affiche au-dessus de la liste.",
-    "tour.s2.step.4": "Ouvrez une ligne pour voir la page du travailleur : identité, identifiants, adresses, télécoms et contacts d'urgence. Modifier change la fiche ; Supprimer la supprime de façon logique après confirmation.",
+    "tour.s2.summary":
+      "Recherchez dans le registre par nom ou identifiant, en tolérant fautes de frappe et variantes d'orthographe, puis ouvrez une fiche pour voir tout ce qui est conservé sur le travailleur.",
+    "tour.s2.step.1":
+      "Choisissez Travailleurs dans la navigation du haut pour ouvrir la liste.",
+    "tour.s2.step.2":
+      "Saisissez un nom ou un identifiant dans la zone de recherche (« Rechercher par nom, identifiant… ») et sélectionnez Rechercher.",
+    "tour.s2.step.3":
+      "Activez Approximative pour tolérer les fautes de frappe, ou Phonétique (Soundex) pour trouver les noms qui se prononcent pareil ; le nombre de résultats s'affiche au-dessus de la liste.",
+    "tour.s2.step.4":
+      "Ouvrez une ligne pour voir la page du travailleur : identité, identifiants, adresses, télécoms et contacts d'urgence. Modifier change la fiche ; Supprimer la supprime de façon logique après confirmation.",
     "tour.s3.title": "Vérifier les correspondances",
-    "tour.s3.summary": "Comparez un candidat au registre avant d'enregistrer quiconque et obtenez des résultats notés qui s'expliquent d'eux-mêmes.",
-    "tour.s3.step.1": "Choisissez Vérifier les correspondances dans la navigation du haut.",
-    "tour.s3.step.2": "Renseignez ce que vous savez : Nom de famille, Prénom (séparés par des espaces), Date de naissance, Genre et Identifiant fiscal.",
-    "tour.s3.step.3": "Réglez le Seuil entre 0.0 et 1.0 (une valeur plus haute ne garde que les correspondances les plus fortes), puis sélectionnez Trouver des correspondances.",
-    "tour.s3.step.4": "Lisez les Résultats de correspondance : chaque candidat affiche son score et sa qualité, et le Détail du score montre la contribution de chaque champ.",
+    "tour.s3.summary":
+      "Comparez un candidat au registre avant d'enregistrer quiconque et obtenez des résultats notés qui s'expliquent d'eux-mêmes.",
+    "tour.s3.step.1":
+      "Choisissez Vérifier les correspondances dans la navigation du haut.",
+    "tour.s3.step.2":
+      "Renseignez ce que vous savez : Nom de famille, Prénom (séparés par des espaces), Date de naissance, Genre et Identifiant fiscal.",
+    "tour.s3.step.3":
+      "Réglez le Seuil entre 0.0 et 1.0 (une valeur plus haute ne garde que les correspondances les plus fortes), puis sélectionnez Trouver des correspondances.",
+    "tour.s3.step.4":
+      "Lisez les Résultats de correspondance : chaque candidat affiche son score et sa qualité, et le Détail du score montre la contribution de chaque champ.",
     "tour.s4.title": "Examiner et fusionner les doublons",
-    "tour.s4.summary": "Parcourez les paires de doublons suspects, tranchez chacune avec les éléments sous les yeux, puis fusionnez les doublons confirmés en une seule fiche conservée.",
-    "tour.s4.step.1": "Choisissez Révision et sélectionnez Lancer l'analyse pour chercher des paires de doublons suspects. Utilisez le filtre Statut pour restreindre la file.",
-    "tour.s4.step.2": "Parcourez le Tableau (En attente, Confirmé, Rejeté, Fusionné automatiquement) ou la table File, puis sélectionnez Comparer pour voir les deux fiches côte à côte avec leur Détail du score.",
-    "tour.s4.step.3": "Sélectionnez Confirmer le doublon ou Rejeter (faire glisser une carte en attente enregistre aussi la décision). Seuls les éléments en attente peuvent être tranchés, et confirmer enregistre le verdict sans fusionner.",
-    "tour.s4.step.4": "Pour une paire confirmée, choisissez Conserver A, y fusionner B (ou Conserver B, y fusionner A) pour ouvrir Fusionner avec les deux ID remplis. Ajoutez un Motif, Charger l'aperçu, puis Fusionner ; le doublon est supprimé de façon logique et la fusion est enregistrée.",
+    "tour.s4.summary":
+      "Parcourez les paires de doublons suspects, tranchez chacune avec les éléments sous les yeux, puis fusionnez les doublons confirmés en une seule fiche conservée.",
+    "tour.s4.step.1":
+      "Choisissez Révision et sélectionnez Lancer l'analyse pour chercher des paires de doublons suspects. Utilisez le filtre Statut pour restreindre la file.",
+    "tour.s4.step.2":
+      "Parcourez le Tableau (En attente, Confirmé, Rejeté, Fusionné automatiquement) ou la table File, puis sélectionnez Comparer pour voir les deux fiches côte à côte avec leur Détail du score.",
+    "tour.s4.step.3":
+      "Sélectionnez Confirmer le doublon ou Rejeter (faire glisser une carte en attente enregistre aussi la décision). Seuls les éléments en attente peuvent être tranchés, et confirmer enregistre le verdict sans fusionner.",
+    "tour.s4.step.4":
+      "Pour une paire confirmée, choisissez Conserver A, y fusionner B (ou Conserver B, y fusionner A) pour ouvrir Fusionner avec les deux ID remplis. Ajoutez un Motif, Charger l'aperçu, puis Fusionner ; le doublon est supprimé de façon logique et la fusion est enregistrée.",
     "tour.s5.title": "Suivre les expirations de justificatifs",
-    "tour.s5.summary": "Voyez sur un calendrier quand expirent les pièces d'identité de chaque travailleur et accédez directement à la fiche qui demande de l'attention.",
+    "tour.s5.summary":
+      "Voyez sur un calendrier quand expirent les pièces d'identité de chaque travailleur et accédez directement à la fiche qui demande de l'attention.",
     "tour.s5.step.1": "Choisissez Échéances dans la navigation du haut.",
-    "tour.s5.step.2": "Un calendrier mensuel en lecture seule affiche chaque date d'expiration de pièce d'identité enregistrée pour les travailleurs comme un évènement sur la journée.",
-    "tour.s5.step.3": "Sélectionnez une entrée pour ouvrir la page de ce travailleur, où vous pouvez vérifier les documents et utiliser Modifier pour les mettre à jour.",
-    "tour.s5.step.4": "Si un avis indique « Affichage de … sur … travailleurs », le calendrier n'est qu'une fenêtre partielle ; utilisez la recherche Travailleurs pour trouver le reste.",
+    "tour.s5.step.2":
+      "Un calendrier mensuel en lecture seule affiche chaque date d'expiration de pièce d'identité enregistrée pour les travailleurs comme un évènement sur la journée.",
+    "tour.s5.step.3":
+      "Sélectionnez une entrée pour ouvrir la page de ce travailleur, où vous pouvez vérifier les documents et utiliser Modifier pour les mettre à jour.",
+    "tour.s5.step.4":
+      "Si un avis indique « Affichage de … sur … travailleurs », le calendrier n'est qu'une fenêtre partielle ; utilisez la recherche Travailleurs pour trouver le reste.",
     "tour.s6.title": "Audit, confidentialité et liens",
-    "tour.s6.summary": "Depuis la page de n'importe quel employé, vous pouvez voir qui a modifié la fiche, l'afficher avec les champs sensibles masqués, l'exporter et la relier à des fiches d'autres services.",
+    "tour.s6.summary":
+      "Depuis la page de n'importe quel employé, vous pouvez voir qui a modifié la fiche, l'afficher avec les champs sensibles masqués, l'exporter et la relier à des fiches d'autres services.",
     "tour.s6.step.1": "Ouvrez un travailleur depuis la liste Travailleurs.",
-    "tour.s6.step.2": "Sélectionnez Audit pour ouvrir le Journal d'audit : chaque modification de la fiche, son auteur et son contenu. Retour au travailleur vous ramène.",
-    "tour.s6.step.3": "Utilisez Afficher masqué pour voir la fiche avec certains champs occultés (Afficher complet revient en arrière) et Exporter les données (RGPD) pour télécharger les données du travailleur en fichier JSON.",
-    "tour.s6.step.4": "Dans Liens inter-services, choisissez le type Même identité (→ personne) ou Employé par (→ organisation), saisissez une référence cible et, en option, un rôle, une confiance et des dates de validité, puis sélectionnez Déclarer le lien. Retirer le supprime.",
+    "tour.s6.step.2":
+      "Sélectionnez Audit pour ouvrir le Journal d'audit : chaque modification de la fiche, son auteur et son contenu. Retour au travailleur vous ramène.",
+    "tour.s6.step.3":
+      "Utilisez Afficher masqué pour voir la fiche avec certains champs occultés (Afficher complet revient en arrière) et Exporter les données (RGPD) pour télécharger les données du travailleur en fichier JSON.",
+    "tour.s6.step.4":
+      "Dans Liens inter-services, choisissez le type Même identité (→ personne) ou Employé par (→ organisation), saisissez une référence cible et, en option, un rôle, une confiance et des dates de validité, puis sélectionnez Déclarer le lien. Retirer le supprime.",
     "signin.sso": "Se connecter avec SSO",
   },
   "hi-001": {
@@ -2559,7 +2779,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -2609,48 +2830,78 @@ const STRINGS = {
     "tour.open": "यह स्क्रीन खोलें",
     "tour.top": "ऊपर लौटें",
     "tour.start.title": "शुरू करने से पहले",
-    "tour.start.summary": "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
-    "tour.start.step.1": "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
-    "tour.start.step.2": "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
-    "tour.start.step.3": "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
-    "tour.start.step.4": "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
-    "tour.intro": "कर्मचारी रजिस्ट्री का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, कर्मचारी को दर्ज करने से लेकर डुप्लिकेट की समीक्षा और दस्तावेज़ों की समाप्ति पर नज़र रखने तक।",
+    "tour.start.summary":
+      "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
+    "tour.start.step.1":
+      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.2":
+      "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
+    "tour.start.step.3":
+      "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
+    "tour.start.step.4":
+      "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
+    "tour.intro":
+      "कर्मचारी रजिस्ट्री का निर्देशित परिचय: हर स्क्रीन क्या करती है और उसे इस्तेमाल करने के चरण, कर्मचारी को दर्ज करने से लेकर डुप्लिकेट की समीक्षा और दस्तावेज़ों की समाप्ति पर नज़र रखने तक।",
     "tour.s1.title": "कर्मचारी को दर्ज करना",
-    "tour.s1.summary": "संरचित नाम, जन्म तिथि, लिंग और कर ID के साथ रिकॉर्ड बनाएँ। कुछ भी सहेजने से पहले गलतियाँ बता दी जाती हैं और संभावित डुप्लिकेट तुरंत पकड़े जाते हैं।",
+    "tour.s1.summary":
+      "संरचित नाम, जन्म तिथि, लिंग और कर ID के साथ रिकॉर्ड बनाएँ। कुछ भी सहेजने से पहले गलतियाँ बता दी जाती हैं और संभावित डुप्लिकेट तुरंत पकड़े जाते हैं।",
     "tour.s1.step.1": "साइन इन करें, फिर ऊपरी नेविगेशन में नया कर्मचारी चुनें।",
-    "tour.s1.step.2": "कुलनाम और नाम (स्पेस से अलग) दर्ज करें, फिर चाहें तो जन्म तिथि, लिंग और कर ID भी भरें।",
-    "tour.s1.step.3": "बनाएँ चुनें। कोई नाम छूटा हो या जन्म तिथि भविष्य की हो तो फ़ील्ड के पास बताया जाता है, और सुधारने तक कुछ भी सहेजा नहीं जाता।",
-    "tour.s1.step.4": "यदि रजिस्ट्री को संभावित डुप्लिकेट मिलते हैं, तो वह उन्हें संभावित डुप्लिकेट के तहत दिखाती है; दोबारा भेजने से पहले उन्हें देखें। सफल होने पर आप नए कर्मचारी के पेज पर पहुँचते हैं।",
+    "tour.s1.step.2":
+      "कुलनाम और नाम (स्पेस से अलग) दर्ज करें, फिर चाहें तो जन्म तिथि, लिंग और कर ID भी भरें।",
+    "tour.s1.step.3":
+      "बनाएँ चुनें। कोई नाम छूटा हो या जन्म तिथि भविष्य की हो तो फ़ील्ड के पास बताया जाता है, और सुधारने तक कुछ भी सहेजा नहीं जाता।",
+    "tour.s1.step.4":
+      "यदि रजिस्ट्री को संभावित डुप्लिकेट मिलते हैं, तो वह उन्हें संभावित डुप्लिकेट के तहत दिखाती है; दोबारा भेजने से पहले उन्हें देखें। सफल होने पर आप नए कर्मचारी के पेज पर पहुँचते हैं।",
     "tour.s2.title": "कर्मचारी खोजना",
-    "tour.s2.summary": "नाम या पहचानकर्ता से रजिस्ट्री खोजें, टाइपो और वर्तनी के अंतर को नज़रअंदाज़ करें, और किसी भी रिकॉर्ड को खोलकर उस कर्मचारी की सारी जानकारी देखें।",
+    "tour.s2.summary":
+      "नाम या पहचानकर्ता से रजिस्ट्री खोजें, टाइपो और वर्तनी के अंतर को नज़रअंदाज़ करें, और किसी भी रिकॉर्ड को खोलकर उस कर्मचारी की सारी जानकारी देखें।",
     "tour.s2.step.1": "सूची खोलने के लिए ऊपरी नेविगेशन में कर्मचारी चुनें।",
     "tour.s2.step.2": "खोज बॉक्स में नाम या पहचानकर्ता लिखें और खोज चुनें।",
-    "tour.s2.step.3": "टाइपो सहने के लिए अस्पष्ट चालू करें, या एक जैसे सुनाई देने वाले नामों के लिए ध्वन्यात्मक (Soundex); परिणामों की संख्या सूची के ऊपर दिखती है।",
-    "tour.s2.step.4": "किसी पंक्ति को खोलकर कर्मचारी का पेज देखें: पहचान, पहचानकर्ता, पते, दूरसंचार और आपातकालीन संपर्क। संपादित करें रिकॉर्ड बदलता है; हटाएँ पुष्टि के बाद उसे सॉफ़्ट-डिलीट करता है।",
+    "tour.s2.step.3":
+      "टाइपो सहने के लिए अस्पष्ट चालू करें, या एक जैसे सुनाई देने वाले नामों के लिए ध्वन्यात्मक (Soundex); परिणामों की संख्या सूची के ऊपर दिखती है।",
+    "tour.s2.step.4":
+      "किसी पंक्ति को खोलकर कर्मचारी का पेज देखें: पहचान, पहचानकर्ता, पते, दूरसंचार और आपातकालीन संपर्क। संपादित करें रिकॉर्ड बदलता है; हटाएँ पुष्टि के बाद उसे सॉफ़्ट-डिलीट करता है।",
     "tour.s3.title": "मिलान जाँचना",
-    "tour.s3.summary": "किसी को दर्ज करने से पहले उम्मीदवार की तुलना रजिस्ट्री से करें और अंकित परिणाम पाएँ जो खुद अपना कारण बताते हैं।",
+    "tour.s3.summary":
+      "किसी को दर्ज करने से पहले उम्मीदवार की तुलना रजिस्ट्री से करें और अंकित परिणाम पाएँ जो खुद अपना कारण बताते हैं।",
     "tour.s3.step.1": "ऊपरी नेविगेशन में मिलान जाँच चुनें।",
-    "tour.s3.step.2": "जो जानते हैं वह भरें: कुलनाम, नाम (स्पेस से अलग), जन्म तिथि, लिंग और कर ID।",
-    "tour.s3.step.3": "सीमा 0.0 से 1.0 के बीच तय करें (ऊँचा मान केवल मज़बूत मिलान रखता है), फिर मिलान खोज चुनें।",
-    "tour.s3.step.4": "मिलान परिणाम पढ़ें: हर उम्मीदवार का स्कोर और गुणवत्ता दिखती है, और स्कोर विवरण बताता है कि हर फ़ील्ड का कितना योगदान रहा।",
+    "tour.s3.step.2":
+      "जो जानते हैं वह भरें: कुलनाम, नाम (स्पेस से अलग), जन्म तिथि, लिंग और कर ID।",
+    "tour.s3.step.3":
+      "सीमा 0.0 से 1.0 के बीच तय करें (ऊँचा मान केवल मज़बूत मिलान रखता है), फिर मिलान खोज चुनें।",
+    "tour.s3.step.4":
+      "मिलान परिणाम पढ़ें: हर उम्मीदवार का स्कोर और गुणवत्ता दिखती है, और स्कोर विवरण बताता है कि हर फ़ील्ड का कितना योगदान रहा।",
     "tour.s4.title": "डुप्लिकेट की समीक्षा और मर्ज",
-    "tour.s4.summary": "संदिग्ध डुप्लिकेट जोड़ियों को देखें, सबूत सामने रखकर हर एक पर फ़ैसला करें, फिर पुष्ट डुप्लिकेट को एक शेष रिकॉर्ड में मिलाएँ।",
-    "tour.s4.step.1": "समीक्षा चुनें और संदिग्ध डुप्लिकेट जोड़ियों के लिए रजिस्ट्री जाँचने हेतु स्कैन चलाएं चुनें। कतार सीमित करने के लिए स्थिति फ़िल्टर इस्तेमाल करें।",
-    "tour.s4.step.2": "बोर्ड (लंबित, पुष्ट, अस्वीकृत, स्वतः विलय) या कतार तालिका देखें, फिर तुलना करें चुनकर दोनों रिकॉर्ड स्कोर विवरण सहित आमने-सामने देखें।",
-    "tour.s4.step.3": "डुप्लिकेट की पुष्टि करें या अस्वीकार करें चुनें (लंबित कार्ड को खींचने से भी निर्णय दर्ज होता है)। केवल लंबित आइटम पर निर्णय हो सकता है, और पुष्टि मर्ज किए बिना केवल फ़ैसला दर्ज करती है।",
-    "tour.s4.step.4": "पुष्ट जोड़ी के लिए A रखें, B को उसमें मिलाएँ (या B रखें, A को उसमें मिलाएँ) चुनें ताकि दोनों आईडी भरे हुए मर्ज पेज खुले। कारण जोड़ें, पूर्वावलोकन लोड करें, फिर मर्ज करें; डुप्लिकेट सॉफ़्ट-डिलीट होता है और मर्ज दर्ज किया जाता है।",
+    "tour.s4.summary":
+      "संदिग्ध डुप्लिकेट जोड़ियों को देखें, सबूत सामने रखकर हर एक पर फ़ैसला करें, फिर पुष्ट डुप्लिकेट को एक शेष रिकॉर्ड में मिलाएँ।",
+    "tour.s4.step.1":
+      "समीक्षा चुनें और संदिग्ध डुप्लिकेट जोड़ियों के लिए रजिस्ट्री जाँचने हेतु स्कैन चलाएं चुनें। कतार सीमित करने के लिए स्थिति फ़िल्टर इस्तेमाल करें।",
+    "tour.s4.step.2":
+      "बोर्ड (लंबित, पुष्ट, अस्वीकृत, स्वतः विलय) या कतार तालिका देखें, फिर तुलना करें चुनकर दोनों रिकॉर्ड स्कोर विवरण सहित आमने-सामने देखें।",
+    "tour.s4.step.3":
+      "डुप्लिकेट की पुष्टि करें या अस्वीकार करें चुनें (लंबित कार्ड को खींचने से भी निर्णय दर्ज होता है)। केवल लंबित आइटम पर निर्णय हो सकता है, और पुष्टि मर्ज किए बिना केवल फ़ैसला दर्ज करती है।",
+    "tour.s4.step.4":
+      "पुष्ट जोड़ी के लिए A रखें, B को उसमें मिलाएँ (या B रखें, A को उसमें मिलाएँ) चुनें ताकि दोनों आईडी भरे हुए मर्ज पेज खुले। कारण जोड़ें, पूर्वावलोकन लोड करें, फिर मर्ज करें; डुप्लिकेट सॉफ़्ट-डिलीट होता है और मर्ज दर्ज किया जाता है।",
     "tour.s5.title": "दस्तावेज़ों की समाप्ति पर नज़र",
-    "tour.s5.summary": "कैलेंडर पर देखें कि हर कर्मचारी के पहचान दस्तावेज़ कब समाप्त होते हैं, और सीधे उस रिकॉर्ड पर जाएँ जिस पर ध्यान चाहिए।",
+    "tour.s5.summary":
+      "कैलेंडर पर देखें कि हर कर्मचारी के पहचान दस्तावेज़ कब समाप्त होते हैं, और सीधे उस रिकॉर्ड पर जाएँ जिस पर ध्यान चाहिए।",
     "tour.s5.step.1": "ऊपरी नेविगेशन में समाप्ति चुनें।",
-    "tour.s5.step.2": "केवल-पठन मासिक कैलेंडर कर्मचारियों के लिए दर्ज हर पहचान दस्तावेज़ की समाप्ति तिथि को पूरे दिन की प्रविष्टि के रूप में दिखाता है।",
-    "tour.s5.step.3": "किसी प्रविष्टि को चुनकर उस कर्मचारी का पेज खोलें, जहाँ आप दस्तावेज़ देख सकते हैं और संपादित करें से उन्हें अपडेट कर सकते हैं।",
-    "tour.s5.step.4": "यदि सूचना में “… में से … तक कर्मचारी दिखाए जा रहे हैं” लिखा हो, तो कैलेंडर आंशिक है; बाकी के लिए कर्मचारी खोज इस्तेमाल करें।",
+    "tour.s5.step.2":
+      "केवल-पठन मासिक कैलेंडर कर्मचारियों के लिए दर्ज हर पहचान दस्तावेज़ की समाप्ति तिथि को पूरे दिन की प्रविष्टि के रूप में दिखाता है।",
+    "tour.s5.step.3":
+      "किसी प्रविष्टि को चुनकर उस कर्मचारी का पेज खोलें, जहाँ आप दस्तावेज़ देख सकते हैं और संपादित करें से उन्हें अपडेट कर सकते हैं।",
+    "tour.s5.step.4":
+      "यदि सूचना में “… में से … तक कर्मचारी दिखाए जा रहे हैं” लिखा हो, तो कैलेंडर आंशिक है; बाकी के लिए कर्मचारी खोज इस्तेमाल करें।",
     "tour.s6.title": "ऑडिट, गोपनीयता और लिंक",
-    "tour.s6.summary": "किसी भी कर्मचारी के पेज से आप देख सकते हैं कि रिकॉर्ड किसने बदला, संवेदनशील फ़ील्ड छिपाकर उसे देख सकते हैं, निर्यात कर सकते हैं और दूसरी सेवाओं के रिकॉर्ड से जोड़ सकते हैं।",
+    "tour.s6.summary":
+      "किसी भी कर्मचारी के पेज से आप देख सकते हैं कि रिकॉर्ड किसने बदला, संवेदनशील फ़ील्ड छिपाकर उसे देख सकते हैं, निर्यात कर सकते हैं और दूसरी सेवाओं के रिकॉर्ड से जोड़ सकते हैं।",
     "tour.s6.step.1": "कर्मचारी सूची से किसी कर्मचारी को खोलें।",
-    "tour.s6.step.2": "ऑडिट चुनकर ऑडिट लॉग खोलें: रिकॉर्ड में हर बदलाव, किसने किया और उसकी सामग्री। कर्मचारी पर वापस आपको लौटाता है।",
-    "tour.s6.step.3": "कुछ फ़ील्ड छिपाकर रिकॉर्ड देखने के लिए मास्क्ड दिखाएँ चुनें (पूर्ण दिखाएँ वापस लाता है), और कर्मचारी का डेटा JSON फ़ाइल के रूप में डाउनलोड करने के लिए डेटा निर्यात करें (GDPR) चुनें।",
-    "tour.s6.step.4": "अंतर-सेवा लिंक में लक्ष्य संदर्भ, वैकल्पिक भूमिका, विश्वास और वैधता तिथियों के साथ समान पहचान (→ व्यक्ति) या नियोक्ता (→ संगठन) प्रकार का लिंक घोषित करें। वापस लें उसे हटा देता है।",
+    "tour.s6.step.2":
+      "ऑडिट चुनकर ऑडिट लॉग खोलें: रिकॉर्ड में हर बदलाव, किसने किया और उसकी सामग्री। कर्मचारी पर वापस आपको लौटाता है।",
+    "tour.s6.step.3":
+      "कुछ फ़ील्ड छिपाकर रिकॉर्ड देखने के लिए मास्क्ड दिखाएँ चुनें (पूर्ण दिखाएँ वापस लाता है), और कर्मचारी का डेटा JSON फ़ाइल के रूप में डाउनलोड करने के लिए डेटा निर्यात करें (GDPR) चुनें।",
+    "tour.s6.step.4":
+      "अंतर-सेवा लिंक में लक्ष्य संदर्भ, वैकल्पिक भूमिका, विश्वास और वैधता तिथियों के साथ समान पहचान (→ व्यक्ति) या नियोक्ता (→ संगठन) प्रकार का लिंक घोषित करें। वापस लें उसे हटा देता है।",
     "signin.sso": "SSO से साइन इन करें",
   },
   "zh-cn": {
@@ -2913,7 +3164,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "splash.hero.title": "每位员工，一份可信记录",
@@ -2958,48 +3210,76 @@ const STRINGS = {
     "tour.open": "打开此页面",
     "tour.top": "返回顶部",
     "tour.start.title": "开始之前",
-    "tour.start.summary": "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
+    "tour.start.summary":
+      "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
     "tour.start.step.1": "点击右上角的“登录”，输入你的邮箱地址。",
-    "tour.start.step.2": "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
+    "tour.start.step.2":
+      "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
     "tour.start.step.3": "你会以已登录状态回到应用，无需记忆或重置任何内容。",
-    "tour.start.step.4": "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
-    "tour.intro": "员工登记库的图文导览：每个页面的作用和使用步骤，从登记员工到审核重复记录、跟踪证件到期。",
+    "tour.start.step.4":
+      "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
+    "tour.intro":
+      "员工登记库的图文导览：每个页面的作用和使用步骤，从登记员工到审核重复记录、跟踪证件到期。",
     "tour.s1.title": "登记一名员工",
-    "tour.s1.summary": "用结构化的姓名、出生日期、性别和税号创建记录。保存前会提示错误，疑似重复也会当场发现。",
+    "tour.s1.summary":
+      "用结构化的姓名、出生日期、性别和税号创建记录。保存前会提示错误，疑似重复也会当场发现。",
     "tour.s1.step.1": "登录后，在顶部导航中选择“新建员工”。",
-    "tour.s1.step.2": "填写“姓”和“名”（多个名用空格分隔），也可以填写出生日期、性别和税号。",
-    "tour.s1.step.3": "选择“创建”。缺少姓名或出生日期在未来时，字段旁会有提示，问题修正前不会保存任何内容。",
-    "tour.s1.step.4": "如果登记库发现疑似重复，会在“可能的重复项”下列出，重新提交前请先核对。成功后会进入新员工的页面。",
+    "tour.s1.step.2":
+      "填写“姓”和“名”（多个名用空格分隔），也可以填写出生日期、性别和税号。",
+    "tour.s1.step.3":
+      "选择“创建”。缺少姓名或出生日期在未来时，字段旁会有提示，问题修正前不会保存任何内容。",
+    "tour.s1.step.4":
+      "如果登记库发现疑似重复，会在“可能的重复项”下列出，重新提交前请先核对。成功后会进入新员工的页面。",
     "tour.s2.title": "查找员工",
-    "tour.s2.summary": "按姓名或标识符搜索登记库，容忍拼写错误和写法差异，并打开任意记录查看该员工的全部信息。",
+    "tour.s2.summary":
+      "按姓名或标识符搜索登记库，容忍拼写错误和写法差异，并打开任意记录查看该员工的全部信息。",
     "tour.s2.step.1": "在顶部导航中选择“员工”以打开列表。",
     "tour.s2.step.2": "在搜索框中输入姓名或标识符，然后选择“搜索”。",
-    "tour.s2.step.3": "开启“模糊”可容忍拼写错误，开启“语音 (Soundex)”可匹配发音相近的姓名；结果数量显示在列表上方。",
-    "tour.s2.step.4": "打开一行即可查看员工页面：身份、标识符、地址、通信方式和紧急联系人。“编辑”可修改记录；“删除”经确认后进行软删除。",
+    "tour.s2.step.3":
+      "开启“模糊”可容忍拼写错误，开启“语音 (Soundex)”可匹配发音相近的姓名；结果数量显示在列表上方。",
+    "tour.s2.step.4":
+      "打开一行即可查看员工页面：身份、标识符、地址、通信方式和紧急联系人。“编辑”可修改记录；“删除”经确认后进行软删除。",
     "tour.s3.title": "匹配检查",
-    "tour.s3.summary": "在登记任何人之前，先将候选人与登记库比对，得到带评分且自带解释的结果。",
+    "tour.s3.summary":
+      "在登记任何人之前，先将候选人与登记库比对，得到带评分且自带解释的结果。",
     "tour.s3.step.1": "在顶部导航中选择“匹配检查”。",
-    "tour.s3.step.2": "填写已知信息：姓、名（用空格分隔）、出生日期、性别和税号。",
-    "tour.s3.step.3": "将阈值设为 0.0 到 1.0 之间（值越高，只保留越强的匹配），然后选择“查找匹配”。",
-    "tour.s3.step.4": "查看匹配结果：每位候选人都显示评分和质量，“分数明细”则显示各字段的贡献。",
+    "tour.s3.step.2":
+      "填写已知信息：姓、名（用空格分隔）、出生日期、性别和税号。",
+    "tour.s3.step.3":
+      "将阈值设为 0.0 到 1.0 之间（值越高，只保留越强的匹配），然后选择“查找匹配”。",
+    "tour.s3.step.4":
+      "查看匹配结果：每位候选人都显示评分和质量，“分数明细”则显示各字段的贡献。",
     "tour.s4.title": "审核并合并重复记录",
-    "tour.s4.summary": "逐一处理疑似重复的记录对，对照证据做出决定，再把确认的重复合并为一条保留的记录。",
-    "tour.s4.step.1": "选择“审核”并点击“运行扫描”，在登记库中查找疑似重复的记录对。可用“状态”筛选器缩小队列范围。",
-    "tour.s4.step.2": "浏览看板（待处理、已确认、已拒绝、已自动合并）或队列，再选择“比较”，并排查看两条记录及其分数明细。",
-    "tour.s4.step.3": "选择“确认为重复”或“拒绝”（拖动待处理卡片同样会记录决定）。只有待处理项可以做决定，确认只记录结论而不合并。",
-    "tour.s4.step.4": "对已确认的记录对，选择“保留 A，将 B 合并入 A”（或“保留 B，将 A 合并入 B”），即可打开已填好两个 ID 的“合并”页。填写原因，加载预览，然后合并；重复记录会被软删除，合并也会被记录。",
+    "tour.s4.summary":
+      "逐一处理疑似重复的记录对，对照证据做出决定，再把确认的重复合并为一条保留的记录。",
+    "tour.s4.step.1":
+      "选择“审核”并点击“运行扫描”，在登记库中查找疑似重复的记录对。可用“状态”筛选器缩小队列范围。",
+    "tour.s4.step.2":
+      "浏览看板（待处理、已确认、已拒绝、已自动合并）或队列，再选择“比较”，并排查看两条记录及其分数明细。",
+    "tour.s4.step.3":
+      "选择“确认为重复”或“拒绝”（拖动待处理卡片同样会记录决定）。只有待处理项可以做决定，确认只记录结论而不合并。",
+    "tour.s4.step.4":
+      "对已确认的记录对，选择“保留 A，将 B 合并入 A”（或“保留 B，将 A 合并入 B”），即可打开已填好两个 ID 的“合并”页。填写原因，加载预览，然后合并；重复记录会被软删除，合并也会被记录。",
     "tour.s5.title": "跟踪证件到期",
-    "tour.s5.summary": "在日历上查看每位员工身份证件的到期时间，并直接跳转到需要处理的记录。",
+    "tour.s5.summary":
+      "在日历上查看每位员工身份证件的到期时间，并直接跳转到需要处理的记录。",
     "tour.s5.step.1": "在顶部导航中选择“到期”。",
-    "tour.s5.step.2": "只读的月历会把员工名下每个身份证件的到期日显示为全天条目。",
-    "tour.s5.step.3": "选择一个条目即可打开该员工的页面，在那里可以核对证件，并用“编辑”进行更新。",
-    "tour.s5.step.4": "如果出现“显示最多 … 名员工中的 … 名”的提示，说明日历只显示了一部分；请用“员工”搜索查找其余记录。",
+    "tour.s5.step.2":
+      "只读的月历会把员工名下每个身份证件的到期日显示为全天条目。",
+    "tour.s5.step.3":
+      "选择一个条目即可打开该员工的页面，在那里可以核对证件，并用“编辑”进行更新。",
+    "tour.s5.step.4":
+      "如果出现“显示最多 … 名员工中的 … 名”的提示，说明日历只显示了一部分；请用“员工”搜索查找其余记录。",
     "tour.s6.title": "审计、隐私与关联",
-    "tour.s6.summary": "在任意员工页面，你可以查看是谁修改了记录、以遮盖敏感字段的方式查看、导出记录，并把它关联到其他服务中的记录。",
+    "tour.s6.summary":
+      "在任意员工页面，你可以查看是谁修改了记录、以遮盖敏感字段的方式查看、导出记录，并把它关联到其他服务中的记录。",
     "tour.s6.step.1": "从“员工”列表中打开一名员工。",
-    "tour.s6.step.2": "选择“审计”打开审计日志：记录的每次修改、修改人及其内容。“返回员工”可回到原页面。",
-    "tour.s6.step.3": "使用“显示脱敏视图”查看隐去部分字段的记录（“显示完整视图”可切换回来），用“导出数据（GDPR）”将该员工的数据下载为 JSON 文件。",
-    "tour.s6.step.4": "在“跨服务关联”中，声明类型为“同一身份（→ 人员）”或“受雇于（→ 组织）”的关联，填写目标引用，以及可选的角色、置信度和有效期。“撤回”可将其移除。",
+    "tour.s6.step.2":
+      "选择“审计”打开审计日志：记录的每次修改、修改人及其内容。“返回员工”可回到原页面。",
+    "tour.s6.step.3":
+      "使用“显示脱敏视图”查看隐去部分字段的记录（“显示完整视图”可切换回来），用“导出数据（GDPR）”将该员工的数据下载为 JSON 文件。",
+    "tour.s6.step.4":
+      "在“跨服务关联”中，声明类型为“同一身份（→ 人员）”或“受雇于（→ 组织）”的关联，填写目标引用，以及可选的角色、置信度和有效期。“撤回”可将其移除。",
     "signin.sso": "使用 SSO 登录",
   },
 } as const;

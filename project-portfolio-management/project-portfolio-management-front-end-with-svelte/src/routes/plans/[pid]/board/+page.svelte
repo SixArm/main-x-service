@@ -18,8 +18,8 @@
     type Standup,
     type Task,
     type Velocity,
-  } from "$lib/api/ppm";
-  import { t } from "$lib/i18n.svelte";
+  } from "#lib/api/ppm.js";
+  import { t } from "#lib/i18n.svelte.js";
   const pid = page.params.pid ?? "";
   const ppm = PpmClient.withFetch();
 

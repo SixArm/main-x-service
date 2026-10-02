@@ -6,8 +6,8 @@
   upstream). Also the SLA register lives with support, not here.
 -->
 <script lang="ts">
-  import { consentByAccount, dpo } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
+  import { consentByAccount, dpo } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   type DpoView = Awaited<ReturnType<typeof dpo>>;
   type ByAccount = Awaited<ReturnType<typeof consentByAccount>>;

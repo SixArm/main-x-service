@@ -1,5 +1,5 @@
 <script lang="ts" module>
-    import type { StringKey } from '$lib/i18n.svelte';
+    import type { StringKey } from '#lib/i18n.svelte.js';
 
     /**
      * One toolbar action: a stable `key` emitted on click, an i18n
@@ -57,9 +57,9 @@
     //   label    — string, accessible name for the toolbar.
     //   class    — string, optional.
 
-    import Button from '$lib/components/Button/Button.svelte';
-    import Icon from '$lib/components/Icon/Icon.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import Button from '#lib/components/Button/Button.svelte';
+    import Icon from '#lib/components/Icon/Icon.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let {
         buttons = DEFAULT_BUTTONS,

@@ -9,8 +9,8 @@
   import { goto } from "$app/navigation";
   import { Calendar, Willow } from "@svar-ui/svelte-calendar";
   import type { CalendarInstanceApi } from "@svar-ui/svelte-calendar";
-  import { getWards, getWhiteboard } from "$lib/api/flow";
-  import type { BedCard } from "$lib/api/types";
+  import { getWards, getWhiteboard } from "#lib/api/flow.js";
+  import type { BedCard } from "#lib/api/types.js";
 
   type EddEntry = { stayPid: string; card: BedCard; ward: string };
 

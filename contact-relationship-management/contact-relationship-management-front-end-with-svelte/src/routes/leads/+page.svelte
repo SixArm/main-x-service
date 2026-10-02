@@ -5,9 +5,9 @@
     Willow as FilterTheme,
     createArrayFilter,
   } from "@svar-ui/svelte-filter";
-  import { getLead, listLeads } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
-  import type { Lead, ScoreBreakdown } from "$lib/api/crm";
+  import { getLead, listLeads } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
+  import type { Lead, ScoreBreakdown } from "#lib/api/crm.js";
 
   let leads = $state<Lead[] | null>(null);
   let selectedPid = $state<string | null>(null);

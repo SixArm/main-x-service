@@ -15,11 +15,11 @@
   There are no reader analytics, because the service records none.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
-  import * as cms from "$lib/api/cms";
-  import { duration, percent, when, workings } from "$lib/format";
-  import SitePicker from "$lib/components/SitePicker.svelte";
-  import type { Health, Throughput } from "$lib/api/cms";
+  import { t } from "#lib/i18n.svelte.js";
+  import * as cms from "#lib/api/cms.js";
+  import { duration, percent, when, workings } from "#lib/format.js";
+  import SitePicker from "#lib/components/SitePicker.svelte";
+  import type { Health, Throughput } from "#lib/api/cms.js";
 
   let site = $state<string | null>(null);
   let health = $state<Health | null>(null);

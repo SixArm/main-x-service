@@ -10,7 +10,7 @@ import type {
   MergeResponse,
   Course,
 } from "./types.js";
-import { API_BASE_URL } from "$lib/config.js";
+import { API_BASE_URL } from "#lib/config.js";
 
 /**
  * Query parameters for the full-text course search endpoint.

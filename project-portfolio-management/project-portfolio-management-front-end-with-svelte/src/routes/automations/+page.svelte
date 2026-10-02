@@ -17,7 +17,7 @@
     type AutomationRun,
     type ScheduledAction,
     type TriggerKind,
-  } from "$lib/api/capabilities";
+  } from "#lib/api/capabilities.js";
 
   const api = CapabilityClient.withFetch();
   let automations = $state<Automation[]>([]);

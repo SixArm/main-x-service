@@ -12,9 +12,9 @@
 -->
 <script lang="ts">
     import { onMount } from "svelte";
-    import { WorkerRepository } from "$lib/api/workers.js";
-    import type { AuditEntry } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import type { AuditEntry } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let healthStatus = $state<"ok" | "down" | "loading">("loading");
     let healthMessage = $state<string | null>(null);

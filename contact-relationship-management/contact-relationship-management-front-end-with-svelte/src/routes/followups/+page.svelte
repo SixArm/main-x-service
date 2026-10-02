@@ -5,8 +5,8 @@
 -->
 <script lang="ts">
   import { Calendar, Willow } from "@svar-ui/svelte-calendar";
-  import { followups, type Followup } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
+  import { followups, type Followup } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   let overdue = $state<Followup[] | null>(null);
   let upcoming = $state<Followup[]>([]);

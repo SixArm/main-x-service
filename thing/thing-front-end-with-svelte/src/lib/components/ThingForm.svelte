@@ -20,13 +20,13 @@
       read once to seed the form, not tracked reactively thereafter.
 -->
 <script lang="ts">
-    import type { Thing } from "$lib/api/types.js";
-    import { createForm } from "$lib/forms/form.svelte.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
+    import type { Thing } from "#lib/api/types.js";
+    import { createForm } from "#lib/forms/form.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
     import ThingIdentifierInput from "./ThingIdentifierInput.svelte";
     import { validateThing } from "./thing-validation.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let props: {
         initial: Thing;

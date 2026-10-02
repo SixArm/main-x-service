@@ -18,8 +18,8 @@
         Willow as FilterTheme,
         createArrayFilter,
     } from "@svar-ui/svelte-filter";
-    import type { Course } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import type { Course } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let {
         courses,

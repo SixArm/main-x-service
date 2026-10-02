@@ -27,9 +27,9 @@
 -->
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { CarePathwayRepository } from "$lib/api/care-pathways";
-  import { ApiError } from "$lib/api/client";
-  import { t } from "$lib/i18n.svelte";
+  import { CarePathwayRepository } from "#lib/api/care-pathways.js";
+  import { ApiError } from "#lib/api/client.js";
+  import { t } from "#lib/i18n.svelte.js";
   import {
     BULK_IMPORT_FORMATS,
     BULK_FORMATS,
@@ -41,8 +41,8 @@
     type BulkFormat,
     type BulkImportFormat,
     type MaskingProfile,
-  } from "$lib/bulk";
-  import type { BulkJobView } from "$lib/api/types";
+  } from "#lib/bulk.js";
+  import type { BulkJobView } from "#lib/api/types.js";
 
   const repo = CarePathwayRepository.withFetch();
 

@@ -17,12 +17,12 @@
 <script lang="ts">
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { WorkerRepository } from "$lib/api/workers.js";
-    import { ApiError } from "$lib/api/client.js";
-    import type { MergeResponse, Worker } from "$lib/api/types.js";
-    import { t, tf } from "$lib/i18n.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import { ApiError } from "#lib/api/client.js";
+    import type { MergeResponse, Worker } from "#lib/api/types.js";
+    import { t, tf } from "#lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
 

@@ -7,7 +7,7 @@
 // Returns an i18n KEY rather than a sentence, so the page renders the
 // message through `t()` in the selected locale.
 
-import type { StringKey } from "$lib/i18n.svelte";
+import type { StringKey } from "#lib/i18n.svelte.js";
 
 /**
  * Validate a merge request's pids before issuing the POST.

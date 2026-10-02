@@ -9,20 +9,20 @@
     - results / error / loading        — response and request status.
 -->
 <script lang="ts">
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import PostalAddressInput from "$lib/components/PostalAddressInput.svelte";
-    import GeoCoordinatesInput from "$lib/components/GeoCoordinatesInput.svelte";
-    import { PlaceRepository } from "$lib/api/places.js";
-    import { blankPostalAddress } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import PostalAddressInput from "#lib/components/PostalAddressInput.svelte";
+    import GeoCoordinatesInput from "#lib/components/GeoCoordinatesInput.svelte";
+    import { PlaceRepository } from "#lib/api/places.js";
+    import { blankPostalAddress } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
     import type {
         GeoCoordinates,
         MatchRequest,
         MatchResult,
         PostalAddress,
-    } from "$lib/api/types.js";
+    } from "#lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
 

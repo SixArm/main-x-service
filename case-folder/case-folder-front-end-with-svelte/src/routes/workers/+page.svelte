@@ -4,13 +4,13 @@
     // Render-only. Lists workers (mirrored from the central Worker
     // Service) with their role; each links to a per-worker activity page.
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
 </script>

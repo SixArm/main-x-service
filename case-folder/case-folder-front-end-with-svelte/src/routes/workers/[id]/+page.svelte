@@ -5,16 +5,16 @@
     // set of all their patients' folders) plus the worker's move log. The
     // `folderTable` snippet is reused for both tables to avoid duplication.
 
-    import type { Folder } from '$lib/store/types';
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import Separator from '$lib/components/Separator/Separator.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
-    import { t, tf, statusLabel } from '$lib/i18n.svelte';
+    import type { Folder } from '#lib/store/types.js';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import Separator from '#lib/components/Separator/Separator.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf, statusLabel } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
 

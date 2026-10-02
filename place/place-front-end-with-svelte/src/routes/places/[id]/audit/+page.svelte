@@ -10,9 +10,9 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
-    import { PlaceRepository } from "$lib/api/places.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import type { AuditEntry } from "$lib/api/types.js";
+    import { PlaceRepository } from "#lib/api/places.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import type { AuditEntry } from "#lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
     let entries = $state<AuditEntry[]>([]);

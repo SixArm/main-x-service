@@ -10,12 +10,12 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import CourseForm from "$lib/components/CourseForm.svelte";
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import { CourseRepository } from "$lib/api/courses.js";
-    import { ApiError } from "$lib/api/client.js";
-    import type { MatchResult, Course } from "$lib/api/types.js";
-    import { t, translate, i18n } from "$lib/i18n.svelte.js";
+    import CourseForm from "#lib/components/CourseForm.svelte";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import { CourseRepository } from "#lib/api/courses.js";
+    import { ApiError } from "#lib/api/client.js";
+    import type { MatchResult, Course } from "#lib/api/types.js";
+    import { t, translate, i18n } from "#lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);

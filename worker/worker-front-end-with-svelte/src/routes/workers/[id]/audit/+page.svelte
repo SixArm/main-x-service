@@ -14,9 +14,9 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
-    import { WorkerRepository } from "$lib/api/workers.js";
-    import type { AuditEntry } from "$lib/api/types.js";
-    import { t, tf } from "$lib/i18n.svelte.js";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import type { AuditEntry } from "#lib/api/types.js";
+    import { t, tf } from "#lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
     let entries = $state<AuditEntry[]>([]);

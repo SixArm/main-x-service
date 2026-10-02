@@ -1,6 +1,6 @@
 // Wrapper over ApiClient for the unified `/api/plans` endpoints.
 
-import { API_BASE_URL } from "$lib/config";
+import { API_BASE_URL } from "#lib/config.js";
 import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
 import type {

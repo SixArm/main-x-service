@@ -2,7 +2,7 @@
 // formatter. Paths mirror the service routes one-to-one — the
 // Playwright suite stubs these exact paths, so drift fails loudly.
 
-import { api } from "$lib/api/client";
+import { api } from "#lib/api/client.js";
 
 type FetchLike = { fetch?: typeof fetch };
 

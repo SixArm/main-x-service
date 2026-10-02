@@ -19,11 +19,11 @@
 -->
 <script lang="ts">
     import { untrack } from "svelte";
-    import { ALL_SCHEMES } from "$lib/api/types";
-    import type { IdentifierScheme, OrgIdentifier, Organization } from "$lib/api/types";
-    import { buildOrganization } from "$lib/api/build";
-    import { identifierFormatHint } from "$lib/identifier-format";
-    import { t } from "$lib/i18n.svelte";
+    import { ALL_SCHEMES } from "#lib/api/types.js";
+    import type { IdentifierScheme, OrgIdentifier, Organization } from "#lib/api/types.js";
+    import { buildOrganization } from "#lib/api/build.js";
+    import { identifierFormatHint } from "#lib/identifier-format.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let {
         initial,

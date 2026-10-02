@@ -5,9 +5,9 @@
   selected.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
-  import * as cms from "$lib/api/cms";
-  import type { Site } from "$lib/api/cms";
+  import { t } from "#lib/i18n.svelte.js";
+  import * as cms from "#lib/api/cms.js";
+  import type { Site } from "#lib/api/cms.js";
 
   let { site = $bindable(), sites = $bindable([]) }: { site: string | null; sites?: Site[] } =
     $props();

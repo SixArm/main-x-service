@@ -14,9 +14,9 @@
     Willow as FilterTheme,
     createArrayFilter,
   } from "@svar-ui/svelte-filter";
-  import { PlanRepository } from "$lib/api/plans";
-  import type { PlanRef } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import { PlanRepository } from "#lib/api/plans.js";
+  import type { PlanRef } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const repo = PlanRepository.withFetch();
 

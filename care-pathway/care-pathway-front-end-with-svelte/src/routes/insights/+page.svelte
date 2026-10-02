@@ -7,15 +7,15 @@
 -->
 <script lang="ts">
     import { onMount } from "svelte";
-    import { CarePathwayRepository } from "$lib/api/care-pathways";
+    import { CarePathwayRepository } from "#lib/api/care-pathways.js";
     import type {
         CoverageInsight,
         DirectoryInsight,
         LanguagesInsight,
         ProvidersInsight,
         VariantsInsight,
-    } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte";
+    } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CarePathwayRepository.withFetch();
 

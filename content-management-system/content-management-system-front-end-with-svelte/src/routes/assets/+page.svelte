@@ -11,11 +11,11 @@
   whether the tool already acted on it.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
-  import * as cms from "$lib/api/cms";
-  import { bytes } from "$lib/format";
-  import SitePicker from "$lib/components/SitePicker.svelte";
-  import type { Asset } from "$lib/api/cms";
+  import { t } from "#lib/i18n.svelte.js";
+  import * as cms from "#lib/api/cms.js";
+  import { bytes } from "#lib/format.js";
+  import SitePicker from "#lib/components/SitePicker.svelte";
+  import type { Asset } from "#lib/api/cms.js";
 
   let site = $state<string | null>(null);
   let assets = $state<Asset[]>([]);

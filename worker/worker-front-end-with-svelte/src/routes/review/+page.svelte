@@ -32,23 +32,23 @@
 <script lang="ts">
     import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
     import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-    import { WorkerRepository } from "$lib/api/workers";
-    import type { ReviewQueueOptions } from "$lib/api/workers";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import type { ReviewQueueOptions } from "#lib/api/workers.js";
     import type {
         Worker,
         ReviewDecision,
         ReviewQueueItem,
         ReviewStatus,
-    } from "$lib/api/types";
+    } from "#lib/api/types.js";
     import {
         REVIEW_LIMITS,
         REVIEW_STATUSES,
         breakdownRows,
         canDecide,
         mergeHref,
-    } from "$lib/review";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { StringKey } from "$lib/i18n.svelte";
+    } from "#lib/review.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { StringKey } from "#lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
 

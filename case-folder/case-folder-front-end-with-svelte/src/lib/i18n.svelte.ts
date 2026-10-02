@@ -20,7 +20,7 @@
 // change (its own `applyDir={false}`, since this store already reflects
 // `lang`/`dir` onto `<html>` — see `+layout.svelte`).
 
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 
 /**
  * Locales for which the UI is translated. To add one, extend this tuple
@@ -73,6 +73,7 @@ export const RTL_LOCALES = ['ar-001'] as const satisfies readonly Locale[];
  */
 export function isRtl(locale: string): boolean {
     const resolved = normaliseLocale(locale);
+
     return (
         resolved !== null &&
         (RTL_LOCALES as readonly string[]).includes(resolved)
@@ -566,7 +567,8 @@ const STRINGS = {
         'splash.trust.5.body':
             'REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.',
         'splash.trust.6.title': 'يتحدث لغتك',
-        'splash.trust.6.body': 'العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.',
+        'splash.trust.6.body':
+            'العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.',
         'splash.cta.title': 'هل أنت مستعد للبدء؟',
         'splash.cta.body':
             'سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.',
@@ -1187,7 +1189,8 @@ const STRINGS = {
         'splash.trust.5.body':
             'REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.',
         'splash.trust.6.title': 'Yn siarad eich iaith',
-        'splash.trust.6.body': 'Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.',
+        'splash.trust.6.body':
+            'Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.',
         'splash.cta.title': 'Barod i ddechrau?',
         'splash.cta.body':
             "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -1805,19 +1808,26 @@ const STRINGS = {
         'splash.features.title': 'Was Sie tun können',
         'splash.trust.title': 'Für Vertrauen gebaut',
         'splash.trust.1.title': 'Anmeldung ohne Passwort',
-        'splash.trust.1.body': 'Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.',
+        'splash.trust.1.body':
+            'Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.',
         'splash.trust.2.title': 'Attributbasierte Berechtigungen',
-        'splash.trust.2.body': 'Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.',
+        'splash.trust.2.body':
+            'Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.',
         'splash.trust.3.title': 'Manipulationssicheres Audit-Protokoll',
-        'splash.trust.3.body': 'Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.',
+        'splash.trust.3.body':
+            'Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.',
         'splash.trust.4.title': 'Datenschutzkontrollen',
-        'splash.trust.4.body': 'Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.',
+        'splash.trust.4.body':
+            'Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.',
         'splash.trust.5.title': 'Offene Standards',
-        'splash.trust.5.body': 'REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.',
+        'splash.trust.5.body':
+            'REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.',
         'splash.trust.6.title': 'Spricht Ihre Sprache',
-        'splash.trust.6.body': 'Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.',
+        'splash.trust.6.body':
+            'Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.',
         'splash.cta.title': 'Bereit für den Einstieg?',
-        'splash.cta.body': 'Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.',
+        'splash.cta.body':
+            'Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.',
         'nav.tour': 'Rundgang',
         'splash.hero.tour': 'Rundgang starten',
         'tour.head': 'Machen Sie den Rundgang',
@@ -1825,75 +1835,124 @@ const STRINGS = {
         'tour.open': 'Diese Ansicht öffnen',
         'tour.top': 'Nach oben',
         'tour.start.title': 'Bevor Sie beginnen',
-        'tour.start.summary': 'Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.',
-        'tour.start.step.1': 'Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.',
-        'tour.start.step.2': 'Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.',
-        'tour.start.step.3': 'Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.',
-        'tour.start.step.4': 'Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.',
+        'tour.start.summary':
+            'Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.',
+        'tour.start.step.1':
+            'Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.',
+        'tour.start.step.2':
+            'Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.',
+        'tour.start.step.3':
+            'Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.',
+        'tour.start.step.4':
+            'Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.',
         'signin.sso': 'Mit SSO anmelden',
         'splash.hero.title': 'Immer wissen, wo jede Akte ist',
-        'splash.hero.subtitle': 'Verfolgen Sie Papierakten mit Behandlungsnotizen nach NHS-Nummer über Gebäude, Räume und Aktenschränke hinweg, mit lückenlosem Prüfprotokoll jeder Bewegung.',
+        'splash.hero.subtitle':
+            'Verfolgen Sie Papierakten mit Behandlungsnotizen nach NHS-Nummer über Gebäude, Räume und Aktenschränke hinweg, mit lückenlosem Prüfprotokoll jeder Bewegung.',
         'splash.benefits.1.title': 'Jede Akte schnell finden',
-        'splash.benefits.1.body': 'Suchen Sie eine Papierakte nach NHS-Nummer und sehen Sie, wo sie sich gerade befindet.',
+        'splash.benefits.1.body':
+            'Suchen Sie eine Papierakte nach NHS-Nummer und sehen Sie, wo sie sich gerade befindet.',
         'splash.benefits.2.title': 'Weniger verlorene Akten',
-        'splash.benefits.2.body': 'Jede Bewegung wird erfasst, sodass eine Akte nie einfach irgendwo im Gebäude ist.',
+        'splash.benefits.2.body':
+            'Jede Bewegung wird erfasst, sodass eine Akte nie einfach irgendwo im Gebäude ist.',
         'splash.benefits.3.title': 'Weniger Suchzeit',
-        'splash.benefits.3.body': 'Pförtner und Klinikpersonal verwenden ihre Zeit auf Versorgung, nicht aufs Durchsuchen von Schränken.',
+        'splash.benefits.3.body':
+            'Pförtner und Klinikpersonal verwenden ihre Zeit auf Versorgung, nicht aufs Durchsuchen von Schränken.',
         'splash.benefits.4.title': 'Eine verlässliche Spur',
-        'splash.benefits.4.body': 'Ein vollständiger, datierter Verlauf zeigt, wer jede Akte wann und warum bewegt hat.',
+        'splash.benefits.4.body':
+            'Ein vollständiger, datierter Verlauf zeigt, wer jede Akte wann und warum bewegt hat.',
         'splash.benefits.5.title': 'Sichere Patientenidentität',
-        'splash.benefits.5.body': 'NHS-Nummern werden vor dem Speichern geprüft, sodass Tippfehler nie zu Datensätzen werden.',
+        'splash.benefits.5.body':
+            'NHS-Nummern werden vor dem Speichern geprüft, sodass Tippfehler nie zu Datensätzen werden.',
         'splash.benefits.6.title': 'Ein klarer Überblick über den Bestand',
-        'splash.benefits.6.body': 'Sehen Sie, wie voll jeder Aktenschrank ist und wie viele Akten unterwegs sind.',
+        'splash.benefits.6.body':
+            'Sehen Sie, wie voll jeder Aktenschrank ist und wie viele Akten unterwegs sind.',
         'splash.features.1.title': 'Aktenregister',
-        'splash.features.1.body': 'Durchsuchen Sie jede Akte nach Patient, Titel oder NHS-Nummer.',
+        'splash.features.1.body':
+            'Durchsuchen Sie jede Akte nach Patient, Titel oder NHS-Nummer.',
         'splash.features.2.title': 'Verschieben und scannen',
-        'splash.features.2.body': 'Erfassen Sie eine Bewegung in Sekunden durch Scannen oder Eingabe der NHS-Nummer.',
+        'splash.features.2.body':
+            'Erfassen Sie eine Bewegung in Sekunden durch Scannen oder Eingabe der NHS-Nummer.',
         'splash.features.3.title': 'Bände',
-        'splash.features.3.body': 'Fassen Sie die Akten eines Patienten zu einem Band zusammen und bewegen Sie sie gemeinsam.',
+        'splash.features.3.body':
+            'Fassen Sie die Akten eines Patienten zu einem Band zusammen und bewegen Sie sie gemeinsam.',
         'splash.features.4.title': 'Gebäude, Räume, Aktenschränke',
-        'splash.features.4.body': 'Bilden Sie die physische Hierarchie von jedem Gebäude bis zu seinen Aktenschränken ab.',
+        'splash.features.4.body':
+            'Bilden Sie die physische Hierarchie von jedem Gebäude bis zu seinen Aktenschränken ab.',
         'splash.features.5.title': 'Bewegungsverlauf',
-        'splash.features.5.body': 'Durchsuchen Sie das vollständige Prüfprotokoll jeder Aktenbewegung.',
+        'splash.features.5.body':
+            'Durchsuchen Sie das vollständige Prüfprotokoll jeder Aktenbewegung.',
         'splash.features.6.title': 'Warnungen und Berichte',
-        'splash.features.6.body': 'Prüfen Sie gebäudeübergreifende Warnungen, Schranknutzung und Kennzahlen.',
-        'tour.intro': 'Ein geführter Rundgang durch die Aktenverfolgung: was jede Ansicht leistet und wie Sie sie nutzen, vom Hinzufügen einer Akte bis zur Prüfung des Bewegungsprotokolls.',
+        'splash.features.6.body':
+            'Prüfen Sie gebäudeübergreifende Warnungen, Schranknutzung und Kennzahlen.',
+        'tour.intro':
+            'Ein geführter Rundgang durch die Aktenverfolgung: was jede Ansicht leistet und wie Sie sie nutzen, vom Hinzufügen einer Akte bis zur Prüfung des Bewegungsprotokolls.',
         'tour.s1.title': 'Eine Akte zum Register hinzufügen',
-        'tour.s1.summary': 'Jede Papierakte gehört zu einem Patienten und wird ab dem Moment des Hinzufügens verfolgt.',
-        'tour.s1.step.1': 'Öffnen Sie „Akten“ und wählen Sie „Akte hinzufügen“; geben Sie dann die 10-stellige NHS-Nummer des Patienten ein, die die Modulus-11-Prüfung bestehen muss.',
-        'tour.s1.step.2': 'Tippen Sie einen Aktentitel wie „Band 1“ oder „Kardiologie 2023“.',
-        'tour.s1.step.3': 'Füllen Sie für einen noch nicht registrierten Patienten auch Patientenname und Geburtsdatum aus; für einen bestehenden Patienten sind sie nicht nötig.',
-        'tour.s1.step.4': 'Wählen Sie den Ausgangsaktenschrank oder lassen Sie ihn leer, wenn die Akte unterwegs ist, und wählen Sie dann „Akte speichern“.',
+        'tour.s1.summary':
+            'Jede Papierakte gehört zu einem Patienten und wird ab dem Moment des Hinzufügens verfolgt.',
+        'tour.s1.step.1':
+            'Öffnen Sie „Akten“ und wählen Sie „Akte hinzufügen“; geben Sie dann die 10-stellige NHS-Nummer des Patienten ein, die die Modulus-11-Prüfung bestehen muss.',
+        'tour.s1.step.2':
+            'Tippen Sie einen Aktentitel wie „Band 1“ oder „Kardiologie 2023“.',
+        'tour.s1.step.3':
+            'Füllen Sie für einen noch nicht registrierten Patienten auch Patientenname und Geburtsdatum aus; für einen bestehenden Patienten sind sie nicht nötig.',
+        'tour.s1.step.4':
+            'Wählen Sie den Ausgangsaktenschrank oder lassen Sie ihn leer, wenn die Akte unterwegs ist, und wählen Sie dann „Akte speichern“.',
         'tour.s2.title': 'Eine Akte finden',
-        'tour.s2.summary': 'Das Aktenregister beantwortet „Wo ist diese Akte gerade?“ mit einem einzigen Suchfeld.',
-        'tour.s2.step.1': 'Öffnen Sie „Akten“ und tippen Sie eine NHS-Nummer, einen Patientennamen, Aktentitel oder Aktenschrank in „Akten durchsuchen“.',
-        'tour.s2.step.2': 'Lesen Sie je Zeile Schrank, Status (im Schrank oder im Transit) und „Zuletzt verschoben“.',
-        'tour.s2.step.3': 'Öffnen Sie eine Akte, um ihre Details und den Bewegungsverlauf zu sehen, oder den Patienten unter „Patienten“, um alle seine Akten zu sehen.',
-        'tour.s2.step.4': 'Wählen Sie „Diese Akte verschieben“, um direkt zur Erfassung einer Bewegung für sie zu gelangen.',
+        'tour.s2.summary':
+            'Das Aktenregister beantwortet „Wo ist diese Akte gerade?“ mit einem einzigen Suchfeld.',
+        'tour.s2.step.1':
+            'Öffnen Sie „Akten“ und tippen Sie eine NHS-Nummer, einen Patientennamen, Aktentitel oder Aktenschrank in „Akten durchsuchen“.',
+        'tour.s2.step.2':
+            'Lesen Sie je Zeile Schrank, Status (im Schrank oder im Transit) und „Zuletzt verschoben“.',
+        'tour.s2.step.3':
+            'Öffnen Sie eine Akte, um ihre Details und den Bewegungsverlauf zu sehen, oder den Patienten unter „Patienten“, um alle seine Akten zu sehen.',
+        'tour.s2.step.4':
+            'Wählen Sie „Diese Akte verschieben“, um direkt zur Erfassung einer Bewegung für sie zu gelangen.',
         'tour.s3.title': 'Eine Akte verschieben',
-        'tour.s3.summary': 'Jede Ablage wird erfasst, sodass der Standort einer Akte immer aktuell ist.',
-        'tour.s3.step.1': 'Öffnen Sie „Akte verschieben“, geben Sie die NHS-Nummer des Patienten ein und wählen Sie dann, welche seiner Akten Sie bewegen.',
-        'tour.s3.step.2': 'Wählen Sie den Zielaktenschrank oder „Im Transit (vom Pförtner getragen)“, wenn sie unterwegs ist.',
-        'tour.s3.step.3': 'Wählen Sie einen Mitarbeiter aus der Liste oder tippen Sie unter „Verschoben von“ einen Namen und ergänzen Sie einen Grund.',
-        'tour.s3.step.4': 'Wählen Sie „Bewegung erfassen“; die Seite bestätigt „Bewegung erfasst“, und die Bewegung geht ins Prüfprotokoll ein.',
+        'tour.s3.summary':
+            'Jede Ablage wird erfasst, sodass der Standort einer Akte immer aktuell ist.',
+        'tour.s3.step.1':
+            'Öffnen Sie „Akte verschieben“, geben Sie die NHS-Nummer des Patienten ein und wählen Sie dann, welche seiner Akten Sie bewegen.',
+        'tour.s3.step.2':
+            'Wählen Sie den Zielaktenschrank oder „Im Transit (vom Pförtner getragen)“, wenn sie unterwegs ist.',
+        'tour.s3.step.3':
+            'Wählen Sie einen Mitarbeiter aus der Liste oder tippen Sie unter „Verschoben von“ einen Namen und ergänzen Sie einen Grund.',
+        'tour.s3.step.4':
+            'Wählen Sie „Bewegung erfassen“; die Seite bestätigt „Bewegung erfasst“, und die Bewegung geht ins Prüfprotokoll ein.',
         'tour.s4.title': 'Eine Akte scannen',
-        'tour.s4.summary': 'Der schnelle Weg für die Aktenverwaltung: Ein Hardware-Scanner ist nicht nötig, ein Tastatur-Scanner funktioniert aber ebenfalls.',
-        'tour.s4.step.1': 'Öffnen Sie „Scannen“ und klicken Sie in das Feld „Scannen oder suchen“.',
-        'tour.s4.step.2': 'Scannen Sie einen Barcode oder tippen Sie eine NHS-Nummer oder eine Akten-ID.',
-        'tour.s4.step.3': 'Sehen Sie sich die Trefferliste an und öffnen Sie eine Akte, um ihre Details zu sehen.',
-        'tour.s4.step.4': 'Wählen Sie „Diese Akte verschieben“, um ihre Bewegung mit bereits gewählter Akte zu erfassen; gibt es keinen Treffer, meldet die Seite, dass keine Akte gefunden wurde.',
+        'tour.s4.summary':
+            'Der schnelle Weg für die Aktenverwaltung: Ein Hardware-Scanner ist nicht nötig, ein Tastatur-Scanner funktioniert aber ebenfalls.',
+        'tour.s4.step.1':
+            'Öffnen Sie „Scannen“ und klicken Sie in das Feld „Scannen oder suchen“.',
+        'tour.s4.step.2':
+            'Scannen Sie einen Barcode oder tippen Sie eine NHS-Nummer oder eine Akten-ID.',
+        'tour.s4.step.3':
+            'Sehen Sie sich die Trefferliste an und öffnen Sie eine Akte, um ihre Details zu sehen.',
+        'tour.s4.step.4':
+            'Wählen Sie „Diese Akte verschieben“, um ihre Bewegung mit bereits gewählter Akte zu erfassen; gibt es keinen Treffer, meldet die Seite, dass keine Akte gefunden wurde.',
         'tour.s5.title': 'Akten zu Bänden bündeln',
-        'tour.s5.summary': 'Ein Band ist ein bewegliches Bündel der Akten eines Patienten, sodass sie gemeinsam wandern.',
-        'tour.s5.step.1': 'Öffnen Sie „Bände“ und wählen Sie „Neuer Band“; geben Sie dann die NHS-Nummer des Patienten und einen Bandtitel ein; der Patient muss bereits eine Akte haben.',
-        'tour.s5.step.2': 'Öffnen Sie den Band und nutzen Sie „Akte hinzufügen“, um die Akten dieses Patienten darin zu bündeln.',
-        'tour.s5.step.3': 'Mit „Diesen Band verschieben“ verlegen Sie jede darin enthaltene Akte in einem Schritt in einen Zielaktenschrank.',
-        'tour.s5.step.4': 'Wählen Sie zurück unter „Bände“ „Etiketten drucken“, wählen Sie die Bände, legen Sie die Anzahl der Kopien fest und wählen Sie „Drucken“, um sie in die Warteschlange zu stellen.',
+        'tour.s5.summary':
+            'Ein Band ist ein bewegliches Bündel der Akten eines Patienten, sodass sie gemeinsam wandern.',
+        'tour.s5.step.1':
+            'Öffnen Sie „Bände“ und wählen Sie „Neuer Band“; geben Sie dann die NHS-Nummer des Patienten und einen Bandtitel ein; der Patient muss bereits eine Akte haben.',
+        'tour.s5.step.2':
+            'Öffnen Sie den Band und nutzen Sie „Akte hinzufügen“, um die Akten dieses Patienten darin zu bündeln.',
+        'tour.s5.step.3':
+            'Mit „Diesen Band verschieben“ verlegen Sie jede darin enthaltene Akte in einem Schritt in einen Zielaktenschrank.',
+        'tour.s5.step.4':
+            'Wählen Sie zurück unter „Bände“ „Etiketten drucken“, wählen Sie die Bände, legen Sie die Anzahl der Kopien fest und wählen Sie „Drucken“, um sie in die Warteschlange zu stellen.',
         'tour.s6.title': 'Verlauf, Warnungen und Berichte prüfen',
-        'tour.s6.summary': 'Jede Bewegung wird aufbewahrt, sodass Sie beantworten können, wer was wann und warum bewegt hat.',
-        'tour.s6.step.1': 'Öffnen Sie „Bewegungsverlauf“ und grenzen Sie ihn mit „Prüfprotokoll filtern“ nach Patient, NHS-Nummer, Aktenschrank oder Pförtner ein; die neuesten Bewegungen stehen zuerst.',
-        'tour.s6.step.2': 'Öffnen Sie eine Zeile, um das vollständige Bewegungsereignis, die betroffene Akte und die übrigen Akten des Patienten zu sehen.',
-        'tour.s6.step.3': 'Öffnen Sie „Warnungen“, um Geofence-Warnungen zu sehen: Bewegungen, deren Ursprungs- und Zielaktenschrank in verschiedenen Gebäuden stehen.',
-        'tour.s6.step.4': 'Öffnen Sie „Berichte“ für die Zahlen auf einen Blick, Schranknutzung, Akten im Transit und Aktivität nach Mitarbeiter, alles live abgeleitet.',
+        'tour.s6.summary':
+            'Jede Bewegung wird aufbewahrt, sodass Sie beantworten können, wer was wann und warum bewegt hat.',
+        'tour.s6.step.1':
+            'Öffnen Sie „Bewegungsverlauf“ und grenzen Sie ihn mit „Prüfprotokoll filtern“ nach Patient, NHS-Nummer, Aktenschrank oder Pförtner ein; die neuesten Bewegungen stehen zuerst.',
+        'tour.s6.step.2':
+            'Öffnen Sie eine Zeile, um das vollständige Bewegungsereignis, die betroffene Akte und die übrigen Akten des Patienten zu sehen.',
+        'tour.s6.step.3':
+            'Öffnen Sie „Warnungen“, um Geofence-Warnungen zu sehen: Bewegungen, deren Ursprungs- und Zielaktenschrank in verschiedenen Gebäuden stehen.',
+        'tour.s6.step.4':
+            'Öffnen Sie „Berichte“ für die Zahlen auf einen Blick, Schranknutzung, Akten im Transit und Aktivität nach Mitarbeiter, alles live abgeleitet.',
     },
     'en-001': {
         // Brand / chrome
@@ -2419,7 +2478,8 @@ const STRINGS = {
         'splash.trust.5.body':
             'REST with OpenAPI, and HL7 FHIR where health systems need it.',
         'splash.trust.6.title': 'Speaks your language',
-        'splash.trust.6.body': 'Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.',
+        'splash.trust.6.body':
+            'Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.',
         'splash.cta.title': 'Ready to get started?',
         'splash.cta.body':
             'Sign in with a magic link sent to your email. No password needed.',
@@ -3058,7 +3118,8 @@ const STRINGS = {
         'splash.trust.5.body':
             'REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.',
         'splash.trust.6.title': 'Habla tu idioma',
-        'splash.trust.6.body': 'Alemán, árabe, chino, español, francés, galés, hindi e inglés.',
+        'splash.trust.6.body':
+            'Alemán, árabe, chino, español, francés, galés, hindi e inglés.',
         'splash.cta.title': '¿Listo para empezar?',
         'splash.cta.body':
             'Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.',
@@ -3695,7 +3756,8 @@ const STRINGS = {
         'splash.trust.5.body':
             'REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.',
         'splash.trust.6.title': 'Parle votre langue',
-        'splash.trust.6.body': 'Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.',
+        'splash.trust.6.body':
+            'Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.',
         'splash.cta.title': 'Prêt à commencer ?',
         'splash.cta.body':
             'Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.',
@@ -4314,7 +4376,8 @@ const STRINGS = {
         'splash.trust.5.body':
             'OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।',
         'splash.trust.6.title': 'आपकी भाषा में',
-        'splash.trust.6.body': 'अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।',
+        'splash.trust.6.body':
+            'अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।',
         'splash.cta.title': 'शुरू करने के लिए तैयार हैं?',
         'splash.cta.body':
             'अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।',
@@ -4902,7 +4965,8 @@ const STRINGS = {
         'splash.trust.5.body':
             'REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。',
         'splash.trust.6.title': '支持你的语言',
-        'splash.trust.6.body': '阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。',
+        'splash.trust.6.body':
+            '阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。',
         'splash.cta.title': '准备好开始了吗？',
         'splash.cta.body': '通过发送到邮箱的魔法链接登录，无需密码。',
         'splash.hero.title': '随时知道每份文件夹在哪里',

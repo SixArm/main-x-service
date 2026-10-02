@@ -22,11 +22,11 @@
 // debugging the service for a decision that was made here.
 
 import type { RequestHandler } from "./$types";
-import { CMS_API_URL } from "$lib/server/config";
-import { exchangeToken } from "$lib/server/auth";
-// The predicate lives in `$lib` because a SvelteKit endpoint may only
+import { CMS_API_URL } from "#lib/server/config.js";
+import { exchangeToken } from "#lib/server/auth.js";
+// The predicate lives in `#lib` because a SvelteKit endpoint may only
 // export HTTP verbs and a fixed set of config names.
-import { isPreviewTokenPath } from "$lib/proxy-paths";
+import { isPreviewTokenPath } from "#lib/proxy-paths.js";
 
 const REFUSAL = {
   error: "not_proxied",

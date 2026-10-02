@@ -6,7 +6,7 @@
   sections open the plan list.
 -->
 <script lang="ts">
-  import Tour from "$lib/components/Tour.svelte";
+  import Tour from "#lib/components/Tour.svelte";
 
   const sections = [
     { href: "/plans/new" },

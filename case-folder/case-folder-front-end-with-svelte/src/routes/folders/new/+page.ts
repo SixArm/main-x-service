@@ -3,8 +3,8 @@
 // Hydrates only cabinets (filtered server-side via `kind`) so the create
 // form can offer an initial-cabinet picker. 503 on failure.
 
-import { api } from '$lib/api/client';
-import { cache } from '$lib/store/cache.svelte';
+import { api } from '#lib/api/client.js';
+import { cache } from '#lib/store/cache.svelte.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch }) {

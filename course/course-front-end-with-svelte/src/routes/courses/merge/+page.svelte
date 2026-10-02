@@ -12,12 +12,12 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { CourseRepository } from "$lib/api/courses.js";
-    import { ApiError } from "$lib/api/client.js";
-    import type { MergeResponse, Course } from "$lib/api/types.js";
-    import { t, translate, i18n } from "$lib/i18n.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { CourseRepository } from "#lib/api/courses.js";
+    import { ApiError } from "#lib/api/client.js";
+    import type { MergeResponse, Course } from "#lib/api/types.js";
+    import { t, translate, i18n } from "#lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
 

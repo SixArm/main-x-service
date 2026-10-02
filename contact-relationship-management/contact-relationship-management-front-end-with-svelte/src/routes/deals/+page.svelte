@@ -1,9 +1,9 @@
 <script lang="ts">
   import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
   import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-  import { forecast, funnel, listDeals, listPipelines, money, moveDeal } from "$lib/api/crm";
-  import { i18n, t } from "$lib/i18n.svelte";
-  import type { Deal, Stage } from "$lib/api/crm";
+  import { forecast, funnel, listDeals, listPipelines, money, moveDeal } from "#lib/api/crm.js";
+  import { i18n, t } from "#lib/i18n.svelte.js";
+  import type { Deal, Stage } from "#lib/api/crm.js";
 
   let stages = $state<Stage[]>([]);
   let deals = $state<Deal[] | null>(null);

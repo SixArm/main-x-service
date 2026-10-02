@@ -10,12 +10,12 @@
     - error / loading — request status.
 -->
 <script lang="ts">
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { WorkerRepository } from "$lib/api/workers.js";
-    import type { Gender, MatchRequest, MatchResult } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import type { Gender, MatchRequest, MatchResult } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
 

@@ -3,10 +3,10 @@
     // and, on submit, POSTs the new pathway then navigates to its detail
     // page. No reactive state of its own; the form owns the field state.
     import { goto } from "$app/navigation";
-    import CarePathwayForm from "$lib/components/CarePathwayForm.svelte";
-    import { CarePathwayRepository } from "$lib/api/care-pathways";
-    import type { CarePathway } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte";
+    import CarePathwayForm from "#lib/components/CarePathwayForm.svelte";
+    import { CarePathwayRepository } from "#lib/api/care-pathways.js";
+    import type { CarePathway } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CarePathwayRepository.withFetch();
     // Empty seed: only `name` is required by the type.

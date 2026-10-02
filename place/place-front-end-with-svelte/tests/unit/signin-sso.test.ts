@@ -6,7 +6,11 @@ import { oidcLoginUrl } from "../../src/lib/server/auth";
 
 const mockEnv: { PUBLIC_OIDC_SIGNIN_ENABLED?: string } = {};
 
-vi.mock("$env/dynamic/public", () => ({ env: mockEnv }));
+vi.mock("$app/env/public", () => ({
+    get PUBLIC_OIDC_SIGNIN_ENABLED() {
+        return mockEnv.PUBLIC_OIDC_SIGNIN_ENABLED;
+    },
+}));
 
 describe("oidcLoginUrl", () => {
     it("points at the auth service's /api/auth/oidc/login with an encoded return_url", () => {

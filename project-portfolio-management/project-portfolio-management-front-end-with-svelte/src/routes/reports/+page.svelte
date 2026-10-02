@@ -4,10 +4,10 @@
   table, and the CSV download.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
-  import { PpmClient, type ReportDefinition, type ReportRun } from "$lib/api/ppm";
-  import { COLLECTIONS, type Collection } from "$lib/api/types";
+  import { PpmClient, type ReportDefinition, type ReportRun } from "#lib/api/ppm.js";
+  import { COLLECTIONS, type Collection } from "#lib/api/types.js";
 
   const ppm = PpmClient.withFetch();
   let reports = $state<ReportDefinition[]>([]);

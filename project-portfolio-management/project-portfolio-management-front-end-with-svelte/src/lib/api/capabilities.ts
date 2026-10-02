@@ -8,7 +8,7 @@
 // These views ship English-first, like the rest of the PPM catalogue;
 // extending the 13-locale catalogues to them is a documented follow-up.
 
-import { API_BASE_URL } from "$lib/config";
+import { API_BASE_URL } from "#lib/config.js";
 import { ApiClient, type Page, type PageRequest } from "./client";
 
 // ---- collaborative review ----

@@ -4,10 +4,10 @@
   stage (idea → proposal → work item).
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
-  import { PpmClient, type Idea } from "$lib/api/ppm";
-  import { COLLECTIONS, type Collection } from "$lib/api/types";
+  import { PpmClient, type Idea } from "#lib/api/ppm.js";
+  import { COLLECTIONS, type Collection } from "#lib/api/types.js";
 
   const ppm = PpmClient.withFetch();
   let ideas = $state<Idea[]>([]);

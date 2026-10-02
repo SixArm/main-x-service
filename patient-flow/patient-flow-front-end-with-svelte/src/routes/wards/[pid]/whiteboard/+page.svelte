@@ -1,5 +1,5 @@
 <script lang="ts">
-  import WardBoard from "$lib/components/WardBoard.svelte";
+  import WardBoard from "#lib/components/WardBoard.svelte";
 
   let { data } = $props();
 </script>

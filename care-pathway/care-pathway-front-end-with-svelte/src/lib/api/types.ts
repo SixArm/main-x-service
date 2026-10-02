@@ -348,7 +348,7 @@ export interface BulkJobView {
   entity: string;
   /** File format token (`jsonl` / `csv` / `tsv` / `ndjson`). */
   format: string;
-  /** Lifecycle status; see `BULK_JOB_STATUSES` in `$lib/bulk`. */
+  /** Lifecycle status; see `BULK_JOB_STATUSES` in `#lib/bulk.js`. */
   status: string;
   /** Total record rows, once the worker has counted them. */
   rows_total: number | null;

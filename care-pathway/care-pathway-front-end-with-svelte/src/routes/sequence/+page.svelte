@@ -10,9 +10,9 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { Gantt, Willow } from "@svar-ui/svelte-gantt";
-    import { CarePathwayRepository } from "$lib/api/care-pathways";
-    import type { CarePathway, PathwayRef } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte";
+    import { CarePathwayRepository } from "#lib/api/care-pathways.js";
+    import type { CarePathway, PathwayRef } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CarePathwayRepository.withFetch();
 

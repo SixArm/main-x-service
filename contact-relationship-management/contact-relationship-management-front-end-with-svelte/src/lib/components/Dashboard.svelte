@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { forecast, money, salesDashboard, slaDashboard } from "$lib/api/crm";
-  import { i18n, t } from "$lib/i18n.svelte";
+  import { forecast, money, salesDashboard, slaDashboard } from "#lib/api/crm.js";
+  import { i18n, t } from "#lib/i18n.svelte.js";
 
   let sales = $state<Awaited<ReturnType<typeof salesDashboard>> | null>(null);
   let sla = $state<Awaited<ReturnType<typeof slaDashboard>> | null>(null);

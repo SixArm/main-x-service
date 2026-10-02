@@ -14,7 +14,7 @@
 // drives the UI strings, `<html lang>`, and `<html dir>` (right-to-left
 // for `ar-001`).
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales for which the UI is translated, sorted alphabetically by code
@@ -69,6 +69,7 @@ export const RTL_LOCALES = ["ar-001"] as const satisfies readonly Locale[];
  */
 export function isRtl(locale: string): boolean {
   const resolved = normaliseLocale(locale);
+
   return (
     resolved !== null && (RTL_LOCALES as readonly string[]).includes(resolved)
   );
@@ -321,7 +322,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -691,7 +693,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -1050,19 +1053,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Weniger doppelte Pfade",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -1071,74 +1081,122 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "splash.hero.title": "Versorgungspfade, klar und konsistent",
-    "splash.hero.subtitle": "Verfassen Sie jeden klinischen Pfad einmal, erkennen Sie Duplikate, bevor sie sich ausbreiten, und verfolgen Sie die auf jedem Pfad eingeschriebenen Personen, mit integriertem, lückenlosem Audit-Protokoll.",
-    "splash.benefits.1.body": "Eine Duplikatprüfung meldet nahezu identische Pfade, bevor ein neuer gespeichert wird.",
+    "splash.hero.subtitle":
+      "Verfassen Sie jeden klinischen Pfad einmal, erkennen Sie Duplikate, bevor sie sich ausbreiten, und verfolgen Sie die auf jedem Pfad eingeschriebenen Personen, mit integriertem, lückenlosem Audit-Protokoll.",
+    "splash.benefits.1.body":
+      "Eine Duplikatprüfung meldet nahezu identische Pfade, bevor ein neuer gespeichert wird.",
     "splash.benefits.2.title": "Sehen, wer auf welchem Pfad ist",
-    "splash.benefits.2.body": "Einschreibungen zeigen Status und Dringlichkeit, sodass niemand aus dem Blick gerät.",
+    "splash.benefits.2.body":
+      "Einschreibungen zeigen Status und Dringlichkeit, sodass niemand aus dem Blick gerät.",
     "splash.benefits.3.title": "Verzögerungen früher erkennen",
-    "splash.benefits.3.body": "Die Zeitanalyse zeigt, wo Patientinnen und Patienten am längsten warten und welche Verläufe ins Stocken geraten sind.",
+    "splash.benefits.3.body":
+      "Die Zeitanalyse zeigt, wo Patientinnen und Patienten am längsten warten und welche Verläufe ins Stocken geraten sind.",
     "splash.benefits.4.title": "Ein saubereres Register",
-    "splash.benefits.4.body": "Bestätigen oder verwerfen Sie vermutete Duplikate in einer Prüfwarteschlange und führen Sie sie dann sicher zusammen.",
+    "splash.benefits.4.body":
+      "Bestätigen oder verwerfen Sie vermutete Duplikate in einer Prüfwarteschlange und führen Sie sie dann sicher zusammen.",
     "splash.benefits.5.title": "Einblick über Pfade hinweg",
-    "splash.benefits.5.body": "Schreibgeschützte Einblicke fassen das gesamte Register zusammen, von Erkrankungen bis zu Sprachen.",
+    "splash.benefits.5.body":
+      "Schreibgeschützte Einblicke fassen das gesamte Register zusammen, von Erkrankungen bis zu Sprachen.",
     "splash.benefits.6.title": "Massenweise laden",
-    "splash.benefits.6.body": "Importieren und exportieren Sie Pfade massenweise, mit herunterladbarem Bericht für jede fehlgeschlagene Zeile.",
+    "splash.benefits.6.body":
+      "Importieren und exportieren Sie Pfade massenweise, mit herunterladbarem Bericht für jede fehlgeschlagene Zeile.",
     "splash.features.1.title": "Strukturierte Pfaddatensätze",
-    "splash.features.1.body": "Name, Code, Anbieter, Versorgungssetting, Erkrankungscodes und Interventionen in einem Formular.",
+    "splash.features.1.body":
+      "Name, Code, Anbieter, Versorgungssetting, Erkrankungscodes und Interventionen in einem Formular.",
     "splash.features.2.title": "Duplikatprüfung und Zusammenführung",
-    "splash.features.2.body": "Gespeicherte Treffer werden mit Bewertungen aufgelistet, und ein Duplikat lässt sich in den Hauptdatensatz zusammenführen.",
+    "splash.features.2.body":
+      "Gespeicherte Treffer werden mit Bewertungen aufgelistet, und ein Duplikat lässt sich in den Hauptdatensatz zusammenführen.",
     "splash.features.3.title": "Instanzen-Board",
-    "splash.features.3.body": "Ziehen Sie jede Einschreibung auf einem Kanban-Board zwischen Statusspalten.",
+    "splash.features.3.body":
+      "Ziehen Sie jede Einschreibung auf einem Kanban-Board zwischen Statusspalten.",
     "splash.features.4.title": "Gantt-Zeitleisten",
-    "splash.features.4.body": "Sehen Sie Einschreibungszeiträume und die Abfolge der Interventionen entlang eines Pfads.",
+    "splash.features.4.body":
+      "Sehen Sie Einschreibungszeiträume und die Abfolge der Interventionen entlang eines Pfads.",
     "splash.features.5.title": "Zeitbasierte Analyse",
-    "splash.features.5.body": "Kohorten- und Verlaufsansichten messen die verstrichene Zeit entlang jedes Pfads.",
+    "splash.features.5.body":
+      "Kohorten- und Verlaufsansichten messen die verstrichene Zeit entlang jedes Pfads.",
     "splash.features.6.title": "Audit-Protokoll pro Pfad",
-    "splash.features.6.body": "Öffnen Sie einen beliebigen Pfad, um seinen vollständigen Änderungsverlauf zu sehen.",
-    "tour.intro": "Ein geführter Rundgang durch das Register der Versorgungspfade: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Pfads bis zur Messung, wie lange Patientinnen und Patienten darauf warten. Das Menü enthält außerdem die Ansichten „Einblicke“, „Gantt“ und „Abfolge“.",
+    "splash.features.6.body":
+      "Öffnen Sie einen beliebigen Pfad, um seinen vollständigen Änderungsverlauf zu sehen.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das Register der Versorgungspfade: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Pfads bis zur Messung, wie lange Patientinnen und Patienten darauf warten. Das Menü enthält außerdem die Ansichten „Einblicke“, „Gantt“ und „Abfolge“.",
     "tour.s1.title": "Einen Versorgungspfad erfassen",
-    "tour.s1.summary": "Legen Sie einen Pfaddatensatz mit Versorgungssetting, Anbieter, Erkrankungscodes, Interventionen und Kennungen an. Ein fehlender Name wird erkannt, bevor etwas gespeichert wird.",
+    "tour.s1.summary":
+      "Legen Sie einen Pfaddatensatz mit Versorgungssetting, Anbieter, Erkrankungscodes, Interventionen und Kennungen an. Ein fehlender Name wird erkannt, bevor etwas gespeichert wird.",
     "tour.s1.step.1": "Öffnen Sie im Menü „Neuer Versorgungspfad“.",
-    "tour.s1.step.2": "Füllen Sie den erforderlichen Namen aus, dann Versorgungssetting, Pfadcode, Anbieter-ID und Anbietername.",
-    "tour.s1.step.3": "Ergänzen Sie „Ziel-Erkrankungscodes“ und Bezeichner mit den Hinzufügen-Schaltflächen und tragen Sie Interventionen, Schlüsselwörter und Sprachen durch Kommas getrennt ein.",
-    "tour.s1.step.4": "Drücken Sie „Erstellen“. Ihr neuer Pfad öffnet sich, und das Formular meldet, falls der Dienst etwas zurückweist.",
+    "tour.s1.step.2":
+      "Füllen Sie den erforderlichen Namen aus, dann Versorgungssetting, Pfadcode, Anbieter-ID und Anbietername.",
+    "tour.s1.step.3":
+      "Ergänzen Sie „Ziel-Erkrankungscodes“ und Bezeichner mit den Hinzufügen-Schaltflächen und tragen Sie Interventionen, Schlüsselwörter und Sprachen durch Kommas getrennt ein.",
+    "tour.s1.step.4":
+      "Drücken Sie „Erstellen“. Ihr neuer Pfad öffnet sich, und das Formular meldet, falls der Dienst etwas zurückweist.",
     "tour.s2.title": "Pfade finden und lesen",
-    "tour.s2.summary": "Durchsuchen Sie das Register nach Namen, öffnen Sie einen Pfad, um seinen vollständigen Datensatz zu lesen, und sehen Sie, was sich zuletzt geändert hat.",
-    "tour.s2.step.1": "Melden Sie sich an und öffnen Sie „Pfade“, die Startseite; jeder registrierte Pfad ist dort aufgelistet.",
-    "tour.s2.step.2": "Tippen Sie einen Namensteil in das Suchfeld und drücken Sie „Suchen“; mit „Löschen“ kehren Sie zur vollständigen Liste zurück.",
-    "tour.s2.step.3": "Öffnen Sie einen Pfad, um Versorgungssetting, Anbieter, Erkrankungscodes, Interventionen, Schlüsselwörter, Sprachen und Bezeichner zu lesen.",
-    "tour.s2.step.4": "Wählen Sie in der Liste „Letzte Aktivität anzeigen“, um die neuesten Änderungen im gesamten Register zu sehen, oder bei einem Pfad „Bearbeiten“, um ihn zu korrigieren.",
+    "tour.s2.summary":
+      "Durchsuchen Sie das Register nach Namen, öffnen Sie einen Pfad, um seinen vollständigen Datensatz zu lesen, und sehen Sie, was sich zuletzt geändert hat.",
+    "tour.s2.step.1":
+      "Melden Sie sich an und öffnen Sie „Pfade“, die Startseite; jeder registrierte Pfad ist dort aufgelistet.",
+    "tour.s2.step.2":
+      "Tippen Sie einen Namensteil in das Suchfeld und drücken Sie „Suchen“; mit „Löschen“ kehren Sie zur vollständigen Liste zurück.",
+    "tour.s2.step.3":
+      "Öffnen Sie einen Pfad, um Versorgungssetting, Anbieter, Erkrankungscodes, Interventionen, Schlüsselwörter, Sprachen und Bezeichner zu lesen.",
+    "tour.s2.step.4":
+      "Wählen Sie in der Liste „Letzte Aktivität anzeigen“, um die neuesten Änderungen im gesamten Register zu sehen, oder bei einem Pfad „Bearbeiten“, um ihn zu korrigieren.",
     "tour.s3.title": "Duplikate prüfen, zusammenführen und nachverfolgen",
-    "tour.s3.summary": "Finden Sie Pfade, die dasselbe beschreiben, führen Sie einen in den anderen ein und behalten Sie einen vollständigen Verlauf jeder Änderung.",
-    "tour.s3.step.1": "Öffnen Sie den Pfad, den Sie behalten möchten, und wählen Sie „Duplikate prüfen“.",
-    "tour.s3.step.2": "Lesen Sie die Liste „Mögliche Duplikate“ oder den Hinweis, dass keines über der Abgleichsschwelle liegt.",
-    "tour.s3.step.3": "Wählen Sie bei einem echten Duplikat „In diesen Datensatz zusammenführen“, dann „Zusammenführung bestätigen“; „Abbrechen“ bricht ab, ohne etwas zu ändern.",
-    "tour.s3.step.4": "Wählen Sie bei einem beliebigen Pfad „Audit-Protokoll anzeigen“, um seinen vollständigen Änderungsverlauf zu sehen.",
+    "tour.s3.summary":
+      "Finden Sie Pfade, die dasselbe beschreiben, führen Sie einen in den anderen ein und behalten Sie einen vollständigen Verlauf jeder Änderung.",
+    "tour.s3.step.1":
+      "Öffnen Sie den Pfad, den Sie behalten möchten, und wählen Sie „Duplikate prüfen“.",
+    "tour.s3.step.2":
+      "Lesen Sie die Liste „Mögliche Duplikate“ oder den Hinweis, dass keines über der Abgleichsschwelle liegt.",
+    "tour.s3.step.3":
+      "Wählen Sie bei einem echten Duplikat „In diesen Datensatz zusammenführen“, dann „Zusammenführung bestätigen“; „Abbrechen“ bricht ab, ohne etwas zu ändern.",
+    "tour.s3.step.4":
+      "Wählen Sie bei einem beliebigen Pfad „Audit-Protokoll anzeigen“, um seinen vollständigen Änderungsverlauf zu sehen.",
     "tour.s4.title": "Einschreibungen auf dem Board verfolgen",
-    "tour.s4.summary": "Sehen Sie die auf einem Pfad eingeschriebenen Personen als Karten in Statusspalten, führen Sie sie durch ihren Lebenszyklus und zeichnen Sie jeden Verlauf von Hand auf.",
-    "tour.s4.step.1": "Öffnen Sie „Board“ und wählen Sie einen Pfad in der Auswahl; seine eingeschriebenen Instanzen erscheinen als Karten.",
-    "tour.s4.step.2": "Die Spalten sind „Active“, „On hold“, „Completed“ und „Discontinued“ (aktiv, pausiert, abgeschlossen, abgebrochen; diese Seite ist nur auf Englisch); ziehen Sie eine Karte in eine andere Spalte, um ihren Status zu ändern.",
-    "tour.s4.step.3": "Lehnt der Dienst eine Verschiebung als unzulässig ab, erscheint ein Fehler, und das Board lädt den gespeicherten Status neu.",
-    "tour.s4.step.4": "Wählen Sie unter dem Board bei „Record a segment“ eine Instanz und nutzen Sie „Start clock“ und „Stop clock“, oder füllen Sie „Stage“, „Category“ und „Started at“ aus, um einen Verlaufsabschnitt festzuhalten (dieses Feld ist nur auf Englisch).",
+    "tour.s4.summary":
+      "Sehen Sie die auf einem Pfad eingeschriebenen Personen als Karten in Statusspalten, führen Sie sie durch ihren Lebenszyklus und zeichnen Sie jeden Verlauf von Hand auf.",
+    "tour.s4.step.1":
+      "Öffnen Sie „Board“ und wählen Sie einen Pfad in der Auswahl; seine eingeschriebenen Instanzen erscheinen als Karten.",
+    "tour.s4.step.2":
+      "Die Spalten sind „Active“, „On hold“, „Completed“ und „Discontinued“ (aktiv, pausiert, abgeschlossen, abgebrochen; diese Seite ist nur auf Englisch); ziehen Sie eine Karte in eine andere Spalte, um ihren Status zu ändern.",
+    "tour.s4.step.3":
+      "Lehnt der Dienst eine Verschiebung als unzulässig ab, erscheint ein Fehler, und das Board lädt den gespeicherten Status neu.",
+    "tour.s4.step.4":
+      "Wählen Sie unter dem Board bei „Record a segment“ eine Instanz und nutzen Sie „Start clock“ und „Stop clock“, oder füllen Sie „Stage“, „Category“ und „Started at“ aus, um einen Verlaufsabschnitt festzuhalten (dieses Feld ist nur auf Englisch).",
     "tour.s5.title": "Zeit auf einem Pfad messen",
-    "tour.s5.summary": "Fragen Sie, wie viel der Kalenderzeit, die Patientinnen und Patienten auf einem Pfad verbringen, tatsächlich Versorgung ist und wohin der Rest geht.",
-    "tour.s5.step.1": "Öffnen Sie „Zeit“, wählen Sie einen Pfad und optional einen „Access standard“, an dem die Kohorte bewertet wird.",
-    "tour.s5.step.2": "Grenzen Sie die Kohorte mit den Filtern „Enthält“ und „Schließt aus“ ein, setzen Sie bei Bedarf „Mit dem Komplement vergleichen“ und drücken Sie „Filter anwenden“.",
-    "tour.s5.step.3": "Lesen Sie die Kohortenkacheln (wertschöpfende Zeit, Durchlaufzeit, Standardeinhaltung), die Prozesslandkarte, die Pfadvarianten und die stockenden Verläufe.",
-    "tour.s5.step.4": "Wählen Sie unter „One journey“ eine einzelne Einschreibung, um ihren wertschöpfenden Anteil, ihre Abdeckung, Durchlaufzeit, Übergaben und eine maßstabsgetreue Zeitleiste zu sehen.",
+    "tour.s5.summary":
+      "Fragen Sie, wie viel der Kalenderzeit, die Patientinnen und Patienten auf einem Pfad verbringen, tatsächlich Versorgung ist und wohin der Rest geht.",
+    "tour.s5.step.1":
+      "Öffnen Sie „Zeit“, wählen Sie einen Pfad und optional einen „Access standard“, an dem die Kohorte bewertet wird.",
+    "tour.s5.step.2":
+      "Grenzen Sie die Kohorte mit den Filtern „Enthält“ und „Schließt aus“ ein, setzen Sie bei Bedarf „Mit dem Komplement vergleichen“ und drücken Sie „Filter anwenden“.",
+    "tour.s5.step.3":
+      "Lesen Sie die Kohortenkacheln (wertschöpfende Zeit, Durchlaufzeit, Standardeinhaltung), die Prozesslandkarte, die Pfadvarianten und die stockenden Verläufe.",
+    "tour.s5.step.4":
+      "Wählen Sie unter „One journey“ eine einzelne Einschreibung, um ihren wertschöpfenden Anteil, ihre Abdeckung, Durchlaufzeit, Übergaben und eine maßstabsgetreue Zeitleiste zu sehen.",
     "tour.s6.title": "Massenimport, -export und Überprüfung",
-    "tour.s6.summary": "Laden Sie eine Datei mit Pfaden oder extrahieren Sie eine gefilterte Menge als Hintergrundauftrag und klären Sie dann Duplikatkandidaten, die ein Import in die Warteschlange gestellt hat.",
-    "tour.s6.step.1": "Öffnen Sie „Massen“ und wählen Sie unter „Importieren“ eine Datei (JSONL, CSV oder TSV) und das passende Format.",
-    "tour.s6.step.2": "Setzen Sie „Testlauf“, um ohne Speichern eine Vorschau zu erhalten, und drücken Sie „Import starten“; das Feld „Auftrag“ zeigt den Fortschritt und die erstellten, aktualisierten, zur Überprüfung vorgemerkten oder fehlerhaften Zeilen.",
-    "tour.s6.step.3": "Wählen Sie unter „Exportieren“ ein Format, die Maskierung („Maskiert (Standard)“; „Vollständig (unmaskiert)“ erfordert erhöhte Berechtigung), optional eine Suchanfrage und ein Limit und drücken Sie „Export starten“.",
-    "tour.s6.step.4": "Öffnen Sie „Prüfungen“ für die „Prüfwarteschlange für Duplikate“: Filtern Sie nach Status und wählen Sie bei jedem Paar „Duplikat bestätigen“ oder „Ablehnen“ (ein Paar, das jemand anderes schon entschieden hat, zeigt einen Hinweis).",
+    "tour.s6.summary":
+      "Laden Sie eine Datei mit Pfaden oder extrahieren Sie eine gefilterte Menge als Hintergrundauftrag und klären Sie dann Duplikatkandidaten, die ein Import in die Warteschlange gestellt hat.",
+    "tour.s6.step.1":
+      "Öffnen Sie „Massen“ und wählen Sie unter „Importieren“ eine Datei (JSONL, CSV oder TSV) und das passende Format.",
+    "tour.s6.step.2":
+      "Setzen Sie „Testlauf“, um ohne Speichern eine Vorschau zu erhalten, und drücken Sie „Import starten“; das Feld „Auftrag“ zeigt den Fortschritt und die erstellten, aktualisierten, zur Überprüfung vorgemerkten oder fehlerhaften Zeilen.",
+    "tour.s6.step.3":
+      "Wählen Sie unter „Exportieren“ ein Format, die Maskierung („Maskiert (Standard)“; „Vollständig (unmaskiert)“ erfordert erhöhte Berechtigung), optional eine Suchanfrage und ein Limit und drücken Sie „Export starten“.",
+    "tour.s6.step.4":
+      "Öffnen Sie „Prüfungen“ für die „Prüfwarteschlange für Duplikate“: Filtern Sie nach Status und wählen Sie bei jedem Paar „Duplikat bestätigen“ oder „Ablehnen“ (ein Paar, das jemand anderes schon entschieden hat, zeigt einen Hinweis).",
   },
   "en-001": {
     "nav.pathways": "Pathways",
@@ -1385,7 +1443,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -1755,7 +1814,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -2127,7 +2187,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -2497,7 +2558,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -2856,7 +2918,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "splash.hero.title": "清晰一致的护理路径",

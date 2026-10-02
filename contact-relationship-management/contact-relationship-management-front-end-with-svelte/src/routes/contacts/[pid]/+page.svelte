@@ -1,8 +1,8 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { eraseContact, getContact, money, recordConsent } from "$lib/api/crm";
-  import { i18n, t } from "$lib/i18n.svelte";
+  import { eraseContact, getContact, money, recordConsent } from "#lib/api/crm.js";
+  import { i18n, t } from "#lib/i18n.svelte.js";
 
   let detail = $state<Awaited<ReturnType<typeof getContact>> | null>(null);
   let error = $state<string | null>(null);

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/svelte';
 import { createRawSnippet } from 'svelte';
-import { cache } from '$lib/store/cache.svelte';
+import { cache } from '#lib/store/cache.svelte.js';
 import Layout from './+layout.svelte';
 
 // `$app/*` and the `lily-design-system-svelte-*` helpers are aliased to test stubs in vitest.config.ts (the

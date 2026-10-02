@@ -4,7 +4,7 @@
 // building boundary). Returned as page data rather than cached because
 // the alerts page is the only consumer. A failure becomes a 503.
 
-import { api } from '$lib/api/client';
+import { api } from '#lib/api/client.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch }) {

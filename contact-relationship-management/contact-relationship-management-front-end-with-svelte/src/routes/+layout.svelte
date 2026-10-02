@@ -1,18 +1,10 @@
-<!--
-  Root layout — the app shell wrapping every route.
-
-  Renders the top bar (hamburger-collapsed primary nav, brand, and an
-  always-visible end group holding Sign in / Sign out and the Lily
-  PickerBar: theme / locale / text size / share) and a <main> slot for the
-  active page. Pure shell: no data fetching here.
--->
 <script lang="ts">
   import "../app.css";
   import { page } from "$app/state";
-  import { browser } from "$app/environment";
+  import { browser } from '$app/env';
   import type { Snippet } from "svelte";
   import type { LayoutData } from "./$types";
-  import { i18n, isRtl, t, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte";
+  import { i18n, isRtl, t, LOCALES, LOCALE_LABELS } from "#lib/i18n.svelte.js";
   import PickerBar from "@lilydesignsystem/svelte-picker-bar";
   import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
@@ -98,6 +90,15 @@
   ] as const;
 </script>
 
+<!--
+  Root layout — the app shell wrapping every route.
+
+  Renders the top bar (hamburger-collapsed primary nav, brand, and an
+  always-visible end group holding Sign in / Sign out and the Lily
+  PickerBar: theme / locale / text size / share) and a <main> slot for the
+  active page. Pure shell: no data fetching here.
+-->
+
 <div class="layout">
   <header class="topbar">
     {#if signedIn}
@@ -107,10 +108,8 @@
         aria-expanded={menuOpen}
         aria-controls="primary-nav"
         aria-label={t("nav.toggle")}
-        onclick={() => (menuOpen = !menuOpen)}
-      >
-        <span class="hamburger-box" aria-hidden="true"></span>
-      </button>
+        onclick={() => menuOpen = !menuOpen}
+      ><span class="hamburger-box" aria-hidden="true"></span></button>
     {/if}
     <a href="/" class="brand"
       >{t("brand.name")}
@@ -124,10 +123,8 @@
               <a
                 href={item.href}
                 aria-current={page.url.pathname === item.href ? "page" : null}
-                onclick={() => (menuOpen = false)}
-              >
-                {t(item.key)}
-              </a>
+                onclick={() => menuOpen = false}
+              >{t(item.key)}</a>
             </li>
           {/each}
         </ul>

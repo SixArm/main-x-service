@@ -1,7 +1,7 @@
 // Pure helpers for T-28f (repo `tasks.md` EV-1): role-tailored navigation
 // and landing view, driven by a deployment-declared `view` ABAC attribute
 // (e.g. `view=executive`) read from `GET /api/auth/me`'s `attrs`
-// (`$lib/server/auth.ts`'s `currentUser`). Extracted from `+layout.svelte`
+// (`#lib/server/auth.ts`'s `currentUser`). Extracted from `+layout.svelte`
 // / the root `+page.svelte` so both are unit-testable without mounting a
 // component — mirroring `merge-validation.ts`'s pattern.
 //
@@ -100,7 +100,7 @@ export function landingRouteForView(
 
 /**
  * The deployment-declared `view` attribute's first value, from
- * `CurrentUser.attrs` (`$lib/server/auth.ts`). `attrs` absent/empty, or
+ * `CurrentUser.attrs` (`#lib/server/auth.ts`). `attrs` absent/empty, or
  * the `view` key absent/empty, both mean "no preference" (`null`).
  */
 export function viewAttr(

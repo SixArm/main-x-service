@@ -5,8 +5,8 @@
   dashboard's API reads for an anonymous visitor.
 -->
 <script lang="ts">
-    import Dashboard from '$lib/components/Dashboard.svelte';
-    import Splash from '$lib/components/Splash.svelte';
+    import Dashboard from '#lib/components/Dashboard.svelte';
+    import Splash from '#lib/components/Splash.svelte';
 
     let { data } = $props();
 </script>

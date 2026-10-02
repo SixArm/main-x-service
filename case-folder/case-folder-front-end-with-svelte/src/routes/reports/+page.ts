@@ -4,7 +4,7 @@
 // batch and returns them as page data (the reports page computes derived
 // metrics locally, so nothing is cached). 503 on failure.
 
-import { api } from '$lib/api/client';
+import { api } from '#lib/api/client.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch }) {

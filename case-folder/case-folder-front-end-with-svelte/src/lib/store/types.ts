@@ -1,7 +1,7 @@
 // Domain types for the Case Tracking.
 //
 // Shapes mirror the Loco JSON API (snake_case fields are converted to
-// camelCase by the API client in `$lib/api/client.ts`). The Loco API
+// camelCase by the API client in `#lib/api/client.ts`). The Loco API
 // is the source of truth — see `case-folder-service-with-rust/spec.md`
 // §11 for the wire contract.
 //

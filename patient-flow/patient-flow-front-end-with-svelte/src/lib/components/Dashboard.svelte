@@ -5,8 +5,8 @@
     - glance: AtAGlance — the at-a-glance payload loaded by the home route.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte.js";
-  import type { AtAGlance } from "$lib/api/types";
+  import { t } from "#lib/i18n.svelte.js";
+  import type { AtAGlance } from "#lib/api/types.js";
 
   let { glance }: { glance: AtAGlance } = $props();
   let wards = $derived(glance.wards);

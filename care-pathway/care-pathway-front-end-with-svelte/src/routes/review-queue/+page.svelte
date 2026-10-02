@@ -19,10 +19,10 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import { CarePathwayRepository } from "$lib/api/care-pathways";
-  import { ApiError } from "$lib/api/client";
-  import { t } from "$lib/i18n.svelte";
-  import type { ReviewQueueItem, ReviewQueueStatus } from "$lib/api/types";
+  import { CarePathwayRepository } from "#lib/api/care-pathways.js";
+  import { ApiError } from "#lib/api/client.js";
+  import { t } from "#lib/i18n.svelte.js";
+  import type { ReviewQueueItem, ReviewQueueStatus } from "#lib/api/types.js";
 
   const repo = CarePathwayRepository.withFetch();
 

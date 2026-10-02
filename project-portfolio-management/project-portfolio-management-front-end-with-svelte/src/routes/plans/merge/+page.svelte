@@ -23,11 +23,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { PlanRepository } from "$lib/api/plans";
-  import { ApiError } from "$lib/api/client";
-  import { validateMerge } from "$lib/components/merge-validation";
-  import type { MergeRecordRow, MergeResponse, Plan } from "$lib/api/types";
-  import { t, translate } from "$lib/i18n.svelte";
+  import { PlanRepository } from "#lib/api/plans.js";
+  import { ApiError } from "#lib/api/client.js";
+  import { validateMerge } from "#lib/components/merge-validation.js";
+  import type { MergeRecordRow, MergeResponse, Plan } from "#lib/api/types.js";
+  import { t, translate } from "#lib/i18n.svelte.js";
 
   const repo = PlanRepository.withFetch();
 

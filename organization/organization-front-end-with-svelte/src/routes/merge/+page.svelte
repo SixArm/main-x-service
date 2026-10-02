@@ -2,7 +2,7 @@
   Merge route (`/merge`) — fold one organization into another.
 
   Both pids may arrive pre-filled as `?main=…&duplicate=…` — the review
-  board (`/review`) deep-links a confirmed pair here via `$lib/review`'s
+  board (`/review`) deep-links a confirmed pair here via `#lib/review`'s
   `mergeHref`, in either survivor order, since a review item names an
   unordered pair and the service records no link between a confirmed
   item and a merge. Both fields stay fully editable afterwards.
@@ -28,15 +28,15 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import { OrganizationRepository } from "$lib/api/organizations";
-    import { ApiError } from "$lib/api/client";
-    import { validateMerge } from "$lib/components/merge-validation";
-    import { t, translate } from "$lib/i18n.svelte";
+    import { OrganizationRepository } from "#lib/api/organizations.js";
+    import { ApiError } from "#lib/api/client.js";
+    import { validateMerge } from "#lib/components/merge-validation.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
     import type {
         MergeRecordRow,
         MergeResponse,
         Organization,
-    } from "$lib/api/types";
+    } from "#lib/api/types.js";
 
     const repo = OrganizationRepository.withFetch();
 

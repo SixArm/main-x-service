@@ -14,9 +14,9 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import { EventRepository } from "$lib/api/events.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import type { Event, Location, Party } from "$lib/api/types.js";
+    import { EventRepository } from "#lib/api/events.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import type { Event, Location, Party } from "#lib/api/types.js";
 
     const repo = EventRepository.withFetch();
     let event = $state<Event | null>(null);

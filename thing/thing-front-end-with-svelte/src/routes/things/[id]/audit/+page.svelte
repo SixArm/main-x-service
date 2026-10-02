@@ -14,10 +14,10 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
-    import { ThingRepository } from "$lib/api/things.js";
-    import { describeApiError } from "$lib/api/errorHandling.js";
-    import type { AuditEntry } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import { ThingRepository } from "#lib/api/things.js";
+    import { describeApiError } from "#lib/api/errorHandling.js";
+    import type { AuditEntry } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
     let entries = $state<AuditEntry[]>([]);

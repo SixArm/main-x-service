@@ -19,16 +19,16 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import JourneyTimeline from "$lib/components/JourneyTimeline.svelte";
-  import ProcessMapView from "$lib/components/ProcessMapView.svelte";
-  import VariantsSunburst from "$lib/components/VariantsSunburst.svelte";
-  import VariantsSankey from "$lib/components/VariantsSankey.svelte";
-  import AttritionFlowchart from "$lib/components/AttritionFlowchart.svelte";
-  import CompareView from "$lib/components/CompareView.svelte";
-  import StalledList from "$lib/components/StalledList.svelte";
-  import DottedChart from "$lib/components/DottedChart.svelte";
-  import { CarePathwayRepository } from "$lib/api/care-pathways";
-  import type { PathwayRef, PathwayInstance } from "$lib/api/types";
+  import JourneyTimeline from "#lib/components/JourneyTimeline.svelte";
+  import ProcessMapView from "#lib/components/ProcessMapView.svelte";
+  import VariantsSunburst from "#lib/components/VariantsSunburst.svelte";
+  import VariantsSankey from "#lib/components/VariantsSankey.svelte";
+  import AttritionFlowchart from "#lib/components/AttritionFlowchart.svelte";
+  import CompareView from "#lib/components/CompareView.svelte";
+  import StalledList from "#lib/components/StalledList.svelte";
+  import DottedChart from "#lib/components/DottedChart.svelte";
+  import { CarePathwayRepository } from "#lib/api/care-pathways.js";
+  import type { PathwayRef, PathwayInstance } from "#lib/api/types.js";
   import {
     TbaRepository,
     confidenceNote,
@@ -48,8 +48,8 @@
     type Standards,
     type Timeline,
     type VariantsReport,
-  } from "$lib/api/tba";
-  import { t } from "$lib/i18n.svelte";
+  } from "#lib/api/tba.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const registry = CarePathwayRepository.withFetch();
   const tba = TbaRepository.withFetch();

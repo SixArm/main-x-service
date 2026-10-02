@@ -19,7 +19,7 @@
   not optional decoration — it is the relief the palette requires.
 -->
 <script lang="ts">
-  import type { FlowSample } from "$lib/api/tba";
+  import type { FlowSample } from "#lib/api/tba.js";
 
   interface Props {
     /** Daily samples, oldest first. */

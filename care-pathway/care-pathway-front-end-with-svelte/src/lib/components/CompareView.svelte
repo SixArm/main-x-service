@@ -8,10 +8,10 @@
   from the published unsplit total.
 -->
 <script lang="ts">
-  import type { Split, SplitSide } from "$lib/api/tba";
-  import { percent } from "$lib/api/tba";
-  import { withheldLabel } from "$lib/analytics-transforms";
-  import { t } from "$lib/i18n.svelte";
+  import type { Split, SplitSide } from "#lib/api/tba.js";
+  import { percent } from "#lib/api/tba.js";
+  import { withheldLabel } from "#lib/analytics-transforms.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   interface Props {
     split: Split;

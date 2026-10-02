@@ -11,9 +11,9 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
-    import { CourseRepository } from "$lib/api/courses.js";
-    import type { AuditEntry } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import { CourseRepository } from "#lib/api/courses.js";
+    import type { AuditEntry } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
     let entries = $state<AuditEntry[]>([]);

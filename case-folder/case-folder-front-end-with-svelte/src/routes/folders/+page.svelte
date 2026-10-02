@@ -11,15 +11,15 @@
     //   debounce — timer handle for the search input.
 
     import { goto } from '$app/navigation';
-    import { cache } from '$lib/store/cache.svelte';
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
-    import { t, statusLabel } from '$lib/i18n.svelte';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, statusLabel } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
 
@@ -41,7 +41,7 @@
             const target = next
                 ? `/folders?q=${encodeURIComponent(next)}`
                 : '/folders';
-            goto(target, { keepFocus: true, replaceState: true });
+            goto(target, { reset: false, replaceState: true });
         }, 200);
     }
 

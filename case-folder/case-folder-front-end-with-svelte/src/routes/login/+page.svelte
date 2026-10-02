@@ -15,17 +15,17 @@
     //                the confirmation message.
     //   magicLink  — dev-only direct link, when the API provides one.
 
-    import { api, ApiError } from '$lib/api/client';
+    import { api, ApiError } from '#lib/api/client.js';
 
-    import Alert from '$lib/components/Alert/Alert.svelte';
-    import Form from '$lib/components/Form/Form.svelte';
-    import Field from '$lib/components/Field/Field.svelte';
-    import Button from '$lib/components/Button/Button.svelte';
-    import { t } from '$lib/i18n.svelte';
-    import { env } from '$env/dynamic/public';
+    import Alert from '#lib/components/Alert/Alert.svelte';
+    import Form from '#lib/components/Form/Form.svelte';
+    import Field from '#lib/components/Field/Field.svelte';
+    import Button from '#lib/components/Button/Button.svelte';
+    import { t } from '#lib/i18n.svelte.js';
+    import { PUBLIC_OIDC_SIGNIN_ENABLED } from '$app/env/public';
 
     // Opt-in SSO link: a plain browser navigation, not a form/fetch.
-    const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === 'true';
+    const ssoEnabled = PUBLIC_OIDC_SIGNIN_ENABLED === 'true';
 
     let email = $state('');
     let emailError = $state('');

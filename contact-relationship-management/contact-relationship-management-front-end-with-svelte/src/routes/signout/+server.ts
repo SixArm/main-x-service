@@ -4,8 +4,8 @@
 
 import type { RequestHandler } from "./$types";
 import { redirect } from "@sveltejs/kit";
-import { signout } from "$lib/server/auth";
-import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "$lib/server/session";
+import { signout } from "#lib/server/auth.js";
+import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "#lib/server/session.js";
 
 export const POST: RequestHandler = async ({ locals, cookies, fetch }) => {
   if (locals.sessionId) {

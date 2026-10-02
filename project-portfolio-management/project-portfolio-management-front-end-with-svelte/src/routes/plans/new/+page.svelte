@@ -6,10 +6,10 @@
 -->
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import PlanForm from "$lib/components/PlanForm.svelte";
-  import { PlanRepository } from "$lib/api/plans";
-  import type { Plan } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import PlanForm from "#lib/components/PlanForm.svelte";
+  import { PlanRepository } from "#lib/api/plans.js";
+  import type { Plan } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const repo = PlanRepository.withFetch();
   const initial: Plan = { name: "" };

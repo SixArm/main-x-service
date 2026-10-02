@@ -4,8 +4,8 @@
 // (may be null if only known via folders), their folders, move history,
 // and whether the central Patient Service matched. 503 on failure.
 
-import { api } from '$lib/api/client';
-import { formatNhsNumber } from '$lib/store/nhs';
+import { api } from '#lib/api/client.js';
+import { formatNhsNumber } from '#lib/store/nhs.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch, params }) {

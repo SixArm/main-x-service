@@ -3,7 +3,7 @@
 // Fetches the worker roster (mirrored from the central Worker Service)
 // and returns it as page data for the list view. 503 on failure.
 
-import { api } from '$lib/api/client';
+import { api } from '#lib/api/client.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch }) {

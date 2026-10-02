@@ -1,6 +1,6 @@
 // Resource-bound wrapper over ApiClient for the organization endpoints.
 
-import { API_BASE_URL } from "$lib/config";
+import { API_BASE_URL } from "#lib/config.js";
 import { ApiClient } from "./client";
 import type { Page, PageRequest } from "./client";
 import type {
@@ -207,7 +207,7 @@ export class OrganizationRepository {
    *
    * Used by the `/review` comparison panel to obtain a **live** score
    * breakdown for a pending pair: the stored review-queue item never
-   * carries `score_breakdown` on the wire (see `$lib/review`'s doc
+   * carries `score_breakdown` on the wire (see `#lib/review`'s doc
    * comment), but this endpoint's `MatchResult.breakdown` does.
    *
    * @param query The organization to score against each candidate.

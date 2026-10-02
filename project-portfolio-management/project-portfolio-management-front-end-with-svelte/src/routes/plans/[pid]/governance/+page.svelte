@@ -6,7 +6,7 @@
   add-form. Every action maps 1:1 to a service endpoint.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import {
@@ -20,7 +20,7 @@
     type Milestone,
     type Objective,
     type Risk,
-  } from "$lib/api/ppm";
+  } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   const pid = $derived(page.params.pid ?? "");

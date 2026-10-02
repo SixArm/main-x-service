@@ -13,7 +13,7 @@
       Nth entry's copy is `tour.s{N}.*`. `href` is the app screen to open.
 -->
 <script lang="ts">
-  import { t, type StringKey } from "$lib/i18n.svelte.js";
+  import { t, type StringKey } from "#lib/i18n.svelte.js";
 
   let { sections }: { sections: { href: string }[] } = $props();
 

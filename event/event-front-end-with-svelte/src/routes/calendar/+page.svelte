@@ -9,9 +9,9 @@
     import { goto } from "$app/navigation";
     import { Calendar, Willow } from "@svar-ui/svelte-calendar";
     import type { CalendarInstanceApi } from "@svar-ui/svelte-calendar";
-    import { EventRepository } from "$lib/api/events";
-    import type { Event as DomainEvent } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte";
+    import { EventRepository } from "#lib/api/events.js";
+    import type { Event as DomainEvent } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = EventRepository.withFetch();
 

@@ -29,7 +29,7 @@
   so `canDecide` disables the buttons rather than offering a request that
   is guaranteed to answer 422.
 
-  KNOWN GAP vs. person's review screen (see `$lib/review`'s module doc):
+  KNOWN GAP vs. person's review screen (see `#lib/review`'s module doc):
   place-service's `ReviewQueueItem` carries neither `provenance` (no such
   column in `review_queue`) nor a wire-serialized `score_breakdown` (the
   column exists but is always written `NULL` and never serialized). The
@@ -41,23 +41,23 @@
 <script lang="ts">
     import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
     import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-    import { PlaceRepository } from "$lib/api/places";
-    import type { ReviewQueueOptions } from "$lib/api/places";
+    import { PlaceRepository } from "#lib/api/places.js";
+    import type { ReviewQueueOptions } from "#lib/api/places.js";
     import type {
         Place,
         ReviewDecision,
         ReviewQueueItem,
         ReviewStatus,
-    } from "$lib/api/types";
+    } from "#lib/api/types.js";
     import {
         REVIEW_LIMITS,
         REVIEW_STATUSES,
         breakdownRows,
         canDecide,
         mergeHref,
-    } from "$lib/review";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import type { StringKey } from "$lib/i18n.svelte";
+    } from "#lib/review.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import type { StringKey } from "#lib/i18n.svelte.js";
 
     const repo = PlaceRepository.withFetch();
 
@@ -302,7 +302,7 @@
             : [],
     );
 
-    // Always empty today — see the module doc + `$lib/review`'s KNOWN GAP
+    // Always empty today — see the module doc + `#lib/review`'s KNOWN GAP
     // note: place-service never serializes `score_breakdown` on the wire.
     // Kept wired (not hardcoded away) so the panel activates automatically
     // the day the service starts sending it.

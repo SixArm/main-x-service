@@ -2,8 +2,8 @@
   import "../app.css";
   import { page } from "$app/state";
   import { enhance } from "$app/forms";
-  import { browser } from "$app/environment";
-  import { i18n, isRtl, t, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte";
+  import { browser } from '$app/env';
+  import { i18n, isRtl, t, LOCALES, LOCALE_LABELS } from "#lib/i18n.svelte.js";
   import PickerBar from "@lilydesignsystem/svelte-picker-bar";
   import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
@@ -106,10 +106,8 @@
         aria-expanded={menuOpen}
         aria-controls="primary-nav"
         aria-label={t("nav.toggle")}
-        onclick={() => (menuOpen = !menuOpen)}
-      >
-        <span class="hamburger-box" aria-hidden="true"></span>
-      </button>
+        onclick={() => menuOpen = !menuOpen}
+      ><span class="hamburger-box" aria-hidden="true"></span></button>
     {/if}
     <a href="/" class="brand">{t("brand.name")}</a>
     {#if signedIn}
@@ -120,10 +118,8 @@
               <a
                 href={item.href}
                 aria-current={page.url.pathname === item.href ? "page" : null}
-                onclick={() => (menuOpen = false)}
-              >
-                {t(item.key)}
-              </a>
+                onclick={() => menuOpen = false}
+              >{t(item.key)}</a>
             </li>
           {/each}
         </ul>
@@ -240,88 +236,88 @@
     .primary-nav {
         /* Collapsed by default at every width; the hamburger toggle adds
            `.open` to reveal it as a dropdown panel below the top bar. */
-        display: none;
-        position: absolute;
-        top: 100%;
-        inset-inline-start: 1.5rem;
-        z-index: 20;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.5rem;
-        min-width: 12rem;
-        padding: 0.75rem;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    }
-    .primary-nav.open {
-        display: flex;
-    }
-    .primary-nav ul {
-        list-style: none;
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-        margin: 0;
-        padding: 0;
-    }
-    .primary-nav a {
-        display: block;
-        padding: 0.5rem 0.625rem;
-        border-radius: var(--radius);
-        color: var(--ink);
-    }
-    .primary-nav a:hover {
-        background: var(--bg);
-        text-decoration: none;
-    }
-    .primary-nav a[aria-current="page"] {
-        background: var(--accent);
-        color: var(--accent-fg);
-        font-weight: 600;
-    }
-    .header-end {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        margin-inline-start: auto;
-    }
-    .header-end form {
-        margin: 0;
-    }
-    .session-button {
-        display: inline-flex;
-        align-items: center;
-        height: 2.5rem;
-        padding: 0 0.875rem;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        background: transparent;
-        color: var(--ink);
-        font: inherit;
-        font-size: 0.875rem;
-        font-weight: 600;
-        line-height: 1;
-        white-space: nowrap;
-        text-decoration: none;
-        cursor: pointer;
-    }
-    .session-button:hover {
-        background: var(--bg);
-        text-decoration: none;
-    }
-    .session-button.signin {
-        border-color: var(--accent);
-        background: var(--accent);
-        color: var(--accent-fg);
-    }
-    .session-button.signin:hover {
-        background: var(--accent);
-        filter: brightness(1.1);
-    }
+    display: none;
+    position: absolute;
+    top: 100%;
+    inset-inline-start: 1.5rem;
+    z-index: 20;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    min-width: 12rem;
+    padding: 0.75rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+  .primary-nav.open {
+    display: flex;
+  }
+  .primary-nav ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+  }
+  .primary-nav a {
+    display: block;
+    padding: 0.5rem 0.625rem;
+    border-radius: var(--radius);
+    color: var(--ink);
+  }
+  .primary-nav a:hover {
+    background: var(--bg);
+    text-decoration: none;
+  }
+  .primary-nav a[aria-current="page"] {
+    background: var(--accent);
+    color: var(--accent-fg);
+    font-weight: 600;
+  }
+  .header-end {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-inline-start: auto;
+  }
+  .header-end form {
+    margin: 0;
+  }
+  .session-button {
+    display: inline-flex;
+    align-items: center;
+    height: 2.5rem;
+    padding: 0 0.875rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .session-button:hover {
+    background: var(--bg);
+    text-decoration: none;
+  }
+  .session-button.signin {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-fg);
+  }
+  .session-button.signin:hover {
+    background: var(--accent);
+    filter: brightness(1.1);
+  }
 
-    /* Lily PickerBar. The Lily theme stylesheet (loaded by ThemePicker, see
+  /* Lily PickerBar. The Lily theme stylesheet (loaded by ThemePicker, see
        `defaultValue` below) styles the picker buttons and listboxes; this
        only places them. Each listbox is anchored to the header (`.topbar`
        is `position: relative`) rather than to its own button, so it drops
@@ -415,32 +411,32 @@
     background: var(--bg);
   }
   .header-end :global(.theme-picker-option),
+  .header-end :global(.locale-picker-option),
+  .header-end :global(.text-size-picker-option) {
+    white-space: nowrap;
+  }
+  @media (max-width: 40rem) {
+    .topbar {
+      padding-inline: 0.75rem;
+      gap: 0.5rem;
+    }
+    .header-end {
+      gap: 0.375rem;
+    }
+    .header-end :global(.theme-picker-option),
     .header-end :global(.locale-picker-option),
     .header-end :global(.text-size-picker-option) {
-        white-space: nowrap;
+      white-space: normal;
     }
-    @media (max-width: 40rem) {
-        .topbar {
-            padding-inline: 0.75rem;
-            gap: 0.5rem;
-        }
-        .header-end {
-            gap: 0.375rem;
-        }
-        .header-end :global(.theme-picker-option),
-        .header-end :global(.locale-picker-option),
-        .header-end :global(.text-size-picker-option) {
-            white-space: normal;
-        }
-        .header-end :global(.share-picker-status) {
-            inset-inline-end: 0.75rem;
-        }
-        .header-end :global(.theme-picker-list),
-        .header-end :global(.locale-picker-list),
-        .header-end :global(.text-size-picker-list),
-        .header-end :global(.share-picker-list),
-  .header-end :global(.picker-bar [role="listbox"]) {
-            inset-inline-end: 0.75rem;
-        }
+    .header-end :global(.share-picker-status) {
+      inset-inline-end: 0.75rem;
     }
+    .header-end :global(.theme-picker-list),
+    .header-end :global(.locale-picker-list),
+    .header-end :global(.text-size-picker-list),
+    .header-end :global(.share-picker-list),
+    .header-end :global(.picker-bar [role="listbox"]) {
+      inset-inline-end: 0.75rem;
+    }
+  }
 </style>

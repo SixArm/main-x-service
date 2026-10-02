@@ -21,13 +21,13 @@
     "@lilydesignsystem/themes": "0.1.0"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.10",
-    "@sveltejs/kit": "^2.70.3",
-    "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "@sveltejs/adapter-static": "^4.0.0",
+    "@sveltejs/kit": "^3.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "svelte": "^5.57.1",
     "svelte-check": "^4.7.6",
     "typescript": "^6.0.3",
-    "vite": "^6.4.3"
+    "vite": "^8.0.12"
   },
   "repository": {
     "type": "git",
@@ -36,5 +36,9 @@
   "homepage": "https://sixarm.github.io/main-x-service.github.io/",
   "bugs": {
     "url": "https://github.com/SixArm/main-x-service/issues"
+  },
+  "imports": {
+    "#lib": "./src/lib/index.js",
+    "#lib/*": "./src/lib/*"
   }
 }

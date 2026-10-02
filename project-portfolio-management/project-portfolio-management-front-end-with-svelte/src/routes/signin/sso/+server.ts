@@ -6,12 +6,12 @@
 
 import type { RequestHandler } from "./$types";
 import { error, redirect } from "@sveltejs/kit";
-import { env } from "$env/dynamic/public";
-import { oidcLoginUrl } from "$lib/server/auth";
+import { PUBLIC_OIDC_SIGNIN_ENABLED } from "$app/env/public";
+import { oidcLoginUrl } from "#lib/server/auth.js";
 
 export const GET: RequestHandler = ({ url }) => {
-  if (env.PUBLIC_OIDC_SIGNIN_ENABLED !== "true") {
+  if (PUBLIC_OIDC_SIGNIN_ENABLED !== "true") {
     error(404, "SSO sign-in is not enabled for this deployment");
   }
-  redirect(303, oidcLoginUrl(url.origin));
+  redirect(303, oidcLoginUrl(url.origin), { external: true });
 };

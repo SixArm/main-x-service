@@ -7,12 +7,12 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import SearchBox from "$lib/components/SearchBox.svelte";
-    import EventGrid from "$lib/components/EventGrid.svelte";
-    import { EventRepository } from "$lib/api/events.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import { EVENT_STATUSES, EVENT_TYPES } from "$lib/api/types.js";
-    import type { Event, EventStatus, EventType } from "$lib/api/types.js";
+    import SearchBox from "#lib/components/SearchBox.svelte";
+    import EventGrid from "#lib/components/EventGrid.svelte";
+    import { EventRepository } from "#lib/api/events.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import { EVENT_STATUSES, EVENT_TYPES } from "#lib/api/types.js";
+    import type { Event, EventStatus, EventType } from "#lib/api/types.js";
 
     let query = $state("");
     let events = $state<Event[]>([]);

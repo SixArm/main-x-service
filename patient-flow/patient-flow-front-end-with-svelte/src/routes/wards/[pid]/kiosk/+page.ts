@@ -4,7 +4,7 @@
 // control once enforcement is on — spec `auth.md`).
 
 import type { PageLoad } from "./$types";
-import { getWhiteboard } from "$lib/api/flow";
+import { getWhiteboard } from "#lib/api/flow.js";
 
 export const load: PageLoad = async ({ fetch, params, url }) => {
   const board = await getWhiteboard(params.pid, fetch);

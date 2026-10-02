@@ -4,14 +4,14 @@
     // Render-only. Reads cached buildings + rooms; `rows` joins each
     // building to its room count for the table.
 
-    import { cache } from '$lib/store/cache.svelte';
-    import { t } from '$lib/i18n.svelte';
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import { t } from '#lib/i18n.svelte.js';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
 
     // Join each building to its room count (counted from the cached rooms).
     const rows = $derived(

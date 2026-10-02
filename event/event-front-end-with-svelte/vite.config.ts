@@ -1,3 +1,9 @@
+// SvelteKit config: TS/PostCSS preprocessing, an auto-detected deploy
+// adapter, and the $lib import alias.
+import adapter from "@sveltejs/adapter-auto";
+
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+
 // Vite + Vitest config. Uses vitest/config so the SvelteKit plugin and the
 // `test` block coexist in one file.
 import { sveltekit } from "@sveltejs/kit/vite";
@@ -5,7 +11,21 @@ import { svelteTesting } from "@testing-library/svelte/vite";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-    plugins: [sveltekit(), svelteTesting()],
+    plugins: [
+        sveltekit({
+            // Enable <script lang="ts"> and other vite preprocessing.
+            preprocess: vitePreprocess(),
+
+            // adapter-auto picks the right build target for the host platform.
+            adapter: adapter(),
+
+            alias: {
+                // `$lib` → src/lib for clean absolute-ish imports.
+                $lib: "src/lib"
+            }
+        }),
+        svelteTesting()
+    ],
     server: {
         // Dev server port; strictPort=false lets Vite pick the next free port.
         port: 5173,

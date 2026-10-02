@@ -6,7 +6,7 @@
   is displayed verbatim). English-first, like the other PPM views.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
   import {
     PpmClient,
@@ -14,7 +14,7 @@
     type FinancialExposure,
     type FinancialVariance,
     type VarianceRow,
-  } from "$lib/api/ppm";
+  } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   let variance = $state<FinancialVariance | null>(null);

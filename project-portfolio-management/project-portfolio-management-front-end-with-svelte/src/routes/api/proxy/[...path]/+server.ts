@@ -8,8 +8,8 @@
 // points here).
 
 import type { RequestHandler } from "./$types";
-import { PROJECT_PORTFOLIO_MANAGEMENT_API_URL } from "$lib/server/config";
-import { exchangeToken } from "$lib/server/auth";
+import { PROJECT_PORTFOLIO_MANAGEMENT_API_URL } from "#lib/server/config.js";
+import { exchangeToken } from "#lib/server/auth.js";
 
 const proxy: RequestHandler = async ({
   request,

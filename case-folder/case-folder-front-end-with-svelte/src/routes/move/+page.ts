@@ -4,8 +4,8 @@
 // workers (the "moved by" picker) in parallel. The folder being moved is
 // looked up live as the user types an NHS Number on the page. 503 on failure.
 
-import { api } from '$lib/api/client';
-import { cache } from '$lib/store/cache.svelte';
+import { api } from '#lib/api/client.js';
+import { cache } from '#lib/store/cache.svelte.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch }) {

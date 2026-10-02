@@ -18,9 +18,9 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import { PlaceRepository } from "$lib/api/places.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import type { Place } from "$lib/api/types.js";
+    import { PlaceRepository } from "#lib/api/places.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import type { Place } from "#lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
     let place = $state<Place | null>(null);

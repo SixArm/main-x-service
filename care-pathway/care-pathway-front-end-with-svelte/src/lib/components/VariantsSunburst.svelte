@@ -11,12 +11,12 @@
   the caption instead, never as which variants they were.
 -->
 <script lang="ts">
-  import type { VariantsReport } from "$lib/api/tba";
+  import type { VariantsReport } from "#lib/api/tba.js";
   import {
     STOPPED,
     sunburstArcs,
     sunburstFromVariants,
-  } from "$lib/analytics-transforms";
+  } from "#lib/analytics-transforms.js";
 
   interface Props {
     report: VariantsReport;

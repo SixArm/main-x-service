@@ -15,10 +15,10 @@
       display in the text input.
 -->
 <script lang="ts">
-    import type { HumanName } from "$lib/api/types.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { t } from "$lib/i18n.svelte.js";
+    import type { HumanName } from "#lib/api/types.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { t } from "#lib/i18n.svelte.js";
 
     let {
         name = $bindable(),

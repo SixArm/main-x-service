@@ -14,8 +14,8 @@
     staleDeals,
     type Finding,
     type StaleDeal,
-  } from "$lib/api/crm";
-  import { i18n, t } from "$lib/i18n.svelte";
+  } from "#lib/api/crm.js";
+  import { i18n, t } from "#lib/i18n.svelte.js";
 
   type Pack = Awaited<ReturnType<typeof executivePack>>;
   type Trends = Awaited<ReturnType<typeof forecastTrends>>;

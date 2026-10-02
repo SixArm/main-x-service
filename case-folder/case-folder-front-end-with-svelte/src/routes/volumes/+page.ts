@@ -3,7 +3,7 @@
 // Fetches all volumes (movable bundles of a patient's folders) and
 // returns them as page data for the list view. 503 on failure.
 
-import { api } from '$lib/api/client';
+import { api } from '#lib/api/client.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch }) {

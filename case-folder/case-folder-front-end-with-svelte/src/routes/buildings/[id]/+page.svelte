@@ -9,21 +9,21 @@
     // State: the add-room form fields (name/description) + roomError.
 
     import { invalidateAll } from '$app/navigation';
-    import { cache } from '$lib/store/cache.svelte';
-    import { ApiError } from '$lib/api/client';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import { ApiError } from '#lib/api/client.js';
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import Separator from '$lib/components/Separator/Separator.svelte';
-    import Form from '$lib/components/Form/Form.svelte';
-    import Field from '$lib/components/Field/Field.svelte';
-    import Button from '$lib/components/Button/Button.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
-    import { t, tf } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import Separator from '#lib/components/Separator/Separator.svelte';
+    import Form from '#lib/components/Form/Form.svelte';
+    import Field from '#lib/components/Field/Field.svelte';
+    import Button from '#lib/components/Button/Button.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
+    import { t, tf } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
     const building = $derived(data.building);

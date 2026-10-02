@@ -14,14 +14,14 @@
   distinguishes the tagged `{ Custom }` variant from the bare string schemes.
 -->
 <script lang="ts">
-    import type { IdentifierType, ThingIdentifier } from "$lib/api/types.js";
+    import type { IdentifierType, ThingIdentifier } from "#lib/api/types.js";
     import {
         IDENTIFIER_TYPE_OPTIONS,
         blankThingIdentifier,
-    } from "$lib/api/types.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { t } from "$lib/i18n.svelte.js";
+    } from "#lib/api/types.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { t } from "#lib/i18n.svelte.js";
 
     let {
         identifiers = $bindable(),

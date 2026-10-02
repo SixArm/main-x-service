@@ -3,8 +3,8 @@
 
 import type { Actions, PageServerLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
-import { signout } from "$lib/server/auth";
-import { CSRF_COOKIE, SESSION_COOKIE } from "$lib/server/session";
+import { signout } from "#lib/server/auth.js";
+import { CSRF_COOKIE, SESSION_COOKIE } from "#lib/server/session.js";
 
 // `page.data.title` convention (see `+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title

@@ -9,7 +9,7 @@
 // `t()` across 13 locales, so a hard-coded English string here would be
 // the one untranslated message on the page.
 
-import type { StringKey } from "$lib/i18n.svelte";
+import type { StringKey } from "#lib/i18n.svelte.js";
 
 /**
  * Validate a merge request's pids before issuing the POST.

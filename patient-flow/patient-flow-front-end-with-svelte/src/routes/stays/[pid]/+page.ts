@@ -2,7 +2,7 @@
 // anchor). A sensitive read — the service audits it.
 
 import type { PageLoad } from "./$types";
-import { getStay } from "$lib/api/flow";
+import { getStay } from "#lib/api/flow.js";
 
 export const load: PageLoad = async ({ fetch, params }) => {
   const detail = await getStay(params.pid, fetch);

@@ -11,11 +11,11 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import SearchBox from "$lib/components/SearchBox.svelte";
-    import CourseGrid from "$lib/components/CourseGrid.svelte";
-    import { CourseRepository } from "$lib/api/courses.js";
-    import type { Course } from "$lib/api/types.js";
-    import { t, translate, i18n } from "$lib/i18n.svelte.js";
+    import SearchBox from "#lib/components/SearchBox.svelte";
+    import CourseGrid from "#lib/components/CourseGrid.svelte";
+    import { CourseRepository } from "#lib/api/courses.js";
+    import type { Course } from "#lib/api/types.js";
+    import { t, translate, i18n } from "#lib/i18n.svelte.js";
 
     let query = $state("");
     let courses = $state<Course[]>([]);

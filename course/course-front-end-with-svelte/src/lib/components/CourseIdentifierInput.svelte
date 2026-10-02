@@ -11,14 +11,14 @@
   mutated in place, so Svelte reactivity reliably re-renders rows.
 -->
 <script lang="ts">
-    import type { IdentifierType, CourseIdentifier } from "$lib/api/types.js";
+    import type { IdentifierType, CourseIdentifier } from "#lib/api/types.js";
     import {
         IDENTIFIER_TYPE_OPTIONS,
         blankCourseIdentifier,
-    } from "$lib/api/types.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
-    import { t } from "$lib/i18n.svelte.js";
+    } from "#lib/api/types.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
+    import { t } from "#lib/i18n.svelte.js";
 
     let {
         identifiers = $bindable(),

@@ -8,12 +8,12 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import EventForm from "$lib/components/EventForm.svelte";
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import { EventRepository } from "$lib/api/events.js";
-    import { ApiError } from "$lib/api/client.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import type { Event, MatchResult } from "$lib/api/types.js";
+    import EventForm from "#lib/components/EventForm.svelte";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import { EventRepository } from "#lib/api/events.js";
+    import { ApiError } from "#lib/api/client.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import type { Event, MatchResult } from "#lib/api/types.js";
 
     const repo = EventRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);

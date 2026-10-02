@@ -14,12 +14,12 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import ThingForm from "$lib/components/ThingForm.svelte";
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import { ThingRepository } from "$lib/api/things.js";
-    import { ApiError } from "$lib/api/client.js";
-    import type { MatchResult, Thing } from "$lib/api/types.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
+    import ThingForm from "#lib/components/ThingForm.svelte";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import { ThingRepository } from "#lib/api/things.js";
+    import { ApiError } from "#lib/api/client.js";
+    import type { MatchResult, Thing } from "#lib/api/types.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);

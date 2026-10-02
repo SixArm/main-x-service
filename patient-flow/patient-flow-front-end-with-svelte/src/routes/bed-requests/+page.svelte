@@ -9,8 +9,8 @@
     cancelBedRequest,
     createBedRequest,
     getEligibleBeds,
-  } from "$lib/api/flow";
-  import type { EligibleBed } from "$lib/api/types";
+  } from "#lib/api/flow.js";
+  import type { EligibleBed } from "#lib/api/types.js";
 
   let { data } = $props();
 

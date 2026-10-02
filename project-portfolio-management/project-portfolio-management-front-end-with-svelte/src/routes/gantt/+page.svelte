@@ -8,11 +8,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Gantt, Willow } from "@svar-ui/svelte-gantt";
-  import { PpmClient } from "$lib/api/ppm";
-  import { PlanRepository } from "$lib/api/plans";
-  import type { PlanRef } from "$lib/api/types";
-  import type { ScheduleView } from "$lib/api/ppm";
-  import { t } from "$lib/i18n.svelte";
+  import { PpmClient } from "#lib/api/ppm.js";
+  import { PlanRepository } from "#lib/api/plans.js";
+  import type { PlanRef } from "#lib/api/types.js";
+  import type { ScheduleView } from "#lib/api/ppm.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const client = PpmClient.withFetch();
 

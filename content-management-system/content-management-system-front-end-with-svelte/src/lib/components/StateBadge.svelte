@@ -6,8 +6,8 @@
   readers can see this page.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
-  import type { MessageKey } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
+  import type { MessageKey } from "#lib/i18n.svelte.js";
 
   let { status }: { status: string } = $props();
 

@@ -12,7 +12,7 @@
 // drop-in replacement with no other behaviour change.
 import { goto } from "$app/navigation";
 import { ApiError } from "./client.js";
-import { t } from "$lib/i18n.svelte.js";
+import { t } from "#lib/i18n.svelte.js";
 
 /**
  * Turn a caught error into the message a route's error banner should

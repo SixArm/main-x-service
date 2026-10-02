@@ -1,8 +1,8 @@
 <script lang="ts">
   // Patient locate: "where is patient X right now?" — an audited,
   // sensitive read (spec `whiteboard.md`).
-  import { locatePerson } from "$lib/api/flow";
-  import type { Locate } from "$lib/api/types";
+  import { locatePerson } from "#lib/api/flow.js";
+  import type { Locate } from "#lib/api/types.js";
 
   let query = $state("");
   let result = $state<Locate | null>(null);

@@ -16,7 +16,7 @@
 // drives the UI strings, `<html lang>`, and `<html dir>` (right-to-left
 // for `ar-001`).
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales for which the UI is translated, sorted alphabetically by code
@@ -71,6 +71,7 @@ export const RTL_LOCALES = ["ar-001"] as const satisfies readonly Locale[];
  */
 export function isRtl(locale: string): boolean {
   const primary = normaliseLocale(locale);
+
   return (
     primary !== null && (RTL_LOCALES as readonly string[]).includes(primary)
   );
@@ -328,7 +329,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -378,48 +380,80 @@ const STRINGS = {
     "tour.open": "افتح هذه الشاشة",
     "tour.top": "العودة إلى الأعلى",
     "tour.start.title": "قبل أن تبدأ",
-    "tour.start.summary": "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
-    "tour.start.step.1": "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
-    "tour.start.step.2": "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
-    "tour.start.step.3": "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
-    "tour.start.step.4": "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
-    "tour.intro": "جولة إرشادية في سجل الخطط: كيف تنشئ خطة، وتدير لوحة تسليمها، وتقرأ تدفقها، وتنقل فكرة حتى تصبح خطة، وتوجّهها عبر الحوكمة.",
+    "tour.start.summary":
+      "تحتاج إلى حساب للعمل مع البيانات الفعلية. يستغرق تسجيل الدخول أقل من دقيقة ولا يتطلب كلمة مرور.",
+    "tour.start.step.1":
+      "اختر «تسجيل الدخول» في أعلى اليمين وأدخل بريدك الإلكتروني.",
+    "tour.start.step.2":
+      "افتح الرابط السحري الذي نرسله إلى بريدك. يعمل مرة واحدة وتنتهي صلاحيته سريعًا.",
+    "tour.start.step.3":
+      "تعود إلى التطبيق وقد سجّلت الدخول، دون شيء لتتذكره أو تعيده.",
+    "tour.start.step.4":
+      "استخدم الأزرار بجوار «تسجيل الدخول» لتغيير السمة واللغة وحجم النص أو لمشاركة الصفحة.",
+    "tour.intro":
+      "جولة إرشادية في سجل الخطط: كيف تنشئ خطة، وتدير لوحة تسليمها، وتقرأ تدفقها، وتنقل فكرة حتى تصبح خطة، وتوجّهها عبر الحوكمة.",
     "tour.s1.title": "إنشاء خطة",
-    "tour.s1.summary": "سجّل خطة باسم وتسمية نوع اختيارية وخطة أم، لتقع ضمن شجرة الخطط الواحدة.",
-    "tour.s1.step.1": "افتح الخطط واختر جديد (أو انتقل مباشرة إلى نموذج الخطة الجديدة).",
-    "tour.s1.step.2": "املأ حقل الاسم وهو إلزامي، ثم اختر اختياريًا النوع والحالة والأولوية، وأضف رمزًا والجهة المالكة ووسومًا وكلمات مفتاحية.",
-    "tour.s1.step.3": "حدّد معرّف المحفظة الأم (pid) لوضع الخطة داخل خطة أخرى، وأضف أي معرّفات لديك بالفعل.",
+    "tour.s1.summary":
+      "سجّل خطة باسم وتسمية نوع اختيارية وخطة أم، لتقع ضمن شجرة الخطط الواحدة.",
+    "tour.s1.step.1":
+      "افتح الخطط واختر جديد (أو انتقل مباشرة إلى نموذج الخطة الجديدة).",
+    "tour.s1.step.2":
+      "املأ حقل الاسم وهو إلزامي، ثم اختر اختياريًا النوع والحالة والأولوية، وأضف رمزًا والجهة المالكة ووسومًا وكلمات مفتاحية.",
+    "tour.s1.step.3":
+      "حدّد معرّف المحفظة الأم (pid) لوضع الخطة داخل خطة أخرى، وأضف أي معرّفات لديك بالفعل.",
     "tour.s1.step.4": "اختر إنشاء. تُحفظ الخطة وتصل إلى صفحة تفاصيلها.",
     "tour.s2.title": "العثور على خطة ومعالجة التكرارات",
-    "tour.s2.summary": "صفِّ قائمة الخطط وافتح سجلًا وتحقق مما إذا كان يكرر خطة أخرى قبل دمجه.",
-    "tour.s2.step.1": "في الخطط، استخدم مرشح الشبكة للتضييق بحسب الاسم، ثم افتح خطة لرؤية نوعها وحالتها ورمزها وجهتها المالكة ووسومها ومعرّفاتها.",
-    "tour.s2.step.2": "في صفحة التفاصيل اختر فحص التكرارات. تظهر التطابقات المحتملة تحت التكرارات المحتملة مع درجاتها.",
-    "tour.s2.step.3": "افتح الخطة المطابقة للمقارنة بين الاثنتين، ثم استخدم تعديل لتصحيح أي من السجلين.",
-    "tour.s2.step.4": "في الدمج، أدخل معرّف الخطة الباقية ومعرّف الخطة المكررة، واختر تحميل المعاينة ثم دمج. يُحذف المكرر حذفًا منطقيًا ويُدرج ضمن عمليات الدمج الأخيرة.",
+    "tour.s2.summary":
+      "صفِّ قائمة الخطط وافتح سجلًا وتحقق مما إذا كان يكرر خطة أخرى قبل دمجه.",
+    "tour.s2.step.1":
+      "في الخطط، استخدم مرشح الشبكة للتضييق بحسب الاسم، ثم افتح خطة لرؤية نوعها وحالتها ورمزها وجهتها المالكة ووسومها ومعرّفاتها.",
+    "tour.s2.step.2":
+      "في صفحة التفاصيل اختر فحص التكرارات. تظهر التطابقات المحتملة تحت التكرارات المحتملة مع درجاتها.",
+    "tour.s2.step.3":
+      "افتح الخطة المطابقة للمقارنة بين الاثنتين، ثم استخدم تعديل لتصحيح أي من السجلين.",
+    "tour.s2.step.4":
+      "في الدمج، أدخل معرّف الخطة الباقية ومعرّف الخطة المكررة، واختر تحميل المعاينة ثم دمج. يُحذف المكرر حذفًا منطقيًا ويُدرج ضمن عمليات الدمج الأخيرة.",
     "tour.s3.title": "إدارة لوحة التسليم",
-    "tour.s3.summary": "لكل خطة لوحة كانبان مع سباقات ومخطط احتراق لتتبع مهامها.",
+    "tour.s3.summary":
+      "لكل خطة لوحة كانبان مع سباقات ومخطط احتراق لتتبع مهامها.",
     "tour.s3.step.1": "افتح خطة واختر اللوحة.",
-    "tour.s3.step.2": "أدخل عنوان مهمة جديدة ونقاط قصة اختيارية وسباقًا، ثم اختر Add task.",
-    "tour.s3.step.3": "اسحب بطاقة بين Todo وIn progress وIn review وDone وBlocked. يُحفظ كل سحب كتغيير في الحالة.",
-    "tour.s3.step.4": "تحت Sprints، أدخل اسم سباق مع تاريخ البدء والانتهاء واختر Add sprint. حدّده لرؤية مخطط الاحتراق، واستخدم أقسام الاجتماع اليومي وملاحظات المراجعة والسرعة.",
+    "tour.s3.step.2":
+      "أدخل عنوان مهمة جديدة ونقاط قصة اختيارية وسباقًا، ثم اختر Add task.",
+    "tour.s3.step.3":
+      "اسحب بطاقة بين Todo وIn progress وIn review وDone وBlocked. يُحفظ كل سحب كتغيير في الحالة.",
+    "tour.s3.step.4":
+      "تحت Sprints، أدخل اسم سباق مع تاريخ البدء والانتهاء واختر Add sprint. حدّده لرؤية مخطط الاحتراق، واستخدم أقسام الاجتماع اليومي وملاحظات المراجعة والسرعة.",
     "tour.s4.title": "قراءة تدفق الخطة",
-    "tour.s4.summary": "يُظهر التحليل المبني على الزمن أين يذهب الوقت التقويمي للخطة، لا مجرد انشغال الناس.",
+    "tour.s4.summary":
+      "يُظهر التحليل المبني على الزمن أين يذهب الوقت التقويمي للخطة، لا مجرد انشغال الناس.",
     "tour.s4.step.1": "افتح خطة واختر Flow.",
-    "tour.s4.step.2": "اقرأ أولًا البطاقات الرئيسية: Service level expectation وFlow efficiency وFirst pass yield وWork in progress.",
-    "tour.s4.step.3": "راجع Aging work in progress لمعرفة العناصر التي انتظرت أطول من المتوقع، ثم Blocked وRework.",
-    "tour.s4.step.4": "استخدم نافذة Cumulative flow وترتيب Constraints وDistributions لمعرفة ما يبطئ التسليم. لا شيء هنا يرتّب الأفراد.",
+    "tour.s4.step.2":
+      "اقرأ أولًا البطاقات الرئيسية: Service level expectation وFlow efficiency وFirst pass yield وWork in progress.",
+    "tour.s4.step.3":
+      "راجع Aging work in progress لمعرفة العناصر التي انتظرت أطول من المتوقع، ثم Blocked وRework.",
+    "tour.s4.step.4":
+      "استخدم نافذة Cumulative flow وترتيب Constraints وDistributions لمعرفة ما يبطئ التسليم. لا شيء هنا يرتّب الأفراد.",
     "tour.s5.title": "من الفكرة إلى الخطة",
-    "tour.s5.summary": "التقط فكرة ودع الناس يصوّتون، ثم انقلها عبر مقترح إلى خطة حقيقية.",
-    "tour.s5.step.1": "افتح الأفكار واستخدم تسجيل مع عنوان الفكرة وعرضها. يصوّت الناس بالسهم لأعلى وتأتي الأفكار الأكثر أصواتًا أولًا.",
-    "tour.s5.step.2": "اختر هدف التحويل ثم إلى مقترح. يمكن رفض فكرة لن يعمل عليها أحد.",
-    "tour.s5.step.3": "افتح المقترحات (استقبال الأعمال). يُقدَّم المسودة ثم تُراجع ثم تُعتمد أو تُرفض. استخدم duplicates? للتحقق من الطلب المتكرر.",
-    "tour.s5.step.4": "اختر promote على مقترح معتمد. يصبح خطة، ويقودك رابط عنصر العمل إليها.",
+    "tour.s5.summary":
+      "التقط فكرة ودع الناس يصوّتون، ثم انقلها عبر مقترح إلى خطة حقيقية.",
+    "tour.s5.step.1":
+      "افتح الأفكار واستخدم تسجيل مع عنوان الفكرة وعرضها. يصوّت الناس بالسهم لأعلى وتأتي الأفكار الأكثر أصواتًا أولًا.",
+    "tour.s5.step.2":
+      "اختر هدف التحويل ثم إلى مقترح. يمكن رفض فكرة لن يعمل عليها أحد.",
+    "tour.s5.step.3":
+      "افتح المقترحات (استقبال الأعمال). يُقدَّم المسودة ثم تُراجع ثم تُعتمد أو تُرفض. استخدم duplicates? للتحقق من الطلب المتكرر.",
+    "tour.s5.step.4":
+      "اختر promote على مقترح معتمد. يصبح خطة، ويقودك رابط عنصر العمل إليها.",
     "tour.s6.title": "توجيه خطة عبر الحوكمة",
-    "tour.s6.summary": "تجمع لوحة واحدة بوابات الخطة ومخاطرها وميزانيتها وفوائدها ومعالمها وتخصيصاتها.",
+    "tour.s6.summary":
+      "تجمع لوحة واحدة بوابات الخطة ومخاطرها وميزانيتها وفوائدها ومعالمها وتخصيصاتها.",
     "tour.s6.step.1": "افتح خطة واختر الحوكمة.",
-    "tour.s6.step.2": "تحت مسار البوابات، اختر قرارًا (approved أو approved_with_conditions أو hold أو rejected) ثم تسجيل القرار للانتقال إلى البوابة التالية.",
-    "tour.s6.step.3": "أضف خطرًا جديدًا وصعّده إن تفاقم. أضف بنود ميزانية بفئة ومبلغ مخطط، وأعلن الفوائد ثم حقّقها عند حصولها.",
-    "tour.s6.step.4": "أضف معالم وعلّمها مكتملة، واستخدم Allocate لمنح الأشخاص سعة. يرسم رابط الجدول الزمني التواريخ والتبعيات.",
+    "tour.s6.step.2":
+      "تحت مسار البوابات، اختر قرارًا (approved أو approved_with_conditions أو hold أو rejected) ثم تسجيل القرار للانتقال إلى البوابة التالية.",
+    "tour.s6.step.3":
+      "أضف خطرًا جديدًا وصعّده إن تفاقم. أضف بنود ميزانية بفئة ومبلغ مخطط، وأعلن الفوائد ثم حقّقها عند حصولها.",
+    "tour.s6.step.4":
+      "أضف معالم وعلّمها مكتملة، واستخدم Allocate لمنح الأشخاص سعة. يرسم رابط الجدول الزمني التواريخ والتبعيات.",
     "signin.sso": "تسجيل الدخول عبر SSO",
   },
   "cy-001": {
@@ -668,7 +702,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -718,48 +753,81 @@ const STRINGS = {
     "tour.open": "Agor y sgrin hon",
     "tour.top": "Yn ôl i'r brig",
     "tour.start.title": "Cyn i chi ddechrau",
-    "tour.start.summary": "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
-    "tour.start.step.1": "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
-    "tour.start.step.2": "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
-    "tour.start.step.3": "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
-    "tour.start.step.4": "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
-    "tour.intro": "Taith dywys drwy'r gofrestr cynlluniau: sut i greu cynllun, rhedeg ei fwrdd cyflawni, darllen ei lif, mynd â syniad yr holl ffordd at gynllun, a'i lywio drwy lywodraethu.",
+    "tour.start.summary":
+      "Mae angen cyfrif arnoch i weithio gyda data go iawn. Mae mewngofnodi'n cymryd llai na munud ac nid oes angen cyfrinair.",
+    "tour.start.step.1":
+      "Dewiswch Mewngofnodi ar y brig ar y dde a rhowch eich cyfeiriad e-bost.",
+    "tour.start.step.2":
+      "Agorwch y ddolen hud a anfonwn atoch. Mae'n gweithio unwaith ac yn dod i ben yn gyflym.",
+    "tour.start.step.3":
+      "Byddwch yn dychwelyd i'r ap wedi mewngofnodi, heb ddim i'w gofio na'i ailosod.",
+    "tour.start.step.4":
+      "Defnyddiwch y botymau wrth ymyl Mewngofnodi i newid y thema, yr iaith a maint y testun, neu i rannu'r dudalen.",
+    "tour.intro":
+      "Taith dywys drwy'r gofrestr cynlluniau: sut i greu cynllun, rhedeg ei fwrdd cyflawni, darllen ei lif, mynd â syniad yr holl ffordd at gynllun, a'i lywio drwy lywodraethu.",
     "tour.s1.title": "Creu cynllun",
-    "tour.s1.summary": "Cofrestrwch gynllun gydag enw, label math dewisol a rhiant, fel ei fod yn eistedd yn yr un goeden gynlluniau.",
-    "tour.s1.step.1": "Agorwch Cynlluniau a dewiswch Newydd (neu ewch yn syth i'r ffurflen cynllun newydd).",
-    "tour.s1.step.2": "Llenwch yr Enw, sy'n orfodol, yna dewiswch Math, Statws a Blaenoriaeth yn ddewisol, ac ychwanegwch God, sefydliad perchennog, tagiau a geiriau allweddol.",
-    "tour.s1.step.3": "Gosodwch y Portffolio rhiant (pid) i osod y cynllun y tu mewn i gynllun arall, ac ychwanegwch unrhyw ddynodwyr sydd gennych eisoes.",
-    "tour.s1.step.4": "Dewiswch Creu. Caiff y cynllun ei gadw a byddwch yn glanio ar ei dudalen manylion.",
+    "tour.s1.summary":
+      "Cofrestrwch gynllun gydag enw, label math dewisol a rhiant, fel ei fod yn eistedd yn yr un goeden gynlluniau.",
+    "tour.s1.step.1":
+      "Agorwch Cynlluniau a dewiswch Newydd (neu ewch yn syth i'r ffurflen cynllun newydd).",
+    "tour.s1.step.2":
+      "Llenwch yr Enw, sy'n orfodol, yna dewiswch Math, Statws a Blaenoriaeth yn ddewisol, ac ychwanegwch God, sefydliad perchennog, tagiau a geiriau allweddol.",
+    "tour.s1.step.3":
+      "Gosodwch y Portffolio rhiant (pid) i osod y cynllun y tu mewn i gynllun arall, ac ychwanegwch unrhyw ddynodwyr sydd gennych eisoes.",
+    "tour.s1.step.4":
+      "Dewiswch Creu. Caiff y cynllun ei gadw a byddwch yn glanio ar ei dudalen manylion.",
     "tour.s2.title": "Dod o hyd i gynllun a delio â dyblygiadau",
-    "tour.s2.summary": "Hidlwch y rhestr cynlluniau, agorwch gofnod, a gwiriwch a yw'n ailadrodd cynllun arall cyn ei uno.",
-    "tour.s2.step.1": "Yn Cynlluniau, defnyddiwch hidlydd y grid i gyfyngu yn ôl Enw, yna agorwch gynllun i weld ei Fath, Statws, Cod, sefydliad perchennog, tagiau a dynodwyr.",
-    "tour.s2.step.2": "Ar y dudalen manylion dewiswch Gwirio dyblygiadau. Mae cyfatebiadau tebygol yn ymddangos dan Dyblygiadau posibl gyda'u sgorau.",
-    "tour.s2.step.3": "Agorwch y cynllun sy'n cyfateb i gymharu'r ddau, yna defnyddiwch Golygu i gywiro'r naill gofnod neu'r llall.",
-    "tour.s2.step.4": "Yn Uno, rhowch Id y cynllun sy'n goroesi ac Id y cynllun dyblyg, dewiswch Llwytho rhagolwg, yna Uno. Caiff y dyblyg ei ddileu'n feddal a'i restru dan Unoiadau diweddar.",
+    "tour.s2.summary":
+      "Hidlwch y rhestr cynlluniau, agorwch gofnod, a gwiriwch a yw'n ailadrodd cynllun arall cyn ei uno.",
+    "tour.s2.step.1":
+      "Yn Cynlluniau, defnyddiwch hidlydd y grid i gyfyngu yn ôl Enw, yna agorwch gynllun i weld ei Fath, Statws, Cod, sefydliad perchennog, tagiau a dynodwyr.",
+    "tour.s2.step.2":
+      "Ar y dudalen manylion dewiswch Gwirio dyblygiadau. Mae cyfatebiadau tebygol yn ymddangos dan Dyblygiadau posibl gyda'u sgorau.",
+    "tour.s2.step.3":
+      "Agorwch y cynllun sy'n cyfateb i gymharu'r ddau, yna defnyddiwch Golygu i gywiro'r naill gofnod neu'r llall.",
+    "tour.s2.step.4":
+      "Yn Uno, rhowch Id y cynllun sy'n goroesi ac Id y cynllun dyblyg, dewiswch Llwytho rhagolwg, yna Uno. Caiff y dyblyg ei ddileu'n feddal a'i restru dan Unoiadau diweddar.",
     "tour.s3.title": "Rhedeg y bwrdd cyflawni",
-    "tour.s3.summary": "Mae gan bob cynllun fwrdd Kanban, gyda sbrintiau a siart llosgi, i olrhain ei dasgau.",
+    "tour.s3.summary":
+      "Mae gan bob cynllun fwrdd Kanban, gyda sbrintiau a siart llosgi, i olrhain ei dasgau.",
     "tour.s3.step.1": "Agorwch gynllun a dewiswch Bwrdd.",
-    "tour.s3.step.2": "Rhowch deitl tasg newydd, pwyntiau stori dewisol a sbrint, yna dewiswch Add task.",
-    "tour.s3.step.3": "Llusgwch gerdyn rhwng Todo, In progress, In review, Done a Blocked. Caiff pob llusgiad ei gadw fel newid statws.",
-    "tour.s3.step.4": "Dan Sprints, rhowch enw sbrint gyda dyddiad dechrau a gorffen a dewiswch Add sprint. Dewiswch ef i weld y siart llosgi, a defnyddiwch yr adrannau standup, nodiadau ôl-drafodaeth a chyflymder.",
+    "tour.s3.step.2":
+      "Rhowch deitl tasg newydd, pwyntiau stori dewisol a sbrint, yna dewiswch Add task.",
+    "tour.s3.step.3":
+      "Llusgwch gerdyn rhwng Todo, In progress, In review, Done a Blocked. Caiff pob llusgiad ei gadw fel newid statws.",
+    "tour.s3.step.4":
+      "Dan Sprints, rhowch enw sbrint gyda dyddiad dechrau a gorffen a dewiswch Add sprint. Dewiswch ef i weld y siart llosgi, a defnyddiwch yr adrannau standup, nodiadau ôl-drafodaeth a chyflymder.",
     "tour.s4.title": "Darllen llif cynllun",
-    "tour.s4.summary": "Mae dadansoddi ar sail amser yn dangos i ble mae amser calendr cynllun yn mynd, nid dim ond pa mor brysur yw pobl.",
+    "tour.s4.summary":
+      "Mae dadansoddi ar sail amser yn dangos i ble mae amser calendr cynllun yn mynd, nid dim ond pa mor brysur yw pobl.",
     "tour.s4.step.1": "Agorwch gynllun a dewiswch Flow.",
-    "tour.s4.step.2": "Darllenwch y teils pennawd yn gyntaf: Service level expectation, Flow efficiency, First pass yield a Work in progress.",
-    "tour.s4.step.3": "Gwiriwch Aging work in progress am eitemau sydd wedi aros yn hirach na'r disgwyl, yna edrychwch ar Blocked a Rework.",
-    "tour.s4.step.4": "Defnyddiwch y ffenestr Cumulative flow, y safle Constraints a'r Distributions i weld beth sy'n arafu cyflawni. Nid oes dim yma'n graddio unigolion.",
+    "tour.s4.step.2":
+      "Darllenwch y teils pennawd yn gyntaf: Service level expectation, Flow efficiency, First pass yield a Work in progress.",
+    "tour.s4.step.3":
+      "Gwiriwch Aging work in progress am eitemau sydd wedi aros yn hirach na'r disgwyl, yna edrychwch ar Blocked a Rework.",
+    "tour.s4.step.4":
+      "Defnyddiwch y ffenestr Cumulative flow, y safle Constraints a'r Distributions i weld beth sy'n arafu cyflawni. Nid oes dim yma'n graddio unigolion.",
     "tour.s5.title": "O syniad i gynllun",
-    "tour.s5.summary": "Cofnodwch syniad, gadewch i bobl bleidleisio, yna ewch ag ef drwy gynnig i fod yn gynllun go iawn.",
-    "tour.s5.step.1": "Agorwch Syniadau a defnyddiwch Cofnodi gyda theitl syniad a chyflwyniad. Mae pobl yn pleidleisio gyda'r saeth i fyny, ac mae'r syniadau â'r mwyaf o bleidleisiau yn dod gyntaf.",
-    "tour.s5.step.2": "Dewiswch darged trosi a dewiswch I gynnig. Gellir gwrthod syniad na fydd neb yn gweithredu arno.",
-    "tour.s5.step.3": "Agorwch Cynigion (derbyn gwaith). Caiff drafft ei gyflwyno, ei adolygu, yna ei gymeradwyo neu ei wrthod. Defnyddiwch duplicates? i wirio am alw sy'n ailadrodd.",
-    "tour.s5.step.4": "Dewiswch promote ar gynnig a gymeradwywyd. Mae'n dod yn gynllun, ac mae dolen yr eitem waith yn mynd â chi ato.",
+    "tour.s5.summary":
+      "Cofnodwch syniad, gadewch i bobl bleidleisio, yna ewch ag ef drwy gynnig i fod yn gynllun go iawn.",
+    "tour.s5.step.1":
+      "Agorwch Syniadau a defnyddiwch Cofnodi gyda theitl syniad a chyflwyniad. Mae pobl yn pleidleisio gyda'r saeth i fyny, ac mae'r syniadau â'r mwyaf o bleidleisiau yn dod gyntaf.",
+    "tour.s5.step.2":
+      "Dewiswch darged trosi a dewiswch I gynnig. Gellir gwrthod syniad na fydd neb yn gweithredu arno.",
+    "tour.s5.step.3":
+      "Agorwch Cynigion (derbyn gwaith). Caiff drafft ei gyflwyno, ei adolygu, yna ei gymeradwyo neu ei wrthod. Defnyddiwch duplicates? i wirio am alw sy'n ailadrodd.",
+    "tour.s5.step.4":
+      "Dewiswch promote ar gynnig a gymeradwywyd. Mae'n dod yn gynllun, ac mae dolen yr eitem waith yn mynd â chi ato.",
     "tour.s6.title": "Llywio cynllun drwy lywodraethu",
-    "tour.s6.summary": "Mae un panel yn dal gatiau, risgiau, cyllideb, buddion, cerrig milltir a dyraniadau cynllun.",
+    "tour.s6.summary":
+      "Mae un panel yn dal gatiau, risgiau, cyllideb, buddion, cerrig milltir a dyraniadau cynllun.",
     "tour.s6.step.1": "Agorwch gynllun a dewiswch Llywodraethu.",
-    "tour.s6.step.2": "Dan Taith y gatiau, dewiswch benderfyniad (approved, approved_with_conditions, hold neu rejected) a Cofnodi penderfyniad i symud i'r glwyd nesaf.",
-    "tour.s6.step.3": "Codwch risg newydd a'i huwchgyfeirio os bydd yn tyfu. Ychwanegwch linellau cyllideb gyda chategori a swm arfaethedig, datganwch fuddion, yna eu gwireddu wrth iddynt gyrraedd.",
-    "tour.s6.step.4": "Ychwanegwch gerrig milltir, marciwch nhw'n gyflawn, a defnyddiwch Allocate i roi capasiti i bobl. Mae'r ddolen Amserlen yn tynnu'r dyddiadau a'r dibyniaethau.",
+    "tour.s6.step.2":
+      "Dan Taith y gatiau, dewiswch benderfyniad (approved, approved_with_conditions, hold neu rejected) a Cofnodi penderfyniad i symud i'r glwyd nesaf.",
+    "tour.s6.step.3":
+      "Codwch risg newydd a'i huwchgyfeirio os bydd yn tyfu. Ychwanegwch linellau cyllideb gyda chategori a swm arfaethedig, datganwch fuddion, yna eu gwireddu wrth iddynt gyrraedd.",
+    "tour.s6.step.4":
+      "Ychwanegwch gerrig milltir, marciwch nhw'n gyflawn, a defnyddiwch Allocate i roi capasiti i bobl. Mae'r ddolen Amserlen yn tynnu'r dyddiadau a'r dibyniaethau.",
     "signin.sso": "Mewngofnodi gydag SSO",
   },
   "de-de": {
@@ -995,19 +1063,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Ein Planbaum",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -1016,74 +1091,120 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "splash.hero.title": "Jeder Plan, eine verbundene Sicht",
-    "splash.hero.subtitle": "Verwalten Sie Portfolios, Projekte und Produkte in einem rekursiven Planbaum, von der ersten Idee bis zur Lieferung, mit integrierter Steuerung, Terminplänen und Audit-Protokoll.",
-    "splash.benefits.1.body": "Jeder Plan kann jeden anderen enthalten, vom ganzen Portfolio bis zur einzelnen Aufgabe.",
+    "splash.hero.subtitle":
+      "Verwalten Sie Portfolios, Projekte und Produkte in einem rekursiven Planbaum, von der ersten Idee bis zur Lieferung, mit integrierter Steuerung, Terminplänen und Audit-Protokoll.",
+    "splash.benefits.1.body":
+      "Jeder Plan kann jeden anderen enthalten, vom ganzen Portfolio bis zur einzelnen Aufgabe.",
     "splash.benefits.2.title": "Gesundheit auf einen Blick",
-    "splash.benefits.2.body": "Dashboards fassen Phase, Risiko und Budgetstatus über alle Pläne zusammen.",
+    "splash.benefits.2.body":
+      "Dashboards fassen Phase, Risiko und Budgetstatus über alle Pläne zusammen.",
     "splash.benefits.3.title": "Weniger doppelte Pläne",
-    "splash.benefits.3.body": "Der Abgleich meldet einen wahrscheinlich doppelten Plan beim Anlegen, und das Zusammenführen behält einen.",
+    "splash.benefits.3.body":
+      "Der Abgleich meldet einen wahrscheinlich doppelten Plan beim Anlegen, und das Zusammenführen behält einen.",
     "splash.benefits.4.title": "Entscheidungen mit Belegen",
-    "splash.benefits.4.body": "Ansichten für Geschäftsführung, Finanzen und Technik zeigen, was jetzt Aufmerksamkeit braucht.",
+    "splash.benefits.4.body":
+      "Ansichten für Geschäftsführung, Finanzen und Technik zeigen, was jetzt Aufmerksamkeit braucht.",
     "splash.benefits.5.title": "Arbeit, die fließt",
-    "splash.benefits.5.body": "Kanban-Boards und Burndown-Diagramme zeigen echten Fortschritt statt Wunschstatus.",
+    "splash.benefits.5.body":
+      "Kanban-Boards und Burndown-Diagramme zeigen echten Fortschritt statt Wunschstatus.",
     "splash.benefits.6.title": "Von der Idee zur Lieferung",
-    "splash.benefits.6.body": "Ideen werden zu Vorschlägen und dann zu Plänen, in einer Pipeline, die alle sehen können.",
+    "splash.benefits.6.body":
+      "Ideen werden zu Vorschlägen und dann zu Plänen, in einer Pipeline, die alle sehen können.",
     "splash.features.1.title": "Rekursive Pläne",
-    "splash.features.1.body": "Eine optionale Art-Bezeichnung und ein Elternverweis, mit Aggregation über jede Ebene.",
+    "splash.features.1.body":
+      "Eine optionale Art-Bezeichnung und ein Elternverweis, mit Aggregation über jede Ebene.",
     "splash.features.2.title": "Aufgabenboards",
-    "splash.features.2.body": "Ein Kanban-Board, Sprints und ein ehrliches Burndown für jeden Plan.",
+    "splash.features.2.body":
+      "Ein Kanban-Board, Sprints und ein ehrliches Burndown für jeden Plan.",
     "splash.features.3.title": "Governance",
-    "splash.features.3.body": "Gates, Risiken, Budgetpositionen, Nutzen und Meilensteine in einem Bereich.",
+    "splash.features.3.body":
+      "Gates, Risiken, Budgetpositionen, Nutzen und Meilensteine in einem Bereich.",
     "splash.features.4.title": "Zeitplan und Gantt",
-    "splash.features.4.body": "Terminierte Teilpläne, Abhängigkeiten und der kritische Pfad in einem Gantt-Diagramm.",
+    "splash.features.4.body":
+      "Terminierte Teilpläne, Abhängigkeiten und der kritische Pfad in einem Gantt-Diagramm.",
     "splash.features.5.title": "Aufnahme und Szenarien",
-    "splash.features.5.body": "Erfassen Sie Ideen, stimmen Sie über Vorschläge ab und vergleichen Sie Was-wäre-wenn-Portfolios.",
+    "splash.features.5.body":
+      "Erfassen Sie Ideen, stimmen Sie über Vorschläge ab und vergleichen Sie Was-wäre-wenn-Portfolios.",
     "splash.features.6.title": "Ziele und Kapazität",
-    "splash.features.6.body": "Richten Sie Pläne an OKRs aus und sehen Sie die Auslastung pro Person, mit markierter Überbelegung.",
-    "tour.intro": "Ein geführter Rundgang durch das Planregister: wie Sie einen Plan anlegen, sein Lieferboard betreiben, seinen Fluss lesen, eine Idee bis zum Plan führen und ihn durch die Governance steuern.",
+    "splash.features.6.body":
+      "Richten Sie Pläne an OKRs aus und sehen Sie die Auslastung pro Person, mit markierter Überbelegung.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das Planregister: wie Sie einen Plan anlegen, sein Lieferboard betreiben, seinen Fluss lesen, eine Idee bis zum Plan führen und ihn durch die Governance steuern.",
     "tour.s1.title": "Einen Plan anlegen",
-    "tour.s1.summary": "Erfassen Sie einen Plan mit Namen, optionaler Art-Bezeichnung und Elternplan, sodass er im einen Planbaum steht.",
-    "tour.s1.step.1": "Öffnen Sie „Pläne“ und wählen Sie „Neu“ (oder gehen Sie direkt zum Formular für einen neuen Plan).",
-    "tour.s1.step.2": "Füllen Sie den Namen aus (erforderlich), wählen Sie dann optional Art, Status und Priorität und ergänzen Sie Code, Eigentümerorganisation, Tags und Schlüsselwörter.",
-    "tour.s1.step.3": "Legen Sie „Übergeordnetes Portfolio (pid)“ fest, um den Plan in einem anderen Plan zu platzieren, und ergänzen Sie vorhandene Kennungen.",
-    "tour.s1.step.4": "Wählen Sie „Erstellen“. Der Plan wird gespeichert, und Sie gelangen auf seine Detailseite.",
+    "tour.s1.summary":
+      "Erfassen Sie einen Plan mit Namen, optionaler Art-Bezeichnung und Elternplan, sodass er im einen Planbaum steht.",
+    "tour.s1.step.1":
+      "Öffnen Sie „Pläne“ und wählen Sie „Neu“ (oder gehen Sie direkt zum Formular für einen neuen Plan).",
+    "tour.s1.step.2":
+      "Füllen Sie den Namen aus (erforderlich), wählen Sie dann optional Art, Status und Priorität und ergänzen Sie Code, Eigentümerorganisation, Tags und Schlüsselwörter.",
+    "tour.s1.step.3":
+      "Legen Sie „Übergeordnetes Portfolio (pid)“ fest, um den Plan in einem anderen Plan zu platzieren, und ergänzen Sie vorhandene Kennungen.",
+    "tour.s1.step.4":
+      "Wählen Sie „Erstellen“. Der Plan wird gespeichert, und Sie gelangen auf seine Detailseite.",
     "tour.s2.title": "Einen Plan finden und mit Duplikaten umgehen",
-    "tour.s2.summary": "Filtern Sie die Planliste, öffnen Sie einen Datensatz und prüfen Sie, ob er einen anderen Plan wiederholt, bevor Sie ihn zusammenführen.",
-    "tour.s2.step.1": "Grenzen Sie unter „Pläne“ die Liste mit dem Tabellenfilter nach Namen ein und öffnen Sie dann einen Plan, um Art, Status, Code, Eigentümerorganisation, Tags und Kennungen zu sehen.",
-    "tour.s2.step.2": "Wählen Sie auf der Detailseite „Duplikate prüfen“. Wahrscheinliche Treffer erscheinen unter „Mögliche Duplikate“ mit ihren Bewertungen.",
-    "tour.s2.step.3": "Öffnen Sie den passenden Plan, um beide zu vergleichen, und korrigieren Sie mit „Bearbeiten“ einen der Datensätze.",
-    "tour.s2.step.4": "Geben Sie unter „Zusammenführen“ die „ID des verbleibenden Plans“ und die „ID des doppelten Plans“ ein, wählen Sie „Vorschau laden“ und dann „Zusammenführen“. Das Duplikat wird weich gelöscht und unter „Letzte Zusammenführungen“ aufgelistet.",
+    "tour.s2.summary":
+      "Filtern Sie die Planliste, öffnen Sie einen Datensatz und prüfen Sie, ob er einen anderen Plan wiederholt, bevor Sie ihn zusammenführen.",
+    "tour.s2.step.1":
+      "Grenzen Sie unter „Pläne“ die Liste mit dem Tabellenfilter nach Namen ein und öffnen Sie dann einen Plan, um Art, Status, Code, Eigentümerorganisation, Tags und Kennungen zu sehen.",
+    "tour.s2.step.2":
+      "Wählen Sie auf der Detailseite „Duplikate prüfen“. Wahrscheinliche Treffer erscheinen unter „Mögliche Duplikate“ mit ihren Bewertungen.",
+    "tour.s2.step.3":
+      "Öffnen Sie den passenden Plan, um beide zu vergleichen, und korrigieren Sie mit „Bearbeiten“ einen der Datensätze.",
+    "tour.s2.step.4":
+      "Geben Sie unter „Zusammenführen“ die „ID des verbleibenden Plans“ und die „ID des doppelten Plans“ ein, wählen Sie „Vorschau laden“ und dann „Zusammenführen“. Das Duplikat wird weich gelöscht und unter „Letzte Zusammenführungen“ aufgelistet.",
     "tour.s3.title": "Das Lieferboard betreiben",
-    "tour.s3.summary": "Jeder Plan hat ein Kanban-Board mit Sprints und einem Burndown, um seine Aufgaben zu verfolgen.",
+    "tour.s3.summary":
+      "Jeder Plan hat ein Kanban-Board mit Sprints und einem Burndown, um seine Aufgaben zu verfolgen.",
     "tour.s3.step.1": "Öffnen Sie einen Plan und wählen Sie „Board“.",
-    "tour.s3.step.2": "Geben Sie einen Aufgabentitel (Feld „New task title“), optionale Story Points und einen Sprint ein und wählen Sie „Add task“ (diese Seite ist nur auf Englisch).",
-    "tour.s3.step.3": "Ziehen Sie eine Karte zwischen „Todo“, „In progress“, „In review“, „Done“ und „Blocked“ (offen, in Arbeit, in Prüfung, erledigt, blockiert). Jedes Ziehen wird als Statusänderung gespeichert.",
-    "tour.s3.step.4": "Geben Sie unter „Sprints“ einen Sprintnamen mit Start- und Enddatum ein und wählen Sie „Add sprint“. Wählen Sie ihn, um das Burndown zu sehen, und nutzen Sie die Bereiche für Standup, Retro-Notizen und Velocity.",
+    "tour.s3.step.2":
+      "Geben Sie einen Aufgabentitel (Feld „New task title“), optionale Story Points und einen Sprint ein und wählen Sie „Add task“ (diese Seite ist nur auf Englisch).",
+    "tour.s3.step.3":
+      "Ziehen Sie eine Karte zwischen „Todo“, „In progress“, „In review“, „Done“ und „Blocked“ (offen, in Arbeit, in Prüfung, erledigt, blockiert). Jedes Ziehen wird als Statusänderung gespeichert.",
+    "tour.s3.step.4":
+      "Geben Sie unter „Sprints“ einen Sprintnamen mit Start- und Enddatum ein und wählen Sie „Add sprint“. Wählen Sie ihn, um das Burndown zu sehen, und nutzen Sie die Bereiche für Standup, Retro-Notizen und Velocity.",
     "tour.s4.title": "Den Fluss eines Plans lesen",
-    "tour.s4.summary": "Die zeitbasierte Analyse zeigt, wohin die Kalenderzeit eines Plans geht, nicht nur, wie ausgelastet die Menschen sind.",
+    "tour.s4.summary":
+      "Die zeitbasierte Analyse zeigt, wohin die Kalenderzeit eines Plans geht, nicht nur, wie ausgelastet die Menschen sind.",
     "tour.s4.step.1": "Öffnen Sie einen Plan und wählen Sie „Flow“.",
-    "tour.s4.step.2": "Lesen Sie zuerst die Kennzahlenkacheln: „Service level expectation“, „Flow efficiency“, „First pass yield“ und „Work in progress“ (diese Seite ist nur auf Englisch).",
-    "tour.s4.step.3": "Prüfen Sie „Aging work in progress“ auf Einträge, die länger als erwartet gewartet haben, und sehen Sie sich dann „Blocked“ und „Rework“ an.",
-    "tour.s4.step.4": "Nutzen Sie das Fenster „Cumulative flow“, das Ranking „Constraints“ und die „Distributions“, um zu sehen, was die Lieferung bremst. Nichts davon bewertet einzelne Personen.",
+    "tour.s4.step.2":
+      "Lesen Sie zuerst die Kennzahlenkacheln: „Service level expectation“, „Flow efficiency“, „First pass yield“ und „Work in progress“ (diese Seite ist nur auf Englisch).",
+    "tour.s4.step.3":
+      "Prüfen Sie „Aging work in progress“ auf Einträge, die länger als erwartet gewartet haben, und sehen Sie sich dann „Blocked“ und „Rework“ an.",
+    "tour.s4.step.4":
+      "Nutzen Sie das Fenster „Cumulative flow“, das Ranking „Constraints“ und die „Distributions“, um zu sehen, was die Lieferung bremst. Nichts davon bewertet einzelne Personen.",
     "tour.s5.title": "Von der Idee zum Plan",
-    "tour.s5.summary": "Erfassen Sie eine Idee, lassen Sie abstimmen und führen Sie sie über einen Vorschlag in einen echten Plan.",
-    "tour.s5.step.1": "Öffnen Sie „Ideen“ und nutzen Sie „Erfassen“ mit einem Titel der Idee und einer Kurzbeschreibung. Mit dem Pfeil nach oben wird abgestimmt, und die meistbewerteten Ideen stehen zuerst.",
-    "tour.s5.step.2": "Wählen Sie ein Umwandlungsziel und dann „Zum Vorschlag“. Eine Idee, die niemand verfolgt, lässt sich stattdessen verwerfen.",
-    "tour.s5.step.3": "Öffnen Sie „Vorschläge“ (Arbeitsaufnahme). Ein Entwurf wird eingereicht, dann geprüft und schließlich genehmigt oder abgelehnt. Mit „Duplikate?“ prüfen Sie auf wiederholte Nachfrage.",
-    "tour.s5.step.4": "Wählen Sie bei einem genehmigten Vorschlag „promote“. Er wird zu einem Plan, und der Link „Arbeitselement“ führt Sie dorthin.",
+    "tour.s5.summary":
+      "Erfassen Sie eine Idee, lassen Sie abstimmen und führen Sie sie über einen Vorschlag in einen echten Plan.",
+    "tour.s5.step.1":
+      "Öffnen Sie „Ideen“ und nutzen Sie „Erfassen“ mit einem Titel der Idee und einer Kurzbeschreibung. Mit dem Pfeil nach oben wird abgestimmt, und die meistbewerteten Ideen stehen zuerst.",
+    "tour.s5.step.2":
+      "Wählen Sie ein Umwandlungsziel und dann „Zum Vorschlag“. Eine Idee, die niemand verfolgt, lässt sich stattdessen verwerfen.",
+    "tour.s5.step.3":
+      "Öffnen Sie „Vorschläge“ (Arbeitsaufnahme). Ein Entwurf wird eingereicht, dann geprüft und schließlich genehmigt oder abgelehnt. Mit „Duplikate?“ prüfen Sie auf wiederholte Nachfrage.",
+    "tour.s5.step.4":
+      "Wählen Sie bei einem genehmigten Vorschlag „promote“. Er wird zu einem Plan, und der Link „Arbeitselement“ führt Sie dorthin.",
     "tour.s6.title": "Einen Plan per Governance steuern",
-    "tour.s6.summary": "Ein Bereich enthält die Gates, Risiken, das Budget, die Nutzen, Meilensteine und Zuweisungen eines Plans.",
+    "tour.s6.summary":
+      "Ein Bereich enthält die Gates, Risiken, das Budget, die Nutzen, Meilensteine und Zuweisungen eines Plans.",
     "tour.s6.step.1": "Öffnen Sie einen Plan und wählen Sie „Governance“.",
-    "tour.s6.step.2": "Wählen Sie unter „Gate-Verlauf“ eine Entscheidung (genehmigt, mit Auflagen genehmigt, zurückgestellt oder abgelehnt) und „Entscheidung erfassen“, um zum nächsten Gate zu wechseln.",
-    "tour.s6.step.3": "Melden Sie ein neues Risiko und eskalieren Sie es, wenn es wächst. Fügen Sie unter „Budget“ Positionen mit Kategorie und geplantem Betrag hinzu, deklarieren Sie „Nutzen“ und realisieren Sie ihn, sobald er eintritt.",
-    "tour.s6.step.4": "Fügen Sie „Meilensteine“ hinzu, schließen Sie sie ab und nutzen Sie „Zuweisen“, um Menschen Kapazität zu geben. Der Link „Zeitplan“ zeichnet Termine und Abhängigkeiten.",
+    "tour.s6.step.2":
+      "Wählen Sie unter „Gate-Verlauf“ eine Entscheidung (genehmigt, mit Auflagen genehmigt, zurückgestellt oder abgelehnt) und „Entscheidung erfassen“, um zum nächsten Gate zu wechseln.",
+    "tour.s6.step.3":
+      "Melden Sie ein neues Risiko und eskalieren Sie es, wenn es wächst. Fügen Sie unter „Budget“ Positionen mit Kategorie und geplantem Betrag hinzu, deklarieren Sie „Nutzen“ und realisieren Sie ihn, sobald er eintritt.",
+    "tour.s6.step.4":
+      "Fügen Sie „Meilensteine“ hinzu, schließen Sie sie ab und nutzen Sie „Zuweisen“, um Menschen Kapazität zu geben. Der Link „Zeitplan“ zeichnet Termine und Abhängigkeiten.",
   },
   "en-001": {
     // Merge page (/plans/merge)
@@ -1336,7 +1457,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -1386,48 +1508,81 @@ const STRINGS = {
     "tour.open": "Open this screen",
     "tour.top": "Back to top",
     "tour.start.title": "Before you begin",
-    "tour.start.summary": "You need an account to work with real data. Signing in takes under a minute and needs no password.",
-    "tour.start.step.1": "Choose Sign in at the top right and enter your email address.",
-    "tour.start.step.2": "Open the magic link we email you. It works once and expires quickly.",
-    "tour.start.step.3": "You return to the app signed in, with nothing to remember or reset.",
-    "tour.start.step.4": "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
-    "tour.intro": "A guided walkthrough of the plan registry: how to create a plan, run its delivery board, read its flow, take an idea all the way to a plan, and steer it through governance.",
+    "tour.start.summary":
+      "You need an account to work with real data. Signing in takes under a minute and needs no password.",
+    "tour.start.step.1":
+      "Choose Sign in at the top right and enter your email address.",
+    "tour.start.step.2":
+      "Open the magic link we email you. It works once and expires quickly.",
+    "tour.start.step.3":
+      "You return to the app signed in, with nothing to remember or reset.",
+    "tour.start.step.4":
+      "Use the buttons beside Sign in to change the theme, language and text size, or to share the page.",
+    "tour.intro":
+      "A guided walkthrough of the plan registry: how to create a plan, run its delivery board, read its flow, take an idea all the way to a plan, and steer it through governance.",
     "tour.s1.title": "Create a plan",
-    "tour.s1.summary": "Register a plan with a name, an optional kind label and a parent, so it sits in the one plan tree.",
-    "tour.s1.step.1": "Open Plans and choose New (or go straight to the new-plan form).",
-    "tour.s1.step.2": "Fill in Name, which is required, then pick an optional Kind, Status and Priority, and add a Code, Owner org, tags and keywords.",
-    "tour.s1.step.3": "Set Parent portfolio (pid) to place the plan inside another plan, and add any identifiers you already hold.",
-    "tour.s1.step.4": "Choose Create. The plan is saved and you land on its detail page.",
+    "tour.s1.summary":
+      "Register a plan with a name, an optional kind label and a parent, so it sits in the one plan tree.",
+    "tour.s1.step.1":
+      "Open Plans and choose New (or go straight to the new-plan form).",
+    "tour.s1.step.2":
+      "Fill in Name, which is required, then pick an optional Kind, Status and Priority, and add a Code, Owner org, tags and keywords.",
+    "tour.s1.step.3":
+      "Set Parent portfolio (pid) to place the plan inside another plan, and add any identifiers you already hold.",
+    "tour.s1.step.4":
+      "Choose Create. The plan is saved and you land on its detail page.",
     "tour.s2.title": "Find a plan and deal with duplicates",
-    "tour.s2.summary": "Filter the plan list, open a record, and check whether it repeats another plan before you merge it.",
-    "tour.s2.step.1": "On Plans, use the grid filter to narrow the list by Name, then open a plan to see its Kind, Status, Code, Owner org, tags and identifiers.",
-    "tour.s2.step.2": "On the detail page choose Check duplicates. Likely matches appear under Potential duplicates with their scores.",
-    "tour.s2.step.3": "Open the matching plan to compare the two, then use Edit to correct either record.",
-    "tour.s2.step.4": "On Merge, enter the Surviving plan id and Duplicate plan id, choose Load preview, then Merge. The duplicate is soft-deleted and listed under Recent merges.",
+    "tour.s2.summary":
+      "Filter the plan list, open a record, and check whether it repeats another plan before you merge it.",
+    "tour.s2.step.1":
+      "On Plans, use the grid filter to narrow the list by Name, then open a plan to see its Kind, Status, Code, Owner org, tags and identifiers.",
+    "tour.s2.step.2":
+      "On the detail page choose Check duplicates. Likely matches appear under Potential duplicates with their scores.",
+    "tour.s2.step.3":
+      "Open the matching plan to compare the two, then use Edit to correct either record.",
+    "tour.s2.step.4":
+      "On Merge, enter the Surviving plan id and Duplicate plan id, choose Load preview, then Merge. The duplicate is soft-deleted and listed under Recent merges.",
     "tour.s3.title": "Run the delivery board",
-    "tour.s3.summary": "Each plan has a Kanban board, with sprints and a burndown, to track its tasks.",
+    "tour.s3.summary":
+      "Each plan has a Kanban board, with sprints and a burndown, to track its tasks.",
     "tour.s3.step.1": "Open a plan and choose Board.",
-    "tour.s3.step.2": "Enter a New task title, optional story points and a sprint, then choose Add task.",
-    "tour.s3.step.3": "Drag a card between Todo, In progress, In review, Done and Blocked. Each drag is saved as a status change.",
-    "tour.s3.step.4": "Under Sprints, enter a Sprint name with a start and end date and choose Add sprint. Select it to see the burndown, and use the standup, retro notes and velocity sections.",
+    "tour.s3.step.2":
+      "Enter a New task title, optional story points and a sprint, then choose Add task.",
+    "tour.s3.step.3":
+      "Drag a card between Todo, In progress, In review, Done and Blocked. Each drag is saved as a status change.",
+    "tour.s3.step.4":
+      "Under Sprints, enter a Sprint name with a start and end date and choose Add sprint. Select it to see the burndown, and use the standup, retro notes and velocity sections.",
     "tour.s4.title": "Read a plan's flow",
-    "tour.s4.summary": "Time-based analysis shows where a plan's calendar time goes, not just how busy people are.",
+    "tour.s4.summary":
+      "Time-based analysis shows where a plan's calendar time goes, not just how busy people are.",
     "tour.s4.step.1": "Open a plan and choose Flow.",
-    "tour.s4.step.2": "Read the headline tiles first: Service level expectation, Flow efficiency, First pass yield and Work in progress.",
-    "tour.s4.step.3": "Check Aging work in progress for items that have waited longer than expected, then look at Blocked and Rework.",
-    "tour.s4.step.4": "Use the Cumulative flow window, the Constraints ranking and the Distributions to see what is slowing delivery. Nothing here ranks individual people.",
+    "tour.s4.step.2":
+      "Read the headline tiles first: Service level expectation, Flow efficiency, First pass yield and Work in progress.",
+    "tour.s4.step.3":
+      "Check Aging work in progress for items that have waited longer than expected, then look at Blocked and Rework.",
+    "tour.s4.step.4":
+      "Use the Cumulative flow window, the Constraints ranking and the Distributions to see what is slowing delivery. Nothing here ranks individual people.",
     "tour.s5.title": "From idea to plan",
-    "tour.s5.summary": "Capture an idea, let people vote, then move it through a proposal into a real plan.",
-    "tour.s5.step.1": "Open Ideas and use Capture with an Idea title and a Pitch. People vote with the up arrow, and the most-voted ideas come first.",
-    "tour.s5.step.2": "Pick a Convert target and choose To proposal. An idea nobody will act on can be dismissed instead.",
-    "tour.s5.step.3": "Open Proposals (work intake). A draft is submitted, then reviewed, then approved or rejected. Use duplicates? to check for repeated demand.",
-    "tour.s5.step.4": "Choose promote on an approved proposal. It becomes a plan, and the work item link takes you to it.",
+    "tour.s5.summary":
+      "Capture an idea, let people vote, then move it through a proposal into a real plan.",
+    "tour.s5.step.1":
+      "Open Ideas and use Capture with an Idea title and a Pitch. People vote with the up arrow, and the most-voted ideas come first.",
+    "tour.s5.step.2":
+      "Pick a Convert target and choose To proposal. An idea nobody will act on can be dismissed instead.",
+    "tour.s5.step.3":
+      "Open Proposals (work intake). A draft is submitted, then reviewed, then approved or rejected. Use duplicates? to check for repeated demand.",
+    "tour.s5.step.4":
+      "Choose promote on an approved proposal. It becomes a plan, and the work item link takes you to it.",
     "tour.s6.title": "Steer a plan with governance",
-    "tour.s6.summary": "One panel holds a plan's gates, risks, budget, benefits, milestones and allocations.",
+    "tour.s6.summary":
+      "One panel holds a plan's gates, risks, budget, benefits, milestones and allocations.",
     "tour.s6.step.1": "Open a plan and choose Governance.",
-    "tour.s6.step.2": "Under Gate journey, choose a decision (approved, approved with conditions, hold or rejected) and Record decision to move to the next gate.",
-    "tour.s6.step.3": "Raise a New risk and escalate it if it grows. Add Budget lines with a category and planned amount, and declare Benefits, then realize them as they arrive.",
-    "tour.s6.step.4": "Add Milestones, mark them complete, and use Allocate to give people capacity. The Schedule link draws the dates and dependencies.",
+    "tour.s6.step.2":
+      "Under Gate journey, choose a decision (approved, approved with conditions, hold or rejected) and Record decision to move to the next gate.",
+    "tour.s6.step.3":
+      "Raise a New risk and escalate it if it grows. Add Budget lines with a category and planned amount, and declare Benefits, then realize them as they arrive.",
+    "tour.s6.step.4":
+      "Add Milestones, mark them complete, and use Allocate to give people capacity. The Schedule link draws the dates and dependencies.",
     "signin.sso": "Sign in with SSO",
   },
   "es-001": {
@@ -1679,7 +1834,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -1729,48 +1885,81 @@ const STRINGS = {
     "tour.open": "Abrir esta pantalla",
     "tour.top": "Volver arriba",
     "tour.start.title": "Antes de empezar",
-    "tour.start.summary": "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
-    "tour.start.step.1": "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
-    "tour.start.step.2": "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
-    "tour.start.step.3": "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
-    "tour.start.step.4": "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
-    "tour.intro": "Un recorrido guiado por el registro de planes: cómo crear un plan, llevar su tablero de entrega, leer su flujo, convertir una idea en un plan y dirigirlo mediante la gobernanza.",
+    "tour.start.summary":
+      "Necesitas una cuenta para trabajar con datos reales. Iniciar sesión lleva menos de un minuto y no requiere contraseña.",
+    "tour.start.step.1":
+      "Elige Iniciar sesión arriba a la derecha e introduce tu correo electrónico.",
+    "tour.start.step.2":
+      "Abre el enlace mágico que te enviamos por correo. Funciona una sola vez y caduca pronto.",
+    "tour.start.step.3":
+      "Vuelves a la aplicación con la sesión iniciada, sin nada que recordar ni restablecer.",
+    "tour.start.step.4":
+      "Usa los botones junto a Iniciar sesión para cambiar el tema, el idioma y el tamaño del texto, o para compartir la página.",
+    "tour.intro":
+      "Un recorrido guiado por el registro de planes: cómo crear un plan, llevar su tablero de entrega, leer su flujo, convertir una idea en un plan y dirigirlo mediante la gobernanza.",
     "tour.s1.title": "Crear un plan",
-    "tour.s1.summary": "Registra un plan con un nombre, una etiqueta de tipo opcional y un plan padre, para que quede dentro del árbol único de planes.",
-    "tour.s1.step.1": "Abre Planes y elige Nuevo (o ve directamente al formulario de nuevo plan).",
-    "tour.s1.step.2": "Rellena Nombre, que es obligatorio, elige opcionalmente Tipo, Estado y Prioridad, y añade un Código, la organización propietaria, etiquetas y palabras clave.",
-    "tour.s1.step.3": "Indica el Plan padre (pid) para situar el plan dentro de otro plan y añade los identificadores que ya tengas.",
-    "tour.s1.step.4": "Elige Crear. El plan se guarda y llegas a su página de detalle.",
+    "tour.s1.summary":
+      "Registra un plan con un nombre, una etiqueta de tipo opcional y un plan padre, para que quede dentro del árbol único de planes.",
+    "tour.s1.step.1":
+      "Abre Planes y elige Nuevo (o ve directamente al formulario de nuevo plan).",
+    "tour.s1.step.2":
+      "Rellena Nombre, que es obligatorio, elige opcionalmente Tipo, Estado y Prioridad, y añade un Código, la organización propietaria, etiquetas y palabras clave.",
+    "tour.s1.step.3":
+      "Indica el Plan padre (pid) para situar el plan dentro de otro plan y añade los identificadores que ya tengas.",
+    "tour.s1.step.4":
+      "Elige Crear. El plan se guarda y llegas a su página de detalle.",
     "tour.s2.title": "Encontrar un plan y gestionar duplicados",
-    "tour.s2.summary": "Filtra la lista de planes, abre un registro y comprueba si repite otro plan antes de combinarlo.",
-    "tour.s2.step.1": "En Planes, usa el filtro de la cuadrícula para acotar por Nombre y abre un plan para ver su Tipo, Estado, Código, organización propietaria, etiquetas e identificadores.",
-    "tour.s2.step.2": "En la página de detalle elige Comprobar duplicados. Las posibles coincidencias aparecen en Posibles duplicados con su puntuación.",
-    "tour.s2.step.3": "Abre el plan coincidente para comparar ambos y usa Editar para corregir cualquiera de los registros.",
-    "tour.s2.step.4": "En Combinar, escribe el Id del plan superviviente y el Id del plan duplicado, elige Cargar vista previa y luego Combinar. El duplicado se elimina de forma lógica y aparece en Combinaciones recientes.",
+    "tour.s2.summary":
+      "Filtra la lista de planes, abre un registro y comprueba si repite otro plan antes de combinarlo.",
+    "tour.s2.step.1":
+      "En Planes, usa el filtro de la cuadrícula para acotar por Nombre y abre un plan para ver su Tipo, Estado, Código, organización propietaria, etiquetas e identificadores.",
+    "tour.s2.step.2":
+      "En la página de detalle elige Comprobar duplicados. Las posibles coincidencias aparecen en Posibles duplicados con su puntuación.",
+    "tour.s2.step.3":
+      "Abre el plan coincidente para comparar ambos y usa Editar para corregir cualquiera de los registros.",
+    "tour.s2.step.4":
+      "En Combinar, escribe el Id del plan superviviente y el Id del plan duplicado, elige Cargar vista previa y luego Combinar. El duplicado se elimina de forma lógica y aparece en Combinaciones recientes.",
     "tour.s3.title": "Llevar el tablero de entrega",
-    "tour.s3.summary": "Cada plan tiene un tablero Kanban, con sprints y un burndown, para seguir sus tareas.",
+    "tour.s3.summary":
+      "Cada plan tiene un tablero Kanban, con sprints y un burndown, para seguir sus tareas.",
     "tour.s3.step.1": "Abre un plan y elige Tablero.",
-    "tour.s3.step.2": "Escribe el título de una nueva tarea, puntos de historia opcionales y un sprint, y elige Add task.",
-    "tour.s3.step.3": "Arrastra una tarjeta entre Todo, In progress, In review, Done y Blocked. Cada arrastre se guarda como un cambio de estado.",
-    "tour.s3.step.4": "En Sprints, escribe un nombre de sprint con fecha de inicio y fin y elige Add sprint. Selecciónalo para ver el burndown y usa las secciones de standup, notas de retrospectiva y velocidad.",
+    "tour.s3.step.2":
+      "Escribe el título de una nueva tarea, puntos de historia opcionales y un sprint, y elige Add task.",
+    "tour.s3.step.3":
+      "Arrastra una tarjeta entre Todo, In progress, In review, Done y Blocked. Cada arrastre se guarda como un cambio de estado.",
+    "tour.s3.step.4":
+      "En Sprints, escribe un nombre de sprint con fecha de inicio y fin y elige Add sprint. Selecciónalo para ver el burndown y usa las secciones de standup, notas de retrospectiva y velocidad.",
     "tour.s4.title": "Leer el flujo de un plan",
-    "tour.s4.summary": "El análisis basado en el tiempo muestra en qué se va el tiempo de calendario de un plan, no solo lo ocupada que está la gente.",
+    "tour.s4.summary":
+      "El análisis basado en el tiempo muestra en qué se va el tiempo de calendario de un plan, no solo lo ocupada que está la gente.",
     "tour.s4.step.1": "Abre un plan y elige Flow.",
-    "tour.s4.step.2": "Lee primero los indicadores principales: Service level expectation, Flow efficiency, First pass yield y Work in progress.",
-    "tour.s4.step.3": "Revisa Aging work in progress para ver los elementos que han esperado más de lo previsto, y después Blocked y Rework.",
-    "tour.s4.step.4": "Usa la ventana de Cumulative flow, la clasificación de Constraints y las Distributions para ver qué frena la entrega. Nada aquí clasifica a personas concretas.",
+    "tour.s4.step.2":
+      "Lee primero los indicadores principales: Service level expectation, Flow efficiency, First pass yield y Work in progress.",
+    "tour.s4.step.3":
+      "Revisa Aging work in progress para ver los elementos que han esperado más de lo previsto, y después Blocked y Rework.",
+    "tour.s4.step.4":
+      "Usa la ventana de Cumulative flow, la clasificación de Constraints y las Distributions para ver qué frena la entrega. Nada aquí clasifica a personas concretas.",
     "tour.s5.title": "De la idea al plan",
-    "tour.s5.summary": "Recoge una idea, deja que la gente vote y llévala, a través de una propuesta, hasta un plan real.",
-    "tour.s5.step.1": "Abre Ideas y usa Capturar con un título de idea y una presentación. La gente vota con la flecha hacia arriba y las ideas más votadas van primero.",
-    "tour.s5.step.2": "Elige un destino de conversión y pulsa A propuesta. Una idea que nadie va a atender puede descartarse.",
-    "tour.s5.step.3": "Abre Propuestas (entrada de trabajo). Un borrador se envía, se revisa y se aprueba o se rechaza. Usa duplicates? para detectar demanda repetida.",
-    "tour.s5.step.4": "Pulsa promote en una propuesta aprobada. Se convierte en un plan y el enlace del elemento de trabajo te lleva a él.",
+    "tour.s5.summary":
+      "Recoge una idea, deja que la gente vote y llévala, a través de una propuesta, hasta un plan real.",
+    "tour.s5.step.1":
+      "Abre Ideas y usa Capturar con un título de idea y una presentación. La gente vota con la flecha hacia arriba y las ideas más votadas van primero.",
+    "tour.s5.step.2":
+      "Elige un destino de conversión y pulsa A propuesta. Una idea que nadie va a atender puede descartarse.",
+    "tour.s5.step.3":
+      "Abre Propuestas (entrada de trabajo). Un borrador se envía, se revisa y se aprueba o se rechaza. Usa duplicates? para detectar demanda repetida.",
+    "tour.s5.step.4":
+      "Pulsa promote en una propuesta aprobada. Se convierte en un plan y el enlace del elemento de trabajo te lleva a él.",
     "tour.s6.title": "Dirigir un plan con la gobernanza",
-    "tour.s6.summary": "Un solo panel reúne las fases, riesgos, presupuesto, beneficios, hitos y asignaciones de un plan.",
+    "tour.s6.summary":
+      "Un solo panel reúne las fases, riesgos, presupuesto, beneficios, hitos y asignaciones de un plan.",
     "tour.s6.step.1": "Abre un plan y elige Gobernanza.",
-    "tour.s6.step.2": "En Recorrido de fases, elige una decisión (approved, approved_with_conditions, hold o rejected) y Registrar decisión para pasar a la siguiente fase.",
-    "tour.s6.step.3": "Plantea un nuevo riesgo y escálalo si crece. Añade líneas de presupuesto con categoría e importe previsto, declara beneficios y márcalos como realizados a medida que llegan.",
-    "tour.s6.step.4": "Añade hitos, márcalos como completos y usa Allocate para dar capacidad a las personas. El enlace Cronograma dibuja las fechas y dependencias.",
+    "tour.s6.step.2":
+      "En Recorrido de fases, elige una decisión (approved, approved_with_conditions, hold o rejected) y Registrar decisión para pasar a la siguiente fase.",
+    "tour.s6.step.3":
+      "Plantea un nuevo riesgo y escálalo si crece. Añade líneas de presupuesto con categoría e importe previsto, declara beneficios y márcalos como realizados a medida que llegan.",
+    "tour.s6.step.4":
+      "Añade hitos, márcalos como completos y usa Allocate para dar capacidad a las personas. El enlace Cronograma dibuja las fechas y dependencias.",
     "signin.sso": "Iniciar sesión con SSO",
   },
   "fr-001": {
@@ -2021,7 +2210,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -2071,48 +2261,81 @@ const STRINGS = {
     "tour.open": "Ouvrir cet écran",
     "tour.top": "Retour en haut",
     "tour.start.title": "Avant de commencer",
-    "tour.start.summary": "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
-    "tour.start.step.1": "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
-    "tour.start.step.2": "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
-    "tour.start.step.3": "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
-    "tour.start.step.4": "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
-    "tour.intro": "Une visite guidée du registre des plans : créer un plan, tenir son tableau de livraison, lire son flux, faire d'une idée un plan et le piloter par la gouvernance.",
+    "tour.start.summary":
+      "Un compte est nécessaire pour travailler avec des données réelles. La connexion prend moins d'une minute et n'exige aucun mot de passe.",
+    "tour.start.step.1":
+      "Choisissez Se connecter en haut à droite et saisissez votre adresse e-mail.",
+    "tour.start.step.2":
+      "Ouvrez le lien magique reçu par e-mail. Il ne fonctionne qu'une fois et expire vite.",
+    "tour.start.step.3":
+      "Vous revenez dans l'application connecté, sans rien à retenir ni à réinitialiser.",
+    "tour.start.step.4":
+      "Utilisez les boutons à côté de Se connecter pour changer le thème, la langue et la taille du texte, ou pour partager la page.",
+    "tour.intro":
+      "Une visite guidée du registre des plans : créer un plan, tenir son tableau de livraison, lire son flux, faire d'une idée un plan et le piloter par la gouvernance.",
     "tour.s1.title": "Créer un plan",
-    "tour.s1.summary": "Enregistrez un plan avec un nom, une étiquette de type facultative et un parent, pour qu'il s'insère dans l'arbre unique des plans.",
-    "tour.s1.step.1": "Ouvrez Plans et choisissez Nouveau (ou allez directement au formulaire de nouveau plan).",
-    "tour.s1.step.2": "Renseignez Nom, obligatoire, puis choisissez éventuellement Type, Statut et Priorité, et ajoutez un Code, l'organisation propriétaire, des étiquettes et des mots-clés.",
-    "tour.s1.step.3": "Indiquez le Plan parent (pid) pour placer le plan dans un autre plan, et ajoutez les identifiants que vous possédez déjà.",
-    "tour.s1.step.4": "Choisissez Créer. Le plan est enregistré et vous arrivez sur sa page de détail.",
+    "tour.s1.summary":
+      "Enregistrez un plan avec un nom, une étiquette de type facultative et un parent, pour qu'il s'insère dans l'arbre unique des plans.",
+    "tour.s1.step.1":
+      "Ouvrez Plans et choisissez Nouveau (ou allez directement au formulaire de nouveau plan).",
+    "tour.s1.step.2":
+      "Renseignez Nom, obligatoire, puis choisissez éventuellement Type, Statut et Priorité, et ajoutez un Code, l'organisation propriétaire, des étiquettes et des mots-clés.",
+    "tour.s1.step.3":
+      "Indiquez le Plan parent (pid) pour placer le plan dans un autre plan, et ajoutez les identifiants que vous possédez déjà.",
+    "tour.s1.step.4":
+      "Choisissez Créer. Le plan est enregistré et vous arrivez sur sa page de détail.",
     "tour.s2.title": "Trouver un plan et traiter les doublons",
-    "tour.s2.summary": "Filtrez la liste des plans, ouvrez une fiche et vérifiez si elle répète un autre plan avant de fusionner.",
-    "tour.s2.step.1": "Dans Plans, utilisez le filtre de la grille pour restreindre par Nom, puis ouvrez un plan pour voir son Type, Statut, Code, organisation propriétaire, étiquettes et identifiants.",
-    "tour.s2.step.2": "Sur la page de détail, choisissez Vérifier les doublons. Les correspondances probables apparaissent sous Doublons potentiels avec leur score.",
-    "tour.s2.step.3": "Ouvrez le plan correspondant pour comparer les deux, puis utilisez Modifier pour corriger l'une ou l'autre fiche.",
-    "tour.s2.step.4": "Dans Fusionner, saisissez l'Id du plan survivant et l'Id du plan doublon, choisissez Charger l'aperçu puis Fusionner. Le doublon est supprimé logiquement et figure sous Fusions récentes.",
+    "tour.s2.summary":
+      "Filtrez la liste des plans, ouvrez une fiche et vérifiez si elle répète un autre plan avant de fusionner.",
+    "tour.s2.step.1":
+      "Dans Plans, utilisez le filtre de la grille pour restreindre par Nom, puis ouvrez un plan pour voir son Type, Statut, Code, organisation propriétaire, étiquettes et identifiants.",
+    "tour.s2.step.2":
+      "Sur la page de détail, choisissez Vérifier les doublons. Les correspondances probables apparaissent sous Doublons potentiels avec leur score.",
+    "tour.s2.step.3":
+      "Ouvrez le plan correspondant pour comparer les deux, puis utilisez Modifier pour corriger l'une ou l'autre fiche.",
+    "tour.s2.step.4":
+      "Dans Fusionner, saisissez l'Id du plan survivant et l'Id du plan doublon, choisissez Charger l'aperçu puis Fusionner. Le doublon est supprimé logiquement et figure sous Fusions récentes.",
     "tour.s3.title": "Tenir le tableau de livraison",
-    "tour.s3.summary": "Chaque plan a un tableau Kanban, avec des sprints et un burndown, pour suivre ses tâches.",
+    "tour.s3.summary":
+      "Chaque plan a un tableau Kanban, avec des sprints et un burndown, pour suivre ses tâches.",
     "tour.s3.step.1": "Ouvrez un plan et choisissez Tableau.",
-    "tour.s3.step.2": "Saisissez le titre d'une nouvelle tâche, des points d'histoire facultatifs et un sprint, puis choisissez Add task.",
-    "tour.s3.step.3": "Faites glisser une carte entre Todo, In progress, In review, Done et Blocked. Chaque déplacement est enregistré comme un changement de statut.",
-    "tour.s3.step.4": "Sous Sprints, saisissez un nom de sprint avec ses dates de début et de fin et choisissez Add sprint. Sélectionnez-le pour voir le burndown, et utilisez les sections standup, notes de rétrospective et vélocité.",
+    "tour.s3.step.2":
+      "Saisissez le titre d'une nouvelle tâche, des points d'histoire facultatifs et un sprint, puis choisissez Add task.",
+    "tour.s3.step.3":
+      "Faites glisser une carte entre Todo, In progress, In review, Done et Blocked. Chaque déplacement est enregistré comme un changement de statut.",
+    "tour.s3.step.4":
+      "Sous Sprints, saisissez un nom de sprint avec ses dates de début et de fin et choisissez Add sprint. Sélectionnez-le pour voir le burndown, et utilisez les sections standup, notes de rétrospective et vélocité.",
     "tour.s4.title": "Lire le flux d'un plan",
-    "tour.s4.summary": "L'analyse fondée sur le temps montre où passe le temps calendaire d'un plan, et pas seulement l'activité des équipes.",
+    "tour.s4.summary":
+      "L'analyse fondée sur le temps montre où passe le temps calendaire d'un plan, et pas seulement l'activité des équipes.",
     "tour.s4.step.1": "Ouvrez un plan et choisissez Flow.",
-    "tour.s4.step.2": "Lisez d'abord les indicateurs clés : Service level expectation, Flow efficiency, First pass yield et Work in progress.",
-    "tour.s4.step.3": "Consultez Aging work in progress pour les éléments qui attendent plus longtemps que prévu, puis Blocked et Rework.",
-    "tour.s4.step.4": "Utilisez la fenêtre Cumulative flow, le classement Constraints et les Distributions pour voir ce qui ralentit la livraison. Rien ici ne classe des personnes.",
+    "tour.s4.step.2":
+      "Lisez d'abord les indicateurs clés : Service level expectation, Flow efficiency, First pass yield et Work in progress.",
+    "tour.s4.step.3":
+      "Consultez Aging work in progress pour les éléments qui attendent plus longtemps que prévu, puis Blocked et Rework.",
+    "tour.s4.step.4":
+      "Utilisez la fenêtre Cumulative flow, le classement Constraints et les Distributions pour voir ce qui ralentit la livraison. Rien ici ne classe des personnes.",
     "tour.s5.title": "De l'idée au plan",
-    "tour.s5.summary": "Recueillez une idée, laissez chacun voter, puis faites-la passer par une proposition jusqu'à un vrai plan.",
-    "tour.s5.step.1": "Ouvrez Idées et utilisez Consigner avec un titre d'idée et un argumentaire. On vote avec la flèche vers le haut, et les idées les plus votées passent en tête.",
-    "tour.s5.step.2": "Choisissez une cible de conversion puis En proposition. Une idée que personne ne traitera peut être écartée.",
-    "tour.s5.step.3": "Ouvrez Propositions (entrée de travaux). Un brouillon est soumis, examiné, puis approuvé ou rejeté. Utilisez duplicates? pour repérer une demande répétée.",
-    "tour.s5.step.4": "Choisissez promote sur une proposition approuvée. Elle devient un plan, et le lien de l'élément de travail y mène.",
+    "tour.s5.summary":
+      "Recueillez une idée, laissez chacun voter, puis faites-la passer par une proposition jusqu'à un vrai plan.",
+    "tour.s5.step.1":
+      "Ouvrez Idées et utilisez Consigner avec un titre d'idée et un argumentaire. On vote avec la flèche vers le haut, et les idées les plus votées passent en tête.",
+    "tour.s5.step.2":
+      "Choisissez une cible de conversion puis En proposition. Une idée que personne ne traitera peut être écartée.",
+    "tour.s5.step.3":
+      "Ouvrez Propositions (entrée de travaux). Un brouillon est soumis, examiné, puis approuvé ou rejeté. Utilisez duplicates? pour repérer une demande répétée.",
+    "tour.s5.step.4":
+      "Choisissez promote sur une proposition approuvée. Elle devient un plan, et le lien de l'élément de travail y mène.",
     "tour.s6.title": "Piloter un plan par la gouvernance",
-    "tour.s6.summary": "Un seul panneau réunit les jalons de décision, risques, budget, bénéfices, étapes et affectations d'un plan.",
+    "tour.s6.summary":
+      "Un seul panneau réunit les jalons de décision, risques, budget, bénéfices, étapes et affectations d'un plan.",
     "tour.s6.step.1": "Ouvrez un plan et choisissez Gouvernance.",
-    "tour.s6.step.2": "Sous Parcours des jalons, choisissez une décision (approved, approved_with_conditions, hold ou rejected) puis Enregistrer la décision pour passer au jalon suivant.",
-    "tour.s6.step.3": "Signalez un nouveau risque et escaladez-le s'il s'aggrave. Ajoutez des lignes de budget avec catégorie et montant prévu, déclarez des bénéfices, puis marquez-les réalisés à mesure.",
-    "tour.s6.step.4": "Ajoutez des étapes, marquez-les terminées et utilisez Allocate pour donner de la capacité aux personnes. Le lien Calendrier dessine les dates et dépendances.",
+    "tour.s6.step.2":
+      "Sous Parcours des jalons, choisissez une décision (approved, approved_with_conditions, hold ou rejected) puis Enregistrer la décision pour passer au jalon suivant.",
+    "tour.s6.step.3":
+      "Signalez un nouveau risque et escaladez-le s'il s'aggrave. Ajoutez des lignes de budget avec catégorie et montant prévu, déclarez des bénéfices, puis marquez-les réalisés à mesure.",
+    "tour.s6.step.4":
+      "Ajoutez des étapes, marquez-les terminées et utilisez Allocate pour donner de la capacité aux personnes. Le lien Calendrier dessine les dates et dépendances.",
     "signin.sso": "Se connecter avec SSO",
   },
   "hi-001": {
@@ -2360,7 +2583,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -2410,48 +2634,81 @@ const STRINGS = {
     "tour.open": "यह स्क्रीन खोलें",
     "tour.top": "ऊपर लौटें",
     "tour.start.title": "शुरू करने से पहले",
-    "tour.start.summary": "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
-    "tour.start.step.1": "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
-    "tour.start.step.2": "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
-    "tour.start.step.3": "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
-    "tour.start.step.4": "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
-    "tour.intro": "योजना रजिस्ट्री का निर्देशित परिचय: योजना कैसे बनाएँ, उसका डिलीवरी बोर्ड कैसे चलाएँ, उसका प्रवाह कैसे पढ़ें, किसी विचार को योजना तक कैसे पहुँचाएँ और शासन के ज़रिए उसे कैसे संचालित करें।",
+    "tour.start.summary":
+      "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
+    "tour.start.step.1":
+      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.2":
+      "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
+    "tour.start.step.3":
+      "आप साइन इन होकर ऐप में लौटते हैं, न कुछ याद रखना, न रीसेट करना।",
+    "tour.start.step.4":
+      "थीम, भाषा और टेक्स्ट का आकार बदलने या पृष्ठ साझा करने के लिए साइन इन के पास के बटन इस्तेमाल करें।",
+    "tour.intro":
+      "योजना रजिस्ट्री का निर्देशित परिचय: योजना कैसे बनाएँ, उसका डिलीवरी बोर्ड कैसे चलाएँ, उसका प्रवाह कैसे पढ़ें, किसी विचार को योजना तक कैसे पहुँचाएँ और शासन के ज़रिए उसे कैसे संचालित करें।",
     "tour.s1.title": "योजना बनाना",
-    "tour.s1.summary": "नाम, वैकल्पिक प्रकार लेबल और पैरेंट के साथ योजना दर्ज करें, ताकि वह एकल योजना वृक्ष में बैठ जाए।",
-    "tour.s1.step.1": "योजनाएँ खोलें और नया चुनें (या सीधे नई योजना के फ़ॉर्म पर जाएँ)।",
-    "tour.s1.step.2": "नाम भरें, जो अनिवार्य है, फिर वैकल्पिक रूप से प्रकार, स्थिति और प्राथमिकता चुनें, और कोड, स्वामी संगठन, टैग और कीवर्ड जोड़ें।",
-    "tour.s1.step.3": "योजना को किसी दूसरी योजना के भीतर रखने के लिए पैरेंट पोर्टफ़ोलियो (pid) सेट करें, और आपके पास जो पहचानकर्ता हैं उन्हें जोड़ें।",
-    "tour.s1.step.4": "बनाएँ चुनें। योजना सहेज ली जाती है और आप उसके विवरण पृष्ठ पर पहुँचते हैं।",
+    "tour.s1.summary":
+      "नाम, वैकल्पिक प्रकार लेबल और पैरेंट के साथ योजना दर्ज करें, ताकि वह एकल योजना वृक्ष में बैठ जाए।",
+    "tour.s1.step.1":
+      "योजनाएँ खोलें और नया चुनें (या सीधे नई योजना के फ़ॉर्म पर जाएँ)।",
+    "tour.s1.step.2":
+      "नाम भरें, जो अनिवार्य है, फिर वैकल्पिक रूप से प्रकार, स्थिति और प्राथमिकता चुनें, और कोड, स्वामी संगठन, टैग और कीवर्ड जोड़ें।",
+    "tour.s1.step.3":
+      "योजना को किसी दूसरी योजना के भीतर रखने के लिए पैरेंट पोर्टफ़ोलियो (pid) सेट करें, और आपके पास जो पहचानकर्ता हैं उन्हें जोड़ें।",
+    "tour.s1.step.4":
+      "बनाएँ चुनें। योजना सहेज ली जाती है और आप उसके विवरण पृष्ठ पर पहुँचते हैं।",
     "tour.s2.title": "योजना खोजना और डुप्लिकेट सँभालना",
-    "tour.s2.summary": "योजना सूची फ़िल्टर करें, रिकॉर्ड खोलें, और मर्ज करने से पहले जाँचें कि वह किसी अन्य योजना को दोहराता तो नहीं।",
-    "tour.s2.step.1": "योजनाएँ में ग्रिड फ़िल्टर से नाम के आधार पर सूची छाँटें, फिर किसी योजना को खोलकर उसका प्रकार, स्थिति, कोड, स्वामी संगठन, टैग और पहचानकर्ता देखें।",
-    "tour.s2.step.2": "विवरण पृष्ठ पर डुप्लिकेट जाँचें चुनें। संभावित मिलान स्कोर के साथ संभावित डुप्लिकेट के अंतर्गत दिखते हैं।",
-    "tour.s2.step.3": "दोनों की तुलना के लिए मिलती-जुलती योजना खोलें, फिर किसी भी रिकॉर्ड को सुधारने के लिए संपादित करें का उपयोग करें।",
-    "tour.s2.step.4": "विलय में शेष रहने वाली योजना की id और डुप्लिकेट योजना की id दर्ज करें, पूर्वावलोकन लोड करें चुनें, फिर विलय। डुप्लिकेट सॉफ़्ट-डिलीट हो जाता है और हाल के विलय में सूचीबद्ध होता है।",
+    "tour.s2.summary":
+      "योजना सूची फ़िल्टर करें, रिकॉर्ड खोलें, और मर्ज करने से पहले जाँचें कि वह किसी अन्य योजना को दोहराता तो नहीं।",
+    "tour.s2.step.1":
+      "योजनाएँ में ग्रिड फ़िल्टर से नाम के आधार पर सूची छाँटें, फिर किसी योजना को खोलकर उसका प्रकार, स्थिति, कोड, स्वामी संगठन, टैग और पहचानकर्ता देखें।",
+    "tour.s2.step.2":
+      "विवरण पृष्ठ पर डुप्लिकेट जाँचें चुनें। संभावित मिलान स्कोर के साथ संभावित डुप्लिकेट के अंतर्गत दिखते हैं।",
+    "tour.s2.step.3":
+      "दोनों की तुलना के लिए मिलती-जुलती योजना खोलें, फिर किसी भी रिकॉर्ड को सुधारने के लिए संपादित करें का उपयोग करें।",
+    "tour.s2.step.4":
+      "विलय में शेष रहने वाली योजना की id और डुप्लिकेट योजना की id दर्ज करें, पूर्वावलोकन लोड करें चुनें, फिर विलय। डुप्लिकेट सॉफ़्ट-डिलीट हो जाता है और हाल के विलय में सूचीबद्ध होता है।",
     "tour.s3.title": "डिलीवरी बोर्ड चलाना",
-    "tour.s3.summary": "हर योजना में उसके कार्यों को ट्रैक करने के लिए स्प्रिंट और बर्नडाउन के साथ एक कानबन बोर्ड होता है।",
+    "tour.s3.summary":
+      "हर योजना में उसके कार्यों को ट्रैक करने के लिए स्प्रिंट और बर्नडाउन के साथ एक कानबन बोर्ड होता है।",
     "tour.s3.step.1": "कोई योजना खोलें और बोर्ड चुनें।",
-    "tour.s3.step.2": "नए कार्य का शीर्षक, वैकल्पिक स्टोरी पॉइंट और स्प्रिंट दर्ज करें, फिर Add task चुनें।",
-    "tour.s3.step.3": "कार्ड को Todo, In progress, In review, Done और Blocked के बीच खींचें। हर खिंचाव स्थिति-परिवर्तन के रूप में सहेजा जाता है।",
-    "tour.s3.step.4": "Sprints के अंतर्गत आरंभ और समाप्ति तिथि के साथ स्प्रिंट का नाम दर्ज करें और Add sprint चुनें। बर्नडाउन देखने के लिए उसे चुनें, और स्टैंडअप, रेट्रो नोट्स और वेलॉसिटी अनुभाग इस्तेमाल करें।",
+    "tour.s3.step.2":
+      "नए कार्य का शीर्षक, वैकल्पिक स्टोरी पॉइंट और स्प्रिंट दर्ज करें, फिर Add task चुनें।",
+    "tour.s3.step.3":
+      "कार्ड को Todo, In progress, In review, Done और Blocked के बीच खींचें। हर खिंचाव स्थिति-परिवर्तन के रूप में सहेजा जाता है।",
+    "tour.s3.step.4":
+      "Sprints के अंतर्गत आरंभ और समाप्ति तिथि के साथ स्प्रिंट का नाम दर्ज करें और Add sprint चुनें। बर्नडाउन देखने के लिए उसे चुनें, और स्टैंडअप, रेट्रो नोट्स और वेलॉसिटी अनुभाग इस्तेमाल करें।",
     "tour.s4.title": "योजना का प्रवाह पढ़ना",
-    "tour.s4.summary": "समय-आधारित विश्लेषण दिखाता है कि योजना का कैलेंडर समय कहाँ जाता है, सिर्फ़ यह नहीं कि लोग कितने व्यस्त हैं।",
+    "tour.s4.summary":
+      "समय-आधारित विश्लेषण दिखाता है कि योजना का कैलेंडर समय कहाँ जाता है, सिर्फ़ यह नहीं कि लोग कितने व्यस्त हैं।",
     "tour.s4.step.1": "कोई योजना खोलें और Flow चुनें।",
-    "tour.s4.step.2": "पहले मुख्य टाइलें पढ़ें: Service level expectation, Flow efficiency, First pass yield और Work in progress।",
-    "tour.s4.step.3": "Aging work in progress में उन मदों को देखें जो अपेक्षा से अधिक प्रतीक्षा में रहीं, फिर Blocked और Rework देखें।",
-    "tour.s4.step.4": "डिलीवरी को क्या धीमा कर रहा है यह देखने के लिए Cumulative flow विंडो, Constraints रैंकिंग और Distributions का उपयोग करें। यहाँ कुछ भी व्यक्तियों को रैंक नहीं करता।",
+    "tour.s4.step.2":
+      "पहले मुख्य टाइलें पढ़ें: Service level expectation, Flow efficiency, First pass yield और Work in progress।",
+    "tour.s4.step.3":
+      "Aging work in progress में उन मदों को देखें जो अपेक्षा से अधिक प्रतीक्षा में रहीं, फिर Blocked और Rework देखें।",
+    "tour.s4.step.4":
+      "डिलीवरी को क्या धीमा कर रहा है यह देखने के लिए Cumulative flow विंडो, Constraints रैंकिंग और Distributions का उपयोग करें। यहाँ कुछ भी व्यक्तियों को रैंक नहीं करता।",
     "tour.s5.title": "विचार से योजना तक",
-    "tour.s5.summary": "कोई विचार दर्ज करें, लोगों को वोट देने दें, फिर उसे प्रस्ताव से होते हुए असली योजना तक ले जाएँ।",
-    "tour.s5.step.1": "विचार खोलें और विचार का शीर्षक तथा पिच के साथ दर्ज करें का उपयोग करें। लोग ऊपर के तीर से वोट देते हैं, और सबसे अधिक वोट वाले विचार पहले आते हैं।",
-    "tour.s5.step.2": "रूपांतरण लक्ष्य चुनें और प्रस्ताव में चुनें। जिस विचार पर कोई काम नहीं करेगा उसे ख़ारिज किया जा सकता है।",
-    "tour.s5.step.3": "प्रस्ताव (कार्य प्रवेश) खोलें। मसौदा जमा होता है, फिर समीक्षा होती है, फिर स्वीकृत या अस्वीकृत। दोहराई गई माँग जाँचने के लिए duplicates? इस्तेमाल करें।",
-    "tour.s5.step.4": "स्वीकृत प्रस्ताव पर promote चुनें। वह योजना बन जाता है, और कार्य-मद का लिंक आपको उस तक ले जाता है।",
+    "tour.s5.summary":
+      "कोई विचार दर्ज करें, लोगों को वोट देने दें, फिर उसे प्रस्ताव से होते हुए असली योजना तक ले जाएँ।",
+    "tour.s5.step.1":
+      "विचार खोलें और विचार का शीर्षक तथा पिच के साथ दर्ज करें का उपयोग करें। लोग ऊपर के तीर से वोट देते हैं, और सबसे अधिक वोट वाले विचार पहले आते हैं।",
+    "tour.s5.step.2":
+      "रूपांतरण लक्ष्य चुनें और प्रस्ताव में चुनें। जिस विचार पर कोई काम नहीं करेगा उसे ख़ारिज किया जा सकता है।",
+    "tour.s5.step.3":
+      "प्रस्ताव (कार्य प्रवेश) खोलें। मसौदा जमा होता है, फिर समीक्षा होती है, फिर स्वीकृत या अस्वीकृत। दोहराई गई माँग जाँचने के लिए duplicates? इस्तेमाल करें।",
+    "tour.s5.step.4":
+      "स्वीकृत प्रस्ताव पर promote चुनें। वह योजना बन जाता है, और कार्य-मद का लिंक आपको उस तक ले जाता है।",
     "tour.s6.title": "शासन से योजना का संचालन",
-    "tour.s6.summary": "एक ही पैनल में योजना के गेट, जोखिम, बजट, लाभ, मील के पत्थर और आवंटन होते हैं।",
+    "tour.s6.summary":
+      "एक ही पैनल में योजना के गेट, जोखिम, बजट, लाभ, मील के पत्थर और आवंटन होते हैं।",
     "tour.s6.step.1": "कोई योजना खोलें और शासन चुनें।",
-    "tour.s6.step.2": "गेट यात्रा में निर्णय चुनें (approved, approved_with_conditions, hold या rejected) और अगले गेट पर जाने के लिए निर्णय दर्ज करें चुनें।",
-    "tour.s6.step.3": "नया जोखिम उठाएँ और बढ़ने पर उसे एस्केलेट करें। श्रेणी और नियोजित राशि के साथ बजट लाइनें जोड़ें, लाभ घोषित करें, फिर मिलते ही उन्हें साकार करें।",
-    "tour.s6.step.4": "मील के पत्थर जोड़ें, उन्हें पूर्ण चिह्नित करें, और लोगों को क्षमता देने के लिए Allocate का उपयोग करें। समय-सारणी लिंक तिथियाँ और निर्भरताएँ दिखाता है।",
+    "tour.s6.step.2":
+      "गेट यात्रा में निर्णय चुनें (approved, approved_with_conditions, hold या rejected) और अगले गेट पर जाने के लिए निर्णय दर्ज करें चुनें।",
+    "tour.s6.step.3":
+      "नया जोखिम उठाएँ और बढ़ने पर उसे एस्केलेट करें। श्रेणी और नियोजित राशि के साथ बजट लाइनें जोड़ें, लाभ घोषित करें, फिर मिलते ही उन्हें साकार करें।",
+    "tour.s6.step.4":
+      "मील के पत्थर जोड़ें, उन्हें पूर्ण चिह्नित करें, और लोगों को क्षमता देने के लिए Allocate का उपयोग करें। समय-सारणी लिंक तिथियाँ और निर्भरताएँ दिखाता है।",
     "signin.sso": "SSO से साइन इन करें",
   },
   "zh-cn": {
@@ -2691,7 +2948,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "splash.hero.title": "每项计划，一个互联视图",
@@ -2733,48 +2991,74 @@ const STRINGS = {
     "tour.open": "打开此页面",
     "tour.top": "返回顶部",
     "tour.start.title": "开始之前",
-    "tour.start.summary": "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
+    "tour.start.summary":
+      "处理真实数据需要账号。登录不到一分钟，也不需要密码。",
     "tour.start.step.1": "点击右上角的“登录”，输入你的邮箱地址。",
-    "tour.start.step.2": "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
+    "tour.start.step.2":
+      "打开我们发到邮箱的魔法链接。它只能使用一次，且很快过期。",
     "tour.start.step.3": "你会以已登录状态回到应用，无需记忆或重置任何内容。",
-    "tour.start.step.4": "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
-    "tour.intro": "计划登记库的图文导览：如何创建计划、运行交付看板、读懂流程数据、把想法变成计划，并通过治理来推进。",
+    "tour.start.step.4":
+      "使用“登录”旁边的按钮切换主题、语言和文字大小，或分享此页面。",
+    "tour.intro":
+      "计划登记库的图文导览：如何创建计划、运行交付看板、读懂流程数据、把想法变成计划，并通过治理来推进。",
     "tour.s1.title": "创建计划",
-    "tour.s1.summary": "用名称、可选的类型标签和上级来登记计划，使其位于同一棵计划树中。",
+    "tour.s1.summary":
+      "用名称、可选的类型标签和上级来登记计划，使其位于同一棵计划树中。",
     "tour.s1.step.1": "打开“计划”并选择“新建”（或直接进入新建计划表单）。",
-    "tour.s1.step.2": "填写必填的“名称”，再按需选择“类型”“状态”和“优先级”，并添加“代码”、所属组织、标签和关键词。",
-    "tour.s1.step.3": "设置“上级组合 (pid)”把计划放到另一个计划之内，并添加你已有的标识符。",
+    "tour.s1.step.2":
+      "填写必填的“名称”，再按需选择“类型”“状态”和“优先级”，并添加“代码”、所属组织、标签和关键词。",
+    "tour.s1.step.3":
+      "设置“上级组合 (pid)”把计划放到另一个计划之内，并添加你已有的标识符。",
     "tour.s1.step.4": "选择“创建”。计划随即保存，并跳转到它的详情页。",
     "tour.s2.title": "查找计划并处理重复",
-    "tour.s2.summary": "筛选计划列表，打开记录，并在合并前检查它是否与其他计划重复。",
-    "tour.s2.step.1": "在“计划”中用表格筛选按名称缩小范围，再打开计划查看其类型、状态、代码、所属组织、标签和标识符。",
-    "tour.s2.step.2": "在详情页选择“检查重复”。可能的匹配项会连同分数显示在“潜在重复”下。",
-    "tour.s2.step.3": "打开匹配的计划进行对比，然后用“编辑”修正其中任一条记录。",
-    "tour.s2.step.4": "在“合并”中输入保留计划的 id 和重复计划的 id，选择“加载预览”，再点“合并”。重复项被软删除，并列在“最近合并”中。",
+    "tour.s2.summary":
+      "筛选计划列表，打开记录，并在合并前检查它是否与其他计划重复。",
+    "tour.s2.step.1":
+      "在“计划”中用表格筛选按名称缩小范围，再打开计划查看其类型、状态、代码、所属组织、标签和标识符。",
+    "tour.s2.step.2":
+      "在详情页选择“检查重复”。可能的匹配项会连同分数显示在“潜在重复”下。",
+    "tour.s2.step.3":
+      "打开匹配的计划进行对比，然后用“编辑”修正其中任一条记录。",
+    "tour.s2.step.4":
+      "在“合并”中输入保留计划的 id 和重复计划的 id，选择“加载预览”，再点“合并”。重复项被软删除，并列在“最近合并”中。",
     "tour.s3.title": "运行交付看板",
     "tour.s3.summary": "每个计划都有带冲刺和燃尽图的看板，用来跟踪任务。",
     "tour.s3.step.1": "打开计划并选择“看板”。",
     "tour.s3.step.2": "输入新任务标题、可选的故事点和冲刺，然后选择 Add task。",
-    "tour.s3.step.3": "在 Todo、In progress、In review、Done 和 Blocked 之间拖动卡片。每次拖动都会保存为一次状态变更。",
-    "tour.s3.step.4": "在 Sprints 下输入冲刺名称及开始、结束日期，选择 Add sprint。选中它即可查看燃尽图，并使用站会、回顾笔记和速率部分。",
+    "tour.s3.step.3":
+      "在 Todo、In progress、In review、Done 和 Blocked 之间拖动卡片。每次拖动都会保存为一次状态变更。",
+    "tour.s3.step.4":
+      "在 Sprints 下输入冲刺名称及开始、结束日期，选择 Add sprint。选中它即可查看燃尽图，并使用站会、回顾笔记和速率部分。",
     "tour.s4.title": "读懂计划的流程数据",
-    "tour.s4.summary": "基于时间的分析显示计划的日历时间花在哪里，而不仅仅是大家有多忙。",
+    "tour.s4.summary":
+      "基于时间的分析显示计划的日历时间花在哪里，而不仅仅是大家有多忙。",
     "tour.s4.step.1": "打开计划并选择 Flow。",
-    "tour.s4.step.2": "先看核心指标：Service level expectation、Flow efficiency、First pass yield 和 Work in progress。",
-    "tour.s4.step.3": "在 Aging work in progress 中查看等待时间超出预期的事项，再看 Blocked 和 Rework。",
-    "tour.s4.step.4": "用 Cumulative flow 时间窗、Constraints 排名和 Distributions 找出拖慢交付的原因。这里不会对任何个人排名。",
+    "tour.s4.step.2":
+      "先看核心指标：Service level expectation、Flow efficiency、First pass yield 和 Work in progress。",
+    "tour.s4.step.3":
+      "在 Aging work in progress 中查看等待时间超出预期的事项，再看 Blocked 和 Rework。",
+    "tour.s4.step.4":
+      "用 Cumulative flow 时间窗、Constraints 排名和 Distributions 找出拖慢交付的原因。这里不会对任何个人排名。",
     "tour.s5.title": "从想法到计划",
     "tour.s5.summary": "记录一个想法，让大家投票，再经由提案变成真正的计划。",
-    "tour.s5.step.1": "打开“想法”，用“记录”填写想法标题和简介。大家用向上箭头投票，得票最多的想法排在最前。",
-    "tour.s5.step.2": "选择转换目标，再点“转为提案”。没人会跟进的想法可以直接驳回。",
-    "tour.s5.step.3": "打开“提案”（工作受理）。草稿先提交、再审阅，然后批准或拒绝。用 duplicates? 检查重复需求。",
-    "tour.s5.step.4": "在已批准的提案上选择 promote。它会变成计划，工作项链接会带你过去。",
+    "tour.s5.step.1":
+      "打开“想法”，用“记录”填写想法标题和简介。大家用向上箭头投票，得票最多的想法排在最前。",
+    "tour.s5.step.2":
+      "选择转换目标，再点“转为提案”。没人会跟进的想法可以直接驳回。",
+    "tour.s5.step.3":
+      "打开“提案”（工作受理）。草稿先提交、再审阅，然后批准或拒绝。用 duplicates? 检查重复需求。",
+    "tour.s5.step.4":
+      "在已批准的提案上选择 promote。它会变成计划，工作项链接会带你过去。",
     "tour.s6.title": "用治理推进计划",
-    "tour.s6.summary": "一个面板汇集计划的关口、风险、预算、收益、里程碑和资源分配。",
+    "tour.s6.summary":
+      "一个面板汇集计划的关口、风险、预算、收益、里程碑和资源分配。",
     "tour.s6.step.1": "打开计划并选择“治理”。",
-    "tour.s6.step.2": "在“阶段关口”下选择一个决定（approved、approved_with_conditions、hold 或 rejected），点“记录决定”进入下一关口。",
-    "tour.s6.step.3": "提出新风险，风险扩大时上报。添加带类别和计划金额的预算行，声明收益，并在收益到位时标记实现。",
-    "tour.s6.step.4": "添加里程碑并标记完成，用 Allocate 给人员分配容量。“进度表”链接会画出日期和依赖关系。",
+    "tour.s6.step.2":
+      "在“阶段关口”下选择一个决定（approved、approved_with_conditions、hold 或 rejected），点“记录决定”进入下一关口。",
+    "tour.s6.step.3":
+      "提出新风险，风险扩大时上报。添加带类别和计划金额的预算行，声明收益，并在收益到位时标记实现。",
+    "tour.s6.step.4":
+      "添加里程碑并标记完成，用 Allocate 给人员分配容量。“进度表”链接会画出日期和依赖关系。",
     "signin.sso": "使用 SSO 登录",
   },
 } as const;

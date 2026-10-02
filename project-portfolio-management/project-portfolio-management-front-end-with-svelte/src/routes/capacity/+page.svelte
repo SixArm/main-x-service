@@ -3,9 +3,9 @@
   a window; summed percent over 100 flags over-allocation.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
-  import { PpmClient, type CapacityView } from "$lib/api/ppm";
+  import { PpmClient, type CapacityView } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   let view = $state<CapacityView | null>(null);

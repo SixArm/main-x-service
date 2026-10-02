@@ -4,7 +4,7 @@
   declares which app screen each workflow section links to, in order.
 -->
 <script lang="ts">
-    import Tour from "$lib/components/Tour.svelte";
+    import Tour from "#lib/components/Tour.svelte";
 
     const sections = [
         { href: "/new" },

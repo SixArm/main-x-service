@@ -11,10 +11,10 @@
       label/input ids on the page. Default "geo".
 -->
 <script lang="ts">
-    import type { GeoCoordinates } from "$lib/api/types.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
+    import type { GeoCoordinates } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
 
     let {
         geo = $bindable(),

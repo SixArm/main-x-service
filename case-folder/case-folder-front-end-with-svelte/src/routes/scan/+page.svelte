@@ -14,19 +14,19 @@
     //   searched — true once a scan completed, to switch "no results" copy.
     //   errorMsg — non-404 API failure to surface in an alert.
 
-    import { api, ApiError } from '$lib/api/client';
-    import { formatNhsNumber } from '$lib/store/nhs';
-    import type { Folder } from '$lib/store/types';
+    import { api, ApiError } from '#lib/api/client.js';
+    import { formatNhsNumber } from '#lib/store/nhs.js';
+    import type { Folder } from '#lib/store/types.js';
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Alert from '$lib/components/Alert/Alert.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import Icon from '$lib/components/Icon/Icon.svelte';
-    import Form from '$lib/components/Form/Form.svelte';
-    import Field from '$lib/components/Field/Field.svelte';
-    import Button from '$lib/components/Button/Button.svelte';
-    import TextInput from '$lib/components/TextInput/TextInput.svelte';
-    import { t, tf, statusLabel } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Alert from '#lib/components/Alert/Alert.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import Icon from '#lib/components/Icon/Icon.svelte';
+    import Form from '#lib/components/Form/Form.svelte';
+    import Field from '#lib/components/Field/Field.svelte';
+    import Button from '#lib/components/Button/Button.svelte';
+    import TextInput from '#lib/components/TextInput/TextInput.svelte';
+    import { t, tf, statusLabel } from '#lib/i18n.svelte.js';
 
     let term = $state('');
     let results = $state<Folder[]>([]);

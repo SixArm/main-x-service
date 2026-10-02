@@ -11,9 +11,9 @@
     import { goto } from "$app/navigation";
     import { Calendar, Willow } from "@svar-ui/svelte-calendar";
     import type { CalendarInstanceApi } from "@svar-ui/svelte-calendar";
-    import { WorkerRepository } from "$lib/api/workers";
-    import type { Worker } from "$lib/api/types";
-    import { t, tf } from "$lib/i18n.svelte.js";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import type { Worker } from "#lib/api/types.js";
+    import { t, tf } from "#lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
 

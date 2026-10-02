@@ -8,7 +8,7 @@
 // error to the user; this load exists only to source SharePicker's title.
 
 import type { PageLoad } from "./$types";
-import { PlanRepository } from "$lib/api/plans";
+import { PlanRepository } from "#lib/api/plans.js";
 
 export const load: PageLoad = async ({ params, fetch }) => {
   const pid = params.pid ?? "";

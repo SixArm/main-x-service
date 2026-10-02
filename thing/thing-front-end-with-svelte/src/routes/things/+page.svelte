@@ -31,12 +31,12 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import SearchBox from "$lib/components/SearchBox.svelte";
-    import ThingGrid from "$lib/components/ThingGrid.svelte";
-    import { ThingRepository } from "$lib/api/things.js";
-    import { describeApiError } from "$lib/api/errorHandling.js";
-    import type { Thing } from "$lib/api/types.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
+    import SearchBox from "#lib/components/SearchBox.svelte";
+    import ThingGrid from "#lib/components/ThingGrid.svelte";
+    import { ThingRepository } from "#lib/api/things.js";
+    import { describeApiError } from "#lib/api/errorHandling.js";
+    import type { Thing } from "#lib/api/types.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
 
     const PAGE_SIZE = 50;
 

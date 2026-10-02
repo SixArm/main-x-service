@@ -9,8 +9,8 @@
 // Any failure is surfaced as a 503 so `+error.svelte` can show it,
 // rather than leaving the dashboard half-populated.
 
-import { api } from '$lib/api/client';
-import { cache } from '$lib/store/cache.svelte';
+import { api } from '#lib/api/client.js';
+import { cache } from '#lib/store/cache.svelte.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch, parent }) {

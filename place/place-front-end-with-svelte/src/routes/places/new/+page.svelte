@@ -8,12 +8,12 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import PlaceForm from "$lib/components/PlaceForm.svelte";
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import { PlaceRepository } from "$lib/api/places.js";
-    import { ApiError } from "$lib/api/client.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import type { MatchResult, Place } from "$lib/api/types.js";
+    import PlaceForm from "#lib/components/PlaceForm.svelte";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import { PlaceRepository } from "#lib/api/places.js";
+    import { ApiError } from "#lib/api/client.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import type { MatchResult, Place } from "#lib/api/types.js";
 
     const repo = PlaceRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);

@@ -21,8 +21,8 @@
     //
     // Events: none emitted; the only output is the `onsubmit` callback.
     import { untrack } from "svelte";
-    import { t } from "$lib/i18n.svelte";
-    import { ALL_CARE_SETTINGS, ALL_CODE_SYSTEMS, ALL_SCHEMES } from "$lib/api/types";
+    import { t } from "#lib/i18n.svelte.js";
+    import { ALL_CARE_SETTINGS, ALL_CODE_SYSTEMS, ALL_SCHEMES } from "#lib/api/types.js";
     import type {
         CarePathway,
         CareSetting,
@@ -30,7 +30,7 @@
         ConditionCode,
         IdentifierScheme,
         PathwayIdentifier,
-    } from "$lib/api/types";
+    } from "#lib/api/types.js";
 
     let {
         initial,

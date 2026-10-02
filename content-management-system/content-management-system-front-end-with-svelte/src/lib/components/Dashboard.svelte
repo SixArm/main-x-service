@@ -15,9 +15,9 @@
   insights, settings) are CMS-T26.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
-  import * as cms from "$lib/api/cms";
-  import type { Health, Site, Backlog } from "$lib/api/cms";
+  import { t } from "#lib/i18n.svelte.js";
+  import * as cms from "#lib/api/cms.js";
+  import type { Health, Site, Backlog } from "#lib/api/cms.js";
 
   let sites = $state<Site[] | null>(null);
   let selected = $state<string | null>(null);

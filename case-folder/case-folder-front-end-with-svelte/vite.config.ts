@@ -1,3 +1,5 @@
+import adapter from '@sveltejs/adapter-auto';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
@@ -7,7 +9,9 @@ import { defineConfig } from 'vite';
 const apiTarget = process.env.LOCO_API_PROXY || 'http://localhost:5150';
 
 export default defineConfig({
-    plugins: [sveltekit()],
+    plugins: [
+        sveltekit({ preprocess: vitePreprocess(), adapter: adapter() })
+    ],
     server: {
         proxy: {
             '/api': { target: apiTarget, changeOrigin: true },

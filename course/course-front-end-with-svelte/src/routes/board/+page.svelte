@@ -8,10 +8,10 @@
     import { onMount } from "svelte";
     import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
     import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-    import { CourseRepository } from "$lib/api/courses";
-    import { COURSE_STATUSES } from "$lib/api/types";
-    import type { Course, CourseStatus } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte.js";
+    import { CourseRepository } from "#lib/api/courses.js";
+    import { COURSE_STATUSES } from "#lib/api/types.js";
+    import type { Course, CourseStatus } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = CourseRepository.withFetch();
 

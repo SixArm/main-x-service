@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
 import Tour from './Tour.svelte';
-import { STRING_KEYS } from '$lib/i18n.svelte';
+import { STRING_KEYS } from '#lib/i18n.svelte.js';
 
 afterEach(cleanup);
 

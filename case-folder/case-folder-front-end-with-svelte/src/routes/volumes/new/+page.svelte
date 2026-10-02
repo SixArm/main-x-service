@@ -9,17 +9,17 @@
     // State: nhsNumber/title/cabinetId fields + per-field + submit errors.
 
     import { goto } from '$app/navigation';
-    import { cache } from '$lib/store/cache.svelte';
-    import { api, ApiError } from '$lib/api/client';
-    import { formatNhsNumber, isValidNhsNumber } from '$lib/store/nhs';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import { api, ApiError } from '#lib/api/client.js';
+    import { formatNhsNumber, isValidNhsNumber } from '#lib/store/nhs.js';
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Alert from '$lib/components/Alert/Alert.svelte';
-    import Form from '$lib/components/Form/Form.svelte';
-    import Field from '$lib/components/Field/Field.svelte';
-    import Button from '$lib/components/Button/Button.svelte';
-    import UnitedKingdomNationalHealthServiceNumberInput from '$lib/components/UnitedKingdomNationalHealthServiceNumberInput/UnitedKingdomNationalHealthServiceNumberInput.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Alert from '#lib/components/Alert/Alert.svelte';
+    import Form from '#lib/components/Form/Form.svelte';
+    import Field from '#lib/components/Field/Field.svelte';
+    import Button from '#lib/components/Button/Button.svelte';
+    import UnitedKingdomNationalHealthServiceNumberInput from '#lib/components/UnitedKingdomNationalHealthServiceNumberInput/UnitedKingdomNationalHealthServiceNumberInput.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let nhsNumber = $state('');
     let title = $state('');

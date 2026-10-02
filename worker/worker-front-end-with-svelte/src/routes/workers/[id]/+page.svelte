@@ -19,10 +19,10 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import { WorkerRepository } from "$lib/api/workers.js";
-    import LinksPanel from "$lib/components/LinksPanel.svelte";
-    import type { Worker } from "$lib/api/types.js";
-    import { t, tf } from "$lib/i18n.svelte.js";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import LinksPanel from "#lib/components/LinksPanel.svelte";
+    import type { Worker } from "#lib/api/types.js";
+    import { t, tf } from "#lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
     let worker = $state<Worker | null>(null);

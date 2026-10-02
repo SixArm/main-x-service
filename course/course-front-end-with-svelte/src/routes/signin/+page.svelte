@@ -1,3 +1,15 @@
+<script lang="ts">
+    import type { ActionData } from "./$types";
+    import { enhance } from "$app/forms";
+    import { PUBLIC_OIDC_SIGNIN_ENABLED } from "$app/env/public";
+    import { i18n, t } from "#lib/i18n.svelte.js";
+
+    let { form }: { form: ActionData } = $props();
+    // Opt-in OIDC federation (EV-2): a plain <a> browser navigation to
+    // /signin/sso, shown only when the deployment enables it.
+    const ssoEnabled = PUBLIC_OIDC_SIGNIN_ENABLED === "true";
+</script>
+
 <!--
   Sign-in page (BFF, per-app magic-link login). Posts to the `default`
   server action, which calls the authentication service server-side with a
@@ -5,18 +17,6 @@
   browser. (Copy uses plain English; full i18n for the signin/verify pages
   is a follow-up — the entity apps had no login UI before the BFF.)
 -->
-<script lang="ts">
-    import type { ActionData } from "./$types";
-    import { enhance } from "$app/forms";
-    import { env } from "$env/dynamic/public";
-    import { i18n, t } from "$lib/i18n.svelte.js";
-
-    let { form }: { form: ActionData } = $props();
-    // Opt-in OIDC federation (EV-2): a plain <a> browser navigation to
-    // /signin/sso, shown only when the deployment enables it.
-    const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === "true";
-</script>
-
 <svelte:head><title>Sign in</title></svelte:head>
 
 <h1>Sign in</h1>

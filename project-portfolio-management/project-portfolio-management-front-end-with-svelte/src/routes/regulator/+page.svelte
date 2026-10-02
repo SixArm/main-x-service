@@ -5,9 +5,9 @@
   `mask` obligation). English-first, like the other PPM views.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
-  import { PpmClient, money, type RegulatorExtract } from "$lib/api/ppm";
+  import { PpmClient, money, type RegulatorExtract } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   let extract = $state<RegulatorExtract | null>(null);

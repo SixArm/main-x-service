@@ -9,12 +9,12 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import WorkerForm from "$lib/components/WorkerForm.svelte";
-    import MatchResultsList from "$lib/components/MatchResultsList.svelte";
-    import { WorkerRepository } from "$lib/api/workers.js";
-    import { ApiError } from "$lib/api/client.js";
-    import type { MatchResult, Worker } from "$lib/api/types.js";
-    import { t, tf } from "$lib/i18n.svelte.js";
+    import WorkerForm from "#lib/components/WorkerForm.svelte";
+    import MatchResultsList from "#lib/components/MatchResultsList.svelte";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import { ApiError } from "#lib/api/client.js";
+    import type { MatchResult, Worker } from "#lib/api/types.js";
+    import { t, tf } from "#lib/i18n.svelte.js";
 
     const repo = WorkerRepository.withFetch();
     let duplicates = $state<MatchResult[]>([]);

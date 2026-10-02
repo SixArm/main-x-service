@@ -4,9 +4,9 @@
   // a wall screen is honest about staleness).
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { BOARD_POLL_MS } from "$lib/config";
-  import { bedTransition, pollWhiteboard } from "$lib/api/flow";
-  import type { Whiteboard } from "$lib/api/types";
+  import { BOARD_POLL_MS } from "#lib/config.js";
+  import { bedTransition, pollWhiteboard } from "#lib/api/flow.js";
+  import type { Whiteboard } from "#lib/api/types.js";
   import BedCard from "./BedCard.svelte";
 
   let {

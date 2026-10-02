@@ -9,9 +9,9 @@
 <script lang="ts">
     import { page } from "$app/state";
     import { onMount } from "svelte";
-    import { EventRepository } from "$lib/api/events.js";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { AuditEntry } from "$lib/api/types.js";
+    import { EventRepository } from "#lib/api/events.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { AuditEntry } from "#lib/api/types.js";
 
     const repo = EventRepository.withFetch();
     let entries = $state<AuditEntry[]>([]);

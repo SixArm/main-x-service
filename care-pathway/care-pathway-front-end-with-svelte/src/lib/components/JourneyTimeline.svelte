@@ -22,8 +22,8 @@
   table view below is the relief that requires — not optional decoration.
 -->
 <script lang="ts">
-  import type { WallEntry, Clock } from "$lib/api/tba";
-  import { percent } from "$lib/api/tba";
+  import type { WallEntry, Clock } from "#lib/api/tba.js";
+  import { percent } from "#lib/api/tba.js";
 
   interface Props {
     /** Segments and gaps interleaved in time order. */

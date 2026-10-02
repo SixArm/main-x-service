@@ -1,14 +1,3 @@
-<!--
-  Root layout — the app shell wrapping every route.
-
-  Renders the persistent top navigation bar (brand, primary nav, the Lily
-  PickerBar — theme/locale/text-size/share) and a <main> slot for the active
-  page. The nav highlights the current route via aria-current. Pure shell:
-  no data fetching here.
-
-  Props:
-    - children: Snippet — the active route's content, rendered in <main>.
--->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
@@ -17,15 +6,14 @@
     import type { LayoutData } from "./$types";
     import PickerBar from "@lilydesignsystem/svelte-picker-bar";
     import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
-
-    import { browser } from "$app/environment";
+    import { browser } from "$app/env";
     import {
         i18n,
         isRtl,
         t,
         LOCALES,
         LOCALE_LABELS,
-    } from "$lib/i18n.svelte.js";
+    } from "#lib/i18n.svelte.js";
 
     // Share destinations for the Lily SharePicker. Lily ships no
     // third-party URLs — each `href` builder is ours. `url`/`title` are
@@ -113,6 +101,18 @@
     ] as const;
 </script>
 
+<!--
+  Root layout — the app shell wrapping every route.
+
+  Renders the persistent top navigation bar (brand, primary nav, the Lily
+  PickerBar — theme/locale/text-size/share) and a <main> slot for the active
+  page. The nav highlights the current route via aria-current. Pure shell:
+  no data fetching here.
+
+  Props:
+    - children: Snippet — the active route's content, rendered in <main>.
+-->
+
 <div class="layout">
     <header class="topbar">
         <button
@@ -122,13 +122,14 @@
             aria-controls="primary-nav"
             aria-label={t("nav.toggle")}
             onclick={() => (menuOpen = !menuOpen)}
+            ><span class="hamburger-box" aria-hidden="true"></span></button
         >
-            <span class="hamburger-box" aria-hidden="true"></span>
-        </button>
-        <a href="/" class="brand"
-            >{t("brand")}
-            <span class="muted small tagline">{t("brand.tagline")}</span></a
-        >
+
+        <a href="/" class="brand">
+            {t("brand")}
+            <span class="muted small tagline">{t("brand.tagline")}</span>
+        </a>
+
         <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
             <ul>
                 {#each navItems as item}
@@ -138,10 +139,8 @@
                             aria-current={page.url.pathname === item.href
                                 ? "page"
                                 : null}
-                            onclick={() => (menuOpen = false)}
+                            onclick={() => (menuOpen = false)}>{t(item.key)}</a
                         >
-                            {t(item.key)}
-                        </a>
                     </li>
                 {/each}
             </ul>

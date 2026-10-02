@@ -8,9 +8,9 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
-  import { PlanRepository } from "$lib/api/plans";
-  import type { ScoredRef, Plan } from "$lib/api/types";
-  import { t } from "$lib/i18n.svelte";
+  import { PlanRepository } from "#lib/api/plans.js";
+  import type { ScoredRef, Plan } from "#lib/api/types.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   const pid = page.params.pid ?? "";
   const repo = PlanRepository.withFetch();

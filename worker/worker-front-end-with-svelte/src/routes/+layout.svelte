@@ -1,19 +1,3 @@
-<!--
-  Root layout — the app shell wrapping every route: a top bar (hamburger
-  nav, brand, sign in / sign out, and the Lily PickerBar for
-  theme/language/text-size/share) plus a <main> that renders the active page.
-
-  $props:
-    - children: Snippet — the active route's rendered content.
-
-  Notable bits:
-    - Imports global CSS once here.
-    - `page` (from $app/state) is read to set aria-current on the active
-      nav link, and `page.data.title` feeds SharePicker (see `pageTitle`
-      below).
-    - PickerBar's own default theme and text-size catalogues are used
-      as-is (no app-specific `themes`/`sizes` override).
--->
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
@@ -22,15 +6,14 @@
     import type { LayoutData } from "./$types";
     import PickerBar from "@lilydesignsystem/svelte-picker-bar";
     import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
-
-    import { browser } from "$app/environment";
+    import { browser } from "$app/env";
     import {
         i18n,
         isRtl,
         t,
         LOCALES,
         LOCALE_LABELS,
-    } from "$lib/i18n.svelte.js";
+    } from "#lib/i18n.svelte.js";
 
     // Share destinations for the Lily SharePicker. Lily ships no
     // third-party URLs — each `href` builder is ours. `url`/`title` are
@@ -123,6 +106,23 @@
     ] as const;
 </script>
 
+<!--
+  Root layout — the app shell wrapping every route: a top bar (hamburger
+  nav, brand, sign in / sign out, and the Lily PickerBar for
+  theme/language/text-size/share) plus a <main> that renders the active page.
+
+  $props:
+    - children: Snippet — the active route's rendered content.
+
+  Notable bits:
+    - Imports global CSS once here.
+    - `page` (from $app/state) is read to set aria-current on the active
+      nav link, and `page.data.title` feeds SharePicker (see `pageTitle`
+      below).
+    - PickerBar's own default theme and text-size catalogues are used
+      as-is (no app-specific `themes`/`sizes` override).
+-->
+
 <div class="layout">
     <header class="topbar">
         <button
@@ -132,13 +132,14 @@
             aria-controls="primary-nav"
             aria-label={t("nav.toggle")}
             onclick={() => (menuOpen = !menuOpen)}
+            ><span class="hamburger-box" aria-hidden="true"></span></button
         >
-            <span class="hamburger-box" aria-hidden="true"></span>
-        </button>
-        <a href="/" class="brand"
-            >{t("brand.name")}
-            <span class="muted small tagline">{t("brand.tagline")}</span></a
-        >
+
+        <a href="/" class="brand">
+            {t("brand.name")}
+            <span class="muted small tagline">{t("brand.tagline")}</span>
+        </a>
+
         <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
             <ul>
                 {#each navItems as item}
@@ -148,10 +149,8 @@
                             aria-current={page.url.pathname === item.href
                                 ? "page"
                                 : null}
-                            onclick={() => (menuOpen = false)}
+                            onclick={() => (menuOpen = false)}>{t(item.key)}</a
                         >
-                            {t(item.key)}
-                        </a>
                     </li>
                 {/each}
             </ul>

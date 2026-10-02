@@ -13,7 +13,7 @@
     CapabilityClient,
     type Prioritisation,
     type PlanSmartScore,
-  } from "$lib/api/capabilities";
+  } from "#lib/api/capabilities.js";
 
   const api = CapabilityClient.withFetch();
   let view = $state<Prioritisation | null>(null);

@@ -21,16 +21,16 @@
 -->
 <script lang="ts">
     import { onMount } from "svelte";
-    import { WorkerRepository } from "$lib/api/workers.js";
-    import type { EntityLink, WorkerEdgeKind } from "$lib/api/types.js";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import type { EntityLink, WorkerEdgeKind } from "#lib/api/types.js";
     import {
         WORKER_EDGE_KINDS,
         checkConfidence,
         checkToRef,
         targetEntityType,
         targetRefExample,
-    } from "$lib/api/links.js";
-    import { t, tf } from "$lib/i18n.svelte.js";
+    } from "#lib/api/links.js";
+    import { t, tf } from "#lib/i18n.svelte.js";
 
     let { workerId }: { workerId: string } = $props();
 

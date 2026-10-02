@@ -10,11 +10,11 @@
 -->
 <script lang="ts">
     import { goto } from "$app/navigation";
-    import SearchBox from "$lib/components/SearchBox.svelte";
-    import WorkerGrid from "$lib/components/WorkerGrid.svelte";
-    import { WorkerRepository } from "$lib/api/workers.js";
-    import type { Worker } from "$lib/api/types.js";
-    import { t, tf } from "$lib/i18n.svelte.js";
+    import SearchBox from "#lib/components/SearchBox.svelte";
+    import WorkerGrid from "#lib/components/WorkerGrid.svelte";
+    import { WorkerRepository } from "#lib/api/workers.js";
+    import type { Worker } from "#lib/api/types.js";
+    import { t, tf } from "#lib/i18n.svelte.js";
 
     let query = $state("");
     let workers = $state<Worker[]>([]);

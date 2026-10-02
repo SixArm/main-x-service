@@ -12,9 +12,9 @@
         Willow as FilterTheme,
         createArrayFilter,
     } from "@svar-ui/svelte-filter";
-    import { OrganizationRepository } from "$lib/api/organizations";
-    import type { OrgRef } from "$lib/api/types";
-    import { t } from "$lib/i18n.svelte";
+    import { OrganizationRepository } from "#lib/api/organizations.js";
+    import type { OrgRef } from "#lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     const repo = OrganizationRepository.withFetch();
 

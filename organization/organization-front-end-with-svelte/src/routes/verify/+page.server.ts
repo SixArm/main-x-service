@@ -12,8 +12,8 @@ import {
   SESSION_COOKIE,
   SESSION_COOKIE_OPTIONS,
   sessionIdFromResponse,
-} from "$lib/server/session";
-import { verifyMagicLink } from "$lib/server/auth";
+} from "#lib/server/session.js";
+import { verifyMagicLink } from "#lib/server/auth.js";
 
 // `page.data.title` convention (see `../+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title

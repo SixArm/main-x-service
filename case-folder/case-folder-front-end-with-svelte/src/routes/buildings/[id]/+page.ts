@@ -4,8 +4,8 @@
 // under it and the cabinets under those rooms) and its presence history.
 // Maps a missing building to 404; any other failure to 503.
 
-import { api, ApiError } from '$lib/api/client';
-import { cache } from '$lib/store/cache.svelte';
+import { api, ApiError } from '#lib/api/client.js';
+import { cache } from '#lib/store/cache.svelte.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch, params }) {

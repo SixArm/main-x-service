@@ -6,8 +6,8 @@
   server-derived; derivations shown verbatim.
 -->
 <script lang="ts">
-  import { cadence, engagementWorkload, membersHealth } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
+  import { cadence, engagementWorkload, membersHealth } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   type Cadence = Awaited<ReturnType<typeof cadence>>;
   type Workload = Awaited<ReturnType<typeof engagementWorkload>>;

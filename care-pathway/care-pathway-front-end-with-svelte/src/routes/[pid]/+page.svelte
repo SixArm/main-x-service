@@ -15,14 +15,14 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import { CarePathwayRepository } from "$lib/api/care-pathways";
+    import { CarePathwayRepository } from "#lib/api/care-pathways.js";
     import type {
         AuditEntry,
         CarePathway,
         PathwayInstance,
         ScoredRef,
-    } from "$lib/api/types";
-    import { t, tf } from "$lib/i18n.svelte";
+    } from "#lib/api/types.js";
+    import { t, tf } from "#lib/i18n.svelte.js";
 
     const repo = CarePathwayRepository.withFetch();
     const pid = page.params.pid ?? "";

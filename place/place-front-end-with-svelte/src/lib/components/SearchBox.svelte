@@ -8,7 +8,7 @@
     - onsearch ((value) => void) — callback fired on submit with the query.
 -->
 <script lang="ts">
-    import { t } from "$lib/i18n.svelte.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let {
         value = $bindable(""),

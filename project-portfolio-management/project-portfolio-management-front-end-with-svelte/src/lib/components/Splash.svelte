@@ -9,7 +9,7 @@
   No props and no data fetching — purely presentational.
 -->
 <script lang="ts">
-  import { t, type StringKey } from "$lib/i18n.svelte";
+  import { t, type StringKey } from "#lib/i18n.svelte.js";
 
   const TILES = [1, 2, 3, 4, 5, 6] as const;
   const AREAS = [

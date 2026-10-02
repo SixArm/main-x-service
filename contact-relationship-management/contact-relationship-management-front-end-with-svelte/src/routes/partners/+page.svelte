@@ -9,8 +9,8 @@
     membershipsView,
     partnershipsRegister,
     stakeholdersView,
-  } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
+  } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   type Stakeholders = Awaited<ReturnType<typeof stakeholdersView>>;
   type Partnerships = Awaited<ReturnType<typeof partnershipsRegister>>;

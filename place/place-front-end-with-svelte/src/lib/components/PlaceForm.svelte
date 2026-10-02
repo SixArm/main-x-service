@@ -18,12 +18,12 @@
     - hasGeo       — whether the Geo section is included (toggles null).
 -->
 <script lang="ts">
-    import type { Place, PlaceType } from "$lib/api/types.js";
-    import { PLACE_TYPES, blankPostalAddress } from "$lib/api/types.js";
-    import { createForm } from "$lib/forms/form.svelte.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
+    import type { Place, PlaceType } from "#lib/api/types.js";
+    import { PLACE_TYPES, blankPostalAddress } from "#lib/api/types.js";
+    import { createForm } from "#lib/forms/form.svelte.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
     import PostalAddressInput from "./PostalAddressInput.svelte";
     import GeoCoordinatesInput from "./GeoCoordinatesInput.svelte";
 

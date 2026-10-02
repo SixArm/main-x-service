@@ -24,10 +24,10 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/state";
-    import { OrganizationRepository } from "$lib/api/organizations";
-    import { excludeSelf } from "$lib/api/build";
-    import { t } from "$lib/i18n.svelte";
-    import type { AuditEntry, Organization, ScoredRef } from "$lib/api/types";
+    import { OrganizationRepository } from "#lib/api/organizations.js";
+    import { excludeSelf } from "#lib/api/build.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { AuditEntry, Organization, ScoredRef } from "#lib/api/types.js";
 
     const repo = OrganizationRepository.withFetch();
     // Route param; `?? ""` satisfies strict typing (param is always set here).

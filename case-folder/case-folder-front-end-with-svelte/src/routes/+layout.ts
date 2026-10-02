@@ -3,8 +3,8 @@
 // session cookie is first-party. A production deployment behind a single
 // reverse proxy could re-enable SSR.
 
-import { api, ApiError } from '$lib/api/client';
-import { cache } from '$lib/store/cache.svelte';
+import { api, ApiError } from '#lib/api/client.js';
+import { cache } from '#lib/store/cache.svelte.js';
 import { redirect } from '@sveltejs/kit';
 
 export const ssr = false;

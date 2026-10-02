@@ -25,8 +25,8 @@
 
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { CMS_API_URL } from "$lib/server/config";
-import { exchangeToken } from "$lib/server/auth";
+import { CMS_API_URL } from "#lib/server/config.js";
+import { exchangeToken } from "#lib/server/auth.js";
 
 interface IssuedToken {
   pid: string;

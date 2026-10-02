@@ -21,10 +21,10 @@
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import { ThingRepository } from "$lib/api/things.js";
-    import { describeApiError } from "$lib/api/errorHandling.js";
-    import type { Thing } from "$lib/api/types.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
+    import { ThingRepository } from "#lib/api/things.js";
+    import { describeApiError } from "#lib/api/errorHandling.js";
+    import type { Thing } from "#lib/api/types.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
     let thing = $state<Thing | null>(null);

@@ -13,12 +13,12 @@
   // Events: nav links are plain anchors; sign-out posts to the root page's
   // `signout` action (BFF); sign-in links to this app's own `/signin`.
   import "../app.css";
-  import { browser } from "$app/environment";
+  import { browser } from '$app/env';
   import { page } from "$app/state";
   import { enhance } from "$app/forms";
   import type { Snippet } from "svelte";
   import type { LayoutData } from "./$types";
-  import { i18n, t, isRtl, LOCALES, LOCALE_LABELS } from "$lib/i18n.svelte";
+  import { i18n, t, isRtl, LOCALES, LOCALE_LABELS } from "#lib/i18n.svelte.js";
   import PickerBar from "@lilydesignsystem/svelte-picker-bar";
   import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
 
@@ -114,10 +114,9 @@
       aria-expanded={menuOpen}
       aria-controls="primary-nav"
       aria-label={t("nav.toggle")}
-      onclick={() => (menuOpen = !menuOpen)}
-    >
-      <span class="hamburger-box" aria-hidden="true"></span>
-    </button>
+      onclick={() => menuOpen = !menuOpen}
+    ><span class="hamburger-box" aria-hidden="true"></span></button>
+
     <a href="/" class="brand">{t("brand.full")}</a>
     <nav id="primary-nav" class="primary-nav" class:open={menuOpen}>
       <ul>
@@ -125,13 +124,9 @@
           <li>
             <a
               href={item.href}
-              aria-current={page.url.pathname === item.href
-                ? "page"
-                : undefined}
-              onclick={() => (menuOpen = false)}
-            >
-              {t(item.key)}
-            </a>
+              aria-current={page.url.pathname === item.href ? "page" : undefined}
+              onclick={() => menuOpen = false}
+            >{t(item.key)}</a>
           </li>
         {/each}
       </ul>

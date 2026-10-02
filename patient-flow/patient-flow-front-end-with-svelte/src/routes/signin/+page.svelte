@@ -1,21 +1,21 @@
+<script lang="ts">
+  import type { ActionData } from "./$types";
+  import { enhance } from "$app/forms";
+  import { PUBLIC_OIDC_SIGNIN_ENABLED } from '$app/env/public';
+  import { t } from "#lib/i18n.svelte.js";
+
+  let { form }: { form: ActionData } = $props();
+  // Opt-in SSO (EV-2): a plain <a> browser navigation to /signin/sso,
+  // not a form action or fetch. Magic link stays the default.
+  const ssoEnabled = PUBLIC_OIDC_SIGNIN_ENABLED === "true";
+</script>
+
 <!--
   Sign-in page (BFF, per-app magic-link login, PF-T18). Posts to the
   `default` server action, which calls the authentication service
   server-side with a return URL pointing back at THIS app's /verify.
   No token is held in the browser.
 -->
-<script lang="ts">
-  import type { ActionData } from "./$types";
-  import { enhance } from "$app/forms";
-  import { env } from "$env/dynamic/public";
-  import { t } from "$lib/i18n.svelte";
-
-  let { form }: { form: ActionData } = $props();
-  // Opt-in SSO (EV-2): a plain <a> browser navigation to /signin/sso,
-  // not a form action or fetch. Magic link stays the default.
-  const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === "true";
-</script>
-
 <svelte:head><title>Sign in — Patient Flow</title></svelte:head>
 
 <h1>Sign in</h1>

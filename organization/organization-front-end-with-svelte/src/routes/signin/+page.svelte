@@ -1,3 +1,14 @@
+<script lang="ts">
+  import type { ActionData } from "./$types";
+  import { enhance } from "$app/forms";
+  import { i18n, t } from "#lib/i18n.svelte.js";
+  import { PUBLIC_OIDC_SIGNIN_ENABLED } from '$app/env/public';
+
+  let { form }: { form: ActionData } = $props();
+  // Opt-in federation (EV-2): a plain <a>, a BROWSER NAVIGATION to /signin/sso.
+  const ssoEnabled = PUBLIC_OIDC_SIGNIN_ENABLED === "true";
+</script>
+
 <!--
   Sign-in page (BFF, per-app magic-link login). Posts to the `default`
   server action, which calls the authentication service server-side with a
@@ -5,17 +16,6 @@
   browser. (Copy uses plain English; full i18n for the signin/verify pages
   is a follow-up — the entity apps had no login UI before the BFF.)
 -->
-<script lang="ts">
-    import type { ActionData } from "./$types";
-    import { enhance } from "$app/forms";
-    import { i18n, t } from "$lib/i18n.svelte";
-    import { env } from "$env/dynamic/public";
-
-    let { form }: { form: ActionData } = $props();
-    // Opt-in federation (EV-2): a plain <a>, a BROWSER NAVIGATION to /signin/sso.
-    const ssoEnabled = env.PUBLIC_OIDC_SIGNIN_ENABLED === "true";
-</script>
-
 <svelte:head><title>Sign in</title></svelte:head>
 
 <h1>Sign in</h1>
@@ -23,20 +23,20 @@
 {#if form?.sent}
     <p class="banner">Check your email for a sign-in link.</p>
 {:else}
-    <form class="stack" method="POST" use:enhance>
-        <label>
-            Email
+  <form class="stack" method="POST" use:enhance>
+    <label>
+      Email 
             <input type="email" name="email" required autocomplete="email" />
-        </label>
-        <input type="hidden" name="locale" value={i18n.locale} />
-        <button class="button" type="submit">Send magic link</button>
-        {#if form?.error}
-            <p class="banner" role="alert">Could not send the sign-in link. Please try again.</p>
-        {/if}
-    </form>
-    {#if ssoEnabled}
+    </label>
+    <input type="hidden" name="locale" value={i18n.locale} />
+    <button class="button" type="submit">Send magic link</button>
+    {#if form?.error}
+      <p class="banner" role="alert">Could not send the sign-in link. Please try again.</p>
+    {/if}
+  </form>
+  {#if ssoEnabled}
         <p>
             <a class="button" href="/signin/sso">{t("signin.sso")}</a>
         </p>
-    {/if}
+  {/if}
 {/if}

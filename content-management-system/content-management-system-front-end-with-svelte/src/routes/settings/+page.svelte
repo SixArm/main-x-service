@@ -7,10 +7,10 @@
   service returns them exactly once at registration.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
-  import * as cms from "$lib/api/cms";
-  import SitePicker from "$lib/components/SitePicker.svelte";
-  import type { ContentType, Site } from "$lib/api/cms";
+  import { t } from "#lib/i18n.svelte.js";
+  import * as cms from "#lib/api/cms.js";
+  import SitePicker from "#lib/components/SitePicker.svelte";
+  import type { ContentType, Site } from "#lib/api/cms.js";
 
   let site = $state<string | null>(null);
   let sites = $state<Site[]>([]);

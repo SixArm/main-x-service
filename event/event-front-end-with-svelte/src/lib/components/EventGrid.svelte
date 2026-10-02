@@ -18,8 +18,8 @@
         Willow as FilterTheme,
         createArrayFilter,
     } from "@svar-ui/svelte-filter";
-    import { t } from "$lib/i18n.svelte.js";
-    import type { Event } from "$lib/api/types.js";
+    import { t } from "#lib/i18n.svelte.js";
+    import type { Event } from "#lib/api/types.js";
 
     let {
         events,

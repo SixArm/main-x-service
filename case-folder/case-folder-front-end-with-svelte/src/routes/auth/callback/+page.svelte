@@ -6,8 +6,8 @@
     // renders while verifying, or shows the load function's error message
     // (with a link back to /login) if the link could not be used.
 
-    import Alert from '$lib/components/Alert/Alert.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import Alert from '#lib/components/Alert/Alert.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let { data } = $props();
 </script>

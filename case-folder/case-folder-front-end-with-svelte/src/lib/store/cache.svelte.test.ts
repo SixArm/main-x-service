@@ -11,7 +11,7 @@ import type { Building, Cabinet, Folder, MoveEvent, Room } from './types';
 // Mock the API client so the cache's mutation methods (which round-trip
 // through `api.*`) can be exercised without any network / Loco backend.
 // Each mutation is asserted on its cache side effects, not the HTTP call.
-vi.mock('$lib/api/client', () => ({
+vi.mock('#lib/api/client.js', () => ({
     api: {
         folders: { create: vi.fn() },
         moves: { create: vi.fn() },
@@ -20,7 +20,7 @@ vi.mock('$lib/api/client', () => ({
 }));
 
 import { cache } from './cache.svelte';
-import { api } from '$lib/api/client';
+import { api } from '#lib/api/client.js';
 
 // Minimal fixtures. Only the fields the cache reads/writes matter.
 function folder(over: Partial<Folder> = {}): Folder {

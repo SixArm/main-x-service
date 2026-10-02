@@ -7,7 +7,7 @@
   Never grouped by actor.
 -->
 <script lang="ts">
-  import type { Stalled } from "$lib/api/tba";
+  import type { Stalled } from "#lib/api/tba.js";
 
   interface Props {
     stalled: Stalled;

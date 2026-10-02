@@ -6,7 +6,7 @@
 // PPM views ship English-first; extending the 13-locale catalogues to
 // these strings is a documented follow-up.
 
-import { API_BASE_URL } from "$lib/config";
+import { API_BASE_URL } from "#lib/config.js";
 import { ApiClient } from "./client";
 import type { Collection } from "./types";
 

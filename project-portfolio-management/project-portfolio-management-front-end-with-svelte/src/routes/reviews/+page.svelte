@@ -19,7 +19,7 @@
     type ReviewStatus,
     type ReviewSubjectKind,
     type ReviewerScope,
-  } from "$lib/api/capabilities";
+  } from "#lib/api/capabilities.js";
 
   const api = CapabilityClient.withFetch();
   let reviews = $state<Review[]>([]);

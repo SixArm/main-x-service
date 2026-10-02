@@ -14,8 +14,8 @@
         Willow as FilterTheme,
         createArrayFilter,
     } from '@svar-ui/svelte-filter';
-    import type { Folder } from '$lib/store/types';
-    import { t } from '$lib/i18n.svelte';
+    import type { Folder } from '#lib/store/types.js';
+    import { t } from '#lib/i18n.svelte.js';
 
     let { folders }: { folders: Folder[] } = $props();
 

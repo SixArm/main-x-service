@@ -12,7 +12,7 @@
 // value a round trip. TaxId / NAICS / ISIC v4 / SIC are unconstrained
 // here, exactly as the server leaves them unconstrained (ORGFE-T4).
 
-import type { IdentifierScheme } from "$lib/api/types.js";
+import type { IdentifierScheme } from "#lib/api/types.js";
 
 /** Keep only the ASCII digits of `s` (drops spaces, hyphens, dots). */
 function digitsOnly(s: string): string {

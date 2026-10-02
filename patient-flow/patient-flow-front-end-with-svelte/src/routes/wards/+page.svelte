@@ -12,8 +12,8 @@
     Willow as FilterTheme,
     createArrayFilter,
   } from "@svar-ui/svelte-filter";
-  import { getWards } from "$lib/api/flow";
-  import type { Ward } from "$lib/api/types";
+  import { getWards } from "#lib/api/flow.js";
+  import type { Ward } from "#lib/api/types.js";
 
   let wards = $state<Ward[]>([]);
   let loading = $state(true);

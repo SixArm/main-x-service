@@ -3,7 +3,7 @@
 // Loads one cabinet with its current folders and its in/out presence
 // timeline. Returned as page data (not cached). 404 if unknown, else 503.
 
-import { api, ApiError } from '$lib/api/client';
+import { api, ApiError } from '#lib/api/client.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch, params }) {

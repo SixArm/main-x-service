@@ -18,8 +18,8 @@
     //   - Headless: no CSS. NHS Number carries the `.nhs-number` class so
     //     the app stylesheet renders it monospaced/bold like everywhere else.
 
-    import UnitedKingdomNationalHealthServiceNumberView from '$lib/components/UnitedKingdomNationalHealthServiceNumberView/UnitedKingdomNationalHealthServiceNumberView.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import UnitedKingdomNationalHealthServiceNumberView from '#lib/components/UnitedKingdomNationalHealthServiceNumberView/UnitedKingdomNationalHealthServiceNumberView.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let {
         name,

@@ -15,9 +15,9 @@
 // reaches the event service.
 
 import type { RequestHandler } from "./$types";
-import { EVENT_API_URL } from "$lib/server/config";
-import { exchangeToken } from "$lib/server/auth";
-import { CSRF_COOKIE, verifyCsrf } from "$lib/server/session";
+import { EVENT_API_URL } from "#lib/server/config.js";
+import { exchangeToken } from "#lib/server/auth.js";
+import { CSRF_COOKIE, verifyCsrf } from "#lib/server/session.js";
 
 /** Methods that mutate state and therefore require CSRF proof. */
 const SAFE_METHODS = new Set(["GET", "HEAD"]);

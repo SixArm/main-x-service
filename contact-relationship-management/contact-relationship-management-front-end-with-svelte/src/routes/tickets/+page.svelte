@@ -5,9 +5,9 @@
     Willow as FilterTheme,
     createArrayFilter,
   } from "@svar-ui/svelte-filter";
-  import { listTickets, ticketStatus } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
-  import type { Ticket } from "$lib/api/crm";
+  import { listTickets, ticketStatus } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
+  import type { Ticket } from "#lib/api/crm.js";
 
   /** The forward move(s) a ticket offers per status. */
   const NEXT: Record<string, string[]> = {

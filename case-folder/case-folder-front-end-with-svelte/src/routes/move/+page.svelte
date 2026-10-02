@@ -15,23 +15,23 @@
     // patientFolders pane, and the debounce timer handle.
 
     import { page } from '$app/state';
-    import { cache } from '$lib/store/cache.svelte';
-    import { api, ApiError } from '$lib/api/client';
-    import type { Folder } from '$lib/store/types';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import { api, ApiError } from '#lib/api/client.js';
+    import type { Folder } from '#lib/store/types.js';
     import {
         formatNhsNumber,
         isValidNhsNumber,
         normaliseNhsNumber,
-    } from '$lib/store/nhs';
+    } from '#lib/store/nhs.js';
 
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import Alert from '$lib/components/Alert/Alert.svelte';
-    import Badge from '$lib/components/Badge/Badge.svelte';
-    import Form from '$lib/components/Form/Form.svelte';
-    import Field from '$lib/components/Field/Field.svelte';
-    import Button from '$lib/components/Button/Button.svelte';
-    import UnitedKingdomNationalHealthServiceNumberInput from '$lib/components/UnitedKingdomNationalHealthServiceNumberInput/UnitedKingdomNationalHealthServiceNumberInput.svelte';
-    import { t, tf, statusLabel } from '$lib/i18n.svelte';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import Alert from '#lib/components/Alert/Alert.svelte';
+    import Badge from '#lib/components/Badge/Badge.svelte';
+    import Form from '#lib/components/Form/Form.svelte';
+    import Field from '#lib/components/Field/Field.svelte';
+    import Button from '#lib/components/Button/Button.svelte';
+    import UnitedKingdomNationalHealthServiceNumberInput from '#lib/components/UnitedKingdomNationalHealthServiceNumberInput/UnitedKingdomNationalHealthServiceNumberInput.svelte';
+    import { t, tf, statusLabel } from '#lib/i18n.svelte.js';
 
     let nhsNumber = $state('');
     let folderId = $state('');

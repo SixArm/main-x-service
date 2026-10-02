@@ -3,7 +3,7 @@
 // Loads one room and its aggregated presence history (across the room's
 // cabinets). Returned as page data. 404 if unknown, else 503.
 
-import { api, ApiError } from '$lib/api/client';
+import { api, ApiError } from '#lib/api/client.js';
 import { error } from '@sveltejs/kit';
 
 export async function load({ fetch, params }) {

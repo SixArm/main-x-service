@@ -2,7 +2,7 @@
 // (?ward=<pid>&since=<rfc3339>).
 
 import type { PageLoad } from "./$types";
-import { getHandover, getRecentAudits, getWards } from "$lib/api/flow";
+import { getHandover, getRecentAudits, getWards } from "#lib/api/flow.js";
 
 export const load: PageLoad = async ({ fetch, url }) => {
   const ward = url.searchParams.get("ward");

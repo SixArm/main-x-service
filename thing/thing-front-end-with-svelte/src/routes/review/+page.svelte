@@ -29,7 +29,7 @@
   so `canDecide` disables the buttons rather than offering a request that
   is guaranteed to answer 422.
 
-  KNOWN GAP (see `$lib/review`'s module doc): this service's review-queue
+  KNOWN GAP (see `#lib/review`'s module doc): this service's review-queue
   wire type carries no `provenance` column at all (verified against
   `src/db/review_queue.rs`'s `COLS` and the wire `ReviewQueueItem`), and
   never populates `score_breakdown` on the wire either — unlike person /
@@ -40,15 +40,15 @@
 <script lang="ts">
     import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
     import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-    import { ThingRepository } from "$lib/api/things.js";
-    import { describeApiError } from "$lib/api/errorHandling.js";
-    import type { ReviewQueueOptions } from "$lib/api/things.js";
+    import { ThingRepository } from "#lib/api/things.js";
+    import { describeApiError } from "#lib/api/errorHandling.js";
+    import type { ReviewQueueOptions } from "#lib/api/things.js";
     import type {
         ReviewDecision,
         ReviewQueueItem,
         ReviewStatus,
         Thing,
-    } from "$lib/api/types.js";
+    } from "#lib/api/types.js";
     import {
         REVIEW_LIMITS,
         REVIEW_STATUSES,
@@ -56,9 +56,9 @@
         breakdownRows,
         canDecide,
         mergeHref,
-    } from "$lib/review.js";
-    import { t, translate } from "$lib/i18n.svelte.js";
-    import type { StringKey } from "$lib/i18n.svelte";
+    } from "#lib/review.js";
+    import { t, translate } from "#lib/i18n.svelte.js";
+    import type { StringKey } from "#lib/i18n.svelte.js";
 
     const repo = ThingRepository.withFetch();
 

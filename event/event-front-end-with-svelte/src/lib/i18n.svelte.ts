@@ -13,7 +13,7 @@
 // chosen locale persists to localStorage under `mxi.event.locale` and is
 // reflected onto `<html lang>` / `<html dir>` by the layout.
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales for which the UI is translated, sorted alphabetically by code
@@ -255,7 +255,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -278,7 +279,8 @@ const STRINGS = {
     "splash.benefits.5.body":
       "لكل حدث سجل تدقيق خاص به يبيّن من غيّر ماذا ومتى.",
     "splash.benefits.6.title": "بلغتك أنت",
-    "splash.benefits.6.body": "استخدم التطبيق بالعربية أو الألمانية أو الويلزية أو الإنجليزية أو الإسبانية أو الفرنسية أو الهندية أو الصينية.",
+    "splash.benefits.6.body":
+      "استخدم التطبيق بالعربية أو الألمانية أو الويلزية أو الإنجليزية أو الإسبانية أو الفرنسية أو الهندية أو الصينية.",
     "splash.features.1.title": "سجلات أحداث غنية",
     "splash.features.1.body":
       "الفترة الزمنية والحالة والنوع ووضع الحضور والمنطقة الزمنية والوصف في مكان واحد.",
@@ -560,7 +562,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -583,7 +586,8 @@ const STRINGS = {
     "splash.benefits.5.body":
       "Mae gan bob digwyddiad ei gofnod archwilio ei hun yn dangos pwy newidiodd beth a phryd.",
     "splash.benefits.6.title": "Yn eich iaith chi",
-    "splash.benefits.6.body": "Defnyddiwch yr ap yn Gymraeg, Almaeneg, Saesneg, Arabeg, Sbaeneg, Ffrangeg, Hindi neu Tsieinëeg.",
+    "splash.benefits.6.body":
+      "Defnyddiwch yr ap yn Gymraeg, Almaeneg, Saesneg, Arabeg, Sbaeneg, Ffrangeg, Hindi neu Tsieinëeg.",
     "splash.features.1.title": "Cofnodion digwyddiad cyfoethog",
     "splash.features.1.body":
       "Ffenestr amser, statws, math, modd presenoldeb, cylch amser a disgrifiad mewn un lle.",
@@ -855,19 +859,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Weniger Dubletten",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -876,74 +887,122 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "splash.hero.title": "Ein verlässlicher Datensatz für jedes Ereignis",
-    "splash.hero.subtitle": "Erfassen Sie Ereignisse einmal, finden Sie sie nach Name oder Datum und verhindern Sie Duplikate, bevor sie entstehen, mit integriertem, lückenlosem Audit-Protokoll.",
-    "splash.benefits.1.body": "Beim Anlegen eines Ereignisses werden Sie vor dem Speichern vor wahrscheinlichen Duplikaten gewarnt.",
+    "splash.hero.subtitle":
+      "Erfassen Sie Ereignisse einmal, finden Sie sie nach Name oder Datum und verhindern Sie Duplikate, bevor sie entstehen, mit integriertem, lückenlosem Audit-Protokoll.",
+    "splash.benefits.1.body":
+      "Beim Anlegen eines Ereignisses werden Sie vor dem Speichern vor wahrscheinlichen Duplikaten gewarnt.",
     "splash.benefits.2.title": "Ereignisse schnell finden",
-    "splash.benefits.2.body": "Suchen Sie nach Namen mit unscharfem Abgleich und filtern Sie dann nach Datum, Status und Typ.",
+    "splash.benefits.2.body":
+      "Suchen Sie nach Namen mit unscharfem Abgleich und filtern Sie dann nach Datum, Status und Typ.",
     "splash.benefits.3.title": "Ein sauberer Datensatz",
-    "splash.benefits.3.body": "Führen Sie bestätigte Duplikate zu einem einzigen Ereignis zusammen und behalten Sie den Verlauf.",
+    "splash.benefits.3.body":
+      "Führen Sie bestätigte Duplikate zu einem einzigen Ereignis zusammen und behalten Sie den Verlauf.",
     "splash.benefits.4.title": "Planen per Kalender",
-    "splash.benefits.4.body": "Sehen Sie Ereignisse im Kalender und ziehen Sie eines in einen neuen Zeitraum, um es zu verschieben.",
+    "splash.benefits.4.body":
+      "Sehen Sie Ereignisse im Kalender und ziehen Sie eines in einen neuen Zeitraum, um es zu verschieben.",
     "splash.benefits.5.title": "Wissen, was sich geändert hat",
-    "splash.benefits.5.body": "Jedes Ereignis hat sein eigenes Audit-Protokoll, das zeigt, wer was wann geändert hat.",
+    "splash.benefits.5.body":
+      "Jedes Ereignis hat sein eigenes Audit-Protokoll, das zeigt, wer was wann geändert hat.",
     "splash.benefits.6.title": "In Ihrer Sprache nutzbar",
-    "splash.benefits.6.body": "Nutzen Sie die Anwendung auf Arabisch, Walisisch, Deutsch, Englisch, Spanisch, Französisch, Hindi oder Chinesisch.",
+    "splash.benefits.6.body":
+      "Nutzen Sie die Anwendung auf Arabisch, Walisisch, Deutsch, Englisch, Spanisch, Französisch, Hindi oder Chinesisch.",
     "splash.features.1.title": "Reichhaltige Ereignisdatensätze",
-    "splash.features.1.body": "Zeitraum, Status, Typ, Teilnahmemodus, Zeitzone und Beschreibung an einem Ort.",
+    "splash.features.1.body":
+      "Zeitraum, Status, Typ, Teilnahmemodus, Zeitzone und Beschreibung an einem Ort.",
     "splash.features.2.title": "Orte und Personen",
-    "splash.features.2.body": "Erfassen Sie Orte, Veranstalter, Mitwirkende, Kennungen und Ticketangebote.",
+    "splash.features.2.body":
+      "Erfassen Sie Orte, Veranstalter, Mitwirkende, Kennungen und Ticketangebote.",
     "splash.features.3.title": "Abgleich prüfen",
-    "splash.features.3.body": "Bewerten Sie ein hypothetisches Ereignis anhand des Index, bevor Sie es anlegen.",
+    "splash.features.3.body":
+      "Bewerten Sie ein hypothetisches Ereignis anhand des Index, bevor Sie es anlegen.",
     "splash.features.4.title": "Geführtes Zusammenführen",
-    "splash.features.4.body": "Vergleichen Sie zwei Ereignisse nebeneinander und führen Sie sie dann mit protokolliertem Grund zusammen.",
+    "splash.features.4.body":
+      "Vergleichen Sie zwei Ereignisse nebeneinander und führen Sie sie dann mit protokolliertem Grund zusammen.",
     "splash.features.5.title": "Kalenderansicht",
-    "splash.features.5.body": "Ein Drag-and-drop-Kalender über den Zeitraum jedes Ereignisses.",
+    "splash.features.5.body":
+      "Ein Drag-and-drop-Kalender über den Zeitraum jedes Ereignisses.",
     "splash.features.6.title": "Themen und Textgröße",
-    "splash.features.6.body": "Wählen Sie ein Farbthema und eine angenehme Textgröße, die beim nächsten Besuch erhalten bleiben.",
-    "tour.intro": "Ein geführter Rundgang durch das Ereignisregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Ereignisses über das Zusammenführen von Duplikaten bis zum Verschieben im Kalender.",
+    "splash.features.6.body":
+      "Wählen Sie ein Farbthema und eine angenehme Textgröße, die beim nächsten Besuch erhalten bleiben.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das Ereignisregister: was jede Ansicht leistet und wie Sie sie nutzen, von der Erfassung eines Ereignisses über das Zusammenführen von Duplikaten bis zum Verschieben im Kalender.",
     "tour.s1.title": "Ein Ereignis erfassen",
-    "tour.s1.summary": "Legen Sie ein Ereignis mit Zeitraum, Status, Typ und Teilnahmemodus an. Wahrscheinliche Duplikate werden markiert, bevor das Ereignis gespeichert wird.",
-    "tour.s1.step.1": "Wählen Sie im Menü „Neues Ereignis“ oder drücken Sie „Neues Ereignis“ in der Ereignisliste.",
-    "tour.s1.step.2": "Füllen Sie Name und Beginn aus (Pflicht), dann Ende, Einlasszeit, Status, Teilnahmemodus und Zeitzone. Das Ende darf nicht vor dem Beginn liegen, und die Einlasszeit nicht danach.",
-    "tour.s1.step.3": "Ergänzen Sie optional Beschreibung, URL, Dauer, Kapazitätsgrenzen, Schlüsselwörter und Sprachen und drücken Sie dann „Erstellen“.",
-    "tour.s1.step.4": "Findet das Register wahrscheinliche Duplikate, listet ein Bereich „Mögliche Duplikate“ sie mit ihren Bewertungen auf. Prüfen Sie sie, bevor Sie erneut absenden.",
+    "tour.s1.summary":
+      "Legen Sie ein Ereignis mit Zeitraum, Status, Typ und Teilnahmemodus an. Wahrscheinliche Duplikate werden markiert, bevor das Ereignis gespeichert wird.",
+    "tour.s1.step.1":
+      "Wählen Sie im Menü „Neues Ereignis“ oder drücken Sie „Neues Ereignis“ in der Ereignisliste.",
+    "tour.s1.step.2":
+      "Füllen Sie Name und Beginn aus (Pflicht), dann Ende, Einlasszeit, Status, Teilnahmemodus und Zeitzone. Das Ende darf nicht vor dem Beginn liegen, und die Einlasszeit nicht danach.",
+    "tour.s1.step.3":
+      "Ergänzen Sie optional Beschreibung, URL, Dauer, Kapazitätsgrenzen, Schlüsselwörter und Sprachen und drücken Sie dann „Erstellen“.",
+    "tour.s1.step.4":
+      "Findet das Register wahrscheinliche Duplikate, listet ein Bereich „Mögliche Duplikate“ sie mit ihren Bewertungen auf. Prüfen Sie sie, bevor Sie erneut absenden.",
     "tour.s2.title": "Ereignisse finden",
-    "tour.s2.summary": "Durchsuchen Sie das Register nach Name, Veranstalter oder Kennung und grenzen Sie die Liste dann nach Datum, Status und Typ ein.",
-    "tour.s2.step.1": "Öffnen Sie im Menü „Ereignisse“; die Liste lädt mit einem Suchfeld und der Zahl der passenden Ereignisse.",
-    "tour.s2.step.2": "Tippen Sie in das Suchfeld, zum Beispiel einen Namen, Veranstalter oder eine Kennung, und drücken Sie „Suchen“.",
-    "tour.s2.step.3": "Setzen Sie „Unscharf“, um Schreibunterschiede zu tolerieren, legen Sie Von, Bis, Status und Typ fest und drücken Sie „Filter anwenden“.",
-    "tour.s2.step.4": "Wählen Sie eine Zeile in der Tabelle, um die Detailseite dieses Ereignisses zu öffnen.",
+    "tour.s2.summary":
+      "Durchsuchen Sie das Register nach Name, Veranstalter oder Kennung und grenzen Sie die Liste dann nach Datum, Status und Typ ein.",
+    "tour.s2.step.1":
+      "Öffnen Sie im Menü „Ereignisse“; die Liste lädt mit einem Suchfeld und der Zahl der passenden Ereignisse.",
+    "tour.s2.step.2":
+      "Tippen Sie in das Suchfeld, zum Beispiel einen Namen, Veranstalter oder eine Kennung, und drücken Sie „Suchen“.",
+    "tour.s2.step.3":
+      "Setzen Sie „Unscharf“, um Schreibunterschiede zu tolerieren, legen Sie Von, Bis, Status und Typ fest und drücken Sie „Filter anwenden“.",
+    "tour.s2.step.4":
+      "Wählen Sie eine Zeile in der Tabelle, um die Detailseite dieses Ereignisses zu öffnen.",
     "tour.s3.title": "Auf Übereinstimmungen prüfen",
-    "tour.s3.summary": "Bewerten Sie hypothetische Ereignisangaben anhand des Registers, ohne etwas anzulegen, um zu sehen, was schon existiert.",
+    "tour.s3.summary":
+      "Bewerten Sie hypothetische Ereignisangaben anhand des Registers, ohne etwas anzulegen, um zu sehen, was schon existiert.",
     "tour.s3.step.1": "Öffnen Sie im Menü „Abgleich prüfen“.",
-    "tour.s3.step.2": "Geben Sie einen Namen ein (Pflicht) und, falls bekannt, Beginn, Ende und Name des Veranstalters.",
-    "tour.s3.step.3": "Legen Sie den „Schwellenwert“ zwischen 0,0 und 1,0 fest und drücken Sie „Treffer suchen“.",
-    "tour.s3.step.4": "Lesen Sie die Abgleichergebnisse: Jeder Kandidat zeigt seine Bewertung, und die Bewertungsaufschlüsselung zeigt, wie sie zustande kam.",
+    "tour.s3.step.2":
+      "Geben Sie einen Namen ein (Pflicht) und, falls bekannt, Beginn, Ende und Name des Veranstalters.",
+    "tour.s3.step.3":
+      "Legen Sie den „Schwellenwert“ zwischen 0,0 und 1,0 fest und drücken Sie „Treffer suchen“.",
+    "tour.s3.step.4":
+      "Lesen Sie die Abgleichergebnisse: Jeder Kandidat zeigt seine Bewertung, und die Bewertungsaufschlüsselung zeigt, wie sie zustande kam.",
     "tour.s4.title": "Duplikate zusammenführen",
-    "tour.s4.summary": "Führen Sie ein bestätigtes Duplikat in das Ereignis ein, das Sie behalten, mit dem im Audit-Protokoll festgehaltenen Grund.",
-    "tour.s4.step.1": "Öffnen Sie im Menü „Zusammenführen“ und geben Sie die „ID des Hauptereignisses“ (der bleibende Datensatz) und die „ID des Duplikat-Ereignisses“ ein.",
-    "tour.s4.step.2": "Drücken Sie „Vorschau laden“, um beide Datensätze nebeneinander zu sehen. Beide IDs müssen angegeben sein und sich unterscheiden.",
-    "tour.s4.step.3": "Geben Sie einen „Grund“ an, der im Audit-Protokoll der Zusammenführung festgehalten wird, drücken Sie dann „Zusammenführen“ und bestätigen Sie die Rückfrage.",
-    "tour.s4.step.4": "Das Duplikat wird weich gelöscht, die Meldung „Zusammenführung abgeschlossen“ zeigt den Zusammenführungsdatensatz, und „Zusammengeführtes Hauptereignis anzeigen“ öffnet den verbleibenden Datensatz.",
+    "tour.s4.summary":
+      "Führen Sie ein bestätigtes Duplikat in das Ereignis ein, das Sie behalten, mit dem im Audit-Protokoll festgehaltenen Grund.",
+    "tour.s4.step.1":
+      "Öffnen Sie im Menü „Zusammenführen“ und geben Sie die „ID des Hauptereignisses“ (der bleibende Datensatz) und die „ID des Duplikat-Ereignisses“ ein.",
+    "tour.s4.step.2":
+      "Drücken Sie „Vorschau laden“, um beide Datensätze nebeneinander zu sehen. Beide IDs müssen angegeben sein und sich unterscheiden.",
+    "tour.s4.step.3":
+      "Geben Sie einen „Grund“ an, der im Audit-Protokoll der Zusammenführung festgehalten wird, drücken Sie dann „Zusammenführen“ und bestätigen Sie die Rückfrage.",
+    "tour.s4.step.4":
+      "Das Duplikat wird weich gelöscht, die Meldung „Zusammenführung abgeschlossen“ zeigt den Zusammenführungsdatensatz, und „Zusammengeführtes Hauptereignis anzeigen“ öffnet den verbleibenden Datensatz.",
     "tour.s5.title": "Im Kalender planen",
-    "tour.s5.summary": "Sehen Sie Ereigniszeiträume in Monats-, Wochen- und Tagesansicht und verschieben Sie per Ziehen.",
-    "tour.s5.step.1": "Öffnen Sie im Menü „Kalender“, um registrierte Ereignisse nach Beginn und Ende platziert zu sehen.",
-    "tour.s5.step.2": "Wechseln Sie zwischen Monats-, Wochen- und Tagesansicht.",
-    "tour.s5.step.3": "Ziehen Sie ein Ereignis in einen neuen Zeitraum; die Änderung wird über die normale Aktualisierung im Ereignisdatensatz gespeichert, der Kalender ist also keine separate Kopie.",
-    "tour.s5.step.4": "Wählen Sie ein Ereignis, um seine Detailseite zu öffnen.",
+    "tour.s5.summary":
+      "Sehen Sie Ereigniszeiträume in Monats-, Wochen- und Tagesansicht und verschieben Sie per Ziehen.",
+    "tour.s5.step.1":
+      "Öffnen Sie im Menü „Kalender“, um registrierte Ereignisse nach Beginn und Ende platziert zu sehen.",
+    "tour.s5.step.2":
+      "Wechseln Sie zwischen Monats-, Wochen- und Tagesansicht.",
+    "tour.s5.step.3":
+      "Ziehen Sie ein Ereignis in einen neuen Zeitraum; die Änderung wird über die normale Aktualisierung im Ereignisdatensatz gespeichert, der Kalender ist also keine separate Kopie.",
+    "tour.s5.step.4":
+      "Wählen Sie ein Ereignis, um seine Detailseite zu öffnen.",
     "tour.s6.title": "Ein Ereignis prüfen, bearbeiten und nachverfolgen",
-    "tour.s6.summary": "Öffnen Sie ein Ereignis, um alles zu lesen, was darüber erfasst ist, es zu korrigieren, zu sehen, wer es geändert hat, es zu maskieren oder zu exportieren.",
-    "tour.s6.step.1": "Lesen Sie auf der Detailseite eines Ereignisses Identität, Ort, Veranstalter, Mitwirkende, Bezeichner und Angebote, soweit erfasst.",
-    "tour.s6.step.2": "Wählen Sie „Bearbeiten“, um den Datensatz zu ändern, und „Speichern“, oder „Löschen“, um ihn nach Bestätigung der Rückfrage weich zu löschen.",
-    "tour.s6.step.3": "Wählen Sie „Audit“, um das Audit-Protokoll zu öffnen: Jeder Eintrag zeigt, wer die Änderung vorgenommen hat, und ihre Nutzdaten.",
-    "tour.s6.step.4": "Mit „Maskiert anzeigen“ sehen Sie die geschwärzte Fassung, mit „Daten exportieren (DSGVO)“ laden Sie den Datensatz herunter.",
+    "tour.s6.summary":
+      "Öffnen Sie ein Ereignis, um alles zu lesen, was darüber erfasst ist, es zu korrigieren, zu sehen, wer es geändert hat, es zu maskieren oder zu exportieren.",
+    "tour.s6.step.1":
+      "Lesen Sie auf der Detailseite eines Ereignisses Identität, Ort, Veranstalter, Mitwirkende, Bezeichner und Angebote, soweit erfasst.",
+    "tour.s6.step.2":
+      "Wählen Sie „Bearbeiten“, um den Datensatz zu ändern, und „Speichern“, oder „Löschen“, um ihn nach Bestätigung der Rückfrage weich zu löschen.",
+    "tour.s6.step.3":
+      "Wählen Sie „Audit“, um das Audit-Protokoll zu öffnen: Jeder Eintrag zeigt, wer die Änderung vorgenommen hat, und ihre Nutzdaten.",
+    "tour.s6.step.4":
+      "Mit „Maskiert anzeigen“ sehen Sie die geschwärzte Fassung, mit „Daten exportieren (DSGVO)“ laden Sie den Datensatz herunter.",
   },
   "en-001": {
     "nav.calendar": "Calendar",
@@ -1140,7 +1199,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -1163,7 +1223,8 @@ const STRINGS = {
     "splash.benefits.5.body":
       "Every event has its own audit log showing who changed what and when.",
     "splash.benefits.6.title": "Works in your language",
-    "splash.benefits.6.body": "Use the app in Arabic, Welsh, German, English, Spanish, French, Hindi or Chinese.",
+    "splash.benefits.6.body":
+      "Use the app in Arabic, Welsh, German, English, Spanish, French, Hindi or Chinese.",
     "splash.features.1.title": "Rich event records",
     "splash.features.1.body":
       "Time window, status, type, attendance mode, time zone and description in one place.",
@@ -1450,7 +1511,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -1473,7 +1535,8 @@ const STRINGS = {
     "splash.benefits.5.body":
       "Cada evento tiene su propio registro de auditoría con quién cambió qué y cuándo.",
     "splash.benefits.6.title": "En tu idioma",
-    "splash.benefits.6.body": "Usa la aplicación en árabe, galés, alemán, inglés, español, francés, hindi o chino.",
+    "splash.benefits.6.body":
+      "Usa la aplicación en árabe, galés, alemán, inglés, español, francés, hindi o chino.",
     "splash.features.1.title": "Registros de eventos completos",
     "splash.features.1.body":
       "Periodo, estado, tipo, modo de asistencia, zona horaria y descripción en un solo lugar.",
@@ -1760,7 +1823,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -1783,7 +1847,8 @@ const STRINGS = {
     "splash.benefits.5.body":
       "Chaque événement a son journal d'audit indiquant qui a modifié quoi et quand.",
     "splash.benefits.6.title": "Dans votre langue",
-    "splash.benefits.6.body": "Utilisez l'application en arabe, gallois, allemand, anglais, espagnol, français, hindi ou chinois.",
+    "splash.benefits.6.body":
+      "Utilisez l'application en arabe, gallois, allemand, anglais, espagnol, français, hindi ou chinois.",
     "splash.features.1.title": "Fiches d'événement complètes",
     "splash.features.1.body":
       "Période, statut, type, mode de participation, fuseau horaire et description au même endroit.",
@@ -2069,7 +2134,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -2092,7 +2158,8 @@ const STRINGS = {
     "splash.benefits.5.body":
       "हर इवेंट का अपना ऑडिट लॉग है जो दिखाता है कि किसने क्या और कब बदला।",
     "splash.benefits.6.title": "आपकी अपनी भाषा में",
-    "splash.benefits.6.body": "ऐप का उपयोग अरबी, वेल्श, जर्मन, अंग्रेज़ी, स्पेनिश, फ़्रेंच, हिंदी या चीनी में करें।",
+    "splash.benefits.6.body":
+      "ऐप का उपयोग अरबी, वेल्श, जर्मन, अंग्रेज़ी, स्पेनिश, फ़्रेंच, हिंदी या चीनी में करें।",
     "splash.features.1.title": "समृद्ध इवेंट रिकॉर्ड",
     "splash.features.1.body":
       "समय अवधि, स्थिति, प्रकार, उपस्थिति मोड, समय क्षेत्र और विवरण एक ही जगह।",
@@ -2368,7 +2435,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "splash.hero.title": "每个活动，一份可信记录",
@@ -2386,7 +2454,8 @@ const STRINGS = {
     "splash.benefits.5.body":
       "每个活动都有独立的审计日志，记录谁在何时改了什么。",
     "splash.benefits.6.title": "支持您的语言",
-    "splash.benefits.6.body": "可使用阿拉伯语、威尔士语、德语、英语、西班牙语、法语、印地语或中文使用本应用。",
+    "splash.benefits.6.body":
+      "可使用阿拉伯语、威尔士语、德语、英语、西班牙语、法语、印地语或中文使用本应用。",
     "splash.features.1.title": "内容丰富的活动记录",
     "splash.features.1.body":
       "时间段、状态、类型、参与方式、时区和描述集中一处。",
@@ -2498,6 +2567,7 @@ function normaliseLocale(raw: string | null | undefined): Locale | null {
   // `zh-Hans-CN` map to the supported locale that starts with that
   // language (`en-001`, `es-001`, `zh-cn`).
   const primary = normalized.split("-")[0] ?? "";
+
   return (
     ((LOCALES as readonly string[]).find(
       (l) => l.toLowerCase().split("-")[0] === primary,

@@ -2,8 +2,8 @@
 // extracted from the component so they are unit-testable without a DOM
 // mount (spec §6 FR-4, §11). The component imports both; behaviour is a
 // pure function of the input Course.
-import type { Course } from "$lib/api/types.js";
-import type { FieldErrors } from "$lib/forms/form.svelte.js";
+import type { Course } from "#lib/api/types.js";
+import type { FieldErrors } from "#lib/forms/form.svelte.js";
 
 /**
  * Client-side mirror of the Course Service's required / format / range

@@ -3,9 +3,9 @@
   objective alignment rollups (which items serve it, with weights).
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
-  import { PpmClient, type Alignment, type Objective } from "$lib/api/ppm";
+  import { PpmClient, type Alignment, type Objective } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   let objectives = $state<Objective[]>([]);

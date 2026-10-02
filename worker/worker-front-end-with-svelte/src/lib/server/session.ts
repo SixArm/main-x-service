@@ -23,7 +23,7 @@ export const SESSION_COOKIE_OPTIONS = {
  * The CSRF double-submit cookie (`agents/share/authentication-sessions.md`
  * §4). Set alongside {@link SESSION_COOKIE} at session establishment
  * (`verify/+page.server.ts`). Unlike the session cookie this one is
- * **deliberately NOT httpOnly** — client-side JS (`$lib/api/client.ts`)
+ * **deliberately NOT httpOnly** — client-side JS (`#lib/api/client.ts`)
  * must read it to echo its value in the `X-CSRF-Token` header on every
  * mutating browser→BFF request; the proxy
  * (`routes/api/proxy/[...path]/+server.ts`) then checks the header

@@ -17,17 +17,17 @@
       the update* helpers parse the edited text back into arrays.
 -->
 <script lang="ts">
-    import type { Course } from "$lib/api/types.js";
+    import type { Course } from "#lib/api/types.js";
     import {
         COURSE_STATUSES,
         EDUCATIONAL_LEVEL_OPTIONS,
-    } from "$lib/api/types.js";
-    import { createForm } from "$lib/forms/form.svelte.js";
-    import LabeledField from "$lib/forms/LabeledField.svelte";
-    import FieldRow from "$lib/forms/FieldRow.svelte";
+    } from "#lib/api/types.js";
+    import { createForm } from "#lib/forms/form.svelte.js";
+    import LabeledField from "#lib/forms/LabeledField.svelte";
+    import FieldRow from "#lib/forms/FieldRow.svelte";
     import CourseIdentifierInput from "./CourseIdentifierInput.svelte";
     import { validateCourse, normalizeForWire } from "./courseFormValidate.js";
-    import { t } from "$lib/i18n.svelte.js";
+    import { t } from "#lib/i18n.svelte.js";
 
     let props: {
         initial: Course;

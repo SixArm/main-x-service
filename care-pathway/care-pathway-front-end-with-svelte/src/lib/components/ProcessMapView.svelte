@@ -15,8 +15,8 @@
   withheld — never silently omitted, per the family's own convention.
 -->
 <script lang="ts">
-  import type { ProcessMapResponse } from "$lib/api/tba";
-  import { layoutProcessMap, withheldLabel } from "$lib/analytics-transforms";
+  import type { ProcessMapResponse } from "#lib/api/tba.js";
+  import { layoutProcessMap, withheldLabel } from "#lib/analytics-transforms.js";
 
   interface Props {
     map: ProcessMapResponse;

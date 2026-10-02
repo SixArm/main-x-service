@@ -4,10 +4,10 @@
   members. Any plan may contain children, so this works for any plan.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
   import { page } from "$app/state";
-  import { PpmClient, type ScheduleView } from "$lib/api/ppm";
+  import { PpmClient, type ScheduleView } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   const pid = $derived(page.params.pid ?? "");

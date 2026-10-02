@@ -7,8 +7,8 @@
 <script lang="ts">
   import { Kanban, Willow, getCardShape } from "@svar-ui/svelte-kanban";
   import type { KanbanInstanceApi } from "@svar-ui/svelte-kanban";
-  import { leadStatus, listLeads, type Lead } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
+  import { leadStatus, listLeads, type Lead } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
 
   let leads = $state<Lead[] | null>(null);
   let error = $state<string | null>(null);

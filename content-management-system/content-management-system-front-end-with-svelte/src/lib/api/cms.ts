@@ -18,7 +18,7 @@
 // about a payload nobody checked.
 
 import { api, apiConditional, type Conditional } from "./client";
-import { PREVIEW_BASE_URL } from "$lib/config";
+import { PREVIEW_BASE_URL } from "#lib/config.js";
 
 /** A delivery namespace: locales, fallback chains, visibility. */
 export interface Site {

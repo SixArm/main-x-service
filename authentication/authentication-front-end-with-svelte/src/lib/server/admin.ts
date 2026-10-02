@@ -5,11 +5,11 @@
 // The admin API itself requires the caller to carry `access=admin`
 // (403 otherwise) — this module just plumbs the request.
 
-import { AUTH_API_URL } from "$app/env/private";
+import * as env from "$app/env/private";
 import { exchangeToken } from "./auth";
 import type { UserAttributes } from "#lib/api/types.js";
 
-const AUTH_API_URL = AUTH_API_URL ?? "http://localhost:5150";
+const AUTH_API_URL = env.AUTH_API_URL || "http://localhost:5150";
 
 type FetchFn = typeof fetch;
 

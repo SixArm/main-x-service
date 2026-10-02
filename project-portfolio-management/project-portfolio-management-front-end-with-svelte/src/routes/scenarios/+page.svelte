@@ -4,7 +4,7 @@
   data, and commit the feasible winner.
 -->
 <script lang="ts">
-  import { t } from "$lib/i18n.svelte";
+  import { t } from "#lib/i18n.svelte.js";
   import { onMount } from "svelte";
   import {
     PpmClient,
@@ -12,7 +12,7 @@
     type Scenario,
     type ScenarioComparison,
     type ScenarioEvaluation,
-  } from "$lib/api/ppm";
+  } from "#lib/api/ppm.js";
 
   const ppm = PpmClient.withFetch();
   let scenarios = $state<Scenario[]>([]);

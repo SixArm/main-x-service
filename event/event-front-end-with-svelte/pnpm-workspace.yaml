@@ -1,4 +1,8 @@
 allowBuilds:
   esbuild: true
+minimumReleaseAgeExclude:
+  - "@sveltejs/adapter-auto@8.0.0"
+  - "@sveltejs/adapter-node@6.0.0"
+  - "@sveltejs/kit@3.0.0"
 overrides:
   "@lilydesignsystem/svelte-headless": 0.2.0

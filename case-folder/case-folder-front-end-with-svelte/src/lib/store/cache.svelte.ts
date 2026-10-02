@@ -9,7 +9,7 @@
 // through the API client and, on success, splice the new record into
 // the cache so subsequent renders see the change without a refetch.
 
-import { api } from '$lib/api/client';
+import { api } from '#lib/api/client.js';
 import type {
     Building,
     Cabinet,

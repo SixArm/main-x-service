@@ -6,14 +6,14 @@
     // reactively by name or NHS Number (spaces stripped on both sides so
     // "943 476 5919" and "9434765919" both match).
 
-    import { cache } from '$lib/store/cache.svelte';
-    import BackLink from '$lib/components/BackLink/BackLink.svelte';
-    import DataTable from '$lib/components/DataTable/DataTable.svelte';
-    import DataTableHead from '$lib/components/DataTableHead/DataTableHead.svelte';
-    import DataTableBody from '$lib/components/DataTableBody/DataTableBody.svelte';
-    import DataTableRow from '$lib/components/DataTableRow/DataTableRow.svelte';
-    import DataTableTD from '$lib/components/DataTableTD/DataTableTD.svelte';
-    import { t } from '$lib/i18n.svelte';
+    import { cache } from '#lib/store/cache.svelte.js';
+    import BackLink from '#lib/components/BackLink/BackLink.svelte';
+    import DataTable from '#lib/components/DataTable/DataTable.svelte';
+    import DataTableHead from '#lib/components/DataTableHead/DataTableHead.svelte';
+    import DataTableBody from '#lib/components/DataTableBody/DataTableBody.svelte';
+    import DataTableRow from '#lib/components/DataTableRow/DataTableRow.svelte';
+    import DataTableTD from '#lib/components/DataTableTD/DataTableTD.svelte';
+    import { t } from '#lib/i18n.svelte.js';
 
     let query = $state('');
 

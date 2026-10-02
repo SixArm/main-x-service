@@ -5,9 +5,9 @@
     Willow as FilterTheme,
     createArrayFilter,
   } from "@svar-ui/svelte-filter";
-  import { listAccounts } from "$lib/api/crm";
-  import { t } from "$lib/i18n.svelte";
-  import type { Account } from "$lib/api/crm";
+  import { listAccounts } from "#lib/api/crm.js";
+  import { t } from "#lib/i18n.svelte.js";
+  import type { Account } from "#lib/api/crm.js";
 
   let accounts = $state<Account[] | null>(null);
   let error = $state<string | null>(null);

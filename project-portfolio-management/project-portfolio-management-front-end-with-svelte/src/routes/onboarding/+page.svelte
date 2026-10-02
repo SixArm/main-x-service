@@ -7,7 +7,7 @@
   measured how long a first hour with this guide actually takes.
 -->
 <script lang="ts">
-  import { ONBOARDING_ROLES } from "$lib/onboarding";
+  import { ONBOARDING_ROLES } from "#lib/onboarding.js";
 </script>
 
 <svelte:head><title>Onboarding — PPM</title></svelte:head>

@@ -15,7 +15,7 @@ import type {
   ReviewStatus,
   Worker,
 } from "./types.js";
-import { API_BASE_URL } from "$lib/config.js";
+import { API_BASE_URL } from "#lib/config.js";
 
 /** Parameters for {@link WorkerRepository.search}. */
 export interface SearchOptions {

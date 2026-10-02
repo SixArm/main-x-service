@@ -3,7 +3,7 @@
 // sees the splash instead.
 
 import type { PageLoad } from "./$types";
-import { getAtAGlance } from "$lib/api/flow";
+import { getAtAGlance } from "#lib/api/flow.js";
 
 export const load: PageLoad = async ({ fetch, parent }) => {
   const { signedIn } = await parent();

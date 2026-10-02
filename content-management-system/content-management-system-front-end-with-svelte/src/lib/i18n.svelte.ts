@@ -22,7 +22,7 @@
 // on a French page; conflating the two would make the locale switcher
 // silently change which content is being edited.
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 /**
  * Locales the UI is translated into, sorted alphabetically by code (the
@@ -185,7 +185,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST مع OpenAPI، وHL7 FHIR حيثما تحتاجه الأنظمة الصحية.",
     "splash.trust.6.title": "يتحدث لغتك",
-    "splash.trust.6.body": "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
+    "splash.trust.6.body":
+      "العربية والصينية والألمانية والإنجليزية والفرنسية والهندية والإسبانية والويلزية.",
     "splash.cta.title": "هل أنت مستعد للبدء؟",
     "splash.cta.body":
       "سجّل الدخول برابط سحري يصلك على بريدك الإلكتروني. لا حاجة لكلمة مرور.",
@@ -430,7 +431,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST gydag OpenAPI, a HL7 FHIR lle mae systemau iechyd ei angen.",
     "splash.trust.6.title": "Yn siarad eich iaith",
-    "splash.trust.6.body": "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
+    "splash.trust.6.body":
+      "Arabeg, Tsieinëeg, Almaeneg, Saesneg, Ffrangeg, Hindi, Sbaeneg a Chymraeg.",
     "splash.cta.title": "Barod i ddechrau?",
     "splash.cta.body":
       "Mewngofnodwch gyda dolen hud a anfonir i'ch e-bost. Dim angen cyfrinair.",
@@ -665,19 +667,26 @@ const STRINGS = {
     "splash.features.title": "Was Sie tun können",
     "splash.trust.title": "Für Vertrauen gebaut",
     "splash.trust.1.title": "Anmeldung ohne Passwort",
-    "splash.trust.1.body": "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
+    "splash.trust.1.body":
+      "Ein Magic-Link per E-Mail: kein Passwort, das verloren gehen oder mehrfach verwendet werden könnte.",
     "splash.trust.2.title": "Attributbasierte Berechtigungen",
-    "splash.trust.2.body": "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
+    "splash.trust.2.body":
+      "Fein abgestufte Regeln legen fest, wer lesen, schreiben, zusammenführen oder löschen darf.",
     "splash.trust.3.title": "Manipulationssicheres Audit-Protokoll",
-    "splash.trust.3.body": "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
+    "splash.trust.3.body":
+      "Ein nur ergänzbarer Verlauf hält jede Änderung fest und wer sie vorgenommen hat.",
     "splash.trust.4.title": "Datenschutzkontrollen",
-    "splash.trust.4.body": "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
+    "splash.trust.4.body":
+      "Sensible Angaben sind maskiert, sofern Sie sie nicht einsehen dürfen.",
     "splash.trust.5.title": "Offene Standards",
-    "splash.trust.5.body": "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
+    "splash.trust.5.body":
+      "REST mit OpenAPI und HL7 FHIR, wo Gesundheitssysteme es benötigen.",
     "splash.trust.6.title": "Spricht Ihre Sprache",
-    "splash.trust.6.body": "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
+    "splash.trust.6.body":
+      "Arabisch, Chinesisch, Deutsch, Englisch, Französisch, Hindi, Spanisch und Walisisch.",
     "splash.cta.title": "Bereit für den Einstieg?",
-    "splash.cta.body": "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
+    "splash.cta.body":
+      "Melden Sie sich mit einem Magic-Link an, der an Ihre E-Mail-Adresse gesendet wird. Kein Passwort nötig.",
     "splash.benefits.1.title": "Wissen, was live ist",
     "nav.tour": "Rundgang",
     "splash.hero.tour": "Rundgang starten",
@@ -686,75 +695,124 @@ const STRINGS = {
     "tour.open": "Diese Ansicht öffnen",
     "tour.top": "Nach oben",
     "tour.start.title": "Bevor Sie beginnen",
-    "tour.start.summary": "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
-    "tour.start.step.1": "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
-    "tour.start.step.2": "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
-    "tour.start.step.3": "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
-    "tour.start.step.4": "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
+    "tour.start.summary":
+      "Für die Arbeit mit echten Daten benötigen Sie ein Konto. Die Anmeldung dauert weniger als eine Minute und kommt ohne Passwort aus.",
+    "tour.start.step.1":
+      "Wählen Sie oben rechts Anmelden und geben Sie Ihre E-Mail-Adresse ein.",
+    "tour.start.step.2":
+      "Öffnen Sie den Magic-Link, den wir Ihnen per E-Mail senden. Er funktioniert nur einmal und läuft schnell ab.",
+    "tour.start.step.3":
+      "Sie kehren angemeldet in die Anwendung zurück, ohne etwas merken oder zurücksetzen zu müssen.",
+    "tour.start.step.4":
+      "Mit den Schaltflächen neben Anmelden ändern Sie Thema, Sprache und Textgröße oder teilen die Seite.",
     "signin.sso": "Mit SSO anmelden",
     "splash.hero.title": "Mit Sicherheit veröffentlichen, in jeder Sprache",
-    "splash.hero.subtitle": "Verfassen Sie strukturierte Inhalte, prüfen Sie sie und veröffentlichen Sie sie, mit integriertem Versionsverlauf, Lokalisierung und Inhaltsqualitätsprüfungen.",
-    "splash.benefits.1.body": "Eine deutliche Markierung zeigt, wenn ein Entwurf dem voraus ist, was Leser derzeit sehen.",
+    "splash.hero.subtitle":
+      "Verfassen Sie strukturierte Inhalte, prüfen Sie sie und veröffentlichen Sie sie, mit integriertem Versionsverlauf, Lokalisierung und Inhaltsqualitätsprüfungen.",
+    "splash.benefits.1.body":
+      "Eine deutliche Markierung zeigt, wenn ein Entwurf dem voraus ist, was Leser derzeit sehen.",
     "splash.benefits.2.title": "Keine verlorenen Änderungen",
-    "splash.benefits.2.body": "Hat jemand anderes zuerst gespeichert, werden Sie informiert und können vergleichen, bevor Sie etwas überschreiben.",
+    "splash.benefits.2.body":
+      "Hat jemand anderes zuerst gespeichert, werden Sie informiert und können vergleichen, bevor Sie etwas überschreiben.",
     "splash.benefits.3.title": "Rückgängig machen ohne Angst",
-    "splash.benefits.3.body": "Das Wiederherstellen einer alten Fassung schreibt eine neue, der Verlauf wird also nie umgeschrieben.",
+    "splash.benefits.3.body":
+      "Das Wiederherstellen einer alten Fassung schreibt eine neue, der Verlauf wird also nie umgeschrieben.",
     "splash.benefits.4.title": "Klare Veröffentlichungsregeln",
-    "splash.benefits.4.body": "Kann ein Eintrag noch nicht veröffentlicht werden, erfahren Sie genau, was ihn aufhält.",
+    "splash.benefits.4.body":
+      "Kann ein Eintrag noch nicht veröffentlicht werden, erfahren Sie genau, was ihn aufhält.",
     "splash.benefits.5.title": "Ehrliche Übersetzungen",
-    "splash.benefits.5.body": "Sehen Sie, welche Übersetzungen hinter der Quelle zurückliegen, bevor es Leser bemerken.",
+    "splash.benefits.5.body":
+      "Sehen Sie, welche Übersetzungen hinter der Quelle zurückliegen, bevor es Leser bemerken.",
     "splash.benefits.6.title": "Probleme früh erkannt",
-    "splash.benefits.6.body": "Befunde zur Inhaltsqualität nennen die verletzte Regel, sodass jeder leicht zu beheben ist.",
+    "splash.benefits.6.body":
+      "Befunde zur Inhaltsqualität nennen die verletzte Regel, sodass jeder leicht zu beheben ist.",
     "splash.features.1.title": "Blockbasierte Inhalte",
-    "splash.features.1.body": "Setzen Sie Einträge aus strukturierten Inhaltsblöcken zusammen statt aus gespeichertem HTML.",
+    "splash.features.1.body":
+      "Setzen Sie Einträge aus strukturierten Inhaltsblöcken zusammen statt aus gespeichertem HTML.",
     "splash.features.2.title": "Versionsverlauf",
-    "splash.features.2.body": "Jedes Speichern ist eine Fassung, die Sie mit einer anderen vergleichen und wiederherstellen können.",
+    "splash.features.2.body":
+      "Jedes Speichern ist eine Fassung, die Sie mit einer anderen vergleichen und wiederherstellen können.",
     "splash.features.3.title": "Redaktioneller Arbeitsablauf",
-    "splash.features.3.body": "Führen Sie Einträge vom Entwurf über Prüfung und Freigabe bis zur Veröffentlichung, mit festgehaltenem Grund für jeden Schritt.",
+    "splash.features.3.body":
+      "Führen Sie Einträge vom Entwurf über Prüfung und Freigabe bis zur Veröffentlichung, mit festgehaltenem Grund für jeden Schritt.",
     "splash.features.4.title": "Lokalisierung",
-    "splash.features.4.body": "Halten Sie eine Variante pro Sprache vor, mit Rückfallketten für alles, was noch nicht übersetzt ist.",
+    "splash.features.4.body":
+      "Halten Sie eine Variante pro Sprache vor, mit Rückfallketten für alles, was noch nicht übersetzt ist.",
     "splash.features.5.title": "Medienbibliothek",
-    "splash.features.5.body": "Verwalten Sie Bilder und Dateien neben den Einträgen, die sie verwenden.",
+    "splash.features.5.body":
+      "Verwalten Sie Bilder und Dateien neben den Einträgen, die sie verwenden.",
     "splash.features.6.title": "Vorschau und Auswertungen",
-    "splash.features.6.body": "Sehen Sie eine Sprache vor der Veröffentlichung in der Vorschau und verfolgen Sie Inhaltsqualität und Rückstand auf dem Dashboard.",
+    "splash.features.6.body":
+      "Sehen Sie eine Sprache vor der Veröffentlichung in der Vorschau und verfolgen Sie Inhaltsqualität und Rückstand auf dem Dashboard.",
     "nav.toggle": "Navigation umschalten",
-    "tour.intro": "Ein geführter Rundgang durch das CMS: wie Sie einen Eintrag finden, seine Inhaltsblöcke bearbeiten, alte Fassungen wiederherstellen, über den Arbeitsablauf veröffentlichen, Übersetzungen aktuell halten und Medien verwalten.",
+    "tour.intro":
+      "Ein geführter Rundgang durch das CMS: wie Sie einen Eintrag finden, seine Inhaltsblöcke bearbeiten, alte Fassungen wiederherstellen, über den Arbeitsablauf veröffentlichen, Übersetzungen aktuell halten und Medien verwalten.",
     "tour.s1.title": "Einen Eintrag finden und öffnen",
-    "tour.s1.summary": "Finden Sie einen beliebigen Eintrag einer Website und öffnen Sie ihn zum Bearbeiten.",
-    "tour.s1.step.1": "Öffnen Sie „Einträge“ und wählen Sie unter „Website wählen“ die Website, an der Sie arbeiten.",
-    "tour.s1.step.2": "Grenzen Sie die Liste mit der Auswahlliste „Typ“ ein oder tippen Sie einen Namensteil in das Feld „Schlüssel“.",
-    "tour.s1.step.3": "Lesen Sie die Spalten „Schlüssel“, „Typ“, „Quellsprache“ und „Status“; archivierte Einträge tragen die Markierung „Archiviert“.",
-    "tour.s1.step.4": "Wählen Sie den Schlüssel eines Eintrags, um seine Seite zu öffnen, auf der Sie ihn bearbeiten, prüfen und veröffentlichen.",
+    "tour.s1.summary":
+      "Finden Sie einen beliebigen Eintrag einer Website und öffnen Sie ihn zum Bearbeiten.",
+    "tour.s1.step.1":
+      "Öffnen Sie „Einträge“ und wählen Sie unter „Website wählen“ die Website, an der Sie arbeiten.",
+    "tour.s1.step.2":
+      "Grenzen Sie die Liste mit der Auswahlliste „Typ“ ein oder tippen Sie einen Namensteil in das Feld „Schlüssel“.",
+    "tour.s1.step.3":
+      "Lesen Sie die Spalten „Schlüssel“, „Typ“, „Quellsprache“ und „Status“; archivierte Einträge tragen die Markierung „Archiviert“.",
+    "tour.s1.step.4":
+      "Wählen Sie den Schlüssel eines Eintrags, um seine Seite zu öffnen, auf der Sie ihn bearbeiten, prüfen und veröffentlichen.",
     "tour.s2.title": "Inhaltsblöcke bearbeiten und eine Fassung speichern",
-    "tour.s2.summary": "Einträge bestehen aus strukturierten Blöcken statt aus gespeichertem HTML, und jedes Speichern wird zu einer Fassung.",
-    "tour.s2.step.1": "Wählen Sie auf der Eintragsseite eine Sprache in der Tabelle „Sprachen“, die Status, Live-Fassung und Rückstand gegenüber der Quelle jeder Sprache zeigt.",
-    "tour.s2.step.2": "Bearbeiten Sie unter „Inhaltsblöcke“ die Blöcke und fügen Sie mit „Block hinzufügen“ eine Überschrift, einen Absatz, eine Liste, ein Zitat, ein Bild oder einen Codeblock ein; „Nach oben“, „Nach unten“ und „Entfernen“ ordnen um oder löschen.",
-    "tour.s2.step.3": "Ändern Sie bei Bedarf den Titel und wählen Sie dann „Fassung speichern“.",
-    "tour.s2.step.4": "Ist der Entwurf der Live-Fassung voraus, sagt die Seite es, sodass Sie stets wissen, dass Leser noch die ältere Fassung sehen.",
+    "tour.s2.summary":
+      "Einträge bestehen aus strukturierten Blöcken statt aus gespeichertem HTML, und jedes Speichern wird zu einer Fassung.",
+    "tour.s2.step.1":
+      "Wählen Sie auf der Eintragsseite eine Sprache in der Tabelle „Sprachen“, die Status, Live-Fassung und Rückstand gegenüber der Quelle jeder Sprache zeigt.",
+    "tour.s2.step.2":
+      "Bearbeiten Sie unter „Inhaltsblöcke“ die Blöcke und fügen Sie mit „Block hinzufügen“ eine Überschrift, einen Absatz, eine Liste, ein Zitat, ein Bild oder einen Codeblock ein; „Nach oben“, „Nach unten“ und „Entfernen“ ordnen um oder löschen.",
+    "tour.s2.step.3":
+      "Ändern Sie bei Bedarf den Titel und wählen Sie dann „Fassung speichern“.",
+    "tour.s2.step.4":
+      "Ist der Entwurf der Live-Fassung voraus, sagt die Seite es, sodass Sie stets wissen, dass Leser noch die ältere Fassung sehen.",
     "tour.s3.title": "Fassungen vergleichen und wiederherstellen",
-    "tour.s3.summary": "Der Verlauf wird nie umgeschrieben, sodass Sie zurückblicken und sicher rückgängig machen können.",
-    "tour.s3.step.1": "Scrollen Sie zum „Versionsverlauf“, der jede Fassung mit Titel, Autor und Datum auflistet; die Live-Fassung ist als „Veröffentlicht“ markiert.",
-    "tour.s3.step.2": "Wählen Sie „Vergleichen“ bei einer Fassung, um zu sehen, wie sie sich von der bearbeiteten unterscheidet; identische Fassungen sagen das.",
-    "tour.s3.step.3": "Wählen Sie „Wiederherstellen“ bei einer älteren Fassung; das schreibt eine neue Fassung und lässt jede frühere unangetastet.",
-    "tour.s3.step.4": "Hat jemand anderes zuerst gespeichert, sagt die Seite es und zeigt die maßgebliche Fassung, sodass Sie vergleichen können, bevor Sie etwas überschreiben.",
+    "tour.s3.summary":
+      "Der Verlauf wird nie umgeschrieben, sodass Sie zurückblicken und sicher rückgängig machen können.",
+    "tour.s3.step.1":
+      "Scrollen Sie zum „Versionsverlauf“, der jede Fassung mit Titel, Autor und Datum auflistet; die Live-Fassung ist als „Veröffentlicht“ markiert.",
+    "tour.s3.step.2":
+      "Wählen Sie „Vergleichen“ bei einer Fassung, um zu sehen, wie sie sich von der bearbeiteten unterscheidet; identische Fassungen sagen das.",
+    "tour.s3.step.3":
+      "Wählen Sie „Wiederherstellen“ bei einer älteren Fassung; das schreibt eine neue Fassung und lässt jede frühere unangetastet.",
+    "tour.s3.step.4":
+      "Hat jemand anderes zuerst gespeichert, sagt die Seite es und zeigt die maßgebliche Fassung, sodass Sie vergleichen können, bevor Sie etwas überschreiben.",
     "tour.s4.title": "Prüfen und veröffentlichen",
-    "tour.s4.summary": "Führen Sie einen Eintrag durch den redaktionellen Arbeitsablauf, mit ausdrücklich genannten Hindernissen und Gründen.",
-    "tour.s4.step.1": "Prüfen Sie auf der Eintragsseite den Veröffentlichungsbereich: „Bereit zur Veröffentlichung“ oder „Noch nicht veröffentlichbar“ mit einer Tabelle aus Regel, Titel und „Was zu tun ist“.",
-    "tour.s4.step.2": "Wählen Sie im Bereich „Arbeitsablauf“ eine „Aktion“ (einreichen, freigeben, ablehnen, veröffentlichen, zurückziehen oder archivieren) und geben Sie einen „Grund“ ein; Ablehnen, Zurückziehen und Archivieren verlangen einen.",
-    "tour.s4.step.3": "Wählen Sie „Vorschau“, um die gewählte Sprache als serverseitige Vorschau zu sehen; ein Hinweis warnt, wenn sie nicht dem entspricht, was Leser sehen.",
-    "tour.s4.step.4": "Öffnen Sie im Menü „Arbeitsablauf“, um zu sehen, was wartet: Einträge „In Prüfung“, offene Übersetzungsanfragen und Elemente unter „Geplant“.",
+    "tour.s4.summary":
+      "Führen Sie einen Eintrag durch den redaktionellen Arbeitsablauf, mit ausdrücklich genannten Hindernissen und Gründen.",
+    "tour.s4.step.1":
+      "Prüfen Sie auf der Eintragsseite den Veröffentlichungsbereich: „Bereit zur Veröffentlichung“ oder „Noch nicht veröffentlichbar“ mit einer Tabelle aus Regel, Titel und „Was zu tun ist“.",
+    "tour.s4.step.2":
+      "Wählen Sie im Bereich „Arbeitsablauf“ eine „Aktion“ (einreichen, freigeben, ablehnen, veröffentlichen, zurückziehen oder archivieren) und geben Sie einen „Grund“ ein; Ablehnen, Zurückziehen und Archivieren verlangen einen.",
+    "tour.s4.step.3":
+      "Wählen Sie „Vorschau“, um die gewählte Sprache als serverseitige Vorschau zu sehen; ein Hinweis warnt, wenn sie nicht dem entspricht, was Leser sehen.",
+    "tour.s4.step.4":
+      "Öffnen Sie im Menü „Arbeitsablauf“, um zu sehen, was wartet: Einträge „In Prüfung“, offene Übersetzungsanfragen und Elemente unter „Geplant“.",
     "tour.s5.title": "Übersetzungen aktuell halten",
-    "tour.s5.summary": "Sehen Sie, welche Sprachen hinter der Quelle zurückliegen, bevor es Leser bemerken.",
-    "tour.s5.step.1": "Öffnen Sie „Übersetzungen“, wählen Sie eine Website und lesen Sie die Tabelle „Sprachen“: je Sprache ihre Einträge und wie viele davon „Entwurf“ und „Veröffentlicht“ sind.",
-    "tour.s5.step.2": "Lesen Sie die auf der Seite genannte Regel, damit Sie genau wissen, was als hinter der Quelle zurückliegend gilt, und den „Stand“, zu dem sie ermittelt wurde.",
-    "tour.s5.step.3": "Suchen Sie unter „Offene Anfragen“ den Schlüssel jedes Eintrags mit Sprache, Status, Autor und Zeitpunkt der letzten Aktualisierung.",
-    "tour.s5.step.4": "Zum Beheben öffnen Sie den Eintrag unter „Einträge“, wählen die Sprache in seiner Tabelle „Sprachen“ und speichern eine neue Fassung in dieser Sprache.",
+    "tour.s5.summary":
+      "Sehen Sie, welche Sprachen hinter der Quelle zurückliegen, bevor es Leser bemerken.",
+    "tour.s5.step.1":
+      "Öffnen Sie „Übersetzungen“, wählen Sie eine Website und lesen Sie die Tabelle „Sprachen“: je Sprache ihre Einträge und wie viele davon „Entwurf“ und „Veröffentlicht“ sind.",
+    "tour.s5.step.2":
+      "Lesen Sie die auf der Seite genannte Regel, damit Sie genau wissen, was als hinter der Quelle zurückliegend gilt, und den „Stand“, zu dem sie ermittelt wurde.",
+    "tour.s5.step.3":
+      "Suchen Sie unter „Offene Anfragen“ den Schlüssel jedes Eintrags mit Sprache, Status, Autor und Zeitpunkt der letzten Aktualisierung.",
+    "tour.s5.step.4":
+      "Zum Beheben öffnen Sie den Eintrag unter „Einträge“, wählen die Sprache in seiner Tabelle „Sprachen“ und speichern eine neue Fassung in dieser Sprache.",
     "tour.s6.title": "Medien und Alternativtexte prüfen",
-    "tour.s6.summary": "Sehen Sie jedes Bild und jede Datei einer Website und erkennen Sie fehlende Alternativtexte, bevor sie die Veröffentlichung blockieren.",
-    "tour.s6.step.1": "Öffnen Sie „Medien“ und lesen Sie die Zusammenfassung: „Belegter Speicher“, Bilder mit „Kein Alternativtext“ und Dateien „Von nichts referenziert“.",
-    "tour.s6.step.2": "Prüfen Sie in der Tabelle Titel, Typ, Größe und Alternativtext jedes Mediums; ein Bild ohne Alternativtext trägt die Markierung „Kein Alternativtext“.",
-    "tour.s6.step.3": "Merken Sie sich die Regel: Ein Bild ohne Alternativtext verhindert die Veröffentlichung der Seite, beheben Sie es also, bevor Sie einen Eintrag zur Veröffentlichung führen.",
-    "tour.s6.step.4": "Als „Von nichts referenziert“ aufgeführte Dateien werden zu Ihrer Beachtung gemeldet, aber nie automatisch gelöscht.",
+    "tour.s6.summary":
+      "Sehen Sie jedes Bild und jede Datei einer Website und erkennen Sie fehlende Alternativtexte, bevor sie die Veröffentlichung blockieren.",
+    "tour.s6.step.1":
+      "Öffnen Sie „Medien“ und lesen Sie die Zusammenfassung: „Belegter Speicher“, Bilder mit „Kein Alternativtext“ und Dateien „Von nichts referenziert“.",
+    "tour.s6.step.2":
+      "Prüfen Sie in der Tabelle Titel, Typ, Größe und Alternativtext jedes Mediums; ein Bild ohne Alternativtext trägt die Markierung „Kein Alternativtext“.",
+    "tour.s6.step.3":
+      "Merken Sie sich die Regel: Ein Bild ohne Alternativtext verhindert die Veröffentlichung der Seite, beheben Sie es also, bevor Sie einen Eintrag zur Veröffentlichung führen.",
+    "tour.s6.step.4":
+      "Als „Von nichts referenziert“ aufgeführte Dateien werden zu Ihrer Beachtung gemeldet, aber nie automatisch gelöscht.",
   },
   "en-001": {
     "brand.name": "Main X · CMS",
@@ -873,7 +931,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST with OpenAPI, and HL7 FHIR where health systems need it.",
     "splash.trust.6.title": "Speaks your language",
-    "splash.trust.6.body": "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
+    "splash.trust.6.body":
+      "Arabic, Chinese, English, French, German, Hindi, Spanish and Welsh.",
     "splash.cta.title": "Ready to get started?",
     "splash.cta.body":
       "Sign in with a magic link sent to your email. No password needed.",
@@ -1121,7 +1180,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST con OpenAPI y HL7 FHIR donde lo necesitan los sistemas de salud.",
     "splash.trust.6.title": "Habla tu idioma",
-    "splash.trust.6.body": "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
+    "splash.trust.6.body":
+      "Alemán, árabe, chino, español, francés, galés, hindi e inglés.",
     "splash.cta.title": "¿Listo para empezar?",
     "splash.cta.body":
       "Inicia sesión con un enlace mágico enviado a tu correo. No necesitas contraseña.",
@@ -1371,7 +1431,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST avec OpenAPI, et HL7 FHIR là où les systèmes de santé en ont besoin.",
     "splash.trust.6.title": "Parle votre langue",
-    "splash.trust.6.body": "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
+    "splash.trust.6.body":
+      "Allemand, anglais, arabe, chinois, espagnol, français, gallois et hindi.",
     "splash.cta.title": "Prêt à commencer ?",
     "splash.cta.body":
       "Connectez-vous avec un lien magique envoyé par e-mail. Aucun mot de passe requis.",
@@ -1620,7 +1681,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body":
+      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -1862,7 +1924,8 @@ const STRINGS = {
     "splash.trust.5.body":
       "REST 搭配 OpenAPI，并在医疗系统需要时支持 HL7 FHIR。",
     "splash.trust.6.title": "支持你的语言",
-    "splash.trust.6.body": "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
+    "splash.trust.6.body":
+      "阿拉伯语、中文、德语、英语、法语、印地语、西班牙语和威尔士语。",
     "splash.cta.title": "准备好开始了吗？",
     "splash.cta.body": "通过发送到邮箱的魔法链接登录，无需密码。",
     "splash.hero.title": "放心发布，覆盖每一种语言",
@@ -2008,6 +2071,7 @@ export function normaliseLocale(
 /** Whether `locale` is written right-to-left. */
 export function isRtl(locale: string): boolean {
   const primary = normaliseLocale(locale);
+
   return (
     primary !== null && (RTL_LOCALES as readonly string[]).includes(primary)
   );
