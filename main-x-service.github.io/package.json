@@ -15,19 +15,19 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@lilydesignsystem/svelte-picker-bar": "^0.1.0",
-    "@lilydesignsystem/svelte-share-picker": "^0.1.2",
-    "@lilydesignsystem/svelte-theme-picker": "^0.1.2",
-    "@lilydesignsystem/themes": "0.1.0"
+    "@lilydesignsystem/svelte-picker-bar": "^0.3.0",
+    "@lilydesignsystem/svelte-share-picker": "^0.2.0",
+    "@lilydesignsystem/svelte-theme-picker": "^0.2.0",
+    "@lilydesignsystem/themes": "0.4.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^4.0.0",
-    "@sveltejs/kit": "^3.0.0",
+    "@sveltejs/kit": "^3.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "svelte": "^5.57.1",
+    "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
     "typescript": "^6.0.3",
-    "vite": "^8.3.1"
+    "vite": "^8.3.4"
   },
   "repository": {
     "type": "git",
