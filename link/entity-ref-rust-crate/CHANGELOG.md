@@ -12,6 +12,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-17
+
+### Changed
+
+- Dependency refresh (`uuid` 1.28); lockfile updated within semver ranges. No API change.
+
 ### Fixed — README drift (ER-1, ER-3) + missing manifest `readme` field (ER-4)
 
 - **ER-1**: "Who actually consumes this" was stale at eight crates;
