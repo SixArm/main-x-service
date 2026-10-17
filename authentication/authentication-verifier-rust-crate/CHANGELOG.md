@@ -8,6 +8,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 > See also: [spec/index.md](./spec/index.md) — single source of truth;
 > [README.md](./README.md) — user-facing intro; [AGENTS.md](./AGENTS.md) — agent guide.
 
+## [0.9.1] - 2026-10-17
+
+### Changed
+
+- Dependency refresh within semver ranges. `jsonwebtoken` deliberately stays on 9.3: 11.x requires choosing a crypto provider, and `rust_crypto` would re-introduce the `rsa` crate (RUSTSEC-2023-0071) the family removed.
+
 ## [Unreleased]
 
 ### Added — `keycloak` feature: verify Keycloak (OIDC) access tokens (KC-1)
