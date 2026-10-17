@@ -544,7 +544,7 @@ mod tests {
         // An opaque UUID — no dots, so it is structurally not a JWT/PASETO
         // and carries no claims.
         let sid = state(3600).create_session(&alice());
-        assert!(!sid.is_empty());
+        assert_ne!(sid, "");
         assert!(!sid.contains('.'));
     }
 }
