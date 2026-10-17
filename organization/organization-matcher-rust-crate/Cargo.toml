@@ -28,7 +28,7 @@ mimalloc = "0.1.52"
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }
-proptest = "1.11"
+proptest = "1.12"
 
 [profile.release]
 opt-level = 3

@@ -129,6 +129,12 @@ tracks the code follow-up:
 - Unit tests for the four score cases; `cargo test` +
   `cargo clippy --all-targets -- -D warnings` clean.
 
+## [0.7.1] - 2026-10-17
+
+### Changed
+
+- Dependency refresh within semver ranges (proptest 1.12). No API change.
+
 ## [0.7.0] — 2026-08-24
 
 ### Changed — coordinate fields named for their units (BREAKING)

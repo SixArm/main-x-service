@@ -31,6 +31,12 @@ from `Cargo.toml`'s lack of a `publish = false` marker.
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 
+## [0.8.1] - 2026-10-17
+
+### Changed
+
+- Dependency refresh within semver ranges (proptest 1.12). No API change.
+
 ## [0.8.0] - 2026-08-28
 
 > Not yet published to crates.io — see the `[Unreleased]` note above.

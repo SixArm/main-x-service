@@ -48,6 +48,12 @@ already agreed on 1.96 before this change.
 ### Changed
 - MSRV raised to Rust 1.96 (N-2 policy tightened from N-3; see spec/rust-msrv-n-minus-2/index.md).
 
+## [0.7.1] - 2026-10-17
+
+### Changed
+
+- Dependency refresh within semver ranges (proptest 1.12). No API change.
+
 ## [0.7.0] - 2026-08-28
 
 ### Added — declared MSRV (Rust 1.95)
