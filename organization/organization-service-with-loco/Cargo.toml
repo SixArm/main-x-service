@@ -27,7 +27,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # Unkeyed content digests: SHA-256 (FIPS 180-4) and SHA3-256 (FIPS 202),
 # kept for structural diversity — a sponge and a Merkle-Damgard chain, so
 # an advance against one design family does not transfer.
-sha2 = { version = "0.10" }
+sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
@@ -134,7 +134,7 @@ insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
 # network dependency).
 ed25519-dalek = { version = "3.0.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-sha2 = { version = "0.10" }
+sha2 = { version = "0.11" }
 base64 = { version = "0.23" }
 # `macros` + `net` power the boot-time key-set fetch tests in src/auth.rs
 # (#[tokio::test] + an ephemeral-port TcpListener serving the key set).
