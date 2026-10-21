@@ -170,12 +170,12 @@ parquet = { version = "60.0.0", default-features = false, features = ["arrow"], 
 aws-config = { version = "1", optional = true, default-features = false, features = [
   "behavior-version-latest",
   "rt-tokio",
-  "rustls",
+  "default-https-client",
 ] }
 aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = [
   "behavior-version-latest",
   "rt-tokio",
-  "rustls",
+  "default-https-client",
   "sigv4a",
 ] }
 aws-credential-types = { version = "1", optional = true }
