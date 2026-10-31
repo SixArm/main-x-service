@@ -16,7 +16,7 @@ path = "src/bin/main.rs"
 
 [dependencies]
 # Async Runtime
-tokio = { version = "1.53", features = ["full"] }
+tokio = { version = "1.54", features = ["full"] }
 
 # Web Framework & HTTP (axum 0.8 to match loco 0.16)
 axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
@@ -87,7 +87,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-opentelemetry = { version = "0.34" }
 
 # Utilities
-uuid = { version = "1.26", features = ["v4", "serde"] }
+uuid = { version = "1.29", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
 thiserror = "2.0"
@@ -156,8 +156,8 @@ fluvio = { version = "0.50", optional = true }
 # RecordBatch; `parquet`'s own `arrow` feature is the writer/reader that
 # serializes one to/from Parquet bytes — same crates.io release line
 # (59.1.0) since the two are versioned in lockstep upstream.
-arrow = { version = "60.0.0", default-features = false, optional = true }
-parquet = { version = "60.0.0", default-features = false, features = ["arrow"], optional = true }
+arrow = { version = "60.1.0", default-features = false, optional = true }
+parquet = { version = "60.1.0", default-features = false, features = ["arrow"], optional = true }
 
 # S3-compatible artifact storage for bulk jobs (BLK-4, optional —
 # agents/share/bulk-import-export.md §12: care-pathway is the reference
@@ -216,7 +216,7 @@ assertables = "10"
 tokio-test = "0.4"
 mockall = "0.15"
 tempfile = "3.27"
-proptest = "1.11"
+proptest = "1.12"
 
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
 # the bearer-verification path is exercised without the auth service or

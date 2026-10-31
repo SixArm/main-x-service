@@ -30,25 +30,25 @@
     "@svar-ui/svelte-calendar": "^2.7.1",
     "@svar-ui/svelte-filemanager": "^2.6.0",
     "@svar-ui/svelte-filter": "^2.6.1",
-    "@svar-ui/svelte-gantt": "^2.7.3",
-    "@svar-ui/svelte-grid": "^2.7.3",
+    "@svar-ui/svelte-gantt": "^2.8.2",
+    "@svar-ui/svelte-grid": "^2.7.5",
     "@svar-ui/svelte-kanban": "^2.6.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0",
+    "@playwright/test": "^1.64.1",
     "@sveltejs/adapter-auto": "^8.0.0",
-    "@sveltejs/kit": "^3.0.0",
+    "@sveltejs/kit": "^3.1.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/svelte": "^5.4.2",
-    "@types/node": "^26.6.3",
-    "jsdom": "^30.1.1",
-    "prettier": "^3.9.9",
+    "@types/node": "^26.6.6",
+    "jsdom": "^30.1.3",
+    "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1",
-    "svelte": "^5.57.1",
-    "svelte-check": "^4.7.6",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.7",
     "typescript": "^6.0.3",
-    "vite": "^8.3.1",
-    "vitest": "^5.0.3"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

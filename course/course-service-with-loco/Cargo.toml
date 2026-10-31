@@ -26,7 +26,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
 # Async runtime
-tokio = { version = "1.53", features = ["full"] }
+tokio = { version = "1.54", features = ["full"] }
 
 # Loco framework (backend-only; the service boots through loco's
 # Hooks/AppContext/CLI and mounts its REST router via after_routes).
@@ -60,7 +60,7 @@ utoipa-swagger-ui = { version = "10", features = ["axum"] }
 # Common types
 chrono = { version = "0.4", features = ["serde"] }
 time = "0.3"
-uuid = { version = "1.26", features = ["serde", "v4"] }
+uuid = { version = "1.29", features = ["serde", "v4"] }
 
 # Observability
 prometheus = { version = "0.14" }

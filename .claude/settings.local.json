@@ -64,6 +64,7 @@
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git push *)",
+      "Bash(cargo publish *)",
       "Bash(git *)",
       "Bash(cargo bench *)",
       "Bash([ -f \"$dir/$file\" ])",

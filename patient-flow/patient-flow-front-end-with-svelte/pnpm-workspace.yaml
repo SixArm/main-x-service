@@ -3,3 +3,4 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@sveltejs/adapter-auto@8.0.0'
   - '@sveltejs/kit@3.0.0'
+  - '@lilydesignsystem/svelte-locale-picker@0.1.3'

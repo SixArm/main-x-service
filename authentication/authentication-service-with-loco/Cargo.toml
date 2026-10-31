@@ -39,7 +39,7 @@ sha3 = { version = "0.10" }
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
-tokio = { version = "1.53", default-features = false, features = [
+tokio = { version = "1.54", default-features = false, features = [
   "rt-multi-thread",
 ] }
 async-trait = { version = "0.1" }
@@ -59,7 +59,7 @@ sea-orm = { version = "2.0", features = [
 sea-orm-migration = { version = "2.0", features = ["runtime-tokio-rustls"] }
 chrono = { version = "0.4" }
 validator = { version = "0.20" }
-uuid = { version = "1.26", features = ["v4"] }
+uuid = { version = "1.29", features = ["v4"] }
 include_dir = { version = "0.7" }
 # PASETO v4.public token signing + Ed25519 public-key publication. As the
 # central auth provider, other services verify tokens offline against the
@@ -128,7 +128,7 @@ authentication-verifier = { path = "../authentication-verifier-rust-crate", defa
 loco-rs = { workspace = true, features = ["testing"] }
 serial_test = { version = "3.5.0" }
 rstest = { version = "0.25" }
-insta = { version = "1.48", features = ["redactions", "yaml", "filters"] }
+insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }
 # T-EV-2 test-only: a stub OIDC provider in `tests/oidc.rs` signs its
 # ID tokens with ES256 (P-256 ECDSA), a pure-Rust implementation with
 # no `rsa`/RUSTSEC-2023-0071 exposure (the family removed `jsonwebtoken`

@@ -22,7 +22,7 @@ loco-rs = { version = "1.2.0", default-features = false, features = ["cli", "wit
 loco-rs = { workspace = true }
 migration = { path = "migration" }
 
-tokio = { version = "1.53", default-features = false, features = [
+tokio = { version = "1.54", default-features = false, features = [
     "rt-multi-thread",
 ] }
 async-trait = "0.1"
@@ -30,7 +30,7 @@ axum = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1.26", features = ["v4"] }
+uuid = { version = "1.29", features = ["v4"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
