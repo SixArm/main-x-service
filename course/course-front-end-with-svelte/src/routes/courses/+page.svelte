@@ -10,6 +10,7 @@
     - loading / error — request status.
 -->
 <script lang="ts">
+    import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import SearchBox from "#lib/components/SearchBox.svelte";
     import CourseGrid from "#lib/components/CourseGrid.svelte";
@@ -55,7 +56,10 @@
 
     // Initial load: empty query ⇒ "show all" (see runSearch above).
     $effect(() => {
-        void runSearch("");
+        // Site-wide search (PickerBar) navigates here as `?<terms>`.
+        const q = decodeURIComponent(page.url.search.slice(1));
+        query = q;
+        void runSearch(q);
     });
 </script>
 

@@ -11,6 +11,7 @@
     - fuzzy / phonetic — search-mode toggles passed to the API.
 -->
 <script lang="ts">
+    import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import SearchBox from "#lib/components/SearchBox.svelte";
     import PersonGrid from "#lib/components/PersonGrid.svelte";
@@ -60,7 +61,10 @@
     // Initial load: list all persons once on mount (SSR is disabled, so no
     // +page.ts load function). Runs once because it reads no reactive deps.
     $effect(() => {
-        void runSearch("");
+        // Site-wide search (PickerBar) navigates here as `?<terms>`.
+        const q = decodeURIComponent(page.url.search.slice(1));
+        query = q;
+        void runSearch(q);
     });
 </script>
 

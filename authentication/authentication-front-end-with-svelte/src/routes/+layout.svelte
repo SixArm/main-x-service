@@ -2,6 +2,7 @@
   import "../app.css";
   import { browser } from '$app/env';
   import { page } from "$app/state";
+  import { goto } from "$app/navigation";
   import { enhance } from "$app/forms";
   import { i18n, t, isRtl, LOCALES, LOCALE_LABELS, type StringKey } from "#lib/i18n.svelte.js";
   import type { Snippet } from "svelte";
@@ -167,11 +168,15 @@
             {/if}
             <PickerBar
                 labels={{
+                    search: t("nav.search"),
+                    searchInput: t("nav.search_input"),
+                    searchSubmit: t("nav.search_submit"),
                     theme: t("nav.theme"),
                     locale: t("nav.locale"),
                     textSize: t("nav.text_size"),
                     share: t("nav.share"),
                 }}
+                searchProps={{ action: "/", navigate: (href: string) => goto(href) }}
                 themesUrl="/assets/themes/"
                 themeProps={{
                     storageKey: "lily-theme",

@@ -1,6 +1,7 @@
 <script lang="ts">
     import "../app.css";
     import { page } from "$app/state";
+    import { goto } from "$app/navigation";
     import { enhance } from "$app/forms";
     import type { Snippet } from "svelte";
     import type { LayoutData } from "./$types";
@@ -162,10 +163,17 @@
             {/if}
             <PickerBar
                 labels={{
+                    search: t("chrome.search"),
+                    searchInput: t("chrome.searchInput"),
+                    searchSubmit: t("chrome.searchSubmit"),
                     theme: t("chrome.theme"),
                     locale: t("chrome.language"),
                     textSize: t("chrome.textSize"),
                     share: t("chrome.share"),
+                }}
+                searchProps={{
+                    action: "/courses",
+                    navigate: (href: string) => goto(href),
                 }}
                 themesUrl="/assets/themes/"
                 themeProps={{

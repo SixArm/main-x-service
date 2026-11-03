@@ -6,6 +6,7 @@
   and the date/status/type filter values.
 -->
 <script lang="ts">
+    import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import SearchBox from "#lib/components/SearchBox.svelte";
     import EventGrid from "#lib/components/EventGrid.svelte";
@@ -61,7 +62,10 @@
 
     // Run an initial unfiltered search once the component is set up.
     $effect(() => {
-        void runSearch("");
+        // Site-wide search (PickerBar) navigates here as `?<terms>`.
+        const q = decodeURIComponent(page.url.search.slice(1));
+        query = q;
+        void runSearch(q);
     });
 </script>
 

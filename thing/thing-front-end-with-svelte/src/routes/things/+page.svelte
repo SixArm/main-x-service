@@ -30,6 +30,7 @@
   (runSearch's default); only the pagination controls advance it.
 -->
 <script lang="ts">
+    import { page } from "$app/state";
     import { goto } from "$app/navigation";
     import SearchBox from "#lib/components/SearchBox.svelte";
     import ThingGrid from "#lib/components/ThingGrid.svelte";
@@ -110,7 +111,10 @@
     // Populate the grid on first render — an empty query routes to
     // `repo.list` inside runSearch (T-15), not a wildcard search.
     $effect(() => {
-        void runSearch("");
+        // Site-wide search (PickerBar) navigates here as `?<terms>`.
+        const q = decodeURIComponent(page.url.search.slice(1));
+        query = q;
+        void runSearch(q);
     });
 </script>
 

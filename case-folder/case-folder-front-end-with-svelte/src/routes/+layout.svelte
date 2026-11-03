@@ -218,11 +218,15 @@
             {/if}
             <PickerBar
                 labels={{
+                    search: t('nav.search'),
+                    searchInput: t('nav.search_input'),
+                    searchSubmit: t('nav.search_submit'),
                     theme: t('chrome.theme'),
                     locale: t('chrome.language'),
                     textSize: t('nav.text_size'),
                     share: t('nav.share'),
                 }}
+                searchProps={{ action: '/folders', navigate: (href: string) => goto(href) }}
                 themesUrl="/assets/themes/"
                 themeProps={{
                     storageKey: 'lily-theme',
