@@ -1,10 +1,13 @@
 <script lang="ts">
   // Patient locate: "where is patient X right now?" — an audited,
   // sensitive read (spec `whiteboard.md`).
+  import { page } from "$app/state";
   import { locatePerson } from "#lib/api/flow.js";
   import type { Locate } from "#lib/api/types.js";
 
-  let query = $state("");
+  // Site-wide search (PickerBar) navigates here as `?<terms>`. Prefill only:
+  // a locate is an audited read, so the operator submits it deliberately.
+  let query = $state(decodeURIComponent(page.url.search.slice(1)).trim());
   let result = $state<Locate | null>(null);
   let error = $state<string | null>(null);
 

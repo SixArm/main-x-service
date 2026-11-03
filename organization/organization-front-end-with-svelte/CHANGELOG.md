@@ -9,6 +9,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — site-wide search is honoured
+
+The site-wide search (PickerBar) navigates to `/organizations?<terms>`; the list now keeps rows whose name contains every term.
+
 ### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
 
 `spec/lily-design-system-svelte-with-picker-bar/index.md` calls for

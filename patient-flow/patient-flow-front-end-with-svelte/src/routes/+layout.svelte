@@ -166,7 +166,7 @@
             textSize: t("nav.text_size"),
                     share: t("nav.share"),
           }}
-          searchProps={{ action: "/stays", navigate: (href: string) => goto(href) }}
+          searchProps={{ action: "/locate", navigate: (href: string) => goto(href) }}
           themesUrl="/assets/themes/"
           themeProps={{
             storageKey: "lily-theme",

@@ -6,6 +6,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
+    import { page } from "$app/state";
     import { Grid, Willow as GridTheme } from "@svar-ui/svelte-grid";
     import {
         FilterBar,
@@ -54,12 +55,27 @@
         { id: "name", label: t("form.name"), type: "text" },
     ]);
     let filterRules = $state<unknown>(null);
+    // Site-wide search (PickerBar) navigates here as `?<terms>`; keep rows
+    // whose name contains every term (case-insensitive).
+    const terms = $derived(
+        decodeURIComponent(page.url.search.slice(1))
+            .toLowerCase()
+            .split(/\s+/)
+            .filter(Boolean),
+    );
+    const searched = $derived(
+        terms.length
+            ? rows.filter((r) =>
+                  terms.every((w) => String(r.name ?? "").toLowerCase().includes(w)),
+              )
+            : rows,
+    );
     const filtered = $derived(
         filterRules
             ? createArrayFilter(
                   filterRules as Parameters<typeof createArrayFilter>[0],
-              )(rows)
-            : rows,
+              )(searched)
+            : searched,
     );
 
     // Row selection navigates to the record's detail route.

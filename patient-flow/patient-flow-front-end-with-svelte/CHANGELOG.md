@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — site-wide search is honoured
+
+The site-wide search (PickerBar) now targets `/locate` (it pointed at `/stays`, which has no index page and would 404) and prefills the input from `?<terms>` without submitting, since a locate is an audited read.
+
 ### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
 
 Removed the hand-maintained `THEMES` array (39 slugs — DaisyUI-style
