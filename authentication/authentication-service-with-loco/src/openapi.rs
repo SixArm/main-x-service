@@ -511,7 +511,10 @@ mod tests {
         // The referenced schemas exist.
         let schemas = &s["components"]["schemas"];
         assert!(schemas["UserAttributes"]["properties"]["attributes"].is_object());
-        assert!(schemas["ReplaceUserAttributes"]["required"][0] == "attributes");
+        assert_eq!(
+            schemas["ReplaceUserAttributes"]["required"][0],
+            "attributes"
+        );
     }
 
     #[test]

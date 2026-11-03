@@ -210,10 +210,9 @@ impl BloodType {
             ("A", r)
         } else if let Some(r) = upper.strip_prefix('B') {
             ("B", r)
-        } else if let Some(r) = upper.strip_prefix('O') {
-            ("O", r)
         } else {
-            return None;
+            let r = upper.strip_prefix('O')?;
+            ("O", r)
         };
         let positive = parse_rh_sign(rest)?;
         Some(match (group, positive) {

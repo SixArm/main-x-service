@@ -224,7 +224,7 @@ mod tests {
     fn test_place_new() {
         let place = Place::new("Central Park");
         assert_eq!(place.name, "Central Park");
-        assert!(place.id != uuid::Uuid::nil());
+        assert_ne!(place.id, uuid::Uuid::nil());
         assert!(!place.is_deleted);
     }
 

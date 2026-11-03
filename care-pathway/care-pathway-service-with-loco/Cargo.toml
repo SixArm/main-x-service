@@ -34,7 +34,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.13" }
 # Embedded full-text search index (see src/search/). Same version as the
 # rest of the family, so one index format.
-tantivy = { version = "0.26" }
+tantivy = { version = "0.27" }
 migration = { path = "migration" }
 sea-orm = { version = "2.0", features = [
   "sqlx-sqlite",
@@ -52,8 +52,8 @@ entity-ref = { path = "../../link/entity-ref-rust-crate" }
 # operator-configured `CARE_PATHWAY_JOURNEY_URL_<TYPE>` bases, and the
 # client is built non-redirecting so a peer cannot steer it elsewhere
 # (SEC-B11).
-reqwest = { version = "0.12", default-features = false, features = [
-  "rustls-tls",
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls",
   "json",
 ] }
 validator = { version = "0.21" }
@@ -64,7 +64,7 @@ mimalloc = { version = "0.1.52" }
 prometheus = { version = "0.14" }
 # SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
 # See src/compliance/audit_chain.rs.
-sha2 = { version = "0.10" }
+sha2 = { version = "0.11" }
 # Second integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
 # structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
 # cryptanalytic advance against one design family does not transfer to
@@ -168,7 +168,7 @@ fluvio = ["dep:fluvio"]
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).
 tempfile = "3"
 loco-rs = { workspace = true, features = ["testing"] }
@@ -187,14 +187,14 @@ sea-orm = { version = "2.0", features = ["mock"] }
 # `loco_rs::TestServer` and this dependency's own `TestServer` must name
 # the same type for a helper to accept either interchangeably.
 axum-test = { version = "17.3" }
-serial_test = { version = "3.5.0" }
-rstest = { version = "0.25" }
+serial_test = { version = "4.0.1" }
+rstest = { version = "0.28" }
 insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }
 # Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so the extractor.s
 # happy path is verified un-gated (no auth-service / network dependency).
 ed25519-dalek = { version = "3.0" }
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
-sha2 = { version = "0.10" }
+sha2 = { version = "0.11" }
 base64 = { version = "0.23" }
 # `macros` + `net` power the boot-time key-set fetch tests in src/auth.rs
 # (#[tokio::test] + an ephemeral-port TcpListener serving the key set).

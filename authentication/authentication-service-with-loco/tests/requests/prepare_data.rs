@@ -82,7 +82,7 @@ pub async fn init_user_login(request: &TestServer, ctx: &AppContext) -> LoggedIn
 /// Build the `Authorization: Bearer <token>` header pair to attach to a
 /// request for the bearer-gated endpoints (`/me`, `/signout`, account…).
 pub fn auth_header(token: &str) -> (HeaderName, HeaderValue) {
-    let auth_header_value = HeaderValue::from_str(&format!("Bearer {}", &token)).unwrap();
+    let auth_header_value = HeaderValue::from_str(&format!("Bearer {}", token)).unwrap();
 
     (HeaderName::from_static("authorization"), auth_header_value)
 }

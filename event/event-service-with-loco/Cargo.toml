@@ -47,7 +47,7 @@ loco-rs = { version = "1.2.0", default-features = false, features = ["cli", "wit
 migration = { path = "migration" }
 
 # Search Engine
-tantivy = "0.26"
+tantivy = "0.27"
 
 # gRPC (PRO-H11: a real Tonic server, generated from proto/event.proto
 # by build.rs). tonic 0.14 split the prost codec out of the core crate
@@ -202,8 +202,8 @@ tokio-stream = { version = "0.1", features = ["net"] }
 # HTTP request against a served router; this crate has no other direct
 # `reqwest` dependency (only a transitive one via
 # `authentication-verifier`'s `fetch` feature).
-reqwest = { version = "0.12", default-features = false, features = [
-  "rustls-tls",
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls",
   "json",
 ] }
 

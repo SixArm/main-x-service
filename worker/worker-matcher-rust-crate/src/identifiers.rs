@@ -1828,9 +1828,7 @@ pub fn parse_br_cpf(s: &str) -> Option<String> {
 #[must_use]
 pub fn parse_cn_rrn(s: &str) -> Option<String> {
     const WEIGHTS: [u32; 17] = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
-    const CHECK: [u8; 11] = [
-        b'1', b'0', b'X', b'9', b'8', b'7', b'6', b'5', b'4', b'3', b'2',
-    ];
+    const CHECK: [u8; 11] = *b"10X98765432";
     let cleaned: String = s
         .chars()
         .filter(char::is_ascii_alphanumeric)

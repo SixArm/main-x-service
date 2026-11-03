@@ -26,7 +26,7 @@ use libfuzzer_sys::fuzz_target;
 use organization_service::bulk::{csv, jsonl};
 
 fuzz_target!(|data: &[u8]| {
-    for delimiter in [b',', b'\t'] {
+    for delimiter in *b",\t" {
         // A readable file yields one slot per row, each independently an
         // `Ok` row or a per-row parse error. A structurally unreadable one
         // (bad framing) is a whole-file `Err` — the documented outcome,

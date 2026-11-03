@@ -35,7 +35,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # no MAC key is configured — a sponge and a Merkle-Damgard chain, so
 # an advance against one design family does not transfer.
 sha2 = { version = "0.11" }
-sha3 = { version = "0.10" }
+sha3 = { version = "0.12" }
 loco-rs = { workspace = true  }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
@@ -68,10 +68,10 @@ include_dir = { version = "0.7" }
 # Optional: gated by the default-on `paseto` feature.
 rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"], optional = true }
 ed25519-dalek = { version = "3.0", optional = true }
-base64 = { version = "0.22" }
+base64 = { version = "0.23" }
 # Prometheus text-exposition metrics served at GET /metrics.prom, for
 # parity with the older Axum services in the family.
-prometheus = { version = "0.13" }
+prometheus = { version = "0.14" }
 
 [features]
 # PASETO v4.public token issuance (`POST /api/auth/token`), the published
@@ -126,13 +126,13 @@ required-features = []
 # claims round-trip.
 authentication-verifier = { path = "../authentication-verifier-rust-crate", default-features = false, features = ["paseto"] }
 loco-rs = { workspace = true, features = ["testing"] }
-serial_test = { version = "3.5.0" }
-rstest = { version = "0.25" }
+serial_test = { version = "4.0.1" }
+rstest = { version = "0.28" }
 insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }
 # T-EV-2 test-only: a stub OIDC provider in `tests/oidc.rs` signs its
 # ID tokens with ES256 (P-256 ECDSA), a pure-Rust implementation with
 # no `rsa`/RUSTSEC-2023-0071 exposure (the family removed `jsonwebtoken`
 # for exactly that advisory — see `security.md` §7's 2026-08-21 entry).
 # Dev-only: never shipped in the service itself.
-p256 = { version = "0.13", features = ["ecdsa"] }
+p256 = { version = "0.14", features = ["ecdsa"] }
 axum-test = { version = "17.3.0" }

@@ -44,7 +44,7 @@ fn sign_id_token(claims: &Value, kid: &str) -> String {
 
 /// The JWK for the stub IdP's public key.
 fn jwk(kid: &str) -> Value {
-    let point = signing_key().verifying_key().to_encoded_point(false);
+    let point = signing_key().verifying_key().to_sec1_point(false);
     let (x, y) = (
         point.x().expect("uncompressed point has x"),
         point.y().expect("uncompressed point has y"),

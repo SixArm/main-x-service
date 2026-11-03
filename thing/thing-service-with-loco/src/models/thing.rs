@@ -222,7 +222,7 @@ mod tests {
     fn test_thing_new() {
         let thing = Thing::new("Pride and Prejudice");
         assert_eq!(thing.name, "Pride and Prejudice");
-        assert!(thing.id != Uuid::nil());
+        assert_ne!(thing.id, Uuid::nil());
         assert!(!thing.is_deleted);
     }
 

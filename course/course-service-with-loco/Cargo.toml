@@ -51,7 +51,7 @@ serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precis
 sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
 
 # Search
-tantivy = "0.26"
+tantivy = "0.27"
 
 # OpenAPI documentation
 utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid"] }
@@ -158,8 +158,8 @@ tokio-stream = { version = "0.1", features = ["net"] }
 # The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
 # HTTP request against a served router; this crate has no other direct
 # `reqwest` dependency.
-reqwest = { version = "0.12", default-features = false, features = [
-  "rustls-tls",
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls",
   "json",
 ] }
 

@@ -475,7 +475,10 @@ mod tests {
             hasher.update(b"r0");
             hasher.update([SEP as u8]);
             hasher.update(r.pid.to_string().as_bytes());
-            format!("{:x}", hasher.finalize())
+            hasher.finalize().iter().fold(String::new(), |mut acc, b| {
+                let _ = write!(acc, "{b:02x}");
+                acc
+            })
         };
         assert_ne!(hash_of(&r), with_other_version);
         assert_eq!(RECORD_HASH_VERSION, "r1");
