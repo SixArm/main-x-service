@@ -6,13 +6,13 @@ stable compiler is `1.N`, the MSRV is `1.(N-2)`.
 
 | | |
 |---|---|
-| Current stable (`N`) | **1.98.0** (2026-08-18) |
-| **Declared MSRV (`N-2`)** | **1.96** |
-| Toolchain we *build* with | **1.96.1** (`rust-toolchain.toml`) |
+| Current stable (`N`) | **1.99.1** (2026-10-13) |
+| **Declared MSRV (`N-2`)** | **1.97** |
+| Toolchain we *build* with | **1.97.1** (`rust-toolchain.toml`) |
 | Single source of truth | [`ci/msrv.txt`](../../ci/msrv.txt) |
 
 At N-2 the MSRV's minor version happens to coincide with the build
-pin's minor version (both `1.96`) — the pin still carries a patch
+pin's minor version (both `1.97`) — the pin still carries a patch
 number the MSRV does not, so they remain two different numbers with
 two different jobs (§3). This is closer together than the family's
 former N-3 policy ever put them, and is a property of today's specific
@@ -38,7 +38,7 @@ apart again until the pin is next bumped.
   uses day to day.
 - **N-2 is a ceiling on our conservatism, not a target.** Nothing obliges
   a crate to sit exactly at the floor. What is forbidden is *silently*
-  drifting above it: a language or `std` feature stabilised after 1.96
+  drifting above it: a language or `std` feature stabilised after 1.97
   may not be used until the floor moves.
 
 ### Why N-2 and not N-3
@@ -59,7 +59,7 @@ change. The reasoning for tightening to N-2:
   failure N-3 was originally chosen to avoid, and N-2 still avoids it.
 - **N-2 still sits comfortably above the real dependency floor** (§4):
   as of this change the loco-based services transitively require
-  1.94, so 1.96 clears it by two releases — one more release of
+  1.94, so 1.97 clears it by three releases — one more release of
   headroom than N-3 had, not less, because stable itself moved on in
   the interim.
 
@@ -71,7 +71,7 @@ Every crate's `Cargo.toml` carries the version in its `[package]` table:
 [package]
 name = "person-matcher"
 edition = "2024"
-rust-version = "1.96"
+rust-version = "1.97"
 ```
 
 - It is declared **per crate** rather than inherited, because this
@@ -85,7 +85,7 @@ rust-version = "1.96"
   Cargo is **MSRV-aware**: when resolving a dependency it prefers the
   newest version compatible with the declared floor, and it refuses to
   build when a locked dependency demands a newer compiler than the
-  toolchain in use. Declaring the field is what turns "we support 1.96"
+  toolchain in use. Declaring the field is what turns "we support 1.97"
   from a README claim into something the build system enforces.
 
 ### Exempt: the `fuzz/` sub-crates
@@ -105,8 +105,8 @@ They are routinely confused, so, explicitly:
 | Number | Where | What it means |
 |---|---|---|
 | **1.98** (`N`) | upstream | the newest stable compiler that exists |
-| **1.96.1** | [`rust-toolchain.toml`](../../rust-toolchain.toml) | the compiler this repo *builds and formats with*, pinned so `cargo fmt` is byte-identical on every machine |
-| **1.96** (`N-2`) | `ci/msrv.txt` + every `Cargo.toml` | the oldest compiler we *promise still works* |
+| **1.97.1** | [`rust-toolchain.toml`](../../rust-toolchain.toml) | the compiler this repo *builds and formats with*, pinned so `cargo fmt` is byte-identical on every machine |
+| **1.97** (`N-2`) | `ci/msrv.txt` + every `Cargo.toml` | the oldest compiler we *promise still works* |
 
 The pin exists to stop rustfmt drift churning the tree; the MSRV exists
 to stop us breaking a consumer. Bumping one does **not** imply bumping
@@ -138,12 +138,12 @@ The stage does two things:
    not, and an MSRV that only holds for `src/` is not one a consumer can
    rely on.
 
-Run locally with `rustup toolchain install 1.96 --profile minimal`
+Run locally with `rustup toolchain install 1.97 --profile minimal`
 first; CI installs it in the job.
 
 ### The dependency floor is the binding constraint
 
-Our own code compiles far below 1.96. What does not is the dependency
+Our own code compiles far below 1.97. What does not is the dependency
 graph: as of this change the loco-based services transitively require
 
 ```
@@ -151,7 +151,7 @@ loco-rs 1.0.1, loco-gen 1.0.0        → rustc 1.94
 sea-orm 2.0.0, sqlx 0.9.0            → rustc 1.94
 ```
 
-so **1.94 is the true floor and 1.96 clears it by two releases.** This is
+so **1.94 is the true floor and 1.97 clears it by three releases.** This is
 worth watching rather than assuming: a dependency bump can raise the
 floor above N-2 without a single line of our code changing, and the
 `msrv` stage is what turns that into a red build instead of a surprise
@@ -230,7 +230,7 @@ passed`) — `authentication-service`, `case-service`,
 (`cargo update`, no manifest change) and fully re-verified before this
 fix could land without turning those 8 crates' CI red: `cargo test
 --locked`, `cargo clippy --all-targets --locked -- -D warnings`, `cargo
-fmt --check`, `cargo +1.96 check --all-targets --locked` (this
+fmt --check`, `cargo +1.97 check --all-targets --locked` (this
 section's own MSRV stage), and `cargo deny check` where a `deny.toml`
 exists (6 of the 8) — all green, on every one of the 8, before
 committing the refreshed lockfiles alongside the `locked_flag` fix. See

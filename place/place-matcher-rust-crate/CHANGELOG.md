@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
+
 ### Added — score address `line2`/`county`/`country` as low-weight supporting fields (OQ-L, resolves OQ-G)
 
 `Address.line2`/`county`/`country` were stored but never read by

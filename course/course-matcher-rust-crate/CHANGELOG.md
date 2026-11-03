@@ -9,6 +9,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
+
 ### Fixed — doc drift: benchmarks described as service-side only (T-15)
 
 `[0.7.0]` added this crate's own `benches/match_pair.rs`, but

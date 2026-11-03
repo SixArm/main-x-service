@@ -42,7 +42,7 @@ representative service manifests
 
 | Concern | Technology | Purpose |
 |---|---|---|
-| Language | Rust, 2024 edition; MSRV **1.96** | Systems performance + memory safety |
+| Language | Rust, 2024 edition; MSRV **1.97** | Systems performance + memory safety |
 | Async runtime | Tokio | Async I/O and concurrency (NOT async_std) |
 | Web framework | Axum 0.8 + Loco.rs 1.0 | HTTP server, routing, config/hooks/CLI (backend-only) |
 | HTTP layer | hyper, tower, tower-http | CORS, compression, tracing middleware |

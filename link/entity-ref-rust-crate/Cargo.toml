@@ -2,7 +2,7 @@
 name = "entity-ref"
 version = "0.2.1"
 edition = "2024"
-rust-version = "1.96"
+rust-version = "1.97"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "EntityRef — the shared cross-service-linking value type (entity_type:uuid URN) + edge-kind registry for the Main X Index family"
 readme = "README.md"

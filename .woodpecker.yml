@@ -27,9 +27,9 @@ when:
   - event: [push, pull_request, manual]
 
 variables:
-  # Matches rust-toolchain.toml (1.96.1); rustup honours the pin from the
+  # Matches rust-toolchain.toml (1.97.1); rustup honours the pin from the
   # file, so the image tag only needs to be recent enough to bootstrap it.
-  - &rust_image 'rust:1.96-bookworm'
+  - &rust_image 'rust:1.97-bookworm'
 
 services:
   - name: postgres

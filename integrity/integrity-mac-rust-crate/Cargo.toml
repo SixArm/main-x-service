@@ -2,7 +2,7 @@
 name = "integrity-mac"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.96"
+rust-version = "1.97"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
 description = "Keyed integrity MACs (HMAC-SHA256) with HKDF domain separation and production-grade key handling for the Main X Index family"
 readme = "README.md"

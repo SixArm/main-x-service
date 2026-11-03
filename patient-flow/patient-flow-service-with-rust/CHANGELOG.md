@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
+
 ### Added — optional Keycloak bearer acceptance; PASETO is now a feature (KC-1, PF-T25, 2026-09-29)
 
 `keycloak` cargo feature (off by default): the blanket guard and the

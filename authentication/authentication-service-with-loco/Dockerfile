@@ -17,7 +17,7 @@
 # run from the repository root (see examples/compose/ for the wired
 # multi-service stacks that build every image this way).
 
-FROM rust:1.96-slim AS builder
+FROM rust:1.97-slim AS builder
 
 # Build dependencies — `libssl-dev` for openssl-sys, `libpq-dev` for
 # the PostgreSQL C client headers SeaORM links against via sqlx.

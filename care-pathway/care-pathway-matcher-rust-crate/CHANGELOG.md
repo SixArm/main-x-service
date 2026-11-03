@@ -10,6 +10,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
+
 ### Added — array-cardinality cap inside the library itself (CPM-T3)
 
 `condition_codes`, `interventions`, `keywords`, `tags`, `relationships`,
