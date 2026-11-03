@@ -123,6 +123,9 @@
         <div class="chrome">
             <PickerBar
                 labels={{
+                    search: "Search",
+                    searchInput: "Search terms",
+                    searchSubmit: "Search",
                     theme: "Theme",
                     locale: "Language",
                     textSize: "Text size",
