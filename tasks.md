@@ -8415,3 +8415,76 @@ Suggested order: WEB-3 → WEB-1 → WEB-4 → WEB-9 → WEB-2 → WEB-8 →
 WEB-5 → WEB-6 → WEB-7. The first five are what make a front-end PR's
 green mean something; the last four are the backlog that green would
 then protect.
+
+
+---
+
+## Phase 12 — Local CI/CD (2026-11-04)
+
+> **Provenance.** Raised after hosted CI queued a push for 8+ minutes and
+> `main` was found red for many commits, with four front-ends' Playwright
+> suites failing since the Lily 0.6 / SvelteKit 3 upgrades — all of which
+> reproduced and were fixed locally in one sitting. Assessment, options
+> considered, and the risks (Apple-Silicon-vs-Linux gap, self-attested
+> results, self-hosted runner security) are in
+> [`spec/local-ci`](spec/local-ci/index.md); this list is the work.
+> Nothing here removes hosted CI. Sizes as above.
+
+- [ ] **LCI-1 (S)** `scripts/ci-local.sh [fast|full]` — runs the chosen
+  tier's stages through `scripts/ci-check.sh` and `ci-front-ends.sh`,
+  defaulting `CI_CHANGED_SINCE=origin/main`. A stage that cannot run
+  prints `SKIPPED: <reason>` and the run is **not** reported as a full
+  pass. Front-end Playwright suites run serially (port 4173 collision).
+  Wrap as `make ci` / `make ci-full`. Depends: nothing.
+- [ ] **LCI-2 (S)** Opt-in `pre-push` hook (`scripts/install-hooks.sh`
+  sets `core.hooksPath` to a tracked `hooks/` dir) running the **fast**
+  tier with a hard time budget; `--no-verify` documented as the escape,
+  and the budget is the guard against its being habitual. Depends: LCI-1.
+- [ ] **LCI-3 (S)** Per-stage run record to git-ignored `.ci-local/`
+  (commit SHA, clean-tree flag, stage, target, exit code, duration,
+  `rustc`/`node`/`pnpm` versions, host triple). Gives the first real
+  per-stage timing data. Depends: LCI-1.
+- [ ] **LCI-4 (M)** Attestation: publish a `local-ci` commit status for
+  an exact SHA from a clean tree, naming the tier. Requires the trust
+  decision in `spec/local-ci` §4.3 (required *in addition to*, never
+  instead of, hosted checks). Decide statuses vs signed git notes first.
+  Depends: LCI-3.
+- [ ] **LCI-5 (M)** Container parity: `scripts/ci-container.sh` runs
+  `ci-check.sh` inside the pinned CI images (`rust:1.97-bookworm`,
+  `node:26-bookworm`) under Podman, `--platform linux/amd64` selectable.
+  Measure amd64-emulation cost before deciding it is a nightly rather
+  than an on-demand tier. Depends: LCI-1.
+- [ ] **LCI-6 (S)** Evaluate `woodpecker-cli exec` against `.woodpecker.yml`
+  locally, including whether Podman's Docker-compatible socket satisfies
+  its docker backend on macOS (**unverified**; no Podman backend is
+  documented). Outcome is a yes/no with the exact command, written into
+  `spec/local-ci` §6. Also verify the Woodpecker change-aware half, which
+  its own header calls unverified. Depends: nothing.
+- [ ] **LCI-7 (L)** Self-hosted Woodpecker/Forgejo runner on a dedicated
+  machine/VM linked to Codeberg: ephemeral containers per job, no secrets
+  for fork PRs, never the dev laptop (`spec/local-ci` §5). Needs a named
+  owner and a machine — split before starting. Depends: LCI-1..LCI-5
+  stable, LCI-6.
+- [ ] **LCI-8 (S)** Cut hosted cost without weakening it: `paths-ignore`
+  for docs-only changes where `docs` covers them; move compile-only
+  `bench`, `fuzz` smoke and `evidence` to schedule/`workflow_dispatch`
+  once observed stable locally; add `sccache`/`kache` and the pnpm store
+  to the caches. **Measure the hit rate and minutes before and after;
+  claim only the measured saving.** The repo is public (checked 2026-11-04), so
+  expect the saving to be queue time and noise, not money; confirm from
+  the billing page.
+- [ ] **LCI-9 (S)** Remove wall-clock flakes from the gate:
+  `care-pathway-matcher` `oversized_arrays_score_in_bounded_time` failed
+  under a loaded full-tree run (965 ms vs a bound) and passed alone. Audit
+  the other `*_in_bounded_time` / timing assertions; move them to an
+  opt-in `--ignored` bench-style tier or make them count operations, not
+  milliseconds. Depends: nothing.
+- [ ] **LCI-10 (S)** Docs: link `spec/local-ci` from `spec/testing`,
+  `CONTRIBUTING.md`, `AGENTS.md` (Continuous integration section) and
+  `llms.txt`/`llms.json`; state in AGENTS.md that a local `fast` pass is
+  expected before pushing. Depends: LCI-1, LCI-2.
+
+Suggested order: LCI-1 → LCI-2 → LCI-9 → LCI-3 → LCI-6 → LCI-5 → LCI-4 →
+LCI-8 → LCI-10 → LCI-7. The first three are what would have caught this
+session's red `main`; LCI-7 is last because it adds a machine to run and
+secure.

@@ -305,6 +305,34 @@ the rest of the program; the audit's "recommended tests" become the test
 half of each task, satisfying the "improve tests (fuzzing, races, unverified
 inputs)" mandate directly.
 
+### Theme G — Local CI/CD (don't depend on hosted CI to find out)
+
+**Why.** Hosted CI proved slow and late rather than wrong: a push sat
+queued for 8+ minutes, `main` was red for many commits, and four
+front-ends' Playwright suites that reproduced locally in seconds had been
+failing unnoticed because nothing made them run before the push. GitHub
+also announced, then postponed, a per-minute charge on self-hosted runners
+(Dec 2025). The repo is public, so hosted minutes are probably free today —
+the case is reliability and early feedback more than money. Full assessment, options and risks:
+[`spec/local-ci`](spec/local-ci/index.md).
+
+**What.** Make the machine in front of us the first place the full gate
+runs, and demote hosted CI to an independent second opinion:
+
+1. a change-aware local gate with a hard time budget (`pre-push`),
+2. a recorded, commit-bound result (attestation) others can see,
+3. container parity with the CI images (Linux, amd64) for what a macOS
+   arm64 laptop cannot prove,
+4. a self-hosted Woodpecker/Forgejo runner only once 1–3 are stable.
+
+**Leans on what exists:** every CI step is already `scripts/ci-check.sh`,
+selection is already change-aware (`CI_CHANGED_SINCE`), and
+`scripts/test-db.sh` already gives a Podman Postgres per service. No new
+pipeline language (Dagger/Nix/`act` were considered and rejected).
+
+**Not goals:** removing `.github/workflows/ci.yml` or `.woodpecker.yml`;
+moving the code host. Tasks: `LCI-*` in [tasks.md](tasks.md) Phase 12.
+
 ## 3. Sequencing
 
 **Phase 1 — Truth & hygiene (do first, cheap, unblocks everything):**
@@ -338,6 +366,13 @@ supply-chain infra (SEC-I1 dependency scanning, SEC-I3 `forbid(unsafe)`) is
 cheap and should land in Phase 1 alongside the other hygiene tasks. The
 remaining SEC items slot next to the capability work they touch (F-input
 with A-search/A-privacy; F-data with A-bulk/A-link; F-guard with B-auth).
+
+**Phase 12 — Local CI/CD (Theme G) is independent and can start any time.**
+LCI-1 (local gate script) and LCI-2 (pre-push hook) are cheap and pay for
+themselves immediately; do them before any further large dependency or
+front-end sweep. LCI-4 (attestation) needs the trust decision in
+`spec/local-ci` §4.3 first. The self-hosted runner (LCI-7) is last and
+needs a machine and an owner.
 
 ## 4. Working agreements (for the executing session)
 
