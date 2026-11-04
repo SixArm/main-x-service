@@ -73,7 +73,14 @@ inside() { [[ "${1}" == "${2}" || "${1}" == "${2}/"* ]]; }
 
 if [[ -n "${CI_CHANGED_SINCE:-}" ]]; then
   if base="$(git merge-base "${CI_CHANGED_SINCE}" HEAD 2>/dev/null)"; then
-    changed="$(git diff --name-only "${base}" HEAD)"
+    if [[ -n "${CI_INCLUDE_WORKTREE:-}" ]]; then
+      # Local runs (scripts/ci-local.sh): also select uncommitted edits, so a
+      # dirty tree cannot pass by hiding its own changes. Hosted CI leaves
+      # this unset and keeps merge-base..HEAD.
+      changed="$({ git diff --name-only "${base}"; git ls-files --others --exclude-standard; } | sort -u)"
+    else
+      changed="$(git diff --name-only "${base}" HEAD)"
+    fi
     run_everything=0
     while IFS= read -r f; do
       [[ -z "${f}" ]] && continue

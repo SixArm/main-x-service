@@ -31,3 +31,6 @@ Cargo.lock
 
 # Test artifacts
 /test-results/
+
+# Local CI run records and logs (scripts/ci-local.sh)
+/.ci-local/
