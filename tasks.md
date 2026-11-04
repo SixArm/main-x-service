@@ -8430,17 +8430,32 @@ then protect.
 > [`spec/local-ci`](spec/local-ci/index.md); this list is the work.
 > Nothing here removes hosted CI. Sizes as above.
 
-- [ ] **LCI-1 (S)** `scripts/ci-local.sh [fast|full]` — runs the chosen
+- [x] **LCI-1 (S)** `scripts/ci-local.sh [fast|full]` — runs the chosen
   tier's stages through `scripts/ci-check.sh` and `ci-front-ends.sh`,
   defaulting `CI_CHANGED_SINCE=origin/main`. A stage that cannot run
   prints `SKIPPED: <reason>` and the run is **not** reported as a full
   pass. Front-end Playwright suites run serially (port 4173 collision).
   Wrap as `make ci` / `make ci-full`. Depends: nothing.
+  **Done 2026-11-04.** `scripts/ci-local.sh [fast|full]`, `make ci` /
+  `make ci-full`. Verified: fast tier over a small diff (16 stages, pass);
+  full tier incl. build + serial Playwright for four front-ends (pass);
+  `test-db` correctly reported `SKIPPED` with no Postgres and the verdict
+  read "PASS WITH SKIPS"; and a deliberately mis-formatted file made `fmt`
+  and `clippy` fail with exit 1 — i.e. the gate is shown to be able to
+  fail. `CI_INCLUDE_WORKTREE=1` (set by this script only; hosted CI is
+  unchanged) makes selection include uncommitted and untracked edits, found
+  necessary when the first failure probe passed because selection only saw
+  committed changes. **Not verified:** the `test-db` and `msrv` stages
+  passing through this script on a crate-changing diff (msrv ran green
+  once; test-db was only exercised as a skip). One run's `clippy` stage
+  logged 2697 s for a single small crate — unexplained, plausibly machine
+  contention from other sessions; watch the LCI-3 timings before trusting
+  any budget (LCI-2).
 - [ ] **LCI-2 (S)** Opt-in `pre-push` hook (`scripts/install-hooks.sh`
   sets `core.hooksPath` to a tracked `hooks/` dir) running the **fast**
   tier with a hard time budget; `--no-verify` documented as the escape,
   and the budget is the guard against its being habitual. Depends: LCI-1.
-- [ ] **LCI-3 (S)** Per-stage run record to git-ignored `.ci-local/`
+- [x] **LCI-3 (S)** Per-stage run record to git-ignored `.ci-local/`
   (commit SHA, clean-tree flag, stage, target, exit code, duration,
   `rustc`/`node`/`pnpm` versions, host triple). Gives the first real
   per-stage timing data. Depends: LCI-1.
