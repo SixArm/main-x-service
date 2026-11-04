@@ -204,8 +204,10 @@ test("search box runs a search and shows its results", async ({ page }) => {
   });
   await page.goto("/", { waitUntil: "networkidle" });
   await expect(page.getByText("Housing benefit appeal")).toBeVisible();
-  await page.getByRole("searchbox").fill("housing");
-  await page.getByRole("button", { name: "Search" }).click();
+  // Scoped to <main>: the layout's PickerBar renders its own search box.
+  const main = page.getByRole("main");
+  await main.getByRole("searchbox").fill("housing");
+  await main.getByRole("button", { name: "Search" }).click();
   await expect(
     page.getByText("Housing benefit appeal (search hit)"),
   ).toBeVisible();

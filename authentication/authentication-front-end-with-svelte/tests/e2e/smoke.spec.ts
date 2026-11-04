@@ -151,7 +151,9 @@ test("home page shows the splash with a sign-in call to action without a session
   ).toHaveAttribute("href", "/signin");
   await expect(page.getByText("You are not signed in.")).toHaveCount(0);
   // The account dashboard is not rendered for an anonymous visitor.
-  await expect(page.getByRole("heading", { name: "Account" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Account", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("the tour is public and renders signed out", async ({ page }) => {

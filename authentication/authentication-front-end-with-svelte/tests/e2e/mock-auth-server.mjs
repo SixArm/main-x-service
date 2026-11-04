@@ -142,7 +142,12 @@ const server = createServer(async (req, res) => {
       token === VALID_MAGIC_TOKEN
         ? { pid: PID, name: NAME, email: EMAIL, isAdmin: false }
         : token === ADMIN_MAGIC_TOKEN
-          ? { pid: ADMIN_PID, name: ADMIN_NAME, email: ADMIN_EMAIL, isAdmin: true }
+          ? {
+              pid: ADMIN_PID,
+              name: ADMIN_NAME,
+              email: ADMIN_EMAIL,
+              isAdmin: true,
+            }
           : null;
     if (!identity) {
       return sendJson(res, 401, { error: "invalid_token" });
@@ -216,7 +221,8 @@ const server = createServer(async (req, res) => {
         description: "caller does not carry access=admin",
       });
     }
-    const targetEmail = targetPid === TARGET_PID ? TARGET_EMAIL : "unknown@example.com";
+    const targetEmail =
+      targetPid === TARGET_PID ? TARGET_EMAIL : "unknown@example.com";
     if (method === "PUT") {
       const body = await readBody(req);
       let attributes;

@@ -63,7 +63,14 @@
         <p class="banner" role="alert">{form.message}</p>
     {/if}
 
-    <form class="stack" method="POST" action="?/save" use:enhance>
+    <!-- Keep `?pid=` in the action URL: the load re-runs against it, and a bare
+         `?/save` would drop the target and hide the editor after saving. -->
+    <form
+        class="stack"
+        method="POST"
+        action={`?pid=${encodeURIComponent(data.target.pid)}&/save`}
+        use:enhance
+    >
         <input type="hidden" name="pid" value={data.target.pid} />
         <label>
             Attributes (JSON: <code>{"{ \"access\": [\"write\"] }"}</code>)

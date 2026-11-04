@@ -190,7 +190,10 @@ async function signIn(page: Page) {
     {
       name: "__Host-mxi_session",
       value: "test-session",
-      url: "http://localhost:4173",
+      // `domain` + `path` rather than `url`: Chromium rejects a `__Host-`
+      // cookie given by an http `url`.
+      domain: "localhost",
+      path: "/",
       httpOnly: true,
       secure: true,
     },

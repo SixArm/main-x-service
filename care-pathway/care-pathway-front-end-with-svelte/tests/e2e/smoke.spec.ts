@@ -189,7 +189,10 @@ test("registry grid renders the seeded pathway", async ({ page, context }) => {
     {
       name: SESSION_COOKIE,
       value: "e2e-session",
-      url: "http://localhost:4173",
+      // `domain` + `path` rather than `url`: Chromium rejects a `__Host-`
+      // cookie given by an http `url`.
+      domain: "localhost",
+      path: "/",
       secure: true, // required by the `__Host-` prefix
     },
   ]);
