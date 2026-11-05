@@ -5,10 +5,10 @@
 //! `care-pathway-matcher` engine, so there is no separate model or
 //! adapter to drift.
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::http::StatusCode;
 use care_pathway_matcher::{CarePathway, MatchConfig, MatchingEngine};
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};

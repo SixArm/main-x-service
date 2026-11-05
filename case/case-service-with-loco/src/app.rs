@@ -2,26 +2,25 @@
 //! registers routes, background workers, and the truncate/seed
 //! lifecycle for `case-service`.
 
-use async_trait::async_trait;
+use axa::{
+    AppContext, Environment, Error, Result,
+    boot::{BootResult, TestApp},
+    cli::{Cli, Command, DbCommand, parse_vars},
+    config::{Config as ServiceConfig, Defaults, MB},
+    db::truncate_table,
+    queue::{Queue, QueueOptions},
+    routes::AppRoutes,
+    server,
+    task::Tasks,
+    worker::{BackgroundWorker, WorkerMode},
+};
 use axum::{
     Router as AxumRouter,
     extract::Request,
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use loco_rs::{
-    Result,
-    app::{AppContext, Hooks, Initializer},
-    bgworker::{BackgroundWorker, Queue},
-    boot::{BootResult, StartMode, create_app},
-    config::Config,
-    controller::AppRoutes,
-    db::truncate_table,
-    environment::Environment,
-    task::Tasks,
-};
-use migration::Migrator;
-use std::path::Path;
+use migration::{Migrator, MigratorTrait};
 use std::sync::OnceLock;
 
 #[allow(unused_imports)]
@@ -63,30 +62,7 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
 /// truncate/seed lifecycle; the binary entrypoint drives it via the
 /// loco CLI.
 pub struct App;
-#[async_trait]
-impl Hooks for App {
-    fn app_name() -> &'static str {
-        env!("CARGO_CRATE_NAME")
-    }
-
-    fn app_version() -> String {
-        format!(
-            "{} ({})",
-            env!("CARGO_PKG_VERSION"),
-            option_env!("BUILD_SHA")
-                .or(option_env!("GITHUB_SHA"))
-                .unwrap_or("dev")
-        )
-    }
-
-    async fn boot(
-        mode: StartMode,
-        environment: &Environment,
-        config: Config,
-    ) -> Result<BootResult> {
-        create_app::<Self, Migrator>(mode, environment, config).await
-    }
-
+impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (repo
     /// `tasks.md` PRO-H12), returning `true` so loco does **not** also
     /// install its own. Ported from care-pathway-service's
@@ -101,7 +77,7 @@ impl Hooks for App {
     /// Returns an error only if an OTLP exporter cannot be **built** (a
     /// malformed endpoint). A collector that is merely unreachable is not an
     /// error: the gRPC channel connects lazily, so boot is unaffected.
-    fn init_logger(ctx: &AppContext) -> Result<bool> {
+    pub fn init_logger(ctx: &AppContext) -> Result<bool> {
         let telemetry_config = TelemetryConfig::from_env();
         if !telemetry_config.export_enabled() {
             return Ok(false);
@@ -114,7 +90,8 @@ impl Hooks for App {
         let operator_supplied =
             std::env::var("RUST_LOG").is_ok() || logger_config.override_filter.is_some();
         let env_filter = observability::with_exporter_diagnostics(
-            loco_rs::logger::init_env_filter::<Self>(
+            axa::logger::init_env_filter(
+                env!("CARGO_CRATE_NAME"),
                 logger_config.override_filter.as_ref(),
                 &logger_config.level,
             ),
@@ -124,9 +101,9 @@ impl Hooks for App {
         // than quietly turning logging on for anyone who enables export.
         let fmt_layer = logger_config
             .enable
-            .then(|| loco_rs::logger::init_layer(std::io::stdout, &logger_config.format, true));
+            .then(|| axa::logger::init_layer(std::io::stdout, &logger_config.format, true));
         let telemetry = observability::init(&telemetry_config, env_filter, fmt_layer)
-            .map_err(|error| loco_rs::Error::Message(format!("OTLP init failed: {error}")))?;
+            .map_err(|error| axa::Error::Message(format!("OTLP init failed: {error}")))?;
         tracing::info!(
             service.name = %telemetry_config.service_name,
             endpoint = %telemetry_config.endpoint.as_deref().unwrap_or_default(),
@@ -138,17 +115,15 @@ impl Hooks for App {
 
     /// Flush and tear down the OTLP providers on graceful shutdown, so the
     /// last batch of spans is not lost with the process.
-    async fn on_shutdown(_ctx: &AppContext) {
+    pub fn on_shutdown(_ctx: &AppContext) {
         if let Some(telemetry) = TELEMETRY.get() {
             telemetry.shutdown();
         }
     }
 
-    async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
-        Ok(vec![])
-    }
-
-    fn routes(_ctx: &AppContext) -> AppRoutes {
+    /// The service's route table.
+    #[must_use]
+    pub fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::cases::routes())
             .add_route(crate::bulk::handlers::routes())
@@ -159,7 +134,12 @@ impl Hooks for App {
             .add_route(controllers::metrics::routes())
     }
 
-    async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
+    /// Add this service's state and layers to the router.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the service's setup fails.
+    pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the process-wide PASETO verifier before the app serves
         // traffic: when `CASE_PASETO_KEYS_URL` is set the published key
         // set is fetched over HTTP once at boot (fetch failure falls back
@@ -199,29 +179,167 @@ impl Hooks for App {
             // module docs.
             .layer(axum::middleware::from_fn(observability::trace_mw)))
     }
-    async fn connect_workers(ctx: &AppContext, queue: &Queue) -> Result<()> {
-        queue
-            .register(crate::bulk::worker::BulkJobWorker::build(ctx))
-            .await?;
+
+    /// Register background workers.
+    ///
+    /// # Errors
+    ///
+    /// Fails when a worker cannot be registered.
+    pub fn connect_workers(ctx: &AppContext, queue: &mut Queue) -> Result<()> {
+        queue.register(crate::bulk::worker::BulkJobWorker::build(ctx));
         Ok(())
     }
 
     #[allow(unused_variables)]
-    fn register_tasks(tasks: &mut Tasks) {
+    /// Register command-line tasks.
+    pub fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::search::SearchReindex);
         tasks.register(crate::tasks::integrity_key::IntegrityKey);
         tasks.register(crate::tasks::integrity_resign::IntegrityResign);
         tasks.register(crate::tasks::seed_examples::SeedExamples);
         // tasks-inject (do not remove)
     }
-    async fn truncate(ctx: &AppContext) -> Result<()> {
+
+    /// Empty the tables.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the database error.
+    pub async fn truncate(ctx: &AppContext) -> Result<()> {
         truncate_table(&ctx.db, entity_links::Entity).await?;
         truncate_table(&ctx.db, merge_records::Entity).await?;
         truncate_table(&ctx.db, audit_logs::Entity).await?;
         truncate_table(&ctx.db, cases::Entity).await?;
         Ok(())
     }
-    async fn seed(_ctx: &AppContext, _base: &Path) -> Result<()> {
+}
+
+/// Service defaults. The environment overrides them; see `axa::config`.
+fn defaults() -> Defaults {
+    Defaults {
+        database: "case_service",
+        port: 5150,
+        production_port: None,
+        body_limit: 2 * MB,
+        max_connections: 1,
+    }
+}
+
+impl App {
+    /// Connect the database and build the context.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the database cannot be reached.
+    pub async fn context(environment: Environment, config: ServiceConfig) -> Result<AppContext> {
+        let db = axa::db::connect(&config.database).await?;
+        let mut ctx = AppContext::new(environment, db, config);
+        if ctx.config.workers == WorkerMode::BackgroundQueue {
+            let mut queue =
+                Queue::connect(&ctx.config.database.uri, QueueOptions::default()).await?;
+            Self::connect_workers(&ctx, &mut queue)?;
+            ctx.queue_provider = Some(std::sync::Arc::new(queue));
+        }
+        Ok(ctx)
+    }
+
+    /// Build the full router: the routes under the standard middleware,
+    /// then this service's own layers.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the service's setup fails.
+    pub async fn router(ctx: &AppContext) -> Result<AxumRouter> {
+        let router = Self::routes(ctx).into_app(ctx.clone())?;
+        Self::after_routes(router, ctx).await
+    }
+
+    /// Run a database command.
+    async fn db(ctx: &AppContext, command: DbCommand) -> Result<()> {
+        match command {
+            DbCommand::Migrate => Migrator::up(&ctx.db, None).await?,
+            DbCommand::Down { steps } => Migrator::down(&ctx.db, Some(steps)).await?,
+            DbCommand::Reset => Migrator::fresh(&ctx.db).await?,
+            DbCommand::Status => Migrator::status(&ctx.db).await?,
+            DbCommand::Truncate => Self::truncate(ctx).await?,
+        }
         Ok(())
+    }
+
+    /// Run the command line.
+    ///
+    /// # Errors
+    ///
+    /// Fails when boot, a command, or the server fails.
+    pub async fn run(cli: Cli) -> Result<()> {
+        let environment = cli
+            .environment
+            .as_deref()
+            .map_or_else(Environment::from_env, Environment::parse);
+        let mut config = ServiceConfig::from_env(&environment, &defaults())?;
+        if let Command::Start { binding, port, .. } = &cli.command {
+            if let Some(binding) = binding {
+                config.server.binding.clone_from(binding);
+            }
+            if let Some(port) = port {
+                config.server.port = *port;
+            }
+        }
+        let ctx = Self::context(environment, config).await?;
+        if !Self::init_logger(&ctx)? {
+            axa::logger::init(env!("CARGO_CRATE_NAME"), &ctx.config.logger);
+        }
+        if ctx.config.database.auto_migrate && !matches!(cli.command, Command::Db { .. }) {
+            Migrator::up(&ctx.db, None).await?;
+        }
+        match cli.command {
+            Command::Start { worker, all, .. } => {
+                let (stop, stopped) = tokio::sync::watch::channel(false);
+                let jobs = (worker || all)
+                    .then(|| ctx.queue_provider.clone())
+                    .flatten()
+                    .map(|queue| tokio::spawn(queue.run(stopped)));
+                if worker {
+                    server::shutdown_signal().await;
+                } else {
+                    let router = Self::router(&ctx).await?;
+                    server::serve(router, &ctx.config.server).await?;
+                }
+                let _ = stop.send(true);
+                if let Some(jobs) = jobs {
+                    let _ = jobs.await;
+                }
+                Self::on_shutdown(&ctx);
+                Ok(())
+            }
+            Command::Db { command } => Self::db(&ctx, command).await,
+            Command::Task { name, params } => {
+                let mut tasks = Tasks::default();
+                Self::register_tasks(&mut tasks);
+                let Some(name) = name else {
+                    for task in tasks.list() {
+                        println!("{}\t{}", task.name, task.detail);
+                    }
+                    return Ok(());
+                };
+                tasks.run(&name, &ctx, &parse_vars(&params)?).await
+            }
+        }
+    }
+}
+
+impl TestApp for App {
+    async fn boot_test() -> Result<BootResult> {
+        let environment = Environment::Test;
+        let config = ServiceConfig::from_env(&environment, &defaults())?;
+        let ctx = Self::context(environment, config).await?;
+        // Every boot starts from an empty, freshly migrated schema, so no
+        // table can carry rows from an earlier test.
+        Migrator::fresh(&ctx.db).await.map_err(Error::from)?;
+        let router = Self::router(&ctx).await?;
+        Ok(BootResult {
+            app_context: ctx,
+            router: Some(router),
+        })
     }
 }

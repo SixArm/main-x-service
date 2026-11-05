@@ -29,8 +29,8 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
+use axa::prelude::ModelResult;
 use care_pathway_matcher::CarePathway;
-use loco_rs::prelude::ModelResult;
 use sea_orm::{ConnectionTrait, DatabaseConnection, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

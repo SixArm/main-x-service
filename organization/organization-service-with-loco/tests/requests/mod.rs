@@ -4,7 +4,7 @@
 
 use std::sync::Once;
 
-use loco_rs::app::AppContext;
+use axa::AppContext;
 use serde_json::json;
 
 mod bulk;

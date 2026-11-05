@@ -12,15 +12,15 @@
 //! native REST controller (§8). These routes sit behind the blanket
 //! auth+ABAC guard (`/fhir/*` is not on the public allow-list).
 
+use axa::AppContext;
+use axa::prelude::{delete, get, post, put};
+use axa::routes::Routes;
 use axum::{
     body::Body,
     extract::{Path, Query, State},
     http::{StatusCode, header},
     response::Response,
 };
-use loco_rs::app::AppContext;
-use loco_rs::controller::Routes;
-use loco_rs::prelude::{delete, get, post, put};
 use serde::Serialize;
 
 use crate::auth::MaybeAuthUser;

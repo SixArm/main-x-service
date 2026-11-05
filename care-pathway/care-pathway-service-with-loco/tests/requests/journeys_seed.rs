@@ -4,14 +4,14 @@
 //! reaches the database as the requested conditions, and a bad
 //! argument is refused rather than silently defaulted.
 
+use axa::TestServer;
+use axa::prelude::*;
 use care_pathway_service::app::App;
 use care_pathway_service::data::journeys::DEFECT_CODES;
 use care_pathway_service::models::_entities::{
     instance_segments, instance_team, pathway_instances,
 };
 use care_pathway_service::tasks::journeys_seed::JourneysSeed;
-use loco_rs::TestServer;
-use loco_rs::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use serial_test::serial;

@@ -37,9 +37,9 @@
 //! a `subject_of` edge behind would preserve exactly the assertion the
 //! subject asked to have erased, even with the case payload gone.
 
+use axa::prelude::ModelResult;
 use case_matcher::Case;
 use chrono::SubsecRound as _;
-use loco_rs::prelude::ModelResult;
 use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, IntoActiveModel};
 use serde::Serialize;
 use uuid::Uuid;
@@ -113,7 +113,7 @@ pub async fn erase<C: ConnectionTrait>(
 
     // 1. Tombstone the payload and retire the record.
     let payload =
-        serde_json::to_value(tombstone()).map_err(|e| loco_rs::model::ModelError::Any(e.into()))?;
+        serde_json::to_value(tombstone()).map_err(|e| axa::model::ModelError::Any(e.into()))?;
     let deleted_at: chrono::DateTime<chrono::FixedOffset> =
         chrono::Utc::now().trunc_subsecs(6).into();
     let mut active = model.into_active_model();

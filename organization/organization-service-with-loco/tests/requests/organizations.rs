@@ -15,7 +15,7 @@
 //! The blank-name → 422 contract is additionally pinned DB-free by a
 //! unit test in `src/controllers/organizations.rs`.
 
-use loco_rs::testing::prelude::*;
+use axa::testing::prelude::*;
 use organization_service::app::App;
 use serde_json::json;
 use serial_test::serial;

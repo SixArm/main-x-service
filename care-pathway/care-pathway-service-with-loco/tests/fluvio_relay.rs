@@ -27,12 +27,12 @@
 //! (`person/person-service-with-loco/src/bulk/store.rs`, BLK-4).
 #![cfg(feature = "fluvio")]
 
+use axa::testing::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
 use care_pathway_service::models::_entities::event_outbox;
 use care_pathway_service::relay::{self, FluvioSink};
 use care_pathway_service::streaming;
-use loco_rs::testing::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serial_test::serial;
 

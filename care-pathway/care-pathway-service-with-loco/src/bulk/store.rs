@@ -40,8 +40,8 @@
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
-use loco_rs::Error;
-use loco_rs::Result;
+use axa::Error;
+use axa::Result;
 
 /// A place to `put` and `get` opaque bulk-job byte artifacts.
 ///

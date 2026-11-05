@@ -37,10 +37,10 @@
 use std::collections::BTreeMap;
 
 use authentication_verifier::Action;
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::http::StatusCode;
 use entity_ref::{EdgeKind, EntityRef, EntityType};
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::MaybeAuthUser;

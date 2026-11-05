@@ -13,11 +13,11 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test outbox_audit -- --ignored`.
 
+use axa::testing::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
 use care_pathway_service::models::_entities::{audit_logs, care_pathways, event_outbox};
 use care_pathway_service::streaming;
-use loco_rs::testing::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 

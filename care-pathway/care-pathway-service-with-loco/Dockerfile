@@ -99,9 +99,6 @@ COPY --from=builder --chown=carepathway:carepathway \
     /app/care-pathway/care-pathway-service-with-loco/target/release/care-pathway-service \
     /app/care-pathway-service
 
-# loco reads config/<environment>.yaml at runtime (not baked into the
-# binary); LOCO_ENV below selects `production.yaml`.
-COPY --chown=carepathway:carepathway care-pathway/care-pathway-service-with-loco/config ./config
 
 # Tantivy full-text index (CARE_PATHWAY_SEARCH_INDEX_PATH, default
 # `data/search-index` relative to CWD — see src/search/mod.rs).
@@ -122,10 +119,10 @@ EXPOSE 5150
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:5150/_health || exit 1
 
-# Runtime defaults; override at `podman run -e …`. LOCO_ENV selects
+# Runtime defaults; override at `podman run -e …`. APP_ENV selects
 # config/production.yaml — a container with no override boots safely
 # in production mode rather than defaulting to loco's own "development".
-ENV LOCO_ENV=production \
+ENV APP_ENV=production \
     PORT=5150
 
 # loco's CLI entry point: `<bin> start` runs the server (see

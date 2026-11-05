@@ -28,7 +28,7 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
-use loco_rs::prelude::ModelResult;
+use axa::prelude::ModelResult;
 use organization_matcher::Organization;
 use sea_orm::{ConnectionTrait, DatabaseConnection, IntoActiveModel, TransactionTrait};
 use serde::{Deserialize, Serialize};

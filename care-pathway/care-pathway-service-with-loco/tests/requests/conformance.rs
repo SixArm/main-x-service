@@ -15,10 +15,10 @@
 //! `tests/requests/compliance.rs` already set for a fixture the API
 //! itself cannot produce.
 
+use axa::TestServer;
+use axa::prelude::*;
 use care_pathway_service::app::App;
 use care_pathway_service::models::_entities::{instance_steps, pathway_instances};
-use loco_rs::TestServer;
-use loco_rs::prelude::*;
 use sea_orm::{ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use serial_test::serial;

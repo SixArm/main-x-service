@@ -11,7 +11,7 @@
 //! returns `202`, the job has already reached its terminal status. No
 //! polling is needed; the very next `GET .../{id}` observes the result.
 
-use loco_rs::testing::prelude::*;
+use axa::testing::prelude::*;
 use organization_matcher::{IdentifierScheme, OrgIdentifier, Organization};
 use organization_service::app::App;
 use organization_service::bulk::{csv, jsonl};

@@ -15,11 +15,11 @@
 //! stored-pair-upsert primitive either way, so a re-scan refreshes scores
 //! without disturbing a pair a human already decided.
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use care_pathway_matcher::{MatchConfig, MatchingEngine};
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::auth::MaybeAuthUser;

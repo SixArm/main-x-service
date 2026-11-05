@@ -6,8 +6,8 @@
 //! pathway identities). The derived views (caseload, overdue reviews,
 //! chronic cohorts, care-team load) live at the end.
 
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use sea_orm::{ActiveValue, QueryOrder};
 use uuid::Uuid;
 

@@ -14,9 +14,9 @@ pub mod metrics;
 /// `IntoResponse` catch-all turns it into a 500), so every controller
 /// lookup routes through this instead of a bare `?`.
 #[must_use]
-pub fn model_not_found(err: loco_rs::model::ModelError) -> loco_rs::Error {
+pub fn model_not_found(err: axa::model::ModelError) -> axa::Error {
     match err {
-        loco_rs::model::ModelError::EntityNotFound => loco_rs::Error::NotFound,
-        other => loco_rs::Error::Model(other),
+        axa::model::ModelError::EntityNotFound => axa::Error::NotFound,
+        other => axa::Error::Model(other),
     }
 }

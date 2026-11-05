@@ -5,9 +5,9 @@
 //! `organization-matcher` engine, so there is no separate model or
 //! adapter to drift.
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::http::StatusCode;
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use organization_matcher::{MatchConfig, MatchingEngine, Organization};
 use serde::{Deserialize, Serialize};
 

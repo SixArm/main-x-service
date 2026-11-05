@@ -15,9 +15,9 @@ use super::row::BulkCaseRow;
 /// # Errors
 ///
 /// Returns an error if the row fails to serialize.
-pub fn to_line(row: &BulkCaseRow) -> loco_rs::Result<String> {
+pub fn to_line(row: &BulkCaseRow) -> axa::Result<String> {
     serde_json::to_string(row)
-        .map_err(|e| loco_rs::Error::Message(format!("serialize row to JSONL: {e}")))
+        .map_err(|e| axa::Error::Message(format!("serialize row to JSONL: {e}")))
 }
 
 /// Parse one JSONL line into a [`BulkCaseRow`].
@@ -38,7 +38,7 @@ pub fn parse_line(line: &str) -> serde_json::Result<BulkCaseRow> {
 /// # Errors
 ///
 /// Returns an error if any row fails to serialize.
-pub fn encode(rows: &[BulkCaseRow]) -> loco_rs::Result<Vec<u8>> {
+pub fn encode(rows: &[BulkCaseRow]) -> axa::Result<Vec<u8>> {
     let mut out = Vec::new();
     for row in rows {
         out.extend_from_slice(to_line(row)?.as_bytes());
@@ -53,9 +53,9 @@ pub fn encode(rows: &[BulkCaseRow]) -> loco_rs::Result<Vec<u8>> {
 /// # Errors
 ///
 /// Returns an error if `input` is not valid UTF-8.
-pub fn split_lines(input: &[u8]) -> loco_rs::Result<Vec<String>> {
+pub fn split_lines(input: &[u8]) -> axa::Result<Vec<String>> {
     let text = std::str::from_utf8(input)
-        .map_err(|e| loco_rs::Error::Message(format!("bulk input is not valid UTF-8: {e}")))?;
+        .map_err(|e| axa::Error::Message(format!("bulk input is not valid UTF-8: {e}")))?;
     Ok(text
         .lines()
         .filter(|l| !l.trim().is_empty())
@@ -72,10 +72,10 @@ pub fn split_lines(input: &[u8]) -> loco_rs::Result<Vec<String>> {
 ///
 /// Returns an error if `input` is not valid UTF-8 (via [`split_lines`])
 /// or if the row count exceeds `max`.
-pub fn split_lines_capped(input: &[u8], max: usize) -> loco_rs::Result<Vec<String>> {
+pub fn split_lines_capped(input: &[u8], max: usize) -> axa::Result<Vec<String>> {
     let lines = split_lines(input)?;
     if lines.len() > max {
-        return Err(loco_rs::Error::Message(format!(
+        return Err(axa::Error::Message(format!(
             "bulk import exceeds the row cap: {} rows > {max}",
             lines.len()
         )));

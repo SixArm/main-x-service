@@ -6,8 +6,8 @@
 //! and kept public under blanket auth enforcement (see
 //! `auth::is_public_path`) so a scraper needs no bearer token.
 
+use axa::prelude::*;
 use axum::http::header::CONTENT_TYPE;
-use loco_rs::prelude::*;
 
 use crate::metrics::{self, Metrics};
 

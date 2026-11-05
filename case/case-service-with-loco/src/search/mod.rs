@@ -31,8 +31,8 @@
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
+use axa::Error;
 use case_matcher::{Case, phonetic::soundex};
-use loco_rs::Error;
 use tantivy::{
     IndexWriter, TantivyDocument,
     collector::TopDocs,

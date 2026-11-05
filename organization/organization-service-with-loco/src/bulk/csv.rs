@@ -15,7 +15,7 @@
 use serde_json::Value;
 use uuid::Uuid;
 
-use loco_rs::Error;
+use axa::Error;
 use organization_matcher::Organization;
 
 use super::columns::{COLUMNS, Kind, from_row_value, get, header, set, to_row_value};
@@ -42,7 +42,7 @@ fn render(value: &Value, kind: Kind) -> String {
 /// # Errors
 ///
 /// When a row fails to serialize or the CSV writer fails.
-pub fn encode(rows: &[(Option<Uuid>, Organization)], delimiter: u8) -> loco_rs::Result<Vec<u8>> {
+pub fn encode(rows: &[(Option<Uuid>, Organization)], delimiter: u8) -> axa::Result<Vec<u8>> {
     let mut wtr = csv::WriterBuilder::new()
         .delimiter(delimiter)
         .from_writer(Vec::new());
@@ -73,7 +73,7 @@ pub fn encode(rows: &[(Option<Uuid>, Organization)], delimiter: u8) -> loco_rs::
 /// Returns an error if the bytes are not a readable CSV (bad header /
 /// structurally broken record framing) — a whole-file failure, distinct
 /// from a per-row `Err` in the returned vector.
-pub fn decode(input: &[u8], delimiter: u8) -> loco_rs::Result<Vec<RowResult>> {
+pub fn decode(input: &[u8], delimiter: u8) -> axa::Result<Vec<RowResult>> {
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .from_reader(input);

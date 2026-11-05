@@ -1,9 +1,9 @@
 //! `care_pathways` model — CRUD over the stored
 //! `care_pathway_matcher::CarePathway` payload.
 
+use axa::prelude::*;
 use care_pathway_matcher::CarePathway as MatchPathway;
 use chrono::SubsecRound as _;
-use loco_rs::prelude::*;
 
 use crate::compliance::record_integrity;
 use sea_orm::sea_query::Expr;

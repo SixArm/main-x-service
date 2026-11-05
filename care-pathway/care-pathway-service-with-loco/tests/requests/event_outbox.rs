@@ -11,13 +11,13 @@
 //! The pure envelope→row mapping and the transport-string parsing are
 //! pinned DB-free in `src/models/event_outbox.rs` and `src/streaming.rs`.
 
+use axa::testing::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
 use care_pathway_service::models::_entities::{care_pathways, event_outbox};
 use care_pathway_service::models::care_pathways::Model as PathwayModel;
 use care_pathway_service::models::event_outbox::OutboxInsert;
 use care_pathway_service::streaming::{ENTITY, Envelope, EventKind, SCHEMA_VERSION};
-use loco_rs::testing::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, TransactionTrait};
 use serial_test::serial;
 use uuid::Uuid;

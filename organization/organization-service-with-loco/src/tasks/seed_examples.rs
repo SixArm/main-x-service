@@ -33,7 +33,7 @@
 
 use std::path::Path;
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use organization_matcher::Organization;
 use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait};
 
@@ -223,7 +223,7 @@ mod tests {
     /// The task advertises the name operators type.
     #[test]
     fn task_is_named_seed_examples() {
-        use loco_rs::task::Task;
+        use axa::task::Task;
         assert_eq!(super::SeedExamples.task().name, "seed_examples");
     }
 }

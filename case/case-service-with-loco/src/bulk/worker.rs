@@ -18,8 +18,8 @@
 //! `download_url` for personal-data records reach `completed` with no
 //! accounting of who extracted them.
 
-use loco_rs::app::AppContext;
-use loco_rs::bgworker::BackgroundWorker;
+use axa::AppContext;
+use axa::worker::BackgroundWorker;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -50,7 +50,7 @@ impl BackgroundWorker<BulkJobArgs> for BulkJobWorker {
         Self { ctx: ctx.clone() }
     }
 
-    async fn perform(&self, args: BulkJobArgs) -> loco_rs::Result<()> {
+    async fn perform(&self, args: BulkJobArgs) -> axa::Result<()> {
         run_bulk_job(&self.ctx, args.job_id).await
     }
 }
@@ -63,17 +63,17 @@ impl BackgroundWorker<BulkJobArgs> for BulkJobWorker {
 ///
 /// Returns an error if the job row is absent, an artifact is unreadable,
 /// or the pipeline / persistence / (export) audit fails.
-pub async fn run_bulk_job(ctx: &AppContext, job_id: Uuid) -> loco_rs::Result<()> {
+pub async fn run_bulk_job(ctx: &AppContext, job_id: Uuid) -> axa::Result<()> {
     let job = bulk_jobs::find_by_id(&ctx.db, job_id)
         .await?
-        .ok_or_else(|| loco_rs::Error::Message(format!("bulk job {job_id} not found")))?;
+        .ok_or_else(|| axa::Error::Message(format!("bulk job {job_id} not found")))?;
 
     bulk_jobs::set_status(&ctx.db, job_id, JobStatus::Running).await?;
 
     let result = match BulkKind::parse(&job.kind) {
         Some(BulkKind::Import) => run_import(ctx, &job).await,
         Some(BulkKind::Export) => run_export(ctx, &job).await,
-        None => Err(loco_rs::Error::Message(format!(
+        None => Err(axa::Error::Message(format!(
             "unknown bulk job kind: {}",
             job.kind
         ))),
@@ -89,11 +89,11 @@ pub async fn run_bulk_job(ctx: &AppContext, job_id: Uuid) -> loco_rs::Result<()>
 
 /// Run an import job: read the input artifact, run the pipeline, persist
 /// the error report (if any), and record the counts.
-async fn run_import(ctx: &AppContext, job: &bulk_jobs::Model) -> loco_rs::Result<()> {
+async fn run_import(ctx: &AppContext, job: &bulk_jobs::Model) -> axa::Result<()> {
     let input_ref = job
         .input_url
         .as_deref()
-        .ok_or_else(|| loco_rs::Error::Message("import job has no input artifact".to_string()))?;
+        .ok_or_else(|| axa::Error::Message("import job has no input artifact".to_string()))?;
     let artifact_store = store::from_env().await?;
     let input = artifact_store.get(input_ref).await?;
 
@@ -160,7 +160,7 @@ async fn run_import(ctx: &AppContext, job: &bulk_jobs::Model) -> loco_rs::Result
 /// Run an export job: run the pipeline (applying the masking profile),
 /// write the output artifact, record the row count, and write the export
 /// audit row (§8) — which **gates delivery** (SEC-B8, see module docs).
-async fn run_export(ctx: &AppContext, job: &bulk_jobs::Model) -> loco_rs::Result<()> {
+async fn run_export(ctx: &AppContext, job: &bulk_jobs::Model) -> axa::Result<()> {
     let params = export_params_from_json(&job.params, &job.format);
     let (bytes, rows_total) = process_export_job(&ctx.db, &params).await?;
 

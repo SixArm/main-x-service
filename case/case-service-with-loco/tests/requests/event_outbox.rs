@@ -11,13 +11,13 @@
 //! The pure envelope→row mapping and the transport-string parsing are
 //! pinned DB-free in `src/models/event_outbox.rs` and `src/streaming.rs`.
 
+use axa::testing::prelude::*;
 use case_matcher::Case;
 use case_service::app::App;
 use case_service::models::_entities::{cases, event_outbox};
 use case_service::models::cases::Model as CaseModel;
 use case_service::models::event_outbox::OutboxInsert;
 use case_service::streaming::{ENTITY, Envelope, EventKind, SCHEMA_VERSION};
-use loco_rs::testing::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, TransactionTrait};
 use serial_test::serial;
 use uuid::Uuid;

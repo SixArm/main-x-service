@@ -16,8 +16,8 @@
 //! keyword conventions (`specialty:<x>`, `jurisdiction:<x>`); no new
 //! storage, and nothing here feeds the matcher.
 
+use axa::prelude::*;
 use care_pathway_matcher::{CarePathway, CareSetting};
-use loco_rs::prelude::*;
 
 use crate::models::care_pathways::Model as PathwayModel;
 

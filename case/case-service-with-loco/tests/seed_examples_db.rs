@@ -12,10 +12,10 @@
 
 use std::path::Path;
 
+use axa::testing::prelude::*;
 use case_service::app::App;
 use case_service::models::_entities::cases;
 use case_service::tasks::seed_examples::{FIXTURE_PATH, parse_fixture, seed};
-use loco_rs::testing::prelude::*;
 use sea_orm::{ConnectionTrait, EntityTrait, PaginatorTrait};
 use serial_test::serial;
 

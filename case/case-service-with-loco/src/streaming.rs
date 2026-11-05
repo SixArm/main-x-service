@@ -28,8 +28,8 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
+use axa::prelude::{ModelError, ModelResult};
 use case_matcher::Case;
-use loco_rs::prelude::{ModelError, ModelResult};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
     QuerySelect, TransactionTrait,

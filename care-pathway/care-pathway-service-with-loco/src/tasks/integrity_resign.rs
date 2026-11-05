@@ -45,7 +45,7 @@
 //! old-key and new-key rows, which is exactly the state rotation already
 //! supports — re-run to finish.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use crate::compliance::mac::{self, MacVerdict};

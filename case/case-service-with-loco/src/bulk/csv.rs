@@ -46,24 +46,24 @@ fn render(value: &Value, kind: Kind) -> String {
 /// # Errors
 ///
 /// Returns an error if a row fails to serialize or the CSV writer fails.
-pub fn encode(rows: &[BulkCaseRow], delimiter: u8) -> loco_rs::Result<Vec<u8>> {
+pub fn encode(rows: &[BulkCaseRow], delimiter: u8) -> axa::Result<Vec<u8>> {
     let mut wtr = ::csv::WriterBuilder::new()
         .delimiter(delimiter)
         .from_writer(Vec::new());
     wtr.write_record(header())
-        .map_err(|e| loco_rs::Error::Message(format!("write CSV header: {e}")))?;
+        .map_err(|e| axa::Error::Message(format!("write CSV header: {e}")))?;
     for row in rows {
         let value = serde_json::to_value(row)
-            .map_err(|e| loco_rs::Error::Message(format!("serialize row to CSV: {e}")))?;
+            .map_err(|e| axa::Error::Message(format!("serialize row to CSV: {e}")))?;
         let record: Vec<String> = COLUMNS
             .iter()
             .map(|c| render(get(&value, c.path), c.kind))
             .collect();
         wtr.write_record(&record)
-            .map_err(|e| loco_rs::Error::Message(format!("write CSV row: {e}")))?;
+            .map_err(|e| axa::Error::Message(format!("write CSV row: {e}")))?;
     }
     wtr.into_inner()
-        .map_err(|e| loco_rs::Error::Message(format!("finish CSV: {e}")))
+        .map_err(|e| axa::Error::Message(format!("finish CSV: {e}")))
 }
 
 /// Parse a delimited-text byte buffer into per-row parse results.
@@ -82,16 +82,13 @@ pub fn encode(rows: &[BulkCaseRow], delimiter: u8) -> loco_rs::Result<Vec<u8>> {
 ///
 /// Returns an error if the bytes are not a readable CSV (bad header /
 /// structurally broken record framing).
-pub fn decode(
-    input: &[u8],
-    delimiter: u8,
-) -> loco_rs::Result<Vec<serde_json::Result<BulkCaseRow>>> {
+pub fn decode(input: &[u8], delimiter: u8) -> axa::Result<Vec<serde_json::Result<BulkCaseRow>>> {
     let mut rdr = ::csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .from_reader(input);
     let headers = rdr
         .headers()
-        .map_err(|e| loco_rs::Error::Message(format!("read CSV header: {e}")))?
+        .map_err(|e| axa::Error::Message(format!("read CSV header: {e}")))?
         .clone();
     // Resolve each expected column to its index in the actual header row.
     let indices: Vec<Option<usize>> = COLUMNS
@@ -101,7 +98,7 @@ pub fn decode(
 
     let mut out = Vec::new();
     for record in rdr.records() {
-        let record = record.map_err(|e| loco_rs::Error::Message(format!("read CSV row: {e}")))?;
+        let record = record.map_err(|e| axa::Error::Message(format!("read CSV row: {e}")))?;
         out.push(record_to_row(&record, &indices));
     }
     Ok(out)

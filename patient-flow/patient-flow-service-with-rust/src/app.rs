@@ -197,8 +197,9 @@ impl TestApp for App {
         let environment = Environment::Test;
         let config = ServiceConfig::from_env(&environment, &defaults())?;
         let ctx = Self::context(environment, config).await?;
-        Migrator::up(&ctx.db, None).await.map_err(Error::from)?;
-        Self::truncate(&ctx).await?;
+        // Every boot starts from an empty, freshly migrated schema, so no
+        // table can carry rows from an earlier test.
+        Migrator::fresh(&ctx.db).await.map_err(Error::from)?;
         let router = Self::router(&ctx).await?;
         Ok(BootResult {
             app_context: ctx,

@@ -8,8 +8,8 @@
 //! progresses. The bulk **logic** lives in [`crate::bulk::pipeline`];
 //! this module only reads and writes the row.
 
+use axa::prelude::*;
 use chrono::Utc;
-use loco_rs::prelude::*;
 use sea_orm::{ColumnTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 

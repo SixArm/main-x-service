@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn lockfile_contains_known_dependencies() {
         let packages = locked_packages();
-        for expected in ["loco-rs", "sea-orm", "axum", "sha2", "care-pathway-matcher"] {
+        for expected in ["axa", "sea-orm", "axum", "sha2", "care-pathway-matcher"] {
             assert!(
                 packages.iter().any(|(n, _)| n == expected),
                 "{expected} missing from the parsed lockfile"
@@ -352,7 +352,7 @@ mod tests {
     #[test]
     fn manifest_parses_direct_dependencies() {
         let direct = declared_dependencies();
-        for expected in ["loco-rs", "serde", "sha2", "care-pathway-matcher"] {
+        for expected in ["axa", "serde", "sha2", "care-pathway-matcher"] {
             assert!(direct.contains(&expected.to_string()), "{expected} missing");
         }
         assert!(!direct.iter().any(|d| d.starts_with('[')), "{direct:?}");

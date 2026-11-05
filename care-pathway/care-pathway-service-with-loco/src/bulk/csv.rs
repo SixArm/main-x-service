@@ -19,8 +19,8 @@
 use serde_json::Value;
 use uuid::Uuid;
 
+use axa::Error;
 use care_pathway_matcher::CarePathway;
-use loco_rs::Error;
 
 use super::columns::{COLUMNS, Kind, from_row_value, get, header, set, to_row_value};
 
@@ -49,7 +49,7 @@ fn render(value: &Value, kind: Kind) -> String {
 pub fn encode(
     rows: &[(Option<Uuid>, Option<bool>, CarePathway)],
     delimiter: u8,
-) -> loco_rs::Result<Vec<u8>> {
+) -> axa::Result<Vec<u8>> {
     let mut wtr = csv::WriterBuilder::new()
         .delimiter(delimiter)
         .from_writer(Vec::new());
@@ -80,7 +80,7 @@ pub fn encode(
 /// Returns an error if the bytes are not a readable CSV (bad header /
 /// structurally broken record framing) — a whole-file failure, distinct
 /// from a per-row `Err` in the returned vector.
-pub fn decode(input: &[u8], delimiter: u8) -> loco_rs::Result<Vec<RowResult>> {
+pub fn decode(input: &[u8], delimiter: u8) -> axa::Result<Vec<RowResult>> {
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .from_reader(input);

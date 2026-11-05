@@ -10,8 +10,8 @@
 //! implementation), adapted to this crate's loco model-error conventions
 //! and `chrono` timestamps.
 
+use axa::prelude::*;
 use chrono::SubsecRound as _;
-use loco_rs::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };

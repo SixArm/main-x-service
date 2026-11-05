@@ -10,7 +10,7 @@
 //! [`Model::unpublished`] / [`Model::mark_published`] are the Phase-3
 //! relay worker's poll + ack (roadmap; the relay itself is not built yet).
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect, prelude::DateTimeWithTimeZone};
 use uuid::Uuid;

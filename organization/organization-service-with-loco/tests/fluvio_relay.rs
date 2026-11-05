@@ -26,7 +26,7 @@
 //! (`person/person-service-with-loco/src/bulk/store.rs`, BLK-4).
 #![cfg(feature = "fluvio")]
 
-use loco_rs::testing::prelude::*;
+use axa::testing::prelude::*;
 use organization_matcher::Organization;
 use organization_service::app::App;
 use organization_service::models::_entities::event_outbox;

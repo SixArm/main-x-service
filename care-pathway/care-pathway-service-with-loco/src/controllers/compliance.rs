@@ -14,10 +14,9 @@
 //! since the whole point is that an auditor can read the posture, and
 //! nothing here discloses pathway data.
 
+use axa::prelude::*;
 use axum::extract::Query;
 use axum::http::StatusCode;
-use axum::response::IntoResponse as _;
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::compliance::checkpoint::Checkpoint;

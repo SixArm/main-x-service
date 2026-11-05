@@ -3,7 +3,7 @@
 //! Swagger UI assets are loaded from a CDN (swagger-ui-dist) to keep the
 //! crate dependency-light; the spec itself is served from this service.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 
 /// The `OpenAPI` 3 document.
 #[debug_handler]

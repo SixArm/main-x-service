@@ -28,7 +28,7 @@
 
 use std::time::Duration;
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::TransactionTrait;
 
 use crate::models::_entities::event_outbox::Column as OutboxColumn;

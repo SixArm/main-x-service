@@ -10,12 +10,12 @@
 //! rather than a small hand-built fixture, per this report's own
 //! acceptance text naming it directly.
 
+use axa::TestServer;
+use axa::prelude::*;
 use care_pathway_service::app::App;
 use care_pathway_service::data::journeys::DEFECT_CODES;
 use care_pathway_service::tasks::journeys_seed::JourneysSeed;
 use care_pathway_service::tba::STAGES;
-use loco_rs::TestServer;
-use loco_rs::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
 

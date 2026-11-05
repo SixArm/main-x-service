@@ -13,8 +13,8 @@
 //! `config/test.yaml` / `DATABASE_URL`). Run with
 //! `cargo test --test enforcement -- --ignored`.
 
+use axa::testing::prelude::*;
 use care_pathway_service::app::App;
-use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
 #[tokio::test]

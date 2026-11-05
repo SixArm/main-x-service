@@ -24,7 +24,7 @@
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
-use loco_rs::Error;
+use axa::Error;
 use organization_matcher::{Organization, phonetic::soundex};
 use tantivy::{
     IndexWriter, TantivyDocument,

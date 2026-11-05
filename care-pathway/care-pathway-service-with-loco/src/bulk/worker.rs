@@ -13,7 +13,7 @@
 //! All the per-row logic lives in the pipeline so it can be exercised
 //! directly (e.g. by request-level tests) without a live queue drain.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;

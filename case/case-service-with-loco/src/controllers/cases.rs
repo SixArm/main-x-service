@@ -5,11 +5,10 @@
 //! engine, so there is no separate model or adapter to drift.
 
 use authentication_verifier::Action;
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::http::StatusCode;
-use axum::response::IntoResponse as _;
 use case_matcher::{Case, MatchConfig, MatchingEngine};
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 
 use crate::compliance::checkpoint::Checkpoint;
 use serde::{Deserialize, Serialize};

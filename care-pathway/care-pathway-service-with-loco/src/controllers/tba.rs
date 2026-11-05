@@ -9,8 +9,8 @@
 //! corrected timestamp corrects the analysis, which is exactly the
 //! correction the method exists to invite.
 
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use sea_orm::{ActiveValue, PaginatorTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 

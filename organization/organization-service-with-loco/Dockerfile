@@ -86,9 +86,6 @@ COPY --from=builder --chown=organization:organization \
     /app/organization/organization-service-with-loco/target/release/organization-service \
     /app/organization-service
 
-# loco reads config/<environment>.yaml at runtime (not baked into the
-# binary); LOCO_ENV below selects `production.yaml`.
-COPY --chown=organization:organization organization/organization-service-with-loco/config ./config
 
 # Tantivy full-text index (ORGANIZATION_SEARCH_INDEX_PATH, default
 # `data/search-index` relative to CWD — see src/search/mod.rs).
@@ -109,14 +106,14 @@ EXPOSE 5150
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:5150/_health || exit 1
 
-# Runtime defaults; override at `podman run -e …`. LOCO_ENV selects
+# Runtime defaults; override at `podman run -e …`. APP_ENV selects
 # config/production.yaml — a container with no override boots safely
 # in production mode rather than defaulting to loco's own "development".
 # JWT_SECRET is required by loco's scaffold-default `auth.jwt` config
 # block (unused — this family authenticates via offline PASETO, see
 # agents/share/authentication-sessions.md — but the field has no
 # fallback, so config loading fails at boot without it).
-ENV LOCO_ENV=production \
+ENV APP_ENV=production \
     PORT=5150
 
 # loco's CLI entry point: `<bin> start` runs the server (see

@@ -1,6 +1,6 @@
 //! `merge_records` model — record and query the record-merge history.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect};
 use uuid::Uuid;
 

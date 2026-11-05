@@ -1,8 +1,8 @@
 //! `cases` model — CRUD over the stored `case_matcher::Case` payload.
 
+use axa::prelude::*;
 use case_matcher::Case as MatchCase;
 use chrono::SubsecRound as _;
-use loco_rs::prelude::*;
 
 use crate::compliance::record_integrity;
 use sea_orm::sea_query::Expr;

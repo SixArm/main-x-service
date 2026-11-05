@@ -1,7 +1,7 @@
 //! `organizations` model — CRUD over the stored
 //! `organization_matcher::Organization` payload.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use organization_matcher::Organization as MatchOrg;
 use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;

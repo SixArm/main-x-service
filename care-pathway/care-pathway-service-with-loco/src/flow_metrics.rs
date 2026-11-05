@@ -30,7 +30,7 @@
 
 use std::time::Duration;
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 
 use crate::metrics::Metrics;
 use crate::models::care_pathways::Model as PathwayModel;

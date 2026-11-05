@@ -24,8 +24,8 @@
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
+use axa::Error;
 use care_pathway_matcher::{CarePathway, phonetic::soundex};
-use loco_rs::Error;
 use tantivy::{
     IndexWriter, TantivyDocument,
     collector::TopDocs,

@@ -1,6 +1,6 @@
 //! `audit_logs` model — record and query the CRUD audit trail.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 

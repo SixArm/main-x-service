@@ -12,7 +12,7 @@
 //! cargo loco task search_reindex batch:1000 # tune the page size
 //! ```
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 
 use crate::models::_entities::organizations;

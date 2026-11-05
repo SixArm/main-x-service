@@ -12,13 +12,13 @@
 //! The accept/reject validation matrix is pinned DB-free in
 //! `src/controllers/links.rs`.
 
+use axa::testing::prelude::*;
 use case_service::app::App;
-use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
 
 /// Create a case and return its `pid`.
-async fn create_case(request: &loco_rs::TestServer) -> String {
+async fn create_case(request: &axa::TestServer) -> String {
     let response = request
         .post("/api/cases")
         .json(&json!({ "title": "Housing benefit appeal" }))

@@ -6,9 +6,9 @@
 //! a public path under blanket JWT enforcement, so a scraper needs no
 //! bearer token. Configure your scraper with `metrics_path: /metrics.prom`.
 
+use axa::prelude::*;
 use axum::body::Body;
 use axum::http::header::CONTENT_TYPE as CONTENT_TYPE_HEADER;
-use loco_rs::prelude::*;
 
 use crate::metrics::{CONTENT_TYPE, Metrics};
 

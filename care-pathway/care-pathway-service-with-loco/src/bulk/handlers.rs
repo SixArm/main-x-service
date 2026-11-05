@@ -20,11 +20,11 @@
 
 use std::collections::BTreeMap;
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::extract::{Multipart, Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

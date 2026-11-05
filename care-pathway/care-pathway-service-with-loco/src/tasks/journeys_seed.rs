@@ -18,7 +18,7 @@
 //! epidemiological question and must never be mistaken for one that
 //! does.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::ActiveValue;
 use uuid::Uuid;
 

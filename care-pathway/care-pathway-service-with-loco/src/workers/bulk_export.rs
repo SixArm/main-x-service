@@ -22,7 +22,7 @@
 //! Jobs run on `bg_pg` (`agents/share/loco.md`), the family's
 //! Postgres-backed queue, so there is still no external broker.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

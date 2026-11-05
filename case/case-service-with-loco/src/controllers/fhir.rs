@@ -26,15 +26,15 @@
 //! identifiers). This closes the earlier gap where these paths took no
 //! caller and returned the full Task to anyone behind the blanket guard.
 
+use axa::AppContext;
+use axa::prelude::{delete, get, post, put};
+use axa::routes::Routes;
 use axum::{
     body::Body,
     extract::{Path, Query, State},
     http::{StatusCode, header},
     response::Response,
 };
-use loco_rs::app::AppContext;
-use loco_rs::controller::Routes;
-use loco_rs::prelude::{delete, get, post, put};
 use serde::Serialize;
 
 use authentication_verifier::Action;

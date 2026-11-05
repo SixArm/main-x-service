@@ -11,8 +11,8 @@
 //! lowercase wire tokens (`pending` / `confirmed` / `rejected` /
 //! `automerged`); the controller owns the enum mapping.
 
+use axa::prelude::*;
 use chrono::{DateTime, Utc};
-use loco_rs::prelude::*;
 use sea_orm::{ConnectionTrait, Statement, Value};
 use uuid::Uuid;
 

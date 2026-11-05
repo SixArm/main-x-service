@@ -26,7 +26,7 @@
 //! Publishing an SBOM is a decision for the operator to make explicitly,
 //! not a default this service makes for them.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use serde::Serialize;
 
 use crate::compliance::{Build, soup};

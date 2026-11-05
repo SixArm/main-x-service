@@ -31,10 +31,10 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::body::Body;
 use axum::http::header::CONTENT_TYPE;
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use sea_orm::QueryOrder;
 use uuid::Uuid;
 

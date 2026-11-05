@@ -19,8 +19,8 @@
 //! conflict). Statuses are stored as the family's lowercase wire tokens
 //! (`pending` / `confirmed` / `rejected` / `automerged`).
 
+use axa::prelude::*;
 use chrono::{DateTime, Utc};
-use loco_rs::prelude::*;
 use sea_orm::{ConnectionTrait, Statement, Value};
 use uuid::Uuid;
 

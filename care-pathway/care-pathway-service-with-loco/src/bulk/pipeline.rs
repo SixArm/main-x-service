@@ -52,8 +52,8 @@
 use sea_orm::{DatabaseBackend, DatabaseConnection, FromQueryResult, Statement};
 use uuid::Uuid;
 
+use axa::Error;
 use care_pathway_matcher::{CarePathway, Confidence, MatchConfig, MatchResult, MatchingEngine};
-use loco_rs::Error;
 
 use crate::controllers::care_pathways::CHECK_DUPLICATES_CANDIDATE_LIMIT;
 use crate::models::care_pathways::Model as PathwayModel;
@@ -183,11 +183,11 @@ pub fn apply_masking(
 async fn find_existing(
     db: &DatabaseConnection,
     key: &StableKey,
-) -> loco_rs::Result<Option<PathwayModel>> {
+) -> axa::Result<Option<PathwayModel>> {
     match key {
         StableKey::Pid(pid) => match PathwayModel::find_by_pid(db, &pid.to_string()).await {
             Ok(model) => Ok(Some(model)),
-            Err(loco_rs::model::ModelError::EntityNotFound) => Ok(None),
+            Err(axa::model::ModelError::EntityNotFound) => Ok(None),
             Err(e) => Err(e.into()),
         },
         StableKey::Identifier { scheme, value } => find_by_identifier(db, scheme, value)
@@ -216,9 +216,9 @@ async fn find_by_identifier(
     db: &DatabaseConnection,
     scheme: &care_pathway_matcher::IdentifierScheme,
     value: &str,
-) -> loco_rs::model::ModelResult<Option<PathwayModel>> {
+) -> axa::model::ModelResult<Option<PathwayModel>> {
     let scheme_json =
-        serde_json::to_value(scheme).map_err(|e| loco_rs::model::ModelError::Any(e.into()))?;
+        serde_json::to_value(scheme).map_err(|e| axa::model::ModelError::Any(e.into()))?;
     let needle = serde_json::json!([{ "scheme": scheme_json, "value": value }]);
     let stmt = Statement::from_sql_and_values(
         DatabaseBackend::Postgres,
@@ -237,7 +237,7 @@ async fn find_by_provider_and_code(
     db: &DatabaseConnection,
     provider_id: &str,
     pathway_code: &str,
-) -> loco_rs::model::ModelResult<Option<PathwayModel>> {
+) -> axa::model::ModelResult<Option<PathwayModel>> {
     let stmt = Statement::from_sql_and_values(
         DatabaseBackend::Postgres,
         "SELECT * FROM care_pathways \
@@ -277,7 +277,7 @@ async fn import_upsert(
     key: &StableKey,
     pathway: &CarePathway,
     actor: Option<&str>,
-) -> loco_rs::Result<(PathwayModel, bool)> {
+) -> axa::Result<(PathwayModel, bool)> {
     let existing = find_existing(db, key).await?;
     if let Some(existing) = existing {
         Ok((
@@ -306,7 +306,7 @@ struct ImportRow {
 /// SEC-B2 row cap uniformly regardless of format
 /// (`jsonl::split_lines_capped` does this inline for JSONL; CSV/TSV is
 /// checked here since `csv::decode` has no cap of its own).
-fn decode_import_rows(input: &[u8], format: BulkFormat) -> loco_rs::Result<Vec<ImportRow>> {
+fn decode_import_rows(input: &[u8], format: BulkFormat) -> axa::Result<Vec<ImportRow>> {
     match format {
         BulkFormat::Jsonl => Ok(
             jsonl::split_lines_capped(input, crate::bulk::MAX_IMPORT_ROWS)?
@@ -423,7 +423,7 @@ async fn create_and_queue_for_review(
     duplicate: &PathwayModel,
     result: &MatchResult,
     actor: Option<&str>,
-) -> loco_rs::Result<PathwayModel> {
+) -> axa::Result<PathwayModel> {
     let saved = streaming::create_and_emit(db, pathway, actor).await?;
     let item = NewReviewItem {
         record_id_a: saved.pid,
@@ -466,7 +466,7 @@ pub async fn process_import_job(
     input: &[u8],
     format: BulkFormat,
     params: &ImportParams,
-) -> loco_rs::Result<ImportOutcome> {
+) -> axa::Result<ImportOutcome> {
     let rows = decode_import_rows(input, format)?;
     let mut outcome = ImportOutcome::default();
     let actor = params.actor.as_deref();
@@ -594,7 +594,7 @@ pub async fn process_import_job(
 pub async fn process_export_job(
     db: &DatabaseConnection,
     params: &ExportParams,
-) -> loco_rs::Result<(Vec<u8>, u64)> {
+) -> axa::Result<(Vec<u8>, u64)> {
     if params.include_soft_deleted {
         return Err(Error::Message(
             "include_soft_deleted=true is not yet supported for export".to_string(),

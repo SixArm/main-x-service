@@ -10,9 +10,9 @@
 //!
 //! `#[ignore]`d: needs PostgreSQL; run with `cargo test -- --ignored`.
 
+use axa::testing::prelude::*;
 use case_service::app::App;
 use case_service::models::review_queue::{NewReviewItem, upsert};
-use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
 

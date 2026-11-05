@@ -1,6 +1,6 @@
 //! Request-level integration tests over the `/api/cases` endpoints
 //! (spec §6 / §11; entity spec T-4), in the loco testing style
-//! (`loco_rs::testing`, as in the authentication-service sibling).
+//! (`axa::testing`, as in the authentication-service sibling).
 //!
 //! These boot the app against the `test` environment, which needs a
 //! reachable PostgreSQL (`config/test.yaml`; override with
@@ -15,8 +15,8 @@
 //! The blank-title → `422` contract is additionally pinned un-gated by
 //! the DB-free unit tests in `src/controllers/cases.rs`.
 
+use axa::testing::prelude::*;
 use case_service::app::App;
-use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
 
@@ -865,7 +865,7 @@ async fn record_integrity_covers_every_write_path_and_catches_tampering() {
     request::<App, _, _>(|request, ctx| async move {
         use sea_orm::ConnectionTrait as _;
 
-        async fn verify(request: &loco_rs::TestServer) -> Value {
+        async fn verify(request: &axa::TestServer) -> Value {
             let response = request.get("/api/cases/records/verify?limit=500").await;
             assert_eq!(response.status_code(), 200);
             response.json()

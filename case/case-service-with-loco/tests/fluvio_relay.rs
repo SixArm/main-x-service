@@ -25,12 +25,12 @@
 //! (`person/person-service-with-loco/src/bulk/store.rs`, BLK-4).
 #![cfg(feature = "fluvio")]
 
+use axa::testing::prelude::*;
 use case_matcher::Case;
 use case_service::app::App;
 use case_service::models::_entities::event_outbox;
 use case_service::relay::{self, FluvioSink};
 use case_service::streaming;
-use loco_rs::testing::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serial_test::serial;
 

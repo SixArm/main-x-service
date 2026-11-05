@@ -8,7 +8,7 @@
 //! `kind`/endpoint pair is permitted) lives in `controllers/links.rs` and
 //! is DB-free; this layer is pure persistence.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ConnectionTrait, QueryOrder, prelude::Date, prelude::DateTimeWithTimeZone};
 use uuid::Uuid;

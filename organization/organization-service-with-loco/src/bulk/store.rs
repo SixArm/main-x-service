@@ -34,7 +34,7 @@
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
-use loco_rs::{Error, Result};
+use axa::{Error, Result};
 
 /// A place to `put` and `get` opaque bulk-job byte artifacts.
 ///

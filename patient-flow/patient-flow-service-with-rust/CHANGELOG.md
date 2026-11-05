@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CORS is off in production** unless `CORS_ALLOWED_ORIGINS` lists origins.
 - Production gains a 60-second request timeout and HSTS, and every response
   gains `x-content-type-options`, `x-frame-options`, and `referrer-policy`.
-  `x-powered-by` and the automatic `ETag` handling are gone.
+  `x-powered-by` is gone. The ward board keeps its `ETag`, which it has always
+  handled itself.
 
 ### Changed
 

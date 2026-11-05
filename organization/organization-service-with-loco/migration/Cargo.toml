@@ -12,7 +12,7 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-loco-rs = { workspace = true }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm"] }
 
 
 [dependencies.sea-orm-migration]

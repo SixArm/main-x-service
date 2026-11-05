@@ -13,11 +13,11 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test outbox_audit -- --ignored`.
 
+use axa::testing::prelude::*;
 use case_matcher::Case;
 use case_service::app::App;
 use case_service::models::_entities::{audit_logs, cases, event_outbox};
 use case_service::streaming;
-use loco_rs::testing::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 

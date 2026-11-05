@@ -57,8 +57,8 @@
 //! The privileged [`MaskingProfile::Full`] profile leaves records
 //! unmasked and is gated at the handler.
 
+use axa::model::{ModelError, ModelResult};
 use case_matcher::{Case, MatchConfig, MatchingEngine};
-use loco_rs::model::{ModelError, ModelResult};
 use sea_orm::DatabaseConnection;
 use uuid::Uuid;
 
@@ -232,7 +232,7 @@ struct ImportRow {
 
 /// Decode `input` per `format` into per-row [`ImportRow`]s, enforcing the
 /// SEC-B2 row cap uniformly regardless of format.
-fn decode_import_rows(input: &[u8], format: BulkFormat) -> loco_rs::Result<Vec<ImportRow>> {
+fn decode_import_rows(input: &[u8], format: BulkFormat) -> axa::Result<Vec<ImportRow>> {
     match format {
         BulkFormat::Jsonl => Ok(
             jsonl::split_lines_capped(input, crate::bulk::MAX_IMPORT_ROWS)?
@@ -247,7 +247,7 @@ fn decode_import_rows(input: &[u8], format: BulkFormat) -> loco_rs::Result<Vec<I
             let delimiter = format.delimiter().unwrap_or(b',');
             let decoded = csv::decode(input, delimiter)?;
             if decoded.len() > crate::bulk::MAX_IMPORT_ROWS {
-                return Err(loco_rs::Error::Message(format!(
+                return Err(axa::Error::Message(format!(
                     "bulk import exceeds the row cap: {} rows > {}",
                     decoded.len(),
                     crate::bulk::MAX_IMPORT_ROWS
@@ -490,7 +490,7 @@ pub async fn process_import_job(
     format: BulkFormat,
     params: &ImportParams,
     actor: Option<&str>,
-) -> loco_rs::Result<ImportOutcome> {
+) -> axa::Result<ImportOutcome> {
     let rows = decode_import_rows(input, format)?;
     let mut outcome = ImportOutcome::default();
 
@@ -535,16 +535,16 @@ pub async fn process_import_job(
 ///
 /// # Errors
 ///
-/// Returns [`loco_rs::Error::Message`] when `params.include_soft_deleted`
+/// Returns [`axa::Error::Message`] when `params.include_soft_deleted`
 /// is `true` — not yet supported, so rather than silently leaking or
 /// ignoring the flag the export is rejected. Also returns an error if
 /// the underlying query or the format encode fails.
 pub async fn process_export_job(
     db: &DatabaseConnection,
     params: &ExportParams,
-) -> loco_rs::Result<(Vec<u8>, u64)> {
+) -> axa::Result<(Vec<u8>, u64)> {
     if params.include_soft_deleted {
-        return Err(loco_rs::Error::Message(
+        return Err(axa::Error::Message(
             "include_soft_deleted=true is not yet supported for export".to_string(),
         ));
     }
@@ -1030,6 +1030,6 @@ mod db_tests {
         )
         .await
         .unwrap_err();
-        assert!(matches!(err, loco_rs::Error::Message(_)));
+        assert!(matches!(err, axa::Error::Message(_)));
     }
 }

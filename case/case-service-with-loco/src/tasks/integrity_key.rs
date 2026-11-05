@@ -38,7 +38,7 @@
 //! security and [`mac::MIN_KEY_LEN`]. Longer buys nothing here: HMAC
 //! hashes a key longer than its block size back down.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 
 use crate::compliance::mac;
 

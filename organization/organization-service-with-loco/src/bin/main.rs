@@ -16,11 +16,16 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use loco_rs::cli;
-use migration::Migrator;
+use axa::cli::Cli;
+use clap::Parser;
 use organization_service::app::App;
 
+/// Parse the command line and run it.
+///
+/// # Errors
+///
+/// Returns the failure from [`App::run`].
 #[tokio::main]
-async fn main() -> loco_rs::Result<()> {
-    cli::main::<App, Migrator>().await
+async fn main() -> axa::Result<()> {
+    App::run(Cli::parse()).await
 }

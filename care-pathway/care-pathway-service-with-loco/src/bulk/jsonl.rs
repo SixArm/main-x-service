@@ -10,8 +10,8 @@
 
 use uuid::Uuid;
 
+use axa::Error;
 use care_pathway_matcher::CarePathway;
-use loco_rs::Error;
 
 use super::columns;
 
@@ -24,7 +24,7 @@ pub fn to_line(
     pid: Option<Uuid>,
     active: Option<bool>,
     pathway: &CarePathway,
-) -> loco_rs::Result<String> {
+) -> axa::Result<String> {
     let value = columns::to_row_value(pid, active, pathway)
         .map_err(|e| Error::Message(format!("serialize care pathway to JSONL: {e}")))?;
     Ok(value.to_string())
@@ -36,7 +36,7 @@ pub fn to_line(
 /// # Errors
 ///
 /// When any row fails to serialize.
-pub fn encode(rows: &[(Option<Uuid>, Option<bool>, CarePathway)]) -> loco_rs::Result<Vec<u8>> {
+pub fn encode(rows: &[(Option<Uuid>, Option<bool>, CarePathway)]) -> axa::Result<Vec<u8>> {
     let mut out = Vec::new();
     for (pid, active, pathway) in rows {
         out.extend_from_slice(to_line(*pid, *active, pathway)?.as_bytes());
@@ -64,7 +64,7 @@ pub fn parse_line(line: &str) -> Result<(bool, Option<Uuid>, Option<bool>, CareP
 /// # Errors
 ///
 /// When `input` is not valid UTF-8.
-pub fn split_lines(input: &[u8]) -> loco_rs::Result<Vec<String>> {
+pub fn split_lines(input: &[u8]) -> axa::Result<Vec<String>> {
     let text = std::str::from_utf8(input)
         .map_err(|e| Error::Message(format!("bulk input is not valid UTF-8: {e}")))?;
     Ok(text
@@ -82,7 +82,7 @@ pub fn split_lines(input: &[u8]) -> loco_rs::Result<Vec<String>> {
 /// # Errors
 ///
 /// When `input` is not valid UTF-8, or the row count exceeds `max`.
-pub fn split_lines_capped(input: &[u8], max: usize) -> loco_rs::Result<Vec<String>> {
+pub fn split_lines_capped(input: &[u8], max: usize) -> axa::Result<Vec<String>> {
     let lines = split_lines(input)?;
     if lines.len() > max {
         return Err(Error::Message(format!(

@@ -145,7 +145,7 @@ impl Checkpoint {
     pub async fn take(
         db: &sea_orm::DatabaseConnection,
         taken_at_micros: i64,
-    ) -> loco_rs::prelude::ModelResult<Option<Self>> {
+    ) -> axa::prelude::ModelResult<Option<Self>> {
         use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 
         let Some(anchor) = audit_logs::Entity::find()
@@ -188,7 +188,7 @@ impl Checkpoint {
     pub async fn verify_against(
         &self,
         db: &sea_orm::DatabaseConnection,
-    ) -> loco_rs::prelude::ModelResult<CheckpointVerdict> {
+    ) -> axa::prelude::ModelResult<CheckpointVerdict> {
         use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 
         match super::mac::verify(

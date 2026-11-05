@@ -5,8 +5,8 @@
 //! most — neither export ever carries the instance's `subject_ref` or a
 //! person URN, even though the seeded instance has both.
 
+use axa::testing::prelude::*;
 use care_pathway_service::app::App;
-use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
 
