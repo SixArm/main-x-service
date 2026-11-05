@@ -1,35 +1,16 @@
-//! Server binary entry point for the Case-Folder Service.
-//!
-//! This is a thin shim over Loco's CLI. It binds the application's
-//! `App` hooks and the database `Migrator`, then hands control to
-//! `loco_rs::cli::main`, which parses subcommands (`start`, `db`,
-//! `task`, `routes`, …) and runs the requested one. All real wiring —
-//! initializer order, route mounting, tasks — lives in
-//! `case_folder_service_with_rust::app`.
+//! Command-line entry point. `cargo run -- start` runs the service and
+//! `cargo run -- task seed` loads demo data; see [`axa::cli::Cli`].
 
-// SEC-I3: the server binary has no reason to reach for `unsafe`; forbid it
-// so the binary target matches the crate's `src/lib.rs`.
-#![forbid(unsafe_code)]
-#![deny(missing_docs)]
-#![warn(clippy::pedantic)]
+use axa::cli::Cli;
+use case_folder_service_with_rust::app;
+use clap::Parser;
 
-use case_folder_service_with_rust::app::App;
-use loco_rs::cli;
-use migration::Migrator;
-
-/// Async entry point: delegate to Loco's CLI dispatcher.
-///
-/// Runs under the Tokio multi-threaded runtime. `cli::main` reads
-/// command-line arguments and boots whichever subcommand was requested,
-/// using `App` for application hooks and `Migrator` for schema
-/// migrations.
+/// Parse the command line and run it.
 ///
 /// # Errors
 ///
-/// Returns the `loco_rs::Error` propagated by `cli::main` when boot,
-/// migration, or the selected subcommand fails (bad config, database
-/// connection failure, migration error, etc.).
+/// Returns the failure from [`app::run`].
 #[tokio::main]
-async fn main() -> loco_rs::Result<()> {
-    cli::main::<App, Migrator>().await
+async fn main() -> axa::Result<()> {
+    app::run(Cli::parse()).await
 }

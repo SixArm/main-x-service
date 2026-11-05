@@ -1,11 +1,10 @@
+use axa::testing::prelude::*;
 use case_folder_service_with_rust::app::App;
-use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
 /// Pins: `/healthz` returns `200` with `status: "ok"`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn healthz_returns_ok() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -21,7 +20,6 @@ async fn healthz_returns_ok() {
 /// counter (patients, folder buckets, place kinds, 24h moves).
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn stats_reports_zeros_on_empty_world() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -44,7 +42,6 @@ async fn stats_reports_zeros_on_empty_world() {
 /// building/room/cabinet chain, `/api/stats` counts each correctly.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn stats_counts_folders_and_places() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

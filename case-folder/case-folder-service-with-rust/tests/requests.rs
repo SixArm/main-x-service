@@ -11,6 +11,7 @@
 //   * Main Thing   Service  (stub injected here — holds folders)
 //   * Main Event   Service  (stub injected here — holds move events)
 
+use axa::prelude::*;
 use case_folder_service_with_rust::{
     initializers::{
         main_event_service_client, main_patient_service_client, main_place_service_client,
@@ -23,7 +24,6 @@ use case_folder_service_with_rust::{
     main_worker_service::{Worker, stub::StubClient as WorkerStubClient},
     nhs::format_nhs_number,
 };
-use loco_rs::prelude::*;
 use std::sync::{Arc, OnceLock};
 use uuid::Uuid;
 

@@ -10,6 +10,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — Loco replaced by axa
+
+- **Loco removed.** The service is now plain Axum plus shared helpers from
+  [`axa`](https://github.com/publicprojects-io/axa). It no longer needs
+  PostgreSQL at boot, so the empty `migration/` crate, `src/models/`,
+  `compose.test.yaml`, and the `config/*.yaml` files are gone.
+- **The 50 request tests run in plain `cargo test`.** They were `#[ignore]`d
+  only because Loco needed a database connection to boot.
+- **Configuration comes from the environment.** `AUTH_ALLOWLIST` replaces the
+  YAML allowlist as a JSON array of `{email, name, role}`, and `APP_ENV`
+  replaces `LOCO_ENV` (still read).
+- **Production now refuses to boot without `AUTH_SECRET`.** This was previously
+  a warning, which allowed tokens signed with an empty secret.
+- Responses gain `x-content-type-options`, `x-frame-options`,
+  `referrer-policy`, and lose `x-powered-by`. CORS is off in production unless
+  `CORS_ALLOWED_ORIGINS` lists origins.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

@@ -83,7 +83,7 @@ struct SessionEntry {
     expires_at: i64,
 }
 
-/// One allowlist entry, as read from `settings.auth.allowlist`.
+/// One allowlist entry, as read from `AUTH_ALLOWLIST`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AllowlistEntry {
     /// Email that may sign in (matched case-insensitively).
@@ -95,7 +95,7 @@ pub struct AllowlistEntry {
     pub role: Option<String>,
 }
 
-/// Deserialized from the `settings.auth` block of the Loco config.
+/// Authentication settings, built by [`AuthConfig::from_env`].
 #[derive(Debug, Clone, Deserialize)]
 pub struct AuthConfig {
     /// HS256 signing secret. Empty means insecure (dev only); see
@@ -157,11 +157,72 @@ impl Default for AuthConfig {
 }
 
 impl AuthConfig {
-    /// True when no usable signing secret was configured — the caller
-    /// should warn loudly (production must set `AUTH_SECRET`).
+    /// True when no usable signing secret was configured.
     #[must_use]
     pub fn secret_is_insecure(&self) -> bool {
         self.secret.trim().is_empty()
+    }
+
+    /// Build the settings for `environment`.
+    ///
+    /// Reads `AUTH_SECRET`, `FRONTEND_URL`, and `AUTH_ALLOWLIST` (a JSON
+    /// array of `{email, name, role}`). Development and test have fixed
+    /// demo identities; production has none unless configured.
+    ///
+    /// # Errors
+    ///
+    /// Fails when production has no `AUTH_SECRET`, because tokens signed
+    /// with an empty secret could be forged by anyone, or when
+    /// `AUTH_ALLOWLIST` is not valid JSON.
+    pub fn from_env(environment: &axa::Environment) -> axa::Result<Self> {
+        let entry = |email: &str, name: &str, role: &str| AllowlistEntry {
+            email: email.to_string(),
+            name: name.to_string(),
+            role: Some(role.to_string()),
+        };
+        let (secret, require_session, expose_magic_link, cookie_secure, demo) = match environment {
+            axa::Environment::Test => (
+                "test-secret-fixed-for-deterministic-tokens",
+                false,
+                true,
+                false,
+                vec![entry("tester@example.nhs.uk", "Test User", "administrator")],
+            ),
+            axa::Environment::Development => (
+                "dev-secret-not-for-production-change-me",
+                true,
+                true,
+                false,
+                vec![
+                    entry("records@example.nhs.uk", "Records Office", "administrator"),
+                    entry("alice@example.nhs.uk", "Alice Johnson", "nurse"),
+                ],
+            ),
+            _ => ("", true, false, true, Vec::new()),
+        };
+        let allowlist = match std::env::var("AUTH_ALLOWLIST") {
+            Ok(json) => serde_json::from_str(&json)
+                .map_err(|e| axa::Error::Message(format!("AUTH_ALLOWLIST is invalid: {e}")))?,
+            Err(_) => demo,
+        };
+        let config = Self {
+            secret: match environment {
+                axa::Environment::Test => secret.to_string(),
+                _ => std::env::var("AUTH_SECRET").unwrap_or_else(|_| secret.to_string()),
+            },
+            require_session,
+            expose_magic_link,
+            cookie_secure,
+            frontend_url: std::env::var("FRONTEND_URL").unwrap_or_else(|_| default_frontend()),
+            allowlist,
+            ..Self::default()
+        };
+        if config.secret_is_insecure() {
+            return Err(axa::Error::string(
+                "AUTH_SECRET must be set outside development and test",
+            ));
+        }
+        Ok(config)
     }
 }
 
@@ -193,7 +254,7 @@ impl AuthState {
     /// pre-indexes the allowlist by lower-cased email for fast lookup.
     ///
     /// # Parameters
-    /// - `config`: the deserialized `settings.auth` block.
+    /// - `config`: the authentication settings.
     /// - `mailer`: magic-link delivery backend.
     #[must_use]
     pub fn new(config: AuthConfig, mailer: Box<dyn Mailer>) -> Self {

@@ -1,12 +1,11 @@
+use axa::testing::prelude::*;
 use case_folder_service_with_rust::app::App;
-use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
 /// Pins: `GET /api/folders?nhs_number=…` returns every folder whose
 /// snapshot matches that NHS number.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn folder_lookup_by_nhs_returns_matching_folders() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -36,7 +35,6 @@ async fn folder_lookup_by_nhs_returns_matching_folders() {
 /// an empty `items` list (not a 404).
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn folder_lookup_by_unknown_nhs_returns_empty_list() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -54,7 +52,6 @@ async fn folder_lookup_by_unknown_nhs_returns_empty_list() {
 /// every seeded worker.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn workers_list_returns_workers_from_main_worker_service() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -81,7 +78,6 @@ async fn workers_list_returns_workers_from_main_worker_service() {
 /// `Location` header, records the event, and relocates the folder.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_move_records_worker_snapshot() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -143,7 +139,6 @@ async fn create_move_records_worker_snapshot() {
 /// verbatim and leaves the worker id / role snapshot empty.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_move_falls_back_to_free_text_when_no_worker_id() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -178,7 +173,6 @@ async fn create_move_falls_back_to_free_text_when_no_worker_id() {
 /// per-field `errors.folder_id` message.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_move_with_invalid_folder_id_returns_422() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -199,7 +193,6 @@ async fn create_move_with_invalid_folder_id_returns_422() {
 /// Pins: a well-formed but unknown `folder_id` returns `404`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn create_move_with_unknown_folder_returns_404() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -219,7 +212,6 @@ async fn create_move_with_unknown_folder_returns_404() {
 /// per recorded move).
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn moves_list_returns_audit_log() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -251,7 +243,6 @@ async fn moves_list_returns_audit_log() {
 /// its folder title and mover.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_returns_single_move() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -285,7 +276,6 @@ async fn show_returns_single_move() {
 /// Pins: `GET /api/moves/{id}` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_unknown_move_returns_404() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

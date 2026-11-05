@@ -1,12 +1,11 @@
+use axa::testing::prelude::*;
 use case_folder_service_with_rust::app::App;
-use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
 /// Pins: `GET /api/workers` lists every worker from the Worker service,
 /// including each worker's role.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn list_returns_workers_from_stub_service() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -29,7 +28,6 @@ async fn list_returns_workers_from_stub_service() {
 /// Pins: `GET /api/workers?q=…` filters the worker list by the query.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn list_filters_by_query() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -51,7 +49,6 @@ async fn list_filters_by_query() {
 /// affected patients, a superset), plus the worker's move list.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_returns_moved_and_patient_folders() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -108,7 +105,6 @@ async fn show_returns_moved_and_patient_folders() {
 /// Pins: `GET /api/workers/{id}` for an unknown id returns `404`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn show_unknown_worker_returns_404() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

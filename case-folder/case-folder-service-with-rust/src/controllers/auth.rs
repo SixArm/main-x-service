@@ -8,12 +8,12 @@
 //! - `GET  /api/auth/me`      — the signed-in user, or `401`.
 //! - `POST /api/auth/logout`  — clear the session cookie.
 
+use axa::prelude::*;
 use axum::{
     Extension, Json, debug_handler,
     http::{HeaderMap, HeaderValue, StatusCode, header::SET_COOKIE},
     response::{IntoResponse, Response},
 };
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

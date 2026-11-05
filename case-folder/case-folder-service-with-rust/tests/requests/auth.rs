@@ -1,5 +1,5 @@
+use axa::testing::prelude::*;
 use case_folder_service_with_rust::app::App;
-use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
 /// A demo email known to the dev user store, so `/api/auth/request`
@@ -10,7 +10,6 @@ const KNOWN_EMAIL: &str = "tester@example.nhs.uk";
 /// `magic_link` containing the `/auth/callback?token=` path.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn request_returns_dev_magic_link_for_known_email() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -31,7 +30,6 @@ async fn request_returns_dev_magic_link_for_known_email() {
 /// `magic_link`, so the endpoint cannot be used to enumerate valid emails.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn request_for_unknown_email_returns_ok_without_link() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -52,7 +50,6 @@ async fn request_for_unknown_email_returns_ok_without_link() {
 /// `errors.email` message.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn request_with_blank_email_returns_422() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -70,7 +67,6 @@ async fn request_with_blank_email_returns_422() {
 /// Pins: verifying a bogus magic-link token returns `401`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn verify_with_invalid_token_returns_401() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -87,7 +83,6 @@ async fn verify_with_invalid_token_returns_401() {
 /// `"Authentication required"` guard error body.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn me_without_session_returns_401() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -104,7 +99,6 @@ async fn me_without_session_returns_401() {
 /// idempotent, so it succeeds even without a prior session.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn logout_clears_the_session_cookie() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -130,7 +124,6 @@ async fn logout_clears_the_session_cookie() {
 /// then present the session as a Bearer token to `/api/auth/me`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn request_verify_me_round_trip() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

@@ -5,8 +5,8 @@
 //! warning is logged — the endpoint itself stays 200 because partial
 //! data is more useful here than a hard failure.
 
+use axa::prelude::*;
 use axum::{Extension, Json, debug_handler};
-use loco_rs::prelude::*;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;

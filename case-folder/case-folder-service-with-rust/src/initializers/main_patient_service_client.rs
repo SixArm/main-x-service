@@ -9,15 +9,11 @@
 //!     (default `http://localhost:5151`).
 //!
 //! Routing-at-request-time lets tests register their stub *after* the app
-//! has booted, which is what Loco's `request::<App, …>` testing harness
-//! forces.
+//! has booted, which is what `axa::testing::request` needs: the app is
+//! built before a test can reach it.
 
 use async_trait::async_trait;
-use axum::Router as AxumRouter;
-use loco_rs::{
-    Result,
-    app::{AppContext, Initializer as LocoInitializer},
-};
+use axum::Router;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
@@ -96,25 +92,14 @@ impl Client for RoutingClient {
     }
 }
 
-/// Loco initializer that registers the Main Patient Service client.
-pub struct ClientInitializer;
-
-#[async_trait]
-impl LocoInitializer for ClientInitializer {
-    /// Stable identifier for this initializer in Loco's registry.
-    fn name(&self) -> String {
-        "main-patient-service-client".to_string()
-    }
-
-    /// Read `MAIN_PATIENT_SERVICE_BASE_URL` (default `http://localhost:5151`),
-    /// build a [`RoutingClient`] over an HTTP fallback, and layer it as an
-    /// Axum `Extension`.
-    async fn after_routes(&self, router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
-        let base_url = std::env::var("MAIN_PATIENT_SERVICE_BASE_URL")
-            .unwrap_or_else(|_| "http://localhost:5151".to_string());
-        let client: Arc<dyn Client> = Arc::new(RoutingClient {
-            fallback: HttpClient::new(base_url),
-        });
-        Ok(router.layer(axum::Extension(client)))
-    }
+/// Layer the Main Patient Service client onto `router` as an Axum
+/// `Extension`, reading `MAIN_PATIENT_SERVICE_BASE_URL` (default
+/// `http://localhost:5151`).
+pub fn install(router: Router) -> Router {
+    let base_url = std::env::var("MAIN_PATIENT_SERVICE_BASE_URL")
+        .unwrap_or_else(|_| "http://localhost:5151".to_string());
+    let client: Arc<dyn Client> = Arc::new(RoutingClient {
+        fallback: HttpClient::new(base_url),
+    });
+    router.layer(axum::Extension(client))
 }

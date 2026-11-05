@@ -119,11 +119,11 @@ pub enum Error {
     BadResponse(String),
 }
 
-/// Flattens our typed [`Error`] into a `loco_rs::Error::Message` so
+/// Flattens our typed [`Error`] into a `axa::Error::Message` so
 /// controllers can `?`-propagate it into Loco's error type.
-impl From<Error> for loco_rs::Error {
+impl From<Error> for axa::Error {
     fn from(value: Error) -> Self {
-        loco_rs::Error::Message(value.to_string())
+        axa::Error::Message(value.to_string())
     }
 }
 

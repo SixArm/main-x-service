@@ -1,4 +1,4 @@
-//! Optional e2e / offline mode for the Loco app.
+//! Optional e2e / offline mode.
 //!
 //! When the env var `USE_UPSTREAM_STUBS=1` is set, every Main-X-Service
 //! client gets swapped for the in-process `StubClient` used by the
@@ -10,14 +10,8 @@
 //! running — invaluable for the SvelteKit Playwright suite and for
 //! local UI iteration.
 //!
-//! In production this initializer is a no-op (env var unset).
+//! In production this does nothing (env var unset).
 
-use async_trait::async_trait;
-use axum::Router as AxumRouter;
-use loco_rs::{
-    Result,
-    app::{AppContext, Initializer},
-};
 use std::sync::Arc;
 
 use crate::initializers::{
@@ -36,10 +30,6 @@ use crate::main_worker_service::{Worker, stub::StubClient as WorkerStub};
 use crate::tasks::seed::run_seed;
 use uuid::Uuid;
 
-/// Loco initializer that, when enabled, replaces every external-service
-/// client with an in-process stub and seeds demo data.
-pub struct StubsInitializer;
-
 /// Whether offline / e2e stub mode is requested via the
 /// `USE_UPSTREAM_STUBS` env var. Accepted truthy values: `1`, `true`,
 /// `TRUE`, `yes`. Anything else (including unset) means disabled.
@@ -50,87 +40,82 @@ fn enabled() -> bool {
     )
 }
 
-#[async_trait]
-impl Initializer for StubsInitializer {
-    /// Stable identifier for this initializer in Loco's registry.
-    fn name(&self) -> String {
-        "bootstrap-stubs".to_string()
+/// No-op unless [`enabled`]. When enabled: build one stub per
+/// external service, register each as the process-wide test client,
+/// seed a few demo workers, run the standard [`run_seed`] demo data
+/// set, then layer on demo worker-attributed moves and a demo volume.
+///
+/// # Errors
+///
+/// Propagates a failure while seeding the stubs.
+pub async fn install() -> axa::Result<()> {
+    if !enabled() {
+        return Ok(());
     }
 
-    /// No-op unless [`enabled`]. When enabled: build one stub per
-    /// external service, register each as the process-wide test client,
-    /// seed a few demo workers, run the standard [`run_seed`] demo data
-    /// set, then layer on demo worker-attributed moves and a demo volume.
-    /// Returns the router unchanged (it only mutates global client slots).
-    async fn after_routes(&self, router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
-        if !enabled() {
-            return Ok(router);
-        }
+    tracing::info!(
+        "USE_UPSTREAM_STUBS is set — swapping every Main-X-Service \
+         client for in-process stubs and seeding demo data."
+    );
 
-        tracing::info!(
-            "USE_UPSTREAM_STUBS is set — swapping every Main-X-Service \
-             client for in-process stubs and seeding demo data."
-        );
+    let patient_stub = Arc::new(PatientStub::new());
+    let place_stub = Arc::new(PlaceStub::new());
+    let worker_stub = Arc::new(WorkerStub::new());
+    let thing_stub = Arc::new(ThingStub::new());
+    let event_stub = Arc::new(EventStub::new());
 
-        let patient_stub = Arc::new(PatientStub::new());
-        let place_stub = Arc::new(PlaceStub::new());
-        let worker_stub = Arc::new(WorkerStub::new());
-        let thing_stub = Arc::new(ThingStub::new());
-        let event_stub = Arc::new(EventStub::new());
+    main_patient_service_client::set_test_client(patient_stub.clone());
+    main_place_service_client::set_test_client(place_stub.clone());
+    main_worker_service_client::set_test_client(worker_stub.clone());
+    main_thing_service_client::set_test_client(thing_stub.clone());
+    main_event_service_client::set_test_client(event_stub.clone());
 
-        main_patient_service_client::set_test_client(patient_stub.clone());
-        main_place_service_client::set_test_client(place_stub.clone());
-        main_worker_service_client::set_test_client(worker_stub.clone());
-        main_thing_service_client::set_test_client(thing_stub.clone());
-        main_event_service_client::set_test_client(event_stub.clone());
+    // A handful of demo workers — kept in named variables so the
+    // demo moves below can be attributed to them. Attribution is what
+    // makes the worker-detail and cabinet-presence-history views
+    // non-empty in the offline demo.
+    //
+    // `alice_worker`: a nurse (seeded but not used to attribute a
+    // move; she shares a name with the demo patient on purpose).
+    let alice_worker = Worker {
+        id: Uuid::new_v4(),
+        name: "Alice Johnson".into(),
+        role: Some("nurse".into()),
+    };
+    // `dr_bob`: a doctor used to attribute David Brown's demo move.
+    let dr_bob = Worker {
+        id: Uuid::new_v4(),
+        name: "Dr Bob Carter".into(),
+        role: Some("doctor".into()),
+    };
+    // `mira`: a records administrator used to attribute Carol's move.
+    let mira = Worker {
+        id: Uuid::new_v4(),
+        name: "Mira (records)".into(),
+        role: Some("administrator".into()),
+    };
+    worker_stub.seed(vec![alice_worker.clone(), dr_bob.clone(), mira.clone()]);
 
-        // A handful of demo workers — kept in named variables so the
-        // demo moves below can be attributed to them. Attribution is what
-        // makes the worker-detail and cabinet-presence-history views
-        // non-empty in the offline demo.
-        //
-        // `alice_worker`: a nurse (seeded but not used to attribute a
-        // move; she shares a name with the demo patient on purpose).
-        let alice_worker = Worker {
-            id: Uuid::new_v4(),
-            name: "Alice Johnson".into(),
-            role: Some("nurse".into()),
-        };
-        // `dr_bob`: a doctor used to attribute David Brown's demo move.
-        let dr_bob = Worker {
-            id: Uuid::new_v4(),
-            name: "Dr Bob Carter".into(),
-            role: Some("doctor".into()),
-        };
-        // `mira`: a records administrator used to attribute Carol's move.
-        let mira = Worker {
-            id: Uuid::new_v4(),
-            name: "Mira (records)".into(),
-            role: Some("administrator".into()),
-        };
-        worker_stub.seed(vec![alice_worker.clone(), dr_bob.clone(), mira.clone()]);
-
-        if let Err(e) = run_seed(
-            place_stub.as_ref(),
-            thing_stub.as_ref(),
-            event_stub.as_ref(),
-            patient_stub.as_ref(),
-        )
-        .await
-        {
-            tracing::warn!(?e, "Failed to seed in-process stubs");
-        } else {
-            tracing::info!("In-process stubs seeded.");
-            // Attribute a couple of moves to workers so the worker-detail
-            // and cabinet-presence-history views are non-empty in the demo.
-            seed_demo_worker_moves(&event_stub, &thing_stub, &place_stub, &dr_bob, &mira).await;
-            // Bundle Alice's folders into a demo volume (left in place, so
-            // tests that pin her folders' cabinets stay valid).
-            seed_demo_volume(&thing_stub).await;
-        }
-
-        Ok(router)
+    if let Err(e) = run_seed(
+        place_stub.as_ref(),
+        thing_stub.as_ref(),
+        event_stub.as_ref(),
+        patient_stub.as_ref(),
+    )
+    .await
+    {
+        tracing::warn!(?e, "Failed to seed in-process stubs");
+    } else {
+        tracing::info!("In-process stubs seeded.");
+        // Attribute a couple of moves to workers so the worker-detail
+        // and cabinet-presence-history views are non-empty in the demo.
+        seed_demo_worker_moves(&event_stub, &thing_stub, &place_stub, &dr_bob, &mira).await;
+        // Bundle Alice's folders into a demo volume (left in place, so
+        // tests that pin her folders' cabinets stay valid).
+        seed_demo_volume(&thing_stub).await;
     }
+
+    Ok(())
 }
 
 /// Bundle Alice Johnson's folders into a demo volume so the volume views

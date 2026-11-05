@@ -13,8 +13,8 @@
 //! and continues with placeholder data so the rest of the demo still
 //! produces useful rows.
 
+use axa::prelude::*;
 use chrono::NaiveDate;
-use loco_rs::prelude::*;
 use uuid::Uuid;
 
 use crate::main_event_service::{self, RecordMove};
@@ -29,7 +29,7 @@ pub struct Seed;
 
 #[async_trait]
 impl Task for Seed {
-    /// Task metadata (name + one-line description) for the Loco CLI listing.
+    /// Task metadata (name + one-line description) for the CLI listing.
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "seed".to_string(),

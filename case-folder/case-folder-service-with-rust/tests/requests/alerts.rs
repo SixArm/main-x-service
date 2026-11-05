@@ -1,12 +1,11 @@
+use axa::testing::prelude::*;
 use case_folder_service_with_rust::app::App;
-use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
 /// Pins: moving a folder across a building boundary (Hospital A →
 /// Hospital B) surfaces a geofence alert naming both buildings.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn cross_building_move_raises_geofence_alert() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;
@@ -61,7 +60,6 @@ async fn cross_building_move_raises_geofence_alert() {
 /// geofence alert.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn same_building_move_raises_no_alert() {
     request::<App, _, _>(|request, ctx| async move {
         super::clean_db(&ctx).await;

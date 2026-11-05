@@ -17,10 +17,8 @@
 //! responses, and snapshots labels (patient name, NHS Number, cabinet
 //! path, worker name/role) onto the records it *writes upstream* so the
 //! audit trail stays readable if an upstream later renames or goes
-//! offline — it does not persist those snapshots itself. The `migration`
-//! crate's migrator list is deliberately empty and `models::_entities` is
-//! a placeholder; Loco requires both modules to exist even though this
-//! service has no PostgreSQL schema of its own.
+//! offline — it does not persist those snapshots itself, and it has no PostgreSQL
+//! database of its own.
 //!
 //! Notable domain rules implemented here:
 //! - **NHS Number Modulus-11** check-digit validation (`nhs`).
@@ -29,9 +27,9 @@
 //! - **Move audit trail** — append-only scan history is the source of
 //!   truth; current location is derived, never edited in place.
 //!
-//! Built on [Loco](https://loco.rs/) (Axum) in backend-only mode: a JSON
-//! API with no view/template tier. The application wiring (initializer
-//! order, mounted routes, tasks) lives in `app`.
+//! Built directly on Axum with shared helpers from [`axa`]: a JSON API with
+//! no view/template tier. The application wiring (setup order, mounted
+//! routes, tasks) lives in `app`.
 
 // SEC-I3: this service has no reason to reach for `unsafe`; forbid it
 // outright to match the family's other crate roots.
@@ -76,10 +74,6 @@ pub mod main_thing_service;
 /// HTTP client for the upstream Main Worker Service: resolves the worker
 /// (and role snapshot) recorded as the actor on each move.
 pub mod main_worker_service;
-
-/// Domain models owned by this crate (folders, volumes, moves, and their
-/// request/response shapes) — distinct from the upstream-owned types.
-pub mod models;
 
 /// NHS Number handling: format normalization and Modulus-11 check-digit
 /// validation.

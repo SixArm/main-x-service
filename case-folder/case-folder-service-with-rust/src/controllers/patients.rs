@@ -4,12 +4,12 @@
 //! in the **Main Thing Service**; per-patient move history lives in
 //! the **Main Event Service**. This controller proxies the three.
 
+use axa::prelude::*;
 use axum::{
     Extension, Json, debug_handler,
     extract::{Path, Query},
     response::{IntoResponse, Response},
 };
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;

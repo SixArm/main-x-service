@@ -1,4 +1,4 @@
-//! Loco initializers for the case-folder tracker.
+//! Router setup steps for the case-folder tracker.
 //!
 //! Each submodule registers one external-service HTTP client as an Axum
 //! `Extension` so controllers can pull it out of the request. In offline

@@ -4,11 +4,7 @@
 //! can inject a stub after the app has booted.
 
 use async_trait::async_trait;
-use axum::Router as AxumRouter;
-use loco_rs::{
-    Result,
-    app::{AppContext, Initializer as LocoInitializer},
-};
+use axum::Router;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
@@ -75,25 +71,14 @@ impl Client for RoutingClient {
     }
 }
 
-/// Loco initializer that registers the Main Worker Service client.
-pub struct ClientInitializer;
-
-#[async_trait]
-impl LocoInitializer for ClientInitializer {
-    /// Stable identifier for this initializer in Loco's registry.
-    fn name(&self) -> String {
-        "main-worker-service-client".to_string()
-    }
-
-    /// Read `MAIN_WORKER_SERVICE_BASE_URL` (default `http://localhost:5152`),
-    /// build a [`RoutingClient`] over an HTTP fallback, and layer it as an
-    /// Axum `Extension`.
-    async fn after_routes(&self, router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
-        let base_url = std::env::var("MAIN_WORKER_SERVICE_BASE_URL")
-            .unwrap_or_else(|_| "http://localhost:5152".to_string());
-        let client: Arc<dyn Client> = Arc::new(RoutingClient {
-            fallback: HttpClient::new(base_url),
-        });
-        Ok(router.layer(axum::Extension(client)))
-    }
+/// Layer the Main Worker Service client onto `router` as an Axum
+/// `Extension`, reading `MAIN_WORKER_SERVICE_BASE_URL` (default
+/// `http://localhost:5152`).
+pub fn install(router: Router) -> Router {
+    let base_url = std::env::var("MAIN_WORKER_SERVICE_BASE_URL")
+        .unwrap_or_else(|_| "http://localhost:5152".to_string());
+    let client: Arc<dyn Client> = Arc::new(RoutingClient {
+        fallback: HttpClient::new(base_url),
+    });
+    router.layer(axum::Extension(client))
 }

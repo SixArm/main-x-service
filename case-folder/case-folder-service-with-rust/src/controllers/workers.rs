@@ -6,12 +6,12 @@
 //! a patient that worker has handled. The tracker stores nothing about
 //! workers itself.
 
+use axa::prelude::*;
 use axum::{
     Extension, Json, debug_handler,
     extract::{Path, Query},
     response::{IntoResponse, Response},
 };
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::Arc;

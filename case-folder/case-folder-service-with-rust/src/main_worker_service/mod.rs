@@ -47,11 +47,11 @@ pub enum Error {
     NotFound,
 }
 
-/// Flattens our typed [`Error`] into a `loco_rs::Error::Message` for
+/// Flattens our typed [`Error`] into a `axa::Error::Message` for
 /// `?`-propagation in controllers.
-impl From<Error> for loco_rs::Error {
+impl From<Error> for axa::Error {
     fn from(value: Error) -> Self {
-        loco_rs::Error::Message(value.to_string())
+        axa::Error::Message(value.to_string())
     }
 }
 
