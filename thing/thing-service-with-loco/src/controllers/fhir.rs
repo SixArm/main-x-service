@@ -13,14 +13,14 @@
 //! behind the blanket auth+ABAC guard (`/fhir/*` is guarded; only
 //! `/fhir/metadata` is public).
 
+use axa::prelude::{delete, get, post, put};
+use axa::routes::Routes;
 use axum::{
     body::{Body, Bytes},
     extract::{Path, Query, State},
     http::{StatusCode, header},
     response::Response,
 };
-use loco_rs::controller::Routes;
-use loco_rs::prelude::{delete, get, post, put};
 use serde::Serialize;
 use uuid::Uuid;
 

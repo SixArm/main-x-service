@@ -17,14 +17,14 @@
 //! validators, audit trail, event stream, and metrics as the native REST
 //! controller (§8).
 
+use axa::prelude::{delete, get, post, put};
+use axa::routes::Routes;
 use axum::{
     body::{Body, Bytes},
     extract::{Path, Query, State},
     http::{StatusCode, header},
     response::Response,
 };
-use loco_rs::controller::Routes;
-use loco_rs::prelude::{delete, get, post, put};
 use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;

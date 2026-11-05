@@ -196,7 +196,7 @@ fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
 /// Bridge so the existing `State<AppState>` handlers run as native loco
 /// controllers: extracts the cheaply-cloneable `AppState` from the
 /// `AppContext` shared store (populated once at boot in `after_routes`).
-impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
+impl axum::extract::FromRef<axa::AppContext> for AppState {
     /// Pull the boot-time `AppState` out of the shared store. The clone is
     /// cheap because every field is an `Arc`/handle.
     ///
@@ -205,7 +205,7 @@ impl axum::extract::FromRef<loco_rs::app::AppContext> for AppState {
     /// Panics if `after_routes` never inserted the state — a programmer
     /// error that would otherwise surface as a confusing per-request 500,
     /// so it fails loudly at the first request instead.
-    fn from_ref(ctx: &loco_rs::app::AppContext) -> Self {
+    fn from_ref(ctx: &axa::AppContext) -> Self {
         ctx.shared_store
             .get::<AppState>()
             .expect("AppState must be inserted into the shared store at boot")

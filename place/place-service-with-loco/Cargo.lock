@@ -578,7 +578,7 @@ dependencies = [
 [[package]]
 name = "axa"
 version = "0.1.0"
-source = "git+https://github.com/publicprojects-io/axa?rev=87bb35027afa6bfd1cac735235ffa5d85d6e27fc#87bb35027afa6bfd1cac735235ffa5d85d6e27fc"
+source = "git+https://github.com/publicprojects-io/axa?rev=164421cec1ded998b2ae03cce2fd700afd2c89fb#164421cec1ded998b2ae03cce2fd700afd2c89fb"
 dependencies = [
  "async-trait",
  "axum 0.8.9",

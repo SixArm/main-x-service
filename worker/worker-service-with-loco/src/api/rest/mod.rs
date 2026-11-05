@@ -286,8 +286,8 @@ pub fn create_router(state: AppState) -> Router {
 /// shared store via `FromRef`. `create_router` is retained for the
 /// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
 #[must_use]
-pub fn workers_routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, delete, get, post};
+pub fn workers_routes() -> axa::routes::Routes {
+    use axa::prelude::{Routes, delete, get, post};
     Routes::new()
         .prefix("/api")
         .add("/health", get(handlers::health_check))
@@ -361,8 +361,8 @@ pub fn workers_routes() -> loco_rs::controller::Routes {
 
 /// Root-level Prometheus scrape route (`GET /metrics.prom`).
 #[must_use]
-pub fn metrics_routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, get};
+pub fn metrics_routes() -> axa::routes::Routes {
+    use axa::prelude::{Routes, get};
     Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
 }
 
@@ -376,9 +376,9 @@ pub fn metrics_routes() -> loco_rs::controller::Routes {
 /// `/Practitioner/{id}` capture. `resourceType` is the standard FHIR R5
 /// `Practitioner` (fhir.md §3), replacing the prototype's `Worker`.
 #[must_use]
-pub fn fhir_routes() -> loco_rs::controller::Routes {
+pub fn fhir_routes() -> axa::routes::Routes {
     use crate::api::fhir::handlers;
-    use loco_rs::prelude::{Routes, get};
+    use axa::prelude::{Routes, get};
     Routes::new()
         .prefix("/fhir")
         .add("/metadata", get(handlers::metadata))

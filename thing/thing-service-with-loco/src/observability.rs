@@ -104,7 +104,7 @@ pub const DEFAULT_OTLP_ENDPOINT: &str = "http://localhost:4317";
 pub const DEFAULT_SERVICE_NAME: &str = "thing-service";
 
 /// The boxed formatting layer type loco's
-/// [`init_layer`](loco_rs::logger::init_layer) returns, accepted by
+/// [`init_layer`](axa::logger::init_layer) returns, accepted by
 /// [`init`] so the log format a deployment configured is reused verbatim
 /// rather than re-derived here.
 pub type FmtLayer =

@@ -148,8 +148,8 @@ pub fn create_router(state: AppState) -> Router {
 /// extract `AppState` from the `AppContext` shared store via `FromRef`.
 /// `create_router` is retained for the integration tests.
 #[must_use]
-pub fn things_routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, get, post};
+pub fn things_routes() -> axa::routes::Routes {
+    use axa::prelude::{Routes, get, post};
     Routes::new()
         .prefix("/api")
         .add("/health", get(handlers::health))
@@ -190,8 +190,8 @@ pub fn things_routes() -> loco_rs::controller::Routes {
 /// Mounted at the root rather than under `/api` so a default Prometheus
 /// scrape config (`metrics_path: /metrics.prom`) finds it.
 #[must_use]
-pub fn metrics_routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, get};
+pub fn metrics_routes() -> axa::routes::Routes {
+    use axa::prelude::{Routes, get};
     Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
 }
 

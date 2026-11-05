@@ -210,8 +210,8 @@ pub fn create_router(state: AppState) -> Router {
 /// `FromRef`. Registered in `App::routes`; `create_router` is retained
 /// for the `tower::oneshot`-based integration tests.
 #[must_use]
-pub fn courses_routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, get, post};
+pub fn courses_routes() -> axa::routes::Routes {
+    use axa::prelude::{Routes, get, post};
     Routes::new()
         .prefix("/api")
         .add("/health", get(handlers::health))
@@ -267,8 +267,8 @@ pub fn courses_routes() -> loco_rs::controller::Routes {
 /// separately from [`courses_routes`] because that set is prefixed
 /// `/api`. Public: scraping needs no bearer token.
 #[must_use]
-pub fn metrics_routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, get};
+pub fn metrics_routes() -> axa::routes::Routes {
+    use axa::prelude::{Routes, get};
     Routes::new().add("/metrics.prom", get(handlers::metrics_prom))
 }
 

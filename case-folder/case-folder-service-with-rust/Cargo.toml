@@ -11,7 +11,7 @@ description = "Case folder service — NHS paper case-note folder location track
 license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
 
 [dependencies]
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "87bb35027afa6bfd1cac735235ffa5d85d6e27fc" }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "164421cec1ded998b2ae03cce2fd700afd2c89fb" }
 
 tokio = { version = "1.54", default-features = false, features = [
     "macros",
@@ -49,5 +49,5 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "87bb35027afa6bfd1cac735235ffa5d85d6e27fc", features = ["testing"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "164421cec1ded998b2ae03cce2fd700afd2c89fb", features = ["testing"] }
 serial_test = "4.0.1"

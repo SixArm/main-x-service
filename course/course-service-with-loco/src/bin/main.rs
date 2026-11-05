@@ -1,10 +1,6 @@
-//! Course Service binary entry-point.
-//!
-//! Boots the service through loco's CLI: parses subcommands (`start`,
-//! `db migrate`, …) and dispatches to the [`course_service::app::App`]
-//! hooks. The REST router is mounted by the app's `after_routes` hook;
-//! see [`course_service`] for the library surface and `../spec.md` for
-//! the canonical behaviour reference.
+//! Command-line entry point. See [`axa::cli::Cli`] for the commands:
+//! `start` runs the service, `db` manages the database, and `task` runs a
+//! named task.
 
 // Always start with high quality coding conventions.
 #![warn(clippy::pedantic)]
@@ -16,11 +12,16 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+use axa::cli::Cli;
+use clap::Parser;
 use course_service::app::App;
-use loco_rs::cli;
-use migration::Migrator;
 
+/// Parse the command line and run it.
+///
+/// # Errors
+///
+/// Returns the failure from [`App::run`].
 #[tokio::main]
-async fn main() -> loco_rs::Result<()> {
-    cli::main::<App, Migrator>().await
+async fn main() -> axa::Result<()> {
+    App::run(Cli::parse()).await
 }

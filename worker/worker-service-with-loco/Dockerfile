@@ -91,9 +91,6 @@ COPY --from=builder --chown=worker:worker \
 # configured `DATABASE_URL` without re-mounting.
 COPY --chown=worker:worker worker/worker-service-with-loco/migrations ./migrations
 
-# loco reads config/<environment>.yaml at runtime (not baked into the
-# binary); LOCO_ENV below selects `production.yaml`.
-COPY --chown=worker:worker worker/worker-service-with-loco/config ./config
 
 RUN mkdir -p /app/data/search_index && chown -R worker:worker /app
 
@@ -111,7 +108,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:8080/api/health || exit 1
 
-# Runtime defaults; override at `podman run -e …`. LOCO_ENV selects
+# Runtime defaults; override at `podman run -e …`. APP_ENV selects
 # config/production.yaml — a container with no override boots safely
 # in production mode rather than defaulting to loco's own "development".
 # NOTE: loco's own config template reads `PORT` (config/production.yaml
@@ -119,7 +116,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 # `SERVER_PORT` this crate's separate `src/config/mod.rs` documents is a
 # different, unrelated config surface (used by non-loco code paths) and
 # does NOT change what port the loco-served binary actually binds.
-ENV LOCO_ENV=production \
+ENV APP_ENV=production \
     PORT=8080 \
     RUST_LOG=info \
     SERVER_HOST=0.0.0.0 \

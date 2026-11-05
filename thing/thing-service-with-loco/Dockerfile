@@ -88,9 +88,6 @@ COPY --from=builder --chown=thing:thing \
     /app/thing/thing-service-with-loco/target/release/thing-service \
     /app/thing-service
 
-# loco reads config/<environment>.yaml at runtime (not baked into the
-# binary); LOCO_ENV below selects `production.yaml`.
-COPY --chown=thing:thing thing/thing-service-with-loco/config ./config
 
 # Tantivy full-text index (SEARCH_INDEX_PATH — this crate's own
 # src/config/ module, not the loco config's search key; default
@@ -113,11 +110,11 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:8080/api/health || exit 1
 
-# Runtime defaults; override at `podman run -e …`. LOCO_ENV selects
+# Runtime defaults; override at `podman run -e …`. APP_ENV selects
 # config/production.yaml — a container with no override boots safely
 # in production mode rather than defaulting to loco's own "development".
 # SEARCH_INDEX_PATH matches the volume created above.
-ENV LOCO_ENV=production \
+ENV APP_ENV=production \
     PORT=8080 \
     SEARCH_INDEX_PATH=/app/data/search_index
 

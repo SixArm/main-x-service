@@ -1,9 +1,6 @@
-//! Binary entry point for the `thing-service` loco.rs application.
-//!
-//! Boots the Loco CLI with the service's [`App`](thing_service::app::App)
-//! and the migration runner, wiring up the REST API, background workers,
-//! and database migrations. All application logic lives in the
-//! `thing-service` library; this binary is a thin launcher.
+//! Command-line entry point. See [`axa::cli::Cli`] for the commands:
+//! `start` runs the service, `db` manages the database, and `task` runs a
+//! named task.
 
 #![warn(clippy::pedantic)]
 #![forbid(unsafe_code)]
@@ -17,19 +14,16 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use loco_rs::cli;
-use migration::Migrator;
+use axa::cli::Cli;
+use clap::Parser;
 use thing_service::app::App;
 
-/// Process entry point: hand control to the loco CLI parameterized with
-/// this service's [`App`] hooks and the migration runner. The Tokio runtime
-/// is set up by `#[tokio::main]`.
+/// Parse the command line and run it.
 ///
 /// # Errors
 ///
-/// Returns any error surfaced by the loco CLI (bad args, boot failure,
-/// migration error, server bind failure).
+/// Returns the failure from [`App::run`].
 #[tokio::main]
-async fn main() -> loco_rs::Result<()> {
-    cli::main::<App, Migrator>().await
+async fn main() -> axa::Result<()> {
+    App::run(Cli::parse()).await
 }

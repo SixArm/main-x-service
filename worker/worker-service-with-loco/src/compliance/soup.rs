@@ -388,7 +388,7 @@ mod tests {
     fn lockfile_contains_known_dependencies() {
         let packages = locked_packages();
         for expected in [
-            "loco-rs",
+            "axa",
             "sea-orm",
             "axum",
             "sha2",
@@ -410,7 +410,7 @@ mod tests {
     fn manifest_parses_direct_dependencies() {
         let direct = declared_dependencies();
         for expected in [
-            "loco-rs",
+            "axa",
             "serde",
             "sha2",
             "sha3",
