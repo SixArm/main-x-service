@@ -35,6 +35,18 @@ The environment is `APP_ENV`. `LOCO_ENV` is still read.
 ## Background jobs
 
 Jobs run on a Postgres queue, the `axa_queue` table, using `FOR UPDATE SKIP
-LOCKED`. There is no external broker, and no SQLite. `start` runs only the
-server, so run `start --worker` or `start --all` to process jobs. Delivery is at
-least once, so a job's work must be safe to repeat.
+LOCKED`. There is no external broker, and no SQLite.
+
+`start` runs only the server, so a service with jobs must run `start --all`, or
+`start --worker` separately. Its image uses `start --all`, and it warns at boot
+when nothing here serves the queue.
+
+A job gets one attempt by default, because a retry repeats its work. Raise
+`max_attempts` only for jobs written to be repeated. Finished rows are deleted
+after seven days.
+
+## Limits
+
+Keep the service-wide body limit small. A route that needs more, such as a bulk
+import, sets its own with `axa::middleware::body_limit`, and its own timeout
+through `Http::timeout_overrides`.

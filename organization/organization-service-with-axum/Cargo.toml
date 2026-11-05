@@ -21,7 +21,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # an advance against one design family does not transfer.
 sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "queue"] }
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
@@ -109,7 +109,7 @@ required-features = []
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue", "testing"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "queue", "testing"] }
 # The `TestServer` axa's testing harness hands to a request test, and
 # `multipart::{MultipartForm, Part}` for the BLK-5 bulk-import request
 # tests (`tests/requests/bulk.rs`). Named explicitly so those tests can

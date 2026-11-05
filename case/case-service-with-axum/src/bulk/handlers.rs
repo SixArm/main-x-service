@@ -511,7 +511,10 @@ async fn list_bulk_jobs(
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/cases")
-        .add("/import", post(import_case))
+        .add(
+            "/import",
+            post(import_case).layer(axa::middleware::body_limit(crate::bulk::IMPORT_BODY_LIMIT)),
+        )
         .add("/import/{id}", get(get_import_job))
         .add("/export", post(export_case))
         .add("/export/{id}", get(get_export_job))

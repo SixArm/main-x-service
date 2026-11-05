@@ -467,7 +467,11 @@ async fn list_bulk_jobs(
 pub fn routes() -> Routes {
     Routes::new()
         .prefix("/api/care-pathways")
-        .add("/import", post(import_pathways))
+        .add(
+            "/import",
+            post(import_pathways)
+                .layer(axa::middleware::body_limit(crate::bulk::IMPORT_BODY_LIMIT)),
+        )
         .add("/import/{id}", get(get_import_job))
         .add("/export", post(export_pathways))
         .add("/export/{id}", get(get_export_job))

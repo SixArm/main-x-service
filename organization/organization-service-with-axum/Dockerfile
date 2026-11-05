@@ -118,4 +118,4 @@ ENV APP_ENV=production \
 
 # loco's CLI entry point: `<bin> start` runs the server (see
 # src/bin/main.rs — `axa::cli::main`).
-CMD ["/app/organization-service", "start"]
+CMD ["/app/organization-service", "start", "--all"]

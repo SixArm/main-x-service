@@ -68,3 +68,4 @@ opentelemetry-proto	Generated `TraceServiceServer`/`MetricsServiceServer` protob
 tonic	gRPC server transport for the same in-process test collector.	Test-only. Not present in a release artefact; this crate declares no gRPC stub of its own (no `src/api/grpc` module), so this is a plain, un-renamed dev-dependency with no extern-prelude collision to dodge.
 tokio-stream	Wraps a `TcpListener` as an incoming stream for the in-process test collector's tonic server.	Test-only. Not present in a release artefact.
 reqwest	HTTP client used only by tests/otlp_middleware.rs to make a real request against a served test router.	Test-only. Not present in a release artefact; unlike care-pathway (which has this as a main dependency for its journey traversal), this crate has no other use for it.
+axum-test	The `TestServer` the testing harness hands to a request test; used by the compliance request tests.	Test-only. Not present in a release artefact.

@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **Bulk jobs now run in production.** The image starts with `start --all`.
+  Nothing ran a worker before, so a production import was accepted and then sat
+  in `queued` forever.
+- **Imports over 2 MB work.** The route advertised a 64 MB limit, but the
+  service-wide 2 MB body limit refused larger files first. The import route now
+  has its own limit, and a 10-minute timeout.
+
 ### Changed — Loco replaced by axa
 
 - **Loco removed.** The service is now plain Axum plus shared helpers from

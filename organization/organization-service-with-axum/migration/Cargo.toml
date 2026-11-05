@@ -12,7 +12,7 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm"] }
 
 
 [dependencies.sea-orm-migration]

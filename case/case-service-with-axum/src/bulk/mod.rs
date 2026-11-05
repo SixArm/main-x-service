@@ -131,6 +131,11 @@ use serde::{Deserialize, Serialize};
 /// implementation.
 pub const MAX_IMPORT_BYTES: usize = 64 * 1024 * 1024;
 
+/// The body limit on the import route: the file limit plus room for multipart
+/// framing, so an oversized file reaches the import's own error rather than a
+/// bare `413`. The rest of the service keeps its small default.
+pub const IMPORT_BODY_LIMIT: usize = MAX_IMPORT_BYTES + 6 * 1024 * 1024;
+
 /// SEC-B2 — the maximum number of record rows in a single **import**.
 ///
 /// Bounds the per-job work so a file of millions of tiny lines cannot

@@ -19,7 +19,7 @@ include = ["src/**/*", "README.md"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "queue"] }
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
@@ -129,11 +129,12 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+axum-test = "21"
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue", "testing"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "queue", "testing"] }
 # `mock`: a `DatabaseConnection` that errors on any query, standing in
 # for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
 # prove a code path never touches the database (src/compliance/disclosure.rs).

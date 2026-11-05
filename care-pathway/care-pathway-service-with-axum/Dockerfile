@@ -127,4 +127,4 @@ ENV APP_ENV=production \
 
 # loco's CLI entry point: `<bin> start` runs the server (see
 # src/bin/main.rs — `axa::cli::main`).
-CMD ["/app/care-pathway-service", "start"]
+CMD ["/app/care-pathway-service", "start", "--all"]

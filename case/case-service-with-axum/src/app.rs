@@ -6,9 +6,9 @@ use axa::{
     AppContext, Environment, Error, Result,
     boot::{BootResult, TestApp},
     cli::{Cli, Command, DbCommand, parse_vars},
-    config::{Config as ServiceConfig, Defaults, MB},
+    config::{Config as ServiceConfig, Defaults, MB, TimeoutOverride},
     db::truncate_table,
-    queue::{Queue, QueueOptions},
+    queue::{Queue, QueueOptions, warn_if_unserved},
     routes::AppRoutes,
     server,
     task::Tasks,
@@ -214,6 +214,21 @@ impl App {
     }
 }
 
+/// How long a bulk import may take. A large upload on a slow link legitimately
+/// runs well past the normal request timeout.
+const IMPORT_TIMEOUT_SECONDS: u64 = 600;
+
+/// Service configuration: the defaults below, the environment, and the routes
+/// with their own limits.
+fn service_config(environment: &Environment) -> Result<ServiceConfig> {
+    let mut config = ServiceConfig::from_env(environment, &defaults())?;
+    config.http.timeout_overrides.push(TimeoutOverride {
+        path_suffix: "/import".to_string(),
+        seconds: IMPORT_TIMEOUT_SECONDS,
+    });
+    Ok(config)
+}
+
 /// Service defaults. The environment overrides them; see `axa::config`.
 fn defaults() -> Defaults {
     Defaults {
@@ -276,7 +291,7 @@ impl App {
             .environment
             .as_deref()
             .map_or_else(Environment::from_env, Environment::parse);
-        let mut config = ServiceConfig::from_env(&environment, &defaults())?;
+        let mut config = service_config(&environment)?;
         if let Command::Start { binding, port, .. } = &cli.command {
             if let Some(binding) = binding {
                 config.server.binding.clone_from(binding);
@@ -294,6 +309,7 @@ impl App {
         }
         match cli.command {
             Command::Start { worker, all, .. } => {
+                warn_if_unserved(&ctx, worker || all);
                 let (stop, stopped) = tokio::sync::watch::channel(false);
                 let jobs = (worker || all)
                     .then(|| ctx.queue_provider.clone())
@@ -331,7 +347,7 @@ impl App {
 impl TestApp for App {
     async fn boot_test() -> Result<BootResult> {
         let environment = Environment::Test;
-        let config = ServiceConfig::from_env(&environment, &defaults())?;
+        let config = service_config(&environment)?;
         let ctx = Self::context(environment, config).await?;
         // Every boot starts from an empty, freshly migrated schema, so no
         // table can carry rows from an earlier test.

@@ -578,16 +578,14 @@ dependencies = [
 [[package]]
 name = "axa"
 version = "0.1.0"
-source = "git+https://github.com/publicprojects-io/axa?rev=5a82afa968c1c5ef6b20193074f22858269b9894#5a82afa968c1c5ef6b20193074f22858269b9894"
+source = "git+https://github.com/publicprojects-io/axa?rev=b1824627a745e68f5d15fd4421911f8f631bdff1#b1824627a745e68f5d15fd4421911f8f631bdff1"
 dependencies = [
  "async-trait",
+ "axa-seaorm",
  "axum 0.8.9",
  "axum-test",
  "clap",
- "cruet",
- "heck 0.5.0",
  "sea-orm",
- "sea-orm-migration",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -596,6 +594,21 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "axa-seaorm"
+version = "0.1.0"
+source = "git+https://github.com/publicprojects-io/axa?rev=b1824627a745e68f5d15fd4421911f8f631bdff1#b1824627a745e68f5d15fd4421911f8f631bdff1"
+dependencies = [
+ "cruet",
+ "heck 0.5.0",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "validator",
 ]
 
 [[package]]
@@ -7074,6 +7087,21 @@ dependencies = [
  "js-sys",
  "serde_core",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "validator"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43fb22e1a008ece370ce08a3e9e4447a910e92621bb49b85d6e48a45397e7cfa"
+dependencies = [
+ "idna",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "url",
 ]
 
 [[package]]

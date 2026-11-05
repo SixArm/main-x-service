@@ -126,4 +126,4 @@ ENV APP_ENV=production \
 # loco's CLI entry point: `<bin> start` runs the server (see
 # src/bin/main.rs — `axa::cli::main`). A bare `<bin>` with no
 # subcommand only prints the CLI's own --help and exits.
-CMD ["/app/person-service", "start"]
+CMD ["/app/person-service", "start", "--all"]

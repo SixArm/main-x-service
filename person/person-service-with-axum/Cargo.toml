@@ -32,7 +32,7 @@ csv = "1"
 sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json", "with-bigdecimal"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "queue"] }
 clap = { version = "4", features = ["derive"] }
 migration = { path = "migration" }
 
@@ -199,7 +199,7 @@ s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue", "testing"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "queue", "testing"] }
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
