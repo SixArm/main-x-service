@@ -16,7 +16,7 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**care-pathway-service-with-loco** owns:
+**care-pathway-service-with-axum** owns:
 
 - Care-pathway CRUD with soft delete (`deleted_at`).
 - `POST …/match` (rank an explicit candidate set, no persistence)

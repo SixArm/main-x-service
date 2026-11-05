@@ -1,6 +1,6 @@
 // Client-side rules for the duplicate review queue.
 //
-// Mirrors `worker-service-with-loco/src/models/review_queue.rs` (the
+// Mirrors `worker-service-with-axum/src/models/review_queue.rs` (the
 // decidable-status guard) and `src/matching/mod.rs::MatchScoreBreakdown`
 // (the per-component score object — identical field names and weights to
 // the person service's own in-service matcher), so the board can explain a
@@ -57,7 +57,7 @@ export function canDecide(item: Pick<ReviewQueueItem, "status">): boolean {
  * catalog key naming it, and its weight in the overall score.
  *
  * Weights are the worker in-service matcher's, per
- * `worker/agents/matching.md` "Layer 1" (`worker-service-with-loco`'s own
+ * `worker/agents/matching.md` "Layer 1" (`worker-service-with-axum`'s own
  * `ProbabilisticMatcher`) — not the broader `worker-matcher` reference
  * crate's ~50-component breakdown, which is a different, unrelated struct.
  * They sum to 1.00, identical in name and weight to the person service's.

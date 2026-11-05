@@ -1,6 +1,6 @@
 # case-front-end-with-svelte
 
-Operator UI for the [Case Service](../case-service-with-loco):
+Operator UI for the [Case Service](../case-service-with-axum):
 case **CRUD + matching** (governmental case management).
 
 SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
@@ -22,7 +22,7 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 ## Prerequisites
 
 - Node 20+ and pnpm
-- A running [Case Service](../case-service-with-loco)
+- A running [Case Service](../case-service-with-axum)
 
 ## Quick start
 

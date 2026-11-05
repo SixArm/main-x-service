@@ -41,16 +41,16 @@
     {
       "title": "Entity registry services (Rust, loco.rs)",
       "items": [
-        { "title": "person-service", "url": "person/person-service-with-loco/spec/index.md", "description": "Person (general) identity registry" },
-        { "title": "worker-service", "url": "worker/worker-service-with-loco/spec/index.md", "description": "Worker (workforce/professional) identity registry, plus assessments" },
-        { "title": "place-service", "url": "place/place-service-with-loco/spec/index.md", "description": "Place registry (schema.org/Place)" },
-        { "title": "thing-service", "url": "thing/thing-service-with-loco/spec/index.md", "description": "Thing/asset registry (schema.org/Thing)" },
-        { "title": "event-service", "url": "event/event-service-with-loco/spec/index.md", "description": "Time-bounded event registry (schema.org/Event)" },
-        { "title": "course-service", "url": "course/course-service-with-loco/spec/index.md", "description": "Course-identity registry plus CourseInstance sub-resource" },
-        { "title": "authentication-service", "url": "authentication/authentication-service-with-loco/spec/index.md", "description": "Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance" },
-        { "title": "organization-service", "url": "organization/organization-service-with-loco/spec/index.md", "description": "Organization registry (schema.org/Organization); family FHIR reference implementation" },
-        { "title": "care-pathway-service", "url": "care-pathway/care-pathway-service-with-loco/spec/index.md", "description": "Clinical care-pathway registry" },
-        { "title": "case-service", "url": "case/case-service-with-loco/spec/index.md", "description": "Governmental case-tracking registry" }
+        { "title": "person-service", "url": "person/person-service-with-axum/spec/index.md", "description": "Person (general) identity registry" },
+        { "title": "worker-service", "url": "worker/worker-service-with-axum/spec/index.md", "description": "Worker (workforce/professional) identity registry, plus assessments" },
+        { "title": "place-service", "url": "place/place-service-with-axum/spec/index.md", "description": "Place registry (schema.org/Place)" },
+        { "title": "thing-service", "url": "thing/thing-service-with-axum/spec/index.md", "description": "Thing/asset registry (schema.org/Thing)" },
+        { "title": "event-service", "url": "event/event-service-with-axum/spec/index.md", "description": "Time-bounded event registry (schema.org/Event)" },
+        { "title": "course-service", "url": "course/course-service-with-axum/spec/index.md", "description": "Course-identity registry plus CourseInstance sub-resource" },
+        { "title": "authentication-service", "url": "authentication/authentication-service-with-axum/spec/index.md", "description": "Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance" },
+        { "title": "organization-service", "url": "organization/organization-service-with-axum/spec/index.md", "description": "Organization registry (schema.org/Organization); family FHIR reference implementation" },
+        { "title": "care-pathway-service", "url": "care-pathway/care-pathway-service-with-axum/spec/index.md", "description": "Clinical care-pathway registry" },
+        { "title": "case-service", "url": "case/case-service-with-axum/spec/index.md", "description": "Governmental case-tracking registry" }
       ]
     },
     {
@@ -78,7 +78,7 @@
     {
       "title": "Cross-cutting services",
       "items": [
-        { "title": "link-graph-service-with-loco", "url": "link/link-graph-service-with-loco/spec/index.md", "description": "Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter" }
+        { "title": "link-graph-service-with-axum", "url": "link/link-graph-service-with-axum/spec/index.md", "description": "Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter" }
       ]
     },
     {

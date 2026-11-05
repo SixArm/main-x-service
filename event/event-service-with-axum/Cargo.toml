@@ -1,0 +1,245 @@
+[package]
+name = "event-service"
+version = "0.6.0"
+edition = "2024"
+rust-version = "1.97"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Event Service - An event administration microservice that interoperates with the event-matcher crate"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+repository = "https://github.com/sixarm/main-x-service/tree/main/event/event-service-with-axum"
+keywords = ["event-matcher", "microservice"]
+categories = ["database"]
+
+[[bin]]
+name = "event-service"
+path = "src/bin/main.rs"
+
+[dependencies]
+# Keyed integrity MACs with production-grade key handling — one audited
+# implementation shared by every service, rather than a copy per crate.
+integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
+# Unkeyed content digests, kept for structural diversity.
+sha2 = { version = "0.11" }
+sha3 = { version = "0.12" }
+# Async Runtime
+tokio = { version = "1.54", features = ["full"] }
+
+# Web Framework & HTTP (axum 0.8 to match loco 0.16)
+axum = { version = "0.8", features = ["macros", "multipart", "ws"] }
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.7", features = ["cors", "trace", "compression-full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precision"] }
+
+# Database (PostgreSQL ORM)
+sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json", "with-bigdecimal"] }
+bigdecimal = { version = "0.4", features = ["serde", "serde-json"] }
+
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm"] }
+clap = { version = "4", features = ["derive"] }
+migration = { path = "migration" }
+
+# Search Engine
+tantivy = "0.27"
+
+# gRPC (PRO-H11: a real Tonic server, generated from proto/event.proto
+# by build.rs). tonic 0.14 split the prost codec out of the core crate
+# into `tonic-prost` (runtime) + `tonic-prost-build` (codegen, see the
+# build-dependency below) — there is no "prost" feature on `tonic`
+# itself any more, and the generated server/client code names
+# `tonic_prost::ProstCodec` directly, so `tonic-prost` is a normal
+# dependency, not merely pulled in transitively.
+tonic = { version = "0.14", features = ["transport", "codegen"] }
+tonic-prost = "0.14"
+prost = "0.14"
+
+# OpenAPI Documentation
+utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "10", features = ["axum"] }
+
+# Data Streaming
+
+# OpenTelemetry (Observability) — real OTLP export (PRO-H9), ported from
+# person-service's src/observability.rs (itself ported from
+# link-graph-service, the family's first working exporter). Versions
+# match person's exactly (0.32 / 0.33), not this crate's former 0.27 /
+# 0.28 pins: those were never exercised (the exporter they were added
+# for was commented out), and 0.27's `install_batch(runtime::Tokio)`
+# pipeline API no longer exists upstream.
+#
+# `grpc-tonic` (not the crate's default `http-proto` + blocking reqwest):
+# the shared doc's `OTLP_ENDPOINT` default is `http://localhost:4317`, the
+# gRPC port. `internal-logs` is kept ON so a failing export is visible in
+# the log rather than silently dropped. No `logs` feature — the pipeline
+# is traces + metrics only, and nothing here uses OTel logs.
+opentelemetry = { version = "0.33", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = [
+  "grpc-tonic",
+  "trace",
+  "metrics",
+  "internal-logs",
+] }
+opentelemetry-semantic-conventions = { version = "0.33" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = { version = "0.34" }
+
+# Utilities
+uuid = { version = "1.29", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+time = "0.3"
+thiserror = "2.0"
+dotenvy = "0.15"
+async-trait = "0.1"
+
+# Fuzzy Matching & String Processing
+strsim = "0.11"
+
+# Prometheus metrics (text exposition for /metrics.prom)
+prometheus = "0.14"
+
+# Sibling matcher crate
+#
+# Path dependency, not a crates.io version pin: the local event-matcher
+# is 0.7.0 (coordinate fields renamed for their units, fa0d2c0f), and
+# crates.io's newest published event-matcher is still 0.6.1 with the
+# pre-rename field names. Pinning "0.6.1" here would compile against
+# the old field names and silently diverge from the sibling source.
+# Revert to a version pin once event-matcher 0.7.0 is published.
+event-matcher = { path = "../event-matcher-rust-crate" }
+
+# Security
+# Offline PASETO v4.public verification of authentication-service tokens
+# against its published Ed25519 key set (`/.well-known/paseto-keys`) — no
+# shared secret, no per-request introspection hop (local path — the
+# monorepo's 0.2 PASETO verifier). The `fetch` feature adds the boot-time
+# HTTP key-set fetch (`Verifier::from_paseto_keys_url`) used when
+# `EVENT_PASETO_KEYS_URL` is set.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
+mimalloc = "0.1.52"
+
+# Durable event bus Phase 3 (BUS-3, ported from case-service's BUS-1
+# reference; agents/share/event-bus.md §5/§8): the relay's real broker
+# sink. Optional and behind the `fluvio` feature below so the default
+# dependency tree (and every existing deployment's build) is unchanged —
+# the relay's `LoggingSink` covers dev/CI with no broker at all.
+fluvio = { version = "0.50", optional = true }
+
+[features]
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `EVENT_KEYCLOAK_*` (see src/api/rest/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
+# Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
+# feature to build or test; only `FluvioSink` — the real-broker producer
+# — lives behind this.
+fluvio = ["dep:fluvio"]
+
+[dev-dependencies]
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "testing"] }
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
+# Testing
+assertables = "10"
+tokio-test = "0.4"
+mockall = "0.15"
+tempfile = "3.27"
+# T-2: proves the date-proximity scorer's timezone correctness against
+# the real IANA tz database (DST-aware), not a hand-picked fixed offset
+# string. Test-only — production code never needs a zone name to score
+# proximity, since `Event::start_date`/`end_date` are stored as absolute
+# `DateTime<Utc>` instants (offset already resolved at the parse
+# boundary; see `Event::time_zone`'s doc comment, "Storage is always
+# UTC").
+chrono-tz = "0.10"
+
+# Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so
+# the bearer-verification path is exercised without the auth service or
+# any network dependency.
+ed25519-dalek = { version = "3.0" }
+rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
+base64 = { version = "0.23" }
+# The activation proof (tests/enforcement.rs) sets process-wide env vars
+# before booting the router, so it must not run beside another test in
+# the same process; `tower` drives that router with `oneshot`.
+serial_test = "4.0"
+tower = { version = "0.5", features = ["util"] }
+
+# Benchmarking
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
+
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
+# `tests/otlp_middleware.rs` (PRO-H9, ported from person-service): the
+# generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the export pipeline is proved against a real gRPC
+# listener in a normal `cargo test` run — no external collector, nothing
+# `#[ignore]`d.
+opentelemetry-proto = { version = "0.33", default-features = false, features = [
+  "gen-tonic",
+  "trace",
+  "metrics",
+] }
+# Plain `tonic`, no rename needed: this crate's main `tonic` dependency
+# above is now also 0.14 (the tonic-prost split, see its own comment),
+# so there is no longer a version collision to dodge with an
+# `otlp-test-tonic = { package = "tonic", … }` alias — that rename was
+# only ever needed while the main gRPC stub sat on tonic 0.12 and this
+# dev-dependency on 0.14 at once.
+tokio-stream = { version = "0.1", features = ["net"] }
+# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
+# HTTP request against a served router; this crate has no other direct
+# `reqwest` dependency (only a transitive one via
+# `authentication-verifier`'s `fetch` feature).
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls",
+  "json",
+] }
+
+[build-dependencies]
+# gRPC code generation (PRO-H11). tonic 0.14 moved prost codegen out of
+# `tonic-build` into `tonic-prost-build` (see the main `tonic-prost`
+# dependency's comment) — pinned to the same 0.14 line as the main
+# `tonic` dependency above, since codegen and runtime must be the same
+# tonic major line.
+tonic-prost-build = "0.14"
+# `tonic_prost_build::compile_protos` shells out to a real `protoc` binary —
+# it does not bundle one. `protoc-bin-vendored` ships prebuilt
+# `protoc` binaries for the platforms this family builds on;
+# `build.rs` points `PROTOC` at it before compiling, so no system
+# `protoc` install is required anywhere. Included from this crate's
+# first landing — person-service's and worker-service's each hit this
+# as a real CI-only failure and needed a follow-up fix.
+protoc-bin-vendored = "3"
+
+[[bench]]
+name = "matching_bench"
+harness = false
+
+[[bench]]
+name = "search_bench"
+harness = false
+
+[[bench]]
+name = "validation_bench"
+harness = false
+
+
+[[bench]]
+name = "bridge_bench"
+harness = false
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.bench]
+inherits = "release"

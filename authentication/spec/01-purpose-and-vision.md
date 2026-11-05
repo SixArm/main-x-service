@@ -29,7 +29,7 @@ The entity comprises three subprojects:
 
 | Subproject | Role |
 |---|---|
-| [authentication-service-with-loco](../authentication-service-with-loco/) | **Sessions + token issuance** — magic-link flow, server-side cookie sessions, PASETO v4.public minting (`POST /token`), Ed25519 key publication (`/.well-known/paseto-keys`). The family's reference loco.rs application. |
+| [authentication-service-with-axum](../authentication-service-with-axum/) | **Sessions + token issuance** — magic-link flow, server-side cookie sessions, PASETO v4.public minting (`POST /token`), Ed25519 key publication (`/.well-known/paseto-keys`). The family's reference loco.rs application. |
 | [authentication-verifier-rust-crate](../authentication-verifier-rust-crate/) | Token **verification** — the dependency-light library peer services embed to verify PASETO tokens offline against the published Ed25519 keys. |
 | [authentication-front-end-with-svelte](../authentication-front-end-with-svelte/) | Operator **UI / BFF** — sign up / sign in / sign out via magic link; holds the session cookie and exchanges it for a PASETO server-side. |
 
@@ -61,7 +61,7 @@ citizens across all Main X Index entity services, where:
 - **Not an identity-proofing service.** It verifies control of an
   email address, not real-world identity. Identity attributes,
   documents, and matching live in the
-  [person entity](../../person/person-service-with-loco/).
+  [person entity](../../person/person-service-with-axum/).
 - **Not the person registry.** The `users` table holds sign-in
   accounts (`pid`, email, name), not demographic records.
 - **Not an OAuth2 / OIDC provider — yet.** The code implements a

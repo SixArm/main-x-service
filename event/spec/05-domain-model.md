@@ -2,7 +2,7 @@
 
 Three model surfaces exist; this section pins how they relate.
 Field-by-field references:
-service [`agents/models.md`](../event-service-with-loco/agents/models.md),
+service [`agents/models.md`](../event-service-with-axum/agents/models.md),
 matcher [`README.md`](../event-matcher-rust-crate/README.md) (0.5.0
 surface), front-end `src/lib/api/types.ts`.
 
@@ -76,11 +76,11 @@ persistence, no UUIDs (only `local_id`, which is never scored).
 The service embeds the matcher (declared in its `Cargo.toml`,
 re-exported from `src/matching/mod.rs` as `matcher_lib`). The bridge
 is
-[`src/matching/adapter.rs`](../event-service-with-loco/src/matching/adapter.rs):
+[`src/matching/adapter.rs`](../event-service-with-axum/src/matching/adapter.rs):
 `to_matcher_event(&service::Event) -> event_matcher::Event`. **This
 adapter is the entity-level contract**; the entity spec wins over
 either crate spec for what it must map. Material rules (full list in
-service spec [§6.2](../event-service-with-loco/spec/06-functional-requirements.md)):
+service spec [§6.2](../event-service-with-axum/spec/06-functional-requirements.md)):
 
 | Service side | Matcher side |
 |---|---|
@@ -100,7 +100,7 @@ Service-only fields (`id`, `active`, `duration`, `time_zone`,
 `all_day`, `attendees`, `sponsors`, `funders`, `contributors`,
 `offers`, `links`, audit timestamps, …) are **dropped** — they have
 no matcher counterpart. The contract is pinned by the bridge tests
-([`tests/duplicate_detection.rs`](../event-service-with-loco/tests/duplicate_detection.rs),
+([`tests/duplicate_detection.rs`](../event-service-with-axum/tests/duplicate_detection.rs),
 16 tests).
 
 ### 5.4 Front-end types

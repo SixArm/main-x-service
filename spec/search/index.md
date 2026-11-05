@@ -27,10 +27,10 @@ search service — but they all follow the conventions below.
 > [privacy (short)](../../agents/share/privacy.md) ·
 > [match-search-merge (combined)](../../agents/share/match-search-merge.md).
 > Per-entity specs:
-> [organization](../../organization/organization-service-with-loco/spec/index.md) ·
-> [care-pathway](../../care-pathway/care-pathway-service-with-loco/spec/index.md) ·
-> [case](../../case/case-service-with-loco/spec/index.md) ·
-> [person](../../person/person-service-with-loco/spec/index.md).
+> [organization](../../organization/organization-service-with-axum/spec/index.md) ·
+> [care-pathway](../../care-pathway/care-pathway-service-with-axum/spec/index.md) ·
+> [case](../../case/case-service-with-axum/spec/index.md) ·
+> [person](../../person/person-service-with-axum/spec/index.md).
 
 ---
 
@@ -57,9 +57,9 @@ every create/update alongside the JSONB `data` payload:
 
 | Service | Search column | Source file (model `search`) |
 |---|---|---|
-| organization-service | `name` | [`src/models/organizations.rs`](../../organization/organization-service-with-loco/src/models/organizations.rs) |
-| care-pathway-service | `name` | [`src/models/care_pathways.rs`](../../care-pathway/care-pathway-service-with-loco/src/models/care_pathways.rs) |
-| case-service | `title` | [`src/models/cases.rs`](../../case/case-service-with-loco/src/models/cases.rs) |
+| organization-service | `name` | [`src/models/organizations.rs`](../../organization/organization-service-with-axum/src/models/organizations.rs) |
+| care-pathway-service | `name` | [`src/models/care_pathways.rs`](../../care-pathway/care-pathway-service-with-axum/src/models/care_pathways.rs) |
+| case-service | `title` | [`src/models/cases.rs`](../../case/case-service-with-axum/src/models/cases.rs) |
 
 The SeaORM query is uniform across the three:
 
@@ -140,7 +140,7 @@ Pinned by a unit test in each crate (`escape_like_neutralises_wildcards`):
 > `ILIKE` search method from organization entirely once Tantivy landed
 > (2026-07-31): `organizations.rs` now issues no `LIKE` query at all
 > (see the removal comment near line 261 of
-> [`organization-service/src/models/organizations.rs`](../../organization/organization-service-with-loco/src/models/organizations.rs)),
+> [`organization-service/src/models/organizations.rs`](../../organization/organization-service-with-axum/src/models/organizations.rs)),
 > so there is no wildcard-injection surface left to have drift on.
 > care-pathway and case still carry `escape_like` in their model files
 > as unused dead code behind their own now-superseded `ILIKE` methods
@@ -196,7 +196,7 @@ select `Exact`/`Fuzzy`/`Phonetic` mode from the query params, and
 resolve the returned pids back to rows.
 
 The reference Tantivy implementation lives in
-[`person-service/src/search/index.rs`](../../person/person-service-with-loco/src/search/index.rs):
+[`person-service/src/search/index.rs`](../../person/person-service-with-axum/src/search/index.rs):
 a `PersonIndexSchema` declares ~11 indexed fields, choosing `TEXT`
 (tokenised + lowercased, for fuzzy name search) vs `STRING` (verbatim,
 for exact lookups like postal code / id) per field, plus a `FAST` field

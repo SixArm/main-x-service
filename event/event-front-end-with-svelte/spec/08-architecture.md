@@ -41,7 +41,7 @@ and §13 T-23a/T-23b (CSRF not yet done).
         Bearer <paseto>   |         | (POST /api/auth/token)
                           v         v
         +-----------------------------+   +-----------------------------+
-        |   event-service-with-loco   |   |   authentication-service    |
+        |   event-service-with-axum   |   |   authentication-service    |
         |   Axum + SeaORM + Tantivy   |   |   (SSO, magic-link, PASETO) |
         +-----------------------------+   +-----------------------------+
 ```

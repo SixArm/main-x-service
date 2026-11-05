@@ -38,7 +38,7 @@ clinic encounter or a political hearing.
 
 - **Service** — enforcement point for masking, export, consent,
   audit. All compliance-relevant behaviour is specified in
-  [service spec §12](../event-service-with-loco/spec/12-compliance.md).
+  [service spec §12](../event-service-with-axum/spec/12-compliance.md).
 - **Matcher** — by construction cannot leak: no IO, no logging, no
   network. Test fixtures use synthetic personal data only.
 - **Front-end** — must not cache or persist personal data
@@ -69,6 +69,6 @@ Four frameworks impose obligations beyond §12.2. Regime detail:
   Core**.
 - **Every extended control is unimplemented in this service today.** The
   reference implementation is the
-  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/);
+  [care-pathway service](../../care-pathway/care-pathway-service-with-axum/);
   event adopts the FHIR conformance machinery at step 4 of the rollout
   ([`spec/compliance` §8.5](../../spec/compliance/index.md)).

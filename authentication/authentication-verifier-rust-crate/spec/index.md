@@ -5,7 +5,7 @@
 > edit + test edit. Live work queue is §13; open questions are §16.
 >
 > Issuing service:
-> [authentication-service-with-loco](../../authentication-service-with-loco/spec/index.md).
+> [authentication-service-with-axum](../../authentication-service-with-axum/spec/index.md).
 > Entity-level contract:
 > [../../spec/index.md](../../spec/index.md).
 > Canonical design (single source of truth for the auth model):
@@ -68,7 +68,7 @@ an `Action`), policy configuration loading from env/file (callers read
 Every peer service crate in the family that accepts the federation's
 bearer tokens: the entity registries (see the "Service crates" table in
 the root [AGENTS.md](../../../AGENTS.md)), the consumer apps, and the
-`link-graph-service-with-loco` read-model aggregator — each uses this
+`link-graph-service-with-axum` read-model aggregator — each uses this
 crate instead of re-implementing verification (and, since v0.3, ABAC)
 per service. This list has grown well past the original six-then-eight
 loco-conversion crates named in earlier drafts of this section; see §5

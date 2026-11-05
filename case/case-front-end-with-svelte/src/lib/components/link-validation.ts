@@ -1,7 +1,7 @@
 // Pure guards for the cross-service links panel, extracted from
 // `LinksPanel.svelte` so the accept/reject matrix is unit-testable without
 // mounting a component. It mirrors — deliberately, without replacing — the
-// service-side `validate_edge` in `case-service-with-loco`
+// service-side `validate_edge` in `case-service-with-axum`
 // (`src/controllers/links.rs`), which is the authority: this check only
 // saves an obviously-doomed round trip and states the reason in the
 // operator's own language.

@@ -1,13 +1,13 @@
 // Client-side rules for the duplicate review queue.
 //
-// Mirrors `thing-service-with-loco/src/db/review_queue.rs` (the
+// Mirrors `thing-service-with-axum/src/db/review_queue.rs` (the
 // decidable-status guard) and `src/matching/scoring.rs::MatchBreakdown`
 // (the per-component score object + weights), so the board can explain a
 // pair's score and disable an impossible decision before the service
 // answers 422. The server stays authoritative — this is a pre-flight
 // courtesy.
 //
-// KNOWN GAP (verified against `thing-service-with-loco`'s
+// KNOWN GAP (verified against `thing-service-with-axum`'s
 // `src/api/rest/handlers.rs` wire `ReviewQueueItem` and
 // `src/db/review_queue.rs`'s `COLS`, 2026-08-04): unlike person / worker /
 // place / organization, this service's review-queue row and wire type
@@ -20,7 +20,7 @@
 // {@link breakdownRows} / {@link breakdownFlags} simply return nothing
 // for this service today — ready for the day the wire type carries the
 // column, not pretending it already does. See
-// `thing-service-with-loco/spec/13-tasks.md` for the tracked follow-up.
+// `thing-service-with-axum/spec/13-tasks.md` for the tracked follow-up.
 //
 // Pure and dependency-free (no Svelte, no fetch) so the mapping is
 // unit-testable exactly as the Rust side's is.
@@ -71,7 +71,7 @@ export function canDecide(item: Pick<ReviewQueueItem, "status">): boolean {
  * catalog key naming it, and its weight in the overall score.
  *
  * Weights are `MatchWeights::default()`
- * (`thing-service-with-loco/src/matching/scoring.rs`); they sum to 1.00.
+ * (`thing-service-with-axum/src/matching/scoring.rs`); they sum to 1.00.
  * Labels reuse the `results.*` keys already translated for
  * `MatchResultsList.svelte`'s own breakdown, rather than duplicating a
  * second set of component labels.

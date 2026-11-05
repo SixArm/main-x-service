@@ -2,10 +2,10 @@
 
 ### Subprojects
 
-- Service: [README](../authentication-service-with-loco/README.md) ·
-  [spec](../authentication-service-with-loco/spec/index.md) ·
-  [AGENTS.md](../authentication-service-with-loco/AGENTS.md) ·
-  [CHANGELOG](../authentication-service-with-loco/CHANGELOG.md)
+- Service: [README](../authentication-service-with-axum/README.md) ·
+  [spec](../authentication-service-with-axum/spec/index.md) ·
+  [AGENTS.md](../authentication-service-with-axum/AGENTS.md) ·
+  [CHANGELOG](../authentication-service-with-axum/CHANGELOG.md)
 - Verifier: [README](../authentication-verifier-rust-crate/README.md) ·
   [spec](../authentication-verifier-rust-crate/spec/index.md) ·
   [AGENTS.md](../authentication-verifier-rust-crate/AGENTS.md) ·
@@ -30,7 +30,7 @@
 - Project root: [`AGENTS.md`](../../AGENTS.md) ·
   [`agents/share/index.md`](../../agents/share/index.md).
 - Sibling entity specs (same §1–§18 shape):
-  [person-service](../../person/person-service-with-loco/spec/index.md),
+  [person-service](../../person/person-service-with-axum/spec/index.md),
   the identity registry whose records this entity deliberately does
   **not** duplicate.
 - Loco conventions: [`agents/share/loco.md`](../../agents/share/loco.md) ·

@@ -12,7 +12,7 @@
 | Config | Threshold 0.85; `strict()` 0.95 / `lenient()` 0.70 presets |
 | Quality | No IO / `unsafe` / panics; deterministic; per-component breakdown; unit + public-API + doctests |
 
-**organization-service-with-loco** (MVP + recent additions):
+**organization-service-with-axum** (MVP + recent additions):
 
 | Capability | Notes |
 |---|---|

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 // Smoke tests that assert the page shell renders. They do NOT require a
 // running Person Service — failures from the API call are swallowed by
 // the page and shown as banners, but the layout still renders. Run with
-// the service started (`docker-compose up` in person-service-with-loco)
+// the service started (`docker-compose up` in person-service-with-axum)
 // for full coverage of the API-driven paths.
 //
 // The `smoke` project carries a stub `__Host-mxi_session` cookie

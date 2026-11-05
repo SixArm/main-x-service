@@ -68,7 +68,7 @@ at the keyboard.
    - Implement the change.
    - Update `CHANGELOG.md` under an "Unreleased" header.
    - If the public surface changed, update the bridge test in
-     [`course-service/tests/duplicate_detection.rs`](../course-service-with-loco/tests/duplicate_detection.rs).
+     [`course-service/tests/duplicate_detection.rs`](../course-service-with-axum/tests/duplicate_detection.rs).
 4. **For editorial changes:** small batched edits are fine; no spec
    update required.
 5. **Validate locally:**

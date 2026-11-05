@@ -7,7 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
 //                    `pnpm test:e2e`.
 //
 //   `integration`  — golden-path flows that exercise the live
-//                    Rust Person Service (`person-service-with-loco`)
+//                    Rust Person Service (`person-service-with-axum`)
 //                    over real HTTP, PLUS a real signed-in session
 //                    (PRO-P32) established once by the `setup` project
 //                    below against a live authentication-service.

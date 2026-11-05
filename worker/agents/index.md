@@ -1,7 +1,7 @@
 # AGENTS directory — Worker entity
 
 Entity-level reference documentation for the Worker trio:
-[worker-service-with-loco](../worker-service-with-loco/),
+[worker-service-with-axum](../worker-service-with-axum/),
 [worker-matcher-rust-crate](../worker-matcher-rust-crate/),
 [worker-front-end-with-svelte](../worker-front-end-with-svelte/).
 
@@ -23,7 +23,7 @@ the per-subproject docs; they do not duplicate crate detail.
 
 | Subproject | Entry point | Highlights |
 |---|---|---|
-| worker-service-with-loco | [agents/index.md](../worker-service-with-loco/agents/index.md) | [models.md](../worker-service-with-loco/agents/models.md), [matching.md](../worker-service-with-loco/agents/matching.md), [restful.md](../worker-service-with-loco/agents/restful.md), [testing.md](../worker-service-with-loco/agents/testing.md) |
+| worker-service-with-axum | [agents/index.md](../worker-service-with-axum/agents/index.md) | [models.md](../worker-service-with-axum/agents/models.md), [matching.md](../worker-service-with-axum/agents/matching.md), [restful.md](../worker-service-with-axum/agents/restful.md), [testing.md](../worker-service-with-axum/agents/testing.md) |
 | worker-matcher-rust-crate | [AGENTS.md](../worker-matcher-rust-crate/AGENTS.md) | [matching-algorithm.md](../worker-matcher-rust-crate/agents/matching-algorithm.md), [normalization.md](../worker-matcher-rust-crate/agents/normalization.md), [national-person-identifiers.md](../worker-matcher-rust-crate/agents/national-person-identifiers.md), [security-and-privacy.md](../worker-matcher-rust-crate/agents/security-and-privacy.md) |
 | worker-front-end-with-svelte | [AGENTS.md](../worker-front-end-with-svelte/AGENTS.md) | Ground rules: Svelte 5 runes only, SPA mode, drift accepted |
 

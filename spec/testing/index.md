@@ -14,8 +14,8 @@ explicitly gated and opted into.
 Each subproject keeps its own testing doc as the local source of truth.
 The per-crate service docs are the most detailed:
 
-- [person-service agents/testing.md](../../person/person-service-with-loco/agents/testing.md)
-- [worker-service agents/testing.md](../../worker/worker-service-with-loco/agents/testing.md)
+- [person-service agents/testing.md](../../person/person-service-with-axum/agents/testing.md)
+- [worker-service agents/testing.md](../../worker/worker-service-with-axum/agents/testing.md)
 
 This page is the cross-cutting view that sits above them. Related
 monorepo docs: [matching](../matching/index.md),
@@ -74,7 +74,7 @@ Coverage tracks the business-logic layer from
 
 These are pure and deterministic: same input, same result, no ordering
 or environment sensitivity. See the per-module breakdown in
-[person-service agents/testing.md](../../person/person-service-with-loco/agents/testing.md).
+[person-service agents/testing.md](../../person/person-service-with-axum/agents/testing.md).
 
 ### 1.2 Bridge tests
 
@@ -89,7 +89,7 @@ test** that pins *both sides of the contract at once*:
 - the matcher's **scoring behaviour** on the projected records.
 
 In the person and worker services this is
-[`tests/duplicate_detection.rs`](../../person/person-service-with-loco/tests/duplicate_detection.rs):
+[`tests/duplicate_detection.rs`](../../person/person-service-with-axum/tests/duplicate_detection.rs):
 each test builds one or two service-side records, projects them through
 `matching::adapter::to_matcher_person`, runs the canonical
 `MatchingEngine`, and asserts on `MatchResult { score, is_match,
@@ -108,7 +108,7 @@ escapes the adapter's own `#[cfg(test)]` module.
 The newer loco.rs services (care-pathway, organization, case) store the
 matcher type **verbatim** as JSONB, so there is no adapter to drift; the
 equivalent bridge test is
-[`tests/matching.rs`](../../care-pathway/care-pathway-service-with-loco/tests/matching.rs),
+[`tests/matching.rs`](../../care-pathway/care-pathway-service-with-axum/tests/matching.rs),
 which proves the crate really embeds the canonical matcher (a shared
 guideline-id deterministically scores `1.0`) and that the payload JSON
 round-trips for JSONB storage. It is also un-gated.
@@ -336,7 +336,7 @@ algorithms.
 ## 6. CI workflows
 
 Each service crate ships a GitHub Actions workflow (the reference is
-[care-pathway-service `.github/workflows/ci.yaml`](../../care-pathway/care-pathway-service-with-loco/.github/workflows/ci.yaml)),
+[care-pathway-service `.github/workflows/ci.yaml`](../../care-pathway/care-pathway-service-with-axum/.github/workflows/ci.yaml)),
 triggered on push to the default branch and on every pull request. It is
 four jobs:
 

@@ -2,9 +2,9 @@
 
 Field-by-field reference: [`agents/models.md`](../agents/models.md).
 Source: service
-[`src/models/users.rs`](../authentication-service-with-loco/src/models/users.rs),
-[`src/models/sessions.rs`](../authentication-service-with-loco/src/models/sessions.rs),
-[`src/auth/mod.rs`](../authentication-service-with-loco/src/auth/mod.rs);
+[`src/models/users.rs`](../authentication-service-with-axum/src/models/users.rs),
+[`src/models/sessions.rs`](../authentication-service-with-axum/src/models/sessions.rs),
+[`src/auth/mod.rs`](../authentication-service-with-axum/src/auth/mod.rs);
 verifier [`src/lib.rs`](../authentication-verifier-rust-crate/src/lib.rs).
 
 ### 5.1 `User` (service)

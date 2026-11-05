@@ -108,7 +108,7 @@ is one `TEXT` column, indexed on both endpoints.
         │ (outbox → bus, event-bus.md)        │                 │
         └───────────────┬─────────────────────┴─────────────────┘
                         ▼
-            ┌── link-graph-service-with-loco ──────────────┐
+            ┌── link-graph-service-with-axum ──────────────┐
             │  Fluvio consumer of ALL entity topics +      │
             │  the new linked/unlinked events              │
             │                                              │
@@ -181,7 +181,7 @@ detail rides in `data`:
 the edge. Consumers dedupe on the envelope `event_id` (at-least-once
 delivery, [event-bus.md §6](event-bus.md)).
 
-### 4.3 Read side — `link-graph-service-with-loco` (the aggregator)
+### 4.3 Read side — `link-graph-service-with-axum` (the aggregator)
 
 A new standalone loco service, modelled on the service-crate template but
 **read-only to the world** (its writes are event-driven). It is the §9
@@ -441,7 +441,7 @@ knowing one exists discloses nothing about anybody.
    to **person** and **worker**; ship `same_identity`.
    - **Partial / reordered — ✅ case `subject_of` write-side landed
      2026-07-10** as the **reference implementation**
-     ([`case/case-service-with-loco`](../../case/case-service-with-loco):
+     ([`case/case-service-with-axum`](../../case/case-service-with-axum):
      `entity_links` migration, `POST`/`GET`/`DELETE
      /api/cases/{pid}/links`, idempotent upsert, `linked`/`unlinked` on
      the additive `Envelope.data` via the transactional emit seam, §10
@@ -454,7 +454,7 @@ knowing one exists discloses nothing about anybody.
      write-side therefore **awaits their own event infrastructure**; the
      contract and the emit pattern are now proven on case.
    - **✅ person `same_identity` write-side landed 2026-07-10**
-     ([`person/person-service-with-loco`](../../person/person-service-with-loco):
+     ([`person/person-service-with-axum`](../../person/person-service-with-axum):
      `entity_links` migration, `POST`/`GET`/`DELETE
      /api/persons/{id}/links`, idempotent upsert, plus the aggregator's
      reconciliation pull `GET /api/persons/links[?since=]` returning the
@@ -464,7 +464,7 @@ knowing one exists discloses nothing about anybody.
      sync path — cross-service `linked`/`unlinked` **event** emission is
      deferred (person's durable `Envelope` has no link kind/`data`).
      **Worker's symmetric side is the remaining follow-up.**
-3. **Aggregator.** Stand up `link-graph-service-with-loco` consuming the
+3. **Aggregator.** Stand up `link-graph-service-with-axum` consuming the
    in-memory→outbox stream; `neighbors` + `single-view` reads; lazy
    verify-on-read (§5.1).
 4. **Affiliations.** Add `person↔org` and `worker↔org`; then `case↔person`
@@ -492,7 +492,7 @@ knowing one exists discloses nothing about anybody.
   crate ever copied it. Every consumer added `entity-ref = { path =
   "../../link/entity-ref-rust-crate" }` instead — a real shared
   dependency, contrary to §2/§3's stated plan. As of 2026-08-04 that is
-  eight crates: `link-graph-service-with-loco` (the aggregator), the
+  eight crates: `link-graph-service-with-axum` (the aggregator), the
   three edge-originating services (person, worker, case), and four
   consumer apps that hadn't been designed yet when this doc was written
   (contact-relationship-management, content-management-system,

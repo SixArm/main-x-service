@@ -11,7 +11,7 @@ are marked and tracked in §13 / §15.
   in one `422` — blank `title`; `opened_date` present but not a valid
   ISO 8601 date; any `identifiers` entry whose `value` is blank; any
   blank entry in `subjects` or `keywords`. Validation rules live in
-  [`crate::validation`](../case-service-with-loco/src/validation.rs).
+  [`crate::validation`](../case-service-with-axum/src/validation.rs).
   Docket / case-number format checks and status-transition rules
   remain deferred (§13 T-9).
 - **FR-2** List active cases: `GET /api/cases` returns `{pid, title}`
@@ -75,7 +75,7 @@ Algorithm reference:
   a snapshot of the transferred payload), and publish a `Merged`
   event. Equal `main_pid`/`duplicate_pid` → `422`; unknown pid →
   `404`. `GET /api/cases/merges/recent` lists the history. Merge logic
-  lives in [`crate::merge`](../case-service-with-loco/src/merge.rs).
+  lives in [`crate::merge`](../case-service-with-axum/src/merge.rs).
 
 ### 6.3 Audit, events, auth, docs — service
 

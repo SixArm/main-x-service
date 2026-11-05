@@ -23,7 +23,7 @@
                               | HTTP JSON
                               v
                 +-----------------------------+
-                |   course-service-with-loco |
+                |   course-service-with-axum |
                 |   Axum + SeaORM + Tantivy   |
                 +-----------------------------+
 ```

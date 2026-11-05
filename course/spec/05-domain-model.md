@@ -8,7 +8,7 @@ and front-end representations are projections of it.
 
 Defined in the service crate (`src/models/`); field-by-field
 schema.org → Rust reference in
-[`course-service-with-loco/agents/models.md`](../course-service-with-loco/agents/models.md).
+[`course-service-with-axum/agents/models.md`](../course-service-with-axum/agents/models.md).
 Material aspects:
 
 - **Course (the template)** — Thing + CreativeWork + LearningResource
@@ -85,12 +85,12 @@ variants), `EducationalLevel` (12 variants + `Custom`),
 ### 5.3 Service ↔ matcher DTO contract (the adapter)
 
 The service embeds the matcher (path dependency) and bridges via
-[`src/matching/adapter.rs`](../course-service-with-loco/src/matching/adapter.rs):
+[`src/matching/adapter.rs`](../course-service-with-axum/src/matching/adapter.rs):
 `to_matcher_course(&service::Course) -> course_matcher::Course`,
 driven by `CourseMatcher` over `course_matcher::MatchingEngine`.
 
 Routing rules (normative; pinned by
-[`tests/duplicate_detection.rs`](../course-service-with-loco/tests/duplicate_detection.rs),
+[`tests/duplicate_detection.rs`](../course-service-with-axum/tests/duplicate_detection.rs),
 14 tests):
 
 - `Course.name` → matcher `name`; `alternate_names` → `alternate_names`.

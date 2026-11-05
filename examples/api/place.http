@@ -1,5 +1,5 @@
 ### place-service — example requests
-# place/place-service-with-loco — "person-style" layout (src/api/rest/).
+# place/place-service-with-axum — "person-style" layout (src/api/rest/).
 # Envelope: {"success":bool,"data":...,"error":...} but data/error are
 # OMITTED (not null) on the unused side — #[serde(skip_serializing_if)],
 # src/api/mod.rs. Different from person/worker/event's "always both keys".

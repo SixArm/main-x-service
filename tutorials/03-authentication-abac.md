@@ -42,8 +42,8 @@ at once needs both moved for one of them.
 Start each crate's own test Postgres, on two different host ports:
 
 ```sh
-scripts/test-db.sh up authentication/authentication-service-with-loco
-TEST_DB_PORT=5434 scripts/test-db.sh up case/case-service-with-loco
+scripts/test-db.sh up authentication/authentication-service-with-axum
+TEST_DB_PORT=5434 scripts/test-db.sh up case/case-service-with-axum
 ```
 
 ```
@@ -60,7 +60,7 @@ Migrate both (same `cargo run -- db migrate` pattern TUT-2 established —
 generator CLI, confirmed again for this tutorial):
 
 ```sh
-cd authentication/authentication-service-with-loco
+cd authentication/authentication-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
   cargo run -- db migrate
 ```
@@ -71,7 +71,7 @@ Migration 'm20260728_000001_add_auth_event_mac' has been applied
 ```
 
 ```sh
-cd case/case-service-with-loco
+cd case/case-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test \
   cargo run -- db migrate
 ```
@@ -94,7 +94,7 @@ gitignored** by this crate's own `.gitignore` (`**/config/*.local.yaml`)
 — so it never needs to be staged or cleaned out of git:
 
 ```sh
-cat > case/case-service-with-loco/config/development.local.yaml <<'EOF'
+cat > case/case-service-with-axum/config/development.local.yaml <<'EOF'
 server:
   port: 5180
 EOF
@@ -104,7 +104,7 @@ Start authentication-service (default port, default environment —
 **development**, which matters for step 2):
 
 ```sh
-cd authentication/authentication-service-with-loco
+cd authentication/authentication-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
   cargo run -- start
 ```
@@ -119,7 +119,7 @@ auth **off** for now (the family-wide default — TUT-1 already covered
 that baseline):
 
 ```sh
-cd case/case-service-with-loco
+cd case/case-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test \
   cargo run -- start
 ```
@@ -294,7 +294,7 @@ kill the backgrounded process) and start it again with auth on, pointed
 at authentication-service's published keys:
 
 ```sh
-cd case/case-service-with-loco
+cd case/case-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test \
   CASE_REQUIRE_AUTH=true \
   CASE_PASETO_KEYS_URL=http://localhost:5150/.well-known/paseto-keys \
@@ -357,7 +357,7 @@ operator tool, not an HTTP endpoint). That's the one that actually works
 here:
 
 ```sh
-cd authentication/authentication-service-with-loco
+cd authentication/authentication-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
   cargo run -- task user_attributes op:set email:demo@example.com key:access values:write
 ```
@@ -529,7 +529,7 @@ closed-case restriction would never fire.
 Restart case-service once more with this policy wired in:
 
 ```sh
-cd case/case-service-with-loco
+cd case/case-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test \
   CASE_REQUIRE_AUTH=true \
   CASE_PASETO_KEYS_URL=http://localhost:5150/.well-known/paseto-keys \
@@ -794,7 +794,7 @@ curl -s http://localhost:5180/api/cases/3fbd8792-4278-4167-999e-012cef9979d5 \
 `alternate_titles`/`agency_name`/`case_type`/`status`/`priority`/
 `opened_date`/`in_language`, unchanged either way). Exactly
 `mask_case`'s documented redaction
-(`case/case-service-with-loco/src/controllers/cases.rs`): `subjects`,
+(`case/case-service-with-axum/src/controllers/cases.rs`): `subjects`,
 `identifiers`, and `same_as` zeroed, `case_number` nulled, everything
 else — including `keywords`, deliberately less identifying — intact. Same
 case, same endpoint, same HTTP status (`200`, not a separate masked
@@ -810,11 +810,11 @@ would be masked here too, since this policy only ever inspects `dept`.
 ```sh
 # stop both cargo run -- start processes (Ctrl-C, or kill the backgrounded PIDs)
 
-rm -f case/case-service-with-loco/config/development.local.yaml
+rm -f case/case-service-with-axum/config/development.local.yaml
 rm -rf /tmp/tut3-scratch
 
-scripts/test-db.sh down authentication/authentication-service-with-loco
-TEST_DB_PORT=5434 scripts/test-db.sh down case/case-service-with-loco
+scripts/test-db.sh down authentication/authentication-service-with-axum
+TEST_DB_PORT=5434 scripts/test-db.sh down case/case-service-with-axum
 ```
 
 `development.local.yaml` was already gitignored and never staged; this

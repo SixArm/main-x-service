@@ -8,7 +8,7 @@ docs; do not duplicate them here.
 
 | Shape | Where | Reference |
 |---|---|---|
-| Registry `Thing` | `thing-service-with-loco/src/models/thing.rs` — schema.org properties + `PropertyValue` identifiers + registry-internal `id` / soft-delete / timestamps | [service agents/models.md](../thing-service-with-loco/agents/models.md) |
+| Registry `Thing` | `thing-service-with-axum/src/models/thing.rs` — schema.org properties + `PropertyValue` identifiers + registry-internal `id` / soft-delete / timestamps | [service agents/models.md](../thing-service-with-axum/agents/models.md) |
 | Matcher `Thing` | `thing-matcher-rust-crate/src/models.rs` — comparison-oriented, `#[non_exhaustive]`, builder-constructed, opaque string identifiers, unscored `local_id` / `owner` | [matcher spec §3](../thing-matcher-rust-crate/spec/03-data-model.md) |
 | Wire types | `thing-front-end-with-svelte/src/lib/api/types.ts` — TypeScript mirror of the service's REST DTOs (per-project copy; drift accepted) | [front-end AGENTS.md](../thing-front-end-with-svelte/AGENTS.md) |
 
@@ -24,7 +24,7 @@ docs; do not duplicate them here.
 | Construction | struct + `Thing::new(name)` | `Thing::builder()` only (`#[non_exhaustive]`) |
 
 The projection is `to_matcher_thing` in
-[`adapter.rs`](../thing-service-with-loco/src/matching/adapter.rs);
+[`adapter.rs`](../thing-service-with-axum/src/matching/adapter.rs);
 the normative mapping table is entity spec
 [§5.3](../spec/05-domain-model.md). Identifier `property_id` maps to
 schema.org canonical tokens (`doi`, `isbn`, `issn`, `gtin`, `sku`,
@@ -40,10 +40,10 @@ verbatim.
   **service side**; the matcher treats any shared `(property_id,
   value)` pair as deterministic.
 - Format rules (ISBN digit counts, DOI `10.` prefix, …): service
-  spec [§5.4](../thing-service-with-loco/spec/05-domain-model.md).
+  spec [§5.4](../thing-service-with-axum/spec/05-domain-model.md).
 
 ## Supporting types
 
 Consent (`DataProcessing` / `DataSharing` / `Marketing` / `Research`),
 merge records, review-queue items — service-side only; see
-[service agents/models.md](../thing-service-with-loco/agents/models.md).
+[service agents/models.md](../thing-service-with-axum/agents/models.md).

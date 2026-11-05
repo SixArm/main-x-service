@@ -271,7 +271,7 @@ don't know the transport.
    (dedup on `event_id` via a new `processed_events` table). Resume
    position is delegated to Fluvio's own named-consumer offset
    management rather than reconstructed in Postgres — see
-   `link-graph-service-with-loco/spec/10-persistence.md` §10.3 for the
+   `link-graph-service-with-axum/spec/10-persistence.md` §10.3 for the
    full reasoning. Only **case** had `FluvioSink` wired at BUS-2 time
    (BUS-1); now that BUS-3 has rolled it to all ten, the aggregator
    consumes ten live topics but nine still see no traffic until a
@@ -289,10 +289,10 @@ don't know the transport.
 
 ## 9. Consumers (initial set)
 
-- **Cross-service link aggregator** ([link-graph-service](../../link/link-graph-service-with-loco))
+- **Cross-service link aggregator** ([link-graph-service](../../link/link-graph-service-with-axum))
   — **landed 2026-08-03, BUS-2**, the first real consumer in the family.
   See [cross-service-linking.md](cross-service-linking.md) §4.3 for its
-  role and `link-graph-service-with-loco/src/consumer.rs` for the
+  role and `link-graph-service-with-axum/src/consumer.rs` for the
   implementation.
 - **Search re-indexer** — keeps Tantivy in sync with DB writes via the
   stream instead of inline indexing; replayable for full rebuilds.

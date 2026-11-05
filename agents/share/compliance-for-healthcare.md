@@ -165,7 +165,7 @@ classification, and which controls are active.
 | IEC 62304 evidence | [`security.md`](security.md) (supply chain), each crate's `spec/` §11 testing and §13 tasks |
 
 The **reference implementation** of all four in code is the
-[care-pathway service](../../care-pathway/care-pathway-service-with-loco/)
+[care-pathway service](../../care-pathway/care-pathway-service-with-axum/)
 (`src/compliance/`, `src/fhir/profile.rs`, `compliance/`), which the other
 services copy-adapt. See also
 [`compliance-for-technology.md`](compliance-for-technology.md) for the

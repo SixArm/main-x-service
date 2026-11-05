@@ -44,7 +44,7 @@ different flag anyway — a pattern TUT-3 already established locally.
 ## 1. Start Postgres and person-service, in worker mode
 
 ```sh
-scripts/test-db.sh up person/person-service-with-loco
+scripts/test-db.sh up person/person-service-with-axum
 ```
 
 ```
@@ -53,7 +53,7 @@ test-db: mxi-person-test-db ready
 ```
 
 ```sh
-cd person/person-service-with-loco
+cd person/person-service-with-axum
 export DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test
 cargo run -- db migrate
 ```
@@ -95,7 +95,7 @@ classifies every row without committing anything
 ([`bulk-import-export.md`](../agents/share/bulk-import-export.md) §6):
 
 ```sh
-cd person/person-service-with-loco   # if not already there
+cd person/person-service-with-axum   # if not already there
 curl -s -F file=@../../examples/data/persons.jsonl -F format=jsonl -F dry_run=true \
   http://localhost:5150/api/persons/import
 ```
@@ -379,8 +379,8 @@ TUT-3 did (its own test Postgres, on a free port since person already
 holds 5150 for its own server):
 
 ```sh
-TEST_DB_PORT=5433 scripts/test-db.sh up authentication/authentication-service-with-loco
-cd authentication/authentication-service-with-loco
+TEST_DB_PORT=5433 scripts/test-db.sh up authentication/authentication-service-with-axum
+cd authentication/authentication-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5433/authentication_service_test cargo run -- db migrate
 cat > config/development.local.yaml <<'EOF'
 server:
@@ -400,7 +400,7 @@ person-service (`Ctrl-C` the step-1 process) pointed at the running
 authentication-service's published keys:
 
 ```sh
-cd person/person-service-with-loco
+cd person/person-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test \
   PERSON_REQUIRE_AUTH=true \
   PERSON_PASETO_KEYS_URL=http://localhost:5151/.well-known/paseto-keys \
@@ -467,7 +467,7 @@ yet by the export-specific elevation check.
 fresh sign-in is required for a new token, same as TUT-3):**
 
 ```sh
-cd authentication/authentication-service-with-loco
+cd authentication/authentication-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5433/authentication_service_test \
   cargo run -- task user_attributes op:set email:tut5@example.com key:access values:write
 # … fresh magic-link sign-in + new TOKEN …
@@ -495,7 +495,7 @@ profile instead of an HTTP verb.
 **`access=admin` — full export finally succeeds:**
 
 ```sh
-cd authentication/authentication-service-with-loco
+cd authentication/authentication-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5433/authentication_service_test \
   cargo run -- task user_attributes op:set email:tut5@example.com key:access values:admin
 # … fresh magic-link sign-in + new TOKEN …
@@ -530,10 +530,10 @@ live-verified matrix:
 
 ```sh
 # Ctrl-C both cargo run -- start processes (person-service, authentication-service)
-scripts/test-db.sh down person/person-service-with-loco
-TEST_DB_PORT=5433 scripts/test-db.sh down authentication/authentication-service-with-loco
+scripts/test-db.sh down person/person-service-with-axum
+TEST_DB_PORT=5433 scripts/test-db.sh down authentication/authentication-service-with-axum
 rm -f /tmp/persons-errors.jsonl /tmp/person-service.log /tmp/auth-service.log
-rm -f authentication/authentication-service-with-loco/config/development.local.yaml
+rm -f authentication/authentication-service-with-axum/config/development.local.yaml
 ```
 
 `test-db.sh down` drops the tmpfs-backed Postgres containers entirely

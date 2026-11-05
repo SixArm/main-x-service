@@ -3,7 +3,7 @@
 The service is loco.rs and returns **raw JSON** — no
 `{success, data, error}` envelope (unlike the pre-loco person
 service). Source:
-[`src/controllers/care_pathways.rs`](../care-pathway-service-with-loco/src/controllers/care_pathways.rs).
+[`src/controllers/care_pathways.rs`](../care-pathway-service-with-axum/src/controllers/care_pathways.rs).
 Base URL in development: `http://localhost:5150`.
 
 ## Endpoints

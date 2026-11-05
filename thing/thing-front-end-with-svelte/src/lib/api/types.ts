@@ -1,6 +1,6 @@
 // TypeScript domain types mirroring the Rust Thing Service models
 // (schema.org/Thing-based). Reference:
-// thing-service-with-loco/agents/models.md.
+// thing-service-with-axum/agents/models.md.
 
 // ─── HTTP envelope ───────────────────────────────────────────────────
 
@@ -316,7 +316,7 @@ export interface ReviewQueueItem {
   /**
    * Per-component {@link MatchBreakdown}, forward-declared only.
    *
-   * VERIFIED GAP (2026-08-04, against `thing-service-with-loco`'s
+   * VERIFIED GAP (2026-08-04, against `thing-service-with-axum`'s
    * `src/api/rest/handlers.rs` `ReviewQueueItem`): the service's stored
    * `review_queue` row has a `score_breakdown` column, but the wire type
    * does not serialize it — the field is simply absent from the JSON

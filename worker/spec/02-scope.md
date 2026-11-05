@@ -4,7 +4,7 @@
 
 Each subproject owns a slice; this spec owns the seams.
 
-**worker-service-with-loco** owns:
+**worker-service-with-axum** owns:
 
 - Worker CRUD with soft delete and full audit trail.
 - Persistence (PostgreSQL via SeaORM, 12+ tables, migrations).

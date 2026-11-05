@@ -23,10 +23,10 @@ Detailed reference documentation for the Event Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../event-service-with-loco/spec.md](../../event-service-with-loco/spec/index.md) | Service spec — system of record |
-| [../../event-service-with-loco/agents/restful.md](../../event-service-with-loco/agents/restful.md) | REST API surface |
-| [../../event-service-with-loco/agents/models.md](../../event-service-with-loco/agents/models.md) | Wire-format domain types |
-| [../../event-service-with-loco/agents/matching.md](../../event-service-with-loco/agents/matching.md) | Matching algorithm reference |
+| [../../event-service-with-axum/spec.md](../../event-service-with-axum/spec/index.md) | Service spec — system of record |
+| [../../event-service-with-axum/agents/restful.md](../../event-service-with-axum/agents/restful.md) | REST API surface |
+| [../../event-service-with-axum/agents/models.md](../../event-service-with-axum/agents/models.md) | Wire-format domain types |
+| [../../event-service-with-axum/agents/matching.md](../../event-service-with-axum/agents/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

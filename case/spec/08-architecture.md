@@ -12,7 +12,7 @@
                                | REST (raw loco JSON, no envelope)
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v-------------------------------+
-|                  case-service-with-loco                     |
+|                  case-service-with-axum                     |
 |  loco.rs 0.16 (Axum 0.8) · port 5150                         |
 |  controllers/cases.rs                                        |
 |    CRUD + /search + /match + /check-duplicates + /merge      |
@@ -39,7 +39,7 @@ matcher's `Case` directly as its API DTO — there is no adapter layer
 ### 8.2 Service layout (loco.rs)
 
 ```
-case-service-with-loco/
+case-service-with-axum/
 ├── src/
 │   ├── app.rs                  loco Hooks (routes, truncate)
 │   ├── bin/main.rs             loco CLI entrypoint

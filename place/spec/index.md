@@ -16,7 +16,7 @@ Subproject specs:
 
 | Subproject | Spec |
 |---|---|
-| [place-service-with-loco](../place-service-with-loco/) | [spec](../place-service-with-loco/spec/index.md) (§1–§18) |
+| [place-service-with-axum](../place-service-with-axum/) | [spec](../place-service-with-axum/spec/index.md) (§1–§18) |
 | [place-matcher-rust-crate](../place-matcher-rust-crate/) | [spec](../place-matcher-rust-crate/spec/index.md) (library shape, §1–§13) |
 | [place-front-end-with-svelte](../place-front-end-with-svelte/) | [spec](../place-front-end-with-svelte/spec/index.md) (§1–§18) |
 

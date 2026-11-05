@@ -3,8 +3,8 @@
 ### 9.1 Service REST API (summary)
 
 Complete reference:
-[`place-service-with-loco/agents/restful.md`](../place-service-with-loco/agents/restful.md)
-and service [spec §9](../place-service-with-loco/spec/09-api-surface.md).
+[`place-service-with-axum/agents/restful.md`](../place-service-with-axum/agents/restful.md)
+and service [spec §9](../place-service-with-axum/spec/09-api-surface.md).
 15 endpoints; standard response envelope; `409` on duplicate-detected
 create; `422` on validation failure.
 

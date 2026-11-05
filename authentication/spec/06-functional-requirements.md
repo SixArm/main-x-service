@@ -24,12 +24,12 @@ Each requirement names its owning subproject. Endpoint detail:
   `config/development.yaml`) and best-effort emailed via the
   `AuthMailer` in production (SMTP from loco config). The `welcome` /
   `forgot` emails render from the on-disk templates under
-  [`src/mailers/auth/`](../authentication-service-with-loco/src/mailers/auth/);
+  [`src/mailers/auth/`](../authentication-service-with-axum/src/mailers/auth/);
   the magic-link email is localised (FR-4a).
 - **FR-4a — Localised magic-link email (T-7).** The magic-link email
   subject + plain-text + HTML bodies are localised via the
   dependency-light catalog
-  [`src/i18n.rs`](../authentication-service-with-loco/src/i18n.rs)
+  [`src/i18n.rs`](../authentication-service-with-axum/src/i18n.rs)
   (`magic_link_email(locale) -> EmailStrings`), not the on-disk
   template directory. Supported locales: **English (`en`)** and
   **Welsh (`cy`)** — Welsh chosen for the public-sector Welsh-language

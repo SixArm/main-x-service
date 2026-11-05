@@ -1,7 +1,7 @@
 ## 5. Domain Model
 
 Field-by-field references:
-[service `agents/models.md`](../thing-service-with-loco/agents/models.md)
+[service `agents/models.md`](../thing-service-with-axum/agents/models.md)
 (registry shape) and
 [matcher spec §3](../thing-matcher-rust-crate/spec/03-data-model.md)
 (comparison shape). This section owns the **contract between the two**.
@@ -54,7 +54,7 @@ Jaccard over the case-insensitively normalised tag sets (weighted
 single-handedly establish a match, so do not treat tags as identifying.
 
 This canonical model is **upstream**: the service model
-([`agents/models.md`](../thing-service-with-loco/agents/models.md)),
+([`agents/models.md`](../thing-service-with-axum/agents/models.md)),
 the matcher DTO ([matcher spec §3](../thing-matcher-rust-crate/spec/03-data-model.md),
 which carries `tags` per §5.3), and the front-end types
 ([`src/lib/api/types.ts`](../thing-front-end-with-svelte/src/lib/api/types.ts))
@@ -81,7 +81,7 @@ refs, scored by typed-set Jaccard), it carries `tags: Vec<String>`
 The service embeds `thing-matcher` (Cargo.toml: `thing-matcher =
 "0.6.1"`) and re-exports it from `src/matching/mod.rs` as
 `matcher_lib`. The bridge is
-[`src/matching/adapter.rs`](../thing-service-with-loco/src/matching/adapter.rs):
+[`src/matching/adapter.rs`](../thing-service-with-axum/src/matching/adapter.rs):
 
 ```
 to_matcher_thing(&service::Thing) -> thing_matcher::Thing
@@ -103,7 +103,7 @@ Projection rules (normative — pinned by the bridge tests):
 | `id`, `is_deleted`, timestamps, `potential_action` | — | dropped (no matcher counterpart) |
 
 Both sides of this contract are pinned by
-[`tests/duplicate_detection.rs`](../thing-service-with-loco/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../thing-service-with-axum/tests/duplicate_detection.rs)
 (15 bridge tests). A change to either the adapter's routing rules or
 the matcher's scoring MUST update this section, the adapter, and the
 bridge tests in one PR.
@@ -123,7 +123,7 @@ The band edges **interleave** (0.95 / 0.80 / 0.60 vs 0.90 / 0.75), so
 there is **no 1:1 label mapping** — e.g. matcher High spans service
 Certain plus the top of Probable. The full score-range overlay table
 lives in service
-[`agents/matching.md`](../thing-service-with-loco/agents/matching.md).
+[`agents/matching.md`](../thing-service-with-axum/agents/matching.md).
 
 Normative rule: the service MUST **re-classify from the raw `f64`
 score**, never from the matcher's label. The adapter carries only the
@@ -146,7 +146,7 @@ Every subproject MUST uphold:
   one record are deduplicated.
 - All URL-valued properties use `http://` or `https://`.
 - Per-type identifier formats per
-  [service spec §5.4](../thing-service-with-loco/spec/05-domain-model.md).
+  [service spec §5.4](../thing-service-with-axum/spec/05-domain-model.md).
 - A `ThingRelationship` references an **existing** `Thing`; **no thing
   relates to itself** (not its own container / sub-part). The directional
   kinds `Contains` / `ContainedIn` and `SuperPart` / `SubPart` must stay

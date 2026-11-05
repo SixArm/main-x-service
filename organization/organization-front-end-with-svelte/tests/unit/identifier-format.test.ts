@@ -1,6 +1,6 @@
 // Unit tests for the pure identifierFormatHint() helper (ORGFE-T4): a
 // client-side length/format hint mirroring the shape checks in
-// organization-service-with-loco's SEC-M5 validation
+// organization-service-with-axum's SEC-M5 validation
 // (`identifier_problem`), without re-implementing any check digit. The
 // server stays authoritative — this only catches an obviously
 // malformed value before the round trip.

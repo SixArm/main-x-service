@@ -74,9 +74,9 @@ on bad input — tests pin those guarantees.
 
 ## Bridge tests (service-side)
 
-The embedding [`course-service`](../../course-service-with-loco/)
+The embedding [`course-service`](../../course-service-with-axum/)
 ships a bridge test
-[`tests/duplicate_detection.rs`](../../course-service-with-loco/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../../course-service-with-axum/tests/duplicate_detection.rs)
 that drives the service-side `Course` through
 `matching::adapter::to_matcher_course` and asserts on
 `MatchingEngine::match_courses`. That suite is the contract test for
@@ -103,7 +103,7 @@ service-side one). This crate's own
   under each shipped `MatchConfig` preset.
 
 The embedding
-[`course-service-with-loco/benches/matching_bench.rs`](../../course-service-with-loco/benches/matching_bench.rs)
+[`course-service-with-axum/benches/matching_bench.rs`](../../course-service-with-axum/benches/matching_bench.rs)
 complements it, so the baseline also reflects the production path
 (adapter + `CourseMatcher` facade), not just the bare library. Run
 with `cargo bench` from that crate. Coverage:

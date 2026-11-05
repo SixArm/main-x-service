@@ -10,11 +10,11 @@
 
 This document describes the shape every entity registry now
 implements — no longer a target, a completed rollout as of 2026-09-02.
-[`link-graph-service`](../../link/link-graph-service-with-loco/) implemented
+[`link-graph-service`](../../link/link-graph-service-with-axum/) implemented
 it first (`src/observability.rs` — the family's first working exporter,
 proved against a real in-process OTLP/gRPC collector in its
 `tests/otlp_export.rs` / `tests/otlp_middleware.rs`).
-[`person-service`](../../person/person-service-with-loco/) is a close port
+[`person-service`](../../person/person-service-with-axum/) is a close port
 of it (repo `tasks.md` PRO-H9, 2026-08-28), with the same in-process-collector
 test tier ported alongside; **worker and event** followed in the same
 task (also 2026-08-28), each copying person's already-adapted port rather

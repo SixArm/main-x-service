@@ -35,16 +35,16 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 
 ## Entity registry services (Rust, loco.rs)
 
-- [person-service](person/person-service-with-loco/spec/index.md): Person (general) identity registry
-- [worker-service](worker/worker-service-with-loco/spec/index.md): Worker (workforce/professional) identity registry, plus assessments
-- [place-service](place/place-service-with-loco/spec/index.md): Place registry (schema.org/Place)
-- [thing-service](thing/thing-service-with-loco/spec/index.md): Thing/asset registry (schema.org/Thing)
-- [event-service](event/event-service-with-loco/spec/index.md): Time-bounded event registry (schema.org/Event)
-- [course-service](course/course-service-with-loco/spec/index.md): Course-identity registry plus CourseInstance sub-resource
-- [authentication-service](authentication/authentication-service-with-loco/spec/index.md): Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance
-- [organization-service](organization/organization-service-with-loco/spec/index.md): Organization registry (schema.org/Organization); family FHIR reference implementation
-- [care-pathway-service](care-pathway/care-pathway-service-with-loco/spec/index.md): Clinical care-pathway registry
-- [case-service](case/case-service-with-loco/spec/index.md): Governmental case-tracking registry
+- [person-service](person/person-service-with-axum/spec/index.md): Person (general) identity registry
+- [worker-service](worker/worker-service-with-axum/spec/index.md): Worker (workforce/professional) identity registry, plus assessments
+- [place-service](place/place-service-with-axum/spec/index.md): Place registry (schema.org/Place)
+- [thing-service](thing/thing-service-with-axum/spec/index.md): Thing/asset registry (schema.org/Thing)
+- [event-service](event/event-service-with-axum/spec/index.md): Time-bounded event registry (schema.org/Event)
+- [course-service](course/course-service-with-axum/spec/index.md): Course-identity registry plus CourseInstance sub-resource
+- [authentication-service](authentication/authentication-service-with-axum/spec/index.md): Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance
+- [organization-service](organization/organization-service-with-axum/spec/index.md): Organization registry (schema.org/Organization); family FHIR reference implementation
+- [care-pathway-service](care-pathway/care-pathway-service-with-axum/spec/index.md): Clinical care-pathway registry
+- [case-service](case/case-service-with-axum/spec/index.md): Governmental case-tracking registry
 
 ## Matcher crates (dependency-light comparison libraries)
 
@@ -66,7 +66,7 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 
 ## Cross-cutting services
 
-- [link-graph-service-with-loco](link/link-graph-service-with-loco/spec/index.md): Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter
+- [link-graph-service-with-axum](link/link-graph-service-with-axum/spec/index.md): Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter
 
 ## GitHub Pages
 

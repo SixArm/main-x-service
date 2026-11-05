@@ -23,10 +23,10 @@ Detailed reference documentation for the Place Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../place-service-with-loco/spec.md](../../place-service-with-loco/spec/index.md) | Service spec — system of record |
-| [../../place-service-with-loco/agents/restful.md](../../place-service-with-loco/agents/restful.md) | REST API surface |
-| [../../place-service-with-loco/agents/models.md](../../place-service-with-loco/agents/models.md) | Wire-format domain types |
-| [../../place-service-with-loco/agents/matching.md](../../place-service-with-loco/agents/matching.md) | Matching algorithm reference |
+| [../../place-service-with-axum/spec.md](../../place-service-with-axum/spec/index.md) | Service spec — system of record |
+| [../../place-service-with-axum/agents/restful.md](../../place-service-with-axum/agents/restful.md) | REST API surface |
+| [../../place-service-with-axum/agents/models.md](../../place-service-with-axum/agents/models.md) | Wire-format domain types |
+| [../../place-service-with-axum/agents/matching.md](../../place-service-with-axum/agents/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

@@ -1,6 +1,6 @@
 # AGENTS.md — Case Front-End
 
-Operator UI for the [Case Service](../case-service-with-loco):
+Operator UI for the [Case Service](../case-service-with-axum):
 case CRUD + matching (governmental case management).
 
 > Read [`spec/index.md`](./spec/index.md) first — the living spec.

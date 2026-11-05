@@ -1,5 +1,5 @@
 ### course-service — example requests
-# course/course-service-with-loco — "person-style" layout (src/api/rest/).
+# course/course-service-with-axum — "person-style" layout (src/api/rest/).
 # Envelope: same as place/thing — data/error OMITTED (not null) on the
 # unused side (#[serde(skip_serializing_if)]). Gated by
 # COURSE_REQUIRE_AUTH (default off). No review-queue HTTP surface, no

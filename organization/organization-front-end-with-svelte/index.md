@@ -1,7 +1,7 @@
 # organization-front-end-with-svelte — documentation index
 
 Operator UI for organization CRUD + matching, consuming the
-[Organization Service](../organization-service-with-loco).
+[Organization Service](../organization-service-with-axum).
 
 ## Start here
 

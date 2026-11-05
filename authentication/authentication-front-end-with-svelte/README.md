@@ -1,6 +1,6 @@
 # authentication-front-end-with-svelte
 
-Operator UI for the [Authentication Service](../authentication-service-with-loco):
+Operator UI for the [Authentication Service](../authentication-service-with-axum):
 passwordless email magic-link **sign up / sign in / sign out**.
 
 SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · **BFF** (server-side
@@ -27,7 +27,7 @@ session) · 13-locale UI (English, Welsh / Cymraeg, + 11 more).
 ## Prerequisites
 
 - Node 20+ and pnpm
-- A running [Authentication Service](../authentication-service-with-loco)
+- A running [Authentication Service](../authentication-service-with-axum)
 
 ## Quick start
 

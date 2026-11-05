@@ -9,7 +9,7 @@ specs.
 
 | Question is about… | Source of truth |
 |---|---|
-| Service crate internals (handlers, schema, in-service matcher) | [service spec](../worker-service-with-loco/spec/index.md) (§1–§18) |
+| Service crate internals (handlers, schema, in-service matcher) | [service spec](../worker-service-with-axum/spec/index.md) (§1–§18) |
 | Matcher crate internals (algorithms, weights, normalisation, API) | [matcher spec](../worker-matcher-rust-crate/spec/index.md) (§1–§25) |
 | Front-end internals (routes, components, build) | [front-end spec](../worker-front-end-with-svelte/spec/index.md) (§1–§18) |
 | **The integration contract** — trio composition, service↔matcher DTO (adapter routing), REST envelope the front-end relies on, shared invariants, entity-wide goals | [entity spec](../spec/index.md) (§1–§18) |
@@ -27,8 +27,8 @@ edit**. At the entity level this often spans subprojects — e.g. a new
 adapter routing rule touches:
 
 1. entity spec §5.3 (the contract),
-2. `worker-service-with-loco/src/matching/adapter.rs` (the code),
-3. `worker-service-with-loco/tests/duplicate_detection.rs` (the
+2. `worker-service-with-axum/src/matching/adapter.rs` (the code),
+3. `worker-service-with-axum/tests/duplicate_detection.rs` (the
    seam test).
 
 ## When to update which entity-spec section
@@ -49,7 +49,7 @@ adapter routing rule touches:
 
 Crate-internal changes update the crate's own spec per its
 `agents/spec-driven-development.md`
-([service](../worker-service-with-loco/agents/spec-driven-development.md),
+([service](../worker-service-with-axum/agents/spec-driven-development.md),
 [matcher](../worker-matcher-rust-crate/agents/spec-driven-development.md)).
 
 ## Anti-patterns
@@ -68,7 +68,7 @@ Crate-internal changes update the crate's own spec per its
 worker/
 ├── spec/              ← entity-level living spec (cross-subproject contract)
 ├── agents/            ← this directory: entity-level orientation docs
-├── worker-service-with-loco/      ← own spec/ + agents/ (authoritative for itself)
+├── worker-service-with-axum/      ← own spec/ + agents/ (authoritative for itself)
 ├── worker-matcher-rust-crate/      ← own spec/ + agents/ (authoritative for itself)
 └── worker-front-end-with-svelte/   ← own spec/ + AGENTS.md (authoritative for itself)
 ```

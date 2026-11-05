@@ -757,7 +757,7 @@ inside it: they are sequence analyses, not elapsed-time ones.
 
 ## 16. Implementation status
 
-TBA-1 … TBA-7 are **implemented** in `care-pathway-service-with-loco`:
+TBA-1 … TBA-7 are **implemented** in `care-pathway-service-with-axum`:
 
 | Piece | Location |
 |---|---|

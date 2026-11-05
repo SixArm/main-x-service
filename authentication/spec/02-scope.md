@@ -28,7 +28,7 @@ subprojects and the rest of the federation:
 
 | Subproject | Owns |
 |---|---|
-| [Service](../authentication-service-with-loco/spec/index.md) | Sign up / sign in / sign out via magic link; server-side cookie sessions; PASETO v4.public minting (`POST /token`); Ed25519 key publication; CSRF; session recording and revocation; the user record; mailer templates. |
+| [Service](../authentication-service-with-axum/spec/index.md) | Sign up / sign in / sign out via magic link; server-side cookie sessions; PASETO v4.public minting (`POST /token`); Ed25519 key publication; CSRF; session recording and revocation; the user record; mailer templates. |
 | [Verifier](../authentication-verifier-rust-crate/) | Offline PASETO v4.public verification: Ed25519 key-set parsing, `kid`-based key selection, signature + `iss` / `aud` / `exp` validation; optional HTTP key fetch (`fetch` feature). Spec: [spec/index.md](../authentication-verifier-rust-crate/spec/index.md). |
 | [Front-end](../authentication-front-end-with-svelte/spec/index.md) | The four routes (`/`, `/signup`, `/signin`, `/verify`); the SvelteKit-server **BFF** that holds the session cookie and exchanges it for a PASETO server-side; CSRF on mutating calls. |
 
@@ -39,7 +39,7 @@ subprojects and the rest of the federation:
 - Roles / permissions / authorization — peer services authorize
   locally from claims.
 - Organization / tenant modelling — see the
-  [organization entity](../../organization/organization-service-with-loco/).
+  [organization entity](../../organization/organization-service-with-axum/).
 - Account self-service beyond sign-in (profile editing, account
   recovery, deletion requests).
 - Refresh tokens (open question — §16 OQ-1).

@@ -1,6 +1,6 @@
 # worker-front-end-with-svelte
 
-SvelteKit front-end for the **[Worker Service](../worker-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Worker Service](../worker-service-with-axum/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
@@ -31,8 +31,8 @@ SvelteKit front-end for the **[Worker Service](../worker-service-with-loco/)** i
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Worker Service — see [`../worker-service-with-loco/README.md`](../worker-service-with-loco/README.md). Default: `http://localhost:5150`.
-- A running Authentication Service for `/signin`/`/verify` — see [`../../authentication/authentication-service-with-loco/README.md`](../../authentication/authentication-service-with-loco/README.md). Default: `http://localhost:5150`.
+- A running Worker Service — see [`../worker-service-with-axum/README.md`](../worker-service-with-axum/README.md). Default: `http://localhost:5150`.
+- A running Authentication Service for `/signin`/`/verify` — see [`../../authentication/authentication-service-with-axum/README.md`](../../authentication/authentication-service-with-axum/README.md). Default: `http://localhost:5150`.
 
 ## Quick start
 

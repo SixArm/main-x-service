@@ -43,7 +43,7 @@ Four crate families, each entity nested under its own top-level
 directory (`person/`, `place/`, `organization/`, …):
 
 - **Entity registry services** — CRUD + matching for one entity, e.g.
-  `person/person-service-with-loco/`. Two internal layouts exist and
+  `person/person-service-with-axum/`. Two internal layouts exist and
   are **not** being converted into each other: the older
   **person-style** shape (`src/api/rest/`, `src/db/`, a separate domain
   model — person, worker, place, thing, event, course) and the newer
@@ -62,8 +62,8 @@ directory (`person/`, `place/`, `organization/`, …):
   `person/person-front-end-with-svelte/`. Deliberate drift between
   them (no shared package) — copy-adapt a sibling rather than factor
   one out.
-- **Cross-cutting services** — `authentication/authentication-service-with-loco/`
-  (the SSO provider) and `link/link-graph-service-with-loco/` (the
+- **Cross-cutting services** — `authentication/authentication-service-with-axum/`
+  (the SSO provider) and `link/link-graph-service-with-axum/` (the
   read-model aggregator); neither is an entity registry.
 
 Consumer apps (`case-folder/`, `patient-flow/`,

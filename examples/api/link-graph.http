@@ -1,5 +1,5 @@
 ### link-graph-service — example requests
-# link/link-graph-service-with-loco — the read-only cross-service
+# link/link-graph-service-with-axum — the read-only cross-service
 # aggregator (agents/share/cross-service-linking.md). Envelope: its OWN
 # ApiEnvelope — {"success":bool,"data":...} on 200 /
 # {"success":false,"error":"..."} on 400 (src/envelope.rs). This is a

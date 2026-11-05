@@ -7,7 +7,7 @@ the service crate. Family conventions:
 ### 10.1 Tables
 
 The `care_pathways` table, created by migration
-[`m20220101_000001_care_pathways`](../care-pathway-service-with-loco/migration/src/m20220101_000001_care_pathways.rs):
+[`m20220101_000001_care_pathways`](../care-pathway-service-with-axum/migration/src/m20220101_000001_care_pathways.rs):
 
 | Column | Type | Notes |
 |---|---|---|
@@ -19,7 +19,7 @@ The `care_pathways` table, created by migration
 | `deleted_at` | `TimestampWithTimeZoneNull` | Soft delete |
 
 The `audit_logs` table, created by migration
-[`m20220101_000002_audit_logs`](../care-pathway-service-with-loco/migration/src/m20220101_000002_audit_logs.rs)
+[`m20220101_000002_audit_logs`](../care-pathway-service-with-axum/migration/src/m20220101_000002_audit_logs.rs)
 — one row per CRUD action (T-3):
 
 | Column | Type | Notes |
@@ -31,7 +31,7 @@ The `audit_logs` table, created by migration
 | `snapshot` | `JsonBinaryNull` | The record's `data` at the time of the action |
 
 The `merge_records` table, created by migration
-[`m20220101_000003_merge_records`](../care-pathway-service-with-loco/migration/src/m20220101_000003_merge_records.rs)
+[`m20220101_000003_merge_records`](../care-pathway-service-with-axum/migration/src/m20220101_000003_merge_records.rs)
 — one row per record-merge (T-8):
 
 | Column | Type | Notes |

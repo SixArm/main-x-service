@@ -14,7 +14,7 @@
 +------------------------------+-------------------------------+
                                |  HTTP JSON, /api/*
 +------------------------------v-------------------------------+
-|  event-service-with-loco (loco.rs / Axum)                   |
+|  event-service-with-axum (loco.rs / Axum)                   |
 |  +----------------+ +----------------+ +------------------+  |
 |  | REST /api   | | FHIR (501 stub)| | gRPC (stub)      |  |
 |  +----------------+ +----------------+ +------------------+  |
@@ -53,7 +53,7 @@ front-end  →(HTTP)→  service  →(Cargo dep)→  matcher
 ### 8.3 API versioning
 
 The REST surface is versioned under **`/api`** (confirmed in the
-service [`agents/restful.md`](../event-service-with-loco/agents/restful.md)
+service [`agents/restful.md`](../event-service-with-axum/agents/restful.md)
 and the front-end
 [spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md)).
 Breaking wire-format changes require a `/api/v2` — an entity-level
@@ -91,7 +91,7 @@ Roadmap (§15, aspirational — not implemented):
 ### 8.6 Data-flow summary
 
 Create / match / merge flows are owned by the service spec
-([§8.5](../event-service-with-loco/spec/08-architecture.md)); the
+([§8.5](../event-service-with-axum/spec/08-architecture.md)); the
 entity-level shape mirrors
 [`agents/share/dataflow.md`](../../agents/share/dataflow.md). The
 front-end adds one entity-specific flow: create-with-409 — `POST

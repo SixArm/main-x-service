@@ -37,16 +37,16 @@ Each crate is self-contained (own REST API, own persistence, own matching algori
 
 ## Entity registry services (Rust, loco.rs)
 
-- [person-service](https://github.com/SixArm/main-x-service/blob/main/person/person-service-with-loco/spec/index.md): Person (general) identity registry
-- [worker-service](https://github.com/SixArm/main-x-service/blob/main/worker/worker-service-with-loco/spec/index.md): Worker (workforce/professional) identity registry, plus assessments
-- [place-service](https://github.com/SixArm/main-x-service/blob/main/place/place-service-with-loco/spec/index.md): Place registry (schema.org/Place)
-- [thing-service](https://github.com/SixArm/main-x-service/blob/main/thing/thing-service-with-loco/spec/index.md): Thing/asset registry (schema.org/Thing)
-- [event-service](https://github.com/SixArm/main-x-service/blob/main/event/event-service-with-loco/spec/index.md): Time-bounded event registry (schema.org/Event)
-- [course-service](https://github.com/SixArm/main-x-service/blob/main/course/course-service-with-loco/spec/index.md): Course-identity registry plus CourseInstance sub-resource
-- [authentication-service](https://github.com/SixArm/main-x-service/blob/main/authentication/authentication-service-with-loco/spec/index.md): Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance
-- [organization-service](https://github.com/SixArm/main-x-service/blob/main/organization/organization-service-with-loco/spec/index.md): Organization registry (schema.org/Organization); family FHIR reference implementation
-- [care-pathway-service](https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-service-with-loco/spec/index.md): Clinical care-pathway registry
-- [case-service](https://github.com/SixArm/main-x-service/blob/main/case/case-service-with-loco/spec/index.md): Governmental case-tracking registry
+- [person-service](https://github.com/SixArm/main-x-service/blob/main/person/person-service-with-axum/spec/index.md): Person (general) identity registry
+- [worker-service](https://github.com/SixArm/main-x-service/blob/main/worker/worker-service-with-axum/spec/index.md): Worker (workforce/professional) identity registry, plus assessments
+- [place-service](https://github.com/SixArm/main-x-service/blob/main/place/place-service-with-axum/spec/index.md): Place registry (schema.org/Place)
+- [thing-service](https://github.com/SixArm/main-x-service/blob/main/thing/thing-service-with-axum/spec/index.md): Thing/asset registry (schema.org/Thing)
+- [event-service](https://github.com/SixArm/main-x-service/blob/main/event/event-service-with-axum/spec/index.md): Time-bounded event registry (schema.org/Event)
+- [course-service](https://github.com/SixArm/main-x-service/blob/main/course/course-service-with-axum/spec/index.md): Course-identity registry plus CourseInstance sub-resource
+- [authentication-service](https://github.com/SixArm/main-x-service/blob/main/authentication/authentication-service-with-axum/spec/index.md): Central SSO — passwordless magic-link, cookie sessions, PASETO v4.public issuance
+- [organization-service](https://github.com/SixArm/main-x-service/blob/main/organization/organization-service-with-axum/spec/index.md): Organization registry (schema.org/Organization); family FHIR reference implementation
+- [care-pathway-service](https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-service-with-axum/spec/index.md): Clinical care-pathway registry
+- [case-service](https://github.com/SixArm/main-x-service/blob/main/case/case-service-with-axum/spec/index.md): Governmental case-tracking registry
 
 ## Matcher crates (dependency-light comparison libraries)
 
@@ -68,7 +68,7 @@ Each crate is self-contained (own REST API, own persistence, own matching algori
 
 ## Cross-cutting services
 
-- [link-graph-service-with-loco](https://github.com/SixArm/main-x-service/blob/main/link/link-graph-service-with-loco/spec/index.md): Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter
+- [link-graph-service-with-axum](https://github.com/SixArm/main-x-service/blob/main/link/link-graph-service-with-axum/spec/index.md): Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter
 
 ## GitHub Pages
 

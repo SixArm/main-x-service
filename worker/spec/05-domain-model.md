@@ -4,7 +4,7 @@
 
 The service's `Worker` is the system-of-record shape: FHIR-flavoured,
 with vector sub-records. Field-by-field reference:
-[service `agents/models.md`](../worker-service-with-loco/agents/models.md).
+[service `agents/models.md`](../worker-service-with-axum/agents/models.md).
 Summary:
 
 | Group | Fields |
@@ -76,7 +76,7 @@ and [§11 Public API](../worker-matcher-rust-crate/spec/11-public-api-specificat
 The service embeds `worker-matcher` (currently `0.6.1` in
 `Cargo.toml`), re-exports it from `src/matching/mod.rs` as
 `matcher_lib`, and bridges via
-[`src/matching/adapter.rs`](../worker-service-with-loco/src/matching/adapter.rs)
+[`src/matching/adapter.rs`](../worker-service-with-axum/src/matching/adapter.rs)
 → `to_matcher_worker(&service::Worker) -> worker_matcher::Worker`.
 
 Routing rules (full table inline in the adapter; highlights):
@@ -119,7 +119,7 @@ Invariants:
   Organisation Data Service code) falls through **unmapped** rather
   than being shoehorned into a wrong scheme.
 - Both sides of the contract are pinned by the bridge test suite
-  [`tests/duplicate_detection.rs`](../worker-service-with-loco/tests/duplicate_detection.rs)
+  [`tests/duplicate_detection.rs`](../worker-service-with-axum/tests/duplicate_detection.rs)
   (14 tests): a regression in either the adapter's routing or the
   matcher's scoring fails a test there.
 

@@ -15,7 +15,7 @@ import {
 } from "../../src/lib/review";
 
 // The five weighted components `MatchBreakdown` carries, plus its two
-// boolean flags — the shape `thing-service-with-loco`'s ad-hoc match /
+// boolean flags — the shape `thing-service-with-axum`'s ad-hoc match /
 // check-duplicates endpoints already return (even though the review-queue
 // endpoint does not wire `score_breakdown` through yet; see the module doc
 // in `src/lib/review.ts`).
@@ -73,7 +73,7 @@ describe("canDecide", () => {
 
 describe("MATCH_COMPONENTS", () => {
     // Pins the service's `MatchWeights::default()`
-    // (`thing-service-with-loco/src/matching/scoring.rs`). If they no
+    // (`thing-service-with-axum/src/matching/scoring.rs`). If they no
     // longer sum to 1.00 the table is lying to the operator.
     it("weights sum to 1.00", () => {
         const total = MATCH_COMPONENTS.reduce((sum, c) => sum + c.weight, 0);

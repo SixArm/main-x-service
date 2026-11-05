@@ -16,7 +16,7 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**case-service-with-loco** owns:
+**case-service-with-axum** owns:
 
 - Case CRUD with soft delete (`deleted_at`), `422` validation.
 - `GET …/search?q=` (Postgres `ILIKE` title search),

@@ -20,7 +20,7 @@ cross-subproject contract.
 
 | Subproject | Spec | Agent guide | Detailed guides |
 |---|---|---|---|
-| [organization-service-with-loco](../organization-service-with-loco/) | [spec/index.md](../organization-service-with-loco/spec/index.md) (§1–§18, single file) | [AGENTS.md](../organization-service-with-loco/AGENTS.md) | — (thin; spec §13 / entity T-1 queue the `agents/` set) |
+| [organization-service-with-axum](../organization-service-with-axum/) | [spec/index.md](../organization-service-with-axum/spec/index.md) (§1–§18, single file) | [AGENTS.md](../organization-service-with-axum/AGENTS.md) | — (thin; spec §13 / entity T-1 queue the `agents/` set) |
 | [organization-matcher-rust-crate](../organization-matcher-rust-crate/) | [spec/index.md](../organization-matcher-rust-crate/spec/index.md) (§1–§25, single file) | [AGENTS.md](../organization-matcher-rust-crate/AGENTS.md) | [agents/index.md](../organization-matcher-rust-crate/agents/index.md) — matching-algorithm, normalization, SDD, testing |
 | [organization-front-end-with-svelte](../organization-front-end-with-svelte/) | [spec/index.md](../organization-front-end-with-svelte/spec/index.md) (§1–§18, single file) | [AGENTS.md](../organization-front-end-with-svelte/AGENTS.md) | — (front-ends ship the thin doc set by design) |
 

@@ -1,7 +1,7 @@
 ## 13. Tasks
 
 - [x] T-1: Scaffold SvelteKit project (config, app shell, CSS).
-- [x] T-2: Wire TypeScript types matching `worker-service-with-loco/agents/models.md`.
+- [x] T-2: Wire TypeScript types matching `worker-service-with-axum/agents/models.md`.
 - [x] T-3: `ApiClient` + `WorkerRepository`.
 - [x] T-4: Form primitives (`LabeledField`, `FieldError`, `FieldRow`, `createForm`).
 - [x] T-5: List route with SVAR DataGrid + search box.
@@ -92,7 +92,7 @@
   `?limit=` (`listReviewQueue` gained a `ReviewQueueOptions` argument;
   "all" is the *absence* of `status`, since the endpoint answers `422
   INVALID_STATUS` for a token it does not know — confirmed against
-  `worker-service-with-loco/src/api/rest/handlers.rs::get_review_queue`,
+  `worker-service-with-axum/src/api/rest/handlers.rs::get_review_queue`,
   which is byte-for-byte the same guard as person's — and there is no
   `offset` so page size is the whole pagination story); a
   **keyboard-reachable path** — the SVAR Kanban's drag-to-decide is
@@ -103,7 +103,7 @@
   with two parallel `GET /api/workers/{id}` calls (`Promise.allSettled`,
   so a soft-deleted side still renders the other) and rendering the
   matcher's `score_breakdown` as a component / weight / score table —
-  confirmed against `worker-service-with-loco/src/matching/mod.rs`'s
+  confirmed against `worker-service-with-axum/src/matching/mod.rs`'s
   `MatchScoreBreakdown` that the seven components and their weights
   (name 0.30, birth date 0.25, gender 0.10, address 0.10, identifier
   0.10, tax id 0.10, document 0.05) are identical in name and value to
@@ -123,7 +123,7 @@
   decision buttons are disabled for a non-`pending` item rather than
   offering a request guaranteed to answer `422
   INVALID_REVIEW_TRANSITION`. **Known gap vs. the person reference,
-  verified rather than assumed**: `worker-service-with-loco`'s
+  verified rather than assumed**: `worker-service-with-axum`'s
   `review_queue` table and `ReviewQueueItem` carry **no `provenance`
   column** — person's was added by a dedicated migration
   (`m20260802_000001_review_queue_provenance.rs`) that was never ported
@@ -163,7 +163,7 @@
   throws a 303-to-`/signin` redirect when signed out, passes through
   silently when signed in).
 
-- [ ] T-27: **Assessment UI.** `worker-service-with-loco` exposes a full
+- [ ] T-27: **Assessment UI.** `worker-service-with-axum` exposes a full
   assessments surface — `create_assessment` / `list_assessments` /
   `get_assessment` / `update_assessment` / `delete_assessment` /
   `assessment_profile` (`src/api/rest/assessments.rs`) over
@@ -268,6 +268,6 @@
   - **Resolved.** A `try`/`catch` around the call, a new `"serviceUnavailable"` error variant, and its message in `+page.svelte`.
   - **Acceptance:** `tests/unit/verify.test.ts` (new) unit-tests the `load` function directly — pinning `missingToken`, the new `serviceUnavailable` (fetch rejects), and `invalidToken` (non-ok response) branches — verified to fail with the `try`/`catch` reverted and pass with it restored. Three-part change: spec (here) + code + test.
 
-- [x] **T-32: `search()`'s `items` vs `workers` field-name mismatch — the Things/Places live-walkthrough bug, cross-checked here.** *(2026-09-08.)* `WorkerRepository.search()` read `data.items` from the service's enveloped search response, but the real service's `SearchResponse` (`worker-service-with-loco/src/api/rest/handlers.rs`) names the field `workers` — `items` never matched anything the real service sends. Both the unit stub and the e2e search stub in this crate's own test suite encoded the same wrong name. Found by cross-checking every sibling front-end after thing-front-end's identical bug (its own spec §13 T-30) surfaced — `WorkerGrid`'s `workers.map(...)` is unconditional, exactly like `ThingGrid`'s, so this had the identical crash surface. Verified live against a real `worker-service` + Postgres: `/workers` renders cleanly and a real search finds a seeded record.
+- [x] **T-32: `search()`'s `items` vs `workers` field-name mismatch — the Things/Places live-walkthrough bug, cross-checked here.** *(2026-09-08.)* `WorkerRepository.search()` read `data.items` from the service's enveloped search response, but the real service's `SearchResponse` (`worker-service-with-axum/src/api/rest/handlers.rs`) names the field `workers` — `items` never matched anything the real service sends. Both the unit stub and the e2e search stub in this crate's own test suite encoded the same wrong name. Found by cross-checking every sibling front-end after thing-front-end's identical bug (its own spec §13 T-30) surfaced — `WorkerGrid`'s `workers.map(...)` is unconditional, exactly like `ThingGrid`'s, so this had the identical crash surface. Verified live against a real `worker-service` + Postgres: `/workers` renders cleanly and a real search finds a seeded record.
   - **Resolved.** Fixed `data.items` → `data.workers` in `src/lib/api/workers.ts::search()` plus the one unit-test stub and one e2e stub asserting the enveloped shape (the `review-queue` endpoint genuinely does use `items` — `ReviewQueueListResponse { items, total }`, confirmed against the Rust source — and was left untouched).
   - **Acceptance:** `npm run check` (0/0), `npm test` (84/84, unchanged count), `npm run test:e2e` (17/17, unchanged), and a live walkthrough against a real service confirmed the fix.

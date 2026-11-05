@@ -1,6 +1,6 @@
 # person-front-end-with-svelte
 
-SvelteKit front-end for the **[Person Service](../person-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Person Service](../person-service-with-axum/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
@@ -37,7 +37,7 @@ The persistent top navigation bar (every route; collapses behind a hamburger tog
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Person Service — see [`../person-service-with-loco/README.md`](../person-service-with-loco/README.md). Dev default (`loco start`, and this app's own fallback): `http://localhost:5150`. The podman-compose container maps `:8080` instead — see "Configuration" below and the integration-test section.
+- A running Person Service — see [`../person-service-with-axum/README.md`](../person-service-with-axum/README.md). Dev default (`loco start`, and this app's own fallback): `http://localhost:5150`. The podman-compose container maps `:8080` instead — see "Configuration" below and the integration-test section.
 
 ## Quick start
 
@@ -74,7 +74,7 @@ The unit tests mock `fetch`. The smoke suite (`tests/e2e/`) asserts the page she
 
 ### Integration tests (live Person Service)
 
-`tests/integration/golden-paths.spec.ts` drives the live SvelteKit preview against a running `person-service-with-loco` over real HTTP. Coverage:
+`tests/integration/golden-paths.spec.ts` drives the live SvelteKit preview against a running `person-service-with-axum` over real HTTP. Coverage:
 
 | Test | Spec FR | What it asserts |
 | --- | --- | --- |
@@ -94,7 +94,7 @@ Each test creates its own records with a timestamped family name and cleans up v
 
 ```bash
 # 1. Start the Rust service (Postgres + Axum) in the background
-(cd ../person-service-with-loco && podman compose up -d)
+(cd ../person-service-with-axum && podman compose up -d)
 
 # 2. Wait for the service to report healthy (first Rust build can take ~5 min)
 curl -sf http://localhost:8080/api/health && echo ok
@@ -108,7 +108,7 @@ bin/e2e --ui
 bin/e2e tests/integration/golden-paths.spec.ts -g "FR-9"
 
 # 4. Tear down when done
-(cd ../person-service-with-loco && podman compose down)
+(cd ../person-service-with-axum && podman compose down)
 ```
 
 To target a different service URL:

@@ -62,4 +62,4 @@ match_organizations(
 ```
 
 Part of the Main X Index family; embedded by
-[organization-service](../organization-service-with-loco).
+[organization-service](../organization-service-with-axum).

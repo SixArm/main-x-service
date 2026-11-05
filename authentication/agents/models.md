@@ -16,9 +16,9 @@ The sign-in account (not a person registry record — identity
 attributes live in the person entity).
 
 **Files:**
-[`src/models/users.rs`](../authentication-service-with-loco/src/models/users.rs),
+[`src/models/users.rs`](../authentication-service-with-axum/src/models/users.rs),
 entity in `src/models/_entities/users.rs`, migration
-[`m20220101_000001_users.rs`](../authentication-service-with-loco/src/migration/m20220101_000001_users.rs).
+[`m20220101_000001_users.rs`](../authentication-service-with-axum/src/migration/m20220101_000001_users.rs).
 
 | Field | Type | Description |
 |---|---|---|
@@ -54,9 +54,9 @@ blob plus sliding idle + absolute TTLs) is the deferred follow-up
 tracked in the service spec §13.
 
 **Files:**
-[`src/models/sessions.rs`](../authentication-service-with-loco/src/models/sessions.rs),
+[`src/models/sessions.rs`](../authentication-service-with-axum/src/models/sessions.rs),
 migration
-[`m20220101_000002_sessions.rs`](../authentication-service-with-loco/src/migration/m20220101_000002_sessions.rs).
+[`m20220101_000002_sessions.rs`](../authentication-service-with-axum/src/migration/m20220101_000002_sessions.rs).
 
 | Field | Type | Description |
 |---|---|---|
@@ -75,7 +75,7 @@ migration
 ## Claims (cross-crate contract)
 
 Defined twice, byte-compatible by convention — service
-[`src/auth/mod.rs`](../authentication-service-with-loco/src/auth/mod.rs)
+[`src/auth/mod.rs`](../authentication-service-with-axum/src/auth/mod.rs)
 and verifier
 [`src/lib.rs`](../authentication-verifier-rust-crate/src/lib.rs):
 
@@ -116,7 +116,7 @@ for offline PASETO verification:
 
 ## View models
 
-**Service** ([`src/views/auth.rs`](../authentication-service-with-loco/src/views/auth.rs)):
+**Service** ([`src/views/auth.rs`](../authentication-service-with-axum/src/views/auth.rs)):
 `LoginResponse { token, pid, name, email, is_verified }` (the `token`
 is the transitional PASETO body kept until every front-end adopts the
 BFF; the credential proper is the `Set-Cookie` session),

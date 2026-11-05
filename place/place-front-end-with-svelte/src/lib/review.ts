@@ -1,6 +1,6 @@
 // Client-side rules for the duplicate review queue.
 //
-// Mirrors `place-service-with-loco/src/db/review_queue.rs` (the
+// Mirrors `place-service-with-axum/src/db/review_queue.rs` (the
 // decidable-status guard) and `agents/matching.md`'s `MatchBreakdown`
 // (the per-component score object place-matcher computes), so the board
 // can explain a pair's score and disable an impossible decision before
@@ -70,7 +70,7 @@ export function canDecide(item: Pick<ReviewQueueItem, "status">): boolean {
  * catalog key naming it, and its weight in the overall score.
  *
  * Weights are the place matcher's default weights, per
- * `place-service-with-loco/agents/matching.md`; they sum to 1.00.
+ * `place-service-with-axum/agents/matching.md`; they sum to 1.00.
  */
 export interface MatchComponent {
   /** Field name in the service's `MatchBreakdown`. */

@@ -1,5 +1,5 @@
 // Unit tests for the links panel's pure guards. These mirror the
-// service-side accept/reject matrix in `case-service-with-loco`
+// service-side accept/reject matrix in `case-service-with-axum`
 // (`src/controllers/links.rs::validate_edge`), so the client refuses
 // exactly what the service would refuse — a client that were laxer would
 // surface a confusing 422, and a client that were stricter would block a

@@ -3,7 +3,7 @@
 ### 10.1 Service — PostgreSQL via SeaORM
 
 Migrations (`sea-orm-migration`, registered in
-[`src/migration/mod.rs`](../authentication-service-with-loco/src/migration/mod.rs)):
+[`src/migration/mod.rs`](../authentication-service-with-axum/src/migration/mod.rs)):
 `m20220101_000001_users`, `m20220101_000002_sessions` (replaced by the
 cookie-session schema below — see the pivot note), `m20220101_000003_auth_events`,
 and the pivot's new `m2026..._sessions_cookie` (the
@@ -17,7 +17,7 @@ development, off in production.
 > §3. The migration is a §13 T-12 follow-up.
 
 **`users`** (from
-[`m20220101_000001_users.rs`](../authentication-service-with-loco/src/migration/m20220101_000001_users.rs)):
+[`m20220101_000001_users.rs`](../authentication-service-with-axum/src/migration/m20220101_000001_users.rs)):
 
 | Column | Type | Notes |
 |---|---|---|
@@ -51,7 +51,7 @@ Partial index `sessions_user ON (user_pid) WHERE revoked_at IS NULL`.
 Valid iff `revoked_at IS NULL AND now() < idle_expires_at AND now() < absolute_expires_at`.
 
 **`auth_events`** (from
-[`m20220101_000003_auth_events.rs`](../authentication-service-with-loco/src/migration/m20220101_000003_auth_events.rs)) —
+[`m20220101_000003_auth_events.rs`](../authentication-service-with-axum/src/migration/m20220101_000003_auth_events.rs)) —
 the durable authentication audit trail (T-10, §12):
 
 | Column | Type | Notes |
@@ -75,7 +75,7 @@ database — family convention, no external broker.
 Not in the database. The **Ed25519 keypair** (PASETO v4.public signing
 + verify keys) comes from env / files (§8.4); the dev keypair is
 committed at
-[`config/keys/`](../authentication-service-with-loco/config/keys/). The
+[`config/keys/`](../authentication-service-with-axum/config/keys/). The
 private key signs `POST /token`; the public key(s) are published at
 `/.well-known/paseto-keys`. *(Replaces the decommissioned RSA keypair.)*
 

@@ -5,7 +5,7 @@
 > open questions are §16.
 >
 > Sibling service:
-> [authentication-service-with-loco](../../authentication-service-with-loco/spec/index.md).
+> [authentication-service-with-axum](../../authentication-service-with-axum/spec/index.md).
 
 > **Supersedes the prior bearer-token SPA model.** This spec adopts the
 > httpOnly-cookie + Backend-For-Frontend (BFF) session model defined in
@@ -183,7 +183,7 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
   no-data-grid posture above) despite the full locale count. Welsh
   support is a deliberate UK public-sector Welsh-language-duty choice and
   mirrors the service's catalog
-  (`authentication-service-with-loco/src/i18n.rs`); the other eleven
+  (`authentication-service-with-axum/src/i18n.rs`); the other eleven
   match the sibling front-ends' coverage. The fallback chain is: target
   locale → English → the key string itself; an unknown or
   region-subtagged input (`cy-GB`) reduces to its primary language (`cy`)
@@ -504,7 +504,7 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
       `GET /api/auth/account/export` (subject data export),
       `GET /api/auth/account/audit` (subject's own audit trail), and
       `DELETE /api/auth/account` (erasure) — see
-      `authentication-service-with-loco/AGENTS.md`'s API-surface table.
+      `authentication-service-with-axum/AGENTS.md`'s API-surface table.
       *(verified: this crate's `src/lib/server/auth.ts` exports only
       `verifyMagicLink`/`requestMagicLink`/`signup`/`exchangeToken`/
       `currentUser`/`signout` — no export/audit/erasure call; the
@@ -555,7 +555,7 @@ session on sign-out and the BFF clears the cookie. CSRF protection (§6 FR
 - [x] **AFE-4 (S) Surface the `429` rate-limit response distinctly from
       a generic failure.** *(resolved 2026-09-06.)* The auth service
       rate-limits `signup`/`magic-link` issuance (5 requests / 5 min
-      per email, `authentication-service-with-loco/AGENTS.md`) and
+      per email, `authentication-service-with-axum/AGENTS.md`) and
       returns `429` over the cap. *(verified: `src/lib/server/auth.ts`'s
       `requestMagicLink`/`signup` returned only `res.ok` — a plain
       boolean — discarding the status code entirely, so

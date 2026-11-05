@@ -3,7 +3,7 @@
 Live work queue for the **entity level** — cross-subproject work, or
 single-subproject work with cross-subproject consequences. Work that
 is purely internal to one crate belongs in that crate's queue
-(service [§13](../course-service-with-loco/spec/13-tasks.md),
+(service [§13](../course-service-with-axum/spec/13-tasks.md),
 matcher [§23](../course-matcher-rust-crate/spec/23-tasks.md),
 front-end [§13](../course-front-end-with-svelte/spec/13-tasks.md)).
 

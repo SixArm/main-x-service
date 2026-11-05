@@ -26,7 +26,7 @@ export function verifyMagicLink(
  * Outcome of a magic-link-issuing call (`requestMagicLink` / `signup`).
  * `rateLimited` is the one documented non-2xx outcome these endpoints
  * intentionally produce (5 requests / 5 min per email,
- * `authentication-service-with-loco/AGENTS.md`) — distinct from any
+ * `authentication-service-with-axum/AGENTS.md`) — distinct from any
  * other failure so the UI can say "try again in a few minutes" rather
  * than a generic "something went wrong" (AFE-4).
  */

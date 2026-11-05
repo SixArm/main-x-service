@@ -1,7 +1,7 @@
 ## 14. Implementation Status
 
 Honest snapshot, rewritten 2026-08 (professionalization audit) against
-`case/case-service-with-loco/CHANGELOG.md` and a grep of its `src/` —
+`case/case-service-with-axum/CHANGELOG.md` and a grep of its `src/` —
 not against this file's own previous text, which had drifted enough to
 contradict itself (an earlier draft said in one line that the
 credential was already PASETO v4 public and, a few lines later, that
@@ -11,7 +11,7 @@ answer, confirmed against `src/auth.rs`, is that PASETO v4 public
 pivot). Aspirational items live in §15.
 
 The crate-level spec
-([`case-service-with-loco/spec/index.md`](../../case/case-service-with-loco/spec/index.md)
+([`case-service-with-axum/spec/index.md`](../../case/case-service-with-axum/spec/index.md)
 §13/§14) is the more granular and more frequently updated record; this
 file is the entity-level summary across matcher + service + front-end
 and should be read as a coarser view of the same facts, not a

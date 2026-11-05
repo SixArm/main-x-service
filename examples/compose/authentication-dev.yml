@@ -1,12 +1,12 @@
 # authentication-service in **development** mode — its own Postgres,
 # `LOCO_ENV=development` overriding the image's baked-in
-# `LOCO_ENV=production` default (authentication-service-with-loco/
+# `LOCO_ENV=production` default (authentication-service-with-axum/
 # Dockerfile).
 #
 # This is deliberately a SEPARATE file from single-service.yml's
 # case-service example, not a `<- swap` copy of it: the whole point
 # here is the environment override. `config/development.yaml`
-# (authentication-service-with-loco/config/) sets `auto_migrate: true`
+# (authentication-service-with-axum/config/) sets `auto_migrate: true`
 # (no separate migrate step needed, unlike every production-mode
 # service in this directory) and is what makes
 # `deliver_magic_link` (src/controllers/auth.rs) write the magic-link
@@ -68,7 +68,7 @@ services:
   authentication-service:
     build:
       context: ../..
-      dockerfile: authentication/authentication-service-with-loco/Dockerfile
+      dockerfile: authentication/authentication-service-with-axum/Dockerfile
     image: mxi-example-authentication-dev-service
     container_name: mxi-example-authentication-dev-service
     # COMPOSE-WORKER: matches every other file in this directory — the

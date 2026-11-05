@@ -151,7 +151,7 @@ lowering `LINK_GRAPH_RECONCILE_SECS` and restarting.
 
 ## A worked example, if you want to see the mechanism before trusting it
 
-`link/link-graph-service-with-loco/tests/reconcile.rs`'s
+`link/link-graph-service-with-axum/tests/reconcile.rs`'s
 `reconcile_adds_missing_and_removes_extra` (DB-gated, `--ignored`) seeds
 the read-model with one edge, points a mock source at a different edge,
 asserts the initial divergence count, applies the repair via `GET

@@ -14,9 +14,9 @@ place, thing, event, course) where they diverge.
 See also the brief shared note
 [`../../agents/share/restful.md`](../../agents/share/restful.md) and the
 per-entity API references such as
-[`../../person/person-service-with-loco/agents/restful.md`](../../person/person-service-with-loco/agents/restful.md)
+[`../../person/person-service-with-axum/agents/restful.md`](../../person/person-service-with-axum/agents/restful.md)
 and
-[`../../organization/organization-service-with-loco/AGENTS.md`](../../organization/organization-service-with-loco/AGENTS.md).
+[`../../organization/organization-service-with-axum/AGENTS.md`](../../organization/organization-service-with-axum/AGENTS.md).
 
 ---
 
@@ -70,7 +70,7 @@ Literal sub-paths (`/search`, `/merge`, `/whoami`, `/merges/recent`, …)
 are registered **before** the `/{pid}` captures so the dynamic segment
 does not shadow them. This ordering is a hard convention — see the
 `routes()` function in
-[`organizations.rs`](../../organization/organization-service-with-loco/src/controllers/organizations.rs).
+[`organizations.rs`](../../organization/organization-service-with-axum/src/controllers/organizations.rs).
 
 ### 1.3 Response envelope: raw loco JSON vs `ApiResponse`
 
@@ -135,11 +135,11 @@ loco services author the spec **by hand** rather than deriving it:
   `organization_matcher::Organization`), which deliberately does not
   depend on `utoipa`. So the OpenAPI document is a hand-written
   `serde_json::Value` in
-  [`src/openapi.rs`](../../organization/organization-service-with-loco/src/openapi.rs)
+  [`src/openapi.rs`](../../organization/organization-service-with-axum/src/openapi.rs)
   (`spec()`), which also keeps the doc accurate to the snake_case wire
   format.
 - Served by
-  [`src/controllers/docs.rs`](../../organization/organization-service-with-loco/src/controllers/docs.rs):
+  [`src/controllers/docs.rs`](../../organization/organization-service-with-axum/src/controllers/docs.rs):
   - `GET /api-docs/openapi.json` — the raw OpenAPI 3.0.3 JSON.
   - `GET /swagger-ui` — a static HTML page that loads Swagger UI from
     the `swagger-ui-dist@5` **CDN** (keeps the crate dependency-light)
@@ -164,7 +164,7 @@ The **human session** is a server-side Postgres **cookie session**
 (opaque id in an httpOnly cookie). **Cross-service** API calls carry a
 short-lived **PASETO v4.public** bearer token (Ed25519-signed), issued by
 the central
-[authentication-service](../../authentication/authentication-service-with-loco)
+[authentication-service](../../authentication/authentication-service-with-axum)
 and verified **offline** by each peer via the
 [authentication-verifier](../../authentication/authentication-verifier-rust-crate)
 crate against the service's published Ed25519 key at
@@ -173,7 +173,7 @@ replaces the prior RS256 JWT + JWKS model 1:1. See
 [`../authentication/index.md`](../authentication/index.md) for the token
 flow and [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 for the source-of-truth design. The per-service extractor lives in
-[`src/auth.rs`](../../organization/organization-service-with-loco/src/auth.rs).
+[`src/auth.rs`](../../organization/organization-service-with-axum/src/auth.rs).
 
 Two extractors, two postures:
 
@@ -425,6 +425,6 @@ in `src/api/rest/handlers.rs` (older services) or
 - [`../merge/index.md`](../merge/index.md) — record merge, including the loco-lineage batch-`deduplicate` gap (§9)
 - [`../index.md`](../index.md) — monorepo spec index
 - Per-entity API references, e.g.
-  [`../../person/person-service-with-loco/agents/restful.md`](../../person/person-service-with-loco/agents/restful.md)
+  [`../../person/person-service-with-axum/agents/restful.md`](../../person/person-service-with-axum/agents/restful.md)
   and
-  [`../../organization/organization-service-with-loco/AGENTS.md`](../../organization/organization-service-with-loco/AGENTS.md)
+  [`../../organization/organization-service-with-axum/AGENTS.md`](../../organization/organization-service-with-axum/AGENTS.md)

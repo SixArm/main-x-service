@@ -23,10 +23,10 @@ Detailed reference documentation for the Thing Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../thing-service-with-loco/spec.md](../../thing-service-with-loco/spec/index.md) | Service spec — system of record |
-| [../../thing-service-with-loco/agents/restful.md](../../thing-service-with-loco/agents/restful.md) | REST API surface |
-| [../../thing-service-with-loco/agents/models.md](../../thing-service-with-loco/agents/models.md) | Wire-format domain types |
-| [../../thing-service-with-loco/agents/matching.md](../../thing-service-with-loco/agents/matching.md) | Matching algorithm reference |
+| [../../thing-service-with-axum/spec.md](../../thing-service-with-axum/spec/index.md) | Service spec — system of record |
+| [../../thing-service-with-axum/agents/restful.md](../../thing-service-with-axum/agents/restful.md) | REST API surface |
+| [../../thing-service-with-axum/agents/models.md](../../thing-service-with-axum/agents/models.md) | Wire-format domain types |
+| [../../thing-service-with-axum/agents/matching.md](../../thing-service-with-axum/agents/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

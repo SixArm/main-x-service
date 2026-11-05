@@ -41,7 +41,7 @@ the session and injects a short-lived PASETO (see `AGENTS.md`
                               | HTTP JSON
                               v
                 +-----------------------------+
-                |   place-service-with-loco |
+                |   place-service-with-axum |
                 |   Axum + SeaORM + Tantivy   |
                 +-----------------------------+
 ```

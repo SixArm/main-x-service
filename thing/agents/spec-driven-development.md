@@ -7,7 +7,7 @@ This guide tells you which spec to edit for a given change.
 
 - Each subproject's own `spec/` is the single source of truth **for
   that subproject's internals** —
-  [service](../thing-service-with-loco/spec/index.md),
+  [service](../thing-service-with-axum/spec/index.md),
   [matcher](../thing-matcher-rust-crate/spec/index.md),
   [front-end](../thing-front-end-with-svelte/spec/index.md).
 - The entity-level [`../spec/`](../spec/index.md) is the source of
@@ -43,16 +43,16 @@ specs — and the bridge tests.
 
 ## The bridge tests are the contract's enforcement
 
-[`thing-service-with-loco/tests/duplicate_detection.rs`](../thing-service-with-loco/tests/duplicate_detection.rs)
+[`thing-service-with-axum/tests/duplicate_detection.rs`](../thing-service-with-axum/tests/duplicate_detection.rs)
 pins both sides of the DTO contract. Any edit to entity §5.3, to
-[`adapter.rs`](../thing-service-with-loco/src/matching/adapter.rs),
+[`adapter.rs`](../thing-service-with-axum/src/matching/adapter.rs),
 or to the matcher's scoring MUST update a bridge test in the same PR.
 
 ## Per-subproject discipline
 
 Each subproject has its own SDD guide — read it before working there:
 
-- [service agents/spec-driven-development.md](../thing-service-with-loco/agents/spec-driven-development.md)
+- [service agents/spec-driven-development.md](../thing-service-with-axum/agents/spec-driven-development.md)
 - [matcher agents/spec-driven-development.md](../thing-matcher-rust-crate/agents/spec-driven-development.md)
 - [front-end agents/spec-driven-development.md](../thing-front-end-with-svelte/agents/spec-driven-development.md)
 

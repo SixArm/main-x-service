@@ -29,7 +29,7 @@ front-end). The entity-level living spec is
 
 | Subproject | Docs |
 |---|---|
-| [authentication-service-with-loco](../authentication-service-with-loco/) | [spec](../authentication-service-with-loco/spec/index.md) · [AGENTS.md](../authentication-service-with-loco/AGENTS.md) · [README](../authentication-service-with-loco/README.md) |
+| [authentication-service-with-axum](../authentication-service-with-axum/) | [spec](../authentication-service-with-axum/spec/index.md) · [AGENTS.md](../authentication-service-with-axum/AGENTS.md) · [README](../authentication-service-with-axum/README.md) |
 | [authentication-verifier-rust-crate](../authentication-verifier-rust-crate/) | [spec](../authentication-verifier-rust-crate/spec/index.md) · [AGENTS.md](../authentication-verifier-rust-crate/AGENTS.md) · [README](../authentication-verifier-rust-crate/README.md) |
 | [authentication-front-end-with-svelte](../authentication-front-end-with-svelte/) | [spec](../authentication-front-end-with-svelte/spec/index.md) · [AGENTS.md](../authentication-front-end-with-svelte/AGENTS.md) · [README](../authentication-front-end-with-svelte/README.md) |
 

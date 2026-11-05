@@ -2,11 +2,11 @@
 
 ### Subprojects (this entity)
 
-- Service: [spec](../organization-service-with-loco/spec/index.md) ·
-  [README](../organization-service-with-loco/README.md) ·
-  [AGENTS.md](../organization-service-with-loco/AGENTS.md) ·
-  [index](../organization-service-with-loco/index.md) ·
-  [CHANGELOG](../organization-service-with-loco/CHANGELOG.md)
+- Service: [spec](../organization-service-with-axum/spec/index.md) ·
+  [README](../organization-service-with-axum/README.md) ·
+  [AGENTS.md](../organization-service-with-axum/AGENTS.md) ·
+  [index](../organization-service-with-axum/index.md) ·
+  [CHANGELOG](../organization-service-with-axum/CHANGELOG.md)
 - Matcher: [spec](../organization-matcher-rust-crate/spec/index.md) ·
   [README](../organization-matcher-rust-crate/README.md) ·
   [AGENTS.md](../organization-matcher-rust-crate/AGENTS.md) ·

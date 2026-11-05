@@ -101,15 +101,15 @@ extra_test_features_for() {
       # already a default feature.
       printf -- '--features fetch,keycloak,test-idp'
       ;;
-    organization/organization-service-with-loco|\
-    worker/worker-service-with-loco|\
-    place/place-service-with-loco|\
-    thing/thing-service-with-loco|\
-    event/event-service-with-loco|\
-    course/course-service-with-loco|\
-    care-pathway/care-pathway-service-with-loco|\
-    case/case-service-with-loco|\
-    link/link-graph-service-with-loco|\
+    organization/organization-service-with-axum|\
+    worker/worker-service-with-axum|\
+    place/place-service-with-axum|\
+    thing/thing-service-with-axum|\
+    event/event-service-with-axum|\
+    course/course-service-with-axum|\
+    care-pathway/care-pathway-service-with-axum|\
+    case/case-service-with-axum|\
+    link/link-graph-service-with-axum|\
     patient-flow/patient-flow-service-with-rust|\
     workforce-planning-management/workforce-planning-management-service-with-rust|\
     contact-relationship-management/contact-relationship-management-service-with-rust|\
@@ -120,7 +120,7 @@ extra_test_features_for() {
       # whose `keycloak_guard` test needs no database is listed here.
       printf -- '--features keycloak'
       ;;
-    person/person-service-with-loco)
+    person/person-service-with-axum)
       # `parquet` gates `src/bulk/parquet_format.rs` (the bulk-export
       # Parquet codec, agents/share/bulk-import-export.md §11 step 4) —
       # self-contained (no live endpoint needed, unlike this crate's `s3`
@@ -130,7 +130,7 @@ extra_test_features_for() {
       # (KC-1).
       printf -- '--features parquet,keycloak'
       ;;
-    authentication/authentication-service-with-loco)
+    authentication/authentication-service-with-axum)
       # `oidc` gates SAML/OIDC identity federation (EV-2,
       # agents/share/authentication-sessions.md §7a): `src/oidc.rs`,
       # `src/controllers/oidc.rs`, and their DB-gated request suite

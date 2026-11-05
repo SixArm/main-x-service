@@ -2,7 +2,7 @@
 
 How the SDD discipline works **across** the trio. For the per-crate
 discipline, read the owner's guide:
-[service](../event-service-with-loco/agents/spec-driven-development.md) ·
+[service](../event-service-with-axum/agents/spec-driven-development.md) ·
 [matcher](../event-matcher-rust-crate/agents/spec-driven-development.md) ·
 [front-end](../event-front-end-with-svelte/agents/spec-driven-development.md).
 

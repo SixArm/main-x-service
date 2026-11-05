@@ -1,10 +1,10 @@
 # Agent guide — course-front-end-with-svelte
 
-Sibling to [`course-service-with-loco/`](../course-service-with-loco/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
+Sibling to [`course-service-with-axum/`](../course-service-with-axum/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
 
 ## Single source of truth
 
-- The service's [`spec.md`](../course-service-with-loco/spec/index.md) and [`agents/`](../course-service-with-loco/agents/) describe the API contract. If a field disappears from `Course` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- The service's [`spec.md`](../course-service-with-axum/spec/index.md) and [`agents/`](../course-service-with-axum/agents/) describe the API contract. If a field disappears from `Course` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
 - This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule

@@ -72,4 +72,4 @@ So the pair lands at `0.75` — `Medium` confidence, below the default
 name-only score down from `~1.0`.
 
 Part of the Main X Index family; embedded by
-[care-pathway-service](../care-pathway-service-with-loco).
+[care-pathway-service](../care-pathway-service-with-axum).

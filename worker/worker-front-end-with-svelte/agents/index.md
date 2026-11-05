@@ -23,10 +23,10 @@ Detailed reference documentation for the Worker Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../worker-service-with-loco/spec.md](../../worker-service-with-loco/spec/index.md) | Service spec — system of record |
-| [../../worker-service-with-loco/agents/restful.md](../../worker-service-with-loco/agents/restful.md) | REST API surface |
-| [../../worker-service-with-loco/agents/models.md](../../worker-service-with-loco/agents/models.md) | Wire-format domain types |
-| [../../worker-service-with-loco/agents/matching.md](../../worker-service-with-loco/agents/matching.md) | Matching algorithm reference |
+| [../../worker-service-with-axum/spec.md](../../worker-service-with-axum/spec/index.md) | Service spec — system of record |
+| [../../worker-service-with-axum/agents/restful.md](../../worker-service-with-axum/agents/restful.md) | REST API surface |
+| [../../worker-service-with-axum/agents/models.md](../../worker-service-with-axum/agents/models.md) | Wire-format domain types |
+| [../../worker-service-with-axum/agents/matching.md](../../worker-service-with-axum/agents/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

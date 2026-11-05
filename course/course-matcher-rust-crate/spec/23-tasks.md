@@ -7,12 +7,12 @@
 - [x] T-5: Unit tests covering deterministic short-circuits + probabilistic ordering.
 - [x] T-6: Phonetic (Soundex) bonus on `name` component — `src/phonetic.rs` + `+0.05` bonus applied inside `name_score` when both names produce the same Soundex code and Jaro-Winkler is `< 0.95`. Capped at `0.95` so a phonetic hit nudges Medium-band scores but never single-handedly mints High confidence.
 - [x] T-7: `course-service`-side adapter + bridge test —
-      [`course-service-with-loco/src/matching/adapter.rs`](../../course-service-with-loco/src/matching/adapter.rs)
+      [`course-service-with-axum/src/matching/adapter.rs`](../../course-service-with-axum/src/matching/adapter.rs)
       projects the service domain `Course` down to this crate's slim
-      shape; [`course-service-with-loco/tests/duplicate_detection.rs`](../../course-service-with-loco/tests/duplicate_detection.rs)
+      shape; [`course-service-with-axum/tests/duplicate_detection.rs`](../../course-service-with-axum/tests/duplicate_detection.rs)
       pins the contract with 14 assertions.
 - [x] T-8: Criterion benches — service-side at
-      [`course-service-with-loco/benches/matching_bench.rs`](../../course-service-with-loco/benches/matching_bench.rs)
+      [`course-service-with-axum/benches/matching_bench.rs`](../../course-service-with-axum/benches/matching_bench.rs)
       cover `match_courses` on a populated pair, the deterministic
       short-circuit path, and `find_matches` ranking 100 candidates.
       This crate also carries its own Criterion bench,
@@ -38,7 +38,7 @@
       (§5, §17). `CHANGELOG.md` and
       [`agents/matching-algorithm.md`](../agents/matching-algorithm.md)
       updated. The service-side bridge test in
-      `course-service-with-loco/tests/duplicate_detection.rs` still
+      `course-service-with-axum/tests/duplicate_detection.rs` still
       routes the slim matcher `Course`; extending it to pin
       `relationships[]` end-to-end is left to whichever PR wires the
       service-side domain field through the adapter (out of scope for

@@ -139,13 +139,13 @@ and that an accepted config never produces an unbounded or NaN score.
   two new public types, two new public struct fields on `Organization`,
   two new `MatchConfig` fields, and two new `MatchBreakdown` fields that
   change computed behaviour once populated is a minor bump, not a
-  patch. `organization-service-with-loco`'s `Cargo.toml` declares this
+  patch. `organization-service-with-axum`'s `Cargo.toml` declares this
   crate as an unconstrained path dependency
   (`organization-matcher = { path = "../organization-matcher-rust-crate" }`,
   no version string), so — unlike worker-matcher's 0.6.1→0.7.0 rollout,
   which broke `worker-service`'s pinned caret requirement — no
   downstream fix was needed; verified with a full `cargo check` /
-  `cargo test` pass on `organization-service-with-loco` after the bump.
+  `cargo test` pass on `organization-service-with-axum` after the bump.
 
 ## [0.1.0] - 2026-08-26
 
@@ -196,7 +196,7 @@ and that an accepted config never produces an unbounded or NaN score.
   `agents/testing.md`, which had the identical gap.
 - Confirmed **SEC-M5** (LEI ISO 7064 MOD 97-10 / GLN GS1 mod-10
   check-digit validation) lives entirely in
-  `organization-service-with-loco`'s `src/validation.rs` — this crate
+  `organization-service-with-axum`'s `src/validation.rs` — this crate
   has no check-digit validators at all (`tests/property_tests.rs`'s own
   module doc says so explicitly). Nothing to change here; noted so a
   future pass doesn't go looking for it in the matcher.

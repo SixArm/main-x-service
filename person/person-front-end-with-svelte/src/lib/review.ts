@@ -1,6 +1,6 @@
 // Client-side rules for the duplicate review queue.
 //
-// Mirrors `person-service-with-loco/src/models/review_queue.rs` (the
+// Mirrors `person-service-with-axum/src/models/review_queue.rs` (the
 // decidable-status guard) and `src/matching/mod.rs::MatchScoreBreakdown`
 // (the per-component score object), so the board can explain a pair's
 // score and disable an impossible decision before the service answers
@@ -55,7 +55,7 @@ export function canDecide(item: Pick<ReviewQueueItem, "status">): boolean {
  * catalog key naming it, and its weight in the overall score.
  *
  * Weights are the person matcher's, per
- * `person-service-with-loco/agents/matching.md`; they sum to 1.00.
+ * `person-service-with-axum/agents/matching.md`; they sum to 1.00.
  */
 export interface MatchComponent {
   /** Field name in the service's `MatchScoreBreakdown`. */

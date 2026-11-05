@@ -60,7 +60,7 @@ transport.
 The loco services (organization, care-pathway, case, portfolio)
 implement **Phase 1** of the durable-bus design: the canonical versioned
 envelope and the publisher trait, wired to an in-memory ring buffer by
-default. Reference implementation: `care-pathway-service-with-loco/src/streaming.rs`.
+default. Reference implementation: `care-pathway-service-with-axum/src/streaming.rs`.
 Every one of these four also carries the Phase 2/3 durable path (§4) —
 `streaming.rs` selects the transport at construction, so this section
 describes only the `memory` branch.
@@ -123,7 +123,7 @@ writes one `audit_logs` row.
 
 The older Axum-era services (person, worker, place, thing, event,
 course) predate the canonical envelope's origin. Reference:
-`person-service-with-loco/src/streaming/mod.rs`. They use a
+`person-service-with-axum/src/streaming/mod.rs`. They use a
 **producer/consumer trait pair** over a richer, record-bearing event
 enum:
 
@@ -308,7 +308,7 @@ Each is a standalone Fluvio consumer (Rust, copying the `Envelope`
 shape per crate — no shared `mxi-events` crate exists, §4.6),
 **idempotent on `event_id`**, tracking its own offset:
 
-- **Cross-service link aggregator** ([link-graph-service](../../link/link-graph-service-with-loco)) —
+- **Cross-service link aggregator** ([link-graph-service](../../link/link-graph-service-with-axum)) —
   ✅ **landed 2026-08-03 (BUS-2)**, the first real consumer in the
   family: one task per entity topic, behind the `fluvio` feature,
   deduping via a `processed_events` table. It already consumes all ten

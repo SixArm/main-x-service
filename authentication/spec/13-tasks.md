@@ -45,7 +45,7 @@ confirms it. Split larger tasks (`T-5a`, `T-5b`).
   - [x] Test that builds a `Verifier` from the service's published
     JWKS document and verifies a token signed by
     `auth::sign_access_token`
-    (`authentication-service-with-loco/tests/sign_verify_contract.rs`;
+    (`authentication-service-with-axum/tests/sign_verify_contract.rs`;
     the verifier is a dev-dependency of the service).
   - **Acceptance met:** the claims round-trip through both crates in
     one DB-free, un-gated test; a `kid` mismatch fails with

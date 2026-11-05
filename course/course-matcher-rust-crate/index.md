@@ -14,7 +14,7 @@ course records modelled on [schema.org/Course](https://schema.org/Course).
 > normal build — see [`fuzz/README.md`](fuzz/README.md). Service-side
 > bridge — 14 contract tests pinning identifier routing + deterministic
 > short-circuits — lives in the embedding `course-service` crate at
-> [`tests/duplicate_detection.rs`](../course-service-with-loco/tests/duplicate_detection.rs).
+> [`tests/duplicate_detection.rs`](../course-service-with-axum/tests/duplicate_detection.rs).
 
 ## Quick start
 
@@ -123,7 +123,7 @@ use course_matcher::{
 - `mimalloc` — demo binary only, under a `musl` target gate.
 
 No `axum`, no `tokio`, no `tantivy`. Embedding services (e.g.
-[`course-service`](../course-service-with-loco/)) bring those
+[`course-service`](../course-service-with-axum/)) bring those
 themselves and adapt their richer Course shape down to ours.
 
 ## Test + build
@@ -137,7 +137,7 @@ cargo doc --open       # rustdoc
 
 # Benches live in the embedding service crate so they exercise the
 # adapter + facade path that production calls:
-cd ../course-service-with-loco && cargo bench
+cd ../course-service-with-axum && cargo bench
 ```
 
 The demo binary ([`src/main.rs`](src/main.rs)) is illustrative only and

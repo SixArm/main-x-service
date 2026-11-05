@@ -13,5 +13,5 @@ See also:
 - [`../AGENTS.md`](../AGENTS.md) — agent guide
 - [`../README.md`](../README.md) / [`../CLAUDE.md`](../CLAUDE.md) — user intro
 - [`../index.md`](../index.md) — worked examples
-- [`../../care-pathway-service-with-loco/`](../../care-pathway-service-with-loco/) — embedding service
+- [`../../care-pathway-service-with-axum/`](../../care-pathway-service-with-axum/) — embedding service
 - [`../../care-pathway-front-end-with-svelte/`](../../care-pathway-front-end-with-svelte/) — front-end consumer

@@ -1,10 +1,10 @@
 // Golden-path integration tests for the Person front-end driven
-// against a *live* person-service-with-loco.
+// against a *live* person-service-with-axum.
 //
 // Prerequisites:
 //   - Rust service running at PUBLIC_API_BASE_URL (default
 //     http://localhost:8080). Bring it up with
-//     `(cd ../person-service-with-loco && docker compose up -d)`
+//     `(cd ../person-service-with-axum && docker compose up -d)`
 //     or via `bin/e2e` which health-checks first.
 //   - Postgres reachable from the service (handled by the service's
 //     docker-compose).
@@ -73,13 +73,13 @@ const MAX_DUPLICATE_RETRIES = 5;
 // the family-name suffix, rather than relying on a fixed date-spacing
 // scheme to dodge the live create-time duplicate detector
 // (`check_duplicates_internal`, threshold 0.7,
-// `person-service-with-loco/src/api/rest/handlers.rs`). Reproduced live,
+// `person-service-with-axum/src/api/rest/handlers.rs`). Reproduced live,
 // repeatedly, that hand-tuned spacing is not durably safe: every
 // `E2E_*` family is a fuzzy-search candidate for every other record
 // (the candidate search tokenizes on `_` and fuzzy-matches per token),
 // a same-year DOB pair scores 0.50-0.95 in the service's own DOB grader
 // (`dob_matching::match_birth_dates`,
-// `person-service-with-loco/src/matching/algorithms.rs`) even with
+// `person-service-with-axum/src/matching/algorithms.rs`) even with
 // wholly distinct names, and this suite's own worker can be recycled
 // mid-run (observed live, apparently triggered by the guarded-page
 // redirects a signed-out run now hits — see this project's `AGENTS.md`

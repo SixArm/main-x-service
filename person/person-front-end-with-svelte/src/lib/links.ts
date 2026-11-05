@@ -1,6 +1,6 @@
 // Client-side rules for the cross-service links a person may originate.
 //
-// Mirrors `person-service-with-loco/src/api/rest/links.rs::validate_edge`
+// Mirrors `person-service-with-axum/src/api/rest/links.rs::validate_edge`
 // and the `entity-ref` crate's `EntityRef` parser, so the operator learns
 // the constraint from the form rather than from a 422. The server stays
 // authoritative — this is a pre-flight courtesy, never a substitute for

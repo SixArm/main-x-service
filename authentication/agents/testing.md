@@ -11,7 +11,7 @@ Entity-level summary. Normative strategy: entity spec
 > **decommissioned** and removed from the code; the crypto tests below
 > exercise the PASETO/Ed25519 surface.
 
-## Service (`authentication-service-with-loco`)
+## Service (`authentication-service-with-axum`)
 
 ```bash
 cargo test --lib        # DB-free unit tests (the src/auth module)

@@ -19,7 +19,7 @@ How to build and run the Main X Index subprojects from source.
 Every service crate uses the same entry points:
 
 ```sh
-cd person/person-service-with-loco
+cd person/person-service-with-axum
 cargo run --release        # REST API server
 cargo test                 # unit + non-DB tests
 ```
@@ -27,9 +27,9 @@ cargo test                 # unit + non-DB tests
 ## Run the DB-gated test suite for a crate
 
 ```sh
-scripts/test-db.sh up   person/person-service-with-loco
-scripts/ci-check.sh test-db person/person-service-with-loco
-scripts/test-db.sh down person/person-service-with-loco
+scripts/test-db.sh up   person/person-service-with-axum
+scripts/ci-check.sh test-db person/person-service-with-axum
+scripts/test-db.sh down person/person-service-with-axum
 ```
 
 Two databases at once collide on port 5432 — move one with

@@ -92,7 +92,7 @@ manual check confirms it. Split tasks too big for one PR
 The three tasks below were found still marked open even though the
 crate CHANGELOG shows them shipped weeks earlier. Closed here with
 their actual landing dates and implementing files, grounded against
-`case/case-service-with-loco/src/` and `CHANGELOG.md`, not against the
+`case/case-service-with-axum/src/` and `CHANGELOG.md`, not against the
 stale prose that used to sit in this file.
 
 - [x] **T-6 — Search + candidate blocking.** *(done 2026-08-02)*
@@ -216,13 +216,13 @@ stale prose that used to sit in this file.
     gap — those files restate what the spec already says, and a
     restatement that nobody regenerates is exactly the drift the SDD
     discipline exists to prevent." Confirmed
-    `case/case-service-with-loco/` has no `agents/` directory today
+    `case/case-service-with-axum/` has no `agents/` directory today
     (only the single `AGENTS.md` entry point, which is the newer
     pattern) — that absence is correct per policy, and adding the
     directory this task asked for would be the regression, not the fix.
   - [x] ~~split any single-file crate specs into the numbered
     layout~~ — **moot.** The crate spec
-    (`case/case-service-with-loco/spec/index.md`) already carries the
+    (`case/case-service-with-axum/spec/index.md`) already carries the
     full §1–§18 numbered structure; it is one file by choice, and
     root `AGENTS.md`'s "Two spec shapes exist" table fixes the
     numbering as what matters for this shape, not a one-file-per-section

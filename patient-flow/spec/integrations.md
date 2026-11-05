@@ -7,12 +7,12 @@ Patient Flow is a consumer of the Main X Index family. It holds
 
 | Service | Used for | How |
 |---|---|---|
-| [person-service](../../person/person-service-with-loco/) | patient identity | `person:<pid>` on Stay, BedRequest; resolve display name + recorded sex (allocation rule input); locate is keyed by this URN |
-| [worker-service](../../worker/worker-service-with-loco/) | staff identity | `worker:<pid>` for named nurse, consultant, transfer/clean actors |
-| [place-service](../../place/place-service-with-loco/) | physical sites | optional `place:<pid>` on Site/Ward |
-| [organization-service](../../organization/organization-service-with-loco/) | the trust | `organization:<pid>` on Site |
-| [authentication-service](../../authentication/authentication-service-with-loco/) | SSO + tokens | offline PASETO v4.public verification via `authentication-verifier`; ABAC `attrs` |
-| [link-graph-service](../../link/link-graph-service-with-loco/) | (roadmap) | Patient Flow events could feed a future `located_at` read model; **not** a v1 edge kind |
+| [person-service](../../person/person-service-with-axum/) | patient identity | `person:<pid>` on Stay, BedRequest; resolve display name + recorded sex (allocation rule input); locate is keyed by this URN |
+| [worker-service](../../worker/worker-service-with-axum/) | staff identity | `worker:<pid>` for named nurse, consultant, transfer/clean actors |
+| [place-service](../../place/place-service-with-axum/) | physical sites | optional `place:<pid>` on Site/Ward |
+| [organization-service](../../organization/organization-service-with-axum/) | the trust | `organization:<pid>` on Site |
+| [authentication-service](../../authentication/authentication-service-with-axum/) | SSO + tokens | offline PASETO v4.public verification via `authentication-verifier`; ABAC `attrs` |
+| [link-graph-service](../../link/link-graph-service-with-axum/) | (roadmap) | Patient Flow events could feed a future `located_at` read model; **not** a v1 edge kind |
 
 Client modules follow the case-folder precedent: one module per
 upstream service with an `http` implementation and a `stub`

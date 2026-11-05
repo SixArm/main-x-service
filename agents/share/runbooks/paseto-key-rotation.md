@@ -5,7 +5,7 @@ This is the OPS-1 slice for **cross-service token signing key rotation**
 MAC-key rotation, which protects audit rows, not tokens. See
 [`authentication-sessions.md`](../authentication-sessions.md) §5 for the
 design and
-[`authentication/authentication-service-with-loco/config/keys/README.md`](../../../authentication/authentication-service-with-loco/config/keys/README.md)
+[`authentication/authentication-service-with-axum/config/keys/README.md`](../../../authentication/authentication-service-with-axum/config/keys/README.md)
 for the crate-local configuration reference this runbook operationalises
 (and corrects — see §5).
 

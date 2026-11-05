@@ -1,6 +1,6 @@
 # event-front-end-with-svelte
 
-SvelteKit front-end for the **[Event Service](../event-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Event Service](../event-service-with-axum/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
@@ -30,7 +30,7 @@ SvelteKit front-end for the **[Event Service](../event-service-with-loco/)** in 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Event Service and Authentication Service — see [`../event-service-with-loco/README.md`](../event-service-with-loco/README.md). Default for both, per the Configuration table below: `http://localhost:5150`.
+- A running Event Service and Authentication Service — see [`../event-service-with-axum/README.md`](../event-service-with-axum/README.md). Default for both, per the Configuration table below: `http://localhost:5150`.
 
 ## Quick start
 

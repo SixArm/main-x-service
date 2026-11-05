@@ -1,7 +1,7 @@
 ## 9. API Surface
 
 Endpoint detail: [`agents/restful.md`](../agents/restful.md); source:
-[`src/controllers/cases.rs`](../case-service-with-loco/src/controllers/cases.rs).
+[`src/controllers/cases.rs`](../case-service-with-axum/src/controllers/cases.rs).
 
 ### 9.1 Service REST API
 

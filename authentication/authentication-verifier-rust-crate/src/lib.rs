@@ -80,7 +80,7 @@
 //! # Ok::<(), authentication_verifier::VerifyError>(())
 //! ```
 //!
-//! [`authentication-service`]: https://github.com/sixarm/authentication-service-with-loco
+//! [`authentication-service`]: https://github.com/sixarm/authentication-service-with-axum
 //! [`agents/share/authentication-sessions.md`]: https://github.com/sixarm/main-x-service
 //! [`agents/share/authorization-attributes.md`]: https://github.com/sixarm/main-x-service
 

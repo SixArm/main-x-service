@@ -11,7 +11,7 @@ library** for the Main X Index single sign-on.
 ## What this crate is
 
 A dependency-light Rust library that verifies the
-[authentication-service](../authentication-service-with-loco)'s
+[authentication-service](../authentication-service-with-axum)'s
 short-lived **PASETO v4.public** (Ed25519) cross-service tokens
 **offline** against the key set it publishes at
 `/.well-known/paseto-keys`. Peer services embed it; there is no shared

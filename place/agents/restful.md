@@ -3,8 +3,8 @@
 The service owns the REST surface; the front-end is its reference
 consumer. This page is the entity-level orientation — full endpoint
 reference with request/response examples:
-[service agents/restful.md](../place-service-with-loco/agents/restful.md);
-inventory: service [spec §9](../place-service-with-loco/spec/09-api-surface.md).
+[service agents/restful.md](../place-service-with-axum/agents/restful.md);
+inventory: service [spec §9](../place-service-with-axum/spec/09-api-surface.md).
 
 ## Shape of the surface
 

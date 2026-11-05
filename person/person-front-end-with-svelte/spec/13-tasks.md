@@ -1,7 +1,7 @@
 ## 13. Tasks
 
 - [x] T-1: Scaffold SvelteKit project (config, app shell, CSS).
-- [x] T-2: Wire TypeScript types matching `person-service-with-loco/agents/models.md`.
+- [x] T-2: Wire TypeScript types matching `person-service-with-axum/agents/models.md`.
 - [x] T-3: `ApiClient` + `PersonRepository`.
 - [x] T-4: Form primitives (`LabeledField`, `FieldError`, `FieldRow`, `createForm`).
 - [x] T-5: List route with SVAR DataGrid + search box.
@@ -12,7 +12,7 @@
 - [x] T-10: Merge UI with preview.
 - [x] T-11: Vitest unit tests for `ApiClient` + `PersonRepository`.
 - [x] T-12: Playwright e2e smoke for every MVP route.
-- [x] T-12a: Playwright **integration** suite (`tests/integration/golden-paths.spec.ts`) driving the live preview against a running `person-service-with-loco`. 9 tests covering FR-1, FR-3 (×2 — happy path + 409 duplicate), FR-5, FR-6, FR-7, FR-8, FR-9, and per-record audit. Idempotent (timestamped family names + REST `DELETE` cleanup, plus a bounded 409-retry in `apiCreatePerson` — PRO-P4, see OQ-5). Run with `bin/e2e` or `pnpm test:integration`. Harness is validated (svelte-check clean, playwright `--list` discovers all 9 tests, smoke project still 6/6, bin/e2e exits 1 with a clear message when the service is down). **The duplicate-detector test-data interaction that used to fail 3 of 9 is fixed (PRO-P4, 2026-08-29 — see OQ-5). The page-visit auth guard (PRO-H10) + CSRF check (PRO-H5) blocker is also closed (T-27, PRO-P32, 2026-08-29): the suite now signs in for real via a dedicated `setup` project — see OQ-5's final update.** **Fully green 10/10, run twice (2026-09-02, PRO-P4 resumed):** PRO-P32 proved the auth mechanism but never re-ran this suite; doing so live surfaced and closed two real front-end bugs (`createForm` couldn't clone a `$state`-wrapped `initial`, breaking `FR-6`; `match()`/`checkDuplicates()` didn't unwrap the service's real `{matches,…}`/`{potential_matches,…}` envelopes, breaking `FR-8`) plus one operational gap (the container's database was never migrated). See OQ-5's closing update for the full record.
+- [x] T-12a: Playwright **integration** suite (`tests/integration/golden-paths.spec.ts`) driving the live preview against a running `person-service-with-axum`. 9 tests covering FR-1, FR-3 (×2 — happy path + 409 duplicate), FR-5, FR-6, FR-7, FR-8, FR-9, and per-record audit. Idempotent (timestamped family names + REST `DELETE` cleanup, plus a bounded 409-retry in `apiCreatePerson` — PRO-P4, see OQ-5). Run with `bin/e2e` or `pnpm test:integration`. Harness is validated (svelte-check clean, playwright `--list` discovers all 9 tests, smoke project still 6/6, bin/e2e exits 1 with a clear message when the service is down). **The duplicate-detector test-data interaction that used to fail 3 of 9 is fixed (PRO-P4, 2026-08-29 — see OQ-5). The page-visit auth guard (PRO-H10) + CSRF check (PRO-H5) blocker is also closed (T-27, PRO-P32, 2026-08-29): the suite now signs in for real via a dedicated `setup` project — see OQ-5's final update.** **Fully green 10/10, run twice (2026-09-02, PRO-P4 resumed):** PRO-P32 proved the auth mechanism but never re-ran this suite; doing so live surfaced and closed two real front-end bugs (`createForm` couldn't clone a `$state`-wrapped `initial`, breaking `FR-6`; `match()`/`checkDuplicates()` didn't unwrap the service's real `{matches,…}`/`{potential_matches,…}` envelopes, breaking `FR-8`) plus one operational gap (the container's database was never migrated). See OQ-5's closing update for the full record.
 - [x] T-13: SSR-safe load functions using `event.fetch` for SEO-irrelevant but warm-cache wins. *(closed as won't-do, 2026-09-03 — repo `tasks.md` WEB-6)* Contradicts a decision this project already made and states in `AGENTS.md`: `src/routes/+layout.ts` sets `ssr = false` and `prerender = false`, every page is client-rendered, and every entity-API call goes through the same-origin BFF proxy with the browser's session cookie — there is no server-side render in which an `event.fetch` load could run, and no `+page.ts` load exists anywhere in `src/routes/`. The "warm-cache win" would mean re-introducing SSR against the CSR-only + BFF design; if that is ever wanted it is a new decision, not this task.
 - [ ] T-14: Integrate Lily Headless components beyond Button (Dialog for merge confirm, Combobox for identifier system, Banner for error states).
 - [ ] T-15: Identifier / address / emergency-contact edit (currently read-only on detail; edit form re-PUTs whole record but no UI to add/remove sub-records).
@@ -164,7 +164,7 @@
     on reload; confirm a review-queue item end-to-end (seed a
     near-duplicate pair, decide via the panel, assert the queue item's
     status flips and the merge deep-link is seeded correctly) — both run
-    via `bin/e2e` against a live `person-service-with-loco`.
+    via `bin/e2e` against a live `person-service-with-axum`.
 
 - [x] T-31: Audit log has a hard, silent 100-entry cap with no way to see
   older history. `src/routes/persons/[id]/audit/+page.svelte` calls
@@ -176,13 +176,13 @@
   (`src/lib/api/persons.ts` line 274) already accepts a `limit`
   parameter the service's audit endpoint presumably also accepts an
   offset/cursor for — confirm against
-  `person-service-with-loco/agents/models.md` and add paging.
+  `person-service-with-axum/agents/models.md` and add paging.
   - **Acceptance:** `tests/unit/persons.test.ts` pins the paged request
     shape; the audit page gains a "load more" control tested by a
     Playwright smoke test asserting a second page of stubbed entries
     appends rather than replaces the first.
   - **Resolved 2026-09-06.** The presumption was false: confirmed
-    against `person-service-with-loco/src/api/rest/handlers.rs`'s
+    against `person-service-with-axum/src/api/rest/handlers.rs`'s
     `AuditLogQuery` and `src/db/audit.rs::get_logs_for_entity` that the
     service's audit endpoint has **no offset/cursor parameter at all**
     (only `limit`). Paging is therefore driven by re-requesting with a

@@ -37,7 +37,7 @@ out not to hold for this crate specifically, and the reason is worth
 being precise about rather than re-asserting the old blanket claim:
 
 ```sh
-cd case/case-service-with-loco
+cd case/case-service-with-axum
 cargo loco --version
 ```
 
@@ -46,7 +46,7 @@ cargo loco --version
      Running `target/debug/case-service --version`
 ```
 
-That ran. Looking at why: `case/case-service-with-loco/.cargo/config.toml`
+That ran. Looking at why: `case/case-service-with-axum/.cargo/config.toml`
 carries
 
 ```toml
@@ -71,7 +71,7 @@ crate in the family regardless of which one happens to carry the alias.
 ## 1. Start Postgres and case-service, with the outbox transport and the relay on
 
 ```sh
-scripts/test-db.sh up case/case-service-with-loco
+scripts/test-db.sh up case/case-service-with-axum
 ```
 
 ```
@@ -80,7 +80,7 @@ test-db: mxi-case-test-db ready
 ```
 
 ```sh
-cd case/case-service-with-loco
+cd case/case-service-with-axum
 DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_test cargo run -- db migrate
 ```
 
@@ -386,7 +386,7 @@ an actual broker, per `agents/share/event-bus.md` §7 and `src/relay.rs`:
 
 Rebuild with `cargo build --features fluvio`, bring up a **local** broker
 with the crate's own opt-in compose file
-(`case/case-service-with-loco/compose.fluvio.yaml` — a Stream Controller
+(`case/case-service-with-axum/compose.fluvio.yaml` — a Stream Controller
 + SPU pair matching Fluvio's own documented Docker Compose layout,
 completely separate from `compose.test.yaml`), then run with
 `CASE_FLUVIO_ENDPOINT=127.0.0.1:9103` pointed at it. Two guardrails worth
@@ -414,7 +414,7 @@ boundary of that.
 
 ```sh
 # Ctrl-C the cargo run -- start process
-scripts/test-db.sh down case/case-service-with-loco
+scripts/test-db.sh down case/case-service-with-axum
 rm -f /tmp/case-service.log
 ```
 

@@ -5,7 +5,7 @@ Each subproject owns its own test pyramid; the entity level owns the
 
 ### 11.1 Seam 1 — service ↔ matcher: bridge tests
 
-[`tests/duplicate_detection.rs`](../event-service-with-loco/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../event-service-with-axum/tests/duplicate_detection.rs)
 in the service (16 tests) drives service-side records through
 `adapter::to_matcher_event` and asserts on
 `MatchingEngine::match_events` output. It pins **both sides** — the
@@ -27,7 +27,7 @@ front-end against a running service yet — tracked as ET-7.
 
 | Subproject | Layers | Reference |
 |---|---|---|
-| Service | 62+ unit tests; integration tests against real PostgreSQL + Tantivy; 16 bridge tests; Criterion benches; CI (`test.yml`, `quality.yml`, `security.yml`) | [agents/testing.md](../event-service-with-loco/agents/testing.md) |
+| Service | 62+ unit tests; integration tests against real PostgreSQL + Tantivy; 16 bridge tests; Criterion benches; CI (`test.yml`, `quality.yml`, `security.yml`) | [agents/testing.md](../event-service-with-axum/agents/testing.md) |
 | Matcher | Unit + integration + property tests + doctests; `cargo clippy -D warnings` clean; benches | [agents/testing.md](../event-matcher-rust-crate/agents/testing.md) |
 | Front-end | Vitest unit (mocked fetch) + Playwright e2e smoke; `svelte-check` | [agents/testing.md](../event-front-end-with-svelte/agents/testing.md) |
 

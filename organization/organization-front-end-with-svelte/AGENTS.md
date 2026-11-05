@@ -1,6 +1,6 @@
 # AGENTS.md — Organization Front-End
 
-Operator UI for the [Organization Service](../organization-service-with-loco):
+Operator UI for the [Organization Service](../organization-service-with-axum):
 organization CRUD + matching.
 
 > Read [`spec/index.md`](./spec/index.md) first — the living spec.

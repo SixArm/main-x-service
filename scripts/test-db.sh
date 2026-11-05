@@ -19,9 +19,9 @@
 #   scripts/test-db.sh down-all               stop every one of them
 #
 # Typical run:
-#   scripts/test-db.sh up organization/organization-service-with-loco
-#   scripts/ci-check.sh test-db organization/organization-service-with-loco
-#   scripts/test-db.sh down organization/organization-service-with-loco
+#   scripts/test-db.sh up organization/organization-service-with-axum
+#   scripts/ci-check.sh test-db organization/organization-service-with-axum
+#   scripts/test-db.sh down organization/organization-service-with-axum
 #
 # Two databases at once (they would otherwise both want port 5432):
 #   TEST_DB_PORT=5433 scripts/test-db.sh up <other-crate>

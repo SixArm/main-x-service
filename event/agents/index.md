@@ -2,7 +2,7 @@
 
 Entity-level reference documentation for the **event** entity of the
 Main X Index: the trio of
-[event-service-with-loco](../event-service-with-loco/),
+[event-service-with-axum](../event-service-with-axum/),
 [event-matcher-rust-crate](../event-matcher-rust-crate/), and
 [event-front-end-with-svelte](../event-front-end-with-svelte/).
 
@@ -31,7 +31,7 @@ subproject's internals.
 
 | Subproject | Entry point | Highlights |
 |---|---|---|
-| Service | [agents/index.md](../event-service-with-loco/agents/index.md) | [models](../event-service-with-loco/agents/models.md) · [matching](../event-service-with-loco/agents/matching.md) · [restful](../event-service-with-loco/agents/restful.md) · [testing](../event-service-with-loco/agents/testing.md) |
+| Service | [agents/index.md](../event-service-with-axum/agents/index.md) | [models](../event-service-with-axum/agents/models.md) · [matching](../event-service-with-axum/agents/matching.md) · [restful](../event-service-with-axum/agents/restful.md) · [testing](../event-service-with-axum/agents/testing.md) |
 | Matcher | [AGENTS.md](../event-matcher-rust-crate/AGENTS.md) | [architecture](../event-matcher-rust-crate/agents/architecture.md) · [matching-algorithm](../event-matcher-rust-crate/agents/matching-algorithm.md) · [normalization](../event-matcher-rust-crate/agents/normalization.md) · [testing](../event-matcher-rust-crate/agents/testing.md) · [security-and-privacy](../event-matcher-rust-crate/agents/security-and-privacy.md) |
 | Front-end | [AGENTS.md](../event-front-end-with-svelte/AGENTS.md) | [agents/index.md](../event-front-end-with-svelte/agents/index.md) · [testing](../event-front-end-with-svelte/agents/testing.md) |
 

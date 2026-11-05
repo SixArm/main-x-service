@@ -43,13 +43,13 @@ As of 2026-09-05, nine crates depend on this one as a real Cargo `path`
 dependency (`entity-ref = { path = "../../link/entity-ref-rust-crate" }`)
 — not a copy-per-project, despite the framing above:
 
-- **`link-graph-service-with-loco`** — the aggregator (the read model);
+- **`link-graph-service-with-axum`** — the aggregator (the read model);
   by far the heaviest user, importing across `auth.rs`, `consumer.rs`,
   `controllers/graph.rs`, `events.rs`, `graph.rs`, `models/edges.rs`,
   `models/entity_presence.rs`, `probe.rs`, `reconcile.rs`, and
   `suggest/{job,mod}.rs`.
-- **`person-service-with-loco`**, **`worker-service-with-loco`**,
-  **`case-service-with-loco`**, **`care-pathway-service-with-loco`** —
+- **`person-service-with-axum`**, **`worker-service-with-axum`**,
+  **`case-service-with-axum`**, **`care-pathway-service-with-axum`** —
   the four entity services that originate edges (`entity_links`
   write-side + `linked`/`unlinked` events), as the design doc
   anticipated. Care-pathway is the newest of the four (2026-08-24): it
@@ -82,9 +82,9 @@ Cross-service links are still **never** a matcher signal — see
       excluding this crate's own manifest and its `fuzz/`, finds NINE
       consumers today: the eight this README's "Who actually consumes
       this" section names (2026-08-04) plus
-      `care-pathway/care-pathway-service-with-loco`, which is not
+      `care-pathway/care-pathway-service-with-axum`, which is not
       mentioned anywhere in this file.
-      `care-pathway-service-with-loco/Cargo.toml:49` confirms
+      `care-pathway-service-with-axum/Cargo.toml:49` confirms
       `entity-ref = { path = "../../link/entity-ref-rust-crate" }`, and
       `agents/share/cross-service-linking.md` §11 records why: care-pathway
       landed the `continues_as` write-side 2026-08-24 — the **fifth**

@@ -152,52 +152,52 @@
       "items": [
         {
           "title": "person-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/person/person-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/person/person-service-with-axum/spec/index.md",
           "description": "Person (general) identity registry"
         },
         {
           "title": "worker-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/worker/worker-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/worker/worker-service-with-axum/spec/index.md",
           "description": "Worker (workforce/professional) identity registry, plus assessments"
         },
         {
           "title": "place-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/place/place-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/place/place-service-with-axum/spec/index.md",
           "description": "Place registry (schema.org/Place)"
         },
         {
           "title": "thing-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/thing/thing-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/thing/thing-service-with-axum/spec/index.md",
           "description": "Thing/asset registry (schema.org/Thing)"
         },
         {
           "title": "event-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/event/event-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/event/event-service-with-axum/spec/index.md",
           "description": "Time-bounded event registry (schema.org/Event)"
         },
         {
           "title": "course-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/course/course-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/course/course-service-with-axum/spec/index.md",
           "description": "Course-identity registry plus CourseInstance sub-resource"
         },
         {
           "title": "authentication-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/authentication/authentication-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/authentication/authentication-service-with-axum/spec/index.md",
           "description": "Central SSO \u2014 passwordless magic-link, cookie sessions, PASETO v4.public issuance"
         },
         {
           "title": "organization-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/organization/organization-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/organization/organization-service-with-axum/spec/index.md",
           "description": "Organization registry (schema.org/Organization); family FHIR reference implementation"
         },
         {
           "title": "care-pathway-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/care-pathway/care-pathway-service-with-axum/spec/index.md",
           "description": "Clinical care-pathway registry"
         },
         {
           "title": "case-service",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/case/case-service-with-loco/spec/index.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/case/case-service-with-axum/spec/index.md",
           "description": "Governmental case-tracking registry"
         },
         {
@@ -282,8 +282,8 @@
       "title": "Cross-cutting services",
       "items": [
         {
-          "title": "link-graph-service-with-loco",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/link/link-graph-service-with-loco/spec/index.md",
+          "title": "link-graph-service-with-axum",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/link/link-graph-service-with-axum/spec/index.md",
           "description": "Read-model aggregator for cross-service entity linking; carries the family's original OpenTelemetry OTLP exporter"
         }
       ]

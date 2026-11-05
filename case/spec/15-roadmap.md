@@ -17,7 +17,7 @@ is personal data.
   [`agents/share/bulk-import-export.md`](../../agents/share/bulk-import-export.md);
   the case-specific stable keys, CSV columns, and (prominently) the
   export sensitivity posture are declared in
-  [case-service §8.7](../case-service-with-loco/spec/index.md). Because
+  [case-service §8.7](../case-service-with-axum/spec/index.md). Because
   case data is personal/sensitive, export is masked by default, full /
   unmasked or soft-deleted export requires case-read authorisation, and
   every export is audited — a bulk extract must never reveal more than

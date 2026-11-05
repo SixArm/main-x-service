@@ -316,7 +316,7 @@ defects had to be fixed first, none of them from the compliance work:
 ### 12.4y SOUP register and SBOM (delivered 2026-07-27)
 
 Every direct dependency is recorded in
-`person-service-with-loco/compliance/soup.tsv` with a purpose and a
+`person-service-with-axum/compliance/soup.tsv` with a purpose and a
 relevance note, and served as a **CycloneDX 1.5** SBOM at
 `GET /api/compliance/sbom`.
 
@@ -994,7 +994,7 @@ every one of these lands harder here than anywhere else.
   organisation produces; the repository supplies the controls they cite.
 - **Every extended control is unimplemented in this service today** —
   the reference implementation lives in the
-  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/)
+  [care-pathway service](../../care-pathway/care-pathway-service-with-axum/)
   and person is step 3 of the rollout
   ([`spec/compliance` §8.5](../../spec/compliance/index.md)). Until it
   lands, read-auditing, chain integrity, and redaction-based erasure are

@@ -47,4 +47,4 @@ The `score` is preset-independent: `MatchConfig::strict()` (threshold
 the computed `score`.
 
 Part of the Main X Index family; embedded by
-[case-service](../case-service-with-loco).
+[case-service](../case-service-with-axum).

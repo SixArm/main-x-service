@@ -7,7 +7,7 @@
 
   T-31: the service's audit endpoint has no `offset`/cursor parameter
   (only `limit`, newest-first) — confirmed against
-  `person-service-with-loco/src/api/rest/handlers.rs`'s `AuditLogQuery`
+  `person-service-with-axum/src/api/rest/handlers.rs`'s `AuditLogQuery`
   and `db/audit.rs::get_logs_for_entity`, neither of which accepts one.
   "Load more" therefore re-requests with a **larger `limit`** each time
   rather than passing an offset; because the endpoint is newest-first

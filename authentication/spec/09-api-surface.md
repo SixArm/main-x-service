@@ -5,9 +5,9 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 ### 9.1 Service REST API
 
 Source:
-[`src/controllers/auth.rs`](../authentication-service-with-loco/src/controllers/auth.rs),
-[`src/controllers/token.rs`](../authentication-service-with-loco/src/controllers/token.rs),
-[`src/controllers/paseto_keys.rs`](../authentication-service-with-loco/src/controllers/paseto_keys.rs).
+[`src/controllers/auth.rs`](../authentication-service-with-axum/src/controllers/auth.rs),
+[`src/controllers/token.rs`](../authentication-service-with-axum/src/controllers/token.rs),
+[`src/controllers/paseto_keys.rs`](../authentication-service-with-axum/src/controllers/paseto_keys.rs).
 
 Auth column: **Cookie** = `__Host-mxi_session` session cookie;
 **+CSRF** = also requires a valid CSRF token (§6.4c, FR-8f).
@@ -45,7 +45,7 @@ access (T-9) is served instead by the bearer-gated, per-subject
 own data is reachable only by that subject.
 
 Plus loco's default routes (`AppRoutes::with_default_routes()` in
-[`src/app.rs`](../authentication-service-with-loco/src/app.rs)),
+[`src/app.rs`](../authentication-service-with-axum/src/app.rs)),
 including the framework health/ping endpoints.
 
 Responses are **raw loco JSON** — no `{success, data, error}` envelope

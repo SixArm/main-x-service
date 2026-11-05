@@ -3,7 +3,7 @@
 The service is loco.rs and returns **raw JSON** — no
 `{success, data, error}` envelope (unlike the pre-loco person service).
 Source:
-[`src/controllers/cases.rs`](../case-service-with-loco/src/controllers/cases.rs).
+[`src/controllers/cases.rs`](../case-service-with-axum/src/controllers/cases.rs).
 Base URL in development: `http://localhost:5150`.
 
 ## Endpoints

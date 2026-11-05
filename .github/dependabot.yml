@@ -9,7 +9,7 @@
 version: 2
 updates:
   - package-ecosystem: "cargo"
-    directory: "/authentication/authentication-service-with-loco"
+    directory: "/authentication/authentication-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -79,7 +79,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/care-pathway/care-pathway-service-with-loco"
+    directory: "/care-pathway/care-pathway-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -93,7 +93,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/care-pathway/care-pathway-service-with-loco/fuzz"
+    directory: "/care-pathway/care-pathway-service-with-axum/fuzz"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -107,7 +107,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/care-pathway/care-pathway-service-with-loco/migration"
+    directory: "/care-pathway/care-pathway-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -177,7 +177,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/case/case-service-with-loco"
+    directory: "/case/case-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -191,7 +191,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/case/case-service-with-loco/fuzz"
+    directory: "/case/case-service-with-axum/fuzz"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -205,7 +205,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/case/case-service-with-loco/migration"
+    directory: "/case/case-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -303,7 +303,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/course/course-service-with-loco"
+    directory: "/course/course-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -317,7 +317,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/course/course-service-with-loco/migration"
+    directory: "/course/course-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -359,7 +359,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/event/event-service-with-loco"
+    directory: "/event/event-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -373,7 +373,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/event/event-service-with-loco/migration"
+    directory: "/event/event-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -443,7 +443,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/link/link-graph-service-with-loco"
+    directory: "/link/link-graph-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -457,7 +457,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/link/link-graph-service-with-loco/migration"
+    directory: "/link/link-graph-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -499,7 +499,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/organization/organization-service-with-loco"
+    directory: "/organization/organization-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -513,7 +513,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/organization/organization-service-with-loco/fuzz"
+    directory: "/organization/organization-service-with-axum/fuzz"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -527,7 +527,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/organization/organization-service-with-loco/migration"
+    directory: "/organization/organization-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -597,7 +597,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/person/person-service-with-loco"
+    directory: "/person/person-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -611,7 +611,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/person/person-service-with-loco/fuzz"
+    directory: "/person/person-service-with-axum/fuzz"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -625,7 +625,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/person/person-service-with-loco/migration"
+    directory: "/person/person-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -667,7 +667,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/place/place-service-with-loco"
+    directory: "/place/place-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -681,7 +681,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/place/place-service-with-loco/migration"
+    directory: "/place/place-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -723,7 +723,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/thing/thing-service-with-loco"
+    directory: "/thing/thing-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -737,7 +737,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/thing/thing-service-with-loco/migration"
+    directory: "/thing/thing-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -779,7 +779,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/worker/worker-service-with-loco"
+    directory: "/worker/worker-service-with-axum"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -793,7 +793,7 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/worker/worker-service-with-loco/migration"
+    directory: "/worker/worker-service-with-axum/migration"
     schedule:
       interval: "weekly"
       day: "monday"

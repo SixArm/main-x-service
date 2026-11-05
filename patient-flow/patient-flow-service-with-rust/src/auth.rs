@@ -3,7 +3,7 @@
 //! [`AuthUser`] is an Axum extractor that pulls `Authorization: Bearer
 //! <paseto>`, verifies the PASETO `v4.public` (Ed25519) signature, issuer,
 //! audience and expiry against the
-//! [authentication-service](../../../authentication/authentication-service-with-loco)
+//! [authentication-service](../../../authentication/authentication-service-with-axum)
 //! published key set, and yields the verified [`Claims`]. Verification is
 //! stateless and offline — no database hit, no introspection call — so any
 //! handler can require authentication by taking an `AuthUser` argument, and

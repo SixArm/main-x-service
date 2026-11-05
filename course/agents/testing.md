@@ -1,7 +1,7 @@
 # Testing — Course Entity
 
 Orientation only. Per-subproject guides:
-[`course-service/agents/testing.md`](../course-service-with-loco/agents/testing.md),
+[`course-service/agents/testing.md`](../course-service-with-axum/agents/testing.md),
 [`course-matcher/agents/testing.md`](../course-matcher-rust-crate/agents/testing.md),
 [`course-front-end/agents/testing.md`](../course-front-end-with-svelte/agents/testing.md).
 Normative strategy: entity spec [§11](../spec/11-testing-strategy.md).

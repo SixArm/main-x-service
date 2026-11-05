@@ -64,7 +64,7 @@ entity is the family's **reference implementation** of all four (see
 [`spec/compliance` §8](../../spec/compliance/index.md) for the
 repository-wide status). The service-side design and task breakdown
 live in the service spec
-[§12 / §13 T-11–T-14](../care-pathway-service-with-loco/spec/index.md).
+[§12 / §13 T-11–T-14](../care-pathway-service-with-axum/spec/index.md).
 
 | Framework | Engagement here | What it drives |
 |---|---|---|

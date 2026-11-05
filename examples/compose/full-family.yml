@@ -75,7 +75,7 @@ services:
 
   # ---- person -------------------------------------------------------
   person-migrate:
-    build: { context: ../.., dockerfile: person/person-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: person/person-service-with-axum/Dockerfile }
     image: mxi-family-person-service
     entrypoint: ["/app/person-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -88,7 +88,7 @@ services:
     networks: [mxi-family]
 
   person-service:
-    build: { context: ../.., dockerfile: person/person-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: person/person-service-with-axum/Dockerfile }
     image: mxi-family-person-service
     # COMPOSE-WORKER: the Dockerfile's own CMD is server-only ("start"),
     # which never registers BulkJobWorker (loco's connect_workers only
@@ -116,7 +116,7 @@ services:
 
   # ---- worker -------------------------------------------------------
   worker-migrate:
-    build: { context: ../.., dockerfile: worker/worker-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: worker/worker-service-with-axum/Dockerfile }
     image: mxi-family-worker-service
     entrypoint: ["/app/worker-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -129,7 +129,7 @@ services:
     networks: [mxi-family]
 
   worker-service:
-    build: { context: ../.., dockerfile: worker/worker-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: worker/worker-service-with-axum/Dockerfile }
     image: mxi-family-worker-service
     # COMPOSE-WORKER — see person-service's comment above.
     command: ["/app/worker-service", "start", "--server-and-worker"]
@@ -151,7 +151,7 @@ services:
 
   # ---- place ----------------------------------------------------------
   place-migrate:
-    build: { context: ../.., dockerfile: place/place-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: place/place-service-with-axum/Dockerfile }
     image: mxi-family-place-service
     entrypoint: ["/app/place-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -164,7 +164,7 @@ services:
     networks: [mxi-family]
 
   place-service:
-    build: { context: ../.., dockerfile: place/place-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: place/place-service-with-axum/Dockerfile }
     image: mxi-family-place-service
     # COMPOSE-WORKER — see person-service's comment above.
     command: ["/app/place-service", "start", "--server-and-worker"]
@@ -186,7 +186,7 @@ services:
 
   # ---- thing ----------------------------------------------------------
   thing-migrate:
-    build: { context: ../.., dockerfile: thing/thing-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: thing/thing-service-with-axum/Dockerfile }
     image: mxi-family-thing-service
     entrypoint: ["/app/thing-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -199,7 +199,7 @@ services:
     networks: [mxi-family]
 
   thing-service:
-    build: { context: ../.., dockerfile: thing/thing-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: thing/thing-service-with-axum/Dockerfile }
     image: mxi-family-thing-service
     # COMPOSE-WORKER — see person-service's comment above.
     command: ["/app/thing-service", "start", "--server-and-worker"]
@@ -221,7 +221,7 @@ services:
 
   # ---- event ----------------------------------------------------------
   event-migrate:
-    build: { context: ../.., dockerfile: event/event-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: event/event-service-with-axum/Dockerfile }
     image: mxi-family-event-service
     entrypoint: ["/app/event-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -234,7 +234,7 @@ services:
     networks: [mxi-family]
 
   event-service:
-    build: { context: ../.., dockerfile: event/event-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: event/event-service-with-axum/Dockerfile }
     image: mxi-family-event-service
     # COMPOSE-WORKER — see person-service's comment above.
     command: ["/app/event-service", "start", "--server-and-worker"]
@@ -256,7 +256,7 @@ services:
 
   # ---- course ---------------------------------------------------------
   course-migrate:
-    build: { context: ../.., dockerfile: course/course-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: course/course-service-with-axum/Dockerfile }
     image: mxi-family-course-service
     entrypoint: ["/app/course-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -269,7 +269,7 @@ services:
     networks: [mxi-family]
 
   course-service:
-    build: { context: ../.., dockerfile: course/course-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: course/course-service-with-axum/Dockerfile }
     image: mxi-family-course-service
     # COMPOSE-WORKER — see person-service's comment above.
     command: ["/app/course-service", "start", "--server-and-worker"]
@@ -291,7 +291,7 @@ services:
 
   # ---- organization -----------------------------------------------------
   organization-migrate:
-    build: { context: ../.., dockerfile: organization/organization-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: organization/organization-service-with-axum/Dockerfile }
     image: mxi-family-organization-service
     entrypoint: ["/app/organization-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -304,7 +304,7 @@ services:
     networks: [mxi-family]
 
   organization-service:
-    build: { context: ../.., dockerfile: organization/organization-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: organization/organization-service-with-axum/Dockerfile }
     image: mxi-family-organization-service
     # COMPOSE-WORKER — see person-service's comment above.
     command: ["/app/organization-service", "start", "--server-and-worker"]
@@ -326,7 +326,7 @@ services:
 
   # ---- care-pathway -----------------------------------------------------
   care-pathway-migrate:
-    build: { context: ../.., dockerfile: care-pathway/care-pathway-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: care-pathway/care-pathway-service-with-axum/Dockerfile }
     image: mxi-family-care-pathway-service
     entrypoint: ["/app/care-pathway-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -339,7 +339,7 @@ services:
     networks: [mxi-family]
 
   care-pathway-service:
-    build: { context: ../.., dockerfile: care-pathway/care-pathway-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: care-pathway/care-pathway-service-with-axum/Dockerfile }
     image: mxi-family-care-pathway-service
     # COMPOSE-WORKER — see person-service's comment above.
     command: ["/app/care-pathway-service", "start", "--server-and-worker"]
@@ -361,7 +361,7 @@ services:
 
   # ---- case ---------------------------------------------------------
   case-migrate:
-    build: { context: ../.., dockerfile: case/case-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: case/case-service-with-axum/Dockerfile }
     image: mxi-family-case-service
     entrypoint: ["/app/case-service"]
     command: ["db", "migrate", "-e", "production"]
@@ -374,7 +374,7 @@ services:
     networks: [mxi-family]
 
   case-service:
-    build: { context: ../.., dockerfile: case/case-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: case/case-service-with-axum/Dockerfile }
     image: mxi-family-case-service
     # COMPOSE-WORKER — see person-service's comment above.
     command: ["/app/case-service", "start", "--server-and-worker"]
@@ -396,7 +396,7 @@ services:
 
   # ---- authentication (central SSO provider) ---------------------------
   authentication-migrate:
-    build: { context: ../.., dockerfile: authentication/authentication-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: authentication/authentication-service-with-axum/Dockerfile }
     image: mxi-family-authentication-service
     entrypoint: ["/app/authentication-service-cli"]
     command: ["db", "migrate", "-e", "production"]
@@ -416,7 +416,7 @@ services:
     networks: [mxi-family]
 
   authentication-service:
-    build: { context: ../.., dockerfile: authentication/authentication-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: authentication/authentication-service-with-axum/Dockerfile }
     image: mxi-family-authentication-service
     # COMPOSE-WORKER — see person-service's comment above (this crate's
     # binary is authentication-service-cli, matching its Dockerfile CMD).
@@ -443,7 +443,7 @@ services:
   # `auto_migrate: true` (unlike every other crate here), so `start`
   # applies pending migrations itself.
   link-graph-service:
-    build: { context: ../.., dockerfile: link/link-graph-service-with-loco/Dockerfile }
+    build: { context: ../.., dockerfile: link/link-graph-service-with-axum/Dockerfile }
     image: mxi-family-link-graph-service
     # COMPOSE-WORKER — see person-service's comment above. This crate
     # registers no workers today (connect_workers is a no-op), so this

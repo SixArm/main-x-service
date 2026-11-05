@@ -73,9 +73,9 @@ Run from each service crate's own directory, against its own database
 (`DATABASE_URL` / `config/development.yaml` as usual):
 
 ```sh
-cd person/person-service-with-loco       && cargo loco task seed_examples
-cd organization/organization-service-with-loco && cargo loco task seed_examples
-cd case/case-service-with-loco           && cargo loco task seed_examples
+cd person/person-service-with-axum       && cargo loco task seed_examples
+cd organization/organization-service-with-axum && cargo loco task seed_examples
+cd case/case-service-with-axum           && cargo loco task seed_examples
 ```
 
 This seeds 50 persons, 20 organizations, and 10 cases. It does **not**

@@ -59,6 +59,6 @@ Four frameworks impose obligations beyond the table above. Regime detail:
   subset of `Device` is profiled at all.
 - **Every extended control is unimplemented in this service today.** The
   reference implementation is the
-  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/);
+  [care-pathway service](../../care-pathway/care-pathway-service-with-axum/);
   thing adopts the FHIR conformance machinery at step 4 of the rollout
   ([`spec/compliance` §8.5](../../spec/compliance/index.md)).

@@ -49,7 +49,7 @@ container, superuser `loco`/`loco`, on tmpfs so every start is a clean
 `initdb`. Run this from the repository root:
 
 ```sh
-scripts/test-db.sh up person/person-service-with-loco
+scripts/test-db.sh up person/person-service-with-axum
 ```
 
 ```
@@ -60,7 +60,7 @@ test-db: mxi-person-test-db ready
   DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test
 ```
 
-person-service's own [`README.md`](../person/person-service-with-loco/README.md)
+person-service's own [`README.md`](../person/person-service-with-axum/README.md)
 "Local Development" section documents `cargo loco start`. **That doesn't
 work as written in this environment** — `cargo loco` needs a `cargo-loco`
 shim on `PATH`, and only the standalone `loco` binary (the Postgres/Redis
@@ -81,7 +81,7 @@ Point `DATABASE_URL` at the test Postgres and apply migrations
 running it explicitly first makes the empty-database state visible):
 
 ```sh
-cd person/person-service-with-loco
+cd person/person-service-with-axum
 export DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test
 cargo run -- db migrate
 ```
@@ -125,7 +125,7 @@ curl -s http://localhost:5150/api/health
 ## 2. Seed the duplicate pairs
 
 ```sh
-cd person/person-service-with-loco   # if not already there
+cd person/person-service-with-axum   # if not already there
 DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test \
   cargo run -- task seed_examples
 ```
@@ -151,7 +151,7 @@ right next to their match at 1/17: exactly the pairs `POST
 loads them through the model layer instead.)
 
 The task's own doc comment
-([`src/tasks/seed_examples.rs`](../person/person-service-with-loco/src/tasks/seed_examples.rs))
+([`src/tasks/seed_examples.rs`](../person/person-service-with-axum/src/tasks/seed_examples.rs))
 explains why this bypasses the create endpoint, and also states it
 writes **no audit row and publishes no event** — deliberately, so the
 tutorials that exercise duplicate detection, audit, and events do so
@@ -625,7 +625,7 @@ When you're done, stop the dev server (`Ctrl-C`).
 # stop person-service (Ctrl-C, or kill the backgrounded process)
 
 # stop and remove the test Postgres
-scripts/test-db.sh down person/person-service-with-loco
+scripts/test-db.sh down person/person-service-with-axum
 ```
 
 `test-db.sh down` drops the tmpfs-backed container entirely, so the next

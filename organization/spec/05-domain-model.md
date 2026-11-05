@@ -149,7 +149,7 @@ All subprojects MUST uphold:
   the matcher requires it for the always-present name component.
 - The JSONB `data` payload round-trips losslessly through
   `serde_json` (pinned by the service's
-  [`tests/matching.rs`](../organization-service-with-loco/tests/matching.rs)).
+  [`tests/matching.rs`](../organization-service-with-axum/tests/matching.rs)).
 - Identifier values are compared **within a scheme** only; tax IDs
   never match across jurisdictions; classification codes never pin.
 - An `OrganizationRelationship` references an **existing**

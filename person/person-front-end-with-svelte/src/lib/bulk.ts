@@ -1,6 +1,6 @@
 // Client-side rules for the bulk import/export surface.
 //
-// Mirrors `person-service-with-loco/src/bulk/handlers.rs` (the REST layer
+// Mirrors `person-service-with-axum/src/bulk/handlers.rs` (the REST layer
 // of `agents/share/bulk-import-export.md` §4), so the operator learns each
 // constraint from the form rather than from a 400. The server stays
 // authoritative — this is a pre-flight courtesy, never a substitute for

@@ -56,7 +56,7 @@ relative to this landscape is §8.
 
 ### 17.4 Family references
 
-- Subproject specs: [service](../case-service-with-loco/spec/index.md),
+- Subproject specs: [service](../case-service-with-axum/spec/index.md),
   [matcher](../case-matcher-rust-crate/spec/index.md),
   [front-end](../case-front-end-with-svelte/spec/index.md).
 - Entity AGENTS reference set: [`agents/index.md`](../agents/index.md).

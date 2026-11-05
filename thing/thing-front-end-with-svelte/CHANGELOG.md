@@ -102,7 +102,7 @@ name. `pnpm run check` (0/0), `pnpm test` (94/94), `pnpm test:e2e`
 still said GDPR-export download UI was out of scope — it landed
 already (WEB-5). See spec §13 T-30. A separate, still-open backend gap
 the same walkthrough found — `q="*"` never lists anything against the
-real service — is tracked in `thing-service-with-loco`'s own spec §13
+real service — is tracked in `thing-service-with-axum`'s own spec §13
 T-15, not here.
 
 ### Fixed — unreachable authentication service crashed /verify with a raw 500, and new E2E coverage for /signin and /verify (T-23)
@@ -383,8 +383,8 @@ Initial scaffold for the Thing Service front-end. SvelteKit 2 + Svelte 5 runes +
 ### Added
 
 - **Routes (MVP).** Dashboard with service-health + recent-audit feed; things list with name / identifier / additional-type search and SVAR DataGrid (columns: ID, Name, schema.org Type, Primary identifier, URL); create with real-time 409 duplicate detection inline; detail view (identity, additional-type as schema.org URL, identifiers with deep links, alternate names, same-as URLs, images); edit; soft-delete with confirm; per-record audit log; match check (name + description + URL + identifiers + same-as); merge with two-ID preview.
-- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `ThingRepository` binding the [Thing Service REST surface](../thing-service-with-loco/agents/restful.md).
-- **TypeScript types.** Snake-case domain types mirroring [`thing-service-with-loco/agents/models.md`](../thing-service-with-loco/agents/models.md): `Thing` with all 13 schema.org/Thing canonical properties (`name`, `alternate_names`, `description`, `disambiguating_description`, `additional_type`, `url`, `identifiers`, `images`, `main_entity_of_page`, `owner`, `same_as`, `subject_of`, `potential_action`); `ThingIdentifier` with schema.org [`PropertyValue`](https://schema.org/PropertyValue) shape (`property_id`, `value`, optional `name`/`url`); `IdentifierType` (Doi/Isbn/Issn/Gtin/Sku/Mpn/SerialNumber/Uri/Uuid/`{Custom: string}`); `DETERMINISTIC_TYPES` constant lists identifier types that short-circuit matching to score 1.0 (Doi/Isbn/Issn/Gtin/Mpn/SerialNumber/Uuid — Sku/Uri/Custom excluded); `MatchResult` + `MatchConfidence` + `MatchBreakdown` (per-component: name / identifier / description / url / same_as / phonetic flag / deterministic flag); `MergeRequest`/`Record`/`Response`; `BatchDeduplicationRequest`/`Response`; `AuditEntry`.
+- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `ThingRepository` binding the [Thing Service REST surface](../thing-service-with-axum/agents/restful.md).
+- **TypeScript types.** Snake-case domain types mirroring [`thing-service-with-axum/agents/models.md`](../thing-service-with-axum/agents/models.md): `Thing` with all 13 schema.org/Thing canonical properties (`name`, `alternate_names`, `description`, `disambiguating_description`, `additional_type`, `url`, `identifiers`, `images`, `main_entity_of_page`, `owner`, `same_as`, `subject_of`, `potential_action`); `ThingIdentifier` with schema.org [`PropertyValue`](https://schema.org/PropertyValue) shape (`property_id`, `value`, optional `name`/`url`); `IdentifierType` (Doi/Isbn/Issn/Gtin/Sku/Mpn/SerialNumber/Uri/Uuid/`{Custom: string}`); `DETERMINISTIC_TYPES` constant lists identifier types that short-circuit matching to score 1.0 (Doi/Isbn/Issn/Gtin/Mpn/SerialNumber/Uuid — Sku/Uri/Custom excluded); `MatchResult` + `MatchConfidence` + `MatchBreakdown` (per-component: name / identifier / description / url / same_as / phonetic flag / deterministic flag); `MergeRequest`/`Record`/`Response`; `BatchDeduplicationRequest`/`Response`; `AuditEntry`.
 - **Form primitives.** `LabeledField`, `FieldError`, `FieldRow`, `createForm` Svelte 5 rune-based store.
 - **Components.** `SearchBox`, `ThingGrid` (SVAR `Grid` with `select` + `init`/`select-row`), `ThingIdentifierInput` (dynamic add/remove, Custom-type label sub-field, optional per-identifier URL), `ThingForm` (name + additional_type URL + description + disambiguating description + URL + owner + multi-line alternate names + multi-line same_as URLs + identifier list; client-side validation of HTTP(S) URL fields), `MatchResultsList` with breakdown surfacing name / identifier / description / URL / same-as / phonetic / deterministic short-circuit.
 - **Tests.** 5 Vitest unit tests for `ApiClient`, 3 unit tests for `ThingRepository`, 5 Playwright smoke tests covering every MVP route shell.
@@ -397,7 +397,7 @@ Initial scaffold for the Thing Service front-end. SvelteKit 2 + Svelte 5 runes +
 
 ### Cross-references
 
-- Service spec: [`../thing-service-with-loco/spec.md`](../thing-service-with-loco/spec/index.md).
-- Service REST contract: [`../thing-service-with-loco/agents/restful.md`](../thing-service-with-loco/agents/restful.md).
-- Service model types: [`../thing-service-with-loco/agents/models.md`](../thing-service-with-loco/agents/models.md).
-- Service matching reference: [`../thing-service-with-loco/agents/matching.md`](../thing-service-with-loco/agents/matching.md).
+- Service spec: [`../thing-service-with-axum/spec.md`](../thing-service-with-axum/spec/index.md).
+- Service REST contract: [`../thing-service-with-axum/agents/restful.md`](../thing-service-with-axum/agents/restful.md).
+- Service model types: [`../thing-service-with-axum/agents/models.md`](../thing-service-with-axum/agents/models.md).
+- Service matching reference: [`../thing-service-with-axum/agents/matching.md`](../thing-service-with-axum/agents/matching.md).

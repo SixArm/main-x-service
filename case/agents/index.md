@@ -18,7 +18,7 @@ matcher crate + front-end.
 
 | Subproject | Spec | Agent guide | Detailed guides |
 |---|---|---|---|
-| [case-service-with-loco](../case-service-with-loco/) | [spec/index.md](../case-service-with-loco/spec/index.md) | [AGENTS.md](../case-service-with-loco/AGENTS.md) | — (thin; see entity spec §13 T-13) |
+| [case-service-with-axum](../case-service-with-axum/) | [spec/index.md](../case-service-with-axum/spec/index.md) | [AGENTS.md](../case-service-with-axum/AGENTS.md) | — (thin; see entity spec §13 T-13) |
 | [case-matcher-rust-crate](../case-matcher-rust-crate/) | [spec/index.md](../case-matcher-rust-crate/spec/index.md) | [AGENTS.md](../case-matcher-rust-crate/AGENTS.md) | [agents/](../case-matcher-rust-crate/agents/index.md) (algorithm, normalization, SDD, testing) |
 | [case-front-end-with-svelte](../case-front-end-with-svelte/) | [spec/index.md](../case-front-end-with-svelte/spec/index.md) | [AGENTS.md](../case-front-end-with-svelte/AGENTS.md) | — (thin) |
 

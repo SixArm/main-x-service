@@ -57,7 +57,7 @@ record IDs are left intact.
 | Postal address | address lines | per `agents/share/privacy.md` |
 
 The implemented person masker is
-[`mask_person`](../../person/person-service-with-loco/src/privacy/mod.rs);
+[`mask_person`](../../person/person-service-with-axum/src/privacy/mod.rs);
 worker and place ship the analogous `mask_worker` / `mask_place`.
 
 ### 1.3 `mask_value` semantics
@@ -84,7 +84,7 @@ boundary. This was a real fix: the earlier byte-indexed implementation
 panicked on multibyte input such as `"1é345"` (the naive `len - 4` byte
 cut landed *inside* the two-byte `é`). The regression is pinned by
 `test_mask_value_multibyte_does_not_panic`
-([source](../../person/person-service-with-loco/src/privacy/mod.rs)),
+([source](../../person/person-service-with-axum/src/privacy/mod.rs)),
 covering `"1é345"`, `"naïve12"`, `"café"`, and `"Müller-9981"`. The
 practical consequence: accented names and non-Latin identifiers are
 masked correctly and the endpoint cannot be crashed by exotic input.
@@ -103,7 +103,7 @@ GET /<plural>/{id}/export
 ```
 
 Backed by `export_<entity>_data` (e.g.
-[`export_person_data`](../../person/person-service-with-loco/src/privacy/mod.rs)),
+[`export_person_data`](../../person/person-service-with-axum/src/privacy/mod.rs)),
 which serializes the full, **unmasked** record to JSON for the
 data-subject right of access. The export is the complete record
 (identifiers, names, addresses, contacts, documents, dates) — masking
@@ -117,7 +117,7 @@ GET /api/auth/account/export   (bearer token required)
 ```
 
 Implemented in
-[`authentication/.../src/controllers/auth.rs`](../../authentication/authentication-service-with-loco/src/controllers/auth.rs)
+[`authentication/.../src/controllers/auth.rs`](../../authentication/authentication-service-with-axum/src/controllers/auth.rs)
 (`export_account` → `AccountExport`). It bundles three datasets for the
 authenticated subject:
 
@@ -160,9 +160,9 @@ DELETE /api/auth/account   (bearer token required)
 
 The authentication service implements true Art. 17 erasure
 (`erase_account` in
-[`auth.rs`](../../authentication/authentication-service-with-loco/src/controllers/auth.rs),
+[`auth.rs`](../../authentication/authentication-service-with-axum/src/controllers/auth.rs),
 `Model::erase` in
-[`models/users.rs`](../../authentication/authentication-service-with-loco/src/models/users.rs)).
+[`models/users.rs`](../../authentication/authentication-service-with-axum/src/models/users.rs)).
 It is a **soft-delete + anonymise + revoke + audit** sequence:
 
 1. **Soft-delete** — stamp `users.deleted_at`.
@@ -194,7 +194,7 @@ is a no-op `200`.
 ## 4. Consent management
 
 The MPI services model GDPR/DPA consent as a first-class record
-([`models/consent.rs`](../../person/person-service-with-loco/src/models/consent.rs)).
+([`models/consent.rs`](../../person/person-service-with-axum/src/models/consent.rs)).
 
 ### 4.1 Consent model
 
@@ -217,7 +217,7 @@ The MPI services model GDPR/DPA consent as a first-class record
 
 ### 4.2 `has_active_consent` checking utility
 
-[`has_active_consent(consents, consent_type) -> bool`](../../person/person-service-with-loco/src/privacy/mod.rs)
+[`has_active_consent(consents, consent_type) -> bool`](../../person/person-service-with-axum/src/privacy/mod.rs)
 answers whether the subject has granted a given consent type that is
 currently in force. A consent counts when, and only when:
 

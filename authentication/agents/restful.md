@@ -60,10 +60,10 @@ OpenAPI 3 + Swagger UI at `/api-docs/openapi.json` + `/swagger-ui`
 (entity spec §13 T-8; hand-written `src/openapi.rs`).
 
 **Source:**
-[`src/controllers/auth.rs`](../authentication-service-with-loco/src/controllers/auth.rs),
-[`src/controllers/paseto_keys.rs`](../authentication-service-with-loco/src/controllers/paseto_keys.rs)
+[`src/controllers/auth.rs`](../authentication-service-with-axum/src/controllers/auth.rs),
+[`src/controllers/paseto_keys.rs`](../authentication-service-with-axum/src/controllers/paseto_keys.rs)
 (published-key endpoint), routes registered in
-[`src/app.rs`](../authentication-service-with-loco/src/app.rs).
+[`src/app.rs`](../authentication-service-with-axum/src/app.rs).
 
 ## Verifier library API
 

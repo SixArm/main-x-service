@@ -19,7 +19,7 @@ See [`agents/testing.md`](../agents/testing.md). Summary:
   groups — single-pair scoring, deterministic short-circuits, `rank`
   throughput at N=10/100/1000, and per-preset cost — exercising
   `MatchingEngine` directly), and
-  [`course-service-with-loco/benches/matching_bench.rs`](../../course-service-with-loco/benches/matching_bench.rs)
+  [`course-service-with-axum/benches/matching_bench.rs`](../../course-service-with-axum/benches/matching_bench.rs)
   (driven through the service-side `CourseMatcher` facade so that
   baseline reflects production paths). The two are complementary, not
   redundant: this crate's bench measures the library in isolation, the

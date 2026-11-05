@@ -140,11 +140,11 @@ the service's, not this app's: no override exists to create past a
 
 ### Fixed
 
-- **2026-08-29 — PRO-P8: `COURSE_API_URL`'s code fallback (`src/lib/server/config.ts`) fixed from `http://localhost:5150` to `http://localhost:8084`, T-28.** The old fallback silently pointed an unconfigured dev environment at the family's shared generic loco port rather than at `course-service-with-loco`'s own documented dev port; no explicit-choice rationale for 5150 exists anywhere in this project's docs, so this was a copy-paste bug from a sibling front-end, not a deliberate convention. `.env.example`, `README.md`, and `index.md` updated to match (they already documented 8084 as the "real" default and flagged the fallback as wrong).
+- **2026-08-29 — PRO-P8: `COURSE_API_URL`'s code fallback (`src/lib/server/config.ts`) fixed from `http://localhost:5150` to `http://localhost:8084`, T-28.** The old fallback silently pointed an unconfigured dev environment at the family's shared generic loco port rather than at `course-service-with-axum`'s own documented dev port; no explicit-choice rationale for 5150 exists anywhere in this project's docs, so this was a copy-paste bug from a sibling front-end, not a deliberate convention. `.env.example`, `README.md`, and `index.md` updated to match (they already documented 8084 as the "real" default and flagged the fallback as wrong).
 
 ### Documentation
 
-- **2026-08-29 — PRO-P8: corrected the false "the service has no FHIR surface" claim in `AGENTS.md`.** `course-service-with-loco` mounts `/fhir/Basic{,/{id}}` + `/fhir/metadata` (T-20, landed and tested). The absence of a FHIR viewer here is a front-end scope choice — the resource is a deliberately non-standard best-effort `Basic` wrapper (`agents/share/fhir.md` §3), and every sibling front-end likewise ships no FHIR UI — not evidence the backend lacks one.
+- **2026-08-29 — PRO-P8: corrected the false "the service has no FHIR surface" claim in `AGENTS.md`.** `course-service-with-axum` mounts `/fhir/Basic{,/{id}}` + `/fhir/metadata` (T-20, landed and tested). The absence of a FHIR viewer here is a front-end scope choice — the resource is a deliberately non-standard best-effort `Basic` wrapper (`agents/share/fhir.md` §3), and every sibling front-end likewise ships no FHIR UI — not evidence the backend lacks one.
 - **2026-08-04 — DOC-4 pass: recorded the 2026-06-18 BFF auth + i18n
   landing that had never been written down here.** The family-wide
   auth-migration commit (2026-06-18) added this app's full BFF —
@@ -164,9 +164,9 @@ the service's, not this app's: no override exists to create past a
   `COURSE_API_URL`/`AUTH_API_URL`, which `README.md` already named
   right but with the wrong default for `COURSE_API_URL`: it (and
   `index.md`) listed `5150`, mirroring `src/lib/server/config.ts`'s
-  own fallback, but `course-service-with-loco` is the one service in
+  own fallback, but `course-service-with-axum` is the one service in
   the family whose dev config overrides the loco default to `8084`
-  (confirmed live against `course-service-with-loco/config/development.yaml`)
+  (confirmed live against `course-service-with-axum/config/development.yaml`)
   — a developer who skips `cp .env.example .env` gets silently routed
   to the wrong port. Docs now state the real `8084` default; the
   code's own fallback constant is untouched and flagged as T-28
@@ -424,8 +424,8 @@ Initial scaffold for the Course Service front-end. SvelteKit 2 + Svelte 5 runes 
 ### Added
 
 - **Routes (MVP).** Dashboard with service-health + recent-audit feed; courses list with name / identifier / additional-type search and SVAR DataGrid (columns: ID, Name, schema.org Type, Primary identifier, URL); create with real-time 409 duplicate detection inline; detail view (identity, additional-type as schema.org URL, identifiers with deep links, alternate names, same-as URLs, images); edit; soft-delete with confirm; per-record audit log; match check (name + description + URL + identifiers + same-as); merge with two-ID preview.
-- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `CourseRepository` binding the [Course Service REST surface](../course-service-with-loco/agents/restful.md). **Note:** Course Service uses `POST /api/courses/duplicates` (not `/check-duplicates`).
-- **TypeScript types.** Snake-case domain types mirroring [`course-service-with-loco/agents/models.md`](../course-service-with-loco/agents/models.md): `Course` with all 13 schema.org/Course canonical properties (`name`, `alternate_names`, `description`, `disambiguating_description`, `additional_type`, `url`, `identifiers`, `images`, `main_entity_of_page`, `owner`, `same_as`, `subject_of`, `potential_action`); `CourseIdentifier` with schema.org [`PropertyValue`](https://schema.org/PropertyValue) shape (`property_id`, `value`, optional `name`/`url`); `IdentifierType` (Doi/Isbn/Issn/Gtin/Sku/Mpn/SerialNumber/Uri/Uuid/`{Custom: string}`); `DETERMINISTIC_TYPES` constant lists identifier types that short-circuit matching to score 1.0 (Doi/Isbn/Issn/Gtin/Mpn/SerialNumber/Uuid — Sku/Uri/Custom excluded); `MatchResult` + `MatchConfidence` + `MatchBreakdown` (per-component: name / identifier / description / url / same_as / phonetic flag / deterministic flag); `MergeRequest`/`Record`/`Response`; `BatchDeduplicationRequest`/`Response`; `AuditEntry`.
+- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `CourseRepository` binding the [Course Service REST surface](../course-service-with-axum/agents/restful.md). **Note:** Course Service uses `POST /api/courses/duplicates` (not `/check-duplicates`).
+- **TypeScript types.** Snake-case domain types mirroring [`course-service-with-axum/agents/models.md`](../course-service-with-axum/agents/models.md): `Course` with all 13 schema.org/Course canonical properties (`name`, `alternate_names`, `description`, `disambiguating_description`, `additional_type`, `url`, `identifiers`, `images`, `main_entity_of_page`, `owner`, `same_as`, `subject_of`, `potential_action`); `CourseIdentifier` with schema.org [`PropertyValue`](https://schema.org/PropertyValue) shape (`property_id`, `value`, optional `name`/`url`); `IdentifierType` (Doi/Isbn/Issn/Gtin/Sku/Mpn/SerialNumber/Uri/Uuid/`{Custom: string}`); `DETERMINISTIC_TYPES` constant lists identifier types that short-circuit matching to score 1.0 (Doi/Isbn/Issn/Gtin/Mpn/SerialNumber/Uuid — Sku/Uri/Custom excluded); `MatchResult` + `MatchConfidence` + `MatchBreakdown` (per-component: name / identifier / description / url / same_as / phonetic flag / deterministic flag); `MergeRequest`/`Record`/`Response`; `BatchDeduplicationRequest`/`Response`; `AuditEntry`.
 - **Form primitives.** `LabeledField`, `FieldError`, `FieldRow`, `createForm` Svelte 5 rune-based store.
 - **Components.** `SearchBox`, `CourseGrid` (SVAR `Grid` with `select` + `init`/`select-row`), `CourseIdentifierInput` (dynamic add/remove, Custom-type label sub-field, optional per-identifier URL), `CourseForm` (name + additional_type URL + description + disambiguating description + URL + owner + multi-line alternate names + multi-line same_as URLs + identifier list; client-side validation of HTTP(S) URL fields), `MatchResultsList` with breakdown surfacing name / identifier / description / URL / same-as / phonetic / deterministic short-circuit.
 - **Tests.** 5 Vitest unit tests for `ApiClient`, 3 unit tests for `CourseRepository` (pins `/duplicates` not `/check-duplicates`), 5 Playwright smoke tests covering every MVP route shell.
@@ -438,7 +438,7 @@ Initial scaffold for the Course Service front-end. SvelteKit 2 + Svelte 5 runes 
 
 ### Cross-references
 
-- Service spec: [`../course-service-with-loco/spec.md`](../course-service-with-loco/spec/index.md).
-- Service REST contract: [`../course-service-with-loco/agents/restful.md`](../course-service-with-loco/agents/restful.md).
-- Service model types: [`../course-service-with-loco/agents/models.md`](../course-service-with-loco/agents/models.md).
-- Service matching reference: [`../course-service-with-loco/agents/matching.md`](../course-service-with-loco/agents/matching.md).
+- Service spec: [`../course-service-with-axum/spec.md`](../course-service-with-axum/spec/index.md).
+- Service REST contract: [`../course-service-with-axum/agents/restful.md`](../course-service-with-axum/agents/restful.md).
+- Service model types: [`../course-service-with-axum/agents/models.md`](../course-service-with-axum/agents/models.md).
+- Service matching reference: [`../course-service-with-axum/agents/matching.md`](../course-service-with-axum/agents/matching.md).

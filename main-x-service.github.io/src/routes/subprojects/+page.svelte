@@ -4,16 +4,16 @@
     type Row = { name: string; path: string; note: string };
 
     const services: Row[] = [
-        { name: "person-service", path: "person/person-service-with-loco", note: "Person (general)" },
-        { name: "worker-service", path: "worker/worker-service-with-loco", note: "Worker (workforce / professional, incl. assessments)" },
-        { name: "place-service", path: "place/place-service-with-loco", note: "Place (schema.org/Place)" },
-        { name: "thing-service", path: "thing/thing-service-with-loco", note: "Thing (schema.org/Thing)" },
-        { name: "event-service", path: "event/event-service-with-loco", note: "Event (schema.org/Event, time-bounded)" },
-        { name: "course-service", path: "course/course-service-with-loco", note: "Course (+ CourseInstance sub-resource)" },
-        { name: "authentication-service", path: "authentication/authentication-service-with-loco", note: "User — the central SSO provider" },
-        { name: "organization-service", path: "organization/organization-service-with-loco", note: "Organization (schema.org/Organization)" },
-        { name: "care-pathway-service", path: "care-pathway/care-pathway-service-with-loco", note: "Care pathway (clinical pathway)" },
-        { name: "case-service", path: "case/case-service-with-loco", note: "Case (governmental case tracking)" },
+        { name: "person-service", path: "person/person-service-with-axum", note: "Person (general)" },
+        { name: "worker-service", path: "worker/worker-service-with-axum", note: "Worker (workforce / professional, incl. assessments)" },
+        { name: "place-service", path: "place/place-service-with-axum", note: "Place (schema.org/Place)" },
+        { name: "thing-service", path: "thing/thing-service-with-axum", note: "Thing (schema.org/Thing)" },
+        { name: "event-service", path: "event/event-service-with-axum", note: "Event (schema.org/Event, time-bounded)" },
+        { name: "course-service", path: "course/course-service-with-axum", note: "Course (+ CourseInstance sub-resource)" },
+        { name: "authentication-service", path: "authentication/authentication-service-with-axum", note: "User — the central SSO provider" },
+        { name: "organization-service", path: "organization/organization-service-with-axum", note: "Organization (schema.org/Organization)" },
+        { name: "care-pathway-service", path: "care-pathway/care-pathway-service-with-axum", note: "Care pathway (clinical pathway)" },
+        { name: "case-service", path: "case/case-service-with-axum", note: "Case (governmental case tracking)" },
         { name: "project-portfolio-management-service", path: "project-portfolio-management/project-portfolio-management-service-with-loco", note: "Plan (one recursive tree; kind is a label, not a gate)" },
     ];
 
@@ -59,7 +59,7 @@
     ];
 
     const crossCutting: Row[] = [
-        { name: "link-graph-service-with-loco", path: "link/link-graph-service-with-loco", note: "Read-model aggregator for cross-service entity linking" },
+        { name: "link-graph-service-with-axum", path: "link/link-graph-service-with-axum", note: "Read-model aggregator for cross-service entity linking" },
     ];
 
     const sections: { title: string; rows: Row[]; nameLabel: string }[] = [

@@ -33,7 +33,7 @@ Conventions:
 - For repository tests: pin the exact route path (e.g.
   `POST /api/things/check-duplicates` — the path the Thing Service
   serves; see [`spec §9`](../spec/09-api-consumption.md) and
-  [`thing-service-with-loco/agents/restful.md`](../../thing-service-with-loco/agents/restful.md)).
+  [`thing-service-with-axum/agents/restful.md`](../../thing-service-with-axum/agents/restful.md)).
 - For envelope tests: assert that `ApiClient` unwraps `{success,
   data, error}` correctly and surfaces `ApiError` with `isConflict`
   / `isNotFound` / `isValidation` shortcuts.

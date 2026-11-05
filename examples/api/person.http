@@ -1,5 +1,5 @@
 ### person-service — example requests
-# person/person-service-with-loco — "person-style" layout (src/api/rest/).
+# person/person-service-with-axum — "person-style" layout (src/api/rest/).
 # Envelope: {"success":bool,"data":...,"error":{"code","message","details"}}
 # — data/error are ALWAYS both present (never omitted), src/api/mod.rs.
 # Gated by PERSON_REQUIRE_AUTH (default off — see 00-auth-handshake.http

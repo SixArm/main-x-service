@@ -1,6 +1,6 @@
 // Client-side length/format hints for the deterministic identifier
 // schemes the service check-digit-validates server-side (SEC-M5,
-// `organization-service-with-loco/src/validation.rs::identifier_problem`).
+// `organization-service-with-axum/src/validation.rs::identifier_problem`).
 //
 // This is a **pure length/format hint**, not a check-digit
 // re-implementation: it never recomputes LEI's ISO 7064 MOD 97-10 check

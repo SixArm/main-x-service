@@ -16,7 +16,7 @@
 
 Subproject specs:
 
-- [course-service-with-loco/spec](../course-service-with-loco/spec/index.md) — registry service (§1–§18)
+- [course-service-with-axum/spec](../course-service-with-axum/spec/index.md) — registry service (§1–§18)
 - [course-matcher-rust-crate/spec](../course-matcher-rust-crate/spec/index.md) — matching library (§1–§25)
 - [course-front-end-with-svelte/spec](../course-front-end-with-svelte/spec/index.md) — operator UI (§1–§18)
 

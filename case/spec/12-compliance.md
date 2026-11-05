@@ -132,7 +132,7 @@ and the design is broken, not the test.
 ### 12.4y SOUP register and SBOM (delivered 2026-07-27)
 
 Every direct dependency is recorded in
-`case-service-with-loco/compliance/soup.tsv` with a purpose and a
+`case-service-with-axum/compliance/soup.tsv` with a purpose and a
 relevance note, and served as a **CycloneDX 1.5** SBOM at
 `GET /api/compliance/sbom`.
 
@@ -775,6 +775,6 @@ Verified by `GET /api/cases/records/verify`.
   Still absent: the GDPR residency and lawful-basis declarations, and
   FHIR profile and terminology validation. The
   reference implementation remains the
-  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/);
+  [care-pathway service](../../care-pathway/care-pathway-service-with-axum/);
   case is step 3 of the rollout
   ([`spec/compliance` §8.5](../../spec/compliance/index.md)).

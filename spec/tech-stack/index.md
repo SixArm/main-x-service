@@ -37,8 +37,8 @@ is in
 [`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md); the
 summary below maps each concern to its technology and grounds it in the
 representative service manifests
-(`person/person-service-with-loco/Cargo.toml`,
-`organization/organization-service-with-loco/Cargo.toml`).
+(`person/person-service-with-axum/Cargo.toml`,
+`organization/organization-service-with-axum/Cargo.toml`).
 
 | Concern | Technology | Purpose |
 |---|---|---|

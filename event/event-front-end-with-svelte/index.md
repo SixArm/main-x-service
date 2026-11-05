@@ -23,7 +23,7 @@ is [`spec.md`](spec/index.md); deep references live in [`agents/`](agents/).
 
 ## Sibling service
 
-- [`../event-service-with-loco/`](../event-service-with-loco/) — the system of record this UI calls. Its [`spec.md`](../event-service-with-loco/spec/index.md) and [`agents/restful.md`](../event-service-with-loco/agents/restful.md) are the API contract.
+- [`../event-service-with-axum/`](../event-service-with-axum/) — the system of record this UI calls. Its [`spec.md`](../event-service-with-axum/spec/index.md) and [`agents/restful.md`](../event-service-with-axum/agents/restful.md) are the API contract.
 
 ## Route map
 

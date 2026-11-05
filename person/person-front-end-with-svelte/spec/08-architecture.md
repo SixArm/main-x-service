@@ -33,7 +33,7 @@ the implementation.
                            | session -> PASETO        | Bearer PASETO
                            v                           v
                 +-----------------------+   +-----------------------+
-                | authentication-service|   | person-service-with-loco|
+                | authentication-service|   | person-service-with-axum|
                 | magic-link + sessions |   | Axum/loco + SeaORM +   |
                 | + POST /api/auth/token|   | Tantivy                |
                 +-----------------------+   +-----------------------+

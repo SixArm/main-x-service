@@ -69,7 +69,7 @@ what `LocalePicker` itself writes via its own `bcp47LocaleTag`.
 
 `WorkerRepository.search()` read `data.items` from the service's
 search response, but the real service names the field `workers`
-(`worker-service-with-loco/src/api/rest/handlers.rs::SearchResponse`)
+(`worker-service-with-axum/src/api/rest/handlers.rs::SearchResponse`)
 — `items` never matched anything a real `worker-service` sends. Both
 the unit and e2e search stubs made the same wrong assumption, so
 `npm test` and its e2e suite stayed green while `/workers` would have
@@ -186,7 +186,7 @@ rather than leaving it open against work that already shipped.
   `ReviewQueueOptions` argument); "all" is the *absence* of `status`,
   since the endpoint answers `422 INVALID_STATUS` for a token it does
   not know — confirmed against
-  `worker-service-with-loco/src/api/rest/handlers.rs::get_review_queue`,
+  `worker-service-with-axum/src/api/rest/handlers.rs::get_review_queue`,
   which is byte-for-byte the same guard as the person service's, and
   there is no `offset` so page size is the whole pagination story.
 - A **keyboard-reachable path**: the pre-existing SVAR Kanban board's
@@ -202,7 +202,7 @@ rather than leaving it open against work that already shipped.
   The seven components and weights (name 0.30, birth date 0.25, gender
   0.10, address 0.10, identifier 0.10, tax id 0.10, document 0.05) are
   identical in name and value to the person service's own in-service
-  matcher (confirmed against `worker-service-with-loco/src/matching/
+  matcher (confirmed against `worker-service-with-axum/src/matching/
   mod.rs::MatchScoreBreakdown`) — a distinct, much simpler struct from
   the `worker-matcher` reference crate's ~50-component breakdown, which
   does not power this queue.
@@ -222,7 +222,7 @@ rather than leaving it open against work that already shipped.
   compared" must not read as "compared and did not match"), and
   `mergeHref`.
 - **Known gap, verified rather than assumed**: unlike the person
-  service, `worker-service-with-loco`'s `review_queue` table carries no
+  service, `worker-service-with-axum`'s `review_queue` table carries no
   `provenance` column, so this screen cannot surface a provenance badge
   the service does not send. This is a backend gap tracked for the
   service crate, not a front-end omission — see `spec/13-tasks.md` T-25.
@@ -349,8 +349,8 @@ Initial scaffold for the Worker Service front-end. Copy-adapted from `person-fro
 ### Added
 
 - **Routes (MVP).** Dashboard with service-health + recent-audit feed; workers list with full-text / fuzzy / phonetic search and SVAR DataGrid; create with real-time 409 duplicate detection inline; detail view (identity, identifiers, addresses, telecom, emergency contacts); edit; soft-delete with confirm; per-record audit log; match check; merge with two-ID preview.
-- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `WorkerRepository` binding the [Worker Service REST surface](../worker-service-with-loco/agents/restful.md) (`GET /api/health`, CRUD on `/api/workers`, `/search`, `/match`, `/check-duplicates`, `/merge`, `/deduplicate`, `/{id}/audit`, `/{id}/masked`, `/{id}/export`, `/api/audit/recent`).
-- **TypeScript types.** Snake-case domain types mirroring [`worker-service-with-loco/agents/models.md`](../worker-service-with-loco/agents/models.md): `Worker`, `HumanName`, `Address`, `ContactPoint`, `Identifier` (MRN/SSN/DL/NPI/PPN/TAX), `IdentityDocument`, `EmergencyContact`, `WorkerLink`, `MatchResult`, `MergeRequest`/`Record`/`Response`, `BatchDeduplicationRequest`/`Response`, `ReviewQueueItem`, `AuditEntry`.
+- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError`; `WorkerRepository` binding the [Worker Service REST surface](../worker-service-with-axum/agents/restful.md) (`GET /api/health`, CRUD on `/api/workers`, `/search`, `/match`, `/check-duplicates`, `/merge`, `/deduplicate`, `/{id}/audit`, `/{id}/masked`, `/{id}/export`, `/api/audit/recent`).
+- **TypeScript types.** Snake-case domain types mirroring [`worker-service-with-axum/agents/models.md`](../worker-service-with-axum/agents/models.md): `Worker`, `HumanName`, `Address`, `ContactPoint`, `Identifier` (MRN/SSN/DL/NPI/PPN/TAX), `IdentityDocument`, `EmergencyContact`, `WorkerLink`, `MatchResult`, `MergeRequest`/`Record`/`Response`, `BatchDeduplicationRequest`/`Response`, `ReviewQueueItem`, `AuditEntry`.
 - **Form primitives.** `LabeledField`, `FieldError`, `FieldRow`, `createForm` Svelte 5 rune-based store.
 - **Components.** `SearchBox`, `WorkerGrid` (SVAR `Grid` with `select` mode + `init`/`select-row`), `HumanNameInput`, `WorkerForm`, `MatchResultsList`.
 - **Tests.** 5 Vitest unit tests for `ApiClient`, 3 unit tests for `WorkerRepository`, 6 Playwright smoke tests covering every MVP route shell.
@@ -363,7 +363,7 @@ Initial scaffold for the Worker Service front-end. Copy-adapted from `person-fro
 
 ### Cross-references
 
-- Service spec: [`../worker-service-with-loco/spec.md`](../worker-service-with-loco/spec/index.md).
-- Service REST contract: [`../worker-service-with-loco/agents/restful.md`](../worker-service-with-loco/agents/restful.md).
-- Service model types: [`../worker-service-with-loco/agents/models.md`](../worker-service-with-loco/agents/models.md).
-- Service matching reference: [`../worker-service-with-loco/agents/matching.md`](../worker-service-with-loco/agents/matching.md).
+- Service spec: [`../worker-service-with-axum/spec.md`](../worker-service-with-axum/spec/index.md).
+- Service REST contract: [`../worker-service-with-axum/agents/restful.md`](../worker-service-with-axum/agents/restful.md).
+- Service model types: [`../worker-service-with-axum/agents/models.md`](../worker-service-with-axum/agents/models.md).
+- Service matching reference: [`../worker-service-with-axum/agents/matching.md`](../worker-service-with-axum/agents/matching.md).

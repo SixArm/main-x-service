@@ -26,18 +26,18 @@
 # defeat the reason this file exists.
 #
 # --- verified green ---------------------------------------------------
-care-pathway/care-pathway-service-with-loco
-case/case-service-with-loco
-person/person-service-with-loco
-worker/worker-service-with-loco
-organization/organization-service-with-loco
-authentication/authentication-service-with-loco
-course/course-service-with-loco
-event/event-service-with-loco
-link/link-graph-service-with-loco
+care-pathway/care-pathway-service-with-axum
+case/case-service-with-axum
+person/person-service-with-axum
+worker/worker-service-with-axum
+organization/organization-service-with-axum
+authentication/authentication-service-with-axum
+course/course-service-with-axum
+event/event-service-with-axum
+link/link-graph-service-with-axum
 patient-flow/patient-flow-service-with-rust
-place/place-service-with-loco
-thing/thing-service-with-loco
+place/place-service-with-axum
+thing/thing-service-with-axum
 #
 # The last eight were enrolled together on 2026-08-01, after every
 # unenrolled suite was swept through its own container (tasks.md

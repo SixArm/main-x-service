@@ -248,7 +248,7 @@ to those three.
 ### 3.5 Correlation across services
 
 The services form a federation (one per entity) plus the central
-[authentication-service](../../authentication/authentication-service-with-loco).
+[authentication-service](../../authentication/authentication-service-with-axum).
 Trace correlation relies on W3C `traceparent` propagation: an inbound
 request's context is extracted, attached to the request span, and
 propagated outbound on DB / RPC / HTTP calls. On the 8 landed services

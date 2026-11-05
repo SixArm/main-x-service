@@ -1,6 +1,6 @@
 # AGENTS.md — Care Pathway Front-End
 
-Operator UI for the [Care Pathway Service](../care-pathway-service-with-loco):
+Operator UI for the [Care Pathway Service](../care-pathway-service-with-axum):
 care-pathway CRUD + matching + merge + audit trail + registry insights +
 instance tracking (Kanban board / Gantt) + time-based analysis + native
 bulk import/export (CPFE-T7) + the duplicate review queue it feeds

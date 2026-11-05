@@ -118,7 +118,7 @@ compliance claim depends on — so the frameworks engage through the
   convention (`record_best_effort` only inserts) but carries no hash
   linkage, so tampering is currently undetectable rather than merely
   unlikely. The reference implementation is the
-  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/).
+  [care-pathway service](../../care-pathway/care-pathway-service-with-axum/).
 - **Best-effort audit writes are a chain hazard.** `record_best_effort`
   deliberately never fails a request — but a dropped row leaves a gap the
   chain cannot distinguish from a deletion. Adopting the chain here means

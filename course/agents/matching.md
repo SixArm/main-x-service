@@ -7,7 +7,7 @@ crate**; the service embeds it; the front-end renders its breakdowns.
   [`course-matcher/agents/matching-algorithm.md`](../course-matcher-rust-crate/agents/matching-algorithm.md)
   and matcher [spec §5–§18](../course-matcher-rust-crate/spec/index.md)
 - Service-side adapter view:
-  [`course-service/agents/matching.md`](../course-service-with-loco/agents/matching.md)
+  [`course-service/agents/matching.md`](../course-service-with-axum/agents/matching.md)
 - Normalisation rules:
   [`course-matcher/agents/normalization.md`](../course-matcher-rust-crate/agents/normalization.md)
 

@@ -8,7 +8,7 @@ contract:
 + entity spec [§5–§6](../spec/05-domain-model.md); source code: verifier
 [`src/lib.rs`](../authentication-verifier-rust-crate/src/lib.rs) and
 service
-[`src/auth/mod.rs`](../authentication-service-with-loco/src/auth/mod.rs).
+[`src/auth/mod.rs`](../authentication-service-with-axum/src/auth/mod.rs).
 
 > The verifier crate is **already harmonized** to PASETO. The auth
 > service's own issuance is **pivot in progress** — RS256 JWT + JWKS are

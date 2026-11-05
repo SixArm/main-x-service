@@ -1,7 +1,7 @@
 # authentication-verifier — documentation index
 
 Offline PASETO v4.public verification for Main X Index peer services:
-fetch the [authentication-service](../authentication-service-with-loco)
+fetch the [authentication-service](../authentication-service-with-axum)
 Ed25519 public key(s) once, then verify bearer tokens locally — no
 shared secret, no introspection hop. (v0.2.0 pivots from RS256 JWT; see
 [authentication-sessions.md](../../agents/share/authentication-sessions.md) §5.)

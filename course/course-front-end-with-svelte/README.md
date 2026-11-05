@@ -1,6 +1,6 @@
 # course-front-end-with-svelte
 
-SvelteKit front-end for the **[Course Service](../course-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Course Service](../course-service-with-axum/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
@@ -31,7 +31,7 @@ SvelteKit front-end for the **[Course Service](../course-service-with-loco/)** i
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Course Service — see [`../course-service-with-loco/README.md`](../course-service-with-loco/README.md). Default: `http://localhost:8084` (the family allocates `8080` to person-service).
+- A running Course Service — see [`../course-service-with-axum/README.md`](../course-service-with-axum/README.md). Default: `http://localhost:8084` (the family allocates `8080` to person-service).
 
 ## Quick start
 

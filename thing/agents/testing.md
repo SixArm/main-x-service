@@ -7,18 +7,18 @@ detail lives in the per-crate guides — this page is the map.
 
 | Subproject | Commands | Guide |
 |---|---|---|
-| Service | `cargo test --lib` (~100 unit) · `cargo test --tests` (integration) · `cargo bench` (Criterion) | [service agents/testing.md](../thing-service-with-loco/agents/testing.md) |
+| Service | `cargo test --lib` (~100 unit) · `cargo test --tests` (integration) · `cargo bench` (Criterion) | [service agents/testing.md](../thing-service-with-axum/agents/testing.md) |
 | Matcher | `cargo test` (unit + integration + property + doctests) · `cargo clippy --all-targets -- -D warnings` · `cargo doc --no-deps` — all three must be clean | [matcher agents/testing.md](../thing-matcher-rust-crate/agents/testing.md) |
 | Front-end | `pnpm test` — 8 Vitest unit tests + 6 Playwright e2e smoke tests | [front-end agents/testing.md](../thing-front-end-with-svelte/agents/testing.md) |
 
 ## The entity-level pin: bridge tests
 
 ```bash
-cd thing-service-with-loco
+cd thing-service-with-axum
 cargo test --test duplicate_detection
 ```
 
-[`tests/duplicate_detection.rs`](../thing-service-with-loco/tests/duplicate_detection.rs)
+[`tests/duplicate_detection.rs`](../thing-service-with-axum/tests/duplicate_detection.rs)
 — 15 black-box tests driving service-shaped records through
 `adapter::to_matcher_thing` into `MatchingEngine::match_things`. They
 pin **both** the adapter's field routing and the matcher's scoring:

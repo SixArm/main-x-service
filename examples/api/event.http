@@ -1,5 +1,5 @@
 ### event-service — example requests
-# event/event-service-with-loco — "person-style" layout (src/api/rest/).
+# event/event-service-with-axum — "person-style" layout (src/api/rest/).
 # Envelope: {"success":bool,"data":...,"error":...} — data/error ALWAYS
 # both present (never omitted), same shape as person/worker (src/api/mod.rs).
 # Gated by EVENT_REQUIRE_AUTH (default off). No review-queue HTTP surface

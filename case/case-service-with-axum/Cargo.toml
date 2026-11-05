@@ -1,0 +1,189 @@
+[workspace]
+
+[package]
+name = "case-service"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.97"
+publish = true 
+default-run = "case-service"
+authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
+description = "Case service"
+readme = "README.md"
+repository = "https://github.com/sixarm/main-x-service/tree/main/case/case-service-with-axum"
+license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
+keywords = ["case", "social", "medical", "legal", "financial"]
+categories = ["development-tools", "rust-patterns"]
+include = ["src/**/*", "README.md"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue"] }
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
+# CSV codec for the bulk import/export operator/spreadsheet format
+# (BLK-5; `agents/share/bulk-import-export.md` §5). Same version the
+# person reference implementation uses, for one family-wide RFC 4180
+# reader/writer.
+csv = "1"
+tokio = { version = "1.54", default-features = false, features = [
+  "rt-multi-thread",
+] }
+async-trait = { version = "0.1" }
+axum = { version = "0.8" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+regex = { version = "1.13" }
+# Embedded full-text search index (see src/search/). Same version as the
+# rest of the family, so one index format.
+tantivy = { version = "0.27" }
+migration = { path = "migration" }
+sea-orm = { version = "2.0", features = [
+  "sqlx-sqlite",
+  "sqlx-postgres",
+  "runtime-tokio-rustls",
+  "macros",
+] }
+chrono = { version = "0.4" }
+validator = { version = "0.21" }
+uuid = { version = "1.29", features = ["v4", "serde"] }
+include_dir = { version = "0.7" }
+mimalloc = { version = "0.1.52" }
+prometheus = { version = "0.14" }
+# SHA-256 for the tamper-evident audit hash chain (HIPAA §164.312(c)).
+# Also a dev-dependency below, for the in-process token tests.
+sha2 = { version = "0.11" }
+# Second integrity digest. SHA-3 (FIPS 202) is a **sponge** construction,
+# structurally unrelated to SHA-256's Merkle-Damgard chaining, so a
+# cryptanalytic advance against one design family does not transfer to
+# it. See spec/12-compliance.md §12.4z.
+sha3 = "0.12"
+# Keyed integrity (HMAC-SHA256, FIPS 198-1) over the same pre-image, with
+# a key the database never holds — see spec/12-compliance.md §12.4z. The
+# unkeyed digests are forgeable by anyone who can write SQL, since their
+# format is published; this is what raises the bar above that.
+# Keyed integrity MACs with production-grade key handling — one audited
+# implementation shared by every service, rather than a copy per crate.
+integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
+# HKDF-SHA256 (RFC 5869) derives a per-(service, domain) subkey from the
+# configured MAC root key, so a tag cannot transfer between purposes, or
+# between two services sharing one cluster-wide key. See
+# src/compliance/mac.rs and spec/12-compliance.md §12.4z.
+# Wipes the root key from memory once the domain subkeys are derived, so
+# it does not survive in core dumps or swap.
+# OS entropy for the integrity_key task. The operating system CSPRNG
+# directly, not a userspace PRNG.
+
+# Canonical matching algorithm — embedded and used directly as the API DTO.
+case-matcher = { path = "../case-matcher-rust-crate" }
+
+# Cross-service entity-linking contract (EntityRef URN + EdgeKind registry).
+# Case owns the `subject_of` (case → person) edge; the write side depends on
+# this shared crate rather than copy-adapting it (per-task decision).
+entity-ref = { path = "../../link/entity-ref-rust-crate" }
+
+# Offline PASETO v4.public verification against the authentication-service Ed25519 keys (local path; monorepo 0.2 verifier).
+# The `fetch` feature adds `Verifier::from_paseto_keys_url` for the boot-time key-set fetch (`CASE_PASETO_KEYS_URL`).
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false }
+
+# Durable event bus Phase 3 (BUS-1; agents/share/event-bus.md §5/§8):
+# the relay's real broker sink. Optional and behind the `fluvio` feature
+# below so the default dependency tree (and every existing deployment's
+# build) is unchanged — the relay's `LoggingSink` covers dev/CI with no
+# broker at all.
+fluvio = { version = "0.50", optional = true }
+
+# Real OpenTelemetry OTLP export (repo tasks.md PRO-H12, slice 6 of 7 —
+# see src/observability.rs's module docs). This crate declares no `tonic`
+# dependency of its own (no gRPC stub), so the span/metric exporters' own
+# `grpc-tonic` feature needs no rename.
+opentelemetry = { version = "0.33", features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.33", default-features = false, features = [
+  "grpc-tonic",
+  "trace",
+  "metrics",
+] }
+opentelemetry-semantic-conventions = { version = "0.33" }
+tracing-opentelemetry = { version = "0.34" }
+
+[features]
+# PASETO bearer verification (the family default): `Verifier`, the boot key
+# fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
+# deployment whose only bearer credential is a Keycloak access token.
+default = ["paseto"]
+paseto = ["authentication-verifier/paseto", "authentication-verifier/fetch"]
+# Also accept Keycloak (OIDC) access tokens, configured by
+# `CASE_KEYCLOAK_*` (see src/auth.rs). Off by default.
+keycloak = ["authentication-verifier/keycloak"]
+# Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
+# feature to build or test; only `FluvioSink` — the real-broker producer
+# — lives behind this.
+fluvio = ["dep:fluvio"]
+
+[[bin]]
+name = "case-service"
+path = "src/bin/main.rs"
+required-features = []
+
+[dev-dependencies]
+# A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
+# token through the real guard without a Keycloak container. Tests only.
+authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
+criterion = { version = "0.8", features = ["html_reports"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue", "testing"] }
+# `mock`: a `DatabaseConnection` that errors on any query, standing in
+# for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
+# prove a code path never touches the database (src/compliance/disclosure.rs).
+sea-orm = { version = "2.0", features = ["mock"] }
+# `#[tokio::test]` + a local ephemeral-port HTTP listener for the boot-time key-set fetch tests.
+# `time` also lets tests/otlp_collector's `wait_for` poll with
+# `tokio::time::sleep` instead of busy-waiting.
+tokio = { version = "1.54", default-features = false, features = [
+  "rt-multi-thread",
+  "macros",
+  "net",
+  "time",
+] }
+serial_test = { version = "4.0.1" }
+rstest = { version = "0.28" }
+insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }
+# Mint PASETO v4.public tokens + a matching Ed25519 key set in-process so the extractor.s
+# happy path is verified un-gated (no auth-service / network dependency).
+ed25519-dalek = { version = "3.0" }
+rusty_paseto = { version = "0.10", default-features = false, features = ["v4_public", "serde_json"] }
+sha2 = { version = "0.11" }
+base64 = { version = "0.23" }
+# Temp key files for the MAC key-file sourcing tests.
+tempfile = { version = "3" }
+
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
+# `tests/otlp_middleware.rs` (PRO-H12, ported from care-pathway-service):
+# the generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the export pipeline is proved against a real gRPC
+# listener in a normal `cargo test` run — no external collector, nothing
+# `#[ignore]`d.
+opentelemetry-proto = { version = "0.33", default-features = false, features = [
+  "gen-tonic",
+  "trace",
+  "metrics",
+] }
+# Plain `tonic`, not a renamed `package = "tonic"` dev-dependency like
+# person/worker/event needed: this crate carries no gRPC stub of its own,
+# so there is no `E0464` extern-prelude collision to dodge.
+tonic = "0.14"
+tokio-stream = { version = "0.1", features = ["net"] }
+# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
+# HTTP request against a served router; this crate has no other `reqwest`
+# dependency (unlike care-pathway, which has one as a main dependency for
+# its journey traversal).
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls",
+  "json",
+] }
+
+[[bench]]
+name = "service_bench"
+harness = false

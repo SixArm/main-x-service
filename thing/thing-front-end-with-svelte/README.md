@@ -1,6 +1,6 @@
 # thing-front-end-with-svelte
 
-SvelteKit front-end for the **[Thing Service](../thing-service-with-loco/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
+SvelteKit front-end for the **[Thing Service](../thing-service-with-axum/)** in the Main X Index. Built on Svelte 5 (runes), SVAR Svelte DataGrid, and Lily Design System Svelte Headless primitives.
 
 ## What's here
 
@@ -30,8 +30,8 @@ SvelteKit front-end for the **[Thing Service](../thing-service-with-loco/)** in 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Thing Service — see [`../thing-service-with-loco/README.md`](../thing-service-with-loco/README.md). Default: `http://localhost:5150` (loco dev default; see Configuration below).
-- A running Authentication Service for sign-in — see [`../../authentication/authentication-service-with-loco/README.md`](../../authentication/authentication-service-with-loco/README.md). Default: `http://localhost:5150` (a distinct instance/port in a real deployment).
+- A running Thing Service — see [`../thing-service-with-axum/README.md`](../thing-service-with-axum/README.md). Default: `http://localhost:5150` (loco dev default; see Configuration below).
+- A running Authentication Service for sign-in — see [`../../authentication/authentication-service-with-axum/README.md`](../../authentication/authentication-service-with-axum/README.md). Default: `http://localhost:5150` (a distinct instance/port in a real deployment).
 
 ## Quick start
 

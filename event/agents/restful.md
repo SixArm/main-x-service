@@ -3,7 +3,7 @@
 One HTTP surface, owned by the service, versioned under **`/api`**,
 consumed by the front-end (and any agency integrator). Full endpoint
 reference with request/response shapes:
-[`event-service-with-loco/agents/restful.md`](../event-service-with-loco/agents/restful.md).
+[`event-service-with-axum/agents/restful.md`](../event-service-with-axum/agents/restful.md).
 Front-end endpoint-to-route map:
 [front-end spec §9](../event-front-end-with-svelte/spec/09-api-consumption.md).
 

@@ -15,7 +15,7 @@ oversized tasks (`T-2a`, `T-2b`).
   precedent)*
   - [x] ~~Split `spec/index.md` into the 18-file `spec/` layout used by
     the mature entities.~~ — **moot.** Checked directly:
-    `organization-service-with-loco/spec/index.md` already carries the
+    `organization-service-with-axum/spec/index.md` already carries the
     full §1–§18 numbered structure (`## 1. Purpose and vision` through
     `## 18. Change control`) in one file by choice. Root `AGENTS.md`'s
     "Two spec shapes exist" table fixes the numbering as what matters
@@ -32,7 +32,7 @@ oversized tasks (`T-2a`, `T-2b`).
     because "those files restate what the spec already says, and a
     restatement that nobody regenerates is exactly the drift the SDD
     discipline exists to prevent." Confirmed
-    `organization-service-with-loco/` has no crate-level `agents/`
+    `organization-service-with-axum/` has no crate-level `agents/`
     directory today (only its `AGENTS.md` entry point, the newer
     pattern) — that absence is correct per policy; adding the directory
     this task asked for would be the regression, not the fix. (The
@@ -184,7 +184,7 @@ oversized tasks (`T-2a`, `T-2b`).
 - [ ] **T-10 — Durable event bus.**
   - [ ] Replace the in-memory ring buffer behind the same publish
     call (the buffer is the documented swap point in
-    [`src/streaming.rs`](../organization-service-with-loco/src/streaming.rs));
+    [`src/streaming.rs`](../organization-service-with-axum/src/streaming.rs));
     unblocks NFR-2 scale-out.
   - **Acceptance:** events survive a process restart; two replicas
     see one stream.

@@ -1,6 +1,6 @@
 // Client-side rules for the duplicate review queue.
 //
-// Mirrors `organization-service-with-loco/src/controllers/organizations.rs`'s
+// Mirrors `organization-service-with-axum/src/controllers/organizations.rs`'s
 // `ReviewStatus` (the decidable-status guard) and
 // `organization_matcher::MatchBreakdown` (the per-component score object;
 // weights from `organization-matcher-rust-crate/src/config.rs`'s

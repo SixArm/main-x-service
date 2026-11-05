@@ -69,7 +69,7 @@ the ONC row the load-bearing one here.
   yet enforced anywhere in code.
 - **Every extended control is unimplemented in this service today.** The
   reference implementation is the
-  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/);
+  [care-pathway service](../../care-pathway/care-pathway-service-with-axum/);
   organization takes the FHIR conformance machinery at step 4 of the
   rollout ([`spec/compliance` §8.5](../../spec/compliance/index.md)) and
   is the natural second adopter, since it already owns the FHIR pattern.

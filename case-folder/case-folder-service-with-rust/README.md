@@ -25,11 +25,11 @@ records or go offline.
 
 - **[Loco](https://loco.rs)** 0.16 — Rails-style Rust web framework on Axum
 - **PostgreSQL** dependency is currently *vestigial* — Loco still needs a database connection at boot, but the tracker has zero local tables.
-- **[person-service-with-loco](../../person/person-service-with-loco)** — Main Patient Service backend
-- **[place-service-with-loco](../../place/place-service-with-loco)** — Main Place Service backend
-- **[worker-service-with-loco](../../worker/worker-service-with-loco)** — Main Worker Service backend
-- **[thing-service-with-loco](../../thing/thing-service-with-loco)** — Main Thing Service backend *(see caveat below)*
-- **[event-service-with-loco](../../event/event-service-with-loco)** — Main Event Service backend
+- **[person-service-with-axum](../../person/person-service-with-axum)** — Main Patient Service backend
+- **[place-service-with-axum](../../place/place-service-with-axum)** — Main Place Service backend
+- **[worker-service-with-axum](../../worker/worker-service-with-axum)** — Main Worker Service backend
+- **[thing-service-with-axum](../../thing/thing-service-with-axum)** — Main Thing Service backend *(see caveat below)*
+- **[event-service-with-axum](../../event/event-service-with-axum)** — Main Event Service backend
 
 > ⚠️ **Thing-service caveat.** As of writing, `main-thing-service`
 > ships a working web UI but **no REST endpoints yet** — its spec

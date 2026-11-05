@@ -1,6 +1,6 @@
 # care-pathway-front-end-with-svelte
 
-Operator UI for the [Care Pathway Service](../care-pathway-service-with-loco):
+Operator UI for the [Care Pathway Service](../care-pathway-service-with-axum):
 care-pathway **CRUD + matching + merge + audit trail + registry
 insights + instance tracking (board/Gantt)**.
 
@@ -45,7 +45,7 @@ route, which injects the server-exchanged PASETO.
 ## Prerequisites
 
 - Node 20+ and pnpm
-- A running [Care Pathway Service](../care-pathway-service-with-loco)
+- A running [Care Pathway Service](../care-pathway-service-with-axum)
 
 ## Quick start
 

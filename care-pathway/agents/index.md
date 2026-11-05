@@ -18,7 +18,7 @@ service crate + matcher crate + front-end.
 
 | Subproject | Spec | Agent guide | Detailed guides |
 |---|---|---|---|
-| [care-pathway-service-with-loco](../care-pathway-service-with-loco/) | [spec/index.md](../care-pathway-service-with-loco/spec/index.md) | [AGENTS.md](../care-pathway-service-with-loco/AGENTS.md) | — (thin; see entity spec §13 T-1) |
+| [care-pathway-service-with-axum](../care-pathway-service-with-axum/) | [spec/index.md](../care-pathway-service-with-axum/spec/index.md) | [AGENTS.md](../care-pathway-service-with-axum/AGENTS.md) | — (thin; see entity spec §13 T-1) |
 | [care-pathway-matcher-rust-crate](../care-pathway-matcher-rust-crate/) | [spec/index.md](../care-pathway-matcher-rust-crate/spec/index.md) | [AGENTS.md](../care-pathway-matcher-rust-crate/AGENTS.md) | [agents/](../care-pathway-matcher-rust-crate/agents/index.md) (algorithm, normalization, SDD, testing) |
 | [care-pathway-front-end-with-svelte](../care-pathway-front-end-with-svelte/) | [spec/index.md](../care-pathway-front-end-with-svelte/spec/index.md) | [AGENTS.md](../care-pathway-front-end-with-svelte/AGENTS.md) | — (thin) |
 

@@ -1,6 +1,6 @@
 // TypeScript domain types mirroring the Rust Place Service models
 // (schema.org/Place-based). Reference:
-// place-service-with-loco/agents/models.md.
+// place-service-with-axum/agents/models.md.
 
 // ─── HTTP envelope ───────────────────────────────────────────────────
 

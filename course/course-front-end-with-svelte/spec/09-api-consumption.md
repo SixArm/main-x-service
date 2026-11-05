@@ -1,6 +1,6 @@
 ## 9. API Consumption
 
-The front-end binds 1:1 to the Course Service REST surface (see [`course-service-with-loco/agents/restful.md`](../../course-service-with-loco/agents/restful.md)):
+The front-end binds 1:1 to the Course Service REST surface (see [`course-service-with-axum/agents/restful.md`](../../course-service-with-axum/agents/restful.md)):
 
 | Endpoint | Used by |
 | --- | --- |

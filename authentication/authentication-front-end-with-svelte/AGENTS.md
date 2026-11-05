@@ -2,7 +2,7 @@
 
 Entry point for AI coding agents (and humans) working in
 `authentication-front-end-with-svelte`: the operator UI for the
-[Authentication Service](../authentication-service-with-loco).
+[Authentication Service](../authentication-service-with-axum).
 
 > Read [`spec/index.md`](./spec/index.md) — the living spec — first.
 

@@ -15,7 +15,7 @@ manual check confirms it. Split tasks too big for one PR
   applied there in the same pass)*
   - [x] ~~Split the service's single-file `spec/index.md` into the
     numbered §-per-file layout~~ — **moot.** Checked directly:
-    `care-pathway-service-with-loco/spec/index.md` already carries the
+    `care-pathway-service-with-axum/spec/index.md` already carries the
     full §1–§18 numbered structure (`## 1. Purpose and vision` through
     `## 18. Change control`) in one file by choice. Root `AGENTS.md`'s
     "Two spec shapes exist" table fixes the numbering as what matters
@@ -33,7 +33,7 @@ manual check confirms it. Split tasks too big for one PR
     because "those files restate what the spec already says, and a
     restatement that nobody regenerates is exactly the drift the SDD
     discipline exists to prevent." Confirmed
-    `care-pathway-service-with-loco/` has no crate-level `agents/`
+    `care-pathway-service-with-axum/` has no crate-level `agents/`
     directory today (only its `AGENTS.md` entry point, the newer
     pattern) — that absence is correct per policy; adding the directory
     this task asked for would be the regression, not the fix. (The
@@ -238,7 +238,7 @@ manual check confirms it. Split tasks too big for one PR
   - **Acceptance:** Swagger UI serves the seven endpoints; malformed
     code test returns `422`. *(Validation leg met; Swagger leg open.)*
 - [x] **T-10 — Bulk import / export.** **Done, 2026-09-12** (`src/bulk/`
-  in `care-pathway-service-with-loco`). See §9.4, §10.4 and
+  in `care-pathway-service-with-axum`). See §9.4, §10.4 and
   [bulk import/export](../../agents/share/bulk-import-export.md).
   - [x] Reused the **existing** `bulk_jobs` table (shared doc §3 schema,
     `UNIQUE (entity, kind, idempotency_key)`) — already migrated for
@@ -307,7 +307,7 @@ manual check confirms it. Split tasks too big for one PR
   and a runtime posture surface.
   - **Done (2026-07-25):** implemented in the service crate as the
     family's reference implementation — see
-    [service spec §12](../care-pathway-service-with-loco/spec/index.md)
+    [service spec §12](../care-pathway-service-with-axum/spec/index.md)
     and its §13 T-11–T-14 for the per-framework breakdown, and
     [`spec/compliance` §8](../../spec/compliance/index.md) for the
     repository-wide status and the rollout to the other services.

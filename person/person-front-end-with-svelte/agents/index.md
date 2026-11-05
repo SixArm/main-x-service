@@ -23,10 +23,10 @@ Detailed reference documentation for the Person Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../person-service-with-loco/spec.md](../../person-service-with-loco/spec/index.md) | Service spec — system of record |
-| [../../person-service-with-loco/agents/restful.md](../../person-service-with-loco/agents/restful.md) | REST API surface |
-| [../../person-service-with-loco/agents/models.md](../../person-service-with-loco/agents/models.md) | Wire-format domain types |
-| [../../person-service-with-loco/agents/matching.md](../../person-service-with-loco/agents/matching.md) | Matching algorithm reference |
+| [../../person-service-with-axum/spec.md](../../person-service-with-axum/spec/index.md) | Service spec — system of record |
+| [../../person-service-with-axum/agents/restful.md](../../person-service-with-axum/agents/restful.md) | REST API surface |
+| [../../person-service-with-axum/agents/models.md](../../person-service-with-axum/agents/models.md) | Wire-format domain types |
+| [../../person-service-with-axum/agents/matching.md](../../person-service-with-axum/agents/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

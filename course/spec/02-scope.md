@@ -15,7 +15,7 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**course-service-with-loco** owns:
+**course-service-with-axum** owns:
 
 - Course CRUD with soft delete and full audit trail; the
   `CourseInstance` sub-resource (`/api/courses/{id}/instances/*`).

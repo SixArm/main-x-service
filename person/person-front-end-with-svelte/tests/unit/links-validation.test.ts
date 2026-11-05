@@ -1,6 +1,6 @@
 // Unit tests for the client-side cross-service link rules. These mirror
 // the accept/reject matrix pinned on the Rust side by
-// `person-service-with-loco/src/api/rest/links.rs::validate_edge`, so a
+// `person-service-with-axum/src/api/rest/links.rs::validate_edge`, so a
 // drift in either direction shows up as a failing test rather than as a
 // 422 the operator has to interpret.
 import { describe, expect, it } from "vitest";

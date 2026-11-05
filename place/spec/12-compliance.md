@@ -36,7 +36,7 @@ therefore treats residence-linked places with person-grade controls:
 ### 12.3 Subproject obligations
 
 - **Service** — implements every mechanism above; see service
-  [spec §12](../place-service-with-loco/spec/12-compliance.md).
+  [spec §12](../place-service-with-axum/spec/12-compliance.md).
 - **Matcher** — never logs or `Debug`-formats place data; no real
   personal data in tests (synthetic fixtures only); see matcher
   [`agents/security-and-privacy.md`](../place-matcher-rust-crate/agents/security-and-privacy.md).
@@ -76,6 +76,6 @@ Four frameworks impose obligations beyond §12.2. Regime detail:
   it does not decide how precise a masked one should be.
 - **Every extended control is unimplemented in this service today.** The
   reference implementation is the
-  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/);
+  [care-pathway service](../../care-pathway/care-pathway-service-with-axum/);
   place adopts the FHIR conformance machinery at step 4 of the rollout
   ([`spec/compliance` §8.5](../../spec/compliance/index.md)).

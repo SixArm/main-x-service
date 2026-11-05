@@ -1,5 +1,5 @@
 ### worker-service — example requests
-# worker/worker-service-with-loco — "person-style" layout (src/api/rest/).
+# worker/worker-service-with-axum — "person-style" layout (src/api/rest/).
 # Envelope: {"success":bool,"data":...,"error":{"code","message","details"}}
 # — data/error ALWAYS both present, identical shape to person's (src/api/mod.rs).
 # Gated by WORKER_REQUIRE_AUTH (default off).

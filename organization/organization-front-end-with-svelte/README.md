@@ -1,6 +1,6 @@
 # organization-front-end-with-svelte
 
-Operator UI for the [Organization Service](../organization-service-with-loco):
+Operator UI for the [Organization Service](../organization-service-with-axum):
 organization **CRUD + matching**.
 
 SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
@@ -22,7 +22,7 @@ SvelteKit 2 · Svelte 5 (runes) · TypeScript strict · SPA.
 ## Prerequisites
 
 - Node 20+ and pnpm
-- A running [Organization Service](../organization-service-with-loco)
+- A running [Organization Service](../organization-service-with-axum)
 
 ## Quick start
 
@@ -54,7 +54,7 @@ excluding the record itself.
 
 **BFF model (current).** The browser holds **no token** and never calls
 the organization service directly. Sign-in via the central
-[authentication-service](../../authentication/authentication-service-with-loco)
+[authentication-service](../../authentication/authentication-service-with-axum)
 passwordless magic-link establishes a server-side **cookie session**
 (opaque id in a `__Host-mxi_session` httpOnly cookie); the browser talks
 only to this front-end's **own SvelteKit server (BFF)**, which exchanges

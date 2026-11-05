@@ -1,7 +1,7 @@
 # case-front-end-with-svelte — documentation index
 
 Operator UI for case CRUD + matching, consuming the
-[Case Service](../case-service-with-loco).
+[Case Service](../case-service-with-axum).
 
 ## Start here
 

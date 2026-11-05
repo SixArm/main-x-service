@@ -224,7 +224,7 @@ detail lives in
 §2; this section is the repository-side status.
 
 **Reference implementation.** All four are implemented first in the
-[care-pathway service](../../care-pathway/care-pathway-service-with-loco/)
+[care-pathway service](../../care-pathway/care-pathway-service-with-axum/)
 — `src/compliance/` (audit hash chain, disclosure accounting, erasure,
 posture, SOUP/SBOM), `src/fhir/profile.rs` + `src/controllers/fhir.rs`
 (profile/terminology validation, SMART discovery, Bulk Data), and the

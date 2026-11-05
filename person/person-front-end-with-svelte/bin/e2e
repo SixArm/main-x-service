@@ -2,10 +2,10 @@
 # Run the live-service integration suite.
 #
 # Prerequisites:
-#   - person-service-with-loco up at PUBLIC_API_BASE_URL (default
+#   - person-service-with-axum up at PUBLIC_API_BASE_URL (default
 #     http://localhost:8080). Bring it up locally with:
-#       (cd ../person-service-with-loco && podman compose up -d)
-#   - authentication-service-with-loco up, in DEVELOPMENT mode, at
+#       (cd ../person-service-with-axum && podman compose up -d)
+#   - authentication-service-with-axum up, in DEVELOPMENT mode, at
 #     AUTH_API_URL (default http://localhost:5150). Bring it up with:
 #       podman compose -f ../../examples/compose/authentication-dev.yml build
 #       podman compose -f ../../examples/compose/authentication-dev.yml up -d
@@ -40,9 +40,9 @@ if ! curl -fsS --max-time 5 "$API_BASE_URL/api/health" > /dev/null; then
 ERROR: person-service is not reachable at $API_BASE_URL/api/health.
 
 Start it first:
-  (cd ../person-service-with-loco && podman compose up -d)
+  (cd ../person-service-with-axum && podman compose up -d)
 then wait for the service to report healthy:
-  podman compose -f ../person-service-with-loco/docker-compose.yml logs -f person-server
+  podman compose -f ../person-service-with-axum/docker-compose.yml logs -f person-server
 
 Or point at a different URL:
   PUBLIC_API_BASE_URL=http://other.host:1234 bin/e2e

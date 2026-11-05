@@ -1,0 +1,114 @@
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:18-alpine
+    container_name: event-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-event_service}
+      POSTGRES_USER: ${POSTGRES_USER:-event_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-event_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-event_user} -d ${POSTGRES_DB:-event_service}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - event-network
+
+  # Event Service application
+  #
+  # Build context is the REPOSITORY ROOT (two levels up from this
+  # file), not this directory — the Dockerfile COPYs in sibling path
+  # dependencies (integrity-mac, authentication-verifier) that live
+  # outside event/. Run `podman compose up -d` from this directory as
+  # documented below; compose resolves `context: ../..` relative to
+  # this file.
+  event-server:
+    build:
+      context: ../..
+      dockerfile: event/event-service-with-axum/Dockerfile
+    container_name: event-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database configuration
+      DATABASE_URL: postgresql://${POSTGRES_USER:-event_user}:${POSTGRES_PASSWORD:-event_password}@postgres:5432/${POSTGRES_DB:-event_service}
+      DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
+      DATABASE_MIN_CONNECTIONS: ${DATABASE_MIN_CONNECTIONS:-2}
+
+      # Server configuration
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080  # inert for loco boot; PORT (below) is what loco reads
+      PORT: 8080
+
+      # Search configuration
+      SEARCH_INDEX_PATH: /app/data/search_index
+
+      # Matching configuration
+      MATCHING_THRESHOLD: ${MATCHING_THRESHOLD:-0.7}
+      MATCHING_NAME_WEIGHT: ${MATCHING_NAME_WEIGHT:-0.4}
+      MATCHING_DOB_WEIGHT: ${MATCHING_DOB_WEIGHT:-0.3}
+      MATCHING_GENDER_WEIGHT: ${MATCHING_GENDER_WEIGHT:-0.1}
+      MATCHING_ADDRESS_WEIGHT: ${MATCHING_ADDRESS_WEIGHT:-0.2}
+
+      # Logging
+      RUST_LOG: ${RUST_LOG:-info}
+      # Required by loco's config schema (auth.jwt.secret has no
+      # default); unused by this crate's actual auth flow, which is
+      # offline PASETO verification (see agents/share/jwt.md).
+      JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
+      RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
+    ports:
+      - "${EVENT_PORT:-8080}:8080"
+    volumes:
+      - search_index:/app/data/search_index
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - event-network
+
+  # pgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: event-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@event.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_LISTEN_PORT: 80
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - event-network
+    profiles:
+      - tools # Only start with --profile tools
+
+volumes:
+  postgres_data:
+    driver: local
+  search_index:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  event-network:
+    driver: bridge

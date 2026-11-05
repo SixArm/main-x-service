@@ -37,7 +37,7 @@ Each entity directory holds these parts:
 | ---- | ----- | ------- |
 | Front-end | SvelteKit 2 SPA (Svelte 5 runes, SVAR DataGrid, Lily) calling the sibling service's REST API | `person/person-front-end-with-svelte/` |
 | Library crate | A **matcher** (dependency-light pairwise comparison lib) — except `authentication`, whose library is the **verifier** | `person/person-matcher-rust-crate/`, `authentication/authentication-verifier-rust-crate/` |
-| Service crate | The HTTP API service over PostgreSQL | `person/person-service-with-loco/` |
+| Service crate | The HTTP API service over PostgreSQL | `person/person-service-with-axum/` |
 | Entity `spec/` | Entity-level umbrella spec (§1–§18 SDD shape; §13 live task queue) | `person/spec/index.md` |
 | Entity `agents/` | Entity-level agent guide index | `person/agents/index.md` |
 
@@ -74,7 +74,7 @@ under the hood). Characteristics:
 - An `App` type implements loco's `Hooks` (`boot`, `routes`,
   `after_routes`, `connect_workers`, `truncate`, `seed`). It carries no
   state; the framework supplies `AppContext` (DB handle, config) per
-  request. See `organization/organization-service-with-loco/src/app.rs`.
+  request. See `organization/organization-service-with-axum/src/app.rs`.
 - Endpoints are **loco controllers** (`src/controllers/*.rs`) registered
   via `AppRoutes::with_default_routes().add_route(...)`. loco supplies
   default `/_health` and `/_ping`.
@@ -84,7 +84,7 @@ under the hood). Characteristics:
   handles (`pid`, `name`, `active`, soft-delete). The service matches with
   the exact same type it stores, so there is no separate model or adapter
   to drift. (e.g. `organizations` table: `pid`, `name`, `data` JSONB,
-  `active`.) See `organization/organization-service-with-loco/AGENTS.md`.
+  `active`.) See `organization/organization-service-with-axum/AGENTS.md`.
 - Cross-service token verification is wired here: `src/auth.rs`
   (`AuthUser` / `MaybeAuthUser` extractors, `/whoami`) using the embedded
   `authentication-verifier` (target: PASETO v4.public; RS256/JWKS
@@ -98,7 +98,7 @@ Entities: **person, worker, place, thing, event, course.**
 
 These predate the loco conversion and follow a hand-rolled,
 master-patient-index-style layout with explicit layered modules. From
-`person/person-service-with-loco/src/lib.rs`:
+`person/person-service-with-axum/src/lib.rs`:
 
 ```
 src/

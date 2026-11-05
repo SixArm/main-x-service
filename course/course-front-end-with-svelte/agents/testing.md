@@ -7,7 +7,7 @@ Two automated layers plus a manual integration pass, mapped to spec
 |---|---|---|---|
 | Unit | Vitest + jsdom | Mocked `fetch` / in-memory | Pin `ApiClient` envelope handling, `ApiError` mapping, `CourseRepository` wiring, form-store behaviour, `CourseForm` validation |
 | Smoke (e2e) | Playwright | Built SvelteKit preview, no service | Pin route shells render, nav, basic form rendering (mocked) |
-| Live integration | (manual) | `pnpm dev` against a running `course-service-with-loco` | Click through CRUD / match / merge over real HTTP |
+| Live integration | (manual) | `pnpm dev` against a running `course-service-with-axum` | Click through CRUD / match / merge over real HTTP |
 
 There is **no** `tests/integration/` directory and **no**
 `test:integration` script — live integration is the manual pass in the
@@ -105,7 +105,7 @@ test("dashboard renders health badge", async ({ page }) => {
 
 No automated tests. Run `pnpm dev` (or a preview build) with
 `COURSE_API_URL` (and `AUTH_API_URL` for the sign-in flow) pointed at
-a running `course-service-with-loco` (and `authentication-service`),
+a running `course-service-with-axum` (and `authentication-service`),
 then click through one flow per spec §6
 FR: search-finds-record, create-lands-on-detail, inline-409, edit-PUT,
 soft-delete-hides, match-renders-score, merge-soft-deletes-duplicate,

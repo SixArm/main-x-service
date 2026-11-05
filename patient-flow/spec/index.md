@@ -25,11 +25,11 @@ The core questions it answers, in real time:
 - *"Who is ready to go home today, and who is delayed — and why?"*
 
 It is a **consumer application**: it does not register identities
-itself. Patients are [person-service](../../person/person-service-with-loco/)
-records, staff are [worker-service](../../worker/worker-service-with-loco/)
-records, physical sites are [place-service](../../place/place-service-with-loco/)
+itself. Patients are [person-service](../../person/person-service-with-axum/)
+records, staff are [worker-service](../../worker/worker-service-with-axum/)
+records, physical sites are [place-service](../../place/place-service-with-axum/)
 records, and the trust is an
-[organization-service](../../organization/organization-service-with-loco/)
+[organization-service](../../organization/organization-service-with-axum/)
 record. Patient Flow owns only the **operational state**: wards, bays,
 beds, stays, transfers, bed requests, and their audit trail.
 

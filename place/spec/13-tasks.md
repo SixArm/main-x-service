@@ -23,7 +23,7 @@ or clearly described manual check confirms the acceptance criterion.
     grep-consistency across client + test + service route.
     *(2026-06-13)*
   - [x] **Service route test added (2026-09-05).**
-    `place-service-with-loco/tests/check_duplicates_route.rs`: boots the
+    `place-service-with-axum/tests/check_duplicates_route.rs`: boots the
     real hand-rolled router (`api::rest::create_router`, same
     construction `api_integration_test.rs` uses) and proves `POST
     /api/places/check-duplicates` returns `200` with the

@@ -41,8 +41,8 @@
 > coordinated with the front-ends. It sits *above* the per-crate specs:
 >
 > - The **issuing service** behaviour lives in
->   [authentication-service-with-loco/spec](../../authentication/authentication-service-with-loco/spec/index.md)
->   (and its [AGENTS](../../authentication/authentication-service-with-loco/AGENTS.md)).
+>   [authentication-service-with-axum/spec](../../authentication/authentication-service-with-axum/spec/index.md)
+>   (and its [AGENTS](../../authentication/authentication-service-with-axum/AGENTS.md)).
 > - The **peer-side verification library** lives in
 >   [authentication-verifier-rust-crate/spec](../../authentication/authentication-verifier-rust-crate/spec/index.md).
 > - The **blanket enforcement + SSO token-handoff contract** lives in
@@ -154,7 +154,7 @@ token stays cryptographically valid at *peers* until it expires (§5,
 
 The signing/verification material is a **key set**, modelled by
 `auth::AuthKeys` in
-[`src/auth/mod.rs`](../../authentication/authentication-service-with-loco/src/auth/mod.rs):
+[`src/auth/mod.rs`](../../authentication/authentication-service-with-axum/src/auth/mod.rs):
 one **primary** Ed25519 signing key plus zero or more **additional**
 verify-only Ed25519 public keys. (Historical note: this section
 formerly described an RSA/RS256 + JWKS key set; that model is removed
@@ -184,7 +184,7 @@ still verifies until it expires, rotation is downtime-free:
    `TOKEN_EXPIRATION`), drop the old public key from the additional set.
 
 Full operator procedure:
-[`config/keys/README.md`](../../authentication/authentication-service-with-loco/config/keys/README.md)
+[`config/keys/README.md`](../../authentication/authentication-service-with-axum/config/keys/README.md)
 (auth service spec §8.4) and the family runbook
 [`agents/share/runbooks/paseto-key-rotation.md`](../../agents/share/runbooks/paseto-key-rotation.md).
 There is no auto-rotation scheduler yet (follow-up, §16).
@@ -241,7 +241,7 @@ crate in their `src/auth.rs`, verifying **PASETO v4.public**
 | `attrs` | ABAC subject attributes, `BTreeMap<String, Vec<String>>` — absent/empty on old tokens (§7a) |
 
 The auth service's
-[`tests/sign_verify_contract.rs`](../../authentication/authentication-service-with-loco/tests/sign_verify_contract.rs)
+[`tests/sign_verify_contract.rs`](../../authentication/authentication-service-with-axum/tests/sign_verify_contract.rs)
 **pins this contract**: a token signed by `auth::sign_access_token`
 verifies through a `Verifier` built from the service's published key set
 at `/.well-known/paseto-keys`, every claim round-trips, `kid =
@@ -277,7 +277,7 @@ window — see the locality caveat below).
 | `user_agent` | captured at issuance (audit). |
 
 Mechanics (see
-[`src/models/sessions.rs`](../../authentication/authentication-service-with-loco/src/models/sessions.rs)):
+[`src/models/sessions.rs`](../../authentication/authentication-service-with-axum/src/models/sessions.rs)):
 
 - **Issue** — `Model::issue` inserts a row at magic-link redemption,
   setting the idle/absolute TTLs and copying the user's ABAC attributes
@@ -320,7 +320,7 @@ request *volume*, never on whether the account exists).
 | Failure mode | **Fail-open**: a limiter DB error allows the request (logged WARN) — the surrounding handler needs the DB anyway, so failing closed would only lock out legitimate sign-ins on a blip. |
 
 Implementation:
-[`src/rate_limit.rs`](../../authentication/authentication-service-with-loco/src/rate_limit.rs)
+[`src/rate_limit.rs`](../../authentication/authentication-service-with-axum/src/rate_limit.rs)
 (`check` / clock-injectable `check_at(db, key, now)` / `reset` test
 helper). The advisory-lock pattern is the canonical example documented
 in [postgresql §9](../postgresql/index.md) (concurrency: transactions &
@@ -571,7 +571,7 @@ and the privacy posture in
 | Coordinated enforcement + SSO handoff contract | [agents/share/jwt-enforcement.md](../../agents/share/jwt-enforcement.md) |
 | **Authorization (SOURCE OF TRUTH — ABAC: attrs claim + policy language)** | [agents/share/authorization-attributes.md](../../agents/share/authorization-attributes.md) |
 | Cross-cutting security invariants + the `REQUIRE_AUTH` activation gate | [agents/share/security.md](../../agents/share/security.md) |
-| Issuing service (behaviour, endpoints, tests) | [authentication-service-with-loco/spec](../../authentication/authentication-service-with-loco/spec/index.md) · [AGENTS](../../authentication/authentication-service-with-loco/AGENTS.md) |
+| Issuing service (behaviour, endpoints, tests) | [authentication-service-with-axum/spec](../../authentication/authentication-service-with-axum/spec/index.md) · [AGENTS](../../authentication/authentication-service-with-axum/AGENTS.md) |
 | Peer-side verification library | [authentication-verifier-rust-crate/spec](../../authentication/authentication-verifier-rust-crate/spec/index.md) |
 | Advisory locks / transactions (rate limiter) | [spec/postgresql](../postgresql/index.md) §9 |
 | Audit + event streaming posture | [agents/share/auditability.md](../../agents/share/auditability.md) |

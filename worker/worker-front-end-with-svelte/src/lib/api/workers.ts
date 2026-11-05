@@ -75,7 +75,7 @@ export class WorkerRepository {
    * Normalizes the two response shapes the service may emit (a bare array,
    * or `{ workers, total }`) into a single `{ items, total }` result so
    * callers don't have to branch. `workers` is the real service's field
-   * name (worker-service-with-loco/src/api/rest/handlers.rs::SearchResponse)
+   * name (worker-service-with-axum/src/api/rest/handlers.rs::SearchResponse)
    * — this used to say `items`, a name the service never actually
    * sends, found only by running this client against a real
    * worker-service (mirrors the identical bug found and fixed in

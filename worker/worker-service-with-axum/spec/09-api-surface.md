@@ -1,0 +1,146 @@
+## 9. API Surface
+
+Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
+
+API URLs are version-free (`/api/workers`, not `/api/v1/workers`);
+clients select the representation version with the `Accepts-version`
+request header (default `1.0`) — see
+[`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+Implemented by `src/api/rest/version.rs` (`require_version_mw`).
+
+| Tier | Surface |
+|---|---|
+| REST (Axum) | 16 endpoints under `/api/workers/*` + `/api/audit/*` + `/api/health` — including `GET /api/workers`, the database-backed collection list added after a live investigation (on the sibling person-service) found `/workers/search?q=*` unreliable for enumeration (see `CHANGELOG.md`) |
+| Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
+| FHIR R5 (Axum) | `Practitioner` CRUD + search under `/fhir/Practitioner` + `/fhir/metadata` (the standard `agents/share/fhir.md` §3 mapping; handlers implemented and **mounted** via `fhir_routes()` in `App::routes`; pinned by `tests/api_integration_test.rs::test_fhir_practitioner_route_is_mounted`, which asserts the `/fhir/Practitioner` route) |
+| gRPC (Tonic) | Real server (T-6, 2026-09-02): `CreateWorker` / `GetWorker` / `ListWorkers` / `DeleteWorker` on `WorkerService`, generated from `proto/worker.proto`, spawned on `grpc_port` alongside the REST router. No `UpdateWorker` RPC yet, and the proto `Worker` message is a partial projection (identification + demographics only) — see spec §13 T-6 |
+| Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
+| Docs | Swagger UI at `/swagger-ui` (OpenAPI 3.0 via utoipa) |
+
+Standard response envelope. `409` on duplicate-detected create; `422`
+on validation failure.
+
+Authentication is opt-in per handler by default: taking an `AuthUser`
+argument requires a valid `Authorization: Bearer <paseto>` token,
+verified offline (PASETO `v4.public`, Ed25519) against the auth-service
+published key set (see §13 T-1a). The key set comes from
+`WORKER_PASETO_KEYS` (key-set JSON), or — when `WORKER_PASETO_KEYS_URL`
+is set — is fetched once at boot from that URL
+(`/.well-known/paseto-keys` on the auth service); the fetched set wins
+over the env key set, and any fetch failure logs a warning and falls
+back to the env path, so the service **always boots** (§13 T-1b fetch
+item; no refresh loop). **Blanket enforcement** (§13 T-1b) is
+implemented and **off by default**: when `WORKER_REQUIRE_AUTH` is truthy
+(`1`/`true`/`yes`/`on`; read once at router construction — restart to
+change), every route on both router surfaces requires a valid bearer
+token and returns `401` otherwise, except the public allow-list:
+`/_health`, `/_ping`, `/api/health`, `/api-docs/openapi.json`,
+`/metrics.prom`, and `/swagger-ui*`. The `/fhir` surface is deliberately
+protected (worker PII).
+
+Authorization (ABAC, inside the same guard — so only when
+`WORKER_REQUIRE_AUTH` is on): the request's action is derived from the
+HTTP method plus this crate's destructive named POSTs
+(`auth::DESTRUCTIVE_POST_SUFFIXES`: `/merge`, `/deduplicate`,
+`/import`), and the shared engine in `authentication-verifier` 0.3
+evaluates the configured policy (`WORKER_ABAC_POLICY` inline JSON /
+`WORKER_ABAC_POLICY_FILE`; unset/unparsable ⇒ built-in default: any
+authenticated subject reads, `access=write` writes, `access=admin`
+adds delete/merge/deduplicate, `svc=true` does everything) over the
+token's `attrs` claim. A valid token the policy denies gets `403`
+with the deciding rule; see
+[authorization-attributes](../../../agents/share/authorization-attributes.md).
+
+### 9.1 Cross-service link endpoints
+
+Worker is a link **originator** in the federated cross-service graph
+(domain model §5.4). Its outbound-edge surface, mirroring the existing
+controller style:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/workers/{pid}/links` | create/upsert an outbound edge (`same_identity` → person, `employed_by` → organization) |
+| `GET` | `/api/workers/{pid}/links` | list this worker's outbound edges |
+| `DELETE` | `/api/workers/{pid}/links/{id}` | soft-delete an edge (emits `unlinked`) |
+
+Writes are **optimistic** — the assertion is stored and a `linked` /
+`unlinked` event is published; the target service is **not** called
+(§8.6). Verification status is the read-side aggregator's concern, not
+returned here. Graph traversal (`neighbors` / `single-view`) lives in the
+separate `link-graph-service-with-axum` aggregator, not this service. See
+[cross-service linking §4.1](../../../agents/share/cross-service-linking.md).
+
+These three per-record endpoints return the crate's uniform
+`{success,data,error}` envelope (`ApiResponse<T>`), matching every other
+worker REST endpoint — fixed 2026-08-03; they previously returned bare
+JSON, which a front-end client that unwraps `.data` would have silently
+read as `undefined` rather than erroring. The bulk aggregator endpoint
+(`GET /api/workers/links`) is deliberately **not** wrapped: it stays bare
+`{"edges": [...]}` for the link-graph aggregator's HTTP client, which
+deserializes that shape directly.
+
+### 9.2 Assessment endpoints
+
+Workforce assessments (domain model §5.5) are a **sub-resource of a
+worker**, so every request loads the worker first (`404` when unknown)
+and authorises at the *worker* level through the record-level ABAC guard
+(`authorize_record`) — reading a worker's psychometric profile is gated
+exactly like reading the worker, recording one like writing it. As
+everywhere in the family, this is a no-op while `WORKER_REQUIRE_AUTH` is
+off.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/workers/{id}/assessments` | record an administration (`201`) |
+| `GET` | `/api/workers/{id}/assessments` | list live assessments (`?category=&status=&valid_on=`) |
+| `GET` | `/api/workers/{id}/assessments/{assessment_id}` | fetch one |
+| `PUT` | `/api/workers/{id}/assessments/{assessment_id}` | update (status move, scoring, corrections) |
+| `DELETE` | `/api/workers/{id}/assessments/{assessment_id}` | withdraw (soft delete) |
+| `GET` | `/api/workers/{id}/assessment-profile` | the derived cross-category profile (`?as_of=`) |
+
+**Lookups are worker-scoped.** An `assessment_id` belonging to a
+different worker is a `404`, never a disclosure.
+
+**Update semantics.** Omitted fields are left untouched; an explicit
+`null` on `provider` / `notes` / `administered_by` / the dates *clears*
+the stored value. A `status` change must be legal for the stored status,
+and the **merged** record is re-validated before persisting — an update
+can never reach a state a create would have refused. An empty update is
+a `422`.
+
+**Profile (`assessment-profile`).** Per category: how many assessments
+are recorded, how many are current as of the date, the **current reading
+per scale** (the most recently administered current assessment that
+reports it), and which of the category's own scales have *no* current
+reading. Plus `selection_suitability` — the mean percentile of current
+selection results. Every figure is derived from real scores only: a
+missing score yields `null`, never an interpolated or zero value, and
+the payload carries a `derivation` string stating exactly how it was
+computed.
+
+**Sensitivity (§5.5).** Reads honour the ABAC `mask` obligation on
+**every** path — the single fetch, the list, and the profile: bands
+survive; raw scores, percentiles, narratives, operator notes, and the
+suitability mean do not (security invariant 5 — a bulk or aggregate read
+must never reveal more than the equivalent single read). Every
+assessment read and every mutation writes an audit row.
+
+Unknown `category` / `status` tokens (in a body or a filter) are `422`
+naming the closed vocabulary; validation failures return the full
+problem list (§5.5 invariants).
+
+
+> **2026-07-19 — stored review queue + decision endpoints.** The batch
+> scan now **persists** its candidate pairs in a `review_queue` table
+> (migration `m20260719_000001`; normalized pair order under a UNIQUE
+> constraint, so a re-scan upserts in place: score columns refresh,
+> decided rows keep their decision, and item ids are stable across
+> scans — the scan response reports the stored rows). Two endpoints:
+> `GET /api/workers/review-queue[?status=&limit=]` lists the stored
+> queue (newest first, limit cap 500; unknown status token → `422`),
+> and `POST /api/workers/review-queue/{id}/decision` with
+> `{"status": "confirmed" | "rejected"}` decides a `pending` item —
+> the transition guard is first-writer-wins in SQL (`404` unknown id,
+> `422` already decided); the reviewer identity is the verified bearer `sub` (or absent).
+> Under ABAC the decision POST derives as a `write` action (not
+> destructive-classed).

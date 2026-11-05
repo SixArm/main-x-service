@@ -1,7 +1,7 @@
 ## 4. Glossary
 
 Entity-level terms. Per-subproject vocabularies: service
-[spec §4](../care-pathway-service-with-loco/spec/index.md), matcher
+[spec §4](../care-pathway-service-with-axum/spec/index.md), matcher
 [spec §3](../care-pathway-matcher-rust-crate/spec/index.md),
 front-end
 [spec §4](../care-pathway-front-end-with-svelte/spec/index.md).

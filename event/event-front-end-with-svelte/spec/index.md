@@ -4,7 +4,7 @@
 >
 > **Three-part PRs.** A behavioural change is one PR: spec edit + code edit + test edit.
 
-For the underlying service contract, see [`../event-service-with-loco/spec.md`](../../event-service-with-loco/spec/index.md). For shared MXI guidance (REST conventions, observability, compliance), see [`../AGENTS.md`](../../../AGENTS.md) and [`../agents/share/`](../../../agents/share/).
+For the underlying service contract, see [`../event-service-with-axum/spec.md`](../../event-service-with-axum/spec/index.md). For shared MXI guidance (REST conventions, observability, compliance), see [`../AGENTS.md`](../../../AGENTS.md) and [`../agents/share/`](../../../agents/share/).
 
 ## Table of contents
 

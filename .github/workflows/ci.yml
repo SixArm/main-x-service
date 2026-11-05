@@ -357,4 +357,4 @@ jobs:
       # so this can run after — headroom for the cache-save step.
       - name: clean care-pathway's target/ (headroom for the cache-save step)
         if: always()
-        run: rm -rf care-pathway/care-pathway-service-with-loco/target
+        run: rm -rf care-pathway/care-pathway-service-with-axum/target

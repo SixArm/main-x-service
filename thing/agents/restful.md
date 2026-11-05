@@ -2,7 +2,7 @@
 
 The service exposes 15 REST endpoints; the front-end consumes them
 1:1. Full endpoint reference with payloads and library API:
-[service agents/restful.md](../thing-service-with-loco/agents/restful.md).
+[service agents/restful.md](../thing-service-with-axum/agents/restful.md).
 Endpoint-by-route consumption map:
 [front-end spec §9](../thing-front-end-with-svelte/spec/09-api-consumption.md).
 

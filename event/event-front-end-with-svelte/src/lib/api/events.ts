@@ -32,7 +32,7 @@ export interface SearchOptions {
  * Construct one per page/component — there is no global HTTP store.
  */
 // REST client for Event Service. Endpoints are mounted under
-// `/api/` — see event-service-with-loco/agents/restful.md.
+// `/api/` — see event-service-with-axum/agents/restful.md.
 export class EventRepository {
   /** @param http - The underlying {@link ApiClient} used for all calls. */
   constructor(private readonly http: ApiClient) {}
@@ -54,7 +54,7 @@ export class EventRepository {
    * Normalizes the two response shapes the service may return (a bare
    * array, or an `{ events, total }` object) into a consistent
    * `{ items, total }` result. `events` is the real service's field
-   * name (event-service-with-loco/src/api/rest/handlers.rs::SearchResponse)
+   * name (event-service-with-axum/src/api/rest/handlers.rs::SearchResponse)
    * — this used to say `items`, a name the service never actually
    * sends, found only by running this client against a real
    * event-service (mirrors the identical bug found and fixed in

@@ -89,7 +89,7 @@ or clearly described manual check confirms it. Split oversized tasks
   - [x] Crate docs still link `../../agents/share/…` and
     `../../AGENTS.md`, which after nesting resolve inside `person/`
     and dangle; sibling-entity links (e.g.
-    `../../worker-service-with-loco/`) dangle likewise.
+    `../../worker-service-with-axum/`) dangle likewise.
   - **Acceptance:** a link-checker pass over `person/**/*.md` reports
     no broken relative links. *(Done 2026-06-13: repo-root links
     re-pointed `../`→`../../` / `../../`→`../../../`, cross-entity
@@ -98,7 +98,7 @@ or clearly described manual check confirms it. Split oversized tasks
     (`rust-loco-stack.md`, `rust-tracing-opentelemetry-stack.md`,
     `loco.md`). Link-checker over the three subprojects: 288 relative
     links resolve; the only remaining broken links are pre-nesting
-    rot in `person-service-with-loco/README.md` + `index.md`
+    rot in `person-service-with-axum/README.md` + `index.md`
     pointing at never-committed files — LICENSE / LICENSE-MIT /
     LICENSE-APACHE / ARCHITECTURE.md / API_GUIDE.md / task-10.md —
     plus a pre-existing dangling `@agents/architecture.md` include in

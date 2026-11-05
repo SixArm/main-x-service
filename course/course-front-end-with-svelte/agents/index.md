@@ -23,10 +23,10 @@ Detailed reference documentation for the Course Service front-end.
 
 | Document | Description |
 |---|---|
-| [../../course-service-with-loco/spec.md](../../course-service-with-loco/spec/index.md) | Service spec — system of record |
-| [../../course-service-with-loco/agents/restful.md](../../course-service-with-loco/agents/restful.md) | REST API surface |
-| [../../course-service-with-loco/agents/models.md](../../course-service-with-loco/agents/models.md) | Wire-format domain types |
-| [../../course-service-with-loco/agents/matching.md](../../course-service-with-loco/agents/matching.md) | Matching algorithm reference |
+| [../../course-service-with-axum/spec.md](../../course-service-with-axum/spec/index.md) | Service spec — system of record |
+| [../../course-service-with-axum/agents/restful.md](../../course-service-with-axum/agents/restful.md) | REST API surface |
+| [../../course-service-with-axum/agents/models.md](../../course-service-with-axum/agents/models.md) | Wire-format domain types |
+| [../../course-service-with-axum/agents/matching.md](../../course-service-with-axum/agents/matching.md) | Matching algorithm reference |
 
 ## Shared family docs
 

@@ -1,10 +1,10 @@
 # Agent guide — worker-front-end-with-svelte
 
-Sibling to [`worker-service-with-loco/`](../worker-service-with-loco/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
+Sibling to [`worker-service-with-axum/`](../worker-service-with-axum/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
 
 ## Single source of truth
 
-- The service's [`spec.md`](../worker-service-with-loco/spec/index.md) and [`agents/`](../worker-service-with-loco/agents/) describe the API contract. If a field disappears from `Worker` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
+- The service's [`spec.md`](../worker-service-with-axum/spec/index.md) and [`agents/`](../worker-service-with-axum/agents/) describe the API contract. If a field disappears from `Worker` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
 - This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
 
 ## Three-part change rule

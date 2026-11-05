@@ -3,7 +3,7 @@
 import * as env from "$app/env/private";
 
 /** Course service base URL — the proxy forwards entity-API calls here
- *  with a server-injected PASETO. course-service-with-loco is the one
+ *  with a server-injected PASETO. course-service-with-axum is the one
  *  service in the family whose own dev config overrides the generic loco
  *  default (5150) to 8084, so the fallback here matches that rather than
  *  the family default (T-28: fixed 2026-08-29 — the old 5150 fallback

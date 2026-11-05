@@ -3,7 +3,7 @@
 Operator UI for care-pathway CRUD + matching + name search + merge +
 audit trail + recent activity + cookie-session / BFF auth (PASETO; pivot
 in progress), consuming the
-[Care Pathway Service](../care-pathway-service-with-loco).
+[Care Pathway Service](../care-pathway-service-with-axum).
 
 ## Start here
 

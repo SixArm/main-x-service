@@ -59,7 +59,7 @@ services:
   case-migrate: # <- swap
     build:
       context: ../..
-      dockerfile: case/case-service-with-loco/Dockerfile # <- swap
+      dockerfile: case/case-service-with-axum/Dockerfile # <- swap
     image: mxi-example-case-service # <- swap
     entrypoint: ["/app/case-service"] # <- swap
     command: ["db", "migrate", "-e", "production"]
@@ -75,7 +75,7 @@ services:
   case-service: # <- swap
     build:
       context: ../..
-      dockerfile: case/case-service-with-loco/Dockerfile # <- swap
+      dockerfile: case/case-service-with-axum/Dockerfile # <- swap
     image: mxi-example-case-service # <- swap
     # COMPOSE-WORKER: the Dockerfile's own CMD is server-only ("start"),
     # which never registers BulkJobWorker (loco's connect_workers only

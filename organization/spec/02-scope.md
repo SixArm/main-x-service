@@ -15,7 +15,7 @@ This spec owns the **cross-subproject contract**:
 
 ### 2.2 In scope — per subproject
 
-**organization-service-with-loco** owns:
+**organization-service-with-axum** owns:
 
 - Organization CRUD with soft delete (`deleted_at` stamp) — loco.rs
   controllers over one `organizations` table.

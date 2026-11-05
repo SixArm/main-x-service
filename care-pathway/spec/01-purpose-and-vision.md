@@ -13,7 +13,7 @@ compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [care-pathway-service-with-loco](../care-pathway-service-with-loco/) | Registry service — loco.rs CRUD + matching over REST; PostgreSQL persistence |
+| [care-pathway-service-with-axum](../care-pathway-service-with-axum/) | Registry service — loco.rs CRUD + matching over REST; PostgreSQL persistence |
 | [care-pathway-matcher-rust-crate](../care-pathway-matcher-rust-crate/) | Canonical pairwise matching library — deterministic + probabilistic, embedded by the service |
 | [care-pathway-front-end-with-svelte](../care-pathway-front-end-with-svelte/) | Operator UI — SvelteKit SPA over the service's REST API |
 

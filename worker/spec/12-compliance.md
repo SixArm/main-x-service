@@ -396,7 +396,7 @@ defects had to be fixed first, none of them from the compliance work:
 ### 12.4y SOUP register and SBOM (delivered 2026-07-27)
 
 Every direct dependency is recorded in
-`worker-service-with-loco/compliance/soup.tsv` with a purpose and a
+`worker-service-with-axum/compliance/soup.tsv` with a purpose and a
 relevance note, and served as a **CycloneDX 1.5** SBOM at
 `GET /api/compliance/sbom`.
 
@@ -1123,6 +1123,6 @@ Four frameworks impose obligations beyond §12.1. Regime detail:
   supplies the controls they would cite.
 - **Every extended control is unimplemented in this service today.** The
   reference implementation is the
-  [care-pathway service](../../care-pathway/care-pathway-service-with-loco/);
+  [care-pathway service](../../care-pathway/care-pathway-service-with-axum/);
   worker is step 3 of the rollout
   ([`spec/compliance` §8.5](../../spec/compliance/index.md)).

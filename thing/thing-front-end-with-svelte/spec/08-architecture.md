@@ -38,7 +38,7 @@ never sees a token or calls the Thing Service directly.
                               | HTTP JSON, Bearer PASETO
                               v
                 +-----------------------------+   +--------------------------+
-                |   thing-service-with-loco    |   |  authentication-service   |
+                |   thing-service-with-axum    |   |  authentication-service   |
                 |   Axum + SeaORM + Tantivy     |   |  magic-link, sessions,    |
                 |                                |   |  PASETO issuance          |
                 +-----------------------------+   +--------------------------+

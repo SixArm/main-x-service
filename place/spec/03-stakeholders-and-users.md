@@ -16,7 +16,7 @@ The Place entity serves a worldwide public governmental deployment.
 ### 3.1 Notes
 
 - Operators authenticate via the central
-  [authentication-service](../../authentication/authentication-service-with-loco/)
+  [authentication-service](../../authentication/authentication-service-with-axum/)
   SSO once JWT enforcement lands (service spec §13 T-8; entity roadmap
   [§15](15-roadmap.md)). Today the API is unauthenticated — a known
   gap, tracked in [§13](13-tasks.md).

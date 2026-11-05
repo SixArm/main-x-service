@@ -18,7 +18,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 `[0.7.0]` added this crate's own `benches/match_pair.rs`, but
 `spec/24-testing-strategy.md`, `agents/testing.md`, and `spec/23-tasks.md`
 T-8 still said benchmarks lived only in
-`course-service-with-loco/benches/matching_bench.rs`. All three now
+`course-service-with-axum/benches/matching_bench.rs`. All three now
 name `benches/match_pair.rs` (four Criterion groups: `match_pair`,
 `deterministic`, `rank`, `config_variants`) alongside the service-side
 bench, with a note on how the two relate (this crate measures the
@@ -319,7 +319,7 @@ silently contradicting the spec.
   `matcher`. Benchmarks section claimed "Out of MVP scope. Once
   criterion is wired in..." though benches live in the embedding
   course-service crate at
-  [`benches/matching_bench.rs`](../course-service-with-loco/benches/matching_bench.rs).
+  [`benches/matching_bench.rs`](../course-service-with-axum/benches/matching_bench.rs).
   Updated both, and added two new symptom-decoder rows ("Phonetic
   bonus suddenly stops firing" / "...never caps") so future
   failures decode straight to the underlying invariant.
@@ -400,7 +400,7 @@ Tracked in `spec.md §23`:
 
 - T-6: Soundex phonetic bonus on the `name` component.
 - T-7: Service-side adapter + bridge test in
-  [`course-service-with-loco/tests/duplicate_detection.rs`](../course-service-with-loco/tests/duplicate_detection.rs).
+  [`course-service-with-axum/tests/duplicate_detection.rs`](../course-service-with-axum/tests/duplicate_detection.rs).
 - T-8: Criterion benchmarks (name match, full match, rank-of-100).
 - T-10: Expose `MatchingEngine::match_one_to_many` for parity with
   sibling matcher crates.
@@ -414,4 +414,4 @@ Tracked in `spec.md §23`:
   [`thing-matcher-rust-crate`](../../thing/thing-matcher-rust-crate/),
   [`worker-matcher-rust-crate`](../../worker/worker-matcher-rust-crate/).
 - Embedding service:
-  [`course-service-with-loco`](../course-service-with-loco/).
+  [`course-service-with-axum`](../course-service-with-axum/).

@@ -878,7 +878,7 @@
   last of the chain) are all in place and tested — including a live
   test proving a near-ceiling (0.99) identifier match still lands
   `pending`/`matcher_suggested`, never auto-promoted. See
-  `link-graph-service-with-loco/spec/13-tasks.md`'s T-29..T-33 entries
+  `link-graph-service-with-axum/spec/13-tasks.md`'s T-29..T-33 entries
   and `CHANGELOG.md` for the full account. `DOC-6` below is now
   unblocked.
 
@@ -1249,7 +1249,7 @@
   **Thing done 2026-08-04** (`thing-front-end-with-svelte/spec/13-tasks.md`
   T-24). Same filter/table/compare/merge-seed shape as person's T-25, but
   with two verified, documented gaps against the reference — checked
-  against thing-service-with-loco's actual `src/api/rest/handlers.rs` /
+  against thing-service-with-axum's actual `src/api/rest/handlers.rs` /
   `src/db/review_queue.rs` rather than assumed byte-identical: this
   service's `review_queue` has **no `provenance` column at all** (unlike
   person/worker/place/organization), so the queue surfaces
@@ -1265,19 +1265,19 @@
   **Worker done 2026-08-04** (copy-adapted from person's T-25; see
   `worker-front-end-with-svelte/spec/13-tasks.md` T-25). Same shape:
   `?status=`/`?limit=` filters confirmed against
-  `worker-service-with-loco/src/api/rest/handlers.rs::get_review_queue`
+  `worker-service-with-axum/src/api/rest/handlers.rs::get_review_queue`
   (byte-for-byte the same guard as person's), a keyboard-reachable queue
   table + `Compare`/`Confirm`/`Reject` buttons alongside the existing
   drag-to-decide board, an inline comparison panel with two parallel
   `GET /api/workers/{id}` calls plus `score_breakdown` rendered against
   the seven components confirmed identical in name/weight to person's
-  (`worker-service-with-loco/src/matching/mod.rs::MatchScoreBreakdown` —
+  (`worker-service-with-axum/src/matching/mod.rs::MatchScoreBreakdown` —
   distinct from the much larger `worker-matcher` reference crate's own
   breakdown struct, which does not power this queue), and a
   `/workers/merge?main=…&duplicate=…` deep link in either order (the
   merge page had no query-param seeding before this and gained it).
   **Known gap, verified rather than assumed**: unlike person,
-  `worker-service-with-loco`'s `review_queue` has no `provenance` column
+  `worker-service-with-axum`'s `review_queue` has no `provenance` column
   (person's was added by a migration never ported to worker), so
   provenance is **not** surfaced here — a backend gap, not a front-end
   omission. New `src/lib/review.ts` + `tests/unit/review.test.ts` (15
@@ -1288,7 +1288,7 @@
   **Place done 2026-08-04** (copy-adapted from person's T-25; see
   `place-front-end-with-svelte/spec/13-tasks.md` T-23). `?status=`/
   `?limit=` filters confirmed against
-  `place-service-with-loco/src/api/rest/handlers.rs::get_review_queue`
+  `place-service-with-axum/src/api/rest/handlers.rs::get_review_queue`
   (same `422 INVALID_STATUS` / no-`offset` guard as person's); a
   keyboard-reachable queue table + `Compare`/`Confirm`/`Reject` buttons
   alongside the existing drag-to-decide board; an inline comparison panel
@@ -1316,7 +1316,7 @@
   **Organization done 2026-08-04** (copy-adapted from person's T-25;
   see `organization-front-end-with-svelte/spec/index.md` §13). The
   fourth and last crate in the fan-out. `?status=`/`?limit=` filters
-  confirmed against `organization-service-with-loco`'s own
+  confirmed against `organization-service-with-axum`'s own
   `controllers/organizations.rs::get_review_queue` (an unrecognised
   status token, including the literal `"all"`, is `422`, matching the
   family shape but with this crate's own `unprocessable_entity` error
@@ -1560,7 +1560,7 @@
   <name> .` from the repo root completed in the same one-to-three
   minutes it always does. Pre-building the image under the exact name
   `podman compose` expects (`<compose-project>-<service>`, e.g.
-  `worker-service-with-loco-worker-server`) and then running `podman
+  `worker-service-with-axum-worker-server`) and then running `podman
   compose up -d` (no `--build`) works reliably — compose just reuses
   the already-built image. Not investigated further (no reproduction
   outside this compose provider); worth a second look if it recurs
@@ -1623,7 +1623,7 @@
 
   - [`runbooks/paseto-key-rotation.md`](agents/share/runbooks/paseto-key-rotation.md)
     — found and fixed a **false claim** in
-    `authentication-service-with-loco/config/keys/README.md`: it said
+    `authentication-service-with-axum/config/keys/README.md`: it said
     peers refetch the key set "at their next boot **or on the first
     `UnknownKid`**" — there is no such refetch-on-`UnknownKid` trigger
     anywhere in `authentication-verifier` or any peer's `auth.rs`. A
@@ -1875,7 +1875,7 @@
   kind) created via curl, both edges written from their originating
   service (`POST /{id}/links`, confirming **worker's own
   `same_identity` write-side has landed** — resolving the open question
-  in the task brief; `worker/worker-service-with-loco/src/api/rest/links.rs`
+  in the task brief; `worker/worker-service-with-axum/src/api/rest/links.rs`
   is a full peer of person's, both DB-gated round-trip and outbox-emit
   tested), then the link-graph aggregator's `neighbors` / `single-view`
   / `health/freshness`, and finally a live break-and-reconcile pass
@@ -2050,7 +2050,7 @@
   narrowed rather than overturned**: `cargo loco --version` and `cargo
   loco db migrate` both actually ran in this crate — not because a
   global `cargo-loco` plugin is now installed, but because
-  `case/case-service-with-loco/.cargo/config.toml` (and
+  `case/case-service-with-axum/.cargo/config.toml` (and
   authentication-service's) carries a repo-local `[alias] loco = "run
   --"`, present in the newer loco-scaffolded crates and absent from
   person/worker/place's. TUT-2/TUT-3/TUT-5's finding stands for the
@@ -2268,7 +2268,7 @@
   `LinkType::ReplacedBy`'s `#[serde(rename_all = "lowercase")]` produces
   `"replacedby"`, not the CHECK's `'replaced_by'` — nothing in this
   crate constructs that variant today. Landed as its own commit
-  (`person/person-service-with-loco` code + tests + `CHANGELOG.md`),
+  (`person/person-service-with-axum` code + tests + `CHANGELOG.md`),
   separate from the TUT-2 tutorial commit.
 - [x] **EX-2 (S)** `examples/policies/` — ABAC cookbook: dept-scoped
   read-deny, closed-case write-deny (`resource.status`), after-hours deny
@@ -3325,7 +3325,7 @@ committing (see plan.md §4).
 > proven true once this pass by root `index.md`).
 >
 > Batched by subproject family so independent crates can be audited in
-> parallel; do **not** audit `link-graph-service-with-loco` while
+> parallel; do **not** audit `link-graph-service-with-axum` while
 > LNK-4's T-29..T-33 chain is still landing (active file conflicts) —
 > queue it last.
 
@@ -3371,7 +3371,7 @@ committing (see plan.md §4).
   current; and, where still on the old pattern, `CLAUDE.md` was thinned
   to the documented one-line `@AGENTS.md` include.
 
-  - [x] **person/person-service-with-loco** *(done 2026-08-04)*.
+  - [x] **person/person-service-with-axum** *(done 2026-08-04)*.
     `spec/13-tasks.md`: reconciled real drift — T-2 (Fluvio publisher),
     T-3 (FHIR bundle), T-4 (FHIR CapabilityStatement) were still `[ ]`
     though delivered by BUS-3 and T-11 respectively; T-10's own Step
@@ -3425,7 +3425,7 @@ committing (see plan.md §4).
     dropped; the crate now matches the documented convention and the
     newer crates' actual practice.
 
-  - *`worker/worker-service-with-loco` done 2026-08-04.* Found and
+  - *`worker/worker-service-with-axum` done 2026-08-04.* Found and
     fixed: (1) **duplicate task IDs** in `spec/13-tasks.md` — "T-10"
     named both the cross-service-links task and the workforce-
     assessments task, and "T-11" both bulk import/export and
@@ -3482,7 +3482,7 @@ committing (see plan.md §4).
     the schema-only scaffolding is not spec drift, just unfinished
     work already honestly described as such.
 
-  - *`place/place-service-with-loco` done 2026-08-04.* Confirmed
+  - *`place/place-service-with-axum` done 2026-08-04.* Confirmed
     today's QA-SERVER-FIELDS fix (65f83fbb) was already a clean
     three-part landing — `spec/09-api-surface.md` and `CHANGELOG.md`
     both already documented it accurately; nothing to fix there.
@@ -3529,7 +3529,7 @@ committing (see plan.md §4).
     byte-accurate against `src/matching/scoring.rs`; `README.md`
     already symlinks to `index.md`.
 
-  - *`thing/thing-service-with-loco` done 2026-08-04.* Confirmed
+  - *`thing/thing-service-with-axum` done 2026-08-04.* Confirmed
     today's QA-SERVER-FIELDS fix (8fecaac7) was already documented
     accurately in `spec/09-api-surface.md` and `CHANGELOG.md`; added a
     corresponding note to `agents/models.md` (which fields are now
@@ -3591,7 +3591,7 @@ committing (see plan.md §4).
     crate's own `spec/13`/`spec/16` — verified correct on inspection;
     `README.md` already symlinks to `index.md`.
 
-  - *`organization/organization-service-with-loco` done 2026-08-04.*
+  - *`organization/organization-service-with-axum` done 2026-08-04.*
     Confirmed `CLAUDE.md` is still the documented thin `@AGENTS.md`
     one-liner (no drift since worker's DOC-2 pass), no `agents/`
     directory (correct for a newer loco-idiomatic crate — §5's domain
@@ -3661,7 +3661,7 @@ committing (see plan.md §4).
     quick-start `DATABASE_URL`/port matched `config/development.yaml`
     exactly.
 
-  - *`course/course-service-with-loco` done 2026-08-04.* Confirmed
+  - *`course/course-service-with-axum` done 2026-08-04.* Confirmed
     `CLAUDE.md` is already the documented thin `@AGENTS.md` one-liner
     (this is the crate worker's DOC-2 note flagged as already-converted;
     confirmed here rather than re-derived) and `README.md` symlinks to
@@ -3728,7 +3728,7 @@ committing (see plan.md §4).
     the docker-compose port mapping (host 8084 → container 8080)
     verified against `config/development.yaml`.
 
-  - *`care-pathway/care-pathway-service-with-loco` done 2026-08-04.*
+  - *`care-pathway/care-pathway-service-with-axum` done 2026-08-04.*
     Confirmed `CLAUDE.md` is still the documented thin `@AGENTS.md`
     one-liner (no drift), no `agents/` directory (correct for a newer
     loco-idiomatic crate), and `spec/index.md` §12 already states this
@@ -3837,7 +3837,7 @@ committing (see plan.md §4).
     count spec §13's most recent entries already cite — no drift there)
     and `cargo fmt --check` clean after the doc-only changes.
 
-  - *`event/event-service-with-loco` done 2026-08-04.* Confirmed it is
+  - *`event/event-service-with-axum` done 2026-08-04.* Confirmed it is
     genuinely the api-versioning reference `agents/share/api-versioning.md`
     names it: `agents/restful.md` already correctly documents the
     version-free `Accepts-version` header (no stale `/api/v1` in any
@@ -3908,7 +3908,7 @@ committing (see plan.md §4).
     quick-start commands verified runnable (`.env.example` present,
     `cargo loco start` path matches `AGENTS.md`).
 
-  - *`case/case-service-with-loco` done 2026-08-04.* This crate carries
+  - *`case/case-service-with-axum` done 2026-08-04.* This crate carries
     an unusually large amount of session history (TUT-1/3/4/6, BUS-1,
     QA-CUST-SQL, COMPOSE-WORKER) and needed the deepest pass of the
     numbered-shape crates so far. Cross-checked the specific items
@@ -3969,7 +3969,7 @@ committing (see plan.md §4).
     added. `cargo fmt --check` / `cargo clippy --all-targets` / `cargo
     check --lib` all clean after every edit.
 
-  - *`authentication/authentication-service-with-loco` done 2026-08-04.*
+  - *`authentication/authentication-service-with-axum` done 2026-08-04.*
     The 11th and last crate in this batch — the family's central SSO
     provider and reference loco.rs crate, so checked more thoroughly
     than the rest, including a live run (test Postgres on a non-default
@@ -4050,7 +4050,7 @@ committing (see plan.md §4).
   guarantees presence — accuracy is the gap this checks for). Note for
   `person-matcher`/`worker-matcher` specifically: `Scorer` and
   `Normalizer::phonetic_code` are now also depended on by
-  `link-graph-service-with-loco/src/suggest/` (LNK-4, this session) —
+  `link-graph-service-with-axum/src/suggest/` (LNK-4, this session) —
   if a doc describes these as used only within their own service's
   matching pipeline, that's now stale.
 
@@ -4059,7 +4059,7 @@ committing (see plan.md §4).
     there). Confirmed no doc claims `Scorer`/`Normalizer::phonetic_code`
     are used only within person-matcher's own pipeline — nothing false
     to correct on that specific point, but added the previously-absent
-    fact: `link-graph-service-with-loco` (LNK-4) is a real, live
+    fact: `link-graph-service-with-axum` (LNK-4) is a real, live
     second consumer (`Cargo.toml` path dep, `src/suggest/` using
     `Scorer::jaro_winkler_similarity`, `Normalizer::phonetic_code`, and
     `Gender`), confirmed via grep. The larger find: **spec was ahead of
@@ -4151,10 +4151,10 @@ committing (see plan.md §4).
     + 10-test `tests/public_api.rs` + 4-test `tests/property_tests.rs`
     + 7 doctests, all green), `cargo clippy --all-targets -- -D
     warnings` clean, `cargo fmt --check` clean, and the sibling
-    `care-pathway-service-with-loco/tests/matching.rs` bridge test
+    `care-pathway-service-with-axum/tests/matching.rs` bridge test
     §20 claims exists (read-only confirmation only — that crate is out
     of this task's scope). Did not touch
-    `care-pathway-service-with-loco` per this task's boundary.
+    `care-pathway-service-with-axum` per this task's boundary.
 
   - [x] `case/case-matcher-rust-crate` done. Found and fixed a real
     spec/code mismatch, not a doc-only staleness: `spec/index.md` §5
@@ -4224,7 +4224,7 @@ committing (see plan.md §4).
     sections in `agents/testing.md`. Checked SEC-M5 (LEI ISO 7064 MOD
     97-10 / GLN GS1 mod-10 check-digit validation) specifically per
     this task's prompt: it lives entirely in the sibling
-    `organization-service-with-loco`'s `src/validation.rs`, not in this
+    `organization-service-with-axum`'s `src/validation.rs`, not in this
     matcher crate at all (confirmed by grep — zero hits for
     check-digit/MOD-97/GS1 anywhere in `src/`, and
     `tests/property_tests.rs`'s own module doc says so explicitly), so
@@ -4250,7 +4250,7 @@ committing (see plan.md §4).
     public_api` (11), `cargo test --test property_tests` (7), `cargo
     test --doc` (7), `cargo clippy --all-targets -- -D warnings`
     clean, `cargo fmt --check` clean. Did not touch
-    `organization-service-with-loco` per this task's boundary. All
+    `organization-service-with-axum` per this task's boundary. All
     touched files stay well under 40 KB.
 
   - [x] **`project-portfolio-management/project-portfolio-management-matcher-rust-crate`
@@ -4336,7 +4336,7 @@ committing (see plan.md §4).
     today. Also confirmed the sibling concern this task flags by
     name — whether spec §15's deterministic-identifier list mistypes
     "LOM" as "LMS id" (a real bug found elsewhere in the family this
-    session, per `course-service-with-loco`'s own DOC-2 pass) — is
+    session, per `course-service-with-axum`'s own DOC-2 pass) — is
     **not** present here: `spec/15-identifier-short-circuits.md`
     correctly lists `Doi`/`Wikidata`/`Lom`/`Oer`/`Uri`/`Uuid`, matching
     `IdentifierScheme::is_deterministic` in `src/course.rs` exactly (the
@@ -4366,12 +4366,12 @@ committing (see plan.md §4).
     (13 passed), `cargo test --test public_api` (16 passed),
     `cargo test --test proptests` (6 passed), `cargo fmt --check`
     clean, `cargo clippy --all-targets -- -D warnings` clean. Did not
-    touch `course/course-service-with-loco` (sibling crate, out of this
+    touch `course/course-service-with-axum` (sibling crate, out of this
     task's boundary). All edited files re-confirmed well under 40 KB.
 
   - *`worker/worker-matcher-rust-crate` done 2026-08-04.* `CLAUDE.md`
     already the thin `@AGENTS.md` one-liner (no drift to fix). Checked
-    the `link-graph-service-with-loco` LNK-4 note directly rather than
+    the `link-graph-service-with-axum` LNK-4 note directly rather than
     assuming symmetry with person-matcher's finding: `worker-matcher`
     is genuinely **not** a link-graph dependency (its `Cargo.toml`
     comment explicitly says "depended on (not `worker-matcher`)"
@@ -4449,8 +4449,8 @@ committing (see plan.md §4).
     clean: `cargo build`, `cargo test --lib` (417 passed), `cargo test`
     (176 doctests, including the edited `deterministic_match` example),
     `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`.
-    Did not touch `worker/worker-service-with-loco` or
-    `link/link-graph-service-with-loco` (out of this task's boundary).
+    Did not touch `worker/worker-service-with-axum` or
+    `link/link-graph-service-with-axum` (out of this task's boundary).
     All edited files re-confirmed under 40 KB.
 
   - *`place/place-matcher-rust-crate` done 2026-08-04.* `CLAUDE.md`
@@ -4512,7 +4512,7 @@ committing (see plan.md §4).
     `spec/`). Verified clean throughout: `cargo fmt --check`, `cargo
     clippy --all-targets -- -D warnings`, `cargo test` (163 lib + 12
     adapter-contract + 37 integration + 11 property + 97 doctest, all
-    passing). Did not touch `place/place-service-with-loco` (sibling
+    passing). Did not touch `place/place-service-with-axum` (sibling
     crate, out of this task's boundary). All edited files re-confirmed
     well under 40 KB.
 
@@ -4612,7 +4612,7 @@ committing (see plan.md §4).
     `cargo test --doc` (67), full `cargo test` (all suites green). This
     was a docs/CI-script-only change — no `src/` edits — so no clippy/
     fmt re-check was needed beyond confirming the test suite still
-    passes. Did not touch `thing/thing-service-with-loco` (sibling
+    passes. Did not touch `thing/thing-service-with-axum` (sibling
     crate, out of this task's boundary). All edited files re-confirmed
     well under 40 KB.
 
@@ -4674,7 +4674,7 @@ committing (see plan.md §4).
     accurate (no Place references, no premature relationships/tags
     claims) and its code examples were spot-checked against the real
     API; `cargo test --doc` reconfirmed 74 passing doctests unchanged
-    before and after. Did not touch `event/event-service-with-loco`
+    before and after. Did not touch `event/event-service-with-axum`
     (sibling crate, out of this task's boundary). All edited files
     re-confirmed well under 40 KB.
 
@@ -4799,7 +4799,7 @@ committing (see plan.md §4).
     (`prettier --check src`) fails on `src/lib/api/types.ts` and
     `src/lib/svar-filter-augment.d.ts` — pre-existing drift, out of
     this doc-only pass's scope. All edited files re-confirmed well
-    under 40 KB. Did not touch `thing/thing-service-with-loco`
+    under 40 KB. Did not touch `thing/thing-service-with-axum`
     (sibling crate, out of this task's boundary) or any of the other
     ten front-ends (concurrent sibling audits).
 
@@ -4808,7 +4808,7 @@ committing (see plan.md §4).
   (`CHANGELOG.md`, `spec/13-tasks.md` T-23) — the real gap was older:
   the family-wide BFF migration (`f66ff50f`, 2026-06-18) touched this
   project's docs only as a mechanical `worker-service-rust-crate` →
-  `worker-service-with-loco` rename pass, never a content pass, even
+  `worker-service-with-axum` rename pass, never a content pass, even
   though the code (`src/hooks.server.ts`, `src/lib/server/{auth,
   config,session}.ts`, `/signin`, `/verify`,
   `src/routes/api/proxy/[...path]/+server.ts`) fully implements the
@@ -4872,7 +4872,7 @@ committing (see plan.md §4).
   established DOC-2 precedent of not rewriting history, and instead
   added a new dated `[Unreleased]` entry retroactively logging the
   2026-06-18 BFF landing, which had never been logged at all. Did not
-  touch `worker/worker-service-with-loco` (sibling crate, out of this
+  touch `worker/worker-service-with-axum` (sibling crate, out of this
   task's boundary) or any of the other ten front-ends (concurrent
   sibling audits).
 
@@ -4914,7 +4914,7 @@ committing (see plan.md §4).
   `AUTH_API_URL`) — but fixing the name surfaced that the *value*
   `README.md` and `index.md` gave for `COURSE_API_URL` (`5150`,
   mirroring `src/lib/server/config.ts`'s own fallback constant) is
-  itself wrong: `course-service-with-loco` is the one service in the
+  itself wrong: `course-service-with-axum` is the one service in the
   family whose dev config overrides the loco default to port `8084`
   (confirmed live against its `config/development.yaml`, matching
   what this front-end's own `README.md` already said elsewhere about
@@ -4942,7 +4942,7 @@ committing (see plan.md §4).
   disclosed English-only exception. Added one CHANGELOG `[Unreleased]`
   Documentation entry retroactively logging the 2026-06-18 landing
   rather than rewriting history. Did not touch
-  `course/course-service-with-loco` (sibling crate, out of this
+  `course/course-service-with-axum` (sibling crate, out of this
   task's boundary) or any of the other ten front-ends (concurrent
   sibling audits).
 
@@ -4987,7 +4987,7 @@ committing (see plan.md §4).
   (optional in `types.ts`), no client-side id-generation workaround to
   remove. i18n: the 13-locale parity test passes and spot-checked
   `review.*` strings carry real per-locale translations, not English
-  stubs. Did not touch `place-service-with-loco` (out of this task's
+  stubs. Did not touch `place-service-with-axum` (out of this task's
   boundary) or any of the other ten front-ends (concurrent sibling
   audits).
 
@@ -5109,7 +5109,7 @@ committing (see plan.md §4).
     `CHANGELOG.md` and `spec/index.md` §11. Verified live: `pnpm run
     check` (0/0), `pnpm test` (61/61), `pnpm test:e2e` (8/8 post-fix),
     `pnpm run build` all green. Did not touch
-    `case/case-service-with-loco` (out of this task's boundary) or any
+    `case/case-service-with-axum` (out of this task's boundary) or any
     sibling front-end.
 
   - *`care-pathway/care-pathway-front-end-with-svelte` done 2026-08-04.*
@@ -5163,7 +5163,7 @@ committing (see plan.md §4).
     `CarePathwayRepository.search()`/`.recentEvents()` remain
     unit-tested but unwired to any route; flagged in spec §13 as an
     open question (restore vs. retire) rather than decided unilaterally.
-    Did not touch the sibling `care-pathway-service-with-loco` (out of
+    Did not touch the sibling `care-pathway-service-with-axum` (out of
     scope) or any other front-end (concurrent sibling audits).
 
   - *`event/event-front-end-with-svelte` done 2026-08-04.* Same
@@ -5184,7 +5184,7 @@ committing (see plan.md §4).
     in-file comment). `spec/15-roadmap.md` v0.3 and `spec/16-open-
     questions.md` OQ-3 both still gated/described auth as not-yet-
     landed; fixed both. `spec/08-architecture.md`'s diagram showed the
-    browser's `ApiClient` calling `event-service-with-loco` directly
+    browser's `ApiClient` calling `event-service-with-axum` directly
     with no BFF hop at all; replaced it with a diagram showing the
     SvelteKit-server BFF hop to both the event service and the
     authentication service. `spec/02-scope.md` §2.2 "Out of scope
@@ -5228,7 +5228,7 @@ committing (see plan.md §4).
     live rather than inferred: `pnpm check` (426 files, 0 errors/0
     warnings) and `pnpm test` (34/34 passing across 5 files including
     the 13-locale i18n parity test) both re-run after the doc edits.
-    Did not touch `event/event-service-with-loco` or
+    Did not touch `event/event-service-with-axum` or
     `event/event-matcher-rust-crate` (sibling crates, out of this
     task's boundary) or any of the other ten front-ends (concurrent
     sibling audits).
@@ -5421,7 +5421,7 @@ committing (see plan.md §4).
   copying as the current posture and shared-dependency as a future,
   threshold-gated event. Grepping `Cargo.toml` across the repo for
   `entity-ref = { path = ...}` found **eight** real consumers today,
-  none of which copied anything: `link-graph-service-with-loco` (the
+  none of which copied anything: `link-graph-service-with-axum` (the
   anticipated aggregator, and by far the heaviest user — 12 files import
   `entity_ref::`), the three edge-originating services the design doc
   did anticipate (person, worker, case), **and four consumer apps the
@@ -5453,7 +5453,7 @@ committing (see plan.md §4).
   `EdgeKind::SubjectOf.sensitivity`) were spot-checked against `src/lib.rs`
   and match. Did not touch `authentication-verifier-rust-crate` or
   `integrity-mac-rust-crate` (sibling agents' concurrent work) or
-  `link-graph-service-with-loco` (out of scope; LNK-4 may still be
+  `link-graph-service-with-axum` (out of scope; LNK-4 may still be
   landing there).
 
   - [x] `integrity/integrity-mac-rust-crate` done 2026-08-04. Clean
@@ -5533,7 +5533,7 @@ committing (see plan.md §4).
   - [x] `authentication/authentication-verifier-rust-crate` done
     2026-08-04. Confirmed first the prompt's own caveat: **two separate
     dependencies exist and were not conflated** —
-    `link-graph-service-with-loco/Cargo.toml` depends on both
+    `link-graph-service-with-axum/Cargo.toml` depends on both
     `person-matcher` (`Scorer`/`Gender`, for LNK-4's identity-matching
     suggestions) *and* `authentication-verifier` (with the `fetch`
     feature, for ABAC/PASETO), confirmed by grep, not assumption. Also
@@ -5627,7 +5627,7 @@ committing (see plan.md §4).
   no such tag exists; H-5's own notes already recorded this crate as
   skipped.
 
-- [x] **DOC-6 (M)** `link-graph-service-with-loco`'s `spec/`,
+- [x] **DOC-6 (M)** `link-graph-service-with-axum`'s `spec/`,
   `AGENTS.md`, `README.md`/`index.md`. **Unblocked 2026-08-04** — LNK-4's
   T-29..T-33 chain is now fully landed (`spec/13-tasks.md` and
   `spec/16-open-questions.md` both updated as each task closed), so the
@@ -6048,7 +6048,7 @@ committing (see plan.md §4).
   the repo.
 
   This closes the documentation-harmonization program's DOC-1..DOC-5
-  and DOC-7/DOC-8 scope. **`DOC-6` (`link-graph-service-with-loco`)**
+  and DOC-7/DOC-8 scope. **`DOC-6` (`link-graph-service-with-axum`)**
   was queued behind LNK-4's T-32/T-33 — both now landed (2026-08-04) —
   so `DOC-6` is unblocked but still not started.
 
@@ -6361,8 +6361,8 @@ running one.
 
 - [x] **FMT-1 (S)** The repo-wide `fmt` gate was red on `main`.
   *(done 2026-08-20)* `scripts/ci-check.sh fmt` failed in
-  `person-service-with-loco/migration` and
-  `worker-service-with-loco/migration` — eight files from commit
+  `person-service-with-axum/migration` and
+  `worker-service-with-axum/migration` — eight files from commit
   `013a69a1` (2026-07-27, "Add BLAKE3 columns and wire the chain
   append"), each an over-long `include_str!` line rustfmt wants wrapped.
   Nothing to do with this pass; found because the new fuzz sub-crates
@@ -6541,8 +6541,8 @@ crate above.
   first pass's spot-check sample missed.)
 - [x] **PRO-H4 (S)** *(done 2026-08-27)* **Delete committed junk & dead
   scaffolding.** Split into two verified batches. Non-code deletions:
-  tracked stray rustup homes `thing/thing-service-with-loco/200/` and
-  `place/place-service-with-loco/200/`; `diesel.toml` in person- and
+  tracked stray rustup homes `thing/thing-service-with-axum/200/` and
+  `place/place-service-with-axum/200/`; `diesel.toml` in person- and
   worker-service (confirmed no diesel dependency exists — the family
   uses SeaORM); matcher `IMPLEMENTATION_SUMMARY.md` snapshots (person,
   worker) plus the doc references to each; thing-matcher `help/`
@@ -6852,7 +6852,7 @@ crate above.
   carrying PRO-H9's dead stub, when PRO-H9 had already replaced both
   with real exporters on 2026-08-28 — a doc-vs-code drift unrelated to
   this slice, fixed while already editing the same paragraphs). Full
-  results: course/course-service-with-loco's own `spec/13-tasks.md`
+  results: course/course-service-with-axum's own `spec/13-tasks.md`
   T-26 and `CHANGELOG.md`.
   *Slice 2 (place), done 2026-08-30:* **overturned this task's own
   scoping assumption.** "per `overview.md`'s capability matrix only
@@ -6877,7 +6877,7 @@ crate above.
   --all-targets -D warnings`, `cargo deny check`, the MSRV check, and
   `cargo bench --no-run` all clean; `cargo test --lib` 229/229 (was
   221, +8); `cargo test --test otlp_export --test otlp_middleware`
-  4/4. Full results: place/place-service-with-loco's own
+  4/4. Full results: place/place-service-with-axum's own
   `spec/13-tasks.md` T-13 and `CHANGELOG.md`.
   *Slice 3 (thing), done 2026-08-30:* confirmed identical shape to
   place's before starting (its own `AGENTS.md` already stated the
@@ -6889,7 +6889,7 @@ crate above.
   --all-targets -D warnings`, `cargo deny check`, the MSRV check, and
   `cargo bench --no-run` all clean; `cargo test --lib` 205/205 (was
   197, +8); `cargo test --test otlp_export --test otlp_middleware`
-  4/4. Full results: thing/thing-service-with-loco's own
+  4/4. Full results: thing/thing-service-with-axum's own
   `spec/13-tasks.md` T-11 and `CHANGELOG.md`.
   *Slice 4 (organization), done 2026-08-30:* the first of the four
   remaining **loco-idiomatic** registries (`src/controllers/`, not
@@ -6911,7 +6911,7 @@ crate above.
   --no-run`, and the MSRV check all clean; `cargo test --lib` 198/198
   (was 190, +8); `cargo test --test otlp_export --test
   otlp_middleware` 4/4. Full results:
-  organization/organization-service-with-loco's own `spec/index.md`
+  organization/organization-service-with-axum's own `spec/index.md`
   §13 and `CHANGELOG.md`.
   *Slice 5 (care-pathway), done 2026-09-01:* the second loco-idiomatic
   registry, ported from organization's slice 4 rather than re-derived.
@@ -7040,7 +7040,7 @@ crate above.
   the whole run) — Rust 1.96 was already `rustup`-installed locally
   from the `rust-toolchain.toml` pin, so this needed no new toolchain
   fetch. Two crates independently re-run standalone afterward
-  (`person-service-with-loco`, `project-portfolio-management-matcher`)
+  (`person-service-with-axum`, `project-portfolio-management-matcher`)
   as an extra spot-check, both green.
 - [x] **PRO-H14 (M)** **Publish `main-x-service.github.io`.**
   *(Premise corrected 2026-09-07: the scaffold below now exists — see
@@ -7831,7 +7831,7 @@ green as it sits; these finish it)**
   on a real defect: T-28f's own text assumed `GET /api/auth/me`
   already carried the caller's ABAC `attrs` — verified false family-wide
   (`grep -rln "attrs" */*-front-end-with-svelte/src/lib/server/*.ts`,
-  no hits), so `authentication-service-with-loco`'s `CurrentResponse`
+  no hits), so `authentication-service-with-axum`'s `CurrentResponse`
   gained `attrs` first (that crate's own `spec/index.md` §13 T-17),
   then the front-end's `src/lib/nav.ts` (new, pure) drives the nav
   reorder + landing-route selection from it. Full account in the

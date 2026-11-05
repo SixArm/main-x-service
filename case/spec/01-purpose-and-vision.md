@@ -13,7 +13,7 @@ delivered as a trio of subprojects that compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [case-service-with-loco](../case-service-with-loco/) | Registry service — loco.rs CRUD + matching over REST; PostgreSQL persistence |
+| [case-service-with-axum](../case-service-with-axum/) | Registry service — loco.rs CRUD + matching over REST; PostgreSQL persistence |
 | [case-matcher-rust-crate](../case-matcher-rust-crate/) | Canonical pairwise matching library — deterministic + probabilistic, embedded by the service |
 | [case-front-end-with-svelte](../case-front-end-with-svelte/) | Operator UI — SvelteKit SPA over the service's REST API |
 

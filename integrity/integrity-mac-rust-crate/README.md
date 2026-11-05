@@ -106,16 +106,16 @@ unverifiable rather than invalid.
 
 - [ ] **IM-2 (L) Evaluate extracting the duplicated audit hash-chain +
       checkpoint logic, the same way this crate's own MAC logic was
-      extracted.** *(verified: `person/person-service-with-loco/src/
-      compliance/audit_chain.rs` and `worker/worker-service-with-loco/
+      extracted.** *(verified: `person/person-service-with-axum/src/
+      compliance/audit_chain.rs` and `worker/worker-service-with-axum/
       src/compliance/audit_chain.rs` are 656 lines each, and `diff`
       between them shows only the entity name and test-vector hash
       differ — the same near-byte-identical-copy shape this crate's own
       README (`## Why it exists`) describes as the trigger for
       extracting the MAC code: "It was copied four times before this
       crate existed … A key-handling defect that survived that way
-      would not announce itself at all." `case-service-with-loco` and
-      `care-pathway-service-with-loco` carry their own
+      would not announce itself at all." `case-service-with-axum` and
+      `care-pathway-service-with-axum` carry their own
       `src/compliance/audit_chain.rs` + `checkpoint.rs` too — four
       copies total, matching this crate's own origin story exactly.
       `agents/share/runbooks/integrity-activation.md` additionally

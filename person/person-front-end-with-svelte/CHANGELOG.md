@@ -98,7 +98,7 @@ navigates to `/persons/{id}` on select. See spec §13 T-28.
 `/persons/[id]/audit` had a hard, silent 100-entry cap with no way to
 see older history — the page fetched `repo.audit(id, 100)` once on
 mount and offered no pagination control. Confirmed against
-`person-service-with-loco`'s `AuditLogQuery`/`get_logs_for_entity`
+`person-service-with-axum`'s `AuditLogQuery`/`get_logs_for_entity`
 that the service's audit endpoint has **no offset/cursor parameter at
 all** (only `limit`, newest-first) — correcting the task's original
 presumption that one probably existed. The fix therefore pages by
@@ -412,7 +412,7 @@ re-run the suite afterward, which had not been done. Full record in
 
 ### Added (prior)
 
-- **Live-service integration test suite** at `tests/integration/golden-paths.spec.ts`. 9 Playwright tests driving the live SvelteKit preview against a running `person-service-with-loco` over real HTTP. Covers spec §6 FR-1 (search-finds-record), FR-3 (create lands on detail page) + the 409-duplicate inline path, FR-5 (detail renders nested fields), FR-6 (edit PUTs the full Person), FR-7 (soft-delete hides record), FR-8 (match check renders score), FR-9 (merge soft-deletes the duplicate), and per-record audit log presence.
+- **Live-service integration test suite** at `tests/integration/golden-paths.spec.ts`. 9 Playwright tests driving the live SvelteKit preview against a running `person-service-with-axum` over real HTTP. Covers spec §6 FR-1 (search-finds-record), FR-3 (create lands on detail page) + the 409-duplicate inline path, FR-5 (detail renders nested fields), FR-6 (edit PUTs the full Person), FR-7 (soft-delete hides record), FR-8 (match check renders score), FR-9 (merge soft-deletes the duplicate), and per-record audit log presence.
 - `playwright.config.ts` refactored to two projects: `smoke` (existing, no service needed; `tests/e2e/`) and `integration` (new, live service required; `tests/integration/`). The webServer command now bakes `PUBLIC_API_BASE_URL` into the preview build so the front-end talks to the configured service.
 - `bin/e2e` wrapper script that health-checks the service at `PUBLIC_API_BASE_URL/api/health` before running Playwright. Forwards extra args (`--headed`, `--ui`, etc.) to playwright.
 - `package.json` adds `test:integration` script. `test:e2e` now scoped to the `smoke` project.
@@ -421,7 +421,7 @@ re-run the suite afterward, which had not been done. Full record in
 
 - `spec.md §11 Testing Strategy` extended with a 3-row layer table (unit / smoke / integration) plus run commands and a section on test idempotency.
 - `spec.md §13 Tasks` marks T-12a integration suite as complete with harness-level validation (svelte-check clean, playwright `--list` discovers all 9 tests, smoke project still 6/6, `bin/e2e` exits 1 with a clear message when the service is down).
-- `spec.md §16 OQ-5` (**resolved 2026-06-04**): the original live-stack blocker — the `person-service-with-loco` had no `src/main.rs`/`[[bin]]` target and a Dockerfile that failed on `debian:bookworm-slim` — has been resolved. The service crate gained `src/main.rs` and the Dockerfile was rebased on `debian:13-slim`; the container builds and runs end-to-end. 6 / 9 Playwright integration tests now pass against the live stack; the remaining 3 are test-data interactions with the now-correctly-aggressive duplicate detector.
+- `spec.md §16 OQ-5` (**resolved 2026-06-04**): the original live-stack blocker — the `person-service-with-axum` had no `src/main.rs`/`[[bin]]` target and a Dockerfile that failed on `debian:bookworm-slim` — has been resolved. The service crate gained `src/main.rs` and the Dockerfile was rebased on `debian:13-slim`; the container builds and runs end-to-end. 6 / 9 Playwright integration tests now pass against the live stack; the remaining 3 are test-data interactions with the now-correctly-aggressive duplicate detector.
 
 ### Validation status
 
@@ -441,8 +441,8 @@ Initial scaffold for the Person Service front-end. SvelteKit 2 + Svelte 5 runes 
 ### Added
 
 - **Routes (MVP).** Dashboard with service-health + recent-audit feed; persons list with full-text / fuzzy / phonetic search and SVAR DataGrid; create with real-time 409 duplicate detection inline; detail view (identity, identifiers, addresses, telecom, emergency contacts); edit; soft-delete with confirm; per-record audit log; match check; merge with two-ID preview.
-- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError` with `isConflict` / `isNotFound` / `isValidation` shortcuts; `PersonRepository` binding the [Person Service REST surface](../person-service-with-loco/agents/restful.md) (`GET /api/health`, CRUD on `/api/persons`, `/search`, `/match`, `/check-duplicates`, `/merge`, `/deduplicate`, `/{id}/audit`, `/{id}/masked`, `/{id}/export`, `/api/audit/recent`).
-- **TypeScript types.** Snake-case domain types mirroring [`person-service-with-loco/agents/models.md`](../person-service-with-loco/agents/models.md): `Person`, `HumanName`, `Address`, `ContactPoint`, `Identifier` (MRN/SSN/DL/NPI/PPN/TAX), `IdentityDocument` (Passport/National-ID/etc.), `EmergencyContact`, `PersonLink`, `MatchResult` + `MatchQuality` + `MatchBreakdown`, `MergeRequest` / `MergeRecord` / `MergeResponse`, `BatchDeduplicationRequest`/`Response`, `ReviewQueueItem`, `AuditEntry`.
+- **API layer.** `ApiClient` (envelope + error normalisation) + `ApiError` with `isConflict` / `isNotFound` / `isValidation` shortcuts; `PersonRepository` binding the [Person Service REST surface](../person-service-with-axum/agents/restful.md) (`GET /api/health`, CRUD on `/api/persons`, `/search`, `/match`, `/check-duplicates`, `/merge`, `/deduplicate`, `/{id}/audit`, `/{id}/masked`, `/{id}/export`, `/api/audit/recent`).
+- **TypeScript types.** Snake-case domain types mirroring [`person-service-with-axum/agents/models.md`](../person-service-with-axum/agents/models.md): `Person`, `HumanName`, `Address`, `ContactPoint`, `Identifier` (MRN/SSN/DL/NPI/PPN/TAX), `IdentityDocument` (Passport/National-ID/etc.), `EmergencyContact`, `PersonLink`, `MatchResult` + `MatchQuality` + `MatchBreakdown`, `MergeRequest` / `MergeRecord` / `MergeResponse`, `BatchDeduplicationRequest`/`Response`, `ReviewQueueItem`, `AuditEntry`.
 - **Form primitives.** `LabeledField`, `FieldError`, `FieldRow`, `createForm` Svelte 5 rune-based store (`value` / `errors` / `submitting` / `submitError` / `submit()` / `reset()`).
 - **Components.** `SearchBox`, `PersonGrid` (SVAR `Grid` with `select` mode and `init` callback subscribing to `select-row`), `HumanNameInput`, `PersonForm`, `MatchResultsList` with per-component breakdown disclosure.
 - **Tests.** 5 Vitest unit tests for `ApiClient` envelope + error handling, 3 unit tests for `PersonRepository` wiring, 6 Playwright smoke tests covering every MVP route shell.
@@ -455,7 +455,7 @@ Initial scaffold for the Person Service front-end. SvelteKit 2 + Svelte 5 runes 
 
 ### Cross-references
 
-- Service spec: [`../person-service-with-loco/spec.md`](../person-service-with-loco/spec/index.md).
-- Service REST contract: [`../person-service-with-loco/agents/restful.md`](../person-service-with-loco/agents/restful.md).
-- Service model types: [`../person-service-with-loco/agents/models.md`](../person-service-with-loco/agents/models.md).
-- Service matching reference: [`../person-service-with-loco/agents/matching.md`](../person-service-with-loco/agents/matching.md).
+- Service spec: [`../person-service-with-axum/spec.md`](../person-service-with-axum/spec/index.md).
+- Service REST contract: [`../person-service-with-axum/agents/restful.md`](../person-service-with-axum/agents/restful.md).
+- Service model types: [`../person-service-with-axum/agents/models.md`](../person-service-with-axum/agents/models.md).
+- Service matching reference: [`../person-service-with-axum/agents/matching.md`](../person-service-with-axum/agents/matching.md).

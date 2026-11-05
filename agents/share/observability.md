@@ -5,26 +5,26 @@ levels, and a Prometheus `/metrics.prom` endpoint. **OpenTelemetry OTLP
 export is family-wide** as of 2026-09-02 (repo `tasks.md` PRO-H9 +
 PRO-H12, both complete): eleven services actually export spans and
 metrics over OTLP —
-[`link-graph-service`](../../link/link-graph-service-with-loco/)
+[`link-graph-service`](../../link/link-graph-service-with-axum/)
 (`src/observability.rs`, the original reference),
-[`person-service`](../../person/person-service-with-loco/),
-[`worker-service`](../../worker/worker-service-with-loco/), and
-[`event-service`](../../event/event-service-with-loco/) (all three
+[`person-service`](../../person/person-service-with-axum/),
+[`worker-service`](../../worker/worker-service-with-axum/), and
+[`event-service`](../../event/event-service-with-axum/) (all three
 `src/observability.rs`, ported from link-graph-service under repo
 `tasks.md` PRO-H9),
-[`course-service`](../../course/course-service-with-loco/),
-[`place-service`](../../place/place-service-with-loco/), and
-[`thing-service`](../../thing/thing-service-with-loco/)
+[`course-service`](../../course/course-service-with-axum/),
+[`place-service`](../../place/place-service-with-axum/), and
+[`thing-service`](../../thing/thing-service-with-axum/)
 (`src/observability.rs`, ported from person's under `tasks.md`
 PRO-H12 slices 1–3),
-[`organization-service`](../../organization/organization-service-with-loco/)
+[`organization-service`](../../organization/organization-service-with-axum/)
 (`src/observability.rs`, ported from course's under `tasks.md` PRO-H12
 slice 4) — the **first of the four loco-idiomatic registries**
 (`src/controllers/`, not person-style `src/api/rest/`) to carry it —
-[`care-pathway-service`](../../care-pathway/care-pathway-service-with-loco/)
+[`care-pathway-service`](../../care-pathway/care-pathway-service-with-axum/)
 (`src/observability.rs`, ported from organization's under `tasks.md`
 PRO-H12 slice 5),
-[`case-service`](../../case/case-service-with-loco/)
+[`case-service`](../../case/case-service-with-axum/)
 (`src/observability.rs`, ported from care-pathway's under `tasks.md`
 PRO-H12 slice 6), and now
 [`project-portfolio-management-service`](../../project-portfolio-management/project-portfolio-management-service-with-loco/)

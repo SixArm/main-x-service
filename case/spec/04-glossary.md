@@ -1,7 +1,7 @@
 ## 4. Glossary
 
 Entity-level terms. Per-subproject vocabularies: service
-[spec §4](../case-service-with-loco/spec/index.md), matcher
+[spec §4](../case-service-with-axum/spec/index.md), matcher
 [spec §3](../case-matcher-rust-crate/spec/index.md),
 front-end
 [spec §4](../case-front-end-with-svelte/spec/index.md).

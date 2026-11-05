@@ -8,8 +8,8 @@ and front-end representations are projections of it.
 
 Defined in the service crate (`src/models/place.rs`); field-by-field
 reference in
-[`place-service-with-loco/agents/models.md`](../place-service-with-loco/agents/models.md).
-Material aspects (service [spec §5](../place-service-with-loco/spec/05-domain-model.md)):
+[`place-service-with-axum/agents/models.md`](../place-service-with-axum/agents/models.md).
+Material aspects (service [spec §5](../place-service-with-axum/spec/05-domain-model.md)):
 
 - **Identity** — UUID `id` + `identifiers: Vec<PlaceIdentifier>`
   (GLN 13-digit, FIPS, GNIS, OSM ID, custom); `global_location_number`
@@ -71,11 +71,11 @@ explicitly **unscored** `local_id`. Constructed via `Place::builder()`.
 
 The service embeds the matcher (declared in `Cargo.toml`, re-exported
 from `src/matching/mod.rs` as `matcher_lib`) and bridges via
-[`src/matching/adapter.rs`](../place-service-with-loco/src/matching/adapter.rs):
+[`src/matching/adapter.rs`](../place-service-with-axum/src/matching/adapter.rs):
 `to_matcher_place(&service::Place) -> place_matcher::Place`.
 
 Routing rules (normative; pinned by
-[`tests/duplicate_detection.rs`](../place-service-with-loco/tests/duplicate_detection.rs)):
+[`tests/duplicate_detection.rs`](../place-service-with-axum/tests/duplicate_detection.rs)):
 
 - `name` → `name`; `alternate_name` → first entry of `alternate_names`.
 - `place_type` (12-variant service enum) → `category` (34-variant
@@ -106,7 +106,7 @@ The projection is **lossy by design**: registry-only fields (`id`,
 `opening_hours`, `description`, `fax_number`, `url`, access flags,
 `relationships`, …) are dropped — they have no matcher counterpart
 (`relationships` is registry-only; it is not a match signal today). Full rationale:
-service [spec §6.2](../place-service-with-loco/spec/06-functional-requirements.md).
+service [spec §6.2](../place-service-with-axum/spec/06-functional-requirements.md).
 
 ### 5.4 Front-end TypeScript types
 
@@ -119,7 +119,7 @@ change cycle (front-end
 
 ### 5.5 Shared invariants
 
-All subprojects MUST uphold (service [spec §5.3](../place-service-with-loco/spec/05-domain-model.md)):
+All subprojects MUST uphold (service [spec §5.3](../place-service-with-axum/spec/05-domain-model.md)):
 
 - `name` is non-empty.
 - `latitude ∈ [-90, 90]`, `longitude ∈ [-180, 180]` when present.

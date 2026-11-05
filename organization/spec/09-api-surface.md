@@ -1,10 +1,10 @@
 ## 9. API Surface
 
 Source of truth for routes:
-[`src/controllers/organizations.rs`](../organization-service-with-loco/src/controllers/organizations.rs)
-and [`docs.rs`](../organization-service-with-loco/src/controllers/docs.rs);
+[`src/controllers/organizations.rs`](../organization-service-with-axum/src/controllers/organizations.rs)
+and [`docs.rs`](../organization-service-with-axum/src/controllers/docs.rs);
 machine-readable form at `/api-docs/openapi.json`
-([`src/openapi.rs`](../organization-service-with-loco/src/openapi.rs)).
+([`src/openapi.rs`](../organization-service-with-axum/src/openapi.rs)).
 
 ### 9.1 REST endpoints (service, default port 5150)
 

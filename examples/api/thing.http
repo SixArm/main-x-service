@@ -1,5 +1,5 @@
 ### thing-service — example requests
-# thing/thing-service-with-loco — "person-style" layout (src/api/rest/).
+# thing/thing-service-with-axum — "person-style" layout (src/api/rest/).
 # Envelope: same as place — {"success","data","error"} with data/error
 # OMITTED (not null) on the unused side (#[serde(skip_serializing_if)]).
 # Gated by THING_REQUIRE_AUTH (default off).

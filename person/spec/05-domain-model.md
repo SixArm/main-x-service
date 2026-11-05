@@ -8,7 +8,7 @@ and front-end representations are projections of it.
 
 Defined in the service crate (`src/models/person.rs`); field-by-field
 reference in
-[`person-service-with-loco/agents/models.md`](../person-service-with-loco/agents/models.md).
+[`person-service-with-axum/agents/models.md`](../person-service-with-axum/agents/models.md).
 Material aspects:
 
 - **Identity** — UUID `id` + `identifiers: Vec<Identifier>`
@@ -77,11 +77,11 @@ scheme (42 schemes), and `passport_books: Vec<PassportBook>`.
 
 The service embeds the matcher (path dependency, re-exported from
 `src/matching/mod.rs` as `matcher_lib`) and bridges via
-[`src/matching/adapter.rs`](../person-service-with-loco/src/matching/adapter.rs):
+[`src/matching/adapter.rs`](../person-service-with-axum/src/matching/adapter.rs):
 `to_matcher_person(&service::Person) -> person_matcher::Person`.
 
 Routing rules (normative; pinned by
-[`tests/duplicate_detection.rs`](../person-service-with-loco/tests/duplicate_detection.rs)):
+[`tests/duplicate_detection.rs`](../person-service-with-axum/tests/duplicate_detection.rs)):
 
 - `name.family` → `family_name`; first/second `name.given` →
   `given_name` / `middle_name`.
@@ -147,7 +147,7 @@ The projection is **lossy by design**: registry-only fields (`id`,
 `active`, `links`, `household_ids`, `managing_organization`,
 timestamps, …) are dropped
 — they have no matcher counterpart. Full rationale: service
-[spec §6.2](../person-service-with-loco/spec/06-functional-requirements.md).
+[spec §6.2](../person-service-with-axum/spec/06-functional-requirements.md).
 
 ### 5.4 Front-end TypeScript types
 

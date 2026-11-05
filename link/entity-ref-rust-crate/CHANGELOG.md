@@ -25,7 +25,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Fixed — README drift (ER-1, ER-3) + missing manifest `readme` field (ER-4)
 
 - **ER-1**: "Who actually consumes this" was stale at eight crates;
-  `care-pathway-service-with-loco` is a ninth (and ships its own
+  `care-pathway-service-with-axum` is a ninth (and ships its own
   `EdgeKind::ContinuesAs` journey-edge origination, 2026-08-24) but
   wasn't listed. Updated the count and narrative.
 - **ER-3**: the "## Types" table's `EdgeKind` row named five kinds,

@@ -117,7 +117,7 @@ Emerging AI tools:
 
 ### 17.4 Family references
 
-- Subproject specs: [service](../care-pathway-service-with-loco/spec/index.md),
+- Subproject specs: [service](../care-pathway-service-with-axum/spec/index.md),
   [matcher](../care-pathway-matcher-rust-crate/spec/index.md),
   [front-end](../care-pathway-front-end-with-svelte/spec/index.md).
 - Entity AGENTS reference set: [`agents/index.md`](../agents/index.md).

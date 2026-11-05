@@ -29,7 +29,7 @@ API or the authentication service.
                  | <PASETO> (server-to-server)| exchange requests
                  v                           v
    +-----------------------------+  +-----------------------------+
-   |   worker-service-with-loco  |  |   authentication-service     |
+   |   worker-service-with-axum  |  |   authentication-service     |
    |   Axum + SeaORM + Tantivy   |  |   (central SSO, PASETO mint) |
    +-----------------------------+  +-----------------------------+
 ```

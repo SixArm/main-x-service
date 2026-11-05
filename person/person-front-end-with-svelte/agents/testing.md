@@ -57,7 +57,7 @@ Conventions:
 
 Conventions:
 
-- Require a live `person-service-with-loco` at `PUBLIC_API_BASE_URL`.
+- Require a live `person-service-with-axum` at `PUBLIC_API_BASE_URL`.
 - The `playwright.config.ts` `webServer` command bakes
   `PUBLIC_API_BASE_URL` into the preview build so the front-end talks
   to the configured service.

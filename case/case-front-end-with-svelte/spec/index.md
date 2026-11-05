@@ -3,7 +3,7 @@
 > **Single source of truth.** Code conforms to this spec. Behavioural
 > change = spec + code + test. Live work queue is §13.
 >
-> Sibling service: [case-service](../../case-service-with-loco/spec/index.md).
+> Sibling service: [case-service](../../case-service-with-axum/spec/index.md).
 
 ## 1. Purpose and vision
 

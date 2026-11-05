@@ -12,7 +12,7 @@
                                | HTTP, raw JSON (no envelope)
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v--------------------------------+
-|               organization-service-with-loco                 |
+|               organization-service-with-axum                 |
 |  loco.rs 0.16 app (Axum 0.8)                                  |
 |  +----------------------+  +---------------------------+      |
 |  | controllers/         |  | controllers/docs.rs       |      |
@@ -53,7 +53,7 @@ Strictly one-way; the matcher is the leaf:
 ### 8.3 Service (loco.rs) structure
 
 ```
-organization-service-with-loco/
+organization-service-with-axum/
 ├── src/
 │   ├── app.rs                      loco Hooks: registers organizations + docs routes
 │   ├── bin/main.rs                 loco CLI entrypoint (`cargo loco start`)

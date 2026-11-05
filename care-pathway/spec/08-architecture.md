@@ -12,7 +12,7 @@
                                | REST (raw loco JSON, no envelope)
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v-------------------------------+
-|            care-pathway-service-with-loco                    |
+|            care-pathway-service-with-axum                    |
 |  loco.rs 0.16 (Axum 0.8) · port 5150                          |
 |  controllers/care_pathways.rs                                  |
 |    CRUD + /match + /check-duplicates                          |
@@ -37,7 +37,7 @@ is no adapter layer (contrast with the person entity).
 ### 8.2 Service layout (loco.rs)
 
 ```
-care-pathway-service-with-loco/
+care-pathway-service-with-axum/
 ├── src/
 │   ├── app.rs                       loco Hooks (routes, truncate)
 │   ├── bin/main.rs                  loco CLI entrypoint

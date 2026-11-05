@@ -11,10 +11,10 @@ Strategy rationale: entity spec
 (cd event-matcher-rust-crate && cargo test && cargo clippy --all-targets -- -D warnings)
 
 # Service
-(cd event-service-with-loco && cargo test --lib)                          # 62+ unit tests
-(cd event-service-with-loco && cargo test --test duplicate_detection)     # 16 seam tests
-(cd event-service-with-loco && DATABASE_URL=… cargo test --test api_integration_test)
-(cd event-service-with-loco && cargo bench)                               # Criterion
+(cd event-service-with-axum && cargo test --lib)                          # 62+ unit tests
+(cd event-service-with-axum && cargo test --test duplicate_detection)     # 16 seam tests
+(cd event-service-with-axum && DATABASE_URL=… cargo test --test api_integration_test)
+(cd event-service-with-axum && cargo bench)                               # Criterion
 
 # Front-end
 (cd event-front-end-with-svelte && pnpm test && pnpm test:e2e && pnpm check)
@@ -24,7 +24,7 @@ Strategy rationale: entity spec
 
 | Seam | Test | Pins |
 |---|---|---|
-| Service ↔ matcher | [`tests/duplicate_detection.rs`](../event-service-with-loco/tests/duplicate_detection.rs) | Adapter field-routing **and** matcher scoring — both sides of the §5.3 DTO contract |
+| Service ↔ matcher | [`tests/duplicate_detection.rs`](../event-service-with-axum/tests/duplicate_detection.rs) | Adapter field-routing **and** matcher scoring — both sides of the §5.3 DTO contract |
 | Front-end ↔ service | `tests/unit/client.test.ts`, `tests/unit/events.test.ts` (mocked fetch) | Envelope handling + endpoint wrapping against the documented wire format |
 | Front-end resilience | `tests/e2e/events.spec.ts` (Playwright, no live service) | Page shells render with the API down |
 
@@ -41,7 +41,7 @@ format, shared invariant) must change a seam test in the same PR.
 
 ## Per-subproject guides
 
-- Service: [`agents/testing.md`](../event-service-with-loco/agents/testing.md)
+- Service: [`agents/testing.md`](../event-service-with-axum/agents/testing.md)
   — layers, factories, tempdir search index, CI workflows, when to
   add a bridge test.
 - Matcher: [`agents/testing.md`](../event-matcher-rust-crate/agents/testing.md)

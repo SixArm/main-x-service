@@ -14,7 +14,7 @@
                      after a successful merge).
     - error / loading / recentError : request + validation status.
 
-  Wire shape (pinned against `case-service-with-loco`): the response is
+  Wire shape (pinned against `case-service-with-axum`): the response is
   `{main_pid, duplicate_pid, main}` — there is NO `merge_record` wrapper,
   so this page shows the survivor's pid and links to it, and reads the
   merge row's timestamp from the recent-merges table instead.

@@ -80,27 +80,27 @@ each service's exact `image:` name and `dockerfile:` path straight out of
 `full-family.yml`:
 
 ```sh
-podman build -f person/person-service-with-loco/Dockerfile \
+podman build -f person/person-service-with-axum/Dockerfile \
   -t mxi-family-person-service .
-podman build -f worker/worker-service-with-loco/Dockerfile \
+podman build -f worker/worker-service-with-axum/Dockerfile \
   -t mxi-family-worker-service .
-podman build -f place/place-service-with-loco/Dockerfile \
+podman build -f place/place-service-with-axum/Dockerfile \
   -t mxi-family-place-service .
-podman build -f thing/thing-service-with-loco/Dockerfile \
+podman build -f thing/thing-service-with-axum/Dockerfile \
   -t mxi-family-thing-service .
-podman build -f event/event-service-with-loco/Dockerfile \
+podman build -f event/event-service-with-axum/Dockerfile \
   -t mxi-family-event-service .
-podman build -f course/course-service-with-loco/Dockerfile \
+podman build -f course/course-service-with-axum/Dockerfile \
   -t mxi-family-course-service .
-podman build -f organization/organization-service-with-loco/Dockerfile \
+podman build -f organization/organization-service-with-axum/Dockerfile \
   -t mxi-family-organization-service .
-podman build -f care-pathway/care-pathway-service-with-loco/Dockerfile \
+podman build -f care-pathway/care-pathway-service-with-axum/Dockerfile \
   -t mxi-family-care-pathway-service .
 podman build -f project-portfolio-management/project-portfolio-management-service-with-loco/Dockerfile \
   -t mxi-family-portfolio-service .
-podman build -f authentication/authentication-service-with-loco/Dockerfile \
+podman build -f authentication/authentication-service-with-axum/Dockerfile \
   -t mxi-family-authentication-service .
-podman build -f link/link-graph-service-with-loco/Dockerfile \
+podman build -f link/link-graph-service-with-axum/Dockerfile \
   -t mxi-family-link-graph-service .
 # case-service was already built by an earlier tutorial/DEP-1 run in this
 # environment (image reused, not rebuilt, in this run)
@@ -397,7 +397,7 @@ actually contains never matters here**, because `PERSON_REQUIRE_AUTH` /
 `CASE_REQUIRE_AUTH` are both off (`full-family.yml`'s default) — and both
 services' `authorize_bulk` short-circuits to `Ok(())` before even looking
 at the bearer when their own `REQUIRE_AUTH` flag is off (confirmed by
-reading `case/case-service-with-loco/src/auth.rs::authorize_record` and
+reading `case/case-service-with-axum/src/auth.rs::authorize_record` and
 `person/worker`'s `src/api/rest/links.rs::authorize_bulk`). Turning on
 enforcement (as TUT-3 does, and as `examples/compose/enforced.yml`
 documents in its own header) would change this: the placeholder would

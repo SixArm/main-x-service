@@ -23,7 +23,7 @@
 //! framed this as copyable per project until a second non-aggregator
 //! consumer justified a shared dependency; in practice it is embedded as
 //! a real Cargo `path` dependency by nine crates (as of 2026-09-05):
-//! the `link-graph-service-with-loco` aggregator, the four entity
+//! the `link-graph-service-with-axum` aggregator, the four entity
 //! services that originate edges (person, worker, case, care-pathway),
 //! and four consumer apps (contact-relationship-management,
 //! content-management-system, patient-flow,

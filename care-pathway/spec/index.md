@@ -17,7 +17,7 @@
 
 Subproject specs:
 
-- [care-pathway-service-with-loco/spec](../care-pathway-service-with-loco/spec/index.md) — registry service (§1–§18, single file today)
+- [care-pathway-service-with-axum/spec](../care-pathway-service-with-axum/spec/index.md) — registry service (§1–§18, single file today)
 - [care-pathway-matcher-rust-crate/spec](../care-pathway-matcher-rust-crate/spec/index.md) — matching library (§1–§25, single file today)
 - [care-pathway-front-end-with-svelte/spec](../care-pathway-front-end-with-svelte/spec/index.md) — operator UI (§1–§18, single file today)
 

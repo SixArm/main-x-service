@@ -1,9 +1,9 @@
 # RESTful API Reference — Organization Entity
 
 Entity-level endpoint map. Source of truth for behaviour:
-[`src/controllers/organizations.rs`](../organization-service-with-loco/src/controllers/organizations.rs);
+[`src/controllers/organizations.rs`](../organization-service-with-axum/src/controllers/organizations.rs);
 machine-readable: `GET /api-docs/openapi.json`
-([`src/openapi.rs`](../organization-service-with-loco/src/openapi.rs));
+([`src/openapi.rs`](../organization-service-with-axum/src/openapi.rs));
 contract summary: entity [spec §9](../spec/09-api-surface.md).
 
 Default base URL: `http://localhost:5150` (loco default port).

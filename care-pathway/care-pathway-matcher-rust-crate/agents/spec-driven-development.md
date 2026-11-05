@@ -18,7 +18,7 @@ to the spec; not the other way around.
   `lib.rs`, `MatchConfig` fields, `MatchResult` / `MatchBreakdown`
   shape, deterministic-identifier scheme list), update the bridge
   test in
-  [`../care-pathway-service-with-loco/tests/matching.rs`](../../care-pathway-service-with-loco/tests/matching.rs)
+  [`../care-pathway-service-with-axum/tests/matching.rs`](../../care-pathway-service-with-axum/tests/matching.rs)
   in the same PR.
 
 ## When To Update Which Section

@@ -2,7 +2,7 @@
 
 Orientation only. The complete endpoint reference (parameters,
 envelopes, status codes) is
-[`course-service/agents/restful.md`](../course-service-with-loco/agents/restful.md);
+[`course-service/agents/restful.md`](../course-service-with-axum/agents/restful.md);
 the normative summary is entity spec [§9](../spec/09-api-surface.md).
 
 ## The one wire contract

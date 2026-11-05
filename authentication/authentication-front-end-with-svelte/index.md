@@ -1,7 +1,7 @@
 # authentication-front-end-with-svelte — documentation index
 
 Operator UI for passwordless magic-link sign up / sign in / sign out,
-consuming the [Authentication Service](../authentication-service-with-loco).
+consuming the [Authentication Service](../authentication-service-with-axum).
 
 ## Start here
 

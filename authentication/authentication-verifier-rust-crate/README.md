@@ -2,7 +2,7 @@
 
 Offline **PASETO v4.public verification** for Main X Index peer services.
 
-The [authentication-service](../authentication-service-with-loco) is
+The [authentication-service](../authentication-service-with-axum) is
 the federation's single sign-on provider: it exchanges a server-side
 cookie session for short-lived **PASETO v4.public** (Ed25519-signed)
 cross-service tokens, and publishes its Ed25519 public key(s) at
@@ -69,7 +69,7 @@ per-request introspection hop.
 - Agent guide: [AGENTS.md](./AGENTS.md)
 - Design: [authentication-sessions.md](../../agents/share/authentication-sessions.md) §5,
   [authorization-attributes.md](../../agents/share/authorization-attributes.md)
-- Issuing service: [authentication-service-with-loco](../authentication-service-with-loco)
+- Issuing service: [authentication-service-with-axum](../authentication-service-with-axum)
 
 ## Quick start
 

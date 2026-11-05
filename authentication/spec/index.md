@@ -2,7 +2,7 @@
 
 > **Source of truth — scoped.** Each subproject's own `spec/` remains
 > the single source of truth **for that subproject** (the
-> [service spec](../authentication-service-with-loco/spec/index.md) and
+> [service spec](../authentication-service-with-axum/spec/index.md) and
 > the [front-end spec](../authentication-front-end-with-svelte/spec/index.md),
 > and the [verifier spec](../authentication-verifier-rust-crate/spec/index.md)).
 > This entity-level spec

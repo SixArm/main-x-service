@@ -3,7 +3,7 @@
 The entity's API is the **service's HTTP surface**; the front-end is
 its first-party consumer. Full endpoint reference (payloads,
 parameters, status codes, response envelope):
-[service agents/restful.md](../person-service-with-loco/agents/restful.md).
+[service agents/restful.md](../person-service-with-axum/agents/restful.md).
 Normative summary: entity [spec §9](../spec/09-api-surface.md).
 
 ## Shape of the surface

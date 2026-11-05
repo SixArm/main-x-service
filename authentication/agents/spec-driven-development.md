@@ -8,7 +8,7 @@ authority model. Read this before editing anything under
 
 - Each subproject's own `spec/` is the single source of truth **for
   that subproject's internals** — the
-  [service spec](../authentication-service-with-loco/spec/index.md)
+  [service spec](../authentication-service-with-axum/spec/index.md)
   and the
   [front-end spec](../authentication-front-end-with-svelte/spec/index.md).
 - The entity-level spec ([`../spec/index.md`](../spec/index.md)) is
@@ -73,7 +73,7 @@ verifier verifies, front-end consumes).
 authentication/
 ├── spec/                 ← entity contract + goals (this level)
 ├── agents/               ← entity reference docs (you are here)
-├── authentication-service-with-loco/
+├── authentication-service-with-axum/
 │   ├── spec/             ← service internals (authoritative for the crate)
 │   └── AGENTS.md, README.md, CHANGELOG.md
 ├── authentication-verifier-rust-crate/

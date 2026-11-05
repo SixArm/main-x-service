@@ -48,7 +48,7 @@ export interface SearchOptions {
 }
 
 // REST client for Place Service. Endpoint shape per
-// place-service-with-loco/agents/restful.md. Place Service uses
+// place-service-with-axum/agents/restful.md. Place Service uses
 // `/check-duplicates` for duplicate-check.
 /**
  * Typed REST client for the Place Service, wrapping an {@link ApiClient}.
@@ -79,7 +79,7 @@ export class PlaceRepository {
    * Normalizes the two response shapes the service may return — a bare
    * `Place[]` or a `{ results, total }` envelope — into a single shape.
    * `results` is the real service's field name
-   * (place-service-with-loco/src/api/rest/handlers.rs::SearchResponse);
+   * (place-service-with-axum/src/api/rest/handlers.rs::SearchResponse);
    * this used to say `items`, a name the service never actually sends,
    * found only by running this client against a real place-service
    * (mirrors the identical thing-front-end T-30 finding — see its

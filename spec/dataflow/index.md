@@ -14,10 +14,10 @@ the same in both; the per-step *detail* differs:
   case, and the loco-converted person/worker/place/thing/event/course
   controllers). The API DTO **is** the matcher type, stored verbatim as
   a single JSONB `data` column. Reference handler:
-  [`care-pathway/care-pathway-service-with-loco/src/controllers/care_pathways.rs`](../../care-pathway/care-pathway-service-with-loco/src/controllers/care_pathways.rs).
+  [`care-pathway/care-pathway-service-with-axum/src/controllers/care_pathways.rs`](../../care-pathway/care-pathway-service-with-axum/src/controllers/care_pathways.rs).
 - **older Axum services** (the pre-conversion `src/api/rest/handlers.rs`
   layer, e.g.
-  [`person/person-service-with-loco/src/api/rest/handlers.rs`](../../person/person-service-with-loco/src/api/rest/handlers.rs)).
+  [`person/person-service-with-axum/src/api/rest/handlers.rs`](../../person/person-service-with-axum/src/api/rest/handlers.rs)).
   Records are spread across **normalized child tables** and indexed in
   **Tantivy**.
 
