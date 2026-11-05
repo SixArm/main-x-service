@@ -30,7 +30,7 @@
 
 use std::time::Duration;
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use time::OffsetDateTime;
 
 use crate::Result;

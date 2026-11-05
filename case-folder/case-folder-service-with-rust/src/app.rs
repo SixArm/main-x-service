@@ -21,6 +21,7 @@ use crate::{auth::AuthConfig, controllers, initializers, tasks};
 fn defaults() -> Defaults {
     Defaults {
         database: "",
+        port: 5150,
         ..Defaults::default()
     }
 }

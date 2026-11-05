@@ -1,24 +1,15 @@
-//! Binary entry point for the **Place Service** microservice.
-//!
-//! Wires the loco.rs CLI to the service [`App`](place_service::app::App) and
-//! the `SeaORM` [`Migrator`](migration::Migrator). Run `cargo run -- --help`
-//! for the available subcommands (start the server, run migrations, …).
+//! Command-line entry point. See [`axa::cli::Cli`] for the commands.
 
-// Always start with high quality coding conventions.
-#![warn(clippy::pedantic)]
-#![forbid(unsafe_code)]
-#![deny(missing_docs)]
-
-// When we build for MUSL static, use faster memory allocator.
-#[cfg(target_env = "musl")]
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
-use loco_rs::cli;
-use migration::Migrator;
+use axa::cli::Cli;
+use clap::Parser;
 use place_service::app::App;
 
+/// Parse the command line and run it.
+///
+/// # Errors
+///
+/// Returns the failure from [`App::run`].
 #[tokio::main]
-async fn main() -> loco_rs::Result<()> {
-    cli::main::<App, Migrator>().await
+async fn main() -> axa::Result<()> {
+    App::run(Cli::parse()).await
 }
