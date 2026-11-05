@@ -1,6 +1,6 @@
 # Examples
 
-> Part of the [Loco edition specification](index.md). Contract details:
+> Part of the [Axum edition specification](index.md). Contract details:
 > [api-contract.md](api-contract.md); routes: [routes.md](routes.md).
 
 ## List folders by NHS Number
@@ -168,7 +168,7 @@ missing endpoint cabinet (in-transit / created-in-place) is suppressed.
 ```rust
 // src/controllers/reports.rs
 use axum::{debug_handler, Json};
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use serde_json::json;
 
 #[debug_handler]

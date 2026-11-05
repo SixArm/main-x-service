@@ -1,7 +1,7 @@
 //! Request-level integration tests for the BLK-5 bulk import/export API
 //! (`agents/share/bulk-import-export.md`; crate spec §10.7).
 //!
-//! These boot the real loco app against the `test` environment config, so
+//! These boot the real axa app against the `test` environment config, so
 //! they require a reachable PostgreSQL instance and are `#[ignore]`d
 //! (family convention; run with `cargo test -- --ignored`).
 //!

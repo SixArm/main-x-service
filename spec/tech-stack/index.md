@@ -14,12 +14,12 @@ See also:
 - [../postgresql/index.md](../postgresql/index.md) — PostgreSQL spec
 - [../availability/index.md](../availability/index.md) — availability / scaling / health
 - [../observability/index.md](../observability/index.md) — tracing / metrics / logs
-- [../../agents/share/rust-loco-stack.md](../../agents/share/rust-loco-stack.md) — **canonical** Rust / Loco dependency table + constraints
-- [../../agents/share/loco.md](../../agents/share/loco.md) — Loco backend conventions
+- [../../agents/share/rust-axum-stack.md](../../agents/share/rust-axum-stack.md) — **canonical** Rust / axa dependency table + constraints
+- [../../agents/share/axa.md](../../agents/share/axa.md) — axa service conventions
 
 > **Single source of truth.** The dependency table and the hard
 > constraints in
-> [`agents/share/rust-loco-stack.md`](../../agents/share/rust-loco-stack.md)
+> [`agents/share/rust-axum-stack.md`](../../agents/share/rust-axum-stack.md)
 > are canonical. This spec summarises them, adds the front-end half of
 > the stack, and records honestly where the repo currently *deviates*
 > from the target — framed as known drift, not as a second standard.
@@ -28,26 +28,26 @@ See also:
 
 ## 1. Backend stack
 
-The backend is **Rust 2024 edition** services built on the Loco.rs
-conventions over Axum, persisted in PostgreSQL via SeaORM. They are
-**backend-only** — Loco's view/template tier (Tera, HTMX, Alpine, Lily)
-is deliberately *not* used; see
-[`loco.md`](../../agents/share/loco.md). The canonical dependency table
-is in
-[`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md); the
-summary below maps each concern to its technology and grounds it in the
-representative service manifests
-(`person/person-service-with-axum/Cargo.toml`,
-`organization/organization-service-with-axum/Cargo.toml`).
+The backend is **Rust 2024 edition** services built directly on Axum, using
+[axa](https://github.com/publicprojects-io/axa) for shared plumbing, and
+persisted in PostgreSQL. They are **backend-only**. The canonical dependency
+table is in
+[`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md); the summary below
+maps each concern to its technology.
+
+The family is moving from SeaORM to sqlx, so that a reviewer can read the exact
+SQL. §5 describes that move, and a crate's own `Cargo.toml` says which side it
+is on.
 
 | Concern | Technology | Purpose |
 |---|---|---|
 | Language | Rust, 2024 edition; MSRV **1.97** | Systems performance + memory safety |
 | Async runtime | Tokio | Async I/O and concurrency (NOT async_std) |
-| Web framework | Axum 0.8 + Loco.rs 1.0 | HTTP server, routing, config/hooks/CLI (backend-only) |
+| Web framework | Axum 0.8 + axa | HTTP server, routing, config/hooks/CLI (backend-only) |
+| Shared service plumbing | axa | Routes, middleware, errors, configuration, CLI, jobs (library, not framework) |
 | HTTP layer | hyper, tower, tower-http | CORS, compression, tracing middleware |
 | Database | PostgreSQL 18+ | Persistence (NOT SQLite) |
-| ORM / migrations | SeaORM 2.0 + sea-orm-migration | Async ORM; schema migrations |
+| Database access | sqlx 0.9 (target); SeaORM 2.0 + sea-orm-migration (being replaced) | Direct, reviewable SQL; schema migrations |
 | Search | Tantivy 0.22 | Embedded full-text search — live on all ten entity registries |
 | API docs | Utoipa 5 + utoipa-swagger-ui 9 (or hand-written OpenAPI) | OpenAPI 3.0 spec + Swagger UI |
 | Serialization | Serde + serde_json | JSON request/response |
@@ -60,7 +60,7 @@ representative service manifests
 | Error handling | thiserror 2 + anyhow 1 | Typed + contextual errors |
 | Password hashing | argon2 0.5 | Magic-link / credential hashing (where used) |
 | Authentication | rusty_paseto (PASETO v4.public) + authentication-verifier 0.9 | Server-side Postgres **cookie sessions** are the session; cross-service auth is short-lived **PASETO v4.public** tokens verified offline against the published Ed25519 key (`/.well-known/paseto-keys`). `jsonwebtoken`/RS256 + JWKS is **decommissioned**. See [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). |
-| Testing | assertables, tokio-test, mockall, tempfile (+ rstest, insta, serial_test in loco services) | Unit + integration + snapshot tests |
+| Testing | assertables, tokio-test, mockall, tempfile (+ rstest, insta, serial_test in controller-style services) | Unit + integration + snapshot tests |
 | Benchmarking | Criterion 0.5 | Statistical performance benchmarks |
 | Memory allocator | MiMalloc 0.1 | Faster allocator on MUSL static builds (NOT jemalloc) |
 | Identifiers | uuid 1 (v4 + serde) | Record + request IDs |
@@ -74,7 +74,7 @@ The matching libraries (`strsim`, `fuzzy-matcher`, `geo`/`haversine`)
 back the algorithms documented in
 [`../../agents/share/match.md`](../../agents/share/match.md); the
 canonical per-entity algorithm lives in each sibling `*-matcher`
-crate, embedded by the service and (for the newer loco services) reused
+crate, embedded by the service and (for the newer controller-style services) reused
 directly as the API DTO.
 
 ---
@@ -82,8 +82,8 @@ directly as the API DTO.
 ## 2. Hard constraints
 
 These are non-negotiable target choices, lifted verbatim from
-[`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md) and
-[`loco.md`](../../agents/share/loco.md). They exist to prevent
+[`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md) and
+[`axa.md`](../../agents/share/axa.md). They exist to prevent
 ecosystem fragmentation across the ten entity slices.
 
 | Choose | Not | Rationale |
@@ -94,17 +94,7 @@ ecosystem fragmentation across the ten entity slices.
 | PostgreSQL | SQLite | One production database; SeaORM Postgres feature only |
 | chrono | jiff | One date/time crate (sea-orm has no `with-jiff`) |
 | sea-orm `with-chrono` / `with-time` | sea-orm `with-jiff` | `with-jiff` does not exist in sea-orm 2.0 |
-| Postgres-backed background jobs (loco `worker` feature, `queue.kind: Postgres`) | SQLite `queue.kind` / external broker | No extra infra dependency for the job queue |
-
-Loco background-job config (target):
-
-```yaml
-queue:
-  kind: Postgres
-  uri: "TODO"
-  dangerously_flush: false
-  num_workers: 2
-```
+| Postgres-backed background jobs (the `axa_queue` table) | SQLite / external broker | No extra infra dependency for the job queue |
 
 ### 2.1 Known drift toward the target
 
@@ -130,7 +120,7 @@ When a crate is brought to target, drop its row here and update its
 Every Rust crate root (`lib.rs` / `main.rs`) carries the same quality
 gate and the MUSL-gated allocator, placed immediately after the
 top-level doc comment (per
-[`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md)):
+[`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md)):
 
 ```rust
 // Always start with high quality coding conventions.
@@ -191,49 +181,39 @@ Constraints and conventions:
 
 ---
 
-## 5. Two service generations
+## 5. Service shapes and the move to sqlx
 
-The service crates were not all built at once, so two generations
-coexist. Read a crate's `Cargo.toml` to know which one you are in.
+Every service is plain Axum on axa. Two internal shapes coexist, and
+[`architecture.md`](../../agents/share/architecture.md) describes them:
+**person-style** (`src/api/rest/`, a rich model with per-field tables) and
+**controller-style** (`src/controllers/`, the matcher type stored as JSONB).
 
-### 5.1 Loco generation (current target)
+### 5.1 Why sqlx
 
-Examples: `organization-service`, `care-pathway-service`,
-`case-service`, `authentication-service`. Thin manifests that lean on
-`loco-rs` 1.0 to pull the web/runtime/CLI surface.
+The goal is auditability through a more popular, more secure, more direct
+stack. A reviewer should be able to read every statement a service runs. SeaORM
+already runs on sqlx, so removing it removes a layer and adds no new database
+driver.
 
-Pulls in: `loco-rs` (Hooks / AppContext / CLI / loco config),
-`axum` 0.8, `sea-orm` 2.0 + `migration` (sea-orm-migration), `serde`,
-`tokio` (minimal `rt-multi-thread`), `validator`, `uuid`, `mimalloc`,
-the sibling `*-matcher` crate (reused as the API DTO),
-`authentication-verifier`. Dev-deps add `rstest`, `insta`,
-`serial_test`, and in-process short-lived-token minting for auth tests
-(PASETO v4.public via `rusty_paseto`; the prior RS256 path —
-`jsonwebtoken`, `rsa`, `sha2`, `base64` — was decommissioned 2026-08-21,
-repo-wide; `cargo deny check` is clean. See
-[`../../agents/share/security.md`](../../agents/share/security.md) §7).
-Search is Postgres `ILIKE`; events are in-memory; OpenAPI is
-hand-written or Utoipa.
+### 5.2 Rules for sqlx code
 
-### 5.2 Older Axum generation
+- All SQL lives in one area per crate, so a reviewer has one place to read.
+- Use `query!` and `query_as!` by default. Commit `.sqlx/`, build with
+  `SQLX_OFFLINE=true`, and check for drift against a real database in CI.
+- Dynamic SQL uses bound `QueryBuilder` calls only. `AssertSqlSafe` and a
+  non-literal `QueryBuilder::push` are refused by CI outside an allowlist.
+- Helpers that run several statements take `&mut PgConnection`, so the same code
+  runs inside a transaction. Audit and outbox rows commit in the same
+  transaction as the change they describe.
+- Migrations are plain SQL run by `sqlx::migrate!`. There is no deployed data to
+  preserve, so a crate may squash to one reviewed baseline, proven by a
+  `pg_dump` schema diff.
 
-Example: `person-service` (and its early peers). A fat, explicit
-manifest that wires the full stack by hand and predates the loco
-conversion.
+### 5.3 Order
 
-Pulls in (beyond the loco set): `hyper` + `tower` + `tower-http`
-explicitly, `sea-orm-migration` directly, `tantivy` 0.22, `tonic` +
-`prost` + `tonic-build` (gRPC, with a `build.rs`), `utoipa` +
-`utoipa-swagger-ui` + `openapiv3`, `fluvio`, the full OpenTelemetry
-0.32 stack + `tracing-opentelemetry` 0.33 + `prometheus`, `chrono` **and**
-`time`, `strsim` + `fuzzy-matcher`, `argon2`, `bigdecimal`, `dotenvy`,
-plus Criterion benches (`matching`, `search`, `validation`, `bridge`)
-and a tuned `[profile.release]` (`lto = true`, `codegen-units = 1`,
-`strip = true`).
-
-The conversion direction is older Axum → Loco; the authentication
-service is the reference conversion. Both generations target the same
-external contract (REST + OpenAPI + the matcher DTO).
+One crate at a time, each proven against a real Postgres before the next, with
+the crates carrying the heaviest compliance load last. Audit digests, MACs, and
+the outbox must behave identically, and their tests are not edited to pass.
 
 ---
 
@@ -243,7 +223,7 @@ external contract (REST + OpenAPI + the matcher DTO).
 |---|---|
 | Rust edition (target) | 2024 |
 | MSRV | **Rust 1.96** — current stable minus two, declared per crate and enforced in CI ([`../rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md)) |
-| Loco.rs | 1.0 |
+| axa | pinned git revision |
 | Axum | 0.8 |
 | SeaORM | 2.0 |
 | PostgreSQL | 18+ |
@@ -261,11 +241,11 @@ two — **1.96** today, derived from stable 1.98.0 — declared as
 `scripts/ci-check.sh msrv`, which compiles every crate against that
 toolchain. The policy, including why N-2 and how to bump it, is
 [`../rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md). Note that the
-binding constraint is the dependency graph, not our code: `loco-rs`,
+binding constraint is the dependency graph, not our code: `axa`,
 `sea-orm`, and `sqlx` already require 1.94.
 
 The remaining edition deviation is the twelve `migration/` sub-crates,
-which are still `edition = "2021"` (a loco generator default). Every
+which are still `edition = "2021"`. Every
 top-level crate is on 2024.
 
 ---
@@ -274,8 +254,8 @@ top-level crate is on 2024.
 
 | Topic | Canonical doc |
 |---|---|
-| Full dependency table + constraints | [`../../agents/share/rust-loco-stack.md`](../../agents/share/rust-loco-stack.md) |
-| Loco conventions, background jobs | [`../../agents/share/loco.md`](../../agents/share/loco.md) |
+| Full dependency table + constraints | [`../../agents/share/rust-axum-stack.md`](../../agents/share/rust-axum-stack.md) |
+| axa conventions, background jobs | [`../../agents/share/axa.md`](../../agents/share/axa.md) |
 | Architecture (module layout, data flow) | [`../architecture/index.md`](../architecture/index.md) |
 | PostgreSQL + extensions | [`../postgresql/index.md`](../postgresql/index.md) |
 | Availability, scaling, health checks | [`../availability/index.md`](../availability/index.md) |

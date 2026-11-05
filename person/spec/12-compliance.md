@@ -58,7 +58,7 @@ audit writes already funnel through — is chained under
 `pg_advisory_xact_lock`; `GET /api/audit/verify` reports linkage and
 content breaks (HIPAA §164.312(c)).
 
-**Ported, not copied.** Person's `audit_log` predates the loco-style
+**Ported, not copied.** Person's `audit_log` predates the controller-style
 services, so two things differ from the reference:
 
 - **Order comes from a new `seq BIGSERIAL`, not the primary key.** The PK

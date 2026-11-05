@@ -6,8 +6,8 @@ subproject. Read this **before** opening a PR.
 ## What this project is
 
 A **SvelteKit browser client** for the
-[Loco JSON API sibling](../case-folder-service-with-rust). The Svelte
-app owns no data; every page fetches from `/api/*`. The Loco app must
+[Axum JSON API sibling](../case-folder-service-with-rust). The Svelte
+app owns no data; every page fetches from `/api/*`. The axa app must
 be running for this app to work.
 
 Full spec is in [`spec/`](spec/index.md). Prefer reading that to
@@ -34,7 +34,7 @@ inferring from the code.
 ### 1. The API is the source of truth
 
 If a list, form, or aggregate **could** be derived from the
-[Loco API](../case-folder-service-with-rust/spec/routes.md), it **must** be.
+[axa API](../case-folder-service-with-rust/spec/routes.md), it **must** be.
 Do not invent local data, do not seed, do not cache to `localStorage`.
 
 ### 2. All `fetch` goes through `src/lib/api/client.ts`
@@ -65,7 +65,7 @@ prerequisite (§12 of spec).
 Load functions call `error(status, message)` from `@sveltejs/kit` on
 API failure. Don't silently fall back to local data. The
 `+error.svelte` page surfaces the failure with the API URL and a
-pointer to the Loco quick-start.
+pointer to the axa quick-start.
 
 ### 6. Field-level error parsing on `422`
 
@@ -80,7 +80,7 @@ for the canonical pattern.
 - Always pre-flight validate before submitting (`isValidNhsNumber`).
 - Never compare formatted strings directly — normalise first
   (`normaliseNhsNumber`).
-- The Loco API runs the identical Modulus 11 validator; we
+- The axa API runs the identical Modulus 11 validator; we
   pre-validate for UX, the API is authoritative.
 
 ### 8. Lily components are headless
@@ -158,7 +158,7 @@ All required green:
   gen:api` fixes it locally.
 - `npm run test:e2e` — the Playwright suite (14 spec files, 73
   `test()` cases; see [spec/testing.md](spec/testing.md) for the table).
-  The Loco API must be running in **stub mode** (see Prerequisites in
+  The axa API must be running in **stub mode** (see Prerequisites in
   [README.md](README.md)).
   Tests are serialised (`fullyParallel: false`) because they share
   the API's upstream state.
@@ -187,7 +187,7 @@ All required green:
 
 1. Add the route in
    [`../case-folder-service-with-rust/spec/routes.md`](../case-folder-service-with-rust/spec/routes.md)
-   first (the Loco subproject is the contract).
+   first (the axa subproject is the contract).
 2. Add a typed method to the matching namespace in
    `src/lib/api/client.ts`. Reuse the snake → camel mappers; add a
    new one if a new shape is introduced.
@@ -242,4 +242,4 @@ All required green:
   Lily change via `pnpm link`.
 - The five upstream Main-X-Services live under
   `~/git/sixarm/main-x-service/` (only relevant if you're testing
-  against real services rather than the Loco app's in-process stubs).
+  against real services rather than the axa app's in-process stubs).

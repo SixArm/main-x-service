@@ -66,7 +66,7 @@ import/export job (`kind`, `format`, `status`, `params`, the
 `rows_total`/`rows_created`/`rows_upserted`/`rows_to_review`/`rows_errored`
 counts, `actor`, artifact URLs, and `expires_at` TTL), with
 `UNIQUE (entity, kind, idempotency_key)` so a retried submit maps to the
-same job. Jobs run on the loco `bg_pg` worker; artifacts (uploaded source,
+same job. Jobs run on the axa `bg_pg` worker; artifacts (uploaded source,
 export output, error report) live in the config-driven artifact store
 (S3-compatible in deployment, local fs in dev), referenced by short-lived
 access-controlled URLs.
@@ -232,7 +232,7 @@ the worse risk.
 The async trait changed `AppState::new` (`src/api/rest/state.rs`) from a
 synchronous constructor to `pub async fn new(..) ->
 crate::Result<Self>`, since the S3 backend's client construction
-resolves credentials asynchronously. Both call sites — the loco
+resolves credentials asynchronously. Both call sites — the axa
 `after_routes` boot hook and the integration-test harness
 (`tests/common/mod.rs`) — were already `async fn`, so this is additive;
 `bulk_store` is built once at boot (`crate::bulk::store::from_env()`)

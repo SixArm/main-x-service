@@ -12,7 +12,7 @@
 
 | Capability | Subproject | Notes |
 |---|---|---|
-| loco.rs chassis | service | Real `Hooks` / `AppContext` boot; the family's reference loco app; loco-rs 0.16 |
+| axa chassis | service | Real `Hooks` / `AppContext` boot; the family's reference axa app; loco-rs 0.16 |
 | Magic-link flow | service | Signup + sign-in + redeem; 32-char token, 5-min expiry, single-use; anti-enumeration always-`200` |
 | PASETO v4.public signing | service | `src/auth` — Ed25519 (`rusty_paseto`), claims §5.3, `kid`-stamped footer, env-driven seed loading, fatal-boot on bad keys |
 | Key-set endpoint | service | `/.well-known/paseto-keys`, pre-rendered at boot; Ed25519 key set |

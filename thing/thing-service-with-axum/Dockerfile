@@ -99,7 +99,7 @@ USER thing
 EXPOSE 8080
 
 # This crate mounts an explicit /api/health route (unlike the
-# loco-native crates, which rely on /_health) — see
+# controller-style crates, which rely on /_health) — see
 # src/api/rest/handlers.rs. NOTE: Podman's default OCI image format
 # silently drops HEALTHCHECK ("HEALTHCHECK is not supported for OCI
 # image format and will be ignored" — build with `--format docker` to
@@ -119,5 +119,5 @@ ENV APP_ENV=production \
     SEARCH_INDEX_PATH=/app/data/search_index
 
 # loco's CLI entry point: `<bin> start` runs the server (see
-# src/bin/main.rs — `loco_rs::cli::main`).
+# src/bin/main.rs — `axa::cli::main`).
 CMD ["/app/thing-service", "start"]

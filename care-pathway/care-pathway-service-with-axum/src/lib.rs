@@ -1,4 +1,4 @@
-//! `care-pathway-service` — a loco.rs registry for clinical
+//! `care-pathway-service` — an axa registry for clinical
 //! **care-pathway** records (CRUD + matching).
 //!
 //! The API DTO is `care_pathway_matcher::CarePathway` itself: the
@@ -8,13 +8,13 @@
 //!
 //! ## Modules
 //!
-//! - [`app`] — loco `Hooks` wiring (routes, workers, truncate/seed).
+//! - [`app`] — axa `Hooks` wiring (routes, workers, truncate/seed).
 //! - [`controllers`] — Axum controllers: CRUD, `match`, `check-duplicates`,
 //!   plus the root `/metrics.prom` Prometheus endpoint.
 //! - [`metrics`] — process-wide Prometheus registry + text rendering.
 //! - [`models`] — `SeaORM` entity + CRUD helpers over the stored payload.
-//! - [`workers`] — background workers (loco `BackgroundWorker`).
-//! - [`tasks`], [`initializers`], [`data`] — loco extension points.
+//! - [`workers`] — background workers (axa `BackgroundWorker`).
+//! - [`tasks`], [`initializers`], [`data`] — axa extension points.
 //!
 //! See `spec/index.md` for the living specification.
 

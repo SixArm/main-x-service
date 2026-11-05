@@ -28,7 +28,7 @@ opens a §13 task.
   §13 T-2 / T-3.
 
 - **OQ-5 — SeaORM time-type feature.** Adopt `with-chrono` from the
-  start (the [rust-loco-stack.md](../../../agents/share/rust-loco-stack.md)
+  start (the [rust-axum-stack.md](../../../agents/share/rust-axum-stack.md)
   default), or match whatever the first-converted siblings are running
   to avoid drift while course-service §13 T-17 is open? *(Lean:
   `with-chrono` — this is a brand-new crate with no carry-over to

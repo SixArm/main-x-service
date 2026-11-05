@@ -2,7 +2,7 @@
 
 The Main X Index is a **family of Rust services** sharing one architecture,
 one matching approach, and one set of operational conventions. Every service
-boots on **loco.rs** (Axum + SeaORM + PostgreSQL); the differences are which
+is plain Axum on [axa](axa.md) with PostgreSQL; the differences are which
 *internal shape* a crate uses and which capabilities it carries (see the
 capability matrix in [overview.md](overview.md)).
 
@@ -30,7 +30,7 @@ capability matrix in [overview.md](overview.md)).
 +---------------------------------+--------------------------------+
                                   |
 +---------------------------------v--------------------------------+
-|  API layer (Axum, mounted by loco)                               |
+|  API layer (Axum)                                                |
 |   REST + OpenAPI/Swagger  ·  FHIR R5 (8 crates)  ·  gRPC (3)      |
 |   blanket ABAC guard (<ENTITY>_REQUIRE_AUTH, default-off)         |
 +---------------------------------+--------------------------------+
@@ -63,19 +63,19 @@ capability matrix in [overview.md](overview.md)).
 
 ## Two internal shapes
 
-Both boot identically through a loco `Hooks` impl in `src/app.rs`; they
+Both boot the same way, through plain functions in `src/app.rs`; they
 differ in how routes and persistence are organised.
 
 ### person-style (`src/api/rest/`)
 
-The older hand-rolled Axum layout, now mounted under loco. Used by
+The older hand-rolled Axum layout. Used by
 **person, worker, course** (and **place / thing / event**, which are
 mid-conversion and also carry a `src/controllers/` surface). A rich
 domain model with per-field tables.
 
 ```
 src/
-├── app.rs                 loco Hooks (boot, routes, workers)
+├── app.rs                 boot, routes, workers, CLI
 ├── api/rest/              mod · handlers · routes · state (AppState) · auth · links
 ├── api/fhir/  api/grpc/   FHIR R5 resource + gRPC stub
 ├── models/                domain model (HumanName, Identifier, Address, …)
@@ -87,16 +87,16 @@ src/
 └── bulk/                  (person only) import/export codecs + jobs
 ```
 
-### loco-style (`src/controllers/`)
+### controller-style (`src/controllers/`)
 
-The newer loco-idiomatic layout. Used by **organization, care-pathway,
+The newer controller-style layout. Used by **organization, care-pathway,
 case, portfolio** (and **link-graph**, **authentication**). The API DTO
 **is** the matcher type, stored verbatim as JSONB — no separate model to
 drift.
 
 ```
 src/
-├── app.rs                 loco Hooks (routes, workers, boot init)
+├── app.rs                 boot, routes, workers, CLI
 ├── controllers/           one module per resource (+ docs, metrics; fhir where present)
 ├── models/                CRUD helpers over the JSONB payload + _entities/ (SeaORM)
 ├── auth.rs                offline PASETO verify + ABAC (authorize_record)
@@ -140,7 +140,7 @@ migrator) in both shapes — `authentication-service` is the exception, with
   the embedded engine), and an `EventProducer` / `EventPublisher` are traits,
   so persistence, matching, and transport are swappable and unit-testable.
 - **Shared state.** person-style holds services in `AppState`
-  (`api/rest/state.rs`); loco-style reads loco's `AppContext` in each
+  (`api/rest/state.rs`); controller-style reads axa's `AppContext` in each
   controller. Both expose the DB, the matcher, the event publisher, and the
   audit log.
 - **Typed errors.** A crate-local `Error` enum (`thiserror`) with a `Result`
@@ -163,4 +163,4 @@ transaction, under the outbox transport) → respond. The aggregator verifies
 and repoints asynchronously.
 
 See [dataflow.md](dataflow.md) for the per-flow detail and
-[rust-loco-stack.md](rust-loco-stack.md) for the dependency stack.
+[rust-axum-stack.md](rust-axum-stack.md) for the dependency stack.

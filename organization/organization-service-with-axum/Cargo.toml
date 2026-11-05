@@ -110,11 +110,11 @@ required-features = []
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
 axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "queue", "testing"] }
-# The `TestServer` loco's testing harness hands to a request test, and
+# The `TestServer` axa's testing harness hands to a request test, and
 # `multipart::{MultipartForm, Part}` for the BLK-5 bulk-import request
 # tests (`tests/requests/bulk.rs`). Named explicitly so those tests can
 # factor out helpers that take a `TestServer` and build multipart
-# bodies — loco re-exports the harness function, not the type.
+# bodies — axa re-exports the harness function, not the type.
 axum-test = "21"
 serial_test = { version = "4.0.1" }
 # Per-test throwaway index directories, so search unit tests never touch

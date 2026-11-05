@@ -6,11 +6,11 @@
 //! and `Model::create_passwordless` fills it with the hash of an
 //! unguessable random value. The loco-scaffold password/reset helpers
 //! (`RegisterParams`, `Model::create_with_password`,
-//! `ActiveModel::reset_password`, …) are kept for parity with the loco
+//! `ActiveModel::reset_password`, …) are kept for parity with the axa
 //! template but are not wired into any route.
 //!
 //! `Model::generate_jwt` was removed on 2026-08-21. It was the only
-//! reference to loco's `auth` feature anywhere in the family, and that
+//! reference to axa's `auth` feature anywhere in the family, and that
 //! feature pulls `jsonwebtoken` and so `rsa`, which carries
 //! RUSTSEC-2023-0071. This family issues PASETO v4.public and never JWT
 //! (`agents/share/jwt.md`), so scaffold parity was costing a standing
@@ -140,7 +140,7 @@ pub fn attributes_to_value(map: &BTreeMap<String, Vec<String>>) -> serde_json::V
     serde_json::Value::Object(object)
 }
 
-/// Password-login params (loco scaffold; unused in the passwordless flow).
+/// Password-login params (Loco scaffold; unused in the passwordless flow).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginParams {
     /// Account email.
@@ -149,7 +149,7 @@ pub struct LoginParams {
     pub password: String,
 }
 
-/// Password-registration params (loco scaffold; unused — see
+/// Password-registration params (Loco scaffold; unused — see
 /// `Model::create_passwordless`).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RegisterParams {

@@ -16,7 +16,7 @@ measurements; multi-region targets are roadmap ([§15](15-roadmap.md)).
 | NFR-8 | Privacy by default | No PII in logs (all three subprojects); masked views available wherever full records are; coordinate rounding for residence-linked places |
 | NFR-9 | Auditability | 100 % of mutating operations produce an audit row + event; audit trail queryable over REST |
 | NFR-10 | Observability | OTLP traces / metrics / logs, `traceparent` per request, Prometheus scrape at `/metrics.prom` |
-| NFR-11 | Background jobs | Loco `BackgroundQueue` backed by PostgreSQL (`bg_pg`) — no external broker |
+| NFR-11 | Background jobs | axa `BackgroundQueue` backed by PostgreSQL (`bg_pg`) — no external broker |
 | NFR-12 | Front-end performance | List-page JS ≤ 250 kB gzipped; time-to-first-interaction < 1 s warm; WAI-ARIA conformance (front-end [spec §7](../place-front-end-with-svelte/spec/07-non-functional-requirements.md)) |
 | NFR-13 | Library hygiene (matcher) | Pure library: no IO, no `unsafe`, no async runtime, no logging; SemVer-stable public API (matcher [spec §9](../place-matcher-rust-crate/spec/09-public-api-contract-semver.md)) |
 

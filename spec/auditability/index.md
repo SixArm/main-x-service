@@ -20,7 +20,7 @@ Every service owns its own implementation — there is no shared audit
 crate — but they all follow the conventions below. As with merge, the
 family splits into two implementation lineages:
 
-- **Loco lineage** (`organization`, `care-pathway`, `case`, `portfolio`):
+- **axa lineage** (`organization`, `care-pathway`, `case`, `portfolio`):
   the canonical shape this spec describes — an `audit_logs` table written
   by a controller `audit()` helper, plus a Phase-1 in-memory event stream
   (`src/streaming.rs`) behind the `EventPublisher` seam.
@@ -73,7 +73,7 @@ allowed to fail the request — auditing is a side effect, not a gate.
 
 ## 2. Audit log (durable)
 
-### 2.1 The `audit_logs` table (Loco lineage)
+### 2.1 The `audit_logs` table (axa lineage)
 
 One row per CRUD/merge action. The migration
 (`migration/src/..._audit_logs.rs`) defines a deliberately small column
@@ -122,7 +122,7 @@ Typed helpers `log_create` / `log_update` / `log_delete` wrap a private
 
 ### 2.3 How the audit row is written
 
-In the Loco lineage every mutating controller action calls a private
+In the axa lineage every mutating controller action calls a private
 `audit()` helper after the DB write, passing the verified caller's
 `sub`:
 
@@ -182,7 +182,7 @@ an audit row.**
 
 ### 3.1 Today: in-memory ring buffer behind a publisher seam
 
-The Loco lineage event stream (`src/streaming.rs`) is **Phase 1** of the
+The axa lineage event stream (`src/streaming.rs`) is **Phase 1** of the
 family's durable event-bus design: the canonical versioned `Envelope`
 plus the `EventPublisher` trait, with an `InMemoryPublisher` wired as
 the default. The buffer is a process-wide `OnceLock<InMemoryPublisher>`
@@ -322,7 +322,7 @@ event stream is explicitly *not* relied upon for compliance.
 | Audit read endpoints (`/audit/recent`, `/{pid}/audit`, `/account/audit`) | **Implemented**. |
 | Bearer-token `actor` (`sub`) stamped on audit rows + envelopes | **Implemented**. |
 | `auth_events` authentication trail + GDPR per-subject access | **Implemented** (authentication service). |
-| Phase 1 event stream: canonical `Envelope` + `EventPublisher` seam + `InMemoryPublisher` + frozen `EventView` | **Implemented** (Loco lineage). |
+| Phase 1 event stream: canonical `Envelope` + `EventPublisher` seam + `InMemoryPublisher` + frozen `EventView` | **Implemented** (axa lineage). |
 | `/events/recent` operator projection | **Implemented**. |
 | Phase 2: transactional outbox (`event_outbox` insert in the same DB transaction, `OutboxPublisher` behind the seam) | **Planned** — see [`agents/share/event-bus.md`](../../agents/share/event-bus.md). |
 | Phase 3: durable bus sink (Fluvio); per-service durable broker | **Planned** (infra-gated roadmap). |

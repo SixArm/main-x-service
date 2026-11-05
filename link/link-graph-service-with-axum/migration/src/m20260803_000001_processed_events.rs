@@ -1,6 +1,6 @@
 //! Migration: create the `processed_events` table — bus-consumer
 //! idempotency under at-least-once delivery (spec §10.3; BUS-2). SQL is
-//! the source of truth; this wrapper bridges it into the loco `Migrator`.
+//! the source of truth; this wrapper bridges it into the axa `Migrator`.
 
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;

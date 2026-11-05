@@ -1,4 +1,4 @@
-//! Loco HTTP controllers for the authentication service.
+//! axa HTTP controllers for the authentication service.
 //!
 //! Each submodule exposes a `routes()` builder that [`crate::app::App`]
 //! mounts. The surface is deliberately small: passwordless magic-link

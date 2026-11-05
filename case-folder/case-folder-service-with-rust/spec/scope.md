@@ -1,6 +1,6 @@
 # Scope
 
-> Part of the [Loco edition specification](index.md). Project-level
+> Part of the [Axum edition specification](index.md). Project-level
 > scope: [root scope](../../spec/scope.md).
 
 ## In scope
@@ -24,7 +24,7 @@
   client-side JavaScript, design systems. Front-ends are separate
   projects that consume this API.
 - Authentication, ABAC, single sign-on, smartcard, CIS2.
-- Mailer, background workers, queues — Loco supports them but they're
+- Mailer, background workers, queues — axa supports them but they're
   not needed here.
 - Real-time websockets / SSE.
 - Multi-tenancy.

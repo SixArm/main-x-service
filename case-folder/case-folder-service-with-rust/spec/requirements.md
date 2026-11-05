@@ -1,6 +1,6 @@
-# Requirements (Loco edition)
+# Requirements (Axum edition)
 
-> Part of the [Loco edition specification](index.md). These implement
+> Part of the [Axum edition specification](index.md). These implement
 > the product requirements in [root requirements](../../spec/requirements.md)
 > (FR-/NFR- IDs referenced below). This file states the **API-level**
 > requirements and acceptance criteria.

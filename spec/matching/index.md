@@ -228,7 +228,7 @@ Two embedding patterns exist:
    `previous_addresses`), field renames (FHIR `state` → matcher `county`,
    `postal_code` → `postcode`), placeholder-date guards.
 
-2. **DTO-is-the-matcher-type (loco.rs services: organization,
+2. **DTO-is-the-matcher-type (axa services: organization,
    care-pathway, case).** The API DTO **is** the matcher's own type
    (stored as JSONB), so there is **no adapter** — the service hands the
    matcher type straight to `MatchingEngine`.
@@ -353,7 +353,7 @@ the matcher sits in the request flow).
 | Confidence bands + tunable thresholds/weights + presets | Implemented |
 | National-ID scheme routing (person/worker), 42 schemes | Implemented |
 | Adapter bridge + bridge tests (FHIR-shaped services) | Implemented (person; pattern reused) |
-| DTO-is-matcher-type embedding (loco.rs services) | Implemented (organization, care-pathway, case) |
+| DTO-is-matcher-type embedding (axa services) | Implemented (organization, care-pathway, case) |
 | Duplicate detection (409 on create, check, batch, review queue) | Implemented |
 | Geo matching (Haversine + Gaussian decay) | Implemented (place) |
 | **Tantivy full-text candidate generation / blocking** | Implemented family-wide — all ten entity registries index via Tantivy (fuzzy + phonetic; duplicate-check blocked on the index) |

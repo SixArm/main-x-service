@@ -41,7 +41,7 @@ at the entity directory level. What it is, on inspection:
   output and there is **no regeneration story** — nothing produces
   or refreshes it from the migrations or from a live database.
 - The service crate's `migrations/` (run through the `migration/`
-  loco Migrator crate) remain the executable source of truth; treat
+  axa Migrator crate) remain the executable source of truth; treat
   this file as a historical design snapshot until OQ-4 (delete /
   generate / formally adopt) is resolved.
 

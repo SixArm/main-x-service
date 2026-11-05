@@ -7,7 +7,7 @@
 //! withholding it or blindly creating an unreviewed duplicate. Mirrors
 //! the raw-SQL `review_queue` module the person/worker/place/thing/
 //! organization registries share (and case's own BLK-5 port), adapted to
-//! this crate's loco error type and `chrono` timestamps —
+//! this crate's axa error type and `chrono` timestamps —
 //! care-pathway has no pre-existing batch deduplication scan, so
 //! `provenance` is part of the table from the start rather than a
 //! follow-up migration (see the migration's module docs).
@@ -29,7 +29,7 @@ use uuid::Uuid;
 const COLS: &str = "id, record_id_a, record_id_b, match_score, match_quality, \
      detection_method, score_breakdown, status, provenance, reviewed_by, created_at, reviewed_at";
 
-/// Map a `SeaORM` (or column-get) error onto the loco database error.
+/// Map a `SeaORM` (or column-get) error onto the axa database error.
 fn db_err<E: Into<sea_orm::DbErr>>(e: E) -> Error {
     Error::DB(e.into())
 }

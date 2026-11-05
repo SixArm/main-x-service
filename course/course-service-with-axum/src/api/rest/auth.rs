@@ -173,7 +173,7 @@ pub fn require_auth_from_env() -> bool {
 }
 
 /// Paths that stay public even when blanket enforcement is on (SEC-G5,
-/// deny-by-default): loco's liveness/readiness probes (`/_health`,
+/// deny-by-default): axa's liveness/readiness probes (`/_health`,
 /// `/_ping`), the `OpenAPI` doc (`/api-docs/openapi.json`) and Swagger UI
 /// (`/swagger-ui*`), the Prometheus scrape (`/metrics.prom`), the API
 /// health check (`/api/health`), and the FHIR `CapabilityStatement`
@@ -532,7 +532,7 @@ fn file_mtime(path: &str) -> Option<std::time::SystemTime> {
 /// flag (`AppState::require_auth`), the ABAC policy
 /// (`AppState::policy`), and the shared verifier, and rejects with
 /// `401`/`403` before any handler runs. Wired on **both** router
-/// surfaces — the hand-written `create_router` and the loco router in
+/// surfaces — the hand-written `create_router` and the axa router in
 /// `App::after_routes` — via `axum::middleware::from_fn_with_state`.
 /// Added unconditionally: it is a near-noop when the flag is off, so
 /// the wiring stays static and the env var is the only switch.
@@ -795,7 +795,7 @@ mod tests {
 
     /// Enforcement on ⇒ the allow-listed `/api/health`, the FHIR
     /// `CapabilityStatement` (`/fhir/metadata`), and every out-of-scope
-    /// path (loco health/ping, `OpenAPI` doc, Swagger UI, Prometheus
+    /// path (axa health/ping, `OpenAPI` doc, Swagger UI, Prometheus
     /// scrape) still pass without a token.
     #[test]
     fn test_enforce_on_allows_public_and_out_of_scope_paths() {

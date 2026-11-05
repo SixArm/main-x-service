@@ -2,7 +2,7 @@
 
 > Part of the [Case Tracking specification](index.md). Each subproject
 > narrows this further: see
-> [loco scope](../case-folder-service-with-rust/spec/scope.md) and
+> [axa scope](../case-folder-service-with-rust/spec/scope.md) and
 > [svelte scope](../case-folder-front-end-with-svelte/spec/scope.md).
 
 ## In scope
@@ -16,7 +16,7 @@
 - Server-side and client-side **NHS Number validation** (Modulus 11).
 - Aggregate views: cabinet utilisation, folders in transit, recent
   activity, KPIs.
-- A JSON API (Loco edition) and a reference browser UI (Svelte edition).
+- A JSON API (Axum edition) and a reference browser UI (Svelte edition).
 - **Passwordless authentication** via email magic link (stateless signed
   tokens) — see [auth.md](auth.md). Identity comes from a configured
   allowlist; CIS2/OIDC + ABAC remain production gates.

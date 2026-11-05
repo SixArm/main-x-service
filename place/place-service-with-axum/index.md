@@ -15,10 +15,10 @@ Prerequisites: Rust 1.97+ (2024 edition), PostgreSQL 18+ with PostGIS.
 ```bash
 cd place/place-service-with-axum   # within the main-x-service monorepo
 
-# Build and run (loco.rs): point DATABASE_URL at the database, then
+# Build and run (axa): point DATABASE_URL at the database, then
 # start. Migrations run automatically in development (auto_migrate).
 export DATABASE_URL=postgres://localhost/place_service_development
-cargo loco start            # or: cargo run -- start
+cargo run -- start            # or: cargo run -- start
 
 # Service binds on the configured port (config/development.yaml):
 curl http://localhost:5150/api/health
@@ -93,7 +93,7 @@ curl "http://localhost:5150/api/places/nearby?lat=40.7829&lon=-73.9654&radius_km
 ## Configuration
 
 Configuration is loaded from `config/{development,test,production}.yaml`
-(Loco convention). Environment-overridable variables:
+(axa convention). Environment-overridable variables:
 
 | Variable             | Description                | Default                 |
 | -------------------- | -------------------------- | ----------------------- |

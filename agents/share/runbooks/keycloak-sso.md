@@ -10,11 +10,11 @@ issuance a magic-link sign-in does, so **no entity service changes** for this pa
 every peer keeps verifying PASETO offline.
 
 > **Why the crate is `axum-keycloak-auth`, not `loco-keycloak-auth`.** The
-> wrapper is 160 lines of glue written against `loco-rs ^0.15`
-> (`Keycloak::from_context(&AppContext)`): unusable from a loco 1.x service,
-> and depending on it would put a second loco (0.15, default features,
+> wrapper is 160 lines of glue written against `axa ^0.15`
+> (`Keycloak::from_context(&AppContext)`): unusable from an axa 1.x service,
+> and depending on it would put a second axa (0.15, default features,
 > ~1,600 packages) in every service's tree. What it wraps is
-> `axum-keycloak-auth` (no loco dependency, `axum 0.8`, `jsonwebtoken` 9 on
+> `axum-keycloak-auth` (no axa dependency, `axum 0.8`, `jsonwebtoken` 9 on
 > `ring`), which passes `cargo deny` cleanly. The verifier crate uses that
 > directly. (An earlier version of this note said the wrapper pulled in the
 > `rsa` crate; that did not reproduce: there is no `rsa` in either tree.)

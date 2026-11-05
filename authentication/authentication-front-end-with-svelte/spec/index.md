@@ -239,7 +239,7 @@ cookie + a CSRF token on mutations, §6 FR 7).
   `Authorization: Bearer <short-lived PASETO>`.
 - `locale` is the optional email-language hint (the current UI locale,
   §4; any of the 13 supported codes); it drops out of the JSON body when
-  unset (service defaults to English). Responses are raw JSON (loco).
+  unset (service defaults to English). Responses are raw JSON (axa).
 
 ## 10. Persistence
 

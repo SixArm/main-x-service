@@ -120,13 +120,13 @@ fetch is one-shot (no refresh loop; restart to pick up a rotation).
 to a truthy value (`1`/`true`/`yes`/`on`, case-insensitive; anything
 else — including unset, blank, `0`, or junk — means off) requires a
 valid PASETO bearer token on **every** route of both router surfaces
-(the standalone Axum `create_router` and the loco router) and returns
+(the standalone Axum `create_router` and the axa router) and returns
 `401` otherwise. The flag and the verifier are captured **once, at
 router construction** — changing the flag requires a process restart.
 The public allow-list (`PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` in
 `src/api/rest/auth.rs`) stays token-free even when enforcement is on:
 
-- `/_health`, `/_ping` (loco health probes)
+- `/_health`, `/_ping` (axa health probes)
 - `/api/health` (this crate's health endpoint)
 - `/api-docs/openapi.json` (OpenAPI document)
 - `/swagger-ui*` (Swagger UI + assets)
@@ -271,7 +271,7 @@ re-validated before persisting.
 > **Status:** the handlers below are implemented in
 > `src/api/fhir/handlers.rs` (wire `resourceType: "Practitioner"`, the
 > standard FHIR R5 type per `agents/share/fhir.md` §3) and are
-> **mounted** on the loco router — `App::routes` registers
+> **mounted** on the axa router — `App::routes` registers
 > `workers_routes()`, `fhir_routes()`, and `metrics_routes()`, and the
 > standalone `create_router` mirrors the same `/fhir/Practitioner`
 > surface for the integration-test harness. Pinned by

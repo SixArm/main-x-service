@@ -45,10 +45,10 @@ fixes its shape once.
 - A bulk backdoor around events or audit — every imported row emits its
   normal event and audit record (§6, §9).
 
-## 3. Execution model — async jobs on the loco `worker` feature
+## 3. Execution model — async jobs on the axa `worker` feature
 
-Bulk operations run as loco **Postgres-backed background jobs**
-(`queue.kind: Postgres`, [loco.md](loco.md)); no external broker.
+Bulk operations run as axa **Postgres-backed background jobs**
+(`queue.kind: Postgres`, [loco.md](axa.md)); no external broker.
 
 ```
 POST /api/<plural>/import   ──202──▶ { job_id }
@@ -334,7 +334,7 @@ adds one section + a §13 task declaring only what differs:
    silent fallback to local storage. `AppState::new` became `async fn`
    since the S3 client's credential resolution is async.
 6. **Roll across the other entities.** ✅ *(done 2026-08-03, organization +
-   case, BLK-5)* Both loco-idiomatic services, so the API DTO is the
+   case, BLK-5)* Both controller-style services, so the API DTO is the
    matcher type stored verbatim as JSONB — no separate model to convert.
    **Organization**: stable key LEI → DUNS → explicit `pid`; keyless rows
    route through the existing `check-duplicates` path into the review

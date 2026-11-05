@@ -24,7 +24,7 @@ Every service crate carries a **`compose.test.yaml`**: one
 DB-gated suite needs, and matching what CI provides
 (`.github/workflows/ci.yml` `test-db`) — superuser `loco`/`loco`, port
 5432, the database its `config/test.yaml` names. Podman, not Docker
-(see [rust-loco-stack.md](rust-loco-stack.md)).
+(see [rust-axum-stack.md](rust-axum-stack.md)).
 
 ```sh
 scripts/test-db.sh up   <crate>          # start; waits for the healthcheck

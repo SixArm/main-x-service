@@ -44,12 +44,12 @@ access (T-9) is served instead by the bearer-gated, per-subject
 `/api/auth/account/audit` + `/api/auth/account/export`, so a subject's
 own data is reachable only by that subject.
 
-Plus loco's default routes (`AppRoutes::with_default_routes()` in
+Plus axa's default routes (`AppRoutes::with_default_routes()` in
 [`src/app.rs`](../authentication-service-with-axum/src/app.rs)),
 including the framework health/ping endpoints.
 
-Responses are **raw loco JSON** — no `{success, data, error}` envelope
-(unlike the sibling entity services). Errors use loco's standard
+Responses are **raw axa JSON** — no `{success, data, error}` envelope
+(unlike the sibling entity services). Errors use axa's standard
 responses: `401` unauthorized, `400` bad request.
 
 ### 9.2 Verifier library API

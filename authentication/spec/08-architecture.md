@@ -17,7 +17,7 @@
 
 ```
 +-----------+      +---------------------------+      +------------------------+
-|  Browser  |      |  auth front-end (BFF)     |      |  auth service (loco)   |
+|  Browser  |      |  auth front-end (BFF)     |      |  auth service (axa)   |
 +-----+-----+      +-------------+-------------+      +-----------+------------+
       |  /signup or /signin      |                                |
       |------------------------->| POST /api/auth/signup          |
@@ -73,7 +73,7 @@ key rotation. The request hot path never leaves the process.
 
 ### 8.3 Deployment topology
 
-- **Auth service** — stateless loco.rs app over PostgreSQL
+- **Auth service** — stateless axa app over PostgreSQL
   (`users` + `sessions` + the Postgres-backed worker queue). Scales
   horizontally; dev port `5150`.
 - **Front-end** — SvelteKit app acting as a **BFF**: its server routes
@@ -142,6 +142,6 @@ This is **config-driven** — no database, no auto-rotation scheduler
 |---|---|---|
 | Token crypto | service `src/auth/` | Self-contained: `rusty_paseto` (v4.public) + `ed25519-dalek` (key handling / `kid` derivation). The bearer extractor is plain Axum `FromRequestParts` — reusable shape for peers. |
 | Session cookie | service `src/cookie.rs` | Pure helpers to build / clear / parse the httpOnly `__Host-mxi_session` cookie. |
-| Controllers | service `src/controllers/{auth,paseto_keys}.rs` | loco controllers registered in `app.rs`; raw loco JSON, no envelope. |
+| Controllers | service `src/controllers/{auth,paseto_keys}.rs` | axa controllers registered in `app.rs`; raw axa JSON, no envelope. |
 | Verification | verifier `src/lib.rs` | Mirrors `auth::verify_token` keyed off the *published* key set instead of local key material. Same `Claims`, same footer-`kid` selection. |
 | UI state | front-end SvelteKit server (`hooks.server.ts` / `+page.server.ts`) | The BFF holds the session cookie server-side; browser JS holds no credential and no `localStorage` token. |

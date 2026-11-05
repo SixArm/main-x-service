@@ -9,11 +9,11 @@
 |  routes: /  /new  /[pid]  /[pid]/edit                        |
 |  lib/api: client.ts → cases.ts (repository)                  |
 +------------------------------+-------------------------------+
-                               | REST (raw loco JSON, no envelope)
+                               | REST (raw axa JSON, no envelope)
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v-------------------------------+
 |                  case-service-with-axum                     |
-|  loco.rs 0.16 (Axum 0.8) · port 5150                         |
+|  axa (Axum 0.8) · port 5150                         |
 |  controllers/cases.rs                                        |
 |    CRUD + /search + /match + /check-duplicates + /merge      |
 |    + /audit + /events + /whoami + /api-docs + /swagger-ui    |
@@ -36,13 +36,13 @@ strsim, unicode-normalization, thiserror only). The service declares
 matcher's `Case` directly as its API DTO — there is no adapter layer
 (contrast with the person entity).
 
-### 8.2 Service layout (loco.rs)
+### 8.2 Service layout (axa)
 
 ```
 case-service-with-axum/
 ├── src/
-│   ├── app.rs                  loco Hooks (routes, truncate)
-│   ├── bin/main.rs             loco CLI entrypoint
+│   ├── app.rs                  `App` functions (routes, truncate)
+│   ├── bin/main.rs             axa CLI entrypoint
 │   ├── auth.rs                 PASETO v4 public verification (embeds authentication-verifier)
 │   ├── merge.rs                pure merge_cases
 │   ├── streaming.rs            in-memory CaseEvent ring buffer
@@ -64,7 +64,7 @@ case-service-with-axum/
 └── tests/{matching.rs, requests/cases.rs}
 ```
 
-Run with `cargo loco start` (needs PostgreSQL; `auto_migrate` on in
+Run with `cargo run -- start` (needs PostgreSQL; `auto_migrate` on in
 development). The front-end runs with `pnpm dev` against
 `PUBLIC_API_BASE_URL`.
 

@@ -12,7 +12,7 @@ for the Main X Index family.
 
 ## What this crate is
 
-A **loco.rs** service that authenticates users via **passwordless email
+A **axa** service that authenticates users via **passwordless email
 magic links**. Verifying a magic link establishes a server-side
 **cookie session** (httpOnly `__Host-mxi_session`); cross-service auth is
 a short-lived **PASETO v4.public** token minted from that session. Every
@@ -31,7 +31,7 @@ It is also the **sourcing side of the family's ABAC authorization**
 `sessions.data.attrs`, and token minting stamps it into the PASETO
 **`attrs`** claim, which peers evaluate with the verifier crate's shared
 `abac` policy engine. Attribute *assignment* is an operator action with
-two surfaces: the `user_attributes` loco CLI task
+two surfaces: the `user_attributes` axa CLI task
 (`src/tasks/attributes.rs`) and the admin HTTP API
 (`src/controllers/admin.rs`, gated by `access=admin`); both write an
 `attributes_assigned` `auth_events` audit row. `scope`/`roles` are
@@ -44,9 +44,9 @@ deprecated for authorization.
 > mints Ed25519 PASETO v4.public tokens and publishes its key set at
 > `/.well-known/paseto-keys`; no JWT is issued anywhere.
 
-It is also the family's **reference loco.rs application**: the existing
-service crates only *declare* `loco-rs` but actually run hand-rolled
-Axum. They will be converted to real loco using this crate as the
+It is also the family's **reference axa application**: the existing
+service crates only *declare* `axa` but actually run hand-rolled
+Axum. They will be converted to real Loco using this crate as the
 template (see root `AGENTS.md`).
 
 **Enterprise identity federation (EV-2, opt-in).** Behind the `oidc`
@@ -65,13 +65,13 @@ alongside OIDC in the same pass.
 
 | Question | Answer |
 |---|---|
-| Framework | loco.rs 1.0.1 (real `Hooks`/`AppContext` boot, loco controllers, loco config, `sea-orm-migration` 2.0). |
+| Framework | axa (real `Hooks`/`AppContext` boot, axa controllers, axa config, `sea-orm-migration` 2.0). |
 | Auth model | Passwordless magic link → server-side cookie session. No passwords are ever checked. |
 | Tokens | Cross-service: short-lived PASETO v4.public (Ed25519); public key(s) published at `/.well-known/paseto-keys` for offline verification. |
 | Build | `cargo build` |
 | Test | `cargo test` (DB-free: unit + contract tests); `cargo test -- --ignored` for the Postgres-backed model/request tests. |
 | Lint | `cargo clippy --bins` |
-| Run | `cargo loco start` (needs Postgres; see README). Works here via this crate's own `.cargo/config.toml` alias (`loco = "run --"`) when run from inside this directory — no `cargo-loco` shim needs to be installed. Same for `cargo loco db migrate`, `cargo loco task …`. If it ever doesn't resolve (e.g. invoked via `--manifest-path` from elsewhere, which does not pick up this local alias), `cargo run -- start` / `-- db migrate` / `-- task …` is the equivalent. |
+| Run | `cargo run -- start` (needs Postgres; see README). Works here via this crate's own `.cargo/config.toml` alias (`loco = "run --"`) when run from inside this directory — no `cargo-loco` shim needs to be installed. Same for `cargo run -- db migrate`, `cargo run -- task …`. If it ever doesn't resolve (e.g. invoked via `--manifest-path` from elsewhere, which does not pick up this local alias), `cargo run -- start` / `-- db migrate` / `-- task …` is the equivalent. |
 
 ---
 
@@ -100,7 +100,7 @@ alongside OIDC in the same pass.
 | GET | `/metrics.prom` | — | Prometheus metrics (text exposition; root path, no `/api` prefix). |
 
 > **`/api/compliance/audit/verify` requires a bearer, decided PRO-P23**
-> — unlike sibling loco-idiomatic crates (e.g. case-service, behind
+> — unlike sibling controller-style crates (e.g. case-service, behind
 > `CASE_REQUIRE_AUTH`), this crate has no blanket `/api/*` guard, so
 > the handler gates itself directly (`AuthUser`, `401` without a valid
 > token), the same per-handler pattern every other route above uses.
@@ -131,13 +131,13 @@ to add a locale. See spec §6.11 / §12.
 
 ## Golden rules
 
-1. **Loco-idiomatic.** New endpoints are loco controllers registered in
+1. **Controller-style.** New endpoints are axa controllers registered in
    `app.rs`; new tables are `sea-orm-migration` migrations registered in
    `src/migration/mod.rs` with a matching entity under
    `src/models/_entities/`.
 2. **Asymmetric public-key tokens only.** Cross-service token
    signing/verification lives in `src/auth`: PASETO v4.public
-   (Ed25519). Do not reintroduce loco's symmetric HS256 helper
+   (Ed25519). Do not reintroduce axa's symmetric HS256 helper
    for cross-service tokens — peers rely on the published public key(s)
    at `/.well-known/paseto-keys`. (RS256 JWT + JWKS are decommissioned.)
 3. **No password flow.** This is passwordless. The `users.password`
@@ -167,8 +167,8 @@ to add a locale. See spec §6.11 / §12.
 
 ```
 src/
-├── app.rs                 loco Hooks: routes, workers, truncate, seed
-├── bin/main.rs            loco CLI entrypoint
+├── app.rs                 `App` functions: routes, workers, truncate, seed
+├── bin/main.rs            axa CLI entrypoint
 ├── auth/mod.rs            PASETO v4.public signing + verification + key-set publication + bearer extractor (Ed25519; built-in DEV_SEED for dev)
 ├── cookie.rs              __Host-mxi_session cookie helpers (set / clear / parse)
 ├── csrf.rs                CSRF synchroniser token (generate / __Host-mxi_csrf cookie / constant-time compare) for POST /token
@@ -219,7 +219,7 @@ config/                    development/production/test yaml (keys/ holds only a 
 | `AUTH_INTEGRITY_MAC_KEY_ID` | — | Key id stamped into new MACs, for rotation. |
 | `AUTH_INTEGRITY_MAC_KEYS_RETIRED` | — | Comma-separated retired key material, still verifiable, no longer used to sign. |
 | `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs; also the redirect target after a successful OIDC sign-in. |
-| `DATABASE_URL` | loco config default | Postgres connection. |
+| `DATABASE_URL` | axa config default | Postgres connection. |
 | `AUTH_OIDC_ISSUER_URL` | — | **EV-2** (`oidc` Cargo feature, off by default). The IdP's issuer URL, used for OIDC discovery. Unset ⇒ `/api/auth/oidc/*` is `404` — federation is opt-in per deployment even with the feature compiled in. |
 | `AUTH_OIDC_CLIENT_ID` | — | This service's registered OAuth2 client id at the IdP. |
 | `AUTH_OIDC_CLIENT_SECRET` | — | This service's client secret, inline. `AUTH_OIDC_CLIENT_SECRET_FILE` takes precedence when both are set. |
@@ -254,11 +254,11 @@ production per SEC-A1's fail-closed guard), and `GET /_health` returns
 `200`. This exercise found and fixed a real bug:
 `config/production.yaml`'s `mailer.smtp.auth.user`/`password` used an
 unquoted Tera `{{ get_env(name="…", default="") }}` call, which renders
-as YAML `null` (not `""`) when the env var is unset — loco's
+as YAML `null` (not `""`) when the env var is unset — axa's
 `SmtpAuth` fields are `String`, not `Option<String>`, so this failed
 config parsing at boot with "invalid type: unit value, expected a
 string". This crate's `.gitignore` also excluded
-`config/production.yaml` entirely (a loco scaffold default nobody had
+`config/production.yaml` entirely (a Loco scaffold default nobody had
 removed), which is why the bug had never been caught — the file never
 left this machine, so no other checkout could exercise it. Both are
 fixed (the file is now tracked; see the `.gitignore` for the

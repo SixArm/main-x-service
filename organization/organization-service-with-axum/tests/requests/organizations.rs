@@ -1,6 +1,6 @@
 //! Request-level integration tests for the organizations API.
 //!
-//! These boot the real loco app against the `test` environment config
+//! These boot the real axa app against the `test` environment config
 //! (`config/test.yaml`), so they require a reachable PostgreSQL
 //! instance (default `postgres://loco:loco@localhost:5432/organization_service_test`,
 //! overridable via `DATABASE_URL`). Following the family convention
@@ -430,7 +430,7 @@ async fn list_and_search_are_paginated() {
             seed_directly(&ctx, json!({"name": format!("Paging Test {i}")})).await;
         }
 
-        // Read one response header as a string; loco's test response
+        // Read one response header as a string; axa's test response
         // exposes the real `HeaderMap`.
         macro_rules! header {
             ($r:expr, $name:expr) => {

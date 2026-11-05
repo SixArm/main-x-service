@@ -3,7 +3,7 @@
 //! Implements the family-wide contract in
 //! `agents/share/bulk-import-export.md` for the case service: async,
 //! job-based bulk import and export driven by a Postgres-backed
-//! background worker (loco `worker`), with **JSONL** as the lossless
+//! background worker (axa `worker`), with **JSONL** as the lossless
 //! reference format and **CSV** as the operator/spreadsheet format. Ports
 //! the shape of the person service's `src/bulk/` (the family reference
 //! implementation) onto this crate's loco-idiomatic layout, where the API
@@ -28,7 +28,7 @@
 //!   [`process_import_job`](pipeline::process_import_job) /
 //!   [`process_export_job`](pipeline::process_export_job) core (the
 //!   testable heart of the worker).
-//! - [`worker`] — the loco `BackgroundWorker` that drains `bulk_jobs`.
+//! - [`worker`] — the axa `BackgroundWorker` that drains `bulk_jobs`.
 //! - [`handlers`] — the REST surface (§4): `POST/GET /api/cases/import[/{id}]`,
 //!   `POST/GET /api/cases/export[/{id}]`, `GET /api/cases/bulk-jobs[/{id}]`.
 //!
@@ -116,7 +116,7 @@ pub mod row;
 pub mod stable_key;
 /// Artifact storage abstraction + local-filesystem implementation.
 pub mod store;
-/// The loco `BackgroundWorker` draining `bulk_jobs`.
+/// The axa `BackgroundWorker` draining `bulk_jobs`.
 pub mod worker;
 
 use serde::{Deserialize, Serialize};

@@ -24,11 +24,11 @@ use crate::{
     tasks,
 };
 
-/// Loco application type. Implements [`Hooks`] to wire up routes,
+/// axa application type. Implements [`Hooks`] to wire up routes,
 /// workers, tasks, seeding, and table truncation for the auth service.
 pub struct App;
 impl App {
-    /// Register the HTTP routes: loco's defaults plus our four
+    /// Register the HTTP routes: axa's defaults plus our four
     /// controller groups — magic-link auth (`/api/auth`), the public
     /// key set (`/.well-known/paseto-keys`), the docs (`/api-docs` +
     /// `/swagger-ui`), and the Prometheus metrics (`/metrics.prom`).
@@ -52,20 +52,20 @@ impl App {
     }
 
     /// Layer the header-based API-versioning middleware (spec §13 T-13)
-    /// onto the router loco just built. This crate's only
+    /// onto the router axa just built. This crate's only
     /// router-construction surface — unlike the person-style crates,
     /// there is no second hand-rolled router anywhere in `src/`/`tests/`.
     ///
     /// # Errors
     ///
-    /// Never returns an error today; the signature is loco's.
+    /// Never returns an error today; the signature is axa's.
     pub fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         Ok(router.layer(axum::middleware::from_fn(
             crate::version::require_version_mw,
         )))
     }
 
-    /// Register loco CLI tasks. `user_attributes` is the operator surface
+    /// Register axa CLI tasks. `user_attributes` is the operator surface
     /// for ABAC attribute assignment (`agents/share/authorization-attributes.md`
     /// §6).
     pub fn register_tasks(tasks: &mut Tasks) {

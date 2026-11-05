@@ -25,7 +25,7 @@ front-end [spec §4](../course-front-end-with-svelte/spec/04-glossary.md).
 | **Merge** | Transfers a duplicate's identifiers / instances / syllabus / links onto a surviving record, soft-deletes the duplicate, snapshots the transfer |
 | **Review queue** | Persisted candidate duplicate pairs: `Pending` / `Confirmed` / `Rejected` / `AutoMerged` |
 | **Soft delete** | Retention with `deleted_at` set; never `DELETE FROM` — the entity-wide erasure mechanism |
-| **Idiomatic loco controllers** | REST handlers registered as native loco `Routes` in `App::routes` (not a merged side-router); this service is the family's reference for the pattern |
+| **Idiomatic axa controllers** | REST handlers registered as native axa `Routes` in `App::routes` (not a merged side-router); this service is the family's reference for the pattern |
 | **SSO** | Single sign-on via the [authentication entity](../../authentication/): magic-link + cookie session, PASETO v4 public tokens ([`authentication-sessions.md`](../../agents/share/authentication-sessions.md), supersedes RS256 JWT + JWKS) |
 | **Bridge test** | Service-side test (`tests/duplicate_detection.rs`) that pins both the adapter and the matcher output |
 | **Drift policy** | Front-ends keep per-project copies of types/client/forms; no shared package (repo decision 2026-06-02) |

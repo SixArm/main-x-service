@@ -1,6 +1,6 @@
 //! Database migrations for `care-pathway-service`.
 //!
-//! Driven by loco's CLI via [`Migrator`] (`sea-orm-migration`). The
+//! Driven by axa's CLI via [`Migrator`] (`sea-orm-migration`). The
 //! migrations create the entity table `care_pathways` (with the
 //! `CarePathway` payload as JSONB), `audit_logs` (the CRUD trail, plus
 //! the compliance columns), `merge_records` (the merge history),
@@ -34,13 +34,13 @@ mod m20260823_000014_time_based_analysis;
 mod m20260824_000015_entity_links;
 mod m20260912_000016_review_queue;
 
-/// The migration runner this crate exposes to loco / `sea-orm-migration`.
+/// The migration runner this crate exposes to axa / `sea-orm-migration`.
 pub struct Migrator;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
     /// The ordered list of migrations to apply (oldest first). The
-    /// inject marker is kept so `cargo loco generate migration` can splice
+    /// inject marker is kept so `cargo axa generate migration` can splice
     /// new migrations in.
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![

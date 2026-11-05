@@ -25,8 +25,8 @@ Shared reference docs live at the repo root under
 |----------|-------------|
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
-| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Full Rust + Loco dependency stack |
-| [loco.md](../../agents/share/loco.md) | Loco framework conventions |
+| [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Full Rust + axa dependency stack |
+| [loco.md](../../agents/share/axa.md) | axa framework conventions |
 | [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](../../agents/share/match.md) | Matching algorithms |
 | [search.md](../../agents/share/search.md) | Search (Tantivy) |
@@ -86,7 +86,7 @@ carried no *working* observability module before this change:
 pins with **zero consumers anywhere in `src/`** — dead scaffolding from
 an earlier, since-deleted stub — bumped to the family's settled 0.32/0.33
 pins in the same change that added the real module.
-`App::init_logger` installs it (loco's own `EnvFilter` + formatted
+`App::init_logger` installs it (axa's own `EnvFilter` + formatted
 layer, plus the `tracing-opentelemetry` bridge over an OTLP/gRPC
 exporter); `App::on_shutdown` flushes it. Export is **on by default** —
 set `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
@@ -100,7 +100,7 @@ siblings use.
 than assumed, and identical to place's slice (PRO-H12 slice 2) before
 it:
 
-- **Two router-construction surfaces**: the loco-native one
+- **Two router-construction surfaces**: the controller-style one
   (`api::rest::things_routes()`, mounted via `App::routes`/
   `App::after_routes`) and a standalone hand-rolled one
   (`api::rest::create_router`, used only by the DB-gated integration

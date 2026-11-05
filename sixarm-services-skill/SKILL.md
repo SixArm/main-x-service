@@ -105,7 +105,7 @@ rather than this repo's own JSON shape.
 | ABAC | Attribute-based access control — who may do what, decided from attributes of the caller and the record, not a fixed role list |
 | PASETO | The signed-token format this repo uses for service-to-service auth (deliberately not JWT — see [`agents/share/jwt.md`](../agents/share/jwt.md)) |
 | Outbox / durable event bus | The transactional pattern that guarantees an emitted event and its database change either both commit or neither does |
-| Loco | The Rust web framework (on top of Axum) most of these services are built with |
+| axa | The Rust web framework (on top of Axum) most of these services are built with |
 
 ## Worked examples
 

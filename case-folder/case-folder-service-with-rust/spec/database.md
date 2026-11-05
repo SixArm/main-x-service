@@ -1,6 +1,6 @@
 # Database, migrations, stub mode & seed
 
-> Part of the [Loco edition specification](index.md).
+> Part of the [Axum edition specification](index.md).
 
 ## Connection string
 
@@ -21,7 +21,7 @@ migrations, but the wiring stays).
 
 No migration files. `migration/src/lib.rs` declares
 `Migrator::migrations() -> vec![]`. The DB connection is opened at boot
-so Loco can populate `AppContext::db` but no schema is created or read.
+so axa can populate `AppContext::db` but no schema is created or read.
 
 ## Stub mode for offline / e2e runs
 
@@ -40,7 +40,7 @@ services.
 
 ## Seed task
 
-`src/tasks/seed.rs` registers the `seed` task with Loco. Running it:
+`src/tasks/seed.rs` registers the `seed` task with axa. Running it:
 
 - Registers **3 buildings, 4 rooms, and 5 cabinets** with the Main Place
   Service (`Cabinet A1`, `A2`, `B1`, `C1`, `Archive Cabinet 1`).

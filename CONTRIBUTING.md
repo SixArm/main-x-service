@@ -18,7 +18,7 @@ issue reports, and feedback are welcome.
 - **Branch per change.** Branch from `main`, merge back with
   `--no-ff`; never commit directly to `main`.
 - **Constraints that are not up for debate** (see
-  [agents/share/rust-loco-stack.md](agents/share/rust-loco-stack.md)):
+  [agents/share/rust-axum-stack.md](agents/share/rust-axum-stack.md)):
   Podman not Docker, Tokio not async_std, PostgreSQL not SQLite,
   PASETO cookie-session auth not JWT sessions, MSRV = stable N-3.
 - **No real personal data, ever** — fixtures and examples are

@@ -5,8 +5,8 @@
 
 ## In scope
 
-- A **browser client** for every Loco API endpoint covered in the
-  [Loco routes](../../case-folder-service-with-rust/spec/routes.md).
+- A **browser client** for every axa API endpoint covered in the
+  [axa routes](../../case-folder-service-with-rust/spec/routes.md).
 - Dashboard with KPIs from `/api/stats`, recent moves, cabinet
   utilisation.
 - Patient register + detail (`/patients`, `/patients/{nhs}`) including

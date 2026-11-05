@@ -16,7 +16,7 @@
 //!   [`process_import_job`](pipeline::process_import_job) /
 //!   [`process_export_job`](pipeline::process_export_job) core (the
 //!   testable heart of the worker).
-//! - [`worker`] — the loco `BackgroundWorker` that drains `bulk_jobs`.
+//! - [`worker`] — the axa `BackgroundWorker` that drains `bulk_jobs`.
 //! - [`handlers`] — the REST surface (§4).
 //!
 //! Export masking + `include_soft_deleted` gating (rollout step 3) are
@@ -69,7 +69,7 @@ pub mod stable_key;
 pub mod store;
 /// SEC-B4 follow-up: the periodic physical-artifact-deletion sweep.
 pub mod sweep;
-/// The loco `BackgroundWorker` draining `bulk_jobs`.
+/// The axa `BackgroundWorker` draining `bulk_jobs`.
 pub mod worker;
 
 use serde::{Deserialize, Serialize};
@@ -143,7 +143,7 @@ pub const MAX_EXPORT_ROWS: u64 = 1_000_000;
 /// days is a generous window for an operator to collect a result. The
 /// expiry gate at the status handler (`bulk::handlers::artifact_expired`)
 /// stops the reference being handed out the instant this deadline passes;
-/// the periodic [`sweep`] (run via the `bulk_artifact_sweep` loco task)
+/// the periodic [`sweep`] (run via the `bulk_artifact_sweep` axa task)
 /// physically deletes the artifact bytes once past it, so the two halves
 /// of SEC-B4 — "stop handing it out" and "stop storing it" — are both
 /// covered rather than the store retaining expired bytes indefinitely.

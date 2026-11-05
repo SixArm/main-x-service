@@ -1587,7 +1587,7 @@ async fn test_out_of_band_edit_to_an_assessment_score_is_detected() {
 ///
 /// Mounted, not merely compiled — and worth pinning here in particular:
 /// this crate is mid-conversion and registers its routes twice, once as
-/// an axum `Router` and once as a loco `Routes`, so a handler added to
+/// an axum `Router` and once as an axa `Routes`, so a handler added to
 /// only one of them compiles and serves 404 from the other.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]

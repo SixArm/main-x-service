@@ -1,9 +1,9 @@
-//! Loco migrator for place-service.
+//! axa migrator for place-service.
 //!
 //! Each migration wraps the corresponding hand-written SQL under
 //! `../migrations/<timestamp>_<name>/{up,down}.sql` via `include_str!`,
-//! so the SQL stays the single source of truth while loco gains a Rust
-//! `Migrator` it can run (`auto_migrate`, `cargo loco db migrate`).
+//! so the SQL stays the single source of truth while axa gains a Rust
+//! `Migrator` it can run (`auto_migrate`, `cargo axa db migrate`).
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
@@ -20,7 +20,7 @@ mod m20260728_000001_add_integrity_digests;
 mod m20260822_000001_geo_coordinates_to_numeric;
 mod m20260824_000001_coordinate_columns_name_their_units;
 
-/// The migration runner this crate exposes to loco / `sea-orm-migration`.
+/// The migration runner this crate exposes to axa / `sea-orm-migration`.
 pub struct Migrator;
 
 #[async_trait::async_trait]

@@ -46,7 +46,7 @@ async fn a_served_request_exports_a_span_and_returns_its_traceparent() {
     let provider = build_tracer_provider(&config)
         .expect("build tracer provider")
         .expect("export enabled");
-    // The filter stands in for loco's module whitelist. Without one the
+    // The filter stands in for axa's module whitelist. Without one the
     // bridge exports every internal `h2` / `hyper` span the server and the
     // exporter's own gRPC client produce — hundreds per request, which is
     // exactly what a production deployment's `EnvFilter` prevents.

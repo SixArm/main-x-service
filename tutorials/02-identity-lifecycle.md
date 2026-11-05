@@ -19,7 +19,7 @@ possible.
    purpose — see
    [`examples/data/README.md`](../examples/data/README.md#the-duplicate-pairs)
    for the full list and scores.
-2. `cargo loco task seed_examples` — loads all 50 persons through the
+2. `cargo run -- task seed_examples` — loads all 50 persons through the
    **model layer**, bypassing the create endpoint's real-time duplicate
    detection so both halves of every pair actually land (`POST
    /api/persons` would `409` the second half of each pair).
@@ -61,14 +61,13 @@ test-db: mxi-person-test-db ready
 ```
 
 person-service's own [`README.md`](../person/person-service-with-axum/README.md)
-"Local Development" section documents `cargo loco start`. **That doesn't
-work as written in this environment** — `cargo loco` needs a `cargo-loco`
+"Local Development" section documents `cargo run -- start`. **That doesn't
+work as written in this environment** — `cargo axa` needs a `cargo-loco`
 shim on `PATH`, and only the standalone `loco` binary (the Postgres/Redis
 generator CLI) is installed here:
 
 ```
-$ cargo loco --version
-error: no such command: `loco`
+$ error: no such command: `loco`
 ```
 
 The README's own parenthetical alternative, `cargo run -- start`, is

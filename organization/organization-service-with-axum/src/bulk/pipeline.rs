@@ -3,7 +3,7 @@
 //!
 //! [`process_import_job`] and [`process_export_job`] carry the whole
 //! per-row / per-job logic and take a plain `&DatabaseConnection`, so the
-//! loco background worker ([`crate::bulk::worker`]) is a thin adapter
+//! axa background worker ([`crate::bulk::worker`]) is a thin adapter
 //! and the logic is exercised directly by request-level tests without
 //! going through the multipart/JSON handler layer.
 //!

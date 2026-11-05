@@ -17,7 +17,7 @@ use crate::metrics::{CONTENT_TYPE, Metrics};
 /// `GET /metrics.prom` — body is [`Metrics::render`] with the
 /// `text/plain; version=0.0.4` content type that Prometheus expects. The
 /// response is built directly so the content type is exactly that string
-/// (loco's `format::text` would force `text/plain; charset=utf-8`).
+/// (axa's `format::text` would force `text/plain; charset=utf-8`).
 ///
 /// # Errors
 ///

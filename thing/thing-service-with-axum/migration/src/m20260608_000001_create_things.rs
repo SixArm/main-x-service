@@ -4,12 +4,12 @@
 //! (`thing_alternate_names`, `thing_identifiers`, `thing_images`,
 //! `thing_same_as`). The actual DDL lives in the sibling `up.sql` / `down.sql`
 //! files and is `include_str!`-embedded so the SQL remains the single source
-//! of truth; this Rust shim only lets loco's `Migrator` run it.
+//! of truth; this Rust shim only lets axa's `Migrator` run it.
 
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;
 
-/// Zero-sized migration marker registered with the loco `Migrator`.
+/// Zero-sized migration marker registered with the axa `Migrator`.
 pub struct Migration;
 
 impl MigrationName for Migration {

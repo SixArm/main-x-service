@@ -25,8 +25,8 @@ Shared reference docs live at the project root under
 |---|---|
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
-| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Full Rust + Loco dependency stack |
-| [loco.md](../../agents/share/loco.md) | Tech stack summary |
+| [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Full Rust + axa dependency stack |
+| [loco.md](../../agents/share/axa.md) | Tech stack summary |
 | [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [restful.md](../../agents/share/restful.md) | REST API conventions |
 | [postgresql.md](../../agents/share/postgresql.md) | PostgreSQL conventions |
@@ -66,7 +66,7 @@ two-router-construction-surfaces adaptation this crate's shape also
 needs. This module is genuinely new — this crate carried **no**
 `src/observability` module at all before this change, unlike
 person/worker/event, which each had a dead stub to replace (PRO-H9).
-`App::init_logger` installs it (loco's own `EnvFilter` + formatted
+`App::init_logger` installs it (axa's own `EnvFilter` + formatted
 layer, plus the `tracing-opentelemetry` bridge over an OTLP/gRPC
 exporter); `App::on_shutdown` flushes it. Export is **on by default** —
 set `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
@@ -81,11 +81,11 @@ siblings use.
 than assumed:
 
 - **Two router-construction surfaces**, exactly as person/worker/event
-  needed: this crate carries the loco-native one
+  needed: this crate carries the controller-style one
   (`api::rest::courses_routes()`, mounted via `App::routes`/
   `App::after_routes`) and a standalone hand-rolled one
   (`api::rest::create_router`, used only by the DB-gated integration
-  tests) — where link-graph-service has exactly one (pure loco). The
+  tests) — where link-graph-service has exactly one (pure axa). The
   `observability::trace_mw` tower middleware (per-request span +
   `http.server.request.duration` histogram + W3C `traceparent` response
   header) is layered onto **both**, as the outermost layer in each, so
@@ -143,8 +143,8 @@ by a different sibling-dependency gap. Fixed to the repo-root
 convention, plus the same three further bugs found by actually running
 the built image (not merely getting `podman build` to succeed): no
 `config/` copy (boot crash: "no configuration file found in folder:
-config"); `CMD` with no `start` subcommand (the loco CLI just prints
-`--help` and exits 0); and no `LOCO_ENV` (would boot in `development`
+config"); `CMD` with no `start` subcommand (the axa CLI just prints
+`--help` and exits 0); and no `APP_ENV` (would boot in `development`
 inside a `production` image). Also: this crate's own
 `config/production.yaml` defaults `PORT` to `8084` (its siblings
 default to `8080`), so `PORT=8080` is now set explicitly to match

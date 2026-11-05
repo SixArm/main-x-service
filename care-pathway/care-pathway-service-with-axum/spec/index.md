@@ -10,7 +10,7 @@
 
 A registry of clinical care-pathway records for the Main X Index family:
 create/read/update/delete and detect duplicates with the canonical
-care-pathway-matcher. Built on loco.rs.
+care-pathway-matcher. Built on axa.
 
 ## 2. Scope
 
@@ -154,7 +154,7 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    `/fhir/.well-known/smart-configuration` are **public** under blanket
    enforcement (discovery must precede the credential).
 15. Bulk import/export (§13 T-10) — **Done**, 2026-09-12 — async,
-   job-based, on the loco `worker` queue: `POST`/`GET
+   job-based, on the axa `worker` queue: `POST`/`GET
    /api/care-pathways/import`, `POST`/`GET /api/care-pathways/export`,
    `GET /api/care-pathways/bulk-jobs`. The uniform family contract
    (execution model, five endpoints, JSONL/CSV/Parquet codecs,
@@ -264,7 +264,7 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    ahead of their sibling tasks — anchors_delays and conformance are
    now wired, item 25's/30's own entries; `variant` still awaits
    T-14c's whole-cohort pipeline). Landed 2026-09-09.
-21. **Seeded synthetic journey cohorts.** `cargo loco task
+21. **Seeded synthetic journey cohorts.** `cargo run -- task
    journeys:seed pathway:<pid> [n:] [seed:] [open_share:] [defects:]`
    generates and persists a deterministic cohort of pathway instances
    with segments, steps, events, and a care team — fixture data for
@@ -700,19 +700,19 @@ project portfolio:
 
 ## 7. Non-functional requirements
 
-loco-idiomatic; Postgres persistence; deterministic matching via the
+controller-style; Postgres persistence; deterministic matching via the
 embedded library; soft-delete with audit-friendly timestamps.
 
 ## 8. Architecture
 
-loco `App` (`src/app.rs`) registers the care-pathways controller. One
+axa `App` (`src/app.rs`) registers the care-pathways controller. One
 `care_pathways` table stores `pid` + denormalised `name` + the full
 `CarePathway` JSONB `data`. Matching calls `care-pathway-matcher`
 directly on the deserialised payloads — no adapter.
 
 ## 9. API surface
 
-See §6. Raw loco JSON. `404` for unknown `pid`; `422` for a validation
+See §6. Raw axa JSON. `404` for unknown `pid`; `422` for a validation
 failure (blank `name`, a `condition_codes` entry malformed for its
 coding system, an `identifiers` entry malformed for its scheme, or an
 `in_language` tag that is not valid BCP-47 — family convention, via
@@ -816,7 +816,7 @@ controller validation unit tests
 (blank-name and malformed-code → `422` pins, plus an `is_self_merge`
 equal-pid pin for the §6.8 self-merge `422` guard).
 Request-level tests (`tests/requests/care_pathways.rs`,
-loco testing harness) cover the CRUD + match endpoints, unknown-pid
+axa testing harness) cover the CRUD + match endpoints, unknown-pid
 `404` on GET / PUT / DELETE (and the merge `404`), the audit/event
 trail, `whoami` (no token → `401`), blanket enforcement (with
 `CARE_PATHWAY_REQUIRE_AUTH=1` set in-test: un-authed `GET
@@ -973,9 +973,9 @@ HKDF derives a distinct subkey per purpose (`audit-chain`, `record`,
 `checkpoint`, below) so a tag produced for one domain can never verify
 as another. No key configured ⇒ no MAC is written, and rows are reported
 `mac_absent` rather than as mismatches — adopting the control must not
-manufacture a wall of false accusations. `cargo loco task
+manufacture a wall of false accusations. `cargo run -- task
 integrity_key` generates/checks/reports the key without ever logging it
-(§ no-secret-in-logs, `agents/share/security.md`); `cargo loco task
+(§ no-secret-in-logs, `agents/share/security.md`); `cargo run -- task
 integrity_resign` re-signs existing rows after a key rotation. Landed
 2026-07-27; the family-wide activation order and env vars are
 [`agents/share/runbooks/integrity-activation.md`](../../../agents/share/runbooks/integrity-activation.md).
@@ -1352,7 +1352,7 @@ the evidence bundle.
   DB-gated request test walks a window and checks the total, the clamp,
   and the `400`.
 - [x] **2026-08-01 — AU-2: key rotation and ABAC policy hot-reload
-  without a restart.** The loco-style half of the family rollout (case
+  without a restart.** The controller-style half of the family rollout (case
   was the reference). `src/auth.rs`: the verifier and the ABAC policy
   became **reloadable holders** (`ReloadableVerifier` /
   `ReloadablePolicy`) the blanket guard and the bearer extractors read
@@ -1495,7 +1495,7 @@ the evidence bundle.
   Data `$export`; no second migration) plus the five endpoints (§6.13:
   `POST`/`GET /api/care-pathways/import`, `POST`/`GET
   /api/care-pathways/export`, `GET /api/care-pathways/bulk-jobs`, all
-  in `src/bulk/handlers.rs`) and a loco `worker`-queue
+  in `src/bulk/handlers.rs`) and an axa `worker`-queue
   `BackgroundWorker` (`src/bulk/worker.rs`) draining
   `queued → running → completed | completed_with_errors | failed`
   (`bulk_jobs::Model::finish_import`, new). **JSONL + CSV + TSV** codecs
@@ -1567,7 +1567,7 @@ the evidence bundle.
   tests for oversized field/array/entry + a within-caps large record.
 
 - [x] **Fix: fresh-Postgres `db migrate` failed in the `event_outbox`
-  migration (2026-07-18).** The loco `create_table` helper pluralizes
+  migration (2026-07-18).** The axa `create_table` helper pluralizes
   table names (`cruet::to_plural`: `event_outbox` → `event_outboxes`),
   so the migration's own index DDL (`ON event_outbox`) failed and
   rolled the whole fresh migrate back — no tables were ever created.
@@ -1753,7 +1753,7 @@ the evidence bundle.
   HKDF-derived per-domain subkeys (`audit-chain` / `record` /
   `checkpoint`) so a tag from one domain can never verify as another; no
   key ⇒ no MAC written, rows report `mac_absent` rather than a
-  mismatch. `cargo loco task integrity_key` (`op:generate` /
+  mismatch. `cargo run -- task integrity_key` (`op:generate` /
   `op:check` / `op:status`, key never logged) and `integrity_resign`
   (re-sign existing rows after rotation). New `src/compliance/checkpoint.rs`
   + `GET`/`POST /api/compliance/checkpoint{,/verify}` (§6.13): a MAC'd
@@ -1939,7 +1939,7 @@ the evidence bundle.
 
 ## 14. Implementation status
 
-Done: loco boot; care_pathways table + migration; CRUD with `422`
+Done: axa boot; care_pathways table + migration; CRUD with `422`
 validation on create/update (blank `name`; ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks; UUID / DOI `identifiers` shapes; BCP-47
 `in_language` syntax — all problems reported together); paginated
@@ -2043,7 +2043,7 @@ terminology-server code-existence checks.
 
 ## 17. References
 
-- The care-pathway-matcher spec; loco.rs; ICD-10 / SNOMED CT.
+- The care-pathway-matcher spec; axa; ICD-10 / SNOMED CT.
 
 ## 18. Change control
 

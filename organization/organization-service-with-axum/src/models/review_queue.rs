@@ -2,7 +2,7 @@
 //! stored counterpart of the scan report, so review decisions survive
 //! restarts and re-scans. Mirrors the raw-SQL module the
 //! person/worker/place/thing registries share, adapted to this crate's
-//! loco error type and chrono timestamps.
+//! axa error type and chrono timestamps.
 //!
 //! Pairs are stored in normalized order (`record_id_a < record_id_b`)
 //! under a UNIQUE constraint, so a re-scan **upserts** the same row:
@@ -21,7 +21,7 @@ use uuid::Uuid;
 const COLS: &str = "id, record_id_a, record_id_b, match_score, match_quality, \
      detection_method, score_breakdown, status, provenance, reviewed_by, created_at, reviewed_at";
 
-/// Map a `SeaORM` (or column-get) error onto the loco database error.
+/// Map a `SeaORM` (or column-get) error onto the axa database error.
 fn db_err<E: Into<sea_orm::DbErr>>(e: E) -> Error {
     Error::DB(e.into())
 }

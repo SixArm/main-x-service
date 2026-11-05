@@ -1,6 +1,6 @@
 # Roadmap
 
-> Part of the [Loco edition specification](index.md). Combined
+> Part of the [Axum edition specification](index.md). Combined
 > cross-edition roadmap: [root roadmap](../../spec/roadmap.md).
 
 | Priority | Item                                                                |

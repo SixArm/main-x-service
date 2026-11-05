@@ -124,6 +124,6 @@ ENV APP_ENV=production \
     SEARCH_INDEX_PATH=/app/data/search_index
 
 # loco's CLI entry point: `<bin> start` runs the server (see
-# src/bin/main.rs — `loco_rs::cli::main`). A bare `<bin>` with no
+# src/bin/main.rs — `axa::cli::main`). A bare `<bin>` with no
 # subcommand only prints the CLI's own --help and exits.
 CMD ["/app/person-service", "start"]

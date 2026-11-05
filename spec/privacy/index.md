@@ -280,7 +280,7 @@ embedded personal data of its own.
 
 ## 7. Implemented vs deferred
 
-Privacy maturity varies by service generation, but the loco.rs services
+Privacy maturity varies by service generation, but the axa services
 have **since closed** most of the gap this section used to describe as
 "deferred". The MPI services (person / worker / place) carry the full
 privacy stack; organization, care-pathway, and portfolio now carry

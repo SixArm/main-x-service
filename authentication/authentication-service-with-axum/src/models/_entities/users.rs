@@ -33,14 +33,14 @@ pub struct Model {
     pub api_key: String,
     /// Display name. Anonymised to a tombstone on GDPR erasure.
     pub name: String,
-    /// Password-reset token (loco scaffold; unused by passwordless flow).
+    /// Password-reset token (Loco scaffold; unused by passwordless flow).
     pub reset_token: Option<String>,
-    /// When the reset token was sent (loco scaffold; unused).
+    /// When the reset token was sent (Loco scaffold; unused).
     pub reset_sent_at: Option<DateTimeWithTimeZone>,
-    /// Email-verification token (loco scaffold; unused — magic-link
+    /// Email-verification token (Loco scaffold; unused — magic-link
     /// redemption verifies the email instead).
     pub email_verification_token: Option<String>,
-    /// When the verification email was sent (loco scaffold; unused).
+    /// When the verification email was sent (Loco scaffold; unused).
     pub email_verification_sent_at: Option<DateTimeWithTimeZone>,
     /// When the email was verified, if ever (set on first magic-link
     /// redemption).

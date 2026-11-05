@@ -64,7 +64,7 @@
 
 /// HTTP / RPC API layer: REST (Axum), FHIR R5, and a gRPC stub.
 pub mod api;
-/// Loco application hooks (boot, routes, migrations).
+/// axa application hooks (boot, routes, migrations).
 pub mod app;
 /// Regulatory-compliance controls: the tamper-evident audit chain and
 /// read/disclosure auditing, adopted from the care-pathway reference
@@ -92,7 +92,7 @@ pub mod relay;
 pub mod search;
 /// Event streaming: producers and consumers for CRUD events.
 pub mod streaming;
-/// CLI tasks (loco extension point).
+/// CLI tasks (axa extension point).
 pub mod tasks;
 /// Data-quality validation and normalization.
 pub mod validation;

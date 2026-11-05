@@ -470,13 +470,13 @@
           "description": "Header-based API versioning (Accepts-version)"
         },
         {
-          "title": "agents/share/loco.md",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/loco.md",
+          "title": "agents/share/axa.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/axa.md",
           "description": "The loco.rs framework conventions used family-wide"
         },
         {
-          "title": "agents/share/rust-loco-stack.md",
-          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/rust-loco-stack.md",
+          "title": "agents/share/rust-axum-stack.md",
+          "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/rust-axum-stack.md",
           "description": "The full Rust + loco dependency stack"
         },
         {

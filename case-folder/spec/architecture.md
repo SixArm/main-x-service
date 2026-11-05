@@ -2,7 +2,7 @@
 
 > Part of the [Case Tracking specification](index.md). Edition-specific
 > internals live in
-> [loco architecture](../case-folder-service-with-rust/spec/architecture.md)
+> [axa architecture](../case-folder-service-with-rust/spec/architecture.md)
 > and [svelte architecture](../case-folder-front-end-with-svelte/spec/architecture.md).
 
 ## Two editions, one domain
@@ -10,7 +10,7 @@
 ```
 ┌───────────────────────────┐        HTTP / JSON        ┌────────────────────────────┐
 │  case-folder-front-end-with-svelte │  ───────────────────────> │  case-folder-service-with-rust    │
-│  SvelteKit browser client  │   GET/POST /api/*         │  Loco/Axum JSON API         │
+│  SvelteKit browser client  │   GET/POST /api/*         │  axa/Axum JSON API         │
 │  (owns no data)            │ <───────────────────────  │  (owns no domain tables)    │
 └───────────────────────────┘                           └─────────────┬──────────────┘
                                                                        │ proxies + snapshots
@@ -21,7 +21,7 @@
                                    └───────────────────────────────────────────────────┘
 ```
 
-- The **Loco edition** is the contract. It defines the JSON API, the
+- The **Axum edition** is the contract. It defines the JSON API, the
   validation, and the upstream proxying. It is back-end only — no UI.
 - The **Svelte edition** is a reference client. It owns no data; every
   page fetches from `/api/*`, hydrates a reactive cache, and renders.
@@ -35,13 +35,13 @@
 Changes flow **API-first**:
 
 1. A new capability is specified at the root (this `spec/`) if it is
-   cross-cutting, then in the **Loco** subproject spec (the wire
+   cross-cutting, then in the **axa** subproject spec (the wire
    contract).
-2. The Loco edition implements and tests it.
+2. The Axum edition implements and tests it.
 3. The Svelte edition consumes it via its typed API client.
 
 The Svelte edition never invents domain data or shapes the API can't
-provide; if it needs new API surface, that surface is added to the Loco
+provide; if it needs new API surface, that surface is added to the axa
 spec first.
 
 ## Coupling rules

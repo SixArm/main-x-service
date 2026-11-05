@@ -1,5 +1,5 @@
 //! Request-level integration tests over the `/api/cases` endpoints
-//! (spec §6 / §11; entity spec T-4), in the loco testing style
+//! (spec §6 / §11; entity spec T-4), in the axa testing style
 //! (`axa::testing`, as in the authentication-service sibling).
 //!
 //! These boot the app against the `test` environment, which needs a

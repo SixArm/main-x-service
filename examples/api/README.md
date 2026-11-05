@@ -59,7 +59,7 @@ podman compose -f examples/compose/full-family.yml down -v
 Every file starts with a `@baseUrl` pointing at that service's mapped
 host port (see the table above — the internal container port is `8080`
 for the six older "person-style" crates and `5150`/`5160` for the newer
-loco-idiomatic ones; the compose file remaps everything to `808x`/`809x`
+controller-style ones; the compose file remaps everything to `808x`/`809x`
 on the host, so you never need to know the internal port).
 
 Requests that need an id (a created record's `pid`, a review-queue item
@@ -105,8 +105,8 @@ reading its controller/handler source, not assumed from a sibling):
   but `data`/`error` are *omitted* (not `null`) on the unused side
   (`#[serde(skip_serializing_if)]`).
 - **organization, care-pathway, case, portfolio, authentication** — bare
-  loco JSON: a success response is the resource itself with no wrapper;
-  a non-2xx is loco's own `{"error":"...","description":"..."}`
+  axa JSON: a success response is the resource itself with no wrapper;
+  a non-2xx is axa's own `{"error":"...","description":"..."}`
   (`ErrorDetail`).
 - **link-graph** — its own envelope, `{"success":bool,"data":...}` on
   `200` / `{"success":false,"error":"..."}` on `400`. Do not confuse this
@@ -120,7 +120,7 @@ entirely and return the resource bare — see the GOTCHA comment in
 
 ## Pagination and API versioning
 
-List/search endpoints on the four newer loco-idiomatic services
+List/search endpoints on the four newer controller-style services
 (organization, care-pathway, case, portfolio) take `?limit=&offset=` and
 report `X-Total-Count` / `X-Limit` / `X-Offset` response headers per
 [`agents/share/restful.md`](../../agents/share/restful.md). The six

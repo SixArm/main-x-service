@@ -16,7 +16,7 @@
 | Rendering            | **Client-side only** (`ssr = false` in `+layout.ts`)            |                           |
 | Type check           | `svelte-check`                                                  |                           |
 
-**Why CSR-only.** The Loco API lives on `http://localhost:5150` during
+**Why CSR-only.** The axa API lives on `http://localhost:5150` during
 dev and the SvelteKit app on `:5173`. Server-side `load` calls work
 during SSR but a production deployment behind a single reverse proxy is
 a separate concern. CSR is the simplest correct default.

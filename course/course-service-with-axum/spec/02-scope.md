@@ -17,7 +17,7 @@
 - Record merging with link tracking and transferred-data snapshots.
 - Data validation + normalisation at the boundary.
 - Per-field privacy masking, GDPR Article 15 export.
-- REST API (loco.rs controllers on Axum) at `/api/courses` and
+- REST API (axa controllers on Axum) at `/api/courses` and
   `/api/courses/{id}/instances`, version-negotiated via the
   `Accepts-version` header (T-25;
   [`api-versioning.md`](../../../agents/share/api-versioning.md)).

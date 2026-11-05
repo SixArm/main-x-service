@@ -10,7 +10,7 @@ Per-subproject detail: [`agents/testing.md`](../agents/testing.md).
   claim round-trip, tampered-signature rejection, garbage-token
   rejection. Run with `cargo test --lib` against the built-in dev
   seed.
-- **Request tests:** loco's `tests/requests/auth.rs` covers the
+- **Request tests:** axa's `tests/requests/auth.rs` covers the
   magic-link / redeem (single-use, anti-enumeration) / me / signout /
   paseto-keys surface (§13 T-3 done). The PostgreSQL-backed tests are
   `#[ignore]`d so plain `cargo test` stays green without a database;

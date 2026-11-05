@@ -21,7 +21,7 @@ service REST API, whose request/response body is the
    SVAR Kanban (`/board`), and Lily `ThemePicker`/`LocalePicker` (in the
    layout) are used dependencies; forms remain plain inputs + the
    `app.css` utilities.
-5. **No envelope.** The service is loco.rs and returns **raw JSON**;
+5. **No envelope.** The service is axa and returns **raw JSON**;
    `src/lib/api/client.ts` is the lean wrapper (get/post/put/delete).
 6. **Auth (BFF + cookie session).** The browser holds **no token** — no
    `localStorage`, no `mxi_access_token`, no URL-fragment handoff. This

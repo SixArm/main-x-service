@@ -6,7 +6,7 @@ pipeline) can read and write records using standard resources, bundles,
 and search parameters instead of the bespoke REST DTOs. This is a design
 document: it fixes the resource mapping, the endpoint surface, the wire
 conventions (Bundle, `OperationOutcome`, `CapabilityStatement`,
-search parameters), where FHIR sits in the loco-idiomatic service layout,
+search parameters), where FHIR sits in the controller-style service layout,
 its auth/authorization posture, and the per-entity adoption, so each crate
 adopts it without re-litigating. Only the per-entity **resource type** and
 **field mapping** differ (§9).
@@ -250,13 +250,13 @@ spec adds one FHIR section + a §13 task declaring only what differs:
 Two structural shapes exist in the family; the contract is identical, the
 mounting differs:
 
-**Loco-idiomatic services** (organization, care-pathway, case, place,
+**Controller-style services** (organization, care-pathway, case, place,
 thing, event, course — `src/controllers/`): FHIR is a new controller
 module.
 
 ```
 src/
-├── controllers/fhir.rs        loco `routes()` → /fhir/<Type>{,/{id}} + /fhir/metadata
+├── controllers/fhir.rs        axa `routes()` → /fhir/<Type>{,/{id}} + /fhir/metadata
 ├── fhir/
 │   ├── mod.rs                 to_fhir_* / from_fhir_* over the stored DTO
 │   ├── resources.rs           Fhir<Resource>, FhirOperationOutcome, FhirBundle, …
@@ -285,7 +285,7 @@ but wires no routes). Their FHIR routes join their existing Axum router
 and inherit the same blanket guard.
 
 **Organization is the reference implementation** (§3 `high` fidelity, the
-newer layout the other seven loco services share); it is built first and
+newer layout the other seven controller-style services share); it is built first and
 copied.
 
 ## 11. Rollout
@@ -294,7 +294,7 @@ copied.
 2. **Reference.** `organization` → `Organization`, full: the `fhir` module,
    mounted controller, `OperationOutcome`, searchset Bundle,
    `CapabilityStatement`, OpenAPI, tests. The copy source for the rest.
-3. **High-fidelity loco services.** `place` → `Location`, `thing` →
+3. **High-fidelity controller-style services.** `place` → `Location`, `thing` →
    `Device`.
 4. **Reconcile the prototypes.** `person` → `Patient` (+ `Person` alias),
    `worker` → `Practitioner`: standard `resourceType`, mount the routes,

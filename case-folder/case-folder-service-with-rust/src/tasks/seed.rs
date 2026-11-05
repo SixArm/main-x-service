@@ -336,7 +336,7 @@ async fn ensure_place(
 ///
 /// # Errors
 ///
-/// Returns `Err` only on a hard failure of the overall Loco task; the
+/// Returns `Err` only on a hard failure of the overall axa task; the
 /// per-service calls are best-effort and do not abort seeding.
 // As above: a flat script of literal demo fixtures.
 #[allow(clippy::too_many_lines)]

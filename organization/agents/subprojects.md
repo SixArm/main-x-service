@@ -7,7 +7,7 @@ direction is strictly one-way:
 organization-front-end-with-svelte
         │  HTTP (raw JSON, snake_case, no envelope)
         ▼
-organization-service-with-axum          loco.rs app, PostgreSQL
+organization-service-with-axum          axa app, PostgreSQL
         │  Cargo path dependency; DTO re-used directly
         ▼
 organization-matcher-rust-crate          pure library, no IO
@@ -17,7 +17,7 @@ organization-matcher-rust-crate          pure library, no IO
 
 | Subproject | Kind | Responsibility |
 |---|---|---|
-| [organization-service-with-axum](../organization-service-with-axum/) | loco.rs 0.16 service | Registry: CRUD (soft delete), name search (`ILIKE`), `/match` + `/check-duplicates`, audit log, in-memory event stream, OpenAPI/Swagger. Stores the DTO verbatim as JSONB |
+| [organization-service-with-axum](../organization-service-with-axum/) | axa service | Registry: CRUD (soft delete), name search (`ILIKE`), `/match` + `/check-duplicates`, audit log, in-memory event stream, OpenAPI/Swagger. Stores the DTO verbatim as JSONB |
 | [organization-matcher-rust-crate](../organization-matcher-rust-crate/) | Rust library | Canonical pairwise matching: deterministic short-circuits (LEI/DUNS/ISO 6523/GLN/Wikidata/ROR/ISNI/VAT, same-jurisdiction tax ID, `same_as`) + probabilistic components. Owns the `Organization` type the whole entity uses |
 | [organization-front-end-with-svelte](../organization-front-end-with-svelte/) | SvelteKit 2 SPA | Operator UI: list / create / detail+delete+check-duplicates / edit. Svelte 5 runes, TS strict, dependency-light (no data grid / design system — accepted drift) |
 
@@ -36,7 +36,7 @@ cargo test && cargo run            # demo binary (not SemVer surface)
 # service — needs PostgreSQL; default port 5150
 cd organization-service-with-axum
 export DATABASE_URL=postgres://loco:loco@localhost:5432/organization_service_development
-cargo loco start                   # migrations auto-run in development
+cargo run -- start                   # migrations auto-run in development
 cargo test --test matching         # DB-free tests
 
 # front-end — needs the service running

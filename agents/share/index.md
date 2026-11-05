@@ -48,7 +48,7 @@ Per-crate `spec.md`:
 | [auditability.md](auditability.md)                               | Audit logging and event streaming                      |
 | [event-bus.md](event-bus.md)                                     | Durable event bus design (outbox → Fluvio)             |
 | [cross-service-linking.md](cross-service-linking.md)             | Cross-service entity linking (hybrid write-local + read-model aggregator) |
-| [bulk-import-export.md](bulk-import-export.md)                   | Bulk import / export (async loco `worker` jobs; JSONL/CSV/Parquet) |
+| [bulk-import-export.md](bulk-import-export.md)                   | Bulk import / export (async axa `worker` jobs; JSONL/CSV/Parquet) |
 | [time-based-analysis.md](time-based-analysis.md)                 | Time-based analysis: elapsed-time measurement, the value-adding ratio, VSM + queueing vocabulary, forecasting, anti-gaming, and the refusal to measure people (§7) — per-person cycle time, throughput and efficiency are refused family-wide; per-person **utilisation** is computed in portfolio, care-pathway and patient-flow under five stated obligations (§7.1, 2026-08-25) |
 | [availability.md](availability.md)                               | Availability, scaling, health checks                   |
 | [dataflow.md](dataflow.md)                                       | Create / match / merge / search data flows             |
@@ -59,7 +59,7 @@ Per-crate `spec.md`:
 | [compliance-for-healthcare.md](compliance-for-healthcare.md)     | Compliance for healthcare (US HIPAA, UK NHS, …)        |
 | [compliance-for-technology.md](compliance-for-technology.md)     | Compliance for technology (ISO, GDPR, …)               |
 | [locales.md](locales.md)                                         | Locales, localization, internationalization, languages |
-| [observability.md](observability.md)                             | Observability summary (alias for the Loco doc)         |
+| [observability.md](observability.md)                             | Observability summary (alias for the axa doc)         |
 | [rust-tracing-opentelemetry-stack.md](rust-tracing-opentelemetry-stack.md) | OpenTelemetry, tracing, metrics, logs, spans           |
 | [postgresql.md](postgresql.md)                                   | PostgreSQL database, extensions                        |
 | [postgresql-sessions-with-jsonb/](postgresql-sessions-with-jsonb/index.md) | Reference pattern: session storage in a JSONB column — used by `authentication-sessions.md` §3 |
@@ -83,7 +83,7 @@ Per-crate `spec.md`:
 | [runbooks/event-bus-outage-replay.md](runbooks/event-bus-outage-replay.md) | Runbook: event-bus outage detection and containment — there is no replay yet; what "sent" can silently lie about |
 | [runbooks/bulk-job-recovery.md](runbooks/bulk-job-recovery.md) | Runbook: bulk import/export job failure recovery — a `running` job can be stuck forever, stable-key vs idempotency-key, symptom → check → action |
 | [security.md](security.md)                                       | Security audit summary, cross-cutting invariants, the `<ENTITY>_REQUIRE_AUTH` activation gate, secret-handling, threat model |
-| [rust-loco-stack.md](rust-loco-stack.md)                         | Stack for Rust, Loco (database, search, …)             |
-| [loco.md](loco.md)                                               | Loco framework (backend-only conventions)              |
+| [rust-axum-stack.md](rust-axum-stack.md)                         | Stack for Rust, axa (database, search, …)             |
+| [loco.md](axa.md)                                               | axa framework (backend-only conventions)              |
 | [svelte-front-end-stack.md](svelte-front-end-stack.md)           | Front-end Lily package distribution: registry versions vs `file:`, `pnpm link` for local dev against an in-flight Lily change |
 | [configuration.md](configuration.md)                             | Complete environment-variable reference — every `<ENTITY>_*`, `LINK_GRAPH_*`, `TOKEN_*`/`AUTH_*` variable, default, effect, governing doc |

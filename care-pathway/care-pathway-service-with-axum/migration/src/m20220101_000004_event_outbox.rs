@@ -5,7 +5,7 @@
 //! its event and vice versa; a relay worker (Phase 3) later drains
 //! unpublished rows to Fluvio and stamps `published_at`.
 //!
-//! Written as explicit SQL rather than the loco `create_table` helper:
+//! Written as explicit SQL rather than the axa `create_table` helper:
 //! the helper **pluralizes** table names (`cruet::to_plural`, so
 //! `event_outbox` → `event_outboxes`), which broke a fresh
 //! `db migrate` — the index DDL below and the `SeaORM` entity

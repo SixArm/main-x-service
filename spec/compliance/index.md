@@ -75,7 +75,7 @@ spec that owns the detail.
 
 | Obligation (regime) | Implemented control | Where |
 |---|---|---|
-| **Audit trail — who / what / when** (HIPAA; ISO 27001) | Durable append-only `audit_logs` / `audit_log` table; best-effort write on every CRUD/merge, stamped with the bearer-token `sub` actor + before/after JSON snapshot. | `src/models/audit_logs.rs` (Loco) / `src/db/audit.rs` (MPI); see [auditability](../auditability/index.md). |
+| **Audit trail — who / what / when** (HIPAA; ISO 27001) | Durable append-only `audit_logs` / `audit_log` table; best-effort write on every CRUD/merge, stamped with the bearer-token `sub` actor + before/after JSON snapshot. | `src/models/audit_logs.rs` (axa) / `src/db/audit.rs` (MPI); see [auditability](../auditability/index.md). |
 | **Right of access — GDPR Art. 15** | Entity export `GET /<plural>/{id}/export` (full unmasked record); account export `GET /api/auth/account/export` (users + sessions + auth_events); per-subject `GET /api/auth/account/audit`. | `src/privacy/mod.rs` (`export_<entity>_data`); `controllers/auth.rs` (`export_account`); see [privacy §2](../privacy/index.md). |
 | **Right to erasure — GDPR Art. 17** | Two semantics: **soft-delete** tombstone on every MPI `DELETE` + merge loser (reversible, preserves audit); **anonymisation** on `DELETE /api/auth/account` (soft-delete + overwrite `email`/`name` + revoke sessions + audit, irreversible). | `models/users.rs` (`Model::erase`); `controllers/auth.rs` (`erase_account`); see [privacy §3](../privacy/index.md). |
 | **Consent / lawful basis** (GDPR; DPA) | First-class `Consent` model (`ConsentType` = DataProcessing / DataSharing / Marketing / Research / EmergencyAccess; `ConsentStatus` = Active / Revoked / Expired) + `has_active_consent` checker. | `src/models/consent.rs`, `src/privacy/mod.rs`; see [privacy §4](../privacy/index.md). |
@@ -174,7 +174,7 @@ the code. This section states those gaps plainly.
 
 | Gap | Detail |
 |---|---|
-| **Per-field masking + GDPR export** | The MPI services (person / worker / place) ship the full privacy stack. The newer **loco services — organization, care-pathway, case — defer per-field masking and the `/export` GDPR surface**; they ship CRUD + matching + audit + event streaming first. Because **case data is personal data**, its masking/export gap is the most consequential and is flagged in its `spec.md`. When implemented, these MUST follow the `mask_value` / `/{id}/masked` / `/{id}/export` shape so behaviour stays uniform. See [privacy §7](../privacy/index.md). |
+| **Per-field masking + GDPR export** | The MPI services (person / worker / place) ship the full privacy stack. The newer **controller-style services — organization, care-pathway, case — defer per-field masking and the `/export` GDPR surface**; they ship CRUD + matching + audit + event streaming first. Because **case data is personal data**, its masking/export gap is the most consequential and is flagged in its `spec.md`. When implemented, these MUST follow the `mask_value` / `/{id}/masked` / `/{id}/export` shape so behaviour stays uniform. See [privacy §7](../privacy/index.md). |
 | **Blanket `/api/*` enforcement** | Implemented but **default-off**, gated per service (`ORGANIZATION_REQUIRE_AUTH`, `CARE_PATHWAY_REQUIRE_AUTH`, `CASE_REQUIRE_AUTH`); the older Axum services (person / worker / place) are a separate follow-up. The guard requires a valid PASETO token (service-to-service) or session (BFF); RS256/JWKS decommissioned. Activation is an ops decision (turning it on before the front-end attaches a credential would `401` every request). See [authentication §7](../authentication/index.md). |
 | **Durable event bus** | The event stream is a Phase-1 in-memory ring buffer; the transactional outbox → Fluvio sink is planned (the audit log, not the stream, is the durable compliance record). See [auditability §6](../auditability/index.md). |
 
@@ -409,7 +409,7 @@ engineering practice without the device framing.
 > `unchained` so the historical gap stays visible, and a DB-gated test
 > pins that on a fresh database a full CRUD cycle leaves **zero**
 > unchained rows — verified to fail when the triggers are restored. The
-> loco-idiomatic services (care-pathway, case) never had such triggers.
+> controller-style services (care-pathway, case) never had such triggers.
 
 > **Fixed (2026-07-26) — the `entity_type` vocabulary had split in
 > person and worker.** Mutation rows were written as `"Person"` /

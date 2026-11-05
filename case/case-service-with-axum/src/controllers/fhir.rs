@@ -4,7 +4,7 @@
 //! delete / search) plus `/fhir/metadata` (the `CapabilityStatement`), per
 //! the family contract
 //! ([`agents/share/fhir.md`](../../../../agents/share/fhir.md)). Handlers
-//! return an Axum [`Response`] directly (not loco's `Result`) so every
+//! return an Axum [`Response`] directly (not axa's `Result`) so every
 //! response carries `application/fhir+json` and every non-2xx body is a
 //! FHIR `OperationOutcome` (§5). Conversions bridge the wire ⇄ stored
 //! `case_matcher::Case` DTO via [`crate::fhir`]; writes reuse the same

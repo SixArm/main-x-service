@@ -169,15 +169,15 @@ axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5e
 # for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
 # prove a code path never touches the database (src/compliance/disclosure.rs).
 sea-orm = { version = "2.0", features = ["mock"] }
-# The `TestServer` loco's testing harness hands to a request test. Named
-# explicitly so request tests can factor out helpers that take one (loco
-# re-exports the type, `loco_rs::TestServer`, but not the `multipart`
+# The `TestServer` axa's testing harness hands to a request test. Named
+# explicitly so request tests can factor out helpers that take one (axa
+# re-exports the type, `axa::TestServer`, but not the `multipart`
 # module the native-bulk import tests need — `src/bulk/handlers.rs`'s
 # multipart upload). Pinned to the exact version loco-rs 1.1.0 depends on
 # internally (matching organization-service's own pin) so this crate
 # does not carry two incompatible copies of `axum-test` at once — an
 # unrelated stale "21.1" pin here duplicated the crate until this fix;
-# `loco_rs::TestServer` and this dependency's own `TestServer` must name
+# `axa::TestServer` and this dependency's own `TestServer` must name
 # the same type for a helper to accept either interchangeably.
 axum-test = "21"
 serial_test = { version = "4.0.1" }

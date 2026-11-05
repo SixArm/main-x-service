@@ -67,7 +67,7 @@ Writes are best-effort and never fail the request; the row may
 distinguish outcomes the HTTP response deliberately hides
 (anti-enumeration).
 
-The Postgres-backed loco worker queue (`bg_pg`) shares the same
+The Postgres-backed axa worker queue (`bg_pg`) shares the same
 database — family convention, no external broker.
 
 ### 10.2 Key storage

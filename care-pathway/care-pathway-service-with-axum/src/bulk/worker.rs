@@ -1,4 +1,4 @@
-//! The loco `BackgroundWorker` that drains **native bulk import/export**
+//! The axa `BackgroundWorker` that drains **native bulk import/export**
 //! `bulk_jobs` rows (§13 T-10; `agents/share/bulk-import-export.md` §3).
 //!
 //! Distinct from [`crate::workers::bulk_export`] (the FHIR Bulk Data
@@ -26,9 +26,9 @@ use crate::bulk::{BulkFormat, BulkKind, MaskingProfile, error_report};
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::bulk_jobs;
 
-/// The loco background worker that runs one native bulk job.
+/// The axa background worker that runs one native bulk job.
 pub struct BulkJobWorker {
-    /// The shared loco application context (database, queue, config).
+    /// The shared axa application context (database, queue, config).
     pub ctx: AppContext,
 }
 

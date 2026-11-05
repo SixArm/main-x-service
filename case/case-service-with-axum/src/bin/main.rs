@@ -1,4 +1,4 @@
-//! `case-service` binary entrypoint — boots the loco.rs CLI
+//! `case-service` binary entrypoint — boots the axa CLI
 //! (`case-service`), wiring the `App` hooks and the database
 //! migrator. See the crate library docs for the service overview.
 

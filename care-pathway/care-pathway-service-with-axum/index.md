@@ -1,6 +1,6 @@
 # Care Pathway Service — documentation index
 
-A loco.rs registry of clinical care-pathway records: CRUD + matching,
+An axa registry of clinical care-pathway records: CRUD + matching,
 embedding the canonical care-pathway-matcher.
 
 ## Start here

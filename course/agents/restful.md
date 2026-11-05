@@ -23,7 +23,7 @@ the normative summary is entity spec [§9](../spec/09-api-surface.md).
 
 | Group | Endpoints |
 |---|---|
-| Health | `GET /api/health`; loco `/_health`, `/_ping` |
+| Health | `GET /api/health`; axa `/_health`, `/_ping` |
 | Course CRUD | `POST/GET/PUT/DELETE /api/courses[/{id}]` |
 | Search | `GET /api/courses/search` (`q`, `limit`, `offset`, `fuzzy`, `phonetic`, `educational_level`, `language`, `provider_id`, `mask_sensitive`) |
 | Match / dedup | `POST /api/courses/{match,check-duplicates,merge,deduplicate}` |
@@ -45,7 +45,7 @@ create), `/courses/[id]` (+ `/edit`, `/audit`), `/courses/match`,
 - The service owns the wire format. Any change ships with a
   front-end `types.ts` + test edit in the same change cycle, and an
   entity spec §9 edit if the surface shape moved.
-- Handlers are idiomatic loco controllers (registered in
+- Handlers are idiomatic axa controllers (registered in
   `App::routes` with the `/api` prefix); this service is the family
   reference for that pattern — keep new endpoints in the same shape.
 - Auth: none today; offline PASETO v4.public verification (published

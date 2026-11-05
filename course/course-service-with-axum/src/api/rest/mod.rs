@@ -204,8 +204,8 @@ pub fn create_router(state: AppState) -> Router {
         .layer(axum::middleware::from_fn(crate::observability::trace_mw))
 }
 
-/// Native loco controller routes (idiomatic path). Mirrors
-/// [`create_router`]'s `/api` surface, but as a loco `Routes` whose
+/// Native axa controller routes (idiomatic path). Mirrors
+/// [`create_router`]'s `/api` surface, but as an axa `Routes` whose
 /// handlers extract `AppState` from the `AppContext` shared store via
 /// `FromRef`. Registered in `App::routes`; `create_router` is retained
 /// for the `tower::oneshot`-based integration tests.
@@ -261,7 +261,7 @@ pub fn courses_routes() -> axa::routes::Routes {
         .add("/audit/verify", get(handlers::verify_audit_integrity))
 }
 
-/// Native loco controller route for the Prometheus metrics endpoint,
+/// Native axa controller route for the Prometheus metrics endpoint,
 /// mounted at the application **root** (`/metrics.prom`, not under
 /// `/api`) — alongside the Swagger UI. Registered in `App::routes`
 /// separately from [`courses_routes`] because that set is prefixed
@@ -279,7 +279,7 @@ mod tests {
 
     /// The Prometheus metrics endpoint is mounted at the application
     /// **root** (`/metrics.prom`), not under the `/api` prefix that
-    /// [`courses_routes`] carries. Asserting against the typed loco
+    /// [`courses_routes`] carries. Asserting against the typed axa
     /// `Routes` (rather than building the full `ApiDoc` document) keeps
     /// the test DB-free and cheap.
     #[test]
@@ -386,7 +386,7 @@ mod tests {
     /// Building the full document is DB-free, so it also lets us assert
     /// the path surface directly — including the root-mounted
     /// `/metrics.prom` endpoint — rather than only inspecting the typed
-    /// loco `Routes`.
+    /// axa `Routes`.
     #[test]
     fn openapi_doc_builds_with_expected_paths() {
         let doc = ApiDoc::openapi();

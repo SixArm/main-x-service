@@ -13,12 +13,12 @@
 //!
 //! ```text
 //! # report how many jobs qualify, without deleting anything
-//! cargo loco task bulk_artifact_sweep
-//! cargo loco task bulk_artifact_sweep op:report
+//! cargo axa task bulk_artifact_sweep
+//! cargo axa task bulk_artifact_sweep op:report
 //!
 //! # actually sweep (up to the row cap for this pass)
-//! cargo loco task bulk_artifact_sweep op:apply
-//! cargo loco task bulk_artifact_sweep op:apply limit:500
+//! cargo axa task bulk_artifact_sweep op:apply
+//! cargo axa task bulk_artifact_sweep op:apply limit:500
 //! ```
 //!
 //! ## Scheduling
@@ -28,11 +28,11 @@
 //! via `perform_later` when a job is submitted, never on a clock, so
 //! there is nothing already running on a schedule to piggyback on.
 //! Rather than invent a new in-process scheduling primitive for this one
-//! maintenance task, it is a loco `Task` — the same shape this crate
+//! maintenance task, it is an axa `Task` — the same shape this crate
 //! already uses for other operator-triggered maintenance
 //! ([`crate::tasks::integrity_resign`]) — meant to be invoked by an
 //! external scheduler (cron, a Kubernetes `CronJob`, a Podman `systemd`
-//! timer unit, …) running `cargo loco task bulk_artifact_sweep
+//! timer unit, …) running `cargo axa task bulk_artifact_sweep
 //! op:apply` on whatever cadence a deployment's retention policy wants
 //! (daily is more than sufficient against the 7-day
 //! [`crate::bulk::BULK_ARTIFACT_TTL_SECS`] window).
@@ -56,7 +56,7 @@ pub struct SweepCommand {
     pub limit: u64,
 }
 
-/// Parse the `key:value` argument style loco tasks use.
+/// Parse the `key:value` argument style axa tasks use.
 ///
 /// Defaults to a **report-only** pass (`apply: false`) because a task
 /// that physically deletes data should never be the default of running

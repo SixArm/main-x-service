@@ -3,7 +3,7 @@
 //!
 //! [`process_import_job`] and [`process_export_job`] carry the whole
 //! per-row / per-job logic and take their collaborators (database
-//! connection) as arguments, so the loco background worker
+//! connection) as arguments, so the axa background worker
 //! ([`crate::bulk::worker`]) is a thin adapter and the logic is
 //! exercised directly by DB-gated tests without booting the app or the
 //! live worker drain.
@@ -661,7 +661,7 @@ mod db_tests {
             .await
             .expect("connect to DATABASE_URL");
         // Unlike the request-level suites under `tests/requests/`, which
-        // boot the loco `App` (auto-migrating), these tests connect
+        // boot the axa `App` (auto-migrating), these tests connect
         // directly — so migrations are applied here explicitly. Idempotent:
         // `sea-orm-migration` tracks applied migrations and skips them on
         // a later call, so running this per test function is safe.

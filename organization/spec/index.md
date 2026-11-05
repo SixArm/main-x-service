@@ -17,7 +17,7 @@
 
 Subproject specs:
 
-- [organization-service-with-axum/spec](../organization-service-with-axum/spec/index.md) — loco.rs registry service (§1–§18, single file)
+- [organization-service-with-axum/spec](../organization-service-with-axum/spec/index.md) — axa registry service (§1–§18, single file)
 - [organization-matcher-rust-crate/spec](../organization-matcher-rust-crate/spec/index.md) — matching library (§1–§25, single file)
 - [organization-front-end-with-svelte/spec](../organization-front-end-with-svelte/spec/index.md) — operator UI (§1–§18, single file)
 

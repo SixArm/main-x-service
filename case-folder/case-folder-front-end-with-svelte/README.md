@@ -3,7 +3,7 @@
 A SvelteKit application for tracking **physical paper case-note folders**
 as they move between **physical file cabinets** in a UK NHS hospital
 setting. The Svelte app is a **client** of the
-[Loco JSON API sibling](../case-folder-service-with-rust) — it owns no
+[Axum JSON API sibling](../case-folder-service-with-rust) — it owns no
 data; every list, form, and audit page round-trips through `/api/*`
 on the back-end.
 
@@ -81,7 +81,7 @@ room.
 
 ## Prerequisites
 
-The Loco JSON API must be running. The easiest path for local dev and
+The Axum JSON API must be running. The easiest path for local dev and
 the Playwright e2e suite is the API's **stub mode**, which boots a
 fully populated API with no need to stand up the five upstream
 Main-X-Services:
@@ -113,7 +113,7 @@ npm run test:e2e:headed      # headed Chromium for debugging
 
 By default the API client's base is `''` (empty), so every request goes
 to a relative `/api/*` path. The Vite dev server **proxies** `/api`
-(and `/healthz`) to the Loco app, which keeps the request first-party so
+(and `/healthz`) to the axa app, which keeps the request first-party so
 the magic-link session's HttpOnly cookie is preserved (see
 [spec/auth.md](spec/auth.md)). Two env vars tune this:
 
@@ -138,7 +138,7 @@ only when you deliberately want a cross-origin client.
 
 If the API is unreachable, the page renders the error route at
 `src/routes/+error.svelte` with the failure message. There is **no
-seed-data fallback** — the seed lives in the Loco subproject's
+seed-data fallback** — the seed lives in the axa subproject's
 `cargo run -- task seed` task.
 
 ## Theming & locale

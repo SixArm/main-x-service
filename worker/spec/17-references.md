@@ -23,7 +23,7 @@ matching layers, REST summary, testing seams.
 - [`agents/share/privacy.md`](../../agents/share/privacy.md), [`auditability.md`](../../agents/share/auditability.md), [`availability.md`](../../agents/share/availability.md), [`observability.md`](../../agents/share/observability.md)
 - [`agents/share/locales.md`](../../agents/share/locales.md) — locale catalogue
 - [`agents/share/compliance-for-healthcare.md`](../../agents/share/compliance-for-healthcare.md), [`compliance-for-technology.md`](../../agents/share/compliance-for-technology.md)
-- [`agents/share/rust-loco-stack.md`](../../agents/share/rust-loco-stack.md), [`postgresql.md`](../../agents/share/postgresql.md), [`restful.md`](../../agents/share/restful.md)
+- [`agents/share/rust-axum-stack.md`](../../agents/share/rust-axum-stack.md), [`postgresql.md`](../../agents/share/postgresql.md), [`restful.md`](../../agents/share/restful.md)
 
 ### Sibling entities
 

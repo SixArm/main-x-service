@@ -20,7 +20,7 @@
 - Shared docs: [`agents/share/index.md`](../../agents/share/index.md) —
   notably [overview](../../agents/share/overview.md),
   [architecture](../../agents/share/architecture.md),
-  [loco](../../agents/share/loco.md),
+  [axa](../../agents/share/axa.md),
   [match-search-merge](../../agents/share/match-search-merge.md),
   [availability](../../agents/share/availability.md),
   [auditability](../../agents/share/auditability.md),

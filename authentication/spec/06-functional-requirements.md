@@ -22,7 +22,7 @@ Each requirement names its owning subproject. Endpoint detail:
 - **FR-4 — Delivery.** The magic link is logged to the tracing console
   (authoritative in development; the mailer is disabled in
   `config/development.yaml`) and best-effort emailed via the
-  `AuthMailer` in production (SMTP from loco config). The `welcome` /
+  `AuthMailer` in production (SMTP from axa config). The `welcome` /
   `forgot` emails render from the on-disk templates under
   [`src/mailers/auth/`](../authentication-service-with-axum/src/mailers/auth/);
   the magic-link email is localised (FR-4a).

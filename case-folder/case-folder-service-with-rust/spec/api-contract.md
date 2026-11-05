@@ -1,6 +1,6 @@
 # JSON contract
 
-> Part of the [Loco edition specification](index.md). The route list is
+> Part of the [Axum edition specification](index.md). The route list is
 > in [routes.md](routes.md); recipes are in [examples.md](examples.md).
 
 A machine-readable **OpenAPI 3.1** document for every endpoint lives at
@@ -37,7 +37,7 @@ A machine-readable **OpenAPI 3.1** document for every endpoint lives at
 
 | Status                 | Body                                             | When                                                  |
 | ---------------------- | ------------------------------------------------ | ----------------------------------------------------- |
-| `400 Bad Request`      | Loco default                                     | malformed JSON / unsupported content-type             |
+| `400 Bad Request`      | axa default                                     | malformed JSON / unsupported content-type             |
 | `404 Not Found`        | `{ "error": "Folder not found" }`                | resource not found                                    |
 | `422 Unprocessable`    | `{ "errors": { "field": "message", ... } }`      | validation failure (each failing field is keyed)      |
 | `503 Service Unavail.` | `{ "error": "Main X Service unreachable: ..." }` | upstream Main-X-Service returned an error / timed out |

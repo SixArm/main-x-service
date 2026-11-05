@@ -27,11 +27,11 @@ and is linked there throughout.
 
 Observability is structured as the three classic pillars. The table
 states the implementation status across the two generations of service
-crate (older Axum services vs. loco-native services — see §2).
+crate (older Axum services vs. controller-style services — see §2).
 
 | Pillar | Crate / mechanism | Where | Status |
 |---|---|---|---|
-| **Logging / tracing** | `tracing` + `tracing-subscriber` (JSON or compact); loco `logger:` config block; SeaORM SQL query logging via `database.enable_logging` | every service | implemented |
+| **Logging / tracing** | `tracing` + `tracing-subscriber` (JSON or compact); axa `logger:` config block; SeaORM SQL query logging via `database.enable_logging` | every service | implemented |
 | **Metrics** | Prometheus text exposition at `GET /metrics.prom` (the `prometheus` crate registry in `src/metrics.rs`) | every service | implemented (all 10 services) |
 | **Distributed tracing** | OpenTelemetry OTLP export, `opentelemetry-semantic-conventions` | flat `src/observability.rs` module | **implemented in 8 services**: the cross-cutting link-graph-service (the original reference) plus **7 of the 10 entity registries** — person, worker, event (PRO-H9), course, place, thing (PRO-H12 slices 1–3), and organization (PRO-H12 slice 4). Real exporter code (`opentelemetry_otlp::{SpanExporter, MetricExporter}`, …), not a stub. **Still missing on 3 entity registries — care-pathway, case, and portfolio** — PRO-H12's remaining scope (§6). |
 
@@ -39,7 +39,7 @@ crate (older Axum services vs. loco-native services — see §2).
 
 Process-wide logging is set up exactly once at startup.
 
-- **Older Axum services (and the loco services that have ported the
+- **Older Axum services (and the controller-style services that have ported the
   OTLP exporter — §1.3)** — `src/observability.rs::init_telemetry`
   builds an OTel `Resource` tagging `service.name` / `service.version`,
   then installs a JSON `tracing` subscriber. The level comes from the
@@ -48,14 +48,14 @@ Process-wide logging is set up exactly once at startup.
   tracer provider on graceful exit. Note the module is a **flat file**,
   `src/observability.rs`, not a `src/observability/mod.rs` directory —
   see §1.3 and §6.2.
-- **Loco-native services without the exporter (care-pathway, case,
-  portfolio)** — logging is driven only by loco's `logger:` config
+- **axa-native services without the exporter (care-pathway, case,
+  portfolio)** — logging is driven only by axa's `logger:` config
   block (see §1.1.1), not a hand-rolled subscriber; there is no
   `src/observability.rs` in these three at all yet.
 
-#### 1.1.1 Loco `logger:` config block
+#### 1.1.1 axa `logger:` config block
 
-The loco services configure logging declaratively in
+The controller-style services configure logging declaratively in
 `config/<env>.yaml`:
 
 ```yaml
@@ -69,17 +69,17 @@ logger:
 
 | Field | development / test | production |
 |---|---|---|
-| `level` | `debug` | loco default (`info`) |
-| `format` | `compact` | loco default |
+| `level` | `debug` | axa default (`info`) |
+| `format` | `compact` | axa default |
 | `pretty_backtrace` | `true` | — |
 
 Production `config/production.yaml` omits the `logger:` block and
-inherits loco defaults; tune it there before going live (set
+inherits axa defaults; tune it there before going live (set
 `format: json` for machine ingestion, `level: info`).
 
 #### 1.1.2 SQL query logging
 
-SeaORM statement logging is gated by the loco `database.enable_logging`
+SeaORM statement logging is gated by the axa `database.enable_logging`
 flag (default `false` in `config/development.yaml` and
 `config/test.yaml`). Enable it to surface every SQL statement on the
 `tracing` stream during development; leave it **off** in production —
@@ -106,10 +106,10 @@ applies only to the three still-missing entity registries
 `src/observability.rs`, link-graph-service (the original reference,
 2026-08-05), person, worker, event (PRO-H9, 2026-08-28), course, place,
 thing (PRO-H12 slices 1–3, 2026-08-30), and organization (PRO-H12 slice
-4, 2026-08-30 — the first loco-idiomatic crate, `src/controllers/`
+4, 2026-08-30 — the first controller-style crate, `src/controllers/`
 rather than `src/api/rest/`, to carry it) each wire a real OTLP
-exporter (span + metric) bridged from `tracing` through loco's
-`Hooks::init_logger` seam, with a per-request span, an
+exporter (span + metric) bridged from `tracing` through axa's
+`App::init_logger` seam, with a per-request span, an
 `http.server.request.duration` histogram, and a W3C `traceparent`
 response header — proved against a real in-process collector, not a
 `todo!()` stub. **care-pathway, case, and portfolio carry no
@@ -163,12 +163,12 @@ Histogram buckets are tuned per metric:
 | Generation | Services | `/metrics.prom`? |
 |---|---|---|
 | Older Axum services | person, worker, place, thing, event, course | **Yes** — `src/metrics.rs` + handler |
-| Loco-native services | organization, care-pathway, case, portfolio, authentication | **Yes** — `src/metrics.rs` + `src/controllers/metrics.rs` |
+| axa-native services | organization, care-pathway, case, portfolio, authentication | **Yes** — `src/metrics.rs` + `src/controllers/metrics.rs` |
 
 Every service exposes the Prometheus surface at the root path
-`/metrics.prom` (public, `text/plain; version=0.0.4`) alongside loco's
+`/metrics.prom` (public, `text/plain; version=0.0.4`) alongside axa's
 default `/_health` and `/_ping`. The two generations differ only in how
-the route is wired (an Axum `metrics_prom` handler vs. a loco controller
+the route is wired (an Axum `metrics_prom` handler vs. an axa controller
 `Routes`), not in the exposition format.
 
 ### 2.4 Scrape configuration
@@ -218,7 +218,7 @@ Audit-log entries are written to the `audit_log` table and are a
 ### 3.3 Log levels
 
 `RUST_LOG` is the `tracing-subscriber::EnvFilter` directive (default
-`info`). It overrides the configured `log_level` / loco `logger.level`
+`info`). It overrides the configured `log_level` / axa `logger.level`
 when present in the process environment. Examples:
 
 ```bash
@@ -286,8 +286,8 @@ duration SLOs regress.
 
 Connection-pool saturation is a leading indicator of latency. Pool
 sizing is configured per service (`DATABASE_MAX_CONNECTIONS` /
-`DATABASE_MIN_CONNECTIONS` on the older services; loco
-`database.max_connections` / `min_connections` on the loco services).
+`DATABASE_MIN_CONNECTIONS` on the older services; axa
+`database.max_connections` / `min_connections` on the controller-style services).
 Surface pool gauges as the pool integration matures; until then, watch
 DB-query span latency and PostgreSQL-side metrics (§5). Pooling itself
 is part of availability — see
@@ -295,7 +295,7 @@ is part of availability — see
 
 ### 4.4 Background jobs
 
-Per [`agents/share/loco.md`](../../agents/share/loco.md), background
+Per [`agents/share/axa.md`](../../agents/share/axa.md), background
 jobs run on a **Postgres-backed** queue (not SQLite), with
 `num_workers: 2`. Instrument job throughput, failures, and queue depth
 once workers carry domain work; today the queue is configured but
@@ -316,7 +316,7 @@ distinct from the trace stream:
   `FluvioSink` relay is **shipped, default-off, on all ten entity
   registries** (see [`spec/event-streaming/index.md`](../event-streaming/index.md)
   §4/§8) — a deployment opts in by flipping the transport, it is not
-  unwritten code. The loco services expose a frozen `EventView`
+  unwritten code. The controller-style services expose a frozen `EventView`
   projection at `GET /api/<plural>/events/recent`.
 
 Instrument publish counts and failures so a stalled audit/event writer
@@ -331,7 +331,7 @@ is visible.
 | Generation | Endpoint |
 |---|---|
 | Older Axum services | `GET /api/health` |
-| Loco-native services | `GET /_health`, `GET /_ping` |
+| axa-native services | `GET /_health`, `GET /_ping` |
 
 These back container/orchestrator liveness and readiness probes (Podman
 health checks, non-root execution, graceful shutdown). The full
@@ -362,7 +362,7 @@ where geo is modeled) are catalogued in the same postgresql spec.
 
 ### 6.1 Implemented today
 
-- JSON / compact structured `tracing` with `RUST_LOG` + loco
+- JSON / compact structured `tracing` with `RUST_LOG` + axa
   `logger:` config; per-call `service.name` / `service.version`.
 - Prometheus `/metrics.prom` text exposition on the **6 older Axum
   services** (person, worker, place, thing, event, **and course** —
@@ -390,7 +390,7 @@ portfolio**, which today have no `src/observability.rs` module at all
 
 | Item | Status | Detail |
 |---|---|---|
-| OTLP exporter (span + metric) | **done** on 8/10; **missing** on care-pathway/case/portfolio | Port organization's loco-idiomatic version (not a person-style crate's) — organization's `AGENTS.md` documents the adaptation these three, all `src/controllers/`-shaped, will need: exactly one router-construction surface, so the tower middleware layers once. |
+| OTLP exporter (span + metric) | **done** on 8/10; **missing** on care-pathway/case/portfolio | Port organization's controller-style version (not a person-style crate's) — organization's `AGENTS.md` documents the adaptation these three, all `src/controllers/`-shaped, will need: exactly one router-construction surface, so the tower middleware layers once. |
 | `traceparent` propagation | **done** on 8/10, inline in the flat `src/observability.rs` (no separate `traces.rs` file — see §3.5) | Same porting task as above. |
 | OTLP metric counterpart (mirrors the Prometheus set) | **done** on 8/10 | Same porting task as above. |
 | `otlp-test-tonic` dev-dependency rename | needed only where a crate **declares** `tonic` at all (tracked by the Cargo.toml, not the gRPC-stub capability row) | Check each remaining crate's own `Cargo.toml` before porting — this tripped up place and thing despite showing `–` on gRPC. |
@@ -410,4 +410,4 @@ portfolio**, which today have no `src/observability.rs` module at all
 | Availability / health / pooling | [`agents/share/availability.md`](../../agents/share/availability.md) |
 | PostgreSQL extensions + operations (§13) | [`../postgresql/index.md`](../postgresql/index.md) |
 | REST surface + status codes | [`../restful/index.md`](../restful/index.md) |
-| Loco conventions + background jobs | [`agents/share/loco.md`](../../agents/share/loco.md) |
+| axa conventions + background jobs | [`agents/share/axa.md`](../../agents/share/axa.md) |

@@ -109,7 +109,7 @@ async fn create_event_round_trip() {
     assert_eq!(fetched.name, title);
 }
 
-/// The FHIR R5 `Appointment` surface is live (the same handlers the loco
+/// The FHIR R5 `Appointment` surface is live (the same handlers the axa
 /// production router serves): `GET /fhir/metadata` returns a `200`
 /// `CapabilityStatement`, and an unknown `GET /fhir/Appointment/{id}`
 /// returns `404` with an `OperationOutcome` body — no more `501` stub.

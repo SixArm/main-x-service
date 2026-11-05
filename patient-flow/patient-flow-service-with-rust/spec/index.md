@@ -1,6 +1,6 @@
 # Patient Flow service — edition spec
 
-Stack-specific specification for the Loco edition. The
+Stack-specific specification for the Axum edition. The
 **cross-cutting spec at [`../../spec/`](../../spec/index.md) is the
 single source of truth** for the domain (model, state machines,
 journeys, views, auth posture); this file adds only what is specific
@@ -11,9 +11,9 @@ adds its spec detail here in the same PR as the code.
 ## Stack
 
 Per [architecture](../../spec/architecture.md) and the family
-[rust-loco-stack](../../../agents/share/rust-loco-stack.md):
-Rust 2024, Loco (Axum + SeaORM), PostgreSQL 18, crate-root
-`migration/`, loco-idiomatic `src/controllers/` layout, pure
+[rust-loco-stack](../../../agents/share/rust-axum-stack.md):
+Rust 2024, axa (Axum + SeaORM), PostgreSQL 18, crate-root
+`migration/`, controller-style `src/controllers/` layout, pure
 `src/flow/` core, stub-first upstream clients, offline PASETO +
 ABAC, OpenAPI/Swagger, `Accepts-version` header versioning,
 tracing + OTLP, Podman.
@@ -38,7 +38,7 @@ tracing + OTLP, Podman.
   (+`_entities/`), `src/controllers/{topology,stays,bed_requests,
   boards,audits,docs,metrics}.rs`, `src/tasks/seed.rs`, crate-root
   `migration/`.
-- **Migration gotcha**: loco's `create_table` helper **pluralizes**
+- **Migration gotcha**: axa's `create_table` helper **pluralizes**
   table names via `cruet::to_plural` — every patient-flow table name
   is already plural so this is a no-op, except `event_outbox`, whose
   migration is written as explicit SQL to keep the exact name the

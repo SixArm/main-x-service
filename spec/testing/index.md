@@ -69,8 +69,8 @@ Coverage tracks the business-logic layer from
 | `validation` | Required-field enforcement, phone normalization, address standardization |
 | `privacy` | Field masking, record masking |
 | `models::*` | Construction + serde round-trips |
-| `auth` (loco services) | PASETO v4.public verification, `kid`/`iss`/`aud`/`exp` checks, published-key parsing (RS256/JWKS decommissioned) |
-| `openapi` (loco services) | Hand-written OpenAPI 3 document shape |
+| `auth` (controller-style services) | PASETO v4.public verification, `kid`/`iss`/`aud`/`exp` checks, published-key parsing (RS256/JWKS decommissioned) |
+| `openapi` (controller-style services) | Hand-written OpenAPI 3 document shape |
 
 These are pure and deterministic: same input, same result, no ordering
 or environment sensitivity. See the per-module breakdown in
@@ -105,7 +105,7 @@ Add a bridge test whenever the adapter gains a routing rule, the matcher
 exposes a new scoring component the service surfaces, or a regression
 escapes the adapter's own `#[cfg(test)]` module.
 
-The newer loco.rs services (care-pathway, organization, case) store the
+The newer axa services (care-pathway, organization, case) store the
 matcher type **verbatim** as JSONB, so there is no adapter to drift; the
 equivalent bridge test is
 [`tests/matching.rs`](../../care-pathway/care-pathway-service-with-axum/tests/matching.rs),
@@ -180,7 +180,7 @@ baseline (18) are covered in
 
 ### 2.4 `dangerously_truncate` / recreate between tests
 
-The loco services run the gated suite against the `test` environment,
+The controller-style services run the gated suite against the `test` environment,
 whose `config/test.yaml` sets the dangerous dev/test-only flags so each
 boot starts from a clean schema:
 
@@ -193,8 +193,8 @@ database:
 
 These flags are guarded to `test`/`development` and must never appear in
 `production.yaml`. Combined with `#[serial]`, they give each request
-test a deterministic, isolated starting state. The loco request harness
-(`loco_rs::testing::request::<App, _, _>`) boots the app against this
+test a deterministic, isolated starting state. The axa request harness
+(`axa::testing::request::<App, _, _>`) boots the app against this
 environment and yields a `request` client plus the `AppContext`.
 
 ---
@@ -324,7 +324,7 @@ test`, fmt/clippy/check):
   publication is asserted in-process, not against a real bus. See
   [event-streaming](../event-streaming/index.md).
 - Full-text **search** beyond the un-gated Tantivy temp-index unit
-  tests, and the `ILIKE` name search on the loco services, exercise the
+  tests, and the `ILIKE` name search on the controller-style services, exercise the
   database in the gated layer. See [search](../search/index.md).
 
 The headline: the richest correctness signal (bridge + unit) is
@@ -348,7 +348,7 @@ four jobs:
 | `test` | `cargo test --all-features --all`, with a `postgres` **service container** and `DATABASE_URL` in the job env | §1–§2 (un-gated + DB-gated together) |
 
 The `clippy` job uses `--workspace` so workspace members are linted in
-one shot; on the loco services that already pulls in the `migration`
+one shot; on the controller-style services that already pulls in the `migration`
 member, but the six older services keep `migration` as a *separate*
 crate (no workspace table), so the dedicated `migration` job —
 `--manifest-path migration/Cargo.toml` — is what guarantees every

@@ -15,8 +15,8 @@ caller gets on the unmasked profile once `PERSON_REQUIRE_AUTH` is on.
 
 Every job submitted here would have accepted a `202` and then sat in
 `queued` forever. `examples/compose/{single-service,full-family}.yml`
-started every container with loco's server-only `CMD [..., "start"]`,
-which never registers `BulkJobWorker` (loco only wires background workers
+started every container with axa's server-only `CMD [..., "start"]`,
+which never registers `BulkJobWorker` (axa only wires background workers
 under `start --server-and-worker`) — found live by EX-1, tracked as
 `COMPOSE-WORKER`, and fixed in its own commit immediately before this one.
 See [`tasks.md`](../tasks.md) `COMPOSE-WORKER` for that fix's own live
@@ -27,7 +27,7 @@ runs person-service **locally** via `cargo run -- start --server-and-worker`,
 the same way TUT-2 and TUT-3 found is what actually works in this
 environment (no `cargo-loco` shim installed). That flag is the exact one
 `COMPOSE-WORKER` added to the compose files; running it locally exercises
-the identical `StartMode::ServerAndWorker` code path loco's CLI parses
+the identical `StartMode::ServerAndWorker` code path axa's CLI parses
 into, just without a container in between. Local `cargo run` is also
 simply faster to iterate steps 2–5 below against, and step 5 needs a
 second service (authentication-service) restarted mid-tutorial with a

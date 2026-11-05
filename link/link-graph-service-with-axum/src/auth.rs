@@ -490,7 +490,7 @@ pub fn conceal_governed<T>(
         .collect()
 }
 
-/// Paths that stay public even when enforcement is on: the loco health /
+/// Paths that stay public even when enforcement is on: the axa health /
 /// ping probes and (once they land) the `OpenAPI` doc, Swagger UI, and
 /// Prometheus metrics.
 #[must_use]

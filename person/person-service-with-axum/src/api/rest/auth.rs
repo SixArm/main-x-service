@@ -16,7 +16,7 @@
 //! When `PERSON_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as an Axum
 //! middleware layer on both router surfaces (`create_router` and the
-//! loco `after_routes` hook) — requires a valid bearer token on every
+//! axa `after_routes` hook) — requires a valid bearer token on every
 //! route except the public allow-list in [`PUBLIC_PATHS`]. It is **off
 //! by default**: unset/blank/junk ⇒ today's behaviour, where the
 //! extractor is opt-in per handler and `GET /api/whoami` proves
@@ -74,7 +74,7 @@ pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/im
 /// what the crate actually serves without a token:
 ///
 /// - `/api/health` — this service's own health endpoint (under `/api`);
-/// - `/_health` / `/_ping` — loco's default health/ping routes (present
+/// - `/_health` / `/_ping` — axa's default health/ping routes (present
 ///   on the loco-mounted surface only);
 /// - `/api-docs/openapi.json` — the `OpenAPI` 3 document;
 /// - `/metrics.prom` — the root-mounted Prometheus scrape path (outside

@@ -5,7 +5,7 @@ strictly one-way: **front-end → service → matcher**.
 
 | Subproject | Role | Stack | Docs |
 |---|---|---|---|
-| [course-service-with-axum](../course-service-with-axum/) | Registry service: CRUD (course + instance sub-resource), search, matching, merge, dedup, audit, privacy, REST + OpenAPI. Boots through loco.rs; **family reference** for idiomatic-loco controllers. | Rust, loco.rs 0.16 (Axum 0.8), SeaORM + PostgreSQL, Tantivy, utoipa | [spec](../course-service-with-axum/spec/index.md) · [AGENTS](../course-service-with-axum/agents/index.md) · [README](../course-service-with-axum/README.md) |
+| [course-service-with-axum](../course-service-with-axum/) | Registry service: CRUD (course + instance sub-resource), search, matching, merge, dedup, audit, privacy, REST + OpenAPI. Boots through axa; **family reference** for idiomatic-loco controllers. | Rust, axa (Axum 0.8), SeaORM + PostgreSQL, Tantivy, utoipa | [spec](../course-service-with-axum/spec/index.md) · [AGENTS](../course-service-with-axum/agents/index.md) · [README](../course-service-with-axum/README.md) |
 | [course-matcher-rust-crate](../course-matcher-rust-crate/) | Canonical pairwise matching library — pure, dependency-light, no IO / async / unsafe. Embedded by the service via `src/matching/adapter.rs`. | Rust library (§1–§25 spec shape) | [spec](../course-matcher-rust-crate/spec/index.md) · [AGENTS](../course-matcher-rust-crate/agents/index.md) · [README](../course-matcher-rust-crate/README.md) |
 | [course-front-end-with-svelte](../course-front-end-with-svelte/) | Operator SPA over the service's REST API: list/search, create-with-409, detail, edit, audit, match, merge. | SvelteKit 2, Svelte 5 runes, SVAR DataGrid, Lily Headless, TypeScript strict | [spec](../course-front-end-with-svelte/spec/index.md) · [AGENTS](../course-front-end-with-svelte/agents/index.md) · [README](../course-front-end-with-svelte/README.md) |
 
@@ -26,8 +26,8 @@ strictly one-way: **front-end → service → matcher**.
 ```bash
 # Service (requires PostgreSQL; see its README for podman compose)
 cd course-service-with-axum
-cargo loco start            # or: cargo run -- start
-cargo loco db migrate       # run migrations explicitly
+cargo run -- start            # or: cargo run -- start
+cargo run -- db migrate       # run migrations explicitly
 cargo test --lib            # unit tests
 
 # Matcher (pure library)

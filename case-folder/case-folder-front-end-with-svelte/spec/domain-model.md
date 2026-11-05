@@ -3,8 +3,8 @@
 > Part of the [Svelte edition specification](index.md). The shared
 > domain (entities, invariants, status vocabulary):
 > [root domain-model](../../spec/domain-model.md). The wire types are
-> owned by the API: [Loco domain-model](../../case-folder-service-with-rust/spec/domain-model.md)
-> and [Loco api-contract](../../case-folder-service-with-rust/spec/api-contract.md).
+> owned by the API: [axa domain-model](../../case-folder-service-with-rust/spec/domain-model.md)
+> and [axa api-contract](../../case-folder-service-with-rust/spec/api-contract.md).
 
 This subproject mirrors the wire types in
 [`src/lib/store/types.ts`](../src/lib/store/types.ts) with **camelCase**

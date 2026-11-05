@@ -15,7 +15,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     /// Add the `sessions.data` column (`JSONB NOT NULL DEFAULT '{}'`).
-    /// Written with sea-query directly (not the loco `add_column` helper)
+    /// Written with sea-query directly (not the axa `add_column` helper)
     /// because the helper cannot express the non-null-with-default shape
     /// an already-populated table needs.
     ///

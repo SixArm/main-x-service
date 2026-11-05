@@ -1,7 +1,7 @@
 //! DB-gated integration tests for the durable event bus Phase-2
 //! transactional outbox (`agents/share/event-bus.md` §3, §5).
 //!
-//! These boot the real loco app against the `test` environment config, so
+//! These boot the real axa app against the `test` environment config, so
 //! they require a reachable PostgreSQL instance and are therefore
 //! `#[ignore]`d (run with `cargo test -- --ignored`). They exercise the
 //! exact write path the `outbox` transport takes in the CRUD handlers:

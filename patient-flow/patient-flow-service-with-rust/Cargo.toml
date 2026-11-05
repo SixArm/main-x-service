@@ -73,7 +73,7 @@ required-features = []
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "testing"] }
 # Name the `TestServer` type in shared request-test helpers (same
-# version loco's testing feature uses internally).
+# version axa's testing feature uses internally).
 axum-test = { version = "21.1.0" }
 tokio = { version = "1.54", default-features = false, features = [
   "rt-multi-thread",

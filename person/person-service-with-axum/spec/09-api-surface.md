@@ -28,7 +28,7 @@ item; no refresh loop). **Blanket enforcement**
 default-off `PERSON_REQUIRE_AUTH` env flag (`1`/`true`/`yes`/`on` ⇒
 on; unset/blank/junk ⇒ off; read once at boot — restart to change).
 When on, every route requires a valid bearer token except the public
-allow-list: `/api/health`, loco's `/_health` / `/_ping`,
+allow-list: `/api/health`, axa's `/_health` / `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom`.
 
 Authorization (ABAC, inside the same guard — so only when

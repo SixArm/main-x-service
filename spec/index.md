@@ -28,7 +28,7 @@ the family-wide source of truth; the briefer versions under
 
 | Topic | Description |
 | ----- | ----------- |
-| [architecture](architecture/index.md) | System architecture — the family shape, the two service generations (loco vs older Axum), layering, cross-service integration |
+| [architecture](architecture/index.md) | System architecture — the family shape, the two service generations (axa vs older Axum), layering, cross-service integration |
 | [dataflow](dataflow/index.md) | Request/data flows — create, match, merge, search, read/masked/export, auth |
 | [tech-stack](tech-stack/index.md) | Technology stack + hard constraints (Podman/Tokio/MiMalloc/PostgreSQL/chrono) and current drift |
 | [agents-directory-name-is-lowercase](agents-directory-name-is-lowercase/index.md) | The agent reference directories are named `agents`, lowercase — the rule, why a case-only mismatch hides on macOS, and the CI stage behind it |

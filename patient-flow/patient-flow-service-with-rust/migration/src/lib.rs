@@ -1,7 +1,7 @@
 //! `sea-orm-migration` schema migrations for `patient-flow-service`.
 //!
 //! The [`Migrator`] runs the ordered list below at boot (or via
-//! `cargo loco db migrate`): the physical topology (sites → wards →
+//! `cargo axa db migrate`): the physical topology (sites → wards →
 //! bays → beds), the inpatient stays + transfers, the demand-side
 //! tables (bed requests, `Red2Green` journal, infection flags), then the
 //! `audit_logs` and `event_outbox` side tables. Stay data is personal
@@ -19,7 +19,7 @@ mod m20220101_000003_demand;
 mod m20220101_000004_audit_logs;
 mod m20220101_000005_event_outbox;
 
-/// The crate's migrator: drives the ordered migration set for the loco
+/// The crate's migrator: drives the ordered migration set for the axa
 /// CLI / boot-time migration.
 pub struct Migrator;
 

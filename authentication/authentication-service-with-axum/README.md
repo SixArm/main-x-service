@@ -5,7 +5,7 @@ Passwordless **email magic-link** authentication establishing a
 server-side **cookie session**; peer services authenticate offline via
 short-lived **PASETO v4.public** tokens minted from the session.
 
-Built on **loco.rs** — and the family's reference loco application.
+Built on **axa** — and the family's reference axa application.
 
 > **Auth model source of truth:**
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
@@ -47,11 +47,11 @@ magic-link email** — the response shape is identical across locales.
 Requires a PostgreSQL instance.
 
 ```bash
-# 1. Point at a database (or use the loco config default).
+# 1. Point at a database (or use the axa config default).
 export DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_development
 
 # 2. Run (auto-migrates in development).
-cargo loco start
+cargo run -- start
 
 # 3. Sign up — the magic link is printed to the console in development.
 curl -s localhost:5150/api/auth/signup -H 'content-type: application/json' \

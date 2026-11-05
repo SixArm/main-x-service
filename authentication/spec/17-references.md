@@ -33,8 +33,8 @@
   [person-service](../../person/person-service-with-axum/spec/index.md),
   the identity registry whose records this entity deliberately does
   **not** duplicate.
-- Loco conventions: [`agents/share/loco.md`](../../agents/share/loco.md) ·
-  [`agents/share/rust-loco-stack.md`](../../agents/share/rust-loco-stack.md).
+- axa conventions: [`agents/share/axa.md`](../../agents/share/axa.md) ·
+  [`agents/share/rust-axum-stack.md`](../../agents/share/rust-axum-stack.md).
 
 ### Standards
 
@@ -48,4 +48,4 @@
   **decommissioned** model, kept for historical reference.
 - OpenID Connect Core / Discovery (roadmap — §15).
 - W3C WebAuthn (roadmap — §15).
-- loco.rs — https://loco.rs/
+- axa — https://axa/

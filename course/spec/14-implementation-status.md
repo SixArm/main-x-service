@@ -7,7 +7,7 @@ Aspirational items live in §15, not here.
 
 | Area | Status |
 |---|---|
-| Loco boot + idiomatic controllers (family reference) | ✅ — code shipped; crate spec/docs lag behind (§13 T-2) |
+| axa boot + idiomatic controllers (family reference) | ✅ — code shipped; crate spec/docs lag behind (§13 T-2) |
 | Course + instance CRUD, search, match, merge, dedup | ✅ FR-1..FR-13 |
 | Audit + event streaming | ✅ in-memory MVP; Fluvio adapter pending |
 | Privacy (masked view + GDPR export) | ✅ |
@@ -45,4 +45,4 @@ Aspirational items live in §15, not here.
 | Front-end ↔ service wire contract (`/api`, envelope, `{ items, total }`) | ✅ pinned by front-end unit tests |
 | Service ↔ matcher adapter contract (§5.3) | ✅ pinned by 14 bridge tests |
 | SSO across the trio | ❌ roadmap |
-| Entity spec ↔ crate specs consistency | ✅ service spec aligned with the loco conversion and post-nesting links repaired 2026-06-13 (§13 T-2, T-3, T-4) |
+| Entity spec ↔ crate specs consistency | ✅ service spec aligned with the Loco conversion and post-nesting links repaired 2026-06-13 (§13 T-2, T-3, T-4) |

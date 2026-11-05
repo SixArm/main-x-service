@@ -239,10 +239,10 @@ deployment's policy is written), but it means:
 > the patched 0.4.16. The other fifteen were **RUSTSEC-2023-0071** (the
 > Marvin timing attack in `rsa` 0.9.10), which cargo-deny reports as
 > having no safe upgrade — so it was **removed rather than suppressed**.
-> The path was `loco-rs` (default `auth` feature) → `jsonwebtoken` →
-> `rsa`, i.e. loco's JWT support, in a family whose whole authentication
+> The path was `axa` (default `auth` feature) → `jsonwebtoken` →
+> `rsa`, i.e. axa's JWT support, in a family whose whole authentication
 > design is PASETO v4.public precisely because it does not trust JWT
-> ([jwt.md](jwt.md)). Every loco crate now takes
+> ([jwt.md](jwt.md)). Every axa crate now takes
 > `default-features = false` without `auth`, and the one reference that
 > blocked it — `authentication-service`'s never-called
 > `Model::generate_jwt`, documented as loco-scaffold parity — was

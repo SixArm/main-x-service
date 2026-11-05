@@ -362,7 +362,7 @@ pub async fn request_claims(headers: &HeaderMap) -> Result<Claims, (StatusCode, 
 
 /// Paths that stay public even when blanket enforcement is on
 /// (deny-unless-public — **every** other path is guarded, including
-/// out-of-prefix routes): loco's liveness/readiness probes, the
+/// out-of-prefix routes): axa's liveness/readiness probes, the
 /// `OpenAPI` doc, the Swagger UI (prefix match), the Prometheus scrape
 /// (so a scraper needs no bearer token), the `/api/health` probe, and
 /// the FHIR `CapabilityStatement` (capability discovery, fhir.md §8).
@@ -531,7 +531,7 @@ pub async fn enforce_request(
 /// flag (`AppState::require_auth`), the construction-time ABAC policy
 /// (`AppState::policy`), and the shared verifier, and rejects with
 /// `401`/`403` before any handler runs. Wired on **both** router
-/// surfaces — the hand-written `create_router` and the loco router in
+/// surfaces — the hand-written `create_router` and the axa router in
 /// `App::after_routes` — via `axum::middleware::from_fn_with_state`.
 /// Added unconditionally: it is a near-noop when the flag is off, so
 /// the wiring stays static and the env var is the only switch.
@@ -793,7 +793,7 @@ mod tests {
     }
 
     /// Enforcement on ⇒ the allow-listed `/api/health` and every
-    /// root-level out-of-scope path (loco health/ping, `OpenAPI` doc,
+    /// root-level out-of-scope path (axa health/ping, `OpenAPI` doc,
     /// Swagger UI, Prometheus scrape) still pass without a token.
     #[test]
     fn test_enforce_on_allows_public_and_out_of_scope_paths() {

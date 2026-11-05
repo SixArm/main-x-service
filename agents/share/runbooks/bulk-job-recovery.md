@@ -17,7 +17,7 @@ runner doesn't catch — that job's row sits in `running` **forever**.
 Nothing in this codebase will ever move it out of that state on its
 own.
 
-(loco's own Postgres-backed queue has an *opt-in* reaper that can
+(axa's own Postgres-backed queue has an *opt-in* reaper that can
 requeue stale `Processing` rows — but it is off by default, and no
 service in this family turns it on. Don't assume it's protecting you
 unless you specifically enabled it.)
@@ -34,8 +34,8 @@ went wrong. **The log line is the only place the actual error text
 lives** — check there first, always, before assuming the failure was
 data-related just because the status says `failed`.
 
-(The underlying error is *also* captured in loco's own job-queue table,
-`pg_loco_queue.task_data->>'error'`, if you need a second source — the
+(The underlying error is *also* captured in axa's own job-queue table,
+`axa_queue.error`, if you need a second source — the
 `bulk_jobs` row's status and that queue row's status are two separate
 pieces of bookkeeping that can, in principle, disagree.)
 

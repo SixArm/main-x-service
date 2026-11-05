@@ -27,9 +27,9 @@ in this session.
 | Rust (this repo pins `1.96.1` in [`rust-toolchain.toml`](../rust-toolchain.toml)) | builds and runs case-service directly | `cargo` on `PATH` |
 | `curl` + `python3` (for `python3 -m json.tool`) | verifies everything live | whatever your OS ships |
 
-## A correction before starting: `cargo loco` actually does work here — for a narrower reason than it sounds
+## A correction before starting: `cargo axa` actually does work here — for a narrower reason than it sounds
 
-Every prior tutorial that touched `cargo loco …` (TUT-2, TUT-3, TUT-5)
+Every prior tutorial that touched `cargo run -- …` (TUT-2, TUT-3, TUT-5)
 found it fails with "no such command: `loco`" and used `cargo run --
 …` instead, because no global `cargo-loco` plugin binary is installed in
 this environment. That finding still holds **in general** — but it turns
@@ -38,7 +38,6 @@ being precise about rather than re-asserting the old blanket claim:
 
 ```sh
 cd case/case-service-with-axum
-cargo loco --version
 ```
 
 ```
@@ -51,12 +50,12 @@ carries
 
 ```toml
 [alias]
-loco = "run --"
+axa = "run --"
 ```
 
 — a **repo-local Cargo alias**, not the missing global plugin. It makes
-`cargo loco X` expand to exactly `cargo run -- X` for *this crate only*,
-so `cargo loco start` and `cargo loco db migrate` genuinely work here
+`cargo run -- X` expand to exactly `cargo run -- X` for *this crate only*,
+so `cargo run -- start` and `cargo run -- db migrate` genuinely work here
 (confirmed live below) for the same reason `cargo run -- start` always
 has. It is present in case-service and authentication-service (both
 newer, loco-scaffolded crates) but **absent** from person/worker/place's
@@ -116,8 +115,8 @@ listening on http://localhost:5150
 ```
 
 Note `modes: server` — **not** `modes: server, worker`. Unlike TUT-5's
-bulk-job worker (a loco `BackgroundQueue` worker that only registers under
-`start --server-and-worker`), the outbox relay is **not** a loco worker at
+bulk-job worker (an axa `BackgroundQueue` worker that only registers under
+`start --server-and-worker`), the outbox relay is **not** an axa worker at
 all: `src/app.rs`'s `after_routes` hook calls `crate::relay::spawn(ctx.db
 .clone())` directly with `tokio::spawn`, unconditionally on every boot —
 `spawn` itself is what checks `CASE_EVENT_TRANSPORT`/`CASE_EVENT_RELAY`
@@ -135,7 +134,7 @@ curl -s http://localhost:5150/_health
 {"ok":true}
 ```
 
-(Case-service's health payload is the loco default `{"ok":true}` —
+(Case-service's health payload is the axa default `{"ok":true}` —
 unlike person-service's richer `/api/health` `{"status","service",
 "version"}` shape TUT-1/TUT-5 show. Different crate, different endpoint;
 not a regression.)
@@ -170,11 +169,11 @@ note about case's wire shape, reconfirmed.
 ## 3. The outbox row — and what it actually proves
 
 Query `event_outbox` directly (the table name is exactly that — no
-pluralization; see the migration file's own comment about a loco
+pluralization; see the migration file's own comment about an axa
 `create_table` helper bug this crate works around):
 
 ```sh
-podman exec mxi-case-test-db psql -U loco -d case_service_test -c \
+podman exec mxi-case-test-db psql -U axa -d case_service_test -c \
   "SELECT id, event_id, entity, entity_pid, kind, occurred_at, actor, schema_version, published_at FROM event_outbox ORDER BY id;"
 ```
 
@@ -190,7 +189,7 @@ already carries a `published_at` — the relay reached it before this query
 ran (§4). The full envelope survives verbatim as `payload`:
 
 ```sh
-podman exec mxi-case-test-db psql -U loco -d case_service_test -t -A -c \
+podman exec mxi-case-test-db psql -U axa -d case_service_test -t -A -c \
   "SELECT payload FROM event_outbox WHERE entity_pid = 'ec863465-bac0-40ee-9caf-119b7a04b127';"
 ```
 

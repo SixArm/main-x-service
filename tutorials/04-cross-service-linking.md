@@ -126,7 +126,7 @@ the next starts, memory never exceeding ~3.4 GB of the 12 GB budget):
 
 The four `person`-style crates (person/worker/place/thing/event/course —
 the older, richer layout) each took visibly longer (178–212 s) than the
-five loco-idiomatic crates + link-graph (85–106 s) — consistent with the
+five controller-style crates + link-graph (85–106 s) — consistent with the
 richer domain model and larger dependency graph the architecture doc
 describes for that layout. Sequential, single-image builds never came
 close to memory pressure (peak observed ~3.4 GB of 12 GB) — the ceiling
@@ -165,7 +165,7 @@ their `db migrate` and exited, then each long-running service started
 against the now-migrated schema.
 
 Verify every health endpoint — the six person-style crates answer on
-`/api/health`, the five loco-idiomatic registries plus link-graph on
+`/api/health`, the five controller-style registries plus link-graph on
 `/_health`:
 
 ```sh
@@ -241,7 +241,7 @@ WORKER_ID=498c9c4f-a20c-48ea-a4a5-9c3bbc4373ff
 Then a governmental case naming that person as its subject (reusing the
 body shape [`examples/api/case.http`](../examples/api/case.http) already
 curl-verifies — but with the real `PERSON_ID` above in `subjects`, not the
-file's placeholder `person:abc`; the case service is loco-idiomatic, so
+file's placeholder `person:abc`; the case service is controller-style, so
 its create response is **bare** JSON, not the `{success,data,error}`
 envelope person/worker use):
 
@@ -516,9 +516,9 @@ one `POST /api/cases/{pid}/links` returned back in §3:
 ```sh
 SUBJECT_OF_EDGE_ID=d9e47aec-564b-4479-80ce-1d7d1dc39a04
 
-podman exec -i mxi-family-postgres psql -U loco -d link_graph -c \
+podman exec -i mxi-family-postgres psql -U axa -d link_graph -c \
   "DELETE FROM edges WHERE edge_id='${SUBJECT_OF_EDGE_ID}';"
-podman exec -i mxi-family-postgres psql -U loco -d link_graph -c \
+podman exec -i mxi-family-postgres psql -U axa -d link_graph -c \
   "INSERT INTO edges (edge_id, from_ref, to_ref, kind, directed, role,
      confidence, provenance, valid_from, valid_to, status, observed_at,
      source_event_id)

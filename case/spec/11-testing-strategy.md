@@ -9,7 +9,7 @@ Entity-level summary; detail in [`agents/testing.md`](../agents/testing.md).
 | matcher | Unit tests embedded per module (`#[cfg(test)]`); integration suite `tests/public_api.rs` over the re-exported surface; rustdoc examples as doctests | Delivered |
 | service | DB-free tests in [`tests/matching.rs`](../case-service-with-axum/tests/matching.rs): matcher embedding + JSON round-trip of the DTO | Delivered |
 | service | Controller + module unit tests (`src/`): blank-title → `422` pin, validation cases, `merge`, `streaming` publish/read-back, `auth` crypto, `openapi` well-formedness, `CHECK_DUPLICATES_SCAN_CAP` value — all DB-free | Delivered |
-| service | Request-level integration tests against PostgreSQL ([`tests/requests/cases.rs`](../case-service-with-axum/tests/requests/cases.rs), loco testing harness): CRUD, 422s, 404, `/search`, `/match`, `/check-duplicates`, `/merge`, audit/events, `whoami`, OpenAPI/Swagger. `#[ignore]`-gated; run with `cargo test -- --ignored` and a Postgres URL | Delivered (gated) |
+| service | Request-level integration tests against PostgreSQL ([`tests/requests/cases.rs`](../case-service-with-axum/tests/requests/cases.rs), axa testing harness): CRUD, 422s, 404, `/search`, `/match`, `/check-duplicates`, `/merge`, audit/events, `whoami`, OpenAPI/Swagger. `#[ignore]`-gated; run with `cargo test -- --ignored` and a Postgres URL | Delivered (gated) |
 | front-end | `pnpm run check` (svelte-check strict, 0 errors / 0 warnings) + production build | Delivered |
 | front-end | vitest units (`ApiClient`, `CaseRepository`, incl. a `check-duplicates` path regression) + Playwright smoke over the four routes (API-stubbed, runs on `vite preview`) | Delivered |
 

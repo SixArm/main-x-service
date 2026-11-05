@@ -15,7 +15,7 @@ search service — but they all follow the conventions below.
 > care-pathway, case, portfolio) — organization landed 2026-07-31,
 > care-pathway 2026-08-01, case + portfolio 2026-08-02, the other six
 > earlier. This supersedes most of §1 below, which described the
-> pre-Tantivy state of the four newest loco services; §1 is kept as a
+> pre-Tantivy state of the four newest controller-style services; §1 is kept as a
 > historical record of the `ILIKE` tier plus a note on what, if
 > anything, still uses it (see §1.5). See
 > [`agents/share/overview.md`](../../agents/share/overview.md) footnote
@@ -36,7 +36,7 @@ search service — but they all follow the conventions below.
 
 ## 1. Historical state — Postgres `ILIKE` substring search [superseded]
 
-> **This section describes the pre-Tantivy state of the loco.rs
+> **This section describes the pre-Tantivy state of the axa
 > services.** All four (organization, care-pathway, case, portfolio)
 > have since migrated their live `GET /<plural>/search` endpoint to
 > Tantivy (§2); this section is kept because the `ILIKE` mechanics it
@@ -45,7 +45,7 @@ search service — but they all follow the conventions below.
 > forward conceptually into the Tantivy handlers. See §1.5 for the
 > current, per-crate reality.
 
-The **loco.rs** services (organization, care-pathway, case, portfolio)
+The **axa** services (organization, care-pathway, case, portfolio)
 originally did **pragmatic Postgres `ILIKE '%q%'` substring search**
 over a single **denormalised scalar column**, not over the JSONB
 payload — before Tantivy landed in each (§2).
@@ -78,7 +78,7 @@ pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult
 }
 ```
 
-Properties (identical across the loco services):
+Properties (identical across the controller-style services):
 
 - **Case-insensitive substring** — `ILIKE '%q%'`, so `acme` matches
   `Acme Corp` and `ACME`.
@@ -175,18 +175,18 @@ superseded.
 
 The upgrade beyond `ILIKE` is an embedded **Tantivy** full-text
 index (see the stack note in
-[`agents/share/loco.md`](../../agents/share/loco.md) and the dependency
+[`agents/share/axa.md`](../../agents/share/axa.md) and the dependency
 table in
-[`agents/share/rust-loco-stack.md`](../../agents/share/rust-loco-stack.md)),
+[`agents/share/rust-axum-stack.md`](../../agents/share/rust-axum-stack.md)),
 and it is **live on every entity registry today** — not a planned
-upgrade for the four newest loco.rs services.
+upgrade for the four newest axa services.
 
 ### 2.1 Where it is wired today
 
 | Service tier | Search backend | Notes |
 |---|---|---|
 | Older Axum services (person, worker, place, thing, event, course — each with a `src/search/` module) | **Tantivy** [implemented] | `src/search/index.rs` declares the per-entity schema (indexed fields, analyzers), `src/search/mod.rs` is the `SearchEngine` wrapper, `src/search/query.rs` builds queries. |
-| loco.rs services (organization, care-pathway, case, portfolio) | **Tantivy** [implemented] | Landed organization 2026-07-31, care-pathway 2026-08-01, case + portfolio 2026-08-02. `GET /<plural>/search` calls `crate::search::engine()` (fuzzy/phonetic/exact modes) exactly like the older services; organization additionally **removed** its prior `ILIKE` model method rather than leaving it dormant (§1). |
+| axa services (organization, care-pathway, case, portfolio) | **Tantivy** [implemented] | Landed organization 2026-07-31, care-pathway 2026-08-01, case + portfolio 2026-08-02. `GET /<plural>/search` calls `crate::search::engine()` (fuzzy/phonetic/exact modes) exactly like the older services; organization additionally **removed** its prior `ILIKE` model method rather than leaving it dormant (§1). |
 
 Every service's `GET /<plural>/search` handler now follows the same
 shape: reject a blank `q` with `400`, resolve `limit`/`offset` (§6),
@@ -338,7 +338,7 @@ digits) is computed for name terms; `Smith` and `Smyth` both encode to
   longer how any live `/search` endpoint behaves (§1.5).
 - **Tantivy tier [implemented, all ten registries]:** client `limit` +
   `offset` via the `TopDocs` collector, on every entity's `/search`.
-  The loco services additionally report the family-wide header contract
+  The controller-style services additionally report the family-wide header contract
   (`X-Total-Count`/`X-Limit`/`X-Offset`) per
   [`agents/share/restful.md`](../../agents/share/restful.md)'s
   Pagination section — that document is the current source of truth for
@@ -358,7 +358,7 @@ here that these were all "deferred" — masking exists, it is just not a
 
 The older Axum services expose `mask_sensitive=true` on search and a
 `GET /<plural>/{id}/masked` view because their search can return
-sensitive fields. **The Tantivy-backed loco `/search` endpoints have no
+sensitive fields. **The Tantivy-backed axa `/search` endpoints have no
 `mask_sensitive` parameter**, and that is a deliberate consequence of
 §1.1/§2's ref-only response shape, not a masking gap: `/search` returns
 only `{pid, name}` / `{pid, title}` (`OrgRef` / `PathwayRef` / …), which
@@ -375,7 +375,7 @@ masked-view endpoint, and GDPR export.
   table/row** as the record, written transactionally on create/update;
   soft-delete set `deleted_at`, which the `IS NULL` filter honoured.
   There was no separate index to keep in sync — consistency was free.
-  This was the reason the loco services started with `ILIKE` (§1) before
+  This was the reason the controller-style services started with `ILIKE` (§1) before
   taking on the cost below.
 - **Tantivy tier [implemented, all ten registries]:** the on-disk index
   is a **second store** that must be kept in step with Postgres.
@@ -390,7 +390,7 @@ masked-view endpoint, and GDPR export.
 
 ## 7. API surface
 
-### 7.1 loco services (organization, care-pathway, case, portfolio) [implemented, Tantivy]
+### 7.1 controller-style services (organization, care-pathway, case, portfolio) [implemented, Tantivy]
 
 | Method | Path | Query params | Behaviour |
 |---|---|---|---|
@@ -433,7 +433,7 @@ per-entity search params); the contract itself is no longer in flux.
 
 ## 8. Summary: implemented, family-wide
 
-| Capability | loco services (org / care-pathway / case / portfolio) | Axum services (person, …) |
+| Capability | controller-style services (org / care-pathway / case / portfolio) | Axum services (person, …) |
 |---|---|---|
 | Historical substring `ILIKE` name/title search | superseded by Tantivy (§1.5) | never had it — Tantivy from the start |
 | `escape_like` wildcard neutralisation | dead code in care-pathway/case (unit-tested, uncalled); removed entirely in organization (§1.3) | n/a |

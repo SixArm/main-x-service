@@ -16,7 +16,7 @@
 //! When `WORKER_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as an Axum
 //! middleware layer via [`apply_enforcement`] on **both** router
-//! surfaces (`create_router` and the loco router in
+//! surfaces (`create_router` and the axa router in
 //! `App::after_routes`) — requires a valid PASETO `v4.public` bearer
 //! token on every route except the public allow-list in
 //! [`PUBLIC_PATHS`] / [`PUBLIC_PATH_PREFIXES`] (health probes, the
@@ -74,7 +74,7 @@ pub const ENTITY: &str = "worker";
 pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/import", "/erase"];
 
 /// Exact-match paths that stay public even when blanket enforcement is
-/// on: loco's default health probes (`/_health`, `/_ping`), this crate's
+/// on: axa's default health probes (`/_health`, `/_ping`), this crate's
 /// own health endpoint (`/api/health` — orchestration probes carry no
 /// token), the served `OpenAPI` document, and the Prometheus scrape
 /// endpoint (`/metrics.prom` — scrapers carry no token). Everything else

@@ -181,8 +181,8 @@ pub fn create_router(state: AppState) -> Router {
         .layer(axum::middleware::from_fn(crate::observability::trace_mw))
 }
 
-/// Native loco controller routes (idiomatic path). Mirrors
-/// [`create_router`]'s `/api` surface as a loco `Routes`; handlers
+/// Native axa controller routes (idiomatic path). Mirrors
+/// [`create_router`]'s `/api` surface as an axa `Routes`; handlers
 /// extract `AppState` from the `AppContext` shared store via `FromRef`.
 /// `create_router` is retained for the integration tests.
 #[must_use]

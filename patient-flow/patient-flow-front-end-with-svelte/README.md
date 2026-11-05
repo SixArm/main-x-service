@@ -2,7 +2,7 @@
 
 A SvelteKit application providing the **digital ward whiteboard**
 and flow-operations UI for the
-[Loco JSON API sibling](../patient-flow-service-with-rust/):
+[Axum JSON API sibling](../patient-flow-service-with-rust/):
 interactive bed cards on ward touchscreens, hospital-at-a-glance,
 bed-request board, patient locate, and clinical-handover audit
 views. The app owns no data — every view round-trips through the

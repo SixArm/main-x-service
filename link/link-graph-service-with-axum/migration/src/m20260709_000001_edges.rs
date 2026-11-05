@@ -1,6 +1,6 @@
 //! Migration: create the `edges` read-model table + its three indexes
 //! (`from_ref`, `to_ref`, `status`). SQL is the source of truth (spec
-//! §10.1); this wrapper bridges it into the loco `Migrator`.
+//! §10.1); this wrapper bridges it into the axa `Migrator`.
 
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;

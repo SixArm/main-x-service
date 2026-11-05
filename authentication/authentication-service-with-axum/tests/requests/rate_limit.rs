@@ -3,7 +3,7 @@
 //!
 //! These exercise the sliding-window behaviour directly against the
 //! `auth_rate_limits` table, injecting a synthetic `now` through
-//! [`rate_limit::check_at`] for determinism. They boot the loco app and so
+//! [`rate_limit::check_at`] for determinism. They boot the axa app and so
 //! need the PostgreSQL instance from `config/test.yaml`; they are
 //! `#[ignore]`d (run with `cargo test -- --ignored`) and `#[serial]` because
 //! they share the one table. The pure key-normalisation case is unit-tested

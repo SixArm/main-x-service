@@ -12,7 +12,7 @@ mod topology;
 /// `(ward_pid, bed_pids)`.
 ///
 /// A macro, not a function: the `request` handed to each test by
-/// loco's `request()` helper is a `loco_rs`-internal-pinned
+/// axa's `request()` helper is a `loco_rs`-internal-pinned
 /// `axum_test::TestServer` — a type this crate cannot name directly
 /// without pulling in that exact same `axum-test` version as a direct
 /// dependency (defeating the point of tracking a newer one for the

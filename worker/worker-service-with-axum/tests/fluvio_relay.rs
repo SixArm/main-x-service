@@ -29,12 +29,12 @@
 //!
 //! **Deviation from the case template:** case drives this test through
 //! `axa::testing::prelude::request::<App, _, _>` because that crate's
-//! dev-dependencies enable loco's `testing` feature. This crate's
+//! dev-dependencies enable axa's `testing` feature. This crate's
 //! dev-dependencies do not, and its own DB-gated outbox atomicity tests
 //! (`src/db/repositories.rs::tests::create_enqueues_a_created_outbox_row`)
 //! already establish the alternative: connect directly via `DATABASE_URL`
 //! and drive the repository. This test follows that established local
-//! pattern instead of introducing the loco test harness for one file.
+//! pattern instead of introducing the axa test harness for one file.
 #![cfg(feature = "fluvio")]
 
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};

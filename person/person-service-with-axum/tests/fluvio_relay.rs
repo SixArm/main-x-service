@@ -28,7 +28,7 @@
 //! ported from and which has likewise never been executed in this repo.
 //!
 //! Deviation from the case-service reference: case drives this round trip
-//! through its loco `App` + `streaming::create_and_emit` (its layout has
+//! through its axa `App` + `streaming::create_and_emit` (its layout has
 //! that helper). This crate's write path enqueues the outbox row inside
 //! `PersonRepository::create`/`update`/`delete`, with no equivalent
 //! single-call helper, so this test instead builds the outbox row

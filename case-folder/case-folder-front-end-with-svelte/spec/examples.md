@@ -103,5 +103,5 @@ To add `/reports`:
 3. Create `src/routes/reports/+page.svelte`.
 4. Add a `NavigationMenu` link in `+layout.svelte`.
 5. If new API surface is needed, propose it in the
-   [Loco spec](../../case-folder-service-with-rust/spec/routes.md) first and
+   [axa spec](../../case-folder-service-with-rust/spec/routes.md) first and
    add a typed method to `src/lib/api/client.ts`.

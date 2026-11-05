@@ -2,12 +2,12 @@
 //!
 //! Adds the HIPAA-style audit trail table and the merge-history table. As with
 //! migration 1, the DDL lives in the sibling `up.sql` / `down.sql` files and is
-//! `include_str!`-embedded; this Rust shim only lets loco's `Migrator` run it.
+//! `include_str!`-embedded; this Rust shim only lets axa's `Migrator` run it.
 
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;
 
-/// Zero-sized migration marker registered with the loco `Migrator`.
+/// Zero-sized migration marker registered with the axa `Migrator`.
 pub struct Migration;
 
 impl MigrationName for Migration {

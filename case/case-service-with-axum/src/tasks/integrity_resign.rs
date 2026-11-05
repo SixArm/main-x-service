@@ -10,12 +10,12 @@
 //!
 //! ```text
 //! # what would change (writes nothing)
-//! cargo loco task integrity_resign
-//! cargo loco task integrity_resign target:audit
+//! cargo axa task integrity_resign
+//! cargo axa task integrity_resign target:audit
 //!
 //! # actually re-sign
-//! cargo loco task integrity_resign op:apply
-//! cargo loco task integrity_resign op:apply target:records limit:5000
+//! cargo axa task integrity_resign op:apply
+//! cargo axa task integrity_resign op:apply target:records limit:5000
 //! ```
 //!
 //! ## The rule that matters: never re-sign what does not verify

@@ -7,7 +7,7 @@
 //! ([`crate::bulk::worker`]) progresses. The bulk **logic** lives in
 //! [`crate::bulk`]; this module only reads and writes the row. Mirrors the
 //! shape of the person service's `db::bulk_jobs` (the family reference
-//! implementation), adapted to this crate's loco model-error conventions
+//! implementation), adapted to this crate's axa model-error conventions
 //! and `chrono` timestamps.
 
 use axa::prelude::*;
@@ -349,7 +349,7 @@ mod db_tests {
             .await
             .expect("connect to DATABASE_URL");
         // Unlike the request-level suites under `tests/requests/`, which
-        // boot the loco `App` (auto-migrating), these tests connect
+        // boot the axa `App` (auto-migrating), these tests connect
         // directly — so migrations are applied here explicitly. Idempotent:
         // `sea-orm-migration` tracks applied migrations and skips them on
         // a later call, so running this per test function is safe.

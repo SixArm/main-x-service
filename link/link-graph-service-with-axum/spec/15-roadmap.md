@@ -15,7 +15,7 @@ per-task status; treat the version labels here as a map of *what*, not
 
 ### v0.1.0 — Contracts & scaffold
 
-- Loco service skeleton, read-only to the world (§13 T-1).
+- axa service skeleton, read-only to the world (§13 T-1).
 - Copied `EntityRef` + `entity_type → service` map (T-2) and closed
   edge-kind registry (T-3).
 - Read-model migrations: `edges`, `entity_presence`, `consumer_offsets`,

@@ -45,7 +45,7 @@ is also sent to the service so the magic-link email language matches.
    2026-08-29** (PRO-P24) — the dependency tree now actually matches this
    rule instead of contradicting it. Add nothing further unless a real
    need appears (drift is accepted family-wide).
-5. **No envelope.** The auth service is loco.rs and returns **raw JSON**
+5. **No envelope.** The auth service is axa and returns **raw JSON**
    (no `{success,data,error}` wrapper).
 6. **`src/lib/api/` held dead code and was pruned — don't resurrect it.**
    `client.ts` (`ApiClient`) and `auth.ts` (`AuthRepository`) were the

@@ -1,9 +1,9 @@
-//! Loco migrator for course-service.
+//! axa migrator for course-service.
 //!
 //! Each migration wraps the corresponding hand-written SQL file under
 //! `../migrations/<timestamp>_<name>/{up,down}.sql` via `include_str!`,
-//! so the SQL remains the single source of truth while loco gains a
-//! Rust `Migrator` it can run (`auto_migrate`, `cargo loco db migrate`).
+//! so the SQL remains the single source of truth while axa gains a
+//! Rust `Migrator` it can run (`auto_migrate`, `cargo axa db migrate`).
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
@@ -20,7 +20,7 @@ mod m20260608_000001_normalize_course_collections;
 mod m20260708_000001_create_course_outbox;
 mod m20260728_000001_add_integrity_digests;
 
-/// The migration runner this crate exposes to loco / `sea-orm-migration`.
+/// The migration runner this crate exposes to axa / `sea-orm-migration`.
 pub struct Migrator;
 
 #[async_trait::async_trait]

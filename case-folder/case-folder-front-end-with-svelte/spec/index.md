@@ -1,7 +1,7 @@
 # Case Tracking (Svelte edition) — Specification
 
 Living specification for the SvelteKit **front-end** that consumes the
-[Loco JSON API sibling](../../case-folder-service-with-rust/spec/index.md).
+[Axum JSON API sibling](../../case-folder-service-with-rust/spec/index.md).
 Single source of truth for spec-driven development of this subproject.
 
 > ⚠️ **Demo software.** Not a regulated medical record. The
@@ -52,5 +52,5 @@ the cache API, UI conventions, theming/locale, and accessibility.
 
 - [Svelte 5 docs](https://svelte.dev/docs) · [SvelteKit 2 docs](https://svelte.dev/docs/kit)
 - [Lily Design System](https://lilydesignsystem.io) · [SVAR Svelte](https://svar.dev/svelte/)
-- [Root specification](../../spec/index.md) · [Loco JSON API sibling](../../case-folder-service-with-rust/spec/index.md)
+- [Root specification](../../spec/index.md) · [Axum JSON API sibling](../../case-folder-service-with-rust/spec/index.md)
 - [UK NHS Number](https://en.wikipedia.org/wiki/NHS_number) · [GOV.UK Design System](https://design-system.service.gov.uk/)

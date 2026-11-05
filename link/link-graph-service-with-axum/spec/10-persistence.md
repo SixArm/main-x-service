@@ -2,7 +2,7 @@
 
 PostgreSQL via SeaORM. The schema source of truth is the hand-written,
 numbered SQL under `migrations/` (`up.sql` / `down.sql` per step),
-bridged into the loco SeaORM `Migrator` (each Rust migration wraps the
+bridged into the axa SeaORM `Migrator` (each Rust migration wraps the
 SQL pair via `include_str!`), consistent with the sibling service crates.
 
 All tables here hold a **derived read-model**; none is a system of
@@ -113,7 +113,7 @@ Inherits the case service's audit posture (§6 FR-19, §12).
 ### 10.5 SeaORM time-type feature
 
 Follow the prevailing family convention at scaffold time. The shared
-stack note ([rust-loco-stack.md](../../../agents/share/rust-loco-stack.md))
+stack note ([rust-axum-stack.md](../../../agents/share/rust-axum-stack.md))
 prescribes `with-chrono` as the loco-service default; this new crate
 SHOULD adopt `with-chrono` from the start rather than inheriting the
 older `with-time` carry-over that the first-converted services are

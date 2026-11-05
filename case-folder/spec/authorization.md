@@ -105,7 +105,7 @@ example policy rules over attributes:
 
 ## 3. Enforcement (where it plugs in)
 
-ABAC layers onto the **existing session guard** ([loco auth](../case-folder-service-with-rust/spec/auth.md)):
+ABAC layers onto the **existing session guard** ([axa auth](../case-folder-service-with-rust/spec/auth.md)):
 
 - The guard already resolves a `Session` identity for `/api/*`. Extend it
   to derive the **action** from the method and the **resource** from the

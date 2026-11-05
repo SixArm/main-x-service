@@ -1,4 +1,4 @@
-//! `patient-flow-service` binary entrypoint — boots the loco.rs CLI,
+//! `patient-flow-service` binary entrypoint — boots the axa CLI,
 //! wiring the `App` hooks and the database migrator. See the crate
 //! library docs for the service overview.
 

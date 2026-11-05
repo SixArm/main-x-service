@@ -16,7 +16,7 @@
 //! When `PLACE_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as an Axum
 //! middleware layer on both router surfaces (`create_router` and the
-//! loco router in `src/app.rs`) — requires a valid bearer token on
+//! axa router in `src/app.rs`) — requires a valid bearer token on
 //! every route except the public allow-list ([`PUBLIC_PATHS`] +
 //! [`PUBLIC_PATH_PREFIXES`]: health, OpenAPI/Swagger docs, Prometheus
 //! metrics). It is **off by default**: unset/blank/`0`/junk ⇒ today's
@@ -72,7 +72,7 @@ pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/im
 
 /// Exact paths that stay public even when blanket enforcement is on:
 /// the health probes (`/api/health` on this crate's surface, plus
-/// loco's default `/_health` / `/_ping`), the raw `OpenAPI` document,
+/// axa's default `/_health` / `/_ping`), the raw `OpenAPI` document,
 /// and the root-mounted Prometheus scrape path (outside `/api`, so a
 /// scraper needs no bearer token). Everything else requires a valid
 /// bearer token when `PLACE_REQUIRE_AUTH` is on.

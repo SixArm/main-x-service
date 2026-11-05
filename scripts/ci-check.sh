@@ -280,7 +280,7 @@ run_stage() {
          CREATE EXTENSION IF NOT EXISTS citext;
          CREATE EXTENSION IF NOT EXISTS unaccent;' || true
       # Crates that carry hand-written SQL migrations need them applied:
-      # unlike the loco-idiomatic services, they do not migrate on boot,
+      # unlike the controller-style services, they do not migrate on boot,
       # so their suite would otherwise run against an empty schema and
       # fail with `relation ... does not exist`. Directory names are
       # timestamp-prefixed, so lexicographic order is apply order.

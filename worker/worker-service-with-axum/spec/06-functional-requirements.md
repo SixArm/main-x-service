@@ -164,7 +164,7 @@ Search parameters: `name`, `family`, `given`,
 `identifier`, `birthdate`, `gender`, `_count`.
 
 **Status:** the FHIR handlers are implemented and **mounted** on the
-loco router — `App::routes` registers `fhir_routes()` alongside the
+axa router — `App::routes` registers `fhir_routes()` alongside the
 REST and metrics route groups, and `create_router` mirrors the same
 `/fhir/Practitioner` surface for the integration-test harness. The mount is
 pinned by `tests/api_integration_test.rs::test_fhir_practitioner_route_is_mounted`

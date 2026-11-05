@@ -1,6 +1,6 @@
 # RESTful API Reference — Case Entity
 
-The service is loco.rs and returns **raw JSON** — no
+The service is axa and returns **raw JSON** — no
 `{success, data, error}` envelope (unlike the pre-loco person service).
 Source:
 [`src/controllers/cases.rs`](../case-service-with-axum/src/controllers/cases.rs).
@@ -8,7 +8,7 @@ Base URL in development: `http://localhost:5150`.
 
 ## Endpoints
 
-### Health (loco built-ins)
+### Health (axa built-ins)
 
 | Method | Path | Description |
 |---|---|---|
@@ -80,7 +80,7 @@ event to the in-memory stream. Durable broker is roadmap.
 | Code | Meaning |
 |---|---|
 | 200 | Success |
-| 400 | Malformed body (loco JSON rejection) or blank search `q` |
+| 400 | Malformed body (axa JSON rejection) or blank search `q` |
 | 401 | Missing / invalid PASETO token on a protected route (`whoami`) |
 | 404 | Unknown or soft-deleted `pid` |
 | 422 | Validation failure: blank `title`, malformed `opened_date`, blank identifier value, blank subject/keyword (family convention) |

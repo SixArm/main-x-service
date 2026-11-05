@@ -189,7 +189,7 @@ See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
 - Rust 1.97+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL 18+
 - No extra CLI tooling required: migrations run through the built-in
-  loco CLI (`cargo loco db migrate`)
+  axa CLI (`cargo run -- db migrate`)
 
 ```bash
 # Clone repository
@@ -201,10 +201,10 @@ createdb person_service
 cp .env.example .env
 # Edit .env and set DATABASE_URL
 
-# Build and run (loco.rs). Migrations run automatically in development
-# (auto_migrate); or run them explicitly with `cargo loco db migrate`.
+# Build and run (axa). Migrations run automatically in development
+# (auto_migrate); or run them explicitly with `cargo run -- db migrate`.
 export DATABASE_URL=postgres://localhost/person_service_development
-cargo loco start            # or: cargo run -- start
+cargo run -- start            # or: cargo run -- start
 ```
 
 ## Podman Deployment
@@ -261,7 +261,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 | **Language**         | Rust 1.97+ 2024 Edition              | Systems programming, performance, safety |
 | **Async Runtime**    | Tokio                                | Asynchronous I/O and concurrency         |
 | **Web Framework**    | Axum                                 | HTTP server and routing                  |
-| **Web Framework**    | Loco                                 | HTTP server and routing                  |
+| **Web Framework**    | axa                                 | HTTP server and routing                  |
 | **Database**         | PostgreSQL 18+                       | Data persistence                         |
 | **ORM**              | SeaORM                               | Async database object-relational mapper  |
 | **Search Engine**    | Tantivy                              | Full-text search indexing                |
@@ -417,7 +417,7 @@ sea-orm-cli migrate status
 
 ### Seed demo data
 
-`cargo loco task seed_examples` loads the repository's shared demo
+`cargo run -- task seed_examples` loads the repository's shared demo
 fixture ([`examples/data/persons.jsonl`](../../examples/data/README.md),
 50 rows including five deliberate duplicate pairs) into the `persons`
 table, for the tutorials. It inserts via the model-layer create
@@ -430,7 +430,7 @@ insert into a non-empty `persons` table (prints a message and exits
 cleanly), so a second run is a no-op:
 
 ```bash
-cargo loco task seed_examples
+cargo run -- task seed_examples
 ```
 
 See the sibling `organization-service`/`case-service` crates for the
@@ -739,13 +739,13 @@ person-service-with-axum/
 │   ├── privacy/            # Data masking, consent checking, GDPR export
 │   ├── bulk/                # Bulk import/export: JSONL/CSV/Parquet codecs, worker, artifact store
 │   ├── compliance/         # SBOM/SOUP, audit-chain verification, checkpoints, erasure, disclosure accounting
-│   ├── tasks/               # loco CLI tasks (`seed_examples`, integrity key/resign)
+│   ├── tasks/               # axa CLI tasks (`seed_examples`, integrity key/resign)
 │   ├── config/              # Configuration management
 │   ├── observability/       # Tracing, Prometheus metrics, OTel resource
 │   ├── relay.rs             # Outbox relay (`LoggingSink` / `FluvioSink`)
 │   ├── metrics.rs           # Prometheus metric inventory
 │   ├── error.rs             # Error types
-│   ├── app.rs               # loco `Hooks` (boot, routes, workers)
+│   ├── app.rs               # axa `Hooks` (boot, routes, workers)
 │   └── lib.rs                # Library root
 ├── migrations/             # Raw SQL, wrapped via include_str! by migration/
 ├── migration/              # Migrator crate root
@@ -820,7 +820,7 @@ Built with excellent Rust crates:
 - [Tokio](https://tokio.rs/) - Async runtime
 - [Axum](https://github.com/tokio-rs/axum) - Web framework
 - [SeaORM](https://www.sea-ql.org/SeaORM/) - Async ORM and query builder
-- [Loco](https://loco.rs/) - Web framework conventions (backend-only)
+- [Loco](https://axa/) - Web framework conventions (backend-only)
 - [OpenTelemetry](https://opentelemetry.io/) - Observability framework
 - [Tantivy](https://github.com/tantivy-search/tantivy) - Search engine
 - [Serde](https://serde.rs/) - Serialization

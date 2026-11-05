@@ -1,4 +1,4 @@
-// Request-level integration tests for the Loco app.
+// Request-level integration tests for the axa app.
 //
 // Each submodule covers one controller. They share the helpers defined
 // below for resetting the in-process stub services so each test starts

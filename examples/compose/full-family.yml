@@ -33,7 +33,7 @@
 # hang observed on this repository's large build context).
 #
 # Host ports (all map to the container's internal port — 8080 for the
-# six person-style crates, 5150 for the five loco-idiomatic registries
+# six person-style crates, 5150 for the five controller-style registries
 # and authentication, 5160 for link-graph):
 #
 #   8081 person        8085 event          8089 case
@@ -403,7 +403,7 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication
-      # SEC-A1 fail-closed: LOCO_ENV=production (baked into the image)
+      # SEC-A1 fail-closed: APP_ENV=production (baked into the image)
       # refuses the crate's dev-seed fallback, so a real seed is
       # required even for this one-shot migrate step. Dev-only
       # placeholder — regenerate for anything beyond a local demo:

@@ -31,28 +31,28 @@ use utoipa_swagger_ui::SwaggerUi;
 /// batch processor is still holding. Set once by [`App::init_logger`].
 static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
-/// The loco application. Owns the boot lifecycle, config, migrations,
+/// The axa application. Owns the boot lifecycle, config, migrations,
 /// and the background queue; the REST surface is merged in via
 /// [`App::after_routes`].
 pub struct App;
 
 impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (repo
-    /// `tasks.md` PRO-H9), returning `true` so loco does **not** also
+    /// `tasks.md` PRO-H9), returning `true` so axa does **not** also
     /// install its own. Ported verbatim from link-graph-service's
-    /// `App::init_logger` — the `Hooks::init_logger` seam is identical
+    /// `App::init_logger` — the `App::init_logger` seam is identical
     /// across both crates' shapes despite the differing router layout
     /// (see `src/observability.rs`'s module docs and `after_routes` below
     /// for where the two crates genuinely diverge).
     ///
-    /// The stack is loco's — its [`EnvFilter`](axa::logger::init_env_filter)
+    /// The stack is axa's — its [`EnvFilter`](axa::logger::init_env_filter)
     /// policy and its formatted layer, so `RUST_LOG`, `logger.level`,
     /// `logger.format` and `logger.override_filter` keep behaving exactly as
     /// they did — **plus** the `tracing-opentelemetry` bridge over an
     /// OTLP/gRPC exporter.
     ///
     /// When OTLP export is off (`OTLP_ENDPOINT=""`) this returns `false` and
-    /// loco's untouched `logger::init` runs, so the disabled path is not a
+    /// axa's untouched `logger::init` runs, so the disabled path is not a
     /// re-implementation that could drift from it.
     ///
     /// # Errors
@@ -67,7 +67,7 @@ impl App {
         }
         let logger_config = &ctx.config.logger;
         // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise loco's module whitelist applies,
+        // the filter outright; otherwise axa's module whitelist applies,
         // and the whitelist has no `opentelemetry*` entry — so a failing
         // export would be silent unless widened.
         let operator_supplied =
@@ -128,7 +128,7 @@ impl App {
         // is set and reachable, env key set otherwise — BEFORE the
         // enforcement middleware and the shared-store state are built,
         // so both router surfaces (the enforcement layer, which
-        // snapshots the verifier here, and the loco handlers' `AuthUser`
+        // snapshots the verifier here, and the axa handlers' `AuthUser`
         // extractor, which reads it from the shared-store `AppState`)
         // verify against the same key set. Fetch failure falls back to
         // the env path — the service always boots.

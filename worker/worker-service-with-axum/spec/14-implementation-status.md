@@ -39,5 +39,5 @@
 | Credential-expiry workflow | T-7 |
 | Role / assignment history | T-8 |
 | Assessment front-end views + FHIR `Observation` projection | T-14 follow-ups (not queued) |
-| FHIR routes mounted on the loco router | T-9 (done 2026-06-13) |
+| FHIR routes mounted on the axa router | T-9 (done 2026-06-13) |
 

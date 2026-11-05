@@ -2,7 +2,7 @@
 
 How the Main X Index family moves from the current **in-memory** event
 streams to a **durable, replayable** event bus, with [Fluvio](https://www.fluvio.io/)
-as the transport (per [rust-loco-stack.md](rust-loco-stack.md)). This is
+as the transport (per [rust-axum-stack.md](rust-axum-stack.md)). This is
 a design document: it fixes the envelope schema, the publisher seam, the
 delivery semantics, and the rollout, so each crate can adopt it without
 re-litigating the shape. It supersedes the "durable event bus" /
@@ -12,7 +12,7 @@ re-litigating the shape. It supersedes the "durable event bus" /
 
 Two implementations exist today, both **process-local and volatile**:
 
-- **loco services** (organization, care-pathway, case) — a `OnceLock`
+- **controller-style services** (organization, care-pathway, case) — a `OnceLock`
   ring buffer in `src/streaming.rs` with free functions `publish(kind,
   pid, name)` / `recent(limit)` and a flat `…Event { kind, pid, name, seq }`
   (cap 1000). `seq` is per-process.
@@ -57,8 +57,8 @@ Shared limitations:
 ## 3. The transactional outbox (core of the design)
 
 The crash window — "DB committed, broker publish not yet sent" — is
-closed with the **transactional outbox** pattern, which fits loco's
-Postgres-backed workers ([loco.md](loco.md)) exactly:
+closed with the **transactional outbox** pattern, which fits axa's
+Postgres-backed workers ([loco.md](axa.md)) exactly:
 
 ```
  ┌── request handler ──────────────────────────────┐
@@ -69,7 +69,7 @@ Postgres-backed workers ([loco.md](loco.md)) exactly:
  └─────────────────────────────────────────────────┘
                      │  (committed atomically)
                      ▼
- ┌── relay worker (loco Postgres-backed worker) ────┐
+ ┌── relay worker (axa Postgres-backed worker) ────┐
  │  poll event_outbox WHERE published_at IS NULL    │
  │     ORDER BY id  FOR UPDATE SKIP LOCKED          │
  │  publish each to Fluvio (topic+partition by pid) │
@@ -142,7 +142,7 @@ Rules:
   per entity; default is full snapshot.
 - **`schema_version`** is bumped on any breaking envelope change;
   consumers switch on it. Additive fields don't bump it.
-- The flat `{kind, pid, name, seq}` the loco `/events/recent` endpoint
+- The flat `{kind, pid, name, seq}` the axa `/events/recent` endpoint
   returns today is a **projection** of this envelope, so the operator API
   is unchanged.
 
@@ -177,8 +177,8 @@ Implementations:
 - **`OutboxPublisher`** — `publish` inserts into `event_outbox` on the
   handler's transaction; `recent` reads the last N outbox rows. This is
   the durable default in deployment.
-- **Relay** — a loco Postgres-backed worker (`queue.kind: Postgres`,
-  [loco.md](loco.md)) that drains `event_outbox` to a **`FluvioSink`**
+- **Relay** — an axa Postgres-backed worker (`queue.kind: Postgres`,
+  [loco.md](axa.md)) that drains `event_outbox` to a **`FluvioSink`**
   (feature `fluvio`). The sink, not the request path, holds the Fluvio
   client, so request latency is unaffected and a Fluvio outage only backs
   up the outbox (it never fails a write).
@@ -224,7 +224,7 @@ don't know the transport.
 
 1. **Land the envelope + trait seam**, with `InMemoryPublisher` wired as
    today. Pure refactor; behaviour identical; tests stay DB-free. (The
-   loco free functions become a thin `InMemoryPublisher`; the legacy
+   axa free functions become a thin `InMemoryPublisher`; the legacy
    `EventProducer` is renamed/adapted to `EventPublisher`.)
 2. **Add `event_outbox`** migration + `OutboxPublisher`; switch handlers
    to write the outbox row on their existing transaction. DB-gated tests

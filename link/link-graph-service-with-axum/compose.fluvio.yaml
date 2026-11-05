@@ -14,7 +14,7 @@
 #     cargo test --features fluvio --test fluvio_consumer -- --ignored
 #   podman compose -f compose.fluvio.yaml down -v
 #
-# Podman, not Docker (agents/share/rust-loco-stack.md). Identical layout
+# Podman, not Docker (agents/share/rust-axum-stack.md). Identical layout
 # to case-service's compose.fluvio.yaml (BUS-1) — copy-adapted, drift
 # accepted, same posture as compose.test.yaml existing per crate.
 services:

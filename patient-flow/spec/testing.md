@@ -7,7 +7,7 @@
   propagation), allocation eligibility (each rule in isolation +
   combinations, override paths), Red2Green day rules, DTOC clock
   edges (grace period, midnight boundary). DB-free.
-- **Request tests** (loco request tests + a Postgres test database):
+- **Request tests** (axa request tests + a Postgres test database):
   every controller happy path + validation `422`s; the admit /
   transfer / discharge flows end-to-end including bed-state side
   effects; concurrency test that two simultaneous placements of one
@@ -35,7 +35,7 @@
 
 - `cargo clippy --all-targets` pedantic-clean, `cargo deny` per repo
   policy; CI mirrors the case-folder quality/security workflows.
-- Seed task (`cargo loco task seed`) creates a demo hospital — 1
+- Seed task (`cargo run -- task seed`) creates a demo hospital — 1
   site, 5 wards (2 inpatient, 1 assessment, 1 escalation, 1 virtual),
   76 beds, ~54 synthetic stays (roughly two-thirds occupancy) — so
   whiteboards demo instantly; synthetic data only

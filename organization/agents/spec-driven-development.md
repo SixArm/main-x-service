@@ -9,7 +9,7 @@ subproject boundary.
 | Document | Source of truth for |
 |---|---|
 | [`../spec/`](../spec/index.md) (this entity's spec) | The **cross-subproject contract**: trio composition, the DTO contract (API body = matcher `Organization` = JSONB payload), wire conventions, shared invariants, entity-wide goals |
-| [service `spec/index.md`](../organization-service-with-axum/spec/index.md) | Service internals: endpoints' implementation, table layout, loco wiring |
+| [service `spec/index.md`](../organization-service-with-axum/spec/index.md) | Service internals: endpoints' implementation, table layout, axa wiring |
 | [matcher `spec/index.md`](../organization-matcher-rust-crate/spec/index.md) | Matcher internals: algorithms, weights, normalisation, public API |
 | [front-end `spec/index.md`](../organization-front-end-with-svelte/spec/index.md) | Front-end internals: routes, form behaviour, client |
 

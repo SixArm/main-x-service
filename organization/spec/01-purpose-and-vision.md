@@ -10,7 +10,7 @@ delivered as a trio of subprojects that compose into one capability:
 
 | Subproject | Role |
 |---|---|
-| [organization-service-with-axum](../organization-service-with-axum/) | Registry service — loco.rs CRUD, name search, matching, audit log, event streaming, OpenAPI/Swagger over REST |
+| [organization-service-with-axum](../organization-service-with-axum/) | Registry service — axa CRUD, name search, matching, audit log, event streaming, OpenAPI/Swagger over REST |
 | [organization-matcher-rust-crate](../organization-matcher-rust-crate/) | Canonical pairwise matching library — deterministic identifier short-circuits + explainable probabilistic scoring, embedded by the service |
 | [organization-front-end-with-svelte](../organization-front-end-with-svelte/) | Operator UI — SvelteKit SPA for CRUD + duplicate-check over the service's REST API |
 

@@ -16,11 +16,11 @@
 > mechanics here as historical.
 
 How the Main X Index family turns on **mandatory** auth for every
-`/api/*` route. This is the family-wide contract; each loco service
+`/api/*` route. This is the family-wide contract; each axa service
 implements the service side identically. It supersedes the per-crate
 "follow-up: blanket enforcement" notes in the service specs §13.
 
-Applies to every entity service. The loco-idiomatic services embed
+Applies to every entity service. The controller-style services embed
 [`authentication-verifier`](../../authentication/authentication-verifier-rust-crate)
 via `src/auth.rs`: **organization**, **care-pathway**, **case**,
 **portfolio**. The six older api/rest-architecture services
@@ -29,7 +29,7 @@ verifier in `src/api/rest/auth.rs` (opt-in `AuthUser` extractor + `whoami`,
 env-driven `<ENTITY>_PASETO_KEYS` / `_TOKEN_ISSUER` / `_TOKEN_AUDIENCE`)
 and, as of 2026-07-04, carry the same default-off blanket middleware
 (`<ENTITY>_REQUIRE_AUTH`, flag read at router construction — restart to
-change), layered on both their Axum and loco router surfaces. Remaining
+change), layered on both their Axum and axa router surfaces. Remaining
 per-crate §13 item: attribute-based access control (ABAC) per
 [authorization-attributes.md](authorization-attributes.md). Boot-time
 HTTP key fetch landed
@@ -55,7 +55,7 @@ an operations decision (set the env var once the SSO token flow is live).
 Default-off also keeps the existing DB-gated request tests green: they
 don't send tokens, so they must keep working until a deployment opts in.
 
-## Service side (loco)
+## Service side (axa)
 
 ### Config
 
@@ -106,7 +106,7 @@ pub fn enforce(
 ```
 
 Wire it as an `axum::middleware::from_fn` layer in the app's
-`after_routes` hook (loco gives you the Axum `Router` there). Add the
+`after_routes` hook (axa gives you the Axum `Router` there). Add the
 layer **unconditionally** — the middleware reads `require_auth()` per
 request and is a near-noop when disabled, so wiring stays static and the
 flag is the only switch:

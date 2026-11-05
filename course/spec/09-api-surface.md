@@ -11,7 +11,7 @@ entity-level orientation: [`agents/restful.md`](../agents/restful.md).
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/health` | Health check (plus loco `/_health`, `/_ping`) |
+| GET | `/api/health` | Health check (plus axa `/_health`, `/_ping`) |
 | POST | `/api/courses` | Create; `409` + `MatchResult[]` on duplicate; `422` on validation |
 | GET | `/api/courses/{id}` | Get one course (includes nested `instances`) |
 | PUT | `/api/courses/{id}` | Replace (excludes `instances`) |

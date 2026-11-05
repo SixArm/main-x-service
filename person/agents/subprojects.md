@@ -7,7 +7,7 @@ person-identity registry with explainable matching and an operator UI.
 
 | Subproject | Kind | Responsibility | Spec shape |
 |---|---|---|---|
-| [person-service-with-axum](../person-service-with-axum/) | Rust service (loco.rs / Axum, SeaORM + PostgreSQL, Tantivy) | System of record: CRUD, search, matching, dedup, merge, audit, privacy, REST + FHIR | [spec/](../person-service-with-axum/spec/index.md) §1–§18 |
+| [person-service-with-axum](../person-service-with-axum/) | Rust service (axa / Axum, SeaORM + PostgreSQL, Tantivy) | System of record: CRUD, search, matching, dedup, merge, audit, privacy, REST + FHIR | [spec/](../person-service-with-axum/spec/index.md) §1–§18 |
 | [person-matcher-rust-crate](../person-matcher-rust-crate/) | Rust library (dependency-light, pure, no IO) | Canonical pairwise matching: deterministic + probabilistic, 42 national-identifier schemes, normalisation | [spec/](../person-matcher-rust-crate/spec/index.md) §1–§25 |
 | [person-front-end-with-svelte](../person-front-end-with-svelte/) | SvelteKit 2 SPA (Svelte 5 runes, SVAR DataGrid, Lily Headless) | Operator UI over the service's REST API | [spec/](../person-front-end-with-svelte/spec/index.md) §1–§18 |
 

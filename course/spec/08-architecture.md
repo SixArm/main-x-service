@@ -14,10 +14,10 @@
 +------------------------------+-------------------------------+
                                | HTTP JSON  /api/*  (:8084)
 +------------------------------v-------------------------------+
-|  course-service-with-axum              (loco.rs 0.16 / Axum) |
+|  course-service-with-axum              (axa / Axum) |
 |  +----------------+ +-----------------+ +------------------+  |
 |  | REST controllers| | Validation     | | Privacy / masking|  |
-|  | (idiomatic loco)| | FR-21..FR-28   | | + GDPR export    |  |
+|  | (idiomatic axa)| | FR-21..FR-28   | | + GDPR export    |  |
 |  +----------------+ +-----------------+ +------------------+  |
 |  +----------------+ +-----------------+ +------------------+  |
 |  | Repositories   | | SearchEngine    | | Audit + events   |  |
@@ -39,11 +39,11 @@ Dependency direction is strictly one-way: **front-end → service →
 matcher**. The matcher depends on nothing in the entity; the
 front-end knows only the REST wire format.
 
-### 8.2 Idiomatic loco controllers (reference implementation)
+### 8.2 Idiomatic axa controllers (reference implementation)
 
-The service boots through loco.rs (CLI, `AppContext`, config from
+The service boots through axa (CLI, `AppContext`, config from
 `config/*.yaml`, migrations, background queue). `src/app.rs`
-implements `Hooks`: REST handlers register as **native loco
+implements `Hooks`: REST handlers register as **native axa
 controllers** in `App::routes` (`AppRoutes::with_default_routes()
 .add_route(courses_routes())`, prefixed `/api`), and the boot-time
 singletons (`SearchEngine`, `CourseMatcher`, domain `Config`,
@@ -53,7 +53,7 @@ Swagger UI + CORS are layered on top there.
 
 This crate is the **family reference** for the idiomatic-loco
 controller conversion — when converting a sibling service, copy this
-shape. See [`agents/share/loco.md`](../../agents/share/loco.md).
+shape. See [`agents/share/axa.md`](../../agents/share/axa.md).
 
 ### 8.3 SSO integration (roadmap)
 

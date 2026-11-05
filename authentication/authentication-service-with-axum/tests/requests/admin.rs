@@ -1,7 +1,7 @@
 //! Request tests for the admin ABAC attribute-assignment surface
 //! (`/api/auth/admin/users/{pid}/attributes`, spec §13).
 //!
-//! The DB-backed flow tests boot the loco app and need the PostgreSQL
+//! The DB-backed flow tests boot the axa app and need the PostgreSQL
 //! instance from `config/test.yaml`; they are `#[ignore]`d so a checkout
 //! without Postgres keeps `cargo test` green. Run them with:
 //!

@@ -3,13 +3,13 @@
 //! The transactional-outbox hand-off buffer for the durable event bus
 //! (Phase 2; `agents/share/event-bus.md` §3). As with the other
 //! migrations, the DDL lives in the sibling `up.sql` / `down.sql` files
-//! and is `include_str!`-embedded; this Rust shim only lets loco's
+//! and is `include_str!`-embedded; this Rust shim only lets axa's
 //! `Migrator` run it.
 
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;
 
-/// Zero-sized migration marker registered with the loco `Migrator`.
+/// Zero-sized migration marker registered with the axa `Migrator`.
 pub struct Migration;
 
 impl MigrationName for Migration {

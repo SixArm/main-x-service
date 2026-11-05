@@ -1,7 +1,7 @@
 //! `sea-orm-migration` schema migrations for `case-service`.
 //!
 //! The [`Migrator`] runs the ordered list below at boot (or via
-//! `cargo loco db migrate`): the `cases` table (the registry), then the
+//! `cargo axa db migrate`): the `cases` table (the registry), then the
 //! `audit_logs` and `merge_records` side tables. Case data is personal
 //! data, so the audit trail these create is the who/what/when record over
 //! every change.
@@ -26,7 +26,7 @@ mod m20260727_000011_integrity_mac;
 mod m20260803_000012_review_queue;
 mod m20260803_000013_bulk_jobs;
 
-/// The crate's migrator: drives the ordered migration set for the loco
+/// The crate's migrator: drives the ordered migration set for the axa
 /// CLI / boot-time migration.
 pub struct Migrator;
 

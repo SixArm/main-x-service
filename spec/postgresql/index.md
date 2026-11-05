@@ -17,11 +17,11 @@ follow the conventions below.
   18 is canonical — treat those as drift.)
 - Access is always via **SeaORM 2.0** over `sqlx-postgres`
   (`runtime-tokio-rustls`); no service issues hand-rolled libpq calls. The
-  loco services additionally lean on loco.rs 1.0 (`with-db`, `worker`).
+  controller-style services additionally lean on axa (`with-db`, `worker`).
 - SeaORM date/uuid/json features in use: `with-uuid`, `with-json`, and
   `with-time` or `with-chrono` depending on the crate (the authentication
   service uses chrono; the constraint in
-  [`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md) prefers
+  [`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md) prefers
   `with-chrono`/`with-time` for new work).
 
 ## 2. One database per service
@@ -35,7 +35,7 @@ prior RS256 JWT model is decommissioned), not the database.
   (`person_service_development`, `organization_service_test`, …);
   `case_folder_<env>` for the case-folder app. Production names come from
   `DATABASE_URL`.
-- **Roles (dev defaults).** loco services default to `loco`/`loco`;
+- **Roles (dev defaults).** controller-style services default to `loco`/`loco`;
   case-folder to `postgres`/`postgres`; the older Axum services to peer
   auth as `$USER` (`postgres://localhost/<db>`). All overridable via
   `DATABASE_URL`.
@@ -45,7 +45,7 @@ prior RS256 JWT model is decommissioned), not the database.
 
 ## 3. Connection & pool configuration
 
-The loco services configure the connection in `config/*.yaml` under
+The controller-style services configure the connection in `config/*.yaml` under
 `database:`:
 
 | Key | Dev default | Notes |
@@ -86,7 +86,7 @@ Fully normalized SQL per [data-modeling.md](../data-modeling.md):
   committed `schema.sql` snapshot. An `add_indexes_and_triggers` migration
   adds the secondary indexes and `updated_at` triggers.
 
-### 4.2 Document-in-a-column (the loco services: organization, care-pathway, case; and authentication for its own tables)
+### 4.2 Document-in-a-column (the controller-style services: organization, care-pathway, case; and authentication for its own tables)
 
 - The matcher/DTO type is stored **verbatim as a JSONB `data` column**, with
   a denormalized scalar (`name` or `title`) lifted out for listing and
@@ -97,7 +97,7 @@ Fully normalized SQL per [data-modeling.md](../data-modeling.md):
   goal for these services (matching reads the payload into the matcher).
 - Side tables are normal columns: `audit_logs`, `merge_records`, and (for
   authentication) `users`, `sessions`, `auth_events`, `auth_rate_limits`.
-- Migrations use **`sea-orm-migration`** (loco's `create_table` helper),
+- Migrations use **`sea-orm-migration`** (axa's `create_table` helper),
   named `m20220101_0000NN_<name>`, registered in a `migration/` subcrate —
   except the **authentication** service, which embeds the migrator in-crate
   under `src/migration/`.
@@ -127,7 +127,7 @@ opaque snapshots** — audit `old_values`/`new_values`, merge
 `transferred`/`snapshot`, review-queue `score_breakdown` — not for
 structured domain data, which uses columns and child tables.
 
-The one sanctioned exception is the loco services' entity `data` column
+The one sanctioned exception is the controller-style services' entity `data` column
 (§4.2): the payload *is* the opaque matcher DTO, stored whole on purpose.
 
 ## 7. Identifiers, soft delete, audit
@@ -143,7 +143,7 @@ The one sanctioned exception is the loco services' entity `data` column
 
 ## 8. Search (ILIKE today, Tantivy planned)
 
-- The loco services do **case-insensitive substring search** on the
+- The controller-style services do **case-insensitive substring search** on the
   denormalized scalar: `Expr::col(Name).ilike("%{q}%")` over active rows,
   capped at 50, blank `q` → `400`.
 - User input is wildcard-escaped (`escape_like` escapes `%`, `_`, `\`) so it
@@ -170,14 +170,14 @@ The one sanctioned exception is the loco services' entity `data` column
 
 ## 10. Background jobs
 
-Background jobs are **Postgres-backed** (the loco `worker` feature,
-`queue.kind: Postgres`), sharing the app database — loco creates its own
+Background jobs are **Postgres-backed** (the axa `worker` feature,
+`queue.kind: Postgres`), sharing the app database — axa creates its own
 queue tables there. Config lives under `queue:` in `config/*.yaml`. See
-[`agents/share/loco.md`](../../agents/share/loco.md).
+[`agents/share/axa.md`](../../agents/share/axa.md).
 
 ## 11. Migrations workflow
 
-- **loco services:** `sea-orm-migration`; `cargo loco db migrate` /
+- **controller-style services:** `sea-orm-migration`; `cargo run -- db migrate` /
   `auto_migrate` on boot in dev. Each migration has `up` + `down`; new
   tables register in `migration/mod.rs` (or `src/migration/mod.rs` for
   authentication) at the `inject-above` marker.

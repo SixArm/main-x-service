@@ -18,7 +18,7 @@ path to meet them at population scale is roadmap (§15), not delivered.
 | NFR-9 | Privacy by default | Sensitive workforce fields (SSN, tax ID, DEA, home address) masked on demand; matcher library MUST never log or persist worker data (pure, no-IO) |
 | NFR-10 | Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus exposition at `/metrics.prom` ([`agents/share/observability.md`](../../agents/share/observability.md)) |
 | NFR-11 | Auditability | 100 % of mutations audited with user context; audit log append-only via soft-delete-only policy (§12) |
-| NFR-12 | Background jobs | Loco `BackgroundQueue` backed by PostgreSQL (`bg_pg`) — no external broker |
+| NFR-12 | Background jobs | axa `BackgroundQueue` backed by PostgreSQL (`bg_pg`) — no external broker |
 | NFR-13 | Supply-chain hygiene | Matcher crate stays dependency-light, no `unsafe`, clippy-clean; service pins the matcher by SemVer (`worker-matcher = "0.6.1"`) |
 | NFR-14 | Front-end quality | TypeScript strict + `noUncheckedIndexedAccess`; page shells must render even when the API is down (degraded-mode banner) |
 

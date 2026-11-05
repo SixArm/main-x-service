@@ -13,7 +13,7 @@ Entity-level summary. Normative contract: entity spec
 
 ## Service REST API
 
-loco.rs, dev port `5150`. Responses are **raw loco JSON — no
+axa, dev port `5150`. Responses are **raw axa JSON — no
 `{success, data, error}` envelope** (deliberate divergence from the
 sibling entity services; the front-end client is correspondingly
 leaner).
@@ -53,7 +53,7 @@ name→`"deleted user"`); see entity spec [§12](../spec/12-compliance.md).
 | Code | Meaning |
 |---|---|
 | 200 | Success (including anti-enumeration "success") |
-| 400 | Bad request (loco standard) |
+| 400 | Bad request (axa standard) |
 | 401 | Invalid/expired magic link, invalid/missing session or PASETO, revoked session, erased account, or missing credential on a gated route |
 
 OpenAPI 3 + Swagger UI at `/api-docs/openapi.json` + `/swagger-ui`
@@ -107,4 +107,4 @@ BFF client/repository specifics.
 | `TOKEN_AUDIENCE` | `main-x-service` | `aud` claim |
 | `TOKEN_EXPIRATION` | `300` | PASETO TTL (seconds) |
 | `FRONTEND_URL` | `http://localhost:5173` | Magic-link base |
-| `DATABASE_URL` | loco config default | PostgreSQL |
+| `DATABASE_URL` | axa config default | PostgreSQL |

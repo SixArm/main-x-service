@@ -1,4 +1,4 @@
-//! Background workers (loco `BackgroundWorker`).
+//! Background workers (axa `BackgroundWorker`).
 
 /// FHIR Bulk Data `$export` worker: materialises a queued job to the
 /// artifact store (`spec/compliance` §12.3).

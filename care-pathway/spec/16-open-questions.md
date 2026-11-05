@@ -6,11 +6,11 @@ spec §16.
 
 - ~~**OQ-1 — Validation status code.**~~ **Resolved 2026-06-13
   (T-2): `422` is normative**, matching the family convention
-  (person/place services) and the service crate spec §6. loco 0.16
+  (person/place services) and the service crate spec §6. axa
   has no `unprocessable_entity` helper, so the controller returns
   `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)` from a
   shared `validate()` used by create and update. `400` remains for
-  malformed bodies (loco JSON rejection). See §9.1 and §13 T-2.
+  malformed bodies (axa JSON rejection). See §9.1 and §13 T-2.
 - **OQ-2 — Duplicate-check scale strategy.** `check-duplicates`
   scans at most 1 000 stored rows in memory. At national volumes:
   search-based blocking (Tantivy), JSONB GIN pre-filtering on

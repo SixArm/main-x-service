@@ -29,16 +29,16 @@ use utoipa_swagger_ui::SwaggerUi;
 /// batch processor is still holding. Set once by [`App::init_logger`].
 static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
-/// The loco application. Owns the boot lifecycle, config, migrations,
+/// The axa application. Owns the boot lifecycle, config, migrations,
 /// and the background queue; the REST surface is merged in via
 /// [`App::after_routes`].
 pub struct App;
 
 impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (repo
-    /// `tasks.md` PRO-H12), returning `true` so loco does **not** also
+    /// `tasks.md` PRO-H12), returning `true` so axa does **not** also
     /// install its own. Ported from person-service's `App::init_logger`
-    /// (itself ported from link-graph-service's) — the `Hooks::init_logger`
+    /// (itself ported from link-graph-service's) — the `App::init_logger`
     /// seam is identical across crates' shapes despite the differing router
     /// layout (see `src/observability.rs`'s module docs and `after_routes`
     /// below for where this crate's shape actually diverges).
@@ -55,7 +55,7 @@ impl App {
         }
         let logger_config = &ctx.config.logger;
         // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise loco's module whitelist applies,
+        // the filter outright; otherwise axa's module whitelist applies,
         // and the whitelist has no `opentelemetry*` entry — so a failing
         // export would be silent unless widened.
         let operator_supplied =
@@ -92,7 +92,7 @@ impl App {
         }
     }
 
-    /// Register the application's controller routes: loco's default routes
+    /// Register the application's controller routes: axa's default routes
     /// plus this service's `places_routes()` (the `/api` surface) and the
     /// root-level `metrics_routes()` (`/metrics.prom` scrape path).
     #[must_use]
@@ -104,7 +104,7 @@ impl App {
     }
 
     /// Post-routing hook: construct boot-time singletons and merge the
-    /// hand-written Axum surface onto loco's router.
+    /// hand-written Axum surface onto axa's router.
     ///
     /// Builds the domain `Config` from the environment, opens the Tantivy
     /// `SearchEngine`, constructs the `PlaceMatcher`, and stuffs the resulting
@@ -125,7 +125,7 @@ impl App {
     ///
     /// # Errors
     ///
-    /// Returns a loco error if config loading or search-index creation fails
+    /// Returns an axa error if config loading or search-index creation fails
     /// (mapped from the domain `Error` via its string form).
     pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         let config = Config::from_env().map_err(|e| axa::Error::string(&e.to_string()))?;

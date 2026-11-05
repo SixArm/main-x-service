@@ -1,7 +1,7 @@
 //! Authentication service — the Main X Index federation's central
 //! single sign-on provider.
 //!
-//! A loco.rs application that authenticates users via passwordless email
+//! An axa application that authenticates users via passwordless email
 //! magic links and issues short-lived PASETO v4.public (Ed25519) access
 //! tokens. Every other service verifies those tokens offline against the
 //! public key set published at `/.well-known/paseto-keys` (see the
@@ -14,12 +14,12 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-/// Loco `Hooks` boot: route registration, workers, seeding, truncation.
+/// axa `Hooks` boot: route registration, workers, seeding, truncation.
 pub mod app;
 /// Access-token `Claims` + the `AuthUser` extractor; with the default-on `paseto`
 /// feature also PASETO v4.public issuance, verification and key-set publication.
 pub mod auth;
-/// Loco HTTP controllers (magic-link auth + paseto-keys endpoint).
+/// axa HTTP controllers (magic-link auth + paseto-keys endpoint).
 /// Compliance controls: keyed integrity over the auth-event trail.
 pub mod compliance;
 pub mod controllers;
@@ -28,19 +28,19 @@ pub mod cookie;
 /// CSRF synchroniser-token helpers (generation, constant-time compare,
 /// and the `__Host-mxi_csrf` non-httpOnly delivery cookie).
 pub mod csrf;
-/// Static data loaders (loco `data/` convention).
+/// Static data loaders (axa `data/` convention).
 pub mod data;
 /// Password hashing and random strings.
 pub mod hash;
 /// Localised user-facing copy (magic-link email subject + bodies).
 pub mod i18n;
-/// Loco app initializers.
+/// axa app initializers.
 pub mod initializers;
 /// Mailers (magic-link / welcome emails).
 pub mod mailers;
 /// Prometheus metrics registry + `/metrics.prom` rendering.
 pub mod metrics;
-/// Database migrations (`SeaORM` / loco migrator).
+/// Database migrations (`SeaORM` / axa migrator).
 pub mod migration;
 /// Domain models and generated `SeaORM` entities.
 pub mod models;

@@ -6,11 +6,11 @@
 [advisories]
 version = 2
 yanked = "warn"
-# Transitive advisories carried by the shared Rust/Loco dependency tree
-# (mostly via loco-rs -> opendal / sqlx / async deps). They are not
-# fixable at the service/library level without an upstream loco-rs bump,
+# Transitive advisories carried by the shared Rust/axa dependency tree
+# (mostly via axa -> opendal / sqlx / async deps). They are not
+# fixable at the service/library level without an upstream axa bump,
 # so they are accepted here WITH this note and revisited on the next
-# loco-rs upgrade. Matcher / library crates with small trees do not pull
+# axa upgrade. Matcher / library crates with small trees do not pull
 # these (an unused ignore is a harmless warning). Real, actionable
 # advisories NOT on this list still fail the build.
 ignore = [
@@ -18,7 +18,7 @@ ignore = [
     "RUSTSEC-2024-0384", # instant (unmaintained), transitive
     "RUSTSEC-2024-0436", # paste (unmaintained), transitive
     "RUSTSEC-2024-0437", # protobuf recursion, transitive
-    "RUSTSEC-2024-0449", # unsafe-libyaml (unmaintained, no patch), transitive via loco-rs -> serde_yaml
+    "RUSTSEC-2024-0449", # unsafe-libyaml (unmaintained, no patch), transitive via axa -> serde_yaml
     "RUSTSEC-2025-0052", # transitive advisory (loco tree)
     "RUSTSEC-2026-0173", # transitive advisory (loco tree)
     "RUSTSEC-2026-0190", # transitive advisory (loco tree)
@@ -30,7 +30,7 @@ ignore = [
 
 [licenses]
 version = 2
-# Permissive licenses used across the Rust / Loco stack. A dependency
+# Permissive licenses used across the Rust / axa stack. A dependency
 # whose license is not listed FAILS the check — a deliberate signal to
 # review a new license, not to silently accept it.
 allow = [

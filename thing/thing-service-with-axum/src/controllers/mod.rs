@@ -1,7 +1,7 @@
-//! Loco-idiomatic controllers.
+//! axa-idiomatic controllers.
 //!
 //! Route groups mounted via `App::routes` (`add_route`) that extract
-//! [`crate::api::rest::AppState`] from the loco `AppContext` shared store.
+//! [`crate::api::rest::AppState`] from the axa `AppContext` shared store.
 //! Today this hosts the HL7 FHIR R5 surface; the native REST API lives in
 //! [`crate::api::rest`].
 

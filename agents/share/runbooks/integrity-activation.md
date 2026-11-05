@@ -156,16 +156,16 @@ environment variables.
 
 ```sh
 # 32 bytes from the OS CSPRNG, hex on stdout and nowhere else
-cargo loco task integrity_key
+cargo run -- task integrity_key
 
 # straight into a secret mount, created mode 0600, refuses to clobber
-cargo loco task integrity_key op:generate out:/run/secrets/mac.key
+cargo run -- task integrity_key op:generate out:/run/secrets/mac.key
 
 # check a candidate before deploying it
-cargo loco task integrity_key op:check key:<hex>
+cargo run -- task integrity_key op:check key:<hex>
 
 # what this process actually loaded (never the key itself)
-cargo loco task integrity_key op:status
+cargo run -- task integrity_key op:status
 ```
 
 Prefer `<E>_INTEGRITY_MAC_KEY_FILE` pointing at a mounted secret over
@@ -199,11 +199,11 @@ away: existing rows still name it. Step 5 is what closes that.
 
 ```sh
 # what would change — writes nothing
-cargo loco task integrity_resign
+cargo run -- task integrity_resign
 
 # do it
-cargo loco task integrity_resign op:apply
-cargo loco task integrity_resign op:apply target:records limit:5000
+cargo run -- task integrity_resign op:apply
+cargo run -- task integrity_resign op:apply target:records limit:5000
 ```
 
 Both the old and new keys must be loaded (the old one in

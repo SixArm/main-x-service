@@ -1,4 +1,4 @@
-//! `cargo loco task seed` — create a synthetic demo hospital so the
+//! `cargo axa task seed` — create a synthetic demo hospital so the
 //! whiteboards demo instantly. **Synthetic data only** (spec
 //! `regulatory.md`): person/worker URNs are random UUIDs, names are
 //! obviously fictional.

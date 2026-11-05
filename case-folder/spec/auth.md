@@ -1,7 +1,7 @@
 # Authentication — email magic link
 
 > Part of the [Case Tracking specification](index.md). Edition detail:
-> [loco auth](../case-folder-service-with-rust/spec/auth.md),
+> [axa auth](../case-folder-service-with-rust/spec/auth.md),
 > [svelte auth](../case-folder-front-end-with-svelte/spec/auth.md).
 
 Authentication is **passwordless email magic link**. The **sign-in
@@ -98,7 +98,7 @@ local clicking work without reading logs.
   and server-to-server tests).
 - Because the cookie is HttpOnly + `SameSite=Lax`, the browser and API
   must be **same-origin**. In dev the SvelteKit server proxies `/api` to
-  the Loco API so the cookie is first-party; in production they sit
+  the axa API so the cookie is first-party; in production they sit
   behind one ingress. This nudges the project toward the same-origin
   production gate it already wanted.
 

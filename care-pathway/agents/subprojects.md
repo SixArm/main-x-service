@@ -6,7 +6,7 @@ care-pathway registry with explainable duplicate matching.
 | Subproject | Kind | Responsibility |
 |---|---|---|
 | [care-pathway-matcher-rust-crate](../care-pathway-matcher-rust-crate/) | Rust library (edition 2024, dependency-light) | Pairwise `CarePathway` comparison: deterministic short-circuits + weighted probabilistic scoring with per-component breakdown. Owns the canonical `CarePathway` domain type. |
-| [care-pathway-service-with-axum](../care-pathway-service-with-axum/) | loco.rs 0.16 service (Axum 0.8, SeaORM 1.1, PostgreSQL) | Registry: CRUD with soft delete + `/match` + `/check-duplicates`. Stores the matcher type verbatim as JSONB. |
+| [care-pathway-service-with-axum](../care-pathway-service-with-axum/) | axa service (Axum 0.8, SeaORM 1.1, PostgreSQL) | Registry: CRUD with soft delete + `/match` + `/check-duplicates`. Stores the matcher type verbatim as JSONB. |
 | [care-pathway-front-end-with-svelte](../care-pathway-front-end-with-svelte/) | SvelteKit 2 SPA (Svelte 5 runes, TS strict, dependency-light — no data grid) | Operator UI: list / create / detail / edit / delete / check-duplicates over the service REST API. |
 
 ## Dependency direction
@@ -32,7 +32,7 @@ cargo run                    # demo binary (not SemVer surface)
 # Service — needs PostgreSQL; port 5150
 cd care-pathway-service-with-axum
 export DATABASE_URL=postgres://loco:loco@localhost:5432/care_pathway_service_development
-cargo loco start             # migrations auto-run in development
+cargo run -- start             # migrations auto-run in development
 cargo test --test matching   # DB-free tests
 
 # Front-end — needs the service running

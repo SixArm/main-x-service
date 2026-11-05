@@ -120,7 +120,7 @@ pub enum Error {
 }
 
 /// Flattens our typed [`Error`] into a `axa::Error::Message` so
-/// controllers can `?`-propagate it into Loco's error type.
+/// controllers can `?`-propagate it into axa's error type.
 impl From<Error> for axa::Error {
     fn from(value: Error) -> Self {
         axa::Error::Message(value.to_string())

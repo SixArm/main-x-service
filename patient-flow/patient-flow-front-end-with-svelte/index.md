@@ -2,7 +2,7 @@
 
 Patient Flow — Svelte edition. The ward-whiteboard and
 flow-operations client for the
-[Loco JSON API sibling](../patient-flow-service-with-rust/).
+[Axum JSON API sibling](../patient-flow-service-with-rust/).
 
 ## Start here
 

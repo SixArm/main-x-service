@@ -14,7 +14,7 @@
 +------------------------------+-------------------------------+
                                |  REST (JSON envelope)
 +------------------------------v-------------------------------+
-|  thing-service-with-axum            loco.rs 0.16 / Axum 0.8  |
+|  thing-service-with-axum            axa / Axum 0.8  |
 |  +----------------+ +----------------+ +-------------------+  |
 |  | REST handlers  | | Validation +   | | Privacy + masking |  |
 |  | 15 endpoints   | | normalisation  | | + GDPR export     |  |

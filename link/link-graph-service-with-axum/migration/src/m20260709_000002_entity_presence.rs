@@ -1,6 +1,6 @@
 //! Migration: create the `entity_presence` existence-oracle table
 //! (spec §10.2). SQL is the source of truth; this wrapper bridges it
-//! into the loco `Migrator`.
+//! into the axa `Migrator`.
 
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;

@@ -1,6 +1,6 @@
 //! Migration: create the `consumer_offsets` table — per-topic bus
 //! position + the freshness watermark backing `as_of` (spec §10.3).
-//! SQL is the source of truth; this wrapper bridges it into the loco
+//! SQL is the source of truth; this wrapper bridges it into the axa
 //! `Migrator`.
 
 use sea_orm_migration::prelude::*;

@@ -2,7 +2,7 @@
 //! the duplicate review queue it (and the bulk-import pipeline) feed
 //! (spec `13-tasks.md` CP-T1).
 //!
-//! These boot the real loco app against the `test` environment config,
+//! These boot the real axa app against the `test` environment config,
 //! so they require a reachable PostgreSQL instance and are `#[ignore]`d
 //! (family convention; run with `cargo test -- --ignored`).
 

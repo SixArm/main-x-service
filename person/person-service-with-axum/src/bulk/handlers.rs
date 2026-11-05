@@ -11,8 +11,8 @@
 //!
 //! Submits are async: a handler stores the input (import), inserts a
 //! `queued` `bulk_jobs` row, enqueues the [`BulkJobWorker`], and returns
-//! `202 Accepted` with the job id. These routes live on the loco router
-//! (`persons_routes`), so they can extract the loco `AppContext` to
+//! `202 Accepted` with the job id. These routes live on the axa router
+//! (`persons_routes`), so they can extract the axa `AppContext` to
 //! enqueue the job. Mutating routes are gated by the blanket auth guard;
 //! `import` is a declared destructive POST (`auth::DESTRUCTIVE_POST_SUFFIXES`).
 

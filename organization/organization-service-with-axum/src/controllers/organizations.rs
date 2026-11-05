@@ -82,7 +82,7 @@ struct ScoredRef {
 /// Validate an incoming `Organization` payload.
 ///
 /// Family convention: validation failures are `422 Unprocessable
-/// Entity` (loco's `bad_request` is reserved for malformed requests).
+/// Entity` (axa's `bad_request` is reserved for malformed requests).
 /// Delegates to [`crate::validation::problems`], which collects the blank
 /// `name` rule, the non-blank `identifiers[i].value` rule, and the SEC-M1
 /// input-size caps, and joins every problem into one response so the
@@ -104,7 +104,7 @@ fn validate(org: &Organization) -> Result<()> {
 }
 
 /// Map model-layer errors to HTTP errors: an unknown `pid` is `404
-/// Not Found` (loco's default mapping for `ModelError::EntityNotFound`
+/// Not Found` (axa's default mapping for `ModelError::EntityNotFound`
 /// is a 500, which would break the spec'd `404` contract).
 fn http_err(err: ModelError) -> Error {
     match err {

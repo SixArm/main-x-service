@@ -1121,7 +1121,7 @@ pub const VERIFY_DEFAULT_LIMIT: u64 = 200;
 /// Record verification assembles each row through the repository — one
 /// query per row — so an unbounded limit is a denial-of-service on a
 /// large table (the SEC-M1 bound-every-input invariant). The cap is
-/// lower than the sibling loco services' because their rows are a single
+/// lower than the sibling axa services' because their rows are a single
 /// JSONB read and these are not.
 pub const VERIFY_MAX_LIMIT: u64 = 1000;
 

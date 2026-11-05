@@ -25,8 +25,8 @@ Shared reference docs live at the project root under
 |----------|-------------|
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
-| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Full Rust + Loco dependency stack |
-| [loco.md](../../agents/share/loco.md) | Tech stack summary |
+| [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Full Rust + axa dependency stack |
+| [loco.md](../../agents/share/axa.md) | Tech stack summary |
 | [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](../../agents/share/match.md) | Matching algorithms |
 | [search.md](../../agents/share/search.md) | Search (Tantivy) |
@@ -87,7 +87,7 @@ from link-graph-service, the family's first working exporter). It
 `// TODO: Initialize OTLP exporter`, spread across `mod.rs` +
 `metrics.rs` + `traces.rs`, and never wired into `App`'s `Hooks` impl
 at all — `init_telemetry`/`shutdown_telemetry` had no caller) rather
-than filling the stub in place. `App::init_logger` installs it (loco's
+than filling the stub in place. `App::init_logger` installs it (axa's
 own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
 bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it.
 Export is **on by default** — set `OTLP_ENDPOINT=""` to disable it —
@@ -104,7 +104,7 @@ siblings use.
 needed the same two adaptations, confirmed rather than assumed:
 
 - **Two router-construction surfaces**, not link-graph-service's one:
-  the loco-native one (`api::rest::events_routes()` +
+  the controller-style one (`api::rest::events_routes()` +
   `controllers::fhir::routes()`, mounted via `App::routes`/
   `App::after_routes`) and a standalone hand-rolled one
   (`api::rest::create_router`, used by the DB-gated integration tests
@@ -113,7 +113,7 @@ needed the same two adaptations, confirmed rather than assumed:
   `src/controllers/` route-registration surface beyond person's two —
   verified directly rather than assumed, and it does **not** add a
   third: `controllers::fhir` contributes routes to *both* of the
-  existing two surfaces (a loco `routes()` registered in `App::routes`,
+  existing two surfaces (an axa `routes()` registered in `App::routes`,
   and an `axum_router` merged inside `create_router`) rather than
   booting its own router. `observability::trace_mw` is layered as the
   outermost middleware on both surfaces, exactly as person's is.
@@ -233,9 +233,9 @@ Postgres, and `GET /api/health` returns `200`. Like person's, this
 crate's Dockerfile pre-dated the family's repo-root-context convention
 and had the same four bugs, found only by running the built image:
 no `config/` copy (boot crash: "no configuration file found in folder:
-config"); `CMD` with no `start` subcommand (the loco CLI just prints
-`--help` and exits 0); no `LOCO_ENV` (would boot in `development`
-inside a `production` image); and a dead `SERVER_PORT` env var — loco's
+config"); `CMD` with no `start` subcommand (the axa CLI just prints
+`--help` and exits 0); no `APP_ENV` (would boot in `development`
+inside a `production` image); and a dead `SERVER_PORT` env var — axa's
 own config reads `PORT`, not `SERVER_PORT` (the latter is a separate,
 unrelated surface this crate's own `src/config/mod.rs` documents for
 non-loco code paths). All four fixed; `PORT=8080` is now set

@@ -54,7 +54,7 @@ roadmap), and the only relational projections are `pid` and `name`.
 
 ### 10.3 Operations
 
-- `auto_migrate` is on in development (`cargo loco start` migrates).
+- `auto_migrate` is on in development (`cargo run -- start` migrates).
 - Soft delete is application-level (`deleted_at`); all queries filter
   `deleted_at IS NULL`.
 - Open question OQ-3: normalise condition codes / interventions into
@@ -71,7 +71,7 @@ import/export job (`kind`, `format`, `status`, `params`, the
 `rows_total`/`rows_created`/`rows_upserted`/`rows_to_review`/`rows_errored`
 counts, `actor`, artifact URLs, and `expires_at` TTL), with
 `UNIQUE (entity, kind, idempotency_key)` so a retried submit maps to the
-same job. Jobs run on the loco `bg_pg` worker; artifacts (uploaded source,
+same job. Jobs run on the axa `bg_pg` worker; artifacts (uploaded source,
 export output, error report) live in the config-driven artifact store
 (`src/bulk/store.rs`), selected by `CARE_PATHWAY_BULK_ARTIFACT_BACKEND`:
 `local` (the default — `file://` references confined to

@@ -124,4 +124,4 @@ Emerging AI tools:
 - Shared docs: [`agents/share/index.md`](../../agents/share/index.md);
   sibling entity-level spec exemplar:
   [person/spec](../../person/spec/index.md).
-- loco.rs: [loco.rs](https://loco.rs/) — the service framework.
+- axa: [axa](https://axa/) — the service framework.

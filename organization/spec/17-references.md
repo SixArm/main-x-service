@@ -45,7 +45,7 @@
   [`locales.md`](../../agents/share/locales.md),
   [`compliance-for-technology.md`](../../agents/share/compliance-for-technology.md),
   [`postgresql.md`](../../agents/share/postgresql.md),
-  [`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md).
+  [`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md).
 
 ### External
 
@@ -55,6 +55,6 @@
   D&B DUNS, [GS1 GLN](https://www.gs1.org/standards/id-keys/gln),
   [ROR](https://ror.org/), [ISNI](https://isni.org/),
   [Wikidata](https://www.wikidata.org/), ISO 6523, EU VAT.
-- [loco.rs](https://loco.rs/) — the service framework.
+- [axa](https://axa/) — the service framework.
 - [SvelteKit](https://kit.svelte.dev/) + Svelte 5 runes — the
   front-end stack.

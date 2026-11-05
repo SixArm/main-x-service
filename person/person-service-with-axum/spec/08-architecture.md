@@ -5,7 +5,7 @@
 ```
 src/
 ├── bin/main.rs              # binary entry: cli::main::<App, Migrator>()
-├── app.rs                   # loco App Hooks (routes, after_routes, queue)
+├── app.rs                   # axa App Hooks (routes, after_routes, queue)
 ├── api/
 │   ├── mod.rs               # ApiResponse, ApiError
 │   ├── rest/                # REST API (Axum) — 15 endpoints, mounted at /api
@@ -26,16 +26,16 @@ src/
 └── lib.rs
 ```
 
-The crate boots through **loco.rs**. The binary target is
+The crate boots through **axa**. The binary target is
 `src/bin/main.rs`, whose `main()` calls
-`loco_rs::cli::main::<App, Migrator>()` — loco parses the subcommands
+`axa::cli::main::<App, Migrator>()` — axa parses the subcommands
 (`start`, `db migrate`, `task`, …) and dispatches against the crate's
 `App` hooks (`src/app.rs`) and the migration crate's `Migrator`. There
 is no hand-rolled `Config::from_env → AppState → serve` path.
 
-`App` (in `src/app.rs`) implements loco's `Hooks`:
+`App` (in `src/app.rs`) implements axa's `Hooks`:
 
-- `routes()` registers the loco `Routes` — `persons_routes()` (the `/api`
+- `routes()` registers the axa `Routes` — `persons_routes()` (the `/api`
   surface) and `metrics_routes()` (root `/metrics.prom`).
 - `after_routes()` builds the boot-time singletons (domain `Config` via
   `Config::from_env`, the Tantivy `SearchEngine`, the
@@ -43,8 +43,8 @@ is no hand-rolled `Config::from_env → AppState → serve` path.
   server** (`crate::api::grpc::serve`, T-6) as a background task with a
   cloned `AppState` — a bind/serve failure is logged, not fatal, so the
   REST surface still boots even if `grpc_port` is unavailable — inserts
-  the original `AppState` into loco's `shared_store`, and merges the
-  Swagger UI plus a permissive CORS layer onto loco's Axum router.
+  the original `AppState` into axa's `shared_store`, and merges the
+  Swagger UI plus a permissive CORS layer onto axa's Axum router.
 
 `proto/person.proto` (crate root, alongside `Cargo.toml`) and `build.rs`
 are the gRPC codegen inputs: `build.rs` compiles the `.proto` via
@@ -53,7 +53,7 @@ into this crate; 2026-09-07) into `$OUT_DIR`, included by
 `tonic::include_proto!` in `src/api/grpc/mod.rs`'s `proto` submodule —
 the generated code is never checked in.
 
-Migrations run via the loco CLI (`cargo loco db migrate`) and are
+Migrations run via the axa CLI (`cargo run -- db migrate`) and are
 **auto-run in development** (`auto_migrate`, per
 [`README.md`](../README.md) / `config/development.yaml`); production
 applies them explicitly. The hand-written `create_router` /

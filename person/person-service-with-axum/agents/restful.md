@@ -120,11 +120,11 @@ fetch is one-shot (no refresh loop; restart to pick up a rotation).
 value (`1`/`true`/`yes`/`on`, case-insensitive; anything else,
 including unset/blank/junk, means **off** — the default) makes every
 route require a valid PASETO bearer token, except the public
-allow-list: `/api/health`, loco's `/_health` / `/_ping`,
+allow-list: `/api/health`, axa's `/_health` / `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom`.
 Unauthorised requests get `401`. The middleware
 (`auth::require_auth_middleware`) is layered unconditionally on both
-router surfaces (`create_router` and the loco `after_routes` hook);
+router surfaces (`create_router` and the axa `after_routes` hook);
 the flag is read once at router construction, so changing it requires
 a restart. Family contract: `agents/share/jwt-enforcement.md`.
 
@@ -221,7 +221,7 @@ so an operator sees the per-component evidence (identifier / name / DOB
 
 Person is the family's **reference entity** for
 [bulk-import-export.md](../../../agents/share/bulk-import-export.md);
-mutating routes are async loco `worker` jobs. `import` is a declared
+mutating routes are async axa `worker` jobs. `import` is a declared
 destructive POST.
 
 | Method | Path | Description |
@@ -336,5 +336,5 @@ Error responses:
 - `src/api/fhir/search_parameters.rs` — FHIR search parameter support
 - `src/api/grpc/mod.rs` — gRPC server (stub)
 - `src/bulk/handlers.rs` — Bulk import/export REST handlers
-- `src/bulk/worker.rs` — `BulkJobWorker` (loco `worker` job)
+- `src/bulk/worker.rs` — `BulkJobWorker` (axa `worker` job)
 - `src/compliance/` — SBOM/SOUP identification, audit-chain verification, checkpoints, record-integrity verification

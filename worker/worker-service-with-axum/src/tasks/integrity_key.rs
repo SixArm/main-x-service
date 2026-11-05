@@ -12,17 +12,17 @@
 //!
 //! ```text
 //! # generate a fresh 32-byte key (hex on stdout, nothing else)
-//! cargo loco task integrity_key
-//! cargo loco task integrity_key op:generate
+//! cargo axa task integrity_key
+//! cargo axa task integrity_key op:generate
 //!
 //! # write it straight to a file for a secret mount, mode 0600
-//! cargo loco task integrity_key op:generate out:/run/secrets/mac.key
+//! cargo axa task integrity_key op:generate out:/run/secrets/mac.key
 //!
 //! # check a candidate key without deploying it
-//! cargo loco task integrity_key op:check key:9f86d081884c7d65…
+//! cargo axa task integrity_key op:check key:9f86d081884c7d65…
 //!
 //! # report what this process currently has loaded (never the key itself)
-//! cargo loco task integrity_key op:status
+//! cargo axa task integrity_key op:status
 //! ```
 //!
 //! ## Why the key is printed and never logged
@@ -59,7 +59,7 @@ pub enum KeyCommand {
     Status,
 }
 
-/// Parse the `key:value` argument style loco tasks use.
+/// Parse the `key:value` argument style axa tasks use.
 ///
 /// Defaults to [`KeyCommand::Generate`] with no output path, because
 /// generating is the overwhelmingly common reason to reach for this.

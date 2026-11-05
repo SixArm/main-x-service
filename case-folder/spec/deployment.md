@@ -6,7 +6,7 @@
 > [regulatory.md](regulatory.md).
 
 The demo runs the [Svelte client](../case-folder-front-end-with-svelte/spec/index.md)
-and the [Loco API](../case-folder-service-with-rust/spec/index.md) as two processes,
+and the [axa API](../case-folder-service-with-rust/spec/index.md) as two processes,
 stitched together in dev by a Vite proxy ([auth.md](auth.md)). Production needs
 a single, hardened, same-origin deployment.
 
@@ -15,8 +15,8 @@ a single, hardened, same-origin deployment.
 ```
             ┌──────────────── ingress (TLS, HSTS, CSP, rate-limit) ───────────────┐
   client ──►│  /            → SvelteKit (adapter-node, SSR on)                     │
-            │  /api/*       → Loco JSON API (:5150, plain HTTP, internal only)     │
-            │  /healthz     → Loco                                                 │
+            │  /api/*       → Axum JSON API (:5150, plain HTTP, internal only)     │
+            │  /healthz     → axa                                                 │
             └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -29,7 +29,7 @@ a single, hardened, same-origin deployment.
   (CSR-only was a deliberate dev simplification — see
   [svelte stack](../case-folder-front-end-with-svelte/spec/stack.md).)
 - **TLS terminates at the ingress** (nginx / Azure App Service / AWS ALB);
-  Loco keeps serving plain HTTP internally ([loco regulatory](../case-folder-service-with-rust/spec/regulatory.md)).
+  axa keeps serving plain HTTP internally ([axa regulatory](../case-folder-service-with-rust/spec/regulatory.md)).
   Set **HSTS**.
 
 ## Hardening checklist (production gates)
@@ -51,7 +51,7 @@ view of them.
 - [ ] **HTTPS + HSTS** at the ingress; redirect HTTP→HTTPS.
 - [ ] **Rate-limiting / WAF** in front of `/api/*` and the auth endpoints.
 - [ ] **Observability**: the OpenTelemetry/Prometheus wiring
-      ([loco stack](../case-folder-service-with-rust/spec/stack.md)) exported to the
+      ([axa stack](../case-folder-service-with-rust/spec/stack.md)) exported to the
       trust's monitoring; alert on auth failures and upstream `503`s.
 
 ## Build/release outline

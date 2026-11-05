@@ -10,7 +10,7 @@
 //! `metrics_path: /metrics.prom`.
 //!
 //! Like [`crate::auth::verifier`], the registry is a process-wide
-//! [`OnceLock`] built on first access — there is no loco state to thread
+//! [`OnceLock`] built on first access — there is no axa state to thread
 //! through, so controllers reach the metrics directly.
 //!
 //! # Metric inventory

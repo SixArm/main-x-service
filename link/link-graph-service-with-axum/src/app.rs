@@ -1,8 +1,8 @@
-//! loco.rs application wiring: the [`App`] `Hooks` implementation that
+//! axa application wiring: the [`App`] `Hooks` implementation that
 //! registers routes and the truncate lifecycle for `link-graph-service`.
 //!
 //! Read-only to the world: the graph read controllers, `OpenAPI`/Swagger,
-//! and Prometheus metrics are mounted (plus loco's default `/_health` /
+//! and Prometheus metrics are mounted (plus axa's default `/_health` /
 //! `/_ping`); `after_routes` adds the blanket read guard and spawns the
 //! periodic reconciliation worker when a source is configured. The live
 //! **Fluvio bus consumer** is the remaining v1-deferred piece (spec §13).
@@ -63,21 +63,21 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
 /// batch processor is still holding. Set once by [`App::init_logger`].
 static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
-/// The loco.rs application hooks for `link-graph-service`.
+/// The axa application hooks for `link-graph-service`.
 pub struct App;
 
 impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (spec §13
-    /// T-22), returning `true` so loco does **not** also install its own.
+    /// T-22), returning `true` so axa does **not** also install its own.
     ///
-    /// The stack is loco's — its [`EnvFilter`](axa::logger::init_env_filter)
+    /// The stack is axa's — its [`EnvFilter`](axa::logger::init_env_filter)
     /// policy and its formatted layer, so `RUST_LOG`, `logger.level`,
     /// `logger.format` and `logger.override_filter` keep behaving exactly as
     /// they did — **plus** the `tracing-opentelemetry` bridge over an
     /// OTLP/gRPC exporter.
     ///
     /// When OTLP export is off (`OTLP_ENDPOINT=""`) this returns `false` and
-    /// loco's untouched `logger::init` runs, so the disabled path is not a
+    /// axa's untouched `logger::init` runs, so the disabled path is not a
     /// re-implementation that could drift from it.
     ///
     /// # Errors
@@ -92,7 +92,7 @@ impl App {
         }
         let logger_config = &ctx.config.logger;
         // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise loco's module whitelist applies,
+        // the filter outright; otherwise axa's module whitelist applies,
         // and the whitelist has no `opentelemetry*` entry — so a failing
         // export would be silent (observed, not assumed) unless widened.
         let operator_supplied =
@@ -129,7 +129,7 @@ impl App {
         }
     }
 
-    /// Assemble the route table: loco's default routes (`/_health`,
+    /// Assemble the route table: axa's default routes (`/_health`,
     /// `/_ping`, …) plus the read-only graph controller (spec §9).
     #[must_use]
     pub fn routes(_ctx: &AppContext) -> AppRoutes {
@@ -148,7 +148,7 @@ impl App {
     ///
     /// # Errors
     ///
-    /// Infallible here; the signature is loco's.
+    /// Infallible here; the signature is axa's.
     pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the verifier from the published key set before serving, then
         // keep it current: this aggregator previously had no boot fetch at
@@ -205,7 +205,7 @@ impl App {
         // tasks-inject (do not remove)
     }
 
-    /// Truncate all read-model tables for the loco test harness. These
+    /// Truncate all read-model tables for the axa test harness. These
     /// tables have no cross-table FKs, so order is unconstrained.
     ///
     /// # Errors

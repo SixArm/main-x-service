@@ -46,7 +46,7 @@ pub mod index;
 
 pub use index::{CaseIndex, CaseIndexSchema, IndexStats};
 
-/// Result alias for the search layer (loco's error type, so handlers can
+/// Result alias for the search layer (axa's error type, so handlers can
 /// propagate with `?`).
 pub type Result<T> = std::result::Result<T, Error>;
 

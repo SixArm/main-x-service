@@ -4,7 +4,7 @@
 //!
 //! The DB-free unit tests in `src/auth.rs` pin the pure `enforce` /
 //! policy-evaluation matrix. What they cannot show is that the
-//! middleware is actually *wired* onto the router loco builds, and that
+//! middleware is actually *wired* onto the router axa builds, and that
 //! a real request with (or without) a valid PASETO gets the right
 //! status. Activation is the moment this service stops being open, so it
 //! deserves a test that fails if the wiring is ever lost.

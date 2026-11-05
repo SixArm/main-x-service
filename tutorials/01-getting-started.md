@@ -17,7 +17,7 @@ default — see [TUT-3](#whats-next) below) and the other nine services (see
 
 | Tool | Why | Tested with |
 |---|---|---|
-| [Podman](https://podman.io/) (not Docker — see [`agents/share/rust-loco-stack.md`](../agents/share/rust-loco-stack.md)) | builds and runs the service + its Postgres | 6.0.2, with `podman machine` running |
+| [Podman](https://podman.io/) (not Docker — see [`agents/share/rust-axum-stack.md`](../agents/share/rust-axum-stack.md)) | builds and runs the service + its Postgres | 6.0.2, with `podman machine` running |
 | A `podman compose` provider | `podman compose` shells out to one; Homebrew's `docker-compose` on macOS | `docker-compose` 5.3.1 (prints a one-line notice on every invocation — expected) |
 | [Node.js](https://nodejs.org/) 20+ and [pnpm](https://pnpm.io/) | runs the front-end dev server | Node v26.5.1, pnpm 11.0.8 |
 | `curl` | verifies the backend directly | whatever your OS ships |

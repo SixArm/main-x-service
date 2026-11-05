@@ -1,7 +1,7 @@
 # NHS Number rules
 
 > Part of the [Case Tracking specification](index.md). Both editions
-> implement the **identical** algorithm: the Loco edition in
+> implement the **identical** algorithm: the Axum edition in
 > [`src/nhs.rs`](../case-folder-service-with-rust/src/nhs.rs), the Svelte
 > edition in [`src/lib/store/nhs.ts`](../case-folder-front-end-with-svelte/src/lib/store/nhs.ts).
 > The API is authoritative; the client validates only for fast UX.

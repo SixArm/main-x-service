@@ -358,7 +358,7 @@ attribute values, so it is safe for 403 bodies and audit trails.
 - [x] **KC-1: `keycloak` feature + `paseto` as a feature (2026-09-29).**
       `paseto` (default on) gates `rusty_paseto`/`Verifier`; `keycloak`
       (off) adds `keycloak::KeycloakVerifier` on `axum-keycloak-auth`
-      (not `loco-keycloak-auth`, which is typed against loco 0.15).
+      (not `loco-keycloak-auth`, which is typed against axa).
       Tests: `keycloak` unit tests plus `tests/keycloak_e2e.rs`
       (real RS256 JWTs against a local OIDC discovery + JWKS server).
       Not published: the crate is still consumed in-tree by `path`.
@@ -552,7 +552,7 @@ attribute values, so it is safe for 403 bodies and audit trails.
       implementations for how much is genuinely copy-identical
       boilerplate (parse `Authorization: Bearer …`, call
       `Verifier::verify`, map `VerifyError` → `401`) versus
-      crate-specific (loco `AppContext` vs `axum::extract::State`,
+      crate-specific (axa `AppContext` vs `axum::extract::State`,
       differing error bodies), then either (a) ship an optional `axum`
       Cargo feature on this crate providing a generic
       `BearerClaims<V: AsRef<Verifier>>` extractor peers can adopt on

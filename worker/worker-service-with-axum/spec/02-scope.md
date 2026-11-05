@@ -20,7 +20,7 @@
 - REST API (Axum) + FHIR R5 `Practitioner` resource
   (`/fhir/Practitioner` + `/fhir/metadata`; the standard mapping per
   `agents/share/fhir.md` §3, superseding the early non-standard
-  `Worker` resourceType; handlers implemented and mounted on the loco
+  `Worker` resourceType; handlers implemented and mounted on the axa
   router via `fhir_routes()` — §13 T-9 done) + gRPC
   (Create/Get/List/Delete Worker — §13 T-6 done).
 - PostgreSQL persistence via SeaORM.

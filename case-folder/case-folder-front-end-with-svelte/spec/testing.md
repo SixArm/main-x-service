@@ -53,7 +53,7 @@ Layout: `playwright.config.ts` + `tests/e2e/**/*.spec.ts`. Tests run in
 a single worker against Chromium; Playwright boots the Svelte dev server
 itself (`webServer` config).
 
-**Prerequisite**: the Loco JSON API must be running on `:5150`. The
+**Prerequisite**: the Axum JSON API must be running on `:5150`. The
 easiest path is **stub mode** (no upstream Main-X-Services needed):
 
 ```bash
@@ -90,7 +90,7 @@ Suites (14 spec files, 73 `test()` cases):
 Helpers in `tests/e2e/helpers/`:
 
 - `nhs.ts` — Modulus-11-valid NHS Number generator + seed-data constants.
-- `seed.ts` — names of records the Loco seed task creates.
+- `seed.ts` — names of records the axa seed task creates.
 - `unique.ts` — unique-name generator so multiple runs don't collide.
 - `forms.ts` — `fieldControl(page, labelText)` because Lily's `Field`
   component doesn't wire its `<label for>` to the child input.
@@ -104,7 +104,7 @@ npm run test:e2e:headed         # headed Chromium
 ## Dev, build, deploy
 
 ```bash
-# In another terminal: start the Loco API (see ../case-folder-service-with-rust/README.md)
+# In another terminal: start the axa API (see ../case-folder-service-with-rust/README.md)
 cd ../case-folder-service-with-rust && cargo run -- task seed && cargo run -- start
 
 # Front-end
@@ -130,5 +130,5 @@ npm run preview
 
 The default adapter is `@sveltejs/adapter-auto`. For self-hosted NHS
 trust deployment, swap to `@sveltejs/adapter-node` and put the SvelteKit
-server + the Loco API behind one ingress (same origin = fewer security
+server + the axa API behind one ingress (same origin = fewer security
 questions).

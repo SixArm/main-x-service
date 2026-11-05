@@ -18,7 +18,7 @@ disagree, §13 wins.**
 
 ### 14.1 What is implemented
 
-- **Scaffold** — loco.rs crate (`Cargo.toml`, `src/lib.rs` +
+- **Scaffold** — axa crate (`Cargo.toml`, `src/lib.rs` +
   `src/bin/main.rs` with the family lint header, `src/app.rs` `Hooks`,
   `config/{development,test,production}.yaml`, the `migration/` bridge
   crate). Read-only to the world; no write controllers of its own
@@ -52,7 +52,7 @@ disagree, §13 wins.**
   (bounded BFS, `kind`/`direction`/`depth≤2`), `GET /api/edges`
   (from/to/kind/status), `GET /api/single-view/{ref}`,
   `GET /api/health/freshness`. `400` on malformed ref / unknown kind /
-  over-cap depth. Loco `/_health` + `/_ping` retained.
+  over-cap depth. axa `/_health` + `/_ping` retained.
 - **Real Fluvio bus consumer** (T-6, BUS-2, `src/consumer.rs`, done
   2026-08-03) — one task per entity topic, behind this crate's own
   `fluvio` Cargo feature. Off with no `LINK_GRAPH_FLUVIO_ENDPOINT`
@@ -80,8 +80,8 @@ disagree, §13 wins.**
   2026-08-05) — **the first working exporter anywhere in this family**;
   the other services either carry a commented-out stub (person, worker,
   event) or nothing. Traces and metrics over OTLP/**gRPC**, bridged from
-  `tracing` and installed through loco 1.0's `Hooks::init_logger` seam so
-  loco's own `EnvFilter` policy and log format are reused rather than
+  `tracing` and installed through axa's `App::init_logger` seam so
+  axa's own `EnvFilter` policy and log format are reused rather than
   re-derived; flushed from `on_shutdown`; `trace_mw` adds a per-request
   span, an `http.server.request.duration` histogram, and the W3C
   `traceparent` response header. On by default (`OTLP_ENDPOINT`,

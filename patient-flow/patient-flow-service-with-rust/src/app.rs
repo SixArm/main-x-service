@@ -1,4 +1,4 @@
-//! loco.rs application wiring: the [`App`] `Hooks` implementation that
+//! axa application wiring: the [`App`] `Hooks` implementation that
 //! registers routes, the blanket auth guard, the API-version
 //! middleware, and the truncate lifecycle for `patient-flow-service`.
 
@@ -39,7 +39,7 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
     }
 }
 
-/// The loco.rs application hooks for `patient-flow-service`.
+/// The axa application hooks for `patient-flow-service`.
 pub struct App;
 impl App {
     /// The service's route table.

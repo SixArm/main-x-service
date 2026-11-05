@@ -1,6 +1,6 @@
 # Documentation index
 
-Patient Flow — Loco edition. JSON-only back-end API for hospital
+Patient Flow — Axum edition. JSON-only back-end API for hospital
 patient flow: beds, stays, whiteboards, capacity.
 
 ## Start here

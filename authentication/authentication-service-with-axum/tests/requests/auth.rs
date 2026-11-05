@@ -7,7 +7,7 @@
 //! - `POST /api/auth/signout`           — revoke session (bearer)
 //! - `GET  /.well-known/jwks.json`      — public keys
 //!
-//! The HTTP tests boot the loco app and therefore need the PostgreSQL
+//! The HTTP tests boot the axa app and therefore need the PostgreSQL
 //! instance from `config/test.yaml` (DATABASE_URL overridable). They
 //! are `#[ignore]`d so a checkout without Postgres keeps `cargo test`
 //! green; run them with:
@@ -488,7 +488,7 @@ async fn paseto_keys_endpoint_publishes_the_signing_key() {
         // that no longer exists. The published set is now Ed25519 keys
         // at `/.well-known/paseto-keys`, which is what peers fetch to
         // verify offline.
-        // Assert on the *body*, not the status: loco's default middleware
+        // Assert on the *body*, not the status: axa's default middleware
         // stack includes a fallback that answers every unmatched route
         // with 200, so a status check here would pass whether or not the
         // route existed. What must be true is that nothing serves a key
@@ -832,7 +832,7 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
 /// handler body.
 ///
 /// The task text that opened this called for a "DB-free" version of
-/// this test; this crate's `request()` harness boots the full loco
+/// this test; this crate's `request()` harness boots the full axa
 /// `App` (a real Postgres connection), so — as every other request
 /// test in this file already does — it needs one. There is no DB-free
 /// way to exercise a real HTTP round trip through the mounted

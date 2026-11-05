@@ -14,7 +14,7 @@ internals.
   link tracking and JSON snapshots.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
 - Event publishing on every CRUD / merge / link.
-- REST API (loco.rs / Axum) + OpenAPI / Swagger; gRPC stub.
+- REST API (axa / Axum) + OpenAPI / Swagger; gRPC stub.
 - PostgreSQL persistence via SeaORM.
 
 **thing-matcher-rust-crate** (canonical algorithm) owns:

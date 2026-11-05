@@ -1,4 +1,4 @@
-//! The loco `BackgroundWorker` that drains `bulk_jobs`
+//! The axa `BackgroundWorker` that drains `bulk_jobs`
 //! (`agents/share/bulk-import-export.md` §3).
 //!
 //! The worker is a thin adapter: it loads the job row, marks it
@@ -21,9 +21,9 @@ use crate::bulk::{BulkFormat, BulkKind, JobStatus, MaskingProfile, error_report}
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::bulk_jobs;
 
-/// The loco background worker that runs one bulk job.
+/// The axa background worker that runs one bulk job.
 pub struct BulkJobWorker {
-    /// The shared loco application context (database, queue, config).
+    /// The shared axa application context (database, queue, config).
     pub ctx: AppContext,
 }
 

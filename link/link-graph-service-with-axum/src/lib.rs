@@ -2,7 +2,7 @@
 //! entity linking (the §4.3 read side of
 //! `agents/share/cross-service-linking.md`).
 //!
-//! A loco.rs backend service that consumes every entity's event stream
+//! An axa backend service that consumes every entity's event stream
 //! (plus the `linked` / `unlinked` events) and serves one queryable
 //! cross-service graph (`neighbors` / `edges` / `single-view` /
 //! freshness). It is **read-only to the world**: all its writes are
@@ -25,7 +25,7 @@
 //!   comparator (LNK-4 / T-29; pure, DB-free, never consumes edges).
 //! - [`observability`] — structured logging + real `OpenTelemetry` OTLP
 //!   export of traces and metrics (T-22).
-//! - [`app`] — loco `Hooks` wiring.
+//! - [`app`] — axa `Hooks` wiring.
 //!
 //! See `spec/index.md` for the living specification.
 //!

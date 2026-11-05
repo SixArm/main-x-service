@@ -19,7 +19,7 @@ not exist yet live in §15, not here.
 | REST + OpenAPI/Swagger + Prometheus `/metrics.prom` | ✅ |
 | FHIR R5 Practitioner | ⚠️ partial — no capability statement / bundles; path discrepancy (§13 T-1) |
 | gRPC | ❌ stub |
-| AuthN/AuthZ | ❌ none — `loco-rs` `auth_jwt` feature compiled in, not enforced (service §13 T-1) |
+| AuthN/AuthZ | ❌ none — `axa` `auth_jwt` feature compiled in, not enforced (service §13 T-1) |
 | Tests | 99 unit + 7 integration + 13 bridge + 3 bench suites |
 
 Detail: [service §14](../worker-service-with-axum/spec/14-implementation-status.md).

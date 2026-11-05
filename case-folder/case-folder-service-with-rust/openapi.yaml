@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Case Tracking API (Loco edition)
+  title: Case Tracking API (Axum edition)
   version: 0.1.0
   description: >
     JSON API for tracking the physical location of paper case-note folders

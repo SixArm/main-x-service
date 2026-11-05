@@ -16,7 +16,7 @@ Entity-level summary. Normative strategy: entity spec
 ```bash
 cargo test --lib        # DB-free unit tests (the src/auth module)
 cargo clippy --bins
-cargo test              # full loco request tests — needs PostgreSQL
+cargo test              # full axa request tests — needs PostgreSQL
 ```
 
 | Layer | Where | Covers |

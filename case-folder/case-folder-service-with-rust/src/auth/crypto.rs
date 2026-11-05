@@ -15,7 +15,7 @@
 //!   `Cargo.toml` feature list has no finer split), reintroducing
 //!   RUSTSEC-2023-0071 (the Marvin timing attack) — the exact crate
 //!   this family removed from the dependency graph on 2026-08-21
-//!   (`agents/share/security.md` §7) by dropping loco's `auth`
+//!   (`agents/share/security.md` §7) by dropping axa's `auth`
 //!   feature. Enabling it here would undo that for a crate whose own
 //!   `Cargo.toml` comment cites the same reasoning.
 //! - `aws_lc_rs` avoids `rsa`, but pulls in a C/asm crypto library

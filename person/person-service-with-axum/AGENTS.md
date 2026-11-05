@@ -25,8 +25,8 @@ Shared reference docs live at the project root under
 |----------|-------------|
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
-| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Full Rust + Loco dependency stack |
-| [loco.md](../../agents/share/loco.md) | Tech stack summary |
+| [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Full Rust + axa dependency stack |
+| [loco.md](../../agents/share/axa.md) | Tech stack summary |
 | [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](../../agents/share/match.md) | Matching algorithms |
 | [search.md](../../agents/share/search.md) | Search (Tantivy) |
@@ -63,16 +63,16 @@ human or agent to open on demand rather than always pull into context):
 @../../agents/share/observability.md
 @../../agents/share/privacy.md
 @../../agents/share/restful.md
-@../../agents/share/loco.md
+@../../agents/share/axa.md
 
 ## Running this crate
 
 ```bash
 # REST API (FHIR R5 mounted within it) + a real gRPC server on
-# GRPC_PORT (default 50051, T-6) — boots via the loco CLI, which needs
+# GRPC_PORT (default 50051, T-6) — boots via the axa CLI, which needs
 # a subcommand. Bare `cargo run` will not start it.
-cargo run -- start                              # or: cargo loco start
-cargo loco db migrate                           # apply migrations (auto in dev)
+cargo run -- start                              # or: cargo run -- start
+cargo run -- db migrate                           # apply migrations (auto in dev)
 
 # Tests
 cargo test --lib                                # unit
@@ -108,7 +108,7 @@ family's first working exporter and this crate's reference. It
 `tracing` subscriber with the OTLP exporter commented out behind
 `// TODO: Initialize OTLP exporter`, never wired into `App`'s `Hooks`
 impl at all) rather than filling the stub in place. `App::init_logger`
-installs it (loco's own `EnvFilter` + formatted layer, plus the
+installs it (axa's own `EnvFilter` + formatted layer, plus the
 `tracing-opentelemetry` bridge over an OTLP/gRPC exporter);
 `App::on_shutdown` flushes it. Export is **on by default** — set
 `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
@@ -120,12 +120,12 @@ the per-service `PERSON_*` convention `PERSON_REQUIRE_AUTH` and its
 siblings use.
 
 **Where this crate's shape forced real adaptation**, beyond the
-`Hooks::init_logger`/`on_shutdown` seam (which ported close to
+`App::init_logger`/`on_shutdown` seam (which ported close to
 verbatim): this crate carries **two** router-construction surfaces —
-the loco-native one (`api::rest::persons_routes()`, mounted via
+the controller-style one (`api::rest::persons_routes()`, mounted via
 `App::routes`/`App::after_routes`) and a standalone hand-rolled one
 (`api::rest::create_router`, used only by the DB-gated integration
-tests) — where link-graph-service has exactly one (pure loco). The
+tests) — where link-graph-service has exactly one (pure axa). The
 `observability::trace_mw` tower middleware (per-request span +
 `http.server.request.duration` histogram + W3C `traceparent` response
 header) is layered onto **both**, as the outermost layer in each, so
@@ -245,17 +245,17 @@ real bugs beyond the build-context mismatch, found only by actually
 running the built image rather than trusting that a `podman build`
 success meant the container worked:
 
-1. It never copied `config/` — the loco binary crashed at boot with
+1. It never copied `config/` — the axa binary crashed at boot with
    `Message("no configuration file found in folder: config")`.
 2. Its `CMD` was `["/app/person-service"]` with no subcommand — this
-   crate's binary dispatches through `loco_rs::cli::main`
+   crate's binary dispatches through `axa::cli::main`
    (`src/bin/main.rs`), which needs an explicit `start` argument; a
    bare invocation just prints the CLI's own `--help` and exits 0
    (a "successful" container that serves nothing).
-3. No `LOCO_ENV` was set, so the binary would have booted in loco's
+3. No `APP_ENV` was set, so the binary would have booted in axa's
    default `development` environment inside a `production`-tagged
    image.
-4. `ENV SERVER_PORT=8080` is dead: loco's own `config/production.yaml`
+4. `ENV SERVER_PORT=8080` is dead: axa's own `config/production.yaml`
    reads `PORT` (`server.port: {{ get_env(name="PORT", default="8080") }}`),
    not `SERVER_PORT` — the `SERVER_PORT` this crate's own
    `src/config/mod.rs` documents is a separate, unrelated config

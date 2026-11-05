@@ -14,7 +14,7 @@
 #     cargo test --features fluvio -- --ignored fluvio_relay
 #   podman compose -f compose.fluvio.yaml down -v
 #
-# Podman, not Docker (agents/share/rust-loco-stack.md). Three services —
+# Podman, not Docker (agents/share/rust-axum-stack.md). Three services —
 # a Stream Controller (sc), a one-shot SPU-registration step (sc-setup),
 # and a Stream Processing Unit (spu) — mirroring Fluvio's own documented
 # Docker Compose layout (fluvio.io/docs/fluvio/installation/docker/),

@@ -9,22 +9,22 @@
  patient-flow-front-end-with-svelte  (SvelteKit BFF)
         │  Authorization: Bearer v4.public.…  (short-lived PASETO)
         ▼
- patient-flow-service-with-rust  (Loco: Axum + SeaORM + PostgreSQL)
+ patient-flow-service-with-rust  (axa: Axum + SeaORM + PostgreSQL)
         │  EntityRef lookups (read-only, cached, stub-able)
         ▼
  person / worker / place / organization / authentication services
 ```
 
-## Service edition (loco-style)
+## Service edition (controller-style)
 
-Follows the family's **loco-idiomatic** layout
+Follows the family's **controller-style** layout
 ([architecture.md](../../agents/share/architecture.md)) — the shape
 organization/care-pathway/case/portfolio use — because Patient Flow
 is new code with no legacy surface:
 
 ```
 src/
-├── app.rs                 loco Hooks (routes, boot, workers)
+├── app.rs                 `App` functions (routes, boot, workers)
 ├── controllers/           wards, bays, beds, stays, bed_requests,
 │                          whiteboard, at_a_glance, locate, capacity,
 │                          audits, docs, metrics
@@ -72,5 +72,5 @@ per [auth.md](auth.md). Touchscreen mode is a CSS/layout concern
 
 PostgreSQL 18, SeaORM migrations, connection pooling, health
 endpoints, stateless horizontal scaling (whiteboard reads are the
-hot path and are plain indexed queries). In-memory loco cache for
+hot path and are plain indexed queries). In-memory axa cache for
 upstream display-name lookups.

@@ -11,7 +11,7 @@ Each service owns its own merge implementation — there is no shared
 merge crate — but they all follow the conventions below. The family
 splits into two implementation lineages:
 
-- **Loco lineage** (`organization`, `care-pathway`, `case`, and
+- **axa lineage** (`organization`, `care-pathway`, `case`, and
   `portfolio` — the latter carries the same `src/merge.rs` +
   `merge_records` + `POST /merge` shape and is included in this lineage
   throughout this doc, even though earlier revisions of this list
@@ -43,7 +43,7 @@ data is transferred onto main, the duplicate is soft-deleted, and a
 permanent history row plus events record what happened.
 
 **Terminology.** The codebase uses **main** / **duplicate**, not
-"master" / "slave". Models name the surviving id `main_pid` (loco
+"master" / "slave". Models name the surviving id `main_pid` (axa
 lineage) or `main_person_id` (MPI lineage). The retired record is the
 `duplicate_pid` / `duplicate_person_id`.
 
@@ -61,7 +61,7 @@ is retired. Choosing which record is main is the caller's decision
 
 ## 2. The merge algorithm (pure fold)
 
-The loco services factor the merge into a **pure, DB-free fold** in
+The controller-style services factor the merge into a **pure, DB-free fold** in
 `src/merge.rs` (e.g.
 [`care-pathway-service/src/merge.rs`](../../care-pathway/care-pathway-service-with-axum/src/merge.rs)
 `merge_pathways`,
@@ -131,7 +131,7 @@ The `POST /merge` handler enforces two guards before doing any work:
 | Success | **200 OK** | Body: `{main_pid, duplicate_pid, main}`. |
 
 The self-merge `422` and unknown-pid `404` are pinned by a DB-free
-controller test in each loco service (e.g. the care-pathway controller
+controller test in each axa service (e.g. the care-pathway controller
 422 test), so they hold without a live database.
 
 ---
@@ -164,7 +164,7 @@ drives a `POST /merge`. Candidate pairs come from:
 
 Candidate generation (blocking / search) is covered by the search /
 dedup reference — [`agents/share/search.md`](../../agents/share/search.md)
-and the [search spec](../search/index.md). In the loco lineage,
+and the [search spec](../search/index.md). In the axa lineage,
 `check-duplicates` candidates are now **search-blocked** on all four
 crates (organization, care-pathway, case, portfolio — Tantivy
 `index.candidates(&query, …)`, landed alongside each crate's Tantivy
@@ -177,7 +177,7 @@ portfolio do not yet (see §9).
 
 ## 5. Persistence
 
-### Loco lineage — `merge_records` table
+### axa lineage — `merge_records` table
 
 One row per merge, written by `MergeRecordModel::record(...)`. Migration:
 [`m20220101_000003_merge_records.rs`](../../care-pathway/care-pathway-service-with-axum/migration/src/m20220101_000003_merge_records.rs).
@@ -238,7 +238,7 @@ row and merge record.
 | `Merged` | the survivor (`main_pid` + merged name) |
 | `Deleted` | the retired duplicate (`duplicate_pid` + its name) |
 
-In the loco lineage these go through the `EventPublisher` seam
+In the axa lineage these go through the `EventPublisher` seam
 (`streaming::publish_with_actor`), in-memory by default
 (`<ENTITY>_EVENT_TRANSPORT=memory`); a durable outbox + `FluvioSink`
 relay is **shipped, default-off, on all ten entity registries** — not
@@ -255,7 +255,7 @@ The event taxonomy — `Created` / `Updated` / `Deleted` / `Merged` (and
   (`deleted_at` set), and the `transferred` JSONB snapshot captures its
   full payload. No data is destroyed by a merge, so a merge is
   recoverable by hand from the history row.
-- **No automated un-merge endpoint.** The loco lineage exposes no
+- **No automated un-merge endpoint.** The axa lineage exposes no
   reverse operation; restoring is a manual data task. The MPI-lineage
   `MergeStatus` enum models a `Reversed` state
   ([`person-service/src/models/merge.rs`](../../person/person-service-with-axum/src/models/merge.rs)),
@@ -280,7 +280,7 @@ The event taxonomy — `Created` / `Updated` / `Deleted` / `Merged` (and
 
 ## 8. Lineage comparison
 
-| Aspect | Loco lineage (`organization`, `care-pathway`, `case`, `portfolio`) | MPI lineage (`person`, `place`, `thing`, `event`, `worker`, `course`) |
+| Aspect | axa lineage (`organization`, `care-pathway`, `case`, `portfolio`) | MPI lineage (`person`, `place`, `thing`, `event`, `worker`, `course`) |
 | --- | --- | --- |
 | Pure fold | `src/merge.rs` (`merge_*`) → `MergeOutcome` | inline in REST handler |
 | History model | `src/models/merge_records.rs` + `merge_records` table | `src/models/merge.rs` (`MergeRecord`, `MergeStatus`) |
@@ -300,7 +300,7 @@ differ only in persistence shape and surrounding plumbing.
 
 ## 9. Implemented vs. deferred
 
-**Implemented (all loco services):**
+**Implemented (all controller-style services):**
 
 - Pure merge fold (scalar fill, list union, former-name alias).
 - `POST /merge` with `422` (self-merge) / `404` (unknown pid) guards.
@@ -315,14 +315,14 @@ differ only in persistence shape and surrounding plumbing.
 
 - Automated **un-merge / reverse** endpoint (data is recoverable
   manually; MPI `Reversed` status is modeled but unused).
-- The **batch `deduplicate`** scan endpoint in the loco lineage —
+- The **batch `deduplicate`** scan endpoint in the axa lineage —
   implemented only in **organization**; care-pathway, case, and
   portfolio don't yet expose it (MPI lineage has the batch scan on
   every crate). **Not** deferred any more: search-blocked **candidate
   generation** for `check-duplicates`, which is now implemented on all
-  four loco crates (§4) — an earlier version of this list grouped the
+  four axa crates (§4) — an earlier version of this list grouped the
   two together as both deferred, which was true only for the batch scan.
-- A formal **review queue** table in the loco lineage (MPI lineage has
+- A formal **review queue** table in the axa lineage (MPI lineage has
   `ReviewQueueItem`).
 - **Durable event bus flip** — the outbox + `FluvioSink` transport
   itself has **shipped**, default-off, on all ten entity registries

@@ -42,7 +42,7 @@ Most relevant to this entity:
 | [locales.md](../../agents/share/locales.md) | i18n & l10n locale set |
 | [compliance-for-technology.md](../../agents/share/compliance-for-technology.md) | GDPR, UK DPA, ISO 27001 / 42001 |
 | [postgresql.md](../../agents/share/postgresql.md) | PostgreSQL setup + extensions |
-| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Full dependency inventory |
+| [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Full dependency inventory |
 
 ## See also
 

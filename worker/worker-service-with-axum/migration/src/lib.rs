@@ -1,9 +1,9 @@
-//! Loco migrator for worker-service.
+//! axa migrator for worker-service.
 //!
 //! Each migration wraps the corresponding hand-written SQL under
 //! `../migrations/<timestamp>_<name>/{up,down}.sql` via `include_str!`,
-//! so the SQL stays the single source of truth while loco gains a Rust
-//! `Migrator` it can run (`auto_migrate`, `cargo loco db migrate`).
+//! so the SQL stays the single source of truth while axa gains a Rust
+//! `Migrator` it can run (`auto_migrate`, `cargo axa db migrate`).
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]
@@ -36,7 +36,7 @@ mod m20260727_000008_sha3_digests;
 mod m20260727_000010_drop_blake3;
 mod m20260727_000012_integrity_mac;
 
-/// The migration runner this crate exposes to loco / `sea-orm-migration`.
+/// The migration runner this crate exposes to axa / `sea-orm-migration`.
 pub struct Migrator;
 
 #[async_trait::async_trait]

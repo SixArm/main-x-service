@@ -454,7 +454,7 @@ SBOM reconstructible rather than merely accurate at the moment it was
 built.
 
 **Both route tables carry it.** This crate is mid-conversion and
-registers its API twice — once as an axum `Router`, once as a loco
+registers its API twice — once as an axum `Router`, once as an axa
 `Routes` — so a handler added to only one compiles cleanly and serves
 `404` from the other. Both endpoints are registered in both, and an
 integration test fetches them against a real database.

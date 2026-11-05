@@ -1,4 +1,4 @@
-//! loco.rs application wiring: the [`App`] `Hooks` implementation that
+//! axa application wiring: the [`App`] `Hooks` implementation that
 //! registers routes, background workers, and the truncate/seed
 //! lifecycle for `case-service`.
 
@@ -56,18 +56,18 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
     }
 }
 
-/// The loco.rs application hooks for `case-service`.
+/// The axa application hooks for `case-service`.
 ///
 /// Implements [`Hooks`] to register routes, background workers, and the
 /// truncate/seed lifecycle; the binary entrypoint drives it via the
-/// loco CLI.
+/// axa CLI.
 pub struct App;
 impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (repo
-    /// `tasks.md` PRO-H12), returning `true` so loco does **not** also
+    /// `tasks.md` PRO-H12), returning `true` so axa does **not** also
     /// install its own. Ported from care-pathway-service's
     /// `App::init_logger` (itself organization's, itself course's,
-    /// itself person's) — the `Hooks::init_logger` seam is identical
+    /// itself person's) — the `App::init_logger` seam is identical
     /// across crates' shapes despite the differing router layout (see
     /// `src/observability.rs`'s module docs and `after_routes` below for
     /// where this crate's shape actually diverges).
@@ -84,7 +84,7 @@ impl App {
         }
         let logger_config = &ctx.config.logger;
         // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise loco's module whitelist applies,
+        // the filter outright; otherwise axa's module whitelist applies,
         // and the whitelist has no `opentelemetry*` entry — so a failing
         // export would be silent unless widened.
         let operator_supplied =

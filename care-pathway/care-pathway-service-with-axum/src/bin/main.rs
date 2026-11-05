@@ -1,4 +1,4 @@
-//! `care-pathway-service` binary entrypoint — boots the loco.rs CLI
+//! `care-pathway-service` binary entrypoint — boots the axa CLI
 //! (`care-pathway-service`), wiring the `App` hooks and the database
 //! migrator. See the crate library docs for the service overview.
 

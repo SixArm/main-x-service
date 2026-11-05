@@ -37,7 +37,7 @@
 #![deny(missing_docs)]
 #![warn(clippy::pedantic)]
 
-/// Loco application wiring: the `App` struct and its `Hooks`
+/// axa application wiring: the `App` struct and its `Hooks`
 /// implementation (boot, initializer order, route mounting, tasks).
 pub mod app;
 
@@ -83,6 +83,6 @@ pub mod nhs;
 /// responses: list wrappers, `422`, `401`, `503`, …).
 pub mod responses;
 
-/// Loco background / CLI tasks (e.g. seed), registered in
+/// axa background / CLI tasks (e.g. seed), registered in
 /// `app::App::register_tasks`.
 pub mod tasks;

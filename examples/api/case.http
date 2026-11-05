@@ -1,5 +1,5 @@
 ### case-service — example requests
-# case/case-service-with-axum — loco-idiomatic layout (src/controllers/).
+# case/case-service-with-axum — controller-style layout (src/controllers/).
 # Envelope: BARE loco JSON — curl-verified identical posture to
 # organization/care-pathway, NOT the "{success,data,error}" shape a
 # stale doc note once suggested (see examples/api/README.md). Gated by

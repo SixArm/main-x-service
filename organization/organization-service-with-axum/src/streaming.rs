@@ -22,7 +22,7 @@
 //! wire shape consumed by the front-end — served from the ring buffer
 //! (`memory`) or the outbox (`outbox`) via [`recent_events`], identically.
 //!
-//! In loco there is no per-request shared state for this, so the
+//! In axa there is no per-request shared state for this, so the
 //! ring-buffer publisher is a `OnceLock`-initialised global.
 
 use std::collections::VecDeque;
@@ -206,7 +206,7 @@ impl EventPublisher for InMemoryPublisher {
 }
 
 /// The process-wide publisher instance, lazily initialised on first use.
-/// In loco there is no per-request shared state for this, so a global is
+/// In axa there is no per-request shared state for this, so a global is
 /// the natural home (see the module docs).
 fn publisher() -> &'static InMemoryPublisher {
     static PUBLISHER: OnceLock<InMemoryPublisher> = OnceLock::new();
@@ -393,7 +393,7 @@ async fn audit_best_effort(
 /// create did not happen when it did. A failure is logged at `ERROR`
 /// (not `WARN`) because the consequence — a live record invisible to
 /// search — is silent until someone notices a missing hit; the repair is
-/// `cargo loco task search_reindex`.
+/// `cargo axa task search_reindex`.
 fn index_best_effort(pid: Uuid, org: &Organization) {
     let Some(engine) = crate::search::engine() else {
         return;

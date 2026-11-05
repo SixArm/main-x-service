@@ -13,7 +13,7 @@
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v--------------------------------+
 |               organization-service-with-axum                 |
-|  loco.rs 0.16 app (Axum 0.8)                                  |
+|  axa app (Axum 0.8)                                  |
 |  +----------------------+  +---------------------------+      |
 |  | controllers/         |  | controllers/docs.rs       |      |
 |  | organizations.rs     |  | /api-docs/openapi.json    |      |
@@ -50,13 +50,13 @@ Strictly one-way; the matcher is the leaf:
   helpers. It MUST NOT acquire IO, async, logging, or service
   dependencies.
 
-### 8.3 Service (loco.rs) structure
+### 8.3 Service (axa) structure
 
 ```
 organization-service-with-axum/
 ├── src/
-│   ├── app.rs                      loco Hooks: registers organizations + docs routes
-│   ├── bin/main.rs                 loco CLI entrypoint (`cargo loco start`)
+│   ├── app.rs                      `App` functions: registers organizations + docs routes
+│   ├── bin/main.rs                 axa CLI entrypoint (`cargo run -- start`)
 │   ├── controllers/
 │   │   ├── organizations.rs        CRUD + search + match + check-duplicates + audit + events
 │   │   └── docs.rs                 OpenAPI JSON + Swagger UI
@@ -70,7 +70,7 @@ organization-service-with-axum/
 └── config/                         development / production / test yaml (auto_migrate in dev)
 ```
 
-Note: the loco scaffolding leftovers (`src/workers/downloader.rs`,
+Note: the Loco scaffolding leftovers (`src/workers/downloader.rs`,
 empty `src/data/` + `src/tasks/`) were removed 2026-06-13 (§13 T-12);
 the app registers no background workers.
 

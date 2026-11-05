@@ -1,12 +1,12 @@
 //! Organization Service — schema.org/Organization-aligned identity registry.
 //!
-//! Library entry-point for a loco.rs service that stores and matches
+//! Library entry-point for an axa service that stores and matches
 //! organization records. The API DTO **is**
 //! [`organization_matcher::Organization`]: the service persists it
 //! verbatim as JSONB and matches with the same type, so there is no
 //! separate model to drift.
 //!
-//! Re-exports the loco [`app::App`] hooks, the REST [`controllers`], the
+//! Re-exports the axa [`app::App`] hooks, the REST [`controllers`], the
 //! `SeaORM` [`models`], the hand-written [`openapi`] document, and the
 //! in-memory [`streaming`] event buffer. For the canonical behaviour
 //! reference see [`../spec/index.md`](../spec/index.md); for per-area
@@ -17,7 +17,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-/// Loco application hooks: route registration, boot, and test truncation.
+/// axa application hooks: route registration, boot, and test truncation.
 pub mod app;
 /// Bearer-token (RS256 JWT) verification extractors for the REST surface.
 pub mod auth;
@@ -56,7 +56,7 @@ pub mod relay;
 pub mod search;
 /// In-memory event stream published on every CRUD action.
 pub mod streaming;
-/// CLI tasks (`cargo loco task <name>`).
+/// CLI tasks (`cargo axa task <name>`).
 pub mod tasks;
 /// Field-level validation for incoming `Organization` payloads (→ `422`).
 pub mod validation;

@@ -3,7 +3,7 @@
 //! the tutorials (EX-4 in the repo-root `tasks.md`).
 //!
 //! ```text
-//! cargo loco task seed_examples
+//! cargo axa task seed_examples
 //! ```
 //!
 //! ## Why this bypasses `POST /api/organizations`
@@ -141,7 +141,7 @@ pub struct SeedExamples;
 
 #[async_trait]
 impl Task for SeedExamples {
-    /// Task metadata (name + one-line description) for the loco CLI.
+    /// Task metadata (name + one-line description) for the axa CLI.
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "seed_examples".to_string(),

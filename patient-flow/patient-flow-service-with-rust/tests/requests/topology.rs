@@ -31,7 +31,7 @@ async fn topology_creates_and_reads_back() {
             wards.as_array().is_some_and(|w| !w.is_empty()),
             "list contains the ward"
         );
-        // Unknown-pid contract: an honest 404, not a 500 (loco 0.16
+        // Unknown-pid contract: an honest 404, not a 500 (axa
         // does not map ModelError::EntityNotFound itself).
         let ghost = uuid::Uuid::new_v4();
         assert_eq!(

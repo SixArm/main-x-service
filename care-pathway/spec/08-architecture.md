@@ -9,11 +9,11 @@
 |  routes: /  /new  /[pid]  /[pid]/edit                         |
 |  lib/api: client.ts → care-pathways.ts (repository)           |
 +------------------------------+-------------------------------+
-                               | REST (raw loco JSON, no envelope)
+                               | REST (raw axa JSON, no envelope)
                                | PUBLIC_API_BASE_URL (default :5150)
 +------------------------------v-------------------------------+
 |            care-pathway-service-with-axum                    |
-|  loco.rs 0.16 (Axum 0.8) · port 5150                          |
+|  axa (Axum 0.8) · port 5150                          |
 |  controllers/care_pathways.rs                                  |
 |    CRUD + /match + /check-duplicates                          |
 |  models/care_pathways.rs  (CRUD over the JSONB payload)       |
@@ -34,13 +34,13 @@ strsim, unicode-normalization, thiserror only). The service declares
 and uses the matcher's `CarePathway` directly as its API DTO — there
 is no adapter layer (contrast with the person entity).
 
-### 8.2 Service layout (loco.rs)
+### 8.2 Service layout (axa)
 
 ```
 care-pathway-service-with-axum/
 ├── src/
-│   ├── app.rs                       loco Hooks (routes, truncate)
-│   ├── bin/main.rs                  loco CLI entrypoint
+│   ├── app.rs                       `App` functions (routes, truncate)
+│   ├── bin/main.rs                  axa CLI entrypoint
 │   ├── controllers/care_pathways.rs CRUD + match + check-duplicates
 │   └── models/
 │       ├── care_pathways.rs         CRUD helpers over the payload
@@ -50,7 +50,7 @@ care-pathway-service-with-axum/
 └── tests/matching.rs                DB-free matcher-embedding tests
 ```
 
-Run with `cargo loco start` (needs PostgreSQL; `auto_migrate` on in
+Run with `cargo run -- start` (needs PostgreSQL; `auto_migrate` on in
 development). The front-end runs with `pnpm dev` against
 `PUBLIC_API_BASE_URL`.
 

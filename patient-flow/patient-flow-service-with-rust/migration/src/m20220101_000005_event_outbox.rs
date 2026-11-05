@@ -5,7 +5,7 @@
 //! its event and vice versa; a relay worker (Phase 3, roadmap) later
 //! drains unpublished rows and stamps `published_at`.
 //!
-//! Written as explicit SQL rather than the loco `create_table` helper:
+//! Written as explicit SQL rather than the axa `create_table` helper:
 //! the helper **pluralizes** table names (`event_outbox` →
 //! `event_outboxes`), which would break the `SeaORM` entity
 //! (`table_name = "event_outbox"`) and the index DDL below. The same

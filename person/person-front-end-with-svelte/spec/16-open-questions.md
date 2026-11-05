@@ -9,7 +9,7 @@
 **Closed 2026-08-29 (PRO-P32).** Decision (asked, not assumed): a real
 magic-link sign-in, not a guard/CSRF bypass. Built and verified live
 end-to-end: `examples/compose/authentication-dev.yml`, a new compose
-stack running authentication-service in `LOCO_ENV=development` (the
+stack running authentication-service in `APP_ENV=development` (the
 production-mode stacks never log the magic-link URL — SEC-A3 — so
 they cannot support this; the file's own header comment covers the
 one non-obvious fix it needed, a container-start `sed` patch of

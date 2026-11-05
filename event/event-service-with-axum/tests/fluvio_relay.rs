@@ -27,8 +27,8 @@
 //! case-service's `fluvio_relay_publishes_an_outbox_row_to_a_real_topic`
 //! (`case/case-service-with-axum/tests/fluvio_relay.rs`, BUS-1).
 //!
-//! Unlike case-service's reference (a loco `request::<App, _, _>` test),
-//! event-service's own test harness has no loco request helper — this
+//! Unlike case-service's reference (an axa `request::<App, _, _>` test),
+//! event-service's own test harness has no axa request helper — this
 //! crate keeps the older hand-rolled `AppState`/repository layout (see
 //! `agents/share/architecture.md` "person-style"). So this test drives
 //! [`SeaOrmEventRepository`] directly with

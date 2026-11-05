@@ -22,8 +22,8 @@ different services**: person *is the same human as* worker, person
 
 ## What it is
 
-- A **loco.rs** backend service (Rust, Axum, SeaORM, PostgreSQL) on the
-  family [Rust + Loco stack](../../agents/share/rust-loco-stack.md).
+- A **axa** backend service (Rust, Axum, SeaORM, PostgreSQL) on the
+  family [Rust + axa stack](../../agents/share/rust-axum-stack.md).
 - **Read-only to the world.** It exposes no write endpoints of its own;
   every change to *its own* state arrives as a consumed bus event
   (`created` / `deleted` / `merged` / `linked` / `unlinked`). It does,
@@ -59,7 +59,7 @@ Requires PostgreSQL.
 
 ```bash
 export DATABASE_URL=postgres://loco:loco@localhost:5432/link_graph_service_development
-cargo loco start        # migrations auto-run in development
+cargo run -- start        # migrations auto-run in development
 
 # Edges incident to a record (both directions, depth-capped)
 curl -s 'localhost:5160/api/neighbors/person:0c4f1e2a-0000-4000-8000-000000000000?direction=both&depth=1'

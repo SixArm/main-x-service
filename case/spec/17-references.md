@@ -64,4 +64,4 @@ relative to this landscape is §8.
   sibling entity-level spec exemplars:
   [person/spec](../../person/spec/index.md),
   [care-pathway/spec](../../care-pathway/spec/index.md).
-- loco.rs: [loco.rs](https://loco.rs/) — the service framework.
+- axa: [axa](https://axa/) — the service framework.

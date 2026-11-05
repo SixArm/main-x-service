@@ -10,7 +10,7 @@
 //! your scraper with `metrics_path: /metrics.prom`.
 //!
 //! The registry is a process-wide [`OnceLock`] built on first access —
-//! there is no loco state to thread through, so handlers reach the
+//! there is no axa state to thread through, so handlers reach the
 //! metrics directly.
 //!
 //! `http_requests_total` is observed by [`track_http_requests_mw`], an

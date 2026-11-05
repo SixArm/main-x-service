@@ -48,7 +48,7 @@ crate README linked above; this is the *order* that keeps every peer
 verifying throughout, worked out from how the refresh timer actually
 behaves rather than assumed:
 
-1. **Generate** a new 32-byte Ed25519 seed (there is no `cargo loco task`
+1. **Generate** a new 32-byte Ed25519 seed (there is no `cargo run -- task`
    for this, unlike the MAC key's `integrity_key` task — the only
    documented path is a shell one-liner, see the README). Do **not**
    promote it yet.

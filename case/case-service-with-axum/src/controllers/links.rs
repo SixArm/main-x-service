@@ -192,7 +192,7 @@ pub fn validate_edge(
     Ok((edge_kind, to))
 }
 
-/// Map a validation reason to a `422` loco error.
+/// Map a validation reason to a `422` axa error.
 fn unprocessable(reason: &str) -> Error {
     Error::CustomError(
         StatusCode::UNPROCESSABLE_ENTITY,

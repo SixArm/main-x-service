@@ -19,7 +19,7 @@
 - [`agents/share/auditability.md`](../../agents/share/auditability.md) — audit + events
 - [`agents/share/availability.md`](../../agents/share/availability.md) — scaling, health checks
 - [`agents/share/compliance-for-technology.md`](../../agents/share/compliance-for-technology.md) — GDPR, UK DPA, ISO 27001 / 42001
-- [`agents/share/rust-loco-stack.md`](../../agents/share/rust-loco-stack.md) — dependency stack
+- [`agents/share/rust-axum-stack.md`](../../agents/share/rust-axum-stack.md) — dependency stack
 
 ### External standards
 

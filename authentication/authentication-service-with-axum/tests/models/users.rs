@@ -1,4 +1,4 @@
-//! Model tests. All of these boot the loco app and therefore require
+//! Model tests. All of these boot the axa app and therefore require
 //! the PostgreSQL instance from `config/test.yaml`, so they are
 //! `#[ignore]`d to keep `cargo test` green on a checkout without
 //! Postgres. Run them with: `cargo test -- --ignored`.
@@ -148,7 +148,7 @@ async fn can_find_by_pid() {
 }
 
 /// Pins `set_email_verification_sent`: it stamps the sent-at timestamp
-/// and generates a verification token (loco scaffold; not the live flow).
+/// and generates a verification token (Loco scaffold; not the live flow).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -238,7 +238,7 @@ async fn can_verified() {
 }
 
 /// Pins `reset_password`: it re-hashes and replaces the stored password
-/// so the new one verifies (loco scaffold; unused by passwordless).
+/// so the new one verifies (Loco scaffold; unused by passwordless).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]

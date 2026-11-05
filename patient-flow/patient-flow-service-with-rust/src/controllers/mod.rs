@@ -1,4 +1,4 @@
-//! Axum controllers (loco `Routes`), one module per surface, plus the
+//! Axum controllers (axa `Routes`), one module per surface, plus the
 //! shared error helpers.
 
 use axa::error::ErrorDetail;
@@ -39,7 +39,7 @@ pub fn unprocessable(message: &str) -> Error {
 }
 
 /// Map a record-level authorization rejection (`(status, reason)`) to a
-/// loco error response: `403` = policy denied; `401` = fail-safe when
+/// axa error response: `403` = policy denied; `401` = fail-safe when
 /// claims are missing behind the guard.
 #[must_use]
 pub fn record_rejection((status, reason): (StatusCode, String)) -> Error {

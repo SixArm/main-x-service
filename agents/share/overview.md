@@ -12,11 +12,11 @@ The **Main X Index** family of crates implements a federated identity index — 
 | [thing-service](../../thing/thing-service-with-axum) | Thing | Generic thing / asset registry (schema.org/Thing) |
 | [event-service](../../event/event-service-with-axum) | Event | Time-bounded event registry (schema.org/Event) |
 | [course-service](../../course/course-service-with-axum) | Course | Course-identity registry (schema.org/Course) — template + `CourseInstance` sub-resource for specific offerings |
-| [authentication-service](../../authentication/authentication-service-with-axum) | User | Central single sign-on provider — passwordless email magic-link auth, Postgres-backed cookie sessions, PASETO v4.public token issuance, `/.well-known/paseto-keys` for offline verification by peers. The first real loco.rs crate and the reference for converting the others. |
-| [organization-service](../../organization/organization-service-with-axum) | Organization | loco.rs registry for schema.org/Organization — CRUD + matching (embeds organization-matcher; API DTO is the matcher's Organization type) + Tantivy full-text search (fuzzy + phonetic; duplicate-check blocks on the index) + audit log + event streaming + OpenAPI/Swagger + record merge + offline PASETO v4.public verification + blanket ABAC guard (`ORGANIZATION_REQUIRE_AUTH`, default-off) + durable outbox events (default memory) + field masking, masked view, and the audited GDPR export wired to the ABAC `mask` obligation (no consent model — an organization is not a data subject). |
-| [care-pathway-service](../../care-pathway/care-pathway-service-with-axum) | Care pathway | loco.rs registry for clinical care pathways — CRUD + Tantivy full-text search (fuzzy + phonetic; condition codes and interventions searchable; duplicate-check blocks on the index) + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type) + condition-code validation + OpenAPI/Swagger + audit log + durable outbox event streaming (default memory) + offline PASETO v4.public verification + record merge + blanket ABAC guard (`CARE_PATHWAY_REQUIRE_AUTH`, default-off). Deferred: privacy, front-end merge action. |
-| [case-service](../../case/case-service-with-axum) | Case | loco.rs registry for governmental cases (case tracking — benefits, legal, social-services, complaints, appeals, investigations) — CRUD + Tantivy full-text/fuzzy/phonetic search (title, subjects, agency, identifiers) with search-blocked duplicate candidates + matching (embeds case-matcher; API DTO is the matcher's Case type) + validation + OpenAPI/Swagger + audit log + durable outbox event streaming (default memory) + offline PASETO v4.public verification + record merge + record-level ABAC + masking obligations + cross-service links (`subject_of`). Case data is personal data; deferred: per-field privacy masking + GDPR export. |
-| [project-portfolio-management-service](../../project-portfolio-management/project-portfolio-management-service-with-loco) | Plan | loco.rs registry for **plans** in one recursive collection (any plan may contain any other via `parent_ref`; the former Portfolio / Project / Product / Program are now an optional descriptive `kind` label) — CRUD + matching (embeds project-portfolio-management-matcher; API DTO is the matcher's Plan type; matching is **not** gated by kind) + **operational sub-resources** under `/api/plans/{pid}/…` (goals / tasks / issues + derived timeline & burndown views) + Tantivy full-text/fuzzy/phonetic name search (`kind` is a search filter, never a matching gate) + containment cycle check + OpenAPI/Swagger + audit log + event streaming + offline PASETO v4 public verification + record merge + cross-service links + bulk import/export. Integrates the central auth (users/SSO), person/worker (people refs), organization (sponsor). |
+| [authentication-service](../../authentication/authentication-service-with-axum) | User | Central single sign-on provider — passwordless email magic-link auth, Postgres-backed cookie sessions, PASETO v4.public token issuance, `/.well-known/paseto-keys` for offline verification by peers. The first real axa crate and the reference for converting the others. |
+| [organization-service](../../organization/organization-service-with-axum) | Organization | axa registry for schema.org/Organization — CRUD + matching (embeds organization-matcher; API DTO is the matcher's Organization type) + Tantivy full-text search (fuzzy + phonetic; duplicate-check blocks on the index) + audit log + event streaming + OpenAPI/Swagger + record merge + offline PASETO v4.public verification + blanket ABAC guard (`ORGANIZATION_REQUIRE_AUTH`, default-off) + durable outbox events (default memory) + field masking, masked view, and the audited GDPR export wired to the ABAC `mask` obligation (no consent model — an organization is not a data subject). |
+| [care-pathway-service](../../care-pathway/care-pathway-service-with-axum) | Care pathway | axa registry for clinical care pathways — CRUD + Tantivy full-text search (fuzzy + phonetic; condition codes and interventions searchable; duplicate-check blocks on the index) + matching (embeds care-pathway-matcher; API DTO is the matcher's CarePathway type) + condition-code validation + OpenAPI/Swagger + audit log + durable outbox event streaming (default memory) + offline PASETO v4.public verification + record merge + blanket ABAC guard (`CARE_PATHWAY_REQUIRE_AUTH`, default-off). Deferred: privacy, front-end merge action. |
+| [case-service](../../case/case-service-with-axum) | Case | axa registry for governmental cases (case tracking — benefits, legal, social-services, complaints, appeals, investigations) — CRUD + Tantivy full-text/fuzzy/phonetic search (title, subjects, agency, identifiers) with search-blocked duplicate candidates + matching (embeds case-matcher; API DTO is the matcher's Case type) + validation + OpenAPI/Swagger + audit log + durable outbox event streaming (default memory) + offline PASETO v4.public verification + record merge + record-level ABAC + masking obligations + cross-service links (`subject_of`). Case data is personal data; deferred: per-field privacy masking + GDPR export. |
+| [project-portfolio-management-service](../../project-portfolio-management/project-portfolio-management-service-with-loco) | Plan | axa registry for **plans** in one recursive collection (any plan may contain any other via `parent_ref`; the former Portfolio / Project / Product / Program are now an optional descriptive `kind` label) — CRUD + matching (embeds project-portfolio-management-matcher; API DTO is the matcher's Plan type; matching is **not** gated by kind) + **operational sub-resources** under `/api/plans/{pid}/…` (goals / tasks / issues + derived timeline & burndown views) + Tantivy full-text/fuzzy/phonetic name search (`kind` is a search filter, never a matching gate) + containment cycle check + OpenAPI/Swagger + audit log + event streaming + offline PASETO v4 public verification + record merge + cross-service links + bulk import/export. Integrates the central auth (users/SSO), person/worker (people refs), organization (sponsor). |
 
 ### Matcher crates
 
@@ -106,7 +106,7 @@ case, and portfolio each provide:
   **duplicate detection** (real-time on create + batch scan) and **record
   merge** with transferred-data snapshots
 - **Audit log** + an **in-memory event stream** of every CRUD/merge
-- **REST API** (Axum via loco) with **OpenAPI / Swagger**
+- **REST API** (Axum via axa) with **OpenAPI / Swagger**
 - **Offline PASETO v4.public verification** + the blanket **ABAC guard**
   (`<ENTITY>_REQUIRE_AUTH`, default-off), via the shared
   `authentication-verifier`
@@ -123,7 +123,7 @@ case, and portfolio each provide:
   portfolio's ported from case's, which ported from
   link-graph-service's — see below). Every entity registry in the
   family now exports real OTLP/gRPC traces and metrics. Organization
-  was the **first of the four loco-idiomatic registries**
+  was the **first of the four controller-style registries**
   (`src/controllers/`, not person-style `src/api/rest/`) to carry the
   exporter, and it settled a question the earlier slices left open for
   this group: it has exactly **one** router-construction surface
@@ -133,7 +133,7 @@ case, and portfolio each provide:
   the same single-surface shape holds for them too (a fresh grep of
   `src/`/`tests/` for a second `Router::new()`/`create_router` each
   time, not carried over from an earlier finding) — all four
-  loco-idiomatic registries now share the identical single-surface
+  controller-style registries now share the identical single-surface
   shape, four for four. Whether a port needs a renamed
   `otlp-test-tonic` dev-dependency (to avoid an extern-prelude
   collision) tracks whether the crate **declares** a `tonic` dependency
@@ -147,7 +147,7 @@ case, and portfolio each provide:
   Check each crate's actual `Cargo.toml`, not this table, before
   assuming either way. The cross-cutting **link-graph-service** carries
   the original reference (`src/observability.rs`: OTLP/gRPC traces +
-  metrics bridged from `tracing` through loco's `Hooks::init_logger`
+  metrics bridged from `tracing` through axa's `App::init_logger`
   seam, with a per-request span, an `http.server.request.duration`
   histogram, and a W3C `traceparent` response header, proved against a
   real in-process collector) that every registry above ported from,
@@ -288,7 +288,7 @@ These are **not** entity registries and share little of the matrix above:
   every entity registry in the family now carries a real OTLP exporter
   (PRO-H12 complete, 2026-09-02).
 
-See [rust-loco-stack.md](rust-loco-stack.md) for the dependency stack.
+See [rust-axum-stack.md](rust-axum-stack.md) for the dependency stack.
 
 ## Running
 

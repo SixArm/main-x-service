@@ -1,6 +1,6 @@
 # Case Service — documentation index
 
-A loco.rs registry of governmental case records: CRUD + matching,
+An axa registry of governmental case records: CRUD + matching,
 embedding the canonical case-matcher.
 
 ## Start here

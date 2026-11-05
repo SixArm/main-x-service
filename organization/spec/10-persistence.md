@@ -1,6 +1,6 @@
 ## 10. Persistence
 
-PostgreSQL via SeaORM 1.1 + `sea-orm-migration` (loco-idiomatic).
+PostgreSQL via SeaORM 1.1 + `sea-orm-migration` (controller-style).
 Family-wide database conventions:
 [`agents/share/postgresql.md`](../../agents/share/postgresql.md).
 

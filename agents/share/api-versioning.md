@@ -96,7 +96,7 @@ A small, pure helper + a thin edge:
   `resolve_version` on `Accepts-version`, returns `406` on the error, and
   on success sets the `Accepts-version` response header. It is orthogonal
   to the auth guard and may be composed in the same layer stack.
-- **Loco-idiomatic services** put the helper in `src/version.rs` and layer
+- **Controller-style services** put the helper in `src/version.rs` and layer
   the middleware in `app.rs` (next to the auth layer). **api/rest-layout
   services** (event, worker, …) put it beside `src/api/rest/auth.rs` and
   layer it in `create_router` + `after_routes`, exactly like the auth

@@ -6,7 +6,7 @@ subproject. Read this **before** opening a PR.
 ## What this project is
 
 A **SvelteKit browser client** for the
-[Loco JSON API sibling](../patient-flow-service-with-rust/): the
+[Axum JSON API sibling](../patient-flow-service-with-rust/): the
 ward whiteboard (including a wall-mounted **touchscreen/kiosk
 mode** with large tap targets), stay detail, hospital-at-a-glance,
 bed-request board, patient locate, and handover audit views. The
@@ -45,7 +45,7 @@ Svelte app owns no data; every page round-trips through the API.
 
 ```bash
 npm install
-npm run dev        # expects the Loco sibling (stub mode) on its default port
+npm run dev        # expects the axa sibling (stub mode) on its default port
 npm test           # vitest
 npx playwright test
 ```

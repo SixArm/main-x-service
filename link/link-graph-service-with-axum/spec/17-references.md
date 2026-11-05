@@ -33,8 +33,8 @@
   blanket `/api/*` JWT enforcement (coordinated family rollout).
 - [compliance-for-healthcare.md](../../../agents/share/compliance-for-healthcare.md)
   / [compliance-for-technology.md](../../../agents/share/compliance-for-technology.md).
-- [rust-loco-stack.md](../../../agents/share/rust-loco-stack.md) —
-  Rust + Loco stack; [loco.md](../../../agents/share/loco.md) — Loco
+- [rust-axum-stack.md](../../../agents/share/rust-axum-stack.md) —
+  Rust + axa stack; [loco.md](../../../agents/share/axa.md) — axa
   conventions; [postgresql.md](../../../agents/share/postgresql.md) —
   PostgreSQL.
 - [observability.md](../../../agents/share/observability.md) /

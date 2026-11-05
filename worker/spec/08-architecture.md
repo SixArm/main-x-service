@@ -11,7 +11,7 @@
                                    |  HTTPS JSON  (envelope: success/data/error)
                                    |  /api/workers/*  /api/audit/*  /api/health
 +----------------------------------v---------------------------------+
-|                 worker-service-with-axum (loco.rs 0.16 / Axum 0.8) |
+|                 worker-service-with-axum (axa / Axum 0.8) |
 |  +-----------+ +-----------+ +------------+ +--------------------+ |
 |  | REST API  | | FHIR R5   | | gRPC stub  | | Swagger UI (utoipa)| |
 |  +-----------+ +-----------+ +------------+ +--------------------+ |

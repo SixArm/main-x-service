@@ -1,8 +1,8 @@
 # RESTful API reference — Course Service
 
 All endpoints mount under `/api` (per spec.md §9): `courses_routes()`
-is a loco `Routes` table with prefix `/api`, registered in
-`App::routes` alongside loco's default ops routes. The `Event`
+is an axa `Routes` table with prefix `/api`, registered in
+`App::routes` alongside axa's default ops routes. The `Event`
 service uses `/api`; `course` does NOT — clients should call
 `/api/courses/...` directly. The front-end's
 [`CourseRepository`](../../course-front-end-with-svelte/src/lib/api/courses.ts)
@@ -17,14 +17,14 @@ layered on both router surfaces (`create_router` + `App::after_routes`).
 ## Library API
 
 ```rust
-use course_service::app::App;                  // loco Hooks (boot, routes, after_routes)
+use course_service::app::App;                  // `App` functions (boot, routes, after_routes)
 use course_service::api::rest::{create_router, courses_routes, AppState};
 use course_service::api::{ApiResponse, ApiError};
 use course_service::models::{Course, CourseInstance, CourseIdentifier};
 use course_service::matching::{CourseMatcher, MatchResult, MatchConfidence};
 ```
 
-The binary boots through the loco CLI (`cargo loco start`);
+The binary boots through the axa CLI (`cargo run -- start`);
 `create_router` is retained for the `tower::oneshot` integration
 tests.
 
@@ -34,8 +34,8 @@ tests.
 |---|---|---|
 | GET | `/api/health` | Service health check (envelope-wrapped `HealthResponse`) |
 | GET | `/api/whoami` | Echoes the verified bearer's claims (T-15) — public when `COURSE_REQUIRE_AUTH` is off. |
-| GET | `/_health` | loco built-in readiness (DB + queue) — plain, no envelope |
-| GET | `/_ping` | loco built-in liveness — plain, no envelope |
+| GET | `/_health` | axa built-in readiness (DB + queue) — plain, no envelope |
+| GET | `/_ping` | axa built-in liveness — plain, no envelope |
 | GET | `/metrics.prom` | Prometheus metrics (T-16) — mounted at the application **root** (not under `/api`), public, `text/plain; version=0.0.4`. NOT envelope-wrapped. |
 
 `GET /metrics.prom` worked example:
@@ -225,11 +225,11 @@ The full spec is rendered at runtime by [`utoipa`](https://docs.rs/utoipa):
 
 ## Source files
 
-- `src/app.rs` — loco `Hooks`: registers `courses_routes()` in
+- `src/app.rs` — axa `Hooks`: registers `courses_routes()` in
   `App::routes`, builds `AppState` into the `AppContext` shared
   store and layers Swagger UI + CORS in `after_routes`
 - `src/api/mod.rs` — `ApiResponse`, `ApiError`
-- `src/api/rest/mod.rs` — `courses_routes()` (loco `Routes`, prefix
+- `src/api/rest/mod.rs` — `courses_routes()` (axa `Routes`, prefix
   `/api`), `create_router` (test-only Axum router), `ApiDoc`
   aggregator
 - `src/api/rest/handlers.rs` — endpoint handlers (FR-1..FR-9 + FR-14..FR-18 wired)

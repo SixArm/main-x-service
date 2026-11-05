@@ -1,6 +1,6 @@
 # Testing strategy
 
-> Part of the [Loco edition specification](index.md). Cross-cutting
+> Part of the [Axum edition specification](index.md). Cross-cutting
 > principles + stub mode: [root testing](../../spec/testing.md).
 
 | Layer         | Tool                                                | Status                                                             |
@@ -9,7 +9,7 @@
 | Lint          | `cargo clippy -- -D warnings`                       | required green                                                     |
 | Format        | `cargo fmt --check`                                 | required green                                                     |
 | Unit          | `cargo test --lib` (in-crate `#[cfg(test)]`)        | **23 in repo (nhs + geofence + auth session + auth crypto)**      |
-| Request tests | `cargo test --test requests` (Loco testing harness) | **50 in repo** (use `StubClient`s — no real Patient/Worker needed) |
+| Request tests | `cargo test --test requests` (axa testing harness) | **50 in repo** (use `StubClient`s — no real Patient/Worker needed) |
 
 ## Unit tests in repo
 

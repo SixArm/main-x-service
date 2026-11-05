@@ -119,5 +119,5 @@ ENV APP_ENV=production \
     PORT=5150
 
 # loco's CLI entry point: `<bin> start` runs the server (see
-# src/bin/main.rs — `loco_rs::cli::main`).
+# src/bin/main.rs — `axa::cli::main`).
 CMD ["/app/case-service", "start"]

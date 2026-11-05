@@ -119,12 +119,12 @@ defects turned up this way, both fixed in the same pass as this doc
 (not left as a "found but not fixed" note):
 
 1. **`config/production.yaml`'s dead `auth:` block crashed boot with no
-   `JWT_SECRET` set**, in **every loco-idiomatic registry**
+   `JWT_SECRET` set**, in **every controller-style registry**
    (organization, care-pathway, case, portfolio) — `{{
    get_env(name="JWT_SECRET") }}` had no `default`, and this family
    issues PASETO v4.public, never JWT (`jwt.md`; `security.md` §7
-   already removed loco's `auth` Cargo feature from every crate for the
-   same reason). loco's own `Config.auth` field is `Option<Auth>` —
+   already removed axa's `auth` Cargo feature from every crate for the
+   same reason). axa's own `Config.auth` field is `Option<Auth>` —
    safe to omit the block entirely, which is the fix, verified against
    a real container + real Postgres for all four crates named above.
    **The trap in fixing this**: a YAML `#` comment does not stop Tera

@@ -1,12 +1,12 @@
 # Domain model
 
-> Part of the [Loco edition specification](index.md). Shared,
+> Part of the [Axum edition specification](index.md). Shared,
 > edition-independent domain (entities, invariants, status vocabulary):
 > [root domain-model](../../spec/domain-model.md). This file adds the
-> Loco-specific service split and the upstream **Client trait**
+> axa-specific service split and the upstream **Client trait**
 > interfaces.
 
-The Loco edition splits the world in five — and the tracker owns
+The Axum edition splits the world in five — and the tracker owns
 _none_ of it:
 
 - **Patient records** live in the **Main Patient Service**. Folders
@@ -61,14 +61,14 @@ _none_ of it:
 
 There are **no local tables**. The `migration` crate's `Migrator`
 returns an empty `Vec`. PostgreSQL is still a boot-time dependency
-because Loco's `create_app::<Self, Migrator>(...)` insists on a `db`
+because axa's `create_app::<Self, Migrator>(...)` insists on a `db`
 field in `AppContext`; nothing else in the codebase touches it. See
 [database.md](database.md).
 
 ## Invariants
 
 The shared invariants are in [root domain-model](../../spec/domain-model.md#invariants).
-Loco-specific notes:
+axa-specific notes:
 
 1. **NHS Number uniqueness** is owned by the Main Patient Service.
 2. **`folders.(patient_id, title)` is `UNIQUE`** — a patient can have

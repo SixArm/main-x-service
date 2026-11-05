@@ -1,7 +1,7 @@
 # Care Pathway Service
 
 A registry of **clinical care-pathway** records: CRUD + matching, built
-on **loco.rs** and embedding the canonical
+on **axa** and embedding the canonical
 [care-pathway-matcher](../care-pathway-matcher-rust-crate).
 
 A *care pathway* (clinical / critical / integrated care pathway) is a
@@ -72,10 +72,10 @@ activity. Full design:
 ### Seeded synthetic journey cohorts (T-14m)
 
 ```sh
-cargo loco task journeys:seed pathway:<pid>                       # 10 clean instances, seed 42
-cargo loco task journeys:seed pathway:<pid> n:50 seed:7 open_share:0.3
-cargo loco task journeys:seed pathway:<pid> defects:all            # one instance per defect code
-cargo loco task journeys:seed pathway:<pid> defects:no_segments,steps_out_of_order
+cargo run -- task journeys:seed pathway:<pid>                       # 10 clean instances, seed 42
+cargo run -- task journeys:seed pathway:<pid> n:50 seed:7 open_share:0.3
+cargo run -- task journeys:seed pathway:<pid> defects:all            # one instance per defect code
+cargo run -- task journeys:seed pathway:<pid> defects:no_segments,steps_out_of_order
 ```
 
 Deterministic and **synthetic only** — never real data, never derived
@@ -371,7 +371,7 @@ and MAC controls above are inert until configured** —
 and a checkpoint only protects what an operator actually stores off-box.
 See
 [`agents/share/runbooks/integrity-activation.md`](../../agents/share/runbooks/integrity-activation.md)
-for the activation order; `cargo loco task integrity_key` generates and
+for the activation order; `cargo run -- task integrity_key` generates and
 checks the key without ever logging it.
 
 ### FHIR R5 ([spec §12.3](./spec/index.md))
@@ -402,7 +402,7 @@ Requires PostgreSQL.
 
 ```bash
 export DATABASE_URL=postgres://loco:loco@localhost:5432/care_pathway_service_development
-cargo loco start        # migrations auto-run in development
+cargo run -- start        # migrations auto-run in development
 
 # Create
 curl -s localhost:5150/api/care-pathways -H 'content-type: application/json' \
@@ -529,7 +529,7 @@ for the order. See [spec §12](./spec/index.md) — including §12.5, which
 states the limits plainly.
 
 **Native bulk import/export** (§13 T-10, `src/bulk/`) is implemented:
-async, job-based JSONL/CSV/TSV import + export on the loco `worker`
+async, job-based JSONL/CSV/TSV import + export on the axa `worker`
 queue, reusing the same `bulk_jobs` table and `ArtifactStore`
 (local/S3) the FHIR Bulk Data `$export` operation already used. Stable
 key: a deterministic identifier (DOI/Wikidata/`GuidelineId`/URI/UUID) →

@@ -1,4 +1,4 @@
-//! `case-service` — a loco.rs registry for governmental **case**
+//! `case-service` — an axa registry for governmental **case**
 //! records (CRUD + matching).
 //!
 //! The API DTO is `case_matcher::Case` itself: the service stores it
@@ -8,11 +8,11 @@
 //!
 //! ## Modules
 //!
-//! - [`app`] — loco `Hooks` wiring (routes, workers, truncate/seed).
+//! - [`app`] — axa `Hooks` wiring (routes, workers, truncate/seed).
 //! - [`controllers`] — Axum controllers: CRUD, `match`, `check-duplicates`.
 //! - [`models`] — `SeaORM` entity + CRUD helpers over the stored payload.
-//! - [`workers`] — background workers (loco `BackgroundWorker`).
-//! - [`tasks`], [`initializers`], [`data`] — loco extension points.
+//! - [`workers`] — background workers (axa `BackgroundWorker`).
+//! - [`tasks`], [`initializers`], [`data`] — axa extension points.
 //!
 //! See `spec/index.md` for the living specification.
 

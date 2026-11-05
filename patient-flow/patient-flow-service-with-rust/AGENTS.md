@@ -5,7 +5,7 @@ subproject. Read this **before** opening a PR.
 
 ## What this project is
 
-A **back-end JSON API**, written in Rust on [Loco](https://loco.rs)
+A **back-end JSON API**, written in Rust on [Loco](https://axa)
 (Axum + SeaORM + PostgreSQL), for hospital patient flow and bed
 management: wards, bays, beds and their live state machine, inpatient
 stays from admission to discharge, bed requests and rule-checked
@@ -32,12 +32,12 @@ cross-cutting spec's [scope boundary](../spec/scope.md).
    change is spec edit + code + tests in one PR. The live task queue
    is [`../spec/tasks.md`](../spec/tasks.md) (PF-T* ids, traced to
    PF-D*/PF-R*).
-2. **Family conventions.** Loco-idiomatic layout
+2. **Family conventions.** Controller-style layout
    (`src/controllers/`), `#![forbid(unsafe_code)]`, thiserror,
    tracing + OTLP, OpenAPI/Swagger, header API versioning
    (`Accepts-version`), Podman not Docker, PostgreSQL not SQLite,
-   `worker` (Postgres-backed) jobs, in-memory loco cache. See
-   [rust-loco-stack](../../agents/share/rust-loco-stack.md).
+   `worker` (Postgres-backed) jobs, in-memory axa cache. See
+   [rust-loco-stack](../../agents/share/rust-axum-stack.md).
 3. **Pure core.** Bed state machine, allocation rules, Red2Green,
    DTOC clock live in `src/flow/` as DB-free pure functions with
    exhaustive unit tests; controllers stay thin (PF-D4).
@@ -69,5 +69,5 @@ src/validation.rs · src/openapi.rs · migration/ · tests/requests/
 ```bash
 cargo run                 # API server (stub mode by default in dev)
 cargo test                # unit + request tests
-cargo loco task seed      # synthetic demo hospital
+cargo run -- task seed      # synthetic demo hospital
 ```

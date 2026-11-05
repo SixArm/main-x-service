@@ -1,7 +1,7 @@
 # Regulatory, security & privacy
 
 > Part of the [Case Tracking specification](index.md). Edition-specific
-> gates: [loco regulatory](../case-folder-service-with-rust/spec/regulatory.md),
+> gates: [axa regulatory](../case-folder-service-with-rust/spec/regulatory.md),
 > [svelte regulatory](../case-folder-front-end-with-svelte/spec/regulatory.md).
 
 > ⚠️ **Demo software.** The project is **not** a regulated medical

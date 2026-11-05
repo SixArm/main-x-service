@@ -54,7 +54,7 @@ only relational projections are `pid` and `title`.
 
 ### 10.3 Operations
 
-- `auto_migrate` is on in development (`cargo loco start` migrates).
+- `auto_migrate` is on in development (`cargo run -- start` migrates).
 - Soft delete is application-level (`deleted_at`); all queries filter
   `deleted_at IS NULL`.
 - Audit rows are written best-effort (a failed audit write logs but

@@ -143,8 +143,8 @@ pub fn create_router(state: AppState) -> Router {
         .layer(axum::middleware::from_fn(crate::observability::trace_mw))
 }
 
-/// Native loco controller routes (idiomatic path). Mirrors
-/// [`create_router`]'s `/api` surface as a loco `Routes`; handlers
+/// Native axa controller routes (idiomatic path). Mirrors
+/// [`create_router`]'s `/api` surface as an axa `Routes`; handlers
 /// extract `AppState` from the `AppContext` shared store via `FromRef`.
 /// `create_router` is retained for the integration tests.
 #[must_use]
@@ -212,7 +212,7 @@ mod tests {
         );
     }
 
-    /// The root-level loco route group binds exactly the `/metrics.prom`
+    /// The root-level axa route group binds exactly the `/metrics.prom`
     /// scrape path.
     #[test]
     fn metrics_routes_binds_metrics_prom() {

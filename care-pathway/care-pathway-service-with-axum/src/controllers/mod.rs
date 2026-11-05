@@ -32,7 +32,7 @@ pub mod tba;
 
 /// Map a model-layer error to its HTTP shape: a missing record is
 /// `404 Not Found`; anything else stays a model error (500-class).
-/// loco 0.16 stopped mapping `ModelError::EntityNotFound` itself (its
+/// axa stopped mapping `ModelError::EntityNotFound` itself (its
 /// `IntoResponse` catch-all turns it into a 500), so every controller
 /// lookup routes through this instead of a bare `?`.
 #[must_use]

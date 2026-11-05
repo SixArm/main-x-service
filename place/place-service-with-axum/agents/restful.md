@@ -242,7 +242,7 @@ bearer token on **every** route except the public allow-list:
 | Public path | Why |
 | --- | --- |
 | `/api/health` | Liveness probe (this crate's surface) |
-| `/_health`, `/_ping` | loco default health routes |
+| `/_health`, `/_ping` | axa default health routes |
 | `/api-docs/openapi.json` | Raw OpenAPI document |
 | `/swagger-ui*` (prefix) | Swagger UI + static assets |
 | `/metrics.prom` | Prometheus scrape (root-mounted, outside `/api`) |
@@ -250,7 +250,7 @@ bearer token on **every** route except the public allow-list:
 The list is the `PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` constants in
 `src/api/rest/auth.rs`; the pure `auth::enforce` decision is layered
 via `axum::middleware::from_fn_with_state` on both router surfaces
-(`create_router` and the loco router in `src/app.rs`). The flag is
+(`create_router` and the axa router in `src/app.rs`). The flag is
 read once at router construction — restart the service to change it.
 Unauthenticated requests to any non-public path return `401`. See
 `agents/share/jwt-enforcement.md` for the family-wide contract.

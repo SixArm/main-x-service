@@ -1,11 +1,11 @@
-### Technology stack for Rust Loco
+### Technology stack for Rust Axum
 
 | Component            | Technology                                        | Purpose                                     |
 | -------------------- | ------------------------------------------------- | ------------------------------------------- |
 | **Language**         | Rust 2024 Edition; MSRV **1.97** (N-2, `spec/rust-msrv-n-minus-2/index.md`) | Systems programming, performance, safety    |
 | **Async Runtime**    | Tokio                                             | Asynchronous I/O and concurrency            |
 | **HTTP**             | tower-http                                        | HTTP layer, CORS, compression               |
-| **Web Framework**    | Axum, Loco                                        | HTTP server and routing (backend-only)      |
+| **Web Framework**    | Axum, axa                                         | HTTP server and routing (backend-only)      |
 | **Database**         | PostgreSQL 18+                                    | Data persistence                            |
 | **ORM**              | SeaORM, sea-orm-migration                         | Async database object-relational mapper     |
 | **Search Engine**    | Tantivy                                           | Embed full-text search indexing             |
@@ -39,18 +39,12 @@ Constraints:
 - Tokio NOT async_std
 - MiMalloc NOT jemalloc
 - PostgreSQL NOT SQLite¹
-- chrono (sea-orm and loco-rs require it; sea-orm has no `with-jiff` feature)
-- sea-orm feature "with-chrono" (loco services) or "with-time" (older services)
+- chrono (sea-orm and axa require it; sea-orm has no `with-jiff` feature)
+- sea-orm feature "with-chrono" (controller-style services) or "with-time" (older services)
 
-¹ This governs which driver we connect with and which URLs/config we
-ship, not what's compiled in: `loco-rs`'s own `with-db` feature
-hardcodes `sea-orm`/`sea-orm-migration`'s `sqlx-sqlite` unconditionally
-for every loco-based crate in the family, regardless of what database
-features that crate itself requests (verified present in patient-flow,
-care-pathway, person, worker, organization, and case's `Cargo.lock`s;
-found and documented 2026-08-29, `tasks.md` PRO-P28). No crate here can
-remove it from its own manifest; doing so needs an upstream loco-rs
-change.
+¹ `axa` hardcoded `sqlx-sqlite` into every crate that used it. Now that
+axa is gone, this rule can be enforced by the dependency graph as well as by
+convention.
 
 ## Configurations
 

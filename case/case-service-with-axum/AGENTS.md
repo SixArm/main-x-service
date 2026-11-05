@@ -7,16 +7,16 @@ registry of **governmental case** records.
 
 ## What this is
 
-A **loco.rs** service for case records: CRUD + matching, embedding the
+A **axa** service for case records: CRUD + matching, embedding the
 canonical [`case-matcher`](../case-matcher-rust-crate). The API DTO **is**
 `case_matcher::Case` — stored verbatim (JSONB) and matched with the same
 type, so there is no separate model or adapter to drift.
 
 | Question | Answer |
 |---|---|
-| Framework | loco.rs 1.0.1 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration` 2.0). |
+| Framework | axa (`Hooks`/`AppContext`/CLI, axa config, `sea-orm-migration` 2.0). |
 | Build / test | `cargo build` · `cargo test` (DB-free unit + `tests/matching.rs`) · `cargo test -- --ignored` (request tests, need Postgres). |
-| Run | `cargo loco start` (needs Postgres). |
+| Run | `cargo run -- start` (needs Postgres). |
 | Persistence | One `cases` table: `pid`, `title`, `data` (JSONB Case), `active`, soft-delete. |
 
 ## API surface
@@ -62,7 +62,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root-mounted, public, `text/plain; version=0.0.4`) |
 
-Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
+Plus axa's default `/_health`, `/_ping`. Every CRUD action writes an
 `audit_logs` row and publishes a `created`/`updated`/`deleted` event. See
 [`spec/index.md`](./spec/index.md) §12 for the compliance-endpoint detail
 (gating, what each verifies) and §8.6/§9 for the links/FHIR detail.
@@ -106,7 +106,7 @@ audited `GET /{pid}/export` GDPR envelope — landed too (spec §13,
 2026-08-02), reusing the existing `disclosure::action::EXPORT`
 machinery for the export's HIPAA §164.528 accounting. **Bulk
 import/export** (spec §8.7/§13, BLK-5, landed 2026-08-03) is wired:
-async job-based JSONL/CSV import + export via `src/bulk/` and a loco
+async job-based JSONL/CSV import + export via `src/bulk/` and an axa
 `BackgroundWorker`, stable-keyed on the agency-scoped
 `(agency_id, case_number)` pair then `pid`, reusing `mask_case` as the
 default export redaction and gating every export's audit write ahead of
@@ -133,7 +133,7 @@ service-identification surface at `/api/compliance*`. Full detail in
 [`spec/index.md`](./spec/index.md) §12.0/§12.0.1 — none of this had a
 `spec/13` task record until this pass.
 
-For a quick demo dataset, `cargo loco task seed_examples` loads the
+For a quick demo dataset, `cargo run -- task seed_examples` loads the
 repository's shared fixture (`examples/data/cases.jsonl`, 10 rows) via
 the model-layer create (no duplicate check, no audit row, no event —
 deliberate for a seed task); it refuses to insert into a non-empty
@@ -154,7 +154,7 @@ person records — see `examples/data/case-subject-links.md`.
 ## Golden rules
 
 1. **Spec-first.** Update `spec/index.md` with behavioural changes.
-2. **Loco-idiomatic.** Endpoints are loco controllers in `app.rs`; new
+2. **Controller-style.** Endpoints are axa controllers in `app.rs`; new
    tables are `sea-orm-migration` migrations.
 3. **Reuse the matcher type.** Do not fork a `Case` DTO.
 4. **Auth credentials** come from the central
@@ -164,8 +164,8 @@ person records — see `examples/data/case-subject-links.md`.
 
 ```
 src/
-├── app.rs                 loco Hooks (routes, truncate, spawns the outbox relay)
-├── bin/main.rs            loco CLI entrypoint
+├── app.rs                 `App` functions (routes, truncate, spawns the outbox relay)
+├── bin/main.rs            axa CLI entrypoint
 ├── version.rs             Accepts-version header negotiation (api-versioning.md)
 ├── controllers/cases.rs   CRUD + match + check-duplicates + deduplicate + review-queue + merge + audit/events/verify + erase + whoami
 ├── controllers/links.rs   cross-service `subject_of` edges (§8.6): create/list/delete + bulk pull
@@ -179,7 +179,7 @@ src/
 ├── openapi.rs             hand-written OpenAPI 3 document
 ├── search/                Tantivy full-text/fuzzy/phonetic index (index.rs schema + mod.rs engine)
 ├── streaming.rs           durable-bus Envelope + EventPublisher/EventSink seam (memory | outbox transports)
-├── relay.rs               Phase-3 outbox relay (plain background loop from app.rs, not a loco worker) + FluvioSink
+├── relay.rs               Phase-3 outbox relay (plain background loop from app.rs, not an axa worker) + FluvioSink
 ├── compliance/            audit_chain · disclosure · erasure (GDPR Art. 17) · checkpoint ·
 │                          record_integrity · mac (keyed HMAC) · soup (SBOM) — see spec §12.0/§12.0.1
 ├── tasks/search.rs        `search_reindex` CLI task + boot-time rebuild-if-empty
@@ -218,9 +218,9 @@ tests/otlp_collector/      the shared in-process OTLP/gRPC collector both otlp_*
 course's, itself person's, itself link-graph-service's, the family's
 first working exporter. This crate carried **no** `src/observability`
 module at all before this change, and is the **third of the four
-loco-idiomatic registries** (organization, care-pathway, case,
+controller-style registries** (organization, care-pathway, case,
 portfolio — `src/controllers/`, not `src/api/rest/`) to carry it.
-`App::init_logger` installs it (loco's own `EnvFilter` + formatted
+`App::init_logger` installs it (axa's own `EnvFilter` + formatted
 layer, plus the `tracing-opentelemetry` bridge over an OTLP/gRPC
 exporter); `App::on_shutdown` flushes it. Export is **on by default** —
 set `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
@@ -234,7 +234,7 @@ siblings use.
 than assumed:
 
 - **Exactly one router-construction surface**, unlike the person-style
-  crates' two. This crate is genuinely loco-idiomatic: `App::routes` +
+  crates' two. This crate is genuinely controller-style: `App::routes` +
   `App::after_routes` in `src/app.rs` is the only place a router gets
   built — confirmed by grepping `src/` and `tests/` for a second
   `Router::new()`/`create_router`: the one hit (`src/auth.rs`) is a
@@ -292,10 +292,10 @@ at the crate root — the Dockerfile now copies that directory
 explicitly. (2) `config/production.yaml`'s `mailer.smtp.auth.user`/
 `password` used an unquoted Tera `{{ get_env(name="…", default="") }}`
 call, which renders as YAML `null` (not `""`) when the env var is
-unset — loco's `SmtpAuth` fields are `String`, not `Option<String>`, so
+unset — axa's `SmtpAuth` fields are `String`, not `Option<String>`, so
 this failed config parsing at boot with "invalid type: unit value,
 expected a string". This crate's `.gitignore` also excluded
-`config/production.yaml` entirely (a loco scaffold default nobody had
+`config/production.yaml` entirely (a Loco scaffold default nobody had
 removed), which is why the SMTP bug had never been caught — the file
 never left this machine, so no other checkout could exercise it. Both
 are fixed (the file is now tracked; see the `.gitignore` for the
@@ -309,10 +309,10 @@ written.
 [`agents/share/runbooks/first-deployment.md`](../../agents/share/runbooks/first-deployment.md)'s
 T-28o exercise (run against project-portfolio-management-service, then
 rolled here), which found two more real defects the 2026-08-03 pass had
-not: (3) the same dead loco JWT `auth:` block as portfolio's — a
+not: (3) the same dead axa JWT `auth:` block as portfolio's — a
 `JWT_SECRET` env-var lookup with no `default` crashed a fresh container
-with the var unset, for a value this crate reads nowhere (`loco-rs` is
-built without the `auth` feature; PASETO, never JWT). loco's
+with the var unset, for a value this crate reads nowhere (`axa` is
+built without the `auth` feature; PASETO, never JWT). axa's
 `Config.auth` is `Option<Auth>`, so the fix is deleting the block, not
 defaulting it. (4) The Dockerfile never `COPY`'d `benches/`, and Cargo
 refuses to parse a `[[bench]]`-declaring manifest at all without that

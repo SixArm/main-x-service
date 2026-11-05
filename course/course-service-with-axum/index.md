@@ -63,13 +63,13 @@ podman run -d --name course-postgres -p 5434:5432 \
   -e POSTGRES_PASSWORD=course_password \
   postgres:18-alpine
 
-# Build and run (loco.rs): point DATABASE_URL at the database, then
+# Build and run (axa): point DATABASE_URL at the database, then
 # start. Migrations run automatically in development (config auto_migrate).
 export DATABASE_URL=postgres://course_user:course_password@localhost:5434/course
-cargo loco start            # or: cargo run -- start
+cargo run -- start            # or: cargo run -- start
 
 # Migrations can also be run explicitly:
-cargo loco db migrate
+cargo run -- db migrate
 ```
 
 ## API
@@ -161,7 +161,7 @@ It emits no sample line until the first request is served.
 ## Configuration
 
 Server binding, logger, database pool, and the background queue are
-owned by the loco environment config in `config/<environment>.yaml`
+owned by the axa environment config in `config/<environment>.yaml`
 (development binds `localhost:8084`; `DATABASE_URL` is interpolated
 into the `database` and `queue` blocks). Domain knobs still come
 from the environment via `Config::from_env`:
@@ -176,7 +176,7 @@ from the environment via `Config::from_env`:
 
 **Parsed but not read anywhere else** (legacy pre-loco `Config` fields
 that nothing in `src/` consults — the real bind address/port come from
-loco's own `config/<environment>.yaml`, and there is no OpenTelemetry
+axa's own `config/<environment>.yaml`, and there is no OpenTelemetry
 exporter or streaming-broker client in this crate): `GRPC_PORT` (no
 gRPC surface exists at all — not even a stub), `OTLP_SERVICE_NAME` /
 `OTLP_ENDPOINT` (no `src/observability/` module), `STREAMING_BROKER_URL`

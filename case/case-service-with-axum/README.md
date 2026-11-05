@@ -1,7 +1,7 @@
 # Case Service
 
 A registry of **governmental case** records: CRUD + matching, built
-on **loco.rs** and embedding the canonical
+on **axa** and embedding the canonical
 [case-matcher](../case-matcher-rust-crate).
 
 A *case* (case management / case tracking) is an open or historical
@@ -49,7 +49,7 @@ Requires PostgreSQL.
 
 ```bash
 export DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_development
-cargo loco start        # migrations auto-run in development
+cargo run -- start        # migrations auto-run in development
 
 curl -s localhost:5150/api/cases -H 'content-type: application/json' \
   -d '{"title":"Housing benefit appeal","agency_id":"dwp","case_number":"HB-2024-0007","identifiers":[{"scheme":"Docket","value":"CV-2024-001234"}]}'

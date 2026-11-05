@@ -5,7 +5,7 @@
 #
 # Derived 2026-11-03 from stable 1.99.1 (2026-10-13). Moved 1.96 -> 1.97; was tightened from the
 # family's former N-3 policy (1.95) to N-2 in the same change.
-# The true dependency floor is 1.94 (loco-rs / sea-orm / sqlx), so this
+# The true dependency floor is 1.94 (axa / sea-orm / sqlx), so this
 # clears it by two releases.
 #
 # One bare `major.minor` line below; everything else here is a comment.

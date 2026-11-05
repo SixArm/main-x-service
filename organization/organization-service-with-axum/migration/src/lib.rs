@@ -3,7 +3,7 @@
 //! Defines the tables the service persists to — `organizations`,
 //! `audit_logs`, `merge_records`, `event_outbox` (the durable
 //! event-bus Phase-2 hand-off buffer), and `bulk_jobs` (BLK-5 async bulk
-//! import/export) — and exposes [`Migrator`], which loco's CLI (`db
+//! import/export) — and exposes [`Migrator`], which axa's CLI (`db
 //! migrate`) and the request-test harness run in order.
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
@@ -22,13 +22,13 @@ mod m20260803_000001_review_queue_provenance;
 mod m20260803_000002_bulk_jobs;
 
 /// The migration runner for this crate. Lists every migration in apply
-/// order; loco's CLI and the test harness drive it via `MigratorTrait`.
+/// order; axa's CLI and the test harness drive it via `MigratorTrait`.
 pub struct Migrator;
 
 #[async_trait::async_trait]
 impl MigratorTrait for Migrator {
     /// The ordered list of migrations to apply (oldest first). The
-    /// `inject-above` marker lets the loco generator splice new
+    /// `inject-above` marker lets the Loco generator splice new
     /// migrations in without hand-editing this list.
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![

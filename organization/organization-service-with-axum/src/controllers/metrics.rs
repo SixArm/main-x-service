@@ -19,7 +19,7 @@ use crate::metrics::{self, Metrics};
 ///
 /// # Errors
 ///
-/// Never in practice; the signature is loco's. Response construction is
+/// Never in practice; the signature is axa's. Response construction is
 /// infallible (a static header value plus an owned body).
 #[debug_handler]
 async fn metrics_prom() -> Result<Response> {

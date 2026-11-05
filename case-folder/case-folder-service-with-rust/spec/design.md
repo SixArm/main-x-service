@@ -1,8 +1,8 @@
-# Design (Loco edition)
+# Design (Axum edition)
 
-> Part of the [Loco edition specification](index.md). System-level
+> Part of the [Axum edition specification](index.md). System-level
 > decisions: [root design](../../spec/design.md). This file records the
-> **Loco-specific** decisions that satisfy [requirements.md](requirements.md).
+> **axa-specific** decisions that satisfy [requirements.md](requirements.md).
 
 ## LD-1 — Client trait + Http + Stub per upstream (AR-8, AR-9)
 
@@ -31,7 +31,7 @@ returned labels into the Thing `keywords`/`identifiers` and the Event
 `Migrator::migrations()` returns `vec![]`; Postgres exists only because
 `create_app::<App, Migrator>` requires an `AppContext.db`. No schema is
 created or read. _Satisfies:_ the aggregator decision without fighting
-Loco's boot contract.
+axa's boot contract.
 
 ## LD-5 — Stub-mode initializer reuses the seed path (AR-8)
 

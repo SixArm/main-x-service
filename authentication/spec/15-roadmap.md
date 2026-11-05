@@ -16,7 +16,7 @@ worldwide governmental deployment with millions of users.
   sessions-table reshape (§13 T-12a/T-12c).
 - **PASETO enforcement rollout across peer services.** Embed the
   PASETO-mode `authentication-verifier` in every entity service (the
-  loco conversion's next step), reject unauthenticated `/api/*`
+  Loco conversion's next step), reject unauthenticated `/api/*`
   requests (valid session or valid PASETO per
   [`agents/share/jwt-enforcement.md`](../../agents/share/jwt-enforcement.md)),
   and have sibling front-ends call entity services server-side (BFF)

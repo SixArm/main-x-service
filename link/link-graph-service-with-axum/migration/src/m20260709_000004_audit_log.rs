@@ -1,5 +1,5 @@
 //! Migration: create the `audit_log` governance table (spec §10.4). SQL
-//! is the source of truth; this wrapper bridges it into the loco
+//! is the source of truth; this wrapper bridges it into the axa
 //! `Migrator`.
 
 use sea_orm_migration::prelude::*;

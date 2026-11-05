@@ -127,7 +127,7 @@ authentication-service too):
    `storageState` that `integration` reuses for every test.
 
 Step 2 only works against authentication-service running in
-`LOCO_ENV=development`: `deliver_magic_link` (its own
+`APP_ENV=development`: `deliver_magic_link` (its own
 `src/controllers/auth.rs`) logs the link **only** in that environment
 (SEC-A3 — a production-mode container never discloses a live login
 token to its logs). That's `examples/compose/authentication-dev.yml`

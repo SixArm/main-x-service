@@ -50,7 +50,7 @@ explicitly blesses, never as the session itself.
   in specs are superseded by this doc.
 - Stateless sessions (rejected per [jwt.md](jwt.md)).
 - An external session store / cache — sessions live in Postgres
-  (the family avoids external brokers; see [loco.md](loco.md)).
+  (the family avoids external brokers; see [loco.md](axa.md)).
 - Long-lived bearer tokens — PASETO tokens are ~5 minutes and derived from
   the session.
 

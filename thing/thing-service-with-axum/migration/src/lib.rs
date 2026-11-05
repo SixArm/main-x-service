@@ -1,9 +1,9 @@
-//! Loco migrator for thing-service.
+//! axa migrator for thing-service.
 //!
 //! Each migration wraps the corresponding hand-written SQL under
 //! `../migrations/<timestamp>_<name>/{up,down}.sql` via `include_str!`,
-//! so the SQL stays the single source of truth while loco gains a Rust
-//! `Migrator` it can run (`auto_migrate`, `cargo loco db migrate`).
+//! so the SQL stays the single source of truth while axa gains a Rust
+//! `Migrator` it can run (`auto_migrate`, `cargo axa db migrate`).
 
 // SEC-I3: migrators run pure SQL orchestration; forbid unsafe.
 #![forbid(unsafe_code)]

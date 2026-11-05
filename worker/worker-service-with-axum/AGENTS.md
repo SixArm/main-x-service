@@ -25,8 +25,8 @@ Shared reference docs live at the project root under
 |----------|-------------|
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
-| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Full Rust + Loco dependency stack |
-| [loco.md](../../agents/share/loco.md) | Tech stack summary |
+| [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Full Rust + axa dependency stack |
+| [loco.md](../../agents/share/axa.md) | Tech stack summary |
 | [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](../../agents/share/match.md) | Matching algorithms |
 | [search.md](../../agents/share/search.md) | Search (Tantivy) |
@@ -91,7 +91,7 @@ subscriber with the OTLP exporter commented out behind
 `// TODO: Initialize OTLP exporter`, never wired into `App`'s `Hooks`
 impl at all, plus a `custom_metrics::WorkerMetrics::new` that `todo!()`d)
 rather than filling the stub in place. `App::init_logger` installs it
-(loco's own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
+(axa's own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
 bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it. Export
 is **on by default** — set `OTLP_ENDPOINT=""` to disable it — at
 `OTLP_ENDPOINT` (default `http://localhost:4317`) with `service.name`
@@ -110,10 +110,10 @@ layering (see `src/config/mod.rs`'s `ObservabilityConfig` doc comment).
 person-service anticipated, confirmed rather than assumed:
 
 - **Two router-construction surfaces.** This crate carries the
-  loco-native one (`api::rest::workers_routes()`, mounted via
+  controller-style one (`api::rest::workers_routes()`, mounted via
   `App::routes`/`App::after_routes`) and a standalone hand-rolled one
   (`api::rest::create_router`, used only by the DB-gated integration
-  tests) — where link-graph-service has exactly one (pure loco). The
+  tests) — where link-graph-service has exactly one (pure axa). The
   `observability::trace_mw` tower middleware (per-request span +
   `http.server.request.duration` histogram + W3C `traceparent` response
   header) is layered onto **both**, as the outermost layer in each, so
@@ -231,9 +231,9 @@ Postgres, and `GET /api/health` returns `200`. Like person's, this
 crate's Dockerfile pre-dated the family's repo-root-context convention
 and had the same four bugs, found only by running the built image:
 no `config/` copy (boot crash: "no configuration file found in folder:
-config"); `CMD` with no `start` subcommand (the loco CLI just prints
-`--help` and exits 0); no `LOCO_ENV` (would boot in `development`
-inside a `production` image); and a dead `SERVER_PORT` env var — loco's
+config"); `CMD` with no `start` subcommand (the axa CLI just prints
+`--help` and exits 0); no `APP_ENV` (would boot in `development`
+inside a `production` image); and a dead `SERVER_PORT` env var — axa's
 own config reads `PORT`, not `SERVER_PORT` (the latter is a separate,
 unrelated surface this crate's own `src/config/mod.rs` documents for
 non-loco code paths). All four fixed; `PORT=8080` is now set

@@ -21,8 +21,8 @@ The shared reference docs live at the project root under
 |----------|-------------|
 | [overview.md](../../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../../agents/share/architecture.md) | Layered architecture |
-| [loco.md](../../../agents/share/loco.md) | Tech stack summary |
-| [rust-loco-stack.md](../../../agents/share/rust-loco-stack.md) | Full dependency inventory |
+| [loco.md](../../../agents/share/axa.md) | Tech stack summary |
+| [rust-axum-stack.md](../../../agents/share/rust-axum-stack.md) | Full dependency inventory |
 | [match-search-merge.md](../../../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](../../../agents/share/match.md) | Matching algorithms (cross-crate) |
 | [search.md](../../../agents/share/search.md) | Search (Tantivy) |

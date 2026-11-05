@@ -2,7 +2,7 @@
 
 > Part of the [Case Tracking specification](index.md). This is the
 > shared, edition-independent domain. The
-> [loco domain-model](../case-folder-service-with-rust/spec/domain-model.md)
+> [axa domain-model](../case-folder-service-with-rust/spec/domain-model.md)
 > adds the wire/`Thing`/`Event` packing detail; the
 > [svelte domain-model](../case-folder-front-end-with-svelte/spec/domain-model.md)
 > adds the camelCase client types.
@@ -82,7 +82,7 @@ task; do not assume it here.)
 
 Tags are a snapshot/registry attribute of the tracker's own record, so
 they follow the canonical model downstream in the same change cycle: the
-[loco domain-model](../case-folder-service-with-rust/spec/domain-model.md)
+[axa domain-model](../case-folder-service-with-rust/spec/domain-model.md)
 wire shape and the
 [svelte domain-model](../case-folder-front-end-with-svelte/spec/domain-model.md)
 camelCase client types pick up `tags` from here.

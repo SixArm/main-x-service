@@ -4,10 +4,10 @@
 //! only the thin impure layer that writes what it returns.
 //!
 //! ```text
-//! cargo loco task journeys:seed pathway:<pid>
-//! cargo loco task journeys:seed pathway:<pid> n:50 seed:7 open_share:0.3
-//! cargo loco task journeys:seed pathway:<pid> defects:all
-//! cargo loco task journeys:seed pathway:<pid> defects:no_segments,steps_out_of_order
+//! cargo axa task journeys:seed pathway:<pid>
+//! cargo axa task journeys:seed pathway:<pid> n:50 seed:7 open_share:0.3
+//! cargo axa task journeys:seed pathway:<pid> defects:all
+//! cargo axa task journeys:seed pathway:<pid> defects:no_segments,steps_out_of_order
 //! ```
 //!
 //! **Never real data, never derived from real data.** Every generated

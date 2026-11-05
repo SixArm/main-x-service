@@ -1,4 +1,4 @@
-//! `patient-flow-service` — a loco.rs consumer application for hospital
+//! `patient-flow-service` — an axa consumer application for hospital
 //! **patient flow and bed management**: wards / bays / beds with a live
 //! bed state machine, inpatient stays from admission to discharge
 //! (SAFER fields, `Red2Green` journal, DTOC), bed requests with
@@ -12,7 +12,7 @@
 //!
 //! ## Modules
 //!
-//! - [`app`] — loco `Hooks` wiring (routes, truncate, seed).
+//! - [`app`] — axa `Hooks` wiring (routes, truncate, seed).
 //! - [`controllers`] — Axum controllers: topology CRUD, bed states,
 //!   stays, bed requests, boards, audits.
 //! - [`flow`] — the **pure core**: bed state machine, allocation rules,

@@ -7,7 +7,7 @@ crate: a registry of **clinical care-pathway** records.
 
 ## What this is
 
-A **loco.rs** service for care-pathway records: CRUD + matching,
+A **axa** service for care-pathway records: CRUD + matching,
 embedding the canonical [`care-pathway-matcher`](../care-pathway-matcher-rust-crate).
 The API DTO **is** `care_pathway_matcher::CarePathway` — stored verbatim
 (JSONB) and matched with the same type, so there is no separate model or
@@ -15,9 +15,9 @@ adapter to drift.
 
 | Question | Answer |
 |---|---|
-| Framework | loco.rs 1.0.1 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration` 2.0). |
+| Framework | axa (`Hooks`/`AppContext`/CLI, axa config, `sea-orm-migration` 2.0). |
 | Build / test | `cargo build` · `cargo test` (DB-free: `tests/matching.rs` + controller 422 pin) · `cargo test -- --ignored` (request tests, need Postgres). |
-| Run | `cargo loco start` (needs Postgres). |
+| Run | `cargo run -- start` (needs Postgres). |
 | Persistence | One `care_pathways` table: `pid`, `name`, `data` (JSONB CarePathway), `active`, soft-delete. |
 
 ## API surface
@@ -66,7 +66,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (text-exposition; root path, public under auth enforcement) |
 
-Plus loco's default `/_health`, `/_ping`. Every CRUD action writes an
+Plus axa's default `/_health`, `/_ping`. Every CRUD action writes an
 `audit_logs` row and publishes a `created`/`updated`/`deleted` event.
 `GET /api/care-pathways` and `GET /api/care-pathways/search` take
 `?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/`X-Offset`.
@@ -378,7 +378,7 @@ MAC'd external-witness chain checkpoints
 the hash chain alone cannot see), row-level record content hashing,
 read/disclosure auditing, GDPR Art. 17 erasure, and a SOUP register +
 CycloneDX SBOM + machine-checked requirement→test traceability.
-`cargo loco task integrity_key`/`integrity_resign` generate, check, and
+`cargo run -- task integrity_key`/`integrity_resign` generate, check, and
 re-sign the MAC key without ever logging it. The mounted **FHIR R5**
 surface (`src/fhir/`, `controllers/fhir.rs`, spec §12.3) maps the
 stored DTO to `PlanDefinition`, with `$validate`, conditional SMART
@@ -399,7 +399,7 @@ only the credential changed. See
 ## Golden rules
 
 1. **Spec-first.** Update `spec/index.md` with behavioural changes.
-2. **Loco-idiomatic.** Endpoints are loco controllers in `app.rs`; new
+2. **Controller-style.** Endpoints are axa controllers in `app.rs`; new
    tables are `sea-orm-migration` migrations.
 3. **Reuse the matcher type.** Do not fork a `CarePathway` DTO.
 4. **Auth** comes from the central
@@ -410,8 +410,8 @@ only the credential changed. See
 
 ```
 src/
-├── app.rs                 loco Hooks (routes, workers, truncate, key/policy-refresh spawn)
-├── bin/main.rs             loco CLI entrypoint
+├── app.rs                 `App` functions (routes, workers, truncate, key/policy-refresh spawn)
+├── bin/main.rs             axa CLI entrypoint
 ├── bin/sbom.rs             `cargo run --bin sbom` — SBOM to stdout, no server boot
 ├── controllers/
 │   ├── care_pathways.rs   CRUD + match + check-duplicates + merge + masked/export + audit/events/disclosures + erase + whoami
@@ -448,13 +448,13 @@ src/
 │   ├── stable_key.rs          identifier → provider+pathway_code → pid priority chain
 │   ├── error_report.rs        the per-row import error report
 │   ├── pipeline.rs            process_import_job/process_export_job — the testable core
-│   ├── worker.rs               the loco BackgroundWorker draining native bulk_jobs rows
+│   ├── worker.rs               the axa BackgroundWorker draining native bulk_jobs rows
 │   ├── handlers.rs             POST/GET import, POST/GET export, GET bulk-jobs
 │   └── store.rs              ArtifactStore trait + local-filesystem/S3 backends (shared with FHIR $export)
 ├── workers/
 │   └── bulk_export.rs        bg_pg worker materialising FHIR $export NDJSON off the request path
 ├── tasks/
-│   ├── search.rs             `cargo loco task` Tantivy reindex + boot-time reindex-if-empty
+│   ├── search.rs             `cargo run -- task` Tantivy reindex + boot-time reindex-if-empty
 │   ├── integrity_key.rs      generate/check/report the MAC root key (never logs the key)
 │   ├── integrity_resign.rs   re-sign existing rows after a MAC key rotation
 │   └── journeys_seed.rs      T-14m: `journeys:seed` — persists what src/data/journeys.rs generates
@@ -516,9 +516,9 @@ tests/otlp_collector/      the shared in-process OTLP/gRPC collector both otlp_*
 `src/observability.rs` — itself a port of course's, itself person's,
 itself link-graph-service's, the family's first working exporter. This
 crate carried **no** `src/observability` module at all before this
-change, and is the **second of the four loco-idiomatic registries**
+change, and is the **second of the four controller-style registries**
 (organization, care-pathway, case, portfolio — `src/controllers/`, not
-`src/api/rest/`) to carry it. `App::init_logger` installs it (loco's
+`src/api/rest/`) to carry it. `App::init_logger` installs it (axa's
 own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
 bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it.
 Export is **on by default** — set `OTLP_ENDPOINT=""` to disable it —
@@ -533,13 +533,13 @@ not the per-service `CARE_PATHWAY_*` convention
 than assumed:
 
 - **Exactly one router-construction surface**, unlike the person-style
-  crates' two. This crate is genuinely loco-idiomatic: `App::routes` +
+  crates' two. This crate is genuinely controller-style: `App::routes` +
   `App::after_routes` in `src/app.rs` is the only place a router gets
   built — confirmed by grepping `src/` and `tests/` for a second
   `Router::new()`/`create_router`: the one hit (`src/auth.rs`) is a
   unit test for the auth middleware itself, not an app-level router,
   and the request-level test suites (`tests/enforcement.rs`,
-  `tests/masking.rs`, …) boot the real `App` via loco's own testing
+  `tests/masking.rs`, …) boot the real `App` via axa's own testing
   harness rather than a second hand-rolled router.
   `observability::trace_mw` is therefore layered **once**, as the
   outermost middleware in `after_routes` — the same precedent
@@ -592,10 +592,10 @@ at the crate root — the Dockerfile now copies that directory
 explicitly. (2) `config/production.yaml`'s `mailer.smtp.auth.user`/
 `password` used an unquoted Tera `{{ get_env(name="…", default="") }}`
 call, which renders as YAML `null` (not `""`) when the env var is
-unset — loco's `SmtpAuth` fields are `String`, not `Option<String>`, so
+unset — axa's `SmtpAuth` fields are `String`, not `Option<String>`, so
 this failed config parsing at boot with "invalid type: unit value,
 expected a string". This crate's `.gitignore` also excluded
-`config/production.yaml` entirely (a loco scaffold default nobody had
+`config/production.yaml` entirely (a Loco scaffold default nobody had
 removed), which is why the SMTP bug had never been caught — the file
 never left this machine, so no other checkout could exercise it. Both
 are fixed (the file is now tracked; see the `.gitignore` for the
@@ -609,10 +609,10 @@ written.
 [`agents/share/runbooks/first-deployment.md`](../../agents/share/runbooks/first-deployment.md)'s
 T-28o exercise (run against project-portfolio-management-service, then
 rolled here), which found two more real defects the 2026-08-03 pass had
-not: (3) the same dead loco JWT `auth:` block as portfolio's — a
+not: (3) the same dead axa JWT `auth:` block as portfolio's — a
 `JWT_SECRET` env-var lookup with no `default` crashed a fresh container
-with the var unset, for a value this crate reads nowhere (`loco-rs` is
-built without the `auth` feature; PASETO, never JWT). loco's
+with the var unset, for a value this crate reads nowhere (`axa` is
+built without the `auth` feature; PASETO, never JWT). axa's
 `Config.auth` is `Option<Auth>`, so the fix is deleting the block, not
 defaulting it. (4) The Dockerfile never `COPY`'d the `entity-ref`
 sibling path dependency at all — added 2026-08-24 for the

@@ -1,6 +1,6 @@
 ### project-portfolio-management-service — example requests
 # project-portfolio-management/project-portfolio-management-service-with-loco
-# — loco-idiomatic layout (src/controllers/). Envelope: BARE loco JSON,
+# — controller-style layout (src/controllers/). Envelope: BARE loco JSON,
 # same posture as organization.http — see that file's header. Gated by
 # PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH (default off). One recursive
 # `Plan` type — `kind` (Project/Portfolio/Product/Program/...) is an
@@ -11,7 +11,7 @@
 # the complete module list. This file covers plan CRUD + match/dedupe
 # plus the flagship engineering sub-resources (tasks, sprints, burndown).
 #
-# GOTCHA: unlike the other loco-idiomatic crates, plan create has NO
+# GOTCHA: unlike the other controller-style crates, plan create has NO
 # 409-on-duplicate path (curl-verified against the code, not just
 # behaviour) — creating the same name twice does not conflict.
 

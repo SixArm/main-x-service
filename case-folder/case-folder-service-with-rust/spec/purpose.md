@@ -1,6 +1,6 @@
 # Purpose
 
-> Part of the [Loco edition specification](index.md). Shared product
+> Part of the [Axum edition specification](index.md). Shared product
 > purpose: [root purpose](../../spec/purpose.md).
 
 Track the physical location of paper case-note folders in a UK NHS

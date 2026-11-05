@@ -1,7 +1,7 @@
 # Agent guide — link-graph-service-with-axum
 
 The **read-model aggregator** for cross-service entity linking — the
-read side of the hybrid topology. A loco.rs backend service that
+read side of the hybrid topology. An axa backend service that
 consumes every entity's event stream and serves one queryable graph.
 **Read-only to the world**; all its writes are event-driven.
 
@@ -111,8 +111,8 @@ the shared design doc first, then the three above.
 
 ## Tech-stack ground rules
 
-- Family [Rust + Loco stack](../../agents/share/rust-loco-stack.md):
-  Rust 2024, Tokio, Axum + Loco (backend-only — no Tera/HTMX/views),
+- Family [Rust + axa stack](../../agents/share/rust-axum-stack.md):
+  Rust 2024, Tokio, Axum + axa (backend-only — no Tera/HTMX/views),
   SeaORM + PostgreSQL, Fluvio for the bus, tracing + OpenTelemetry,
   MiMalloc on MUSL.
 - **OpenAPI is hand-written, not Utoipa-generated.** `src/openapi.rs`

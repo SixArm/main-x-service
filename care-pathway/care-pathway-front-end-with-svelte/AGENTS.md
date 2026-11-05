@@ -27,7 +27,7 @@ service REST API, whose request/response body is the
    Gantt (`/gantt` instance timeline + `/sequence` intervention sequence); plus Lily
    `ThemePicker`/`LocalePicker` (in the layout). Forms remain plain
    inputs + the `app.css` utilities.
-5. **No envelope.** The service is loco.rs and returns **raw JSON**;
+5. **No envelope.** The service is axa and returns **raw JSON**;
    `src/lib/api/client.ts` is the lean wrapper (get/post/put/delete).
 
 ## Layout

@@ -16,7 +16,7 @@
 
 | Capability | Notes |
 |---|---|
-| loco boot + chassis | loco.rs 0.16, Axum 0.8, SeaORM 1.1 |
+| axa boot + chassis | axa, Axum 0.8, SeaORM 1.1 |
 | Schema + migrations | `organizations` (JSONB payload), `audit_logs` |
 | CRUD | Create / list / get / replace / soft-delete; blank-name guard (`422` on create + replace); unknown pid `404` |
 | Matching endpoints | `/match` (rank) and `/check-duplicates` (vs stored, ≤ 1 000 rows) embedding the matcher directly — no adapter |
@@ -27,7 +27,7 @@
 | Token verification | Offline verification against the auth-service published key (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit + merge `actor` stamped from the token *(recent)*. Credential is **PASETO v4.public** (Ed25519) per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md) — originally shipped against RS256-JWT/JWKS, since switched (§13 T-9) |
 | OpenAPI / Swagger | Hand-written OpenAPI 3 at `/api-docs/openapi.json` + `/swagger-ui` *(recent)* |
 | Tests | DB-free `tests/matching.rs` + unit tests (validation `422` pin, 5 `merge` cases); request-level suite `tests/requests/organizations.rs` (Postgres, `#[ignore]`-gated, 9 tests); green build + clippy |
-| Hygiene | loco scaffolding leftovers removed (no `workers/` / `data/` / `tasks/` stubs) *(recent)* |
+| Hygiene | Loco scaffolding leftovers removed (no `workers/` / `data/` / `tasks/` stubs) *(recent)* |
 
 **organization-front-end-with-svelte** (MVP):
 

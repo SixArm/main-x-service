@@ -24,7 +24,7 @@ pub mod auth;
 pub mod handlers;
 /// Cross-service entity-link write-side endpoints (`same_identity`).
 pub mod links;
-/// Loco route-group registration (`workers_routes`, `fhir_routes`, `metrics_routes`).
+/// axa route-group registration (`workers_routes`, `fhir_routes`, `metrics_routes`).
 pub mod routes;
 /// Shared [`AppState`] carried by every handler.
 pub mod state;
@@ -145,7 +145,7 @@ pub struct ApiDoc;
 /// construction — restart to change; default off) is the only switch.
 pub fn create_router(state: AppState) -> Router {
     // FHIR R5 `/fhir/Practitioner` surface + `/fhir/metadata`, mirroring the
-    // loco mount in `crate::app::App::routes` (built from [`fhir_routes`]) so
+    // axa mount in `crate::app::App::routes` (built from [`fhir_routes`]) so
     // the integration-test router matches production.
     let fhir_routes = {
         use crate::api::fhir::handlers as fhir;
@@ -281,8 +281,8 @@ pub fn create_router(state: AppState) -> Router {
         .layer(axum::middleware::from_fn(crate::observability::trace_mw))
 }
 
-/// Native loco controller routes (idiomatic path): the `/api` surface
-/// as a loco `Routes`; handlers extract `AppState` from the `AppContext`
+/// Native axa controller routes (idiomatic path): the `/api` surface
+/// as an axa `Routes`; handlers extract `AppState` from the `AppContext`
 /// shared store via `FromRef`. `create_router` is retained for the
 /// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
 #[must_use]
@@ -368,7 +368,7 @@ pub fn metrics_routes() -> axa::routes::Routes {
 
 /// HL7 FHIR R5 `/fhir/Practitioner` controller routes + `/fhir/metadata`.
 ///
-/// Mounts the handlers in [`crate::api::fhir::handlers`] as a loco `Routes`
+/// Mounts the handlers in [`crate::api::fhir::handlers`] as an axa `Routes`
 /// group. The handlers extract [`AppState`] from the `AppContext` shared
 /// store via `FromRef`, exactly like the REST surface, so they reuse the same
 /// repository, search engine, and matcher. Wired into the router by

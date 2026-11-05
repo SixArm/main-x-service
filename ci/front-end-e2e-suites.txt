@@ -29,7 +29,7 @@ workforce-planning-management/workforce-planning-management-front-end-with-svelt
 # --- not enrolled ------------------------------------------------------
 #
 # case-folder/case-folder-front-end-with-svelte — its playwright.config.ts
-# assumes a live Loco JSON API on http://localhost:5150 with the seed
+# assumes a live Axum JSON API on http://localhost:5150 with the seed
 # task already run (`global-setup.ts` pings /healthz and verifies seed
 # state before any test runs, so a misconfigured environment fails fast
 # rather than producing a wall of stale assertions). This stage has no

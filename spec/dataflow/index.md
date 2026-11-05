@@ -10,7 +10,7 @@ pipeline as implemented in the service crates.
 Two generations of service exist in the repo, and the step *order* is
 the same in both; the per-step *detail* differs:
 
-- **loco.rs services** (authentication, organization, care-pathway,
+- **axa services** (authentication, organization, care-pathway,
   case, and the loco-converted person/worker/place/thing/event/course
   controllers). The API DTO **is** the matcher type, stored verbatim as
   a single JSONB `data` column. Reference handler:
@@ -39,7 +39,7 @@ topic specs hold the deeper per-stage detail:
 ## 1. Create flow
 
 `POST /api/<plural>` — create a record. The body is the entity DTO
-(in loco services, the matcher type itself).
+(in controller-style services, the matcher type itself).
 
 ```
 HTTP POST
@@ -61,7 +61,7 @@ HTTP POST
   │
   ├─ 7. Write audit row (best-effort, actor from token)
   │
-  └─ 8. Response ........................... 201 Created (older) / 200 (loco)
+  └─ 8. Response ........................... 201 Created (older) / 200 (axa)
 ```
 
 Step-by-step:
@@ -69,23 +69,23 @@ Step-by-step:
 1. **Validate.** `validate(&payload)` collects *every* problem and
    reports them in one response so the caller fixes them in a single
    round-trip. A failure is **`422 Unprocessable Entity`** (family
-   convention; loco has no `unprocessable_entity` helper, so the loco
+   convention; axa has no `unprocessable_entity` helper, so the axa
    services raise `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY,
    …)`). Rules live in each crate's `src/validation.rs`. See
    [validation](../validation/index.md).
 2. **Duplicate detection.** Where wired, search produces blocking
    candidates, then the matcher scores each and classifies the
    confidence band. See [matching](../matching/index.md) and
-   [search](../search/index.md). (In the current loco services this
+   [search](../search/index.md). (In the current controller-style services this
    real-time gate on create is deferred; the equivalent is the explicit
    [check-duplicates](#2-match--check-duplicates-flow) endpoint.)
 3. **Conflict.** If duplicates are detected, return **`409 Conflict`**
    with the candidate matches in the body — nothing is persisted.
 4. **Persist.** `Model::create(&db, &payload)` performs the INSERT.
    In the older services this fans out across normalized child tables
-   inside one transaction; in loco services it is a single-row INSERT of
+   inside one transaction; in controller-style services it is a single-row INSERT of
    the JSONB `data` column plus the denormalized `name`/`pid`.
-5. **Search index.** Every service, loco or older, indexes the new
+5. **Search index.** Every service, axa or older, indexes the new
    record in Tantivy — full-text search is live family-wide, not just
    in the older services. See [search](../search/index.md).
 6. **Publish event.** A `Created` event goes to the in-memory event
@@ -99,7 +99,7 @@ Step-by-step:
    `WARN` and swallowed — the create has already committed and the audit
    trail is a secondary side-channel. See
    [auditability](../auditability/index.md).
-8. **Respond.** Older services return **`201 Created`**; loco services
+8. **Respond.** Older services return **`201 Created`**; controller-style services
    return **`200`** with the lightweight `{pid, name}` reference.
 
 > Ordering note: steps 6–7 are *post-commit* side-channels. The record
@@ -265,7 +265,7 @@ GET /api/<plural>/{id}/export     → 200 GDPR data-export JSON
    export of the record.
 
 Masked/export are present in the older privacy-complete services
-(person/place/worker) and deferred in several loco services (e.g.
+(person/place/worker) and deferred in several controller-style services (e.g.
 case privacy masking + GDPR export is on the deferred list) — consult
 the per-crate `spec.md §13` for the live status.
 
@@ -293,7 +293,7 @@ and [../../agents/share/authentication-sessions.md](../../agents/share/authentic
 ```
 
 This replaces the prior RS256 JWT + JWKS model 1:1 (code follow-up
-pending). Two extractors gate handlers in the loco services
+pending). Two extractors gate handlers in the controller-style services
 (`src/auth.rs`, embedding `authentication-verifier`):
 
 - `AuthUser` — **required** token. The extractor verifies `kid` / `iss`
@@ -340,7 +340,7 @@ retired duplicate.
 The pipelines are step-for-step identical; the per-step *detail*
 differs between the two service generations:
 
-| Stage | loco.rs services | older Axum services |
+| Stage | axa services | older Axum services |
 | --- | --- | --- |
 | Persistence (create §1.4) | single-row INSERT of JSONB `data` + denormalized `name`/`pid` | INSERT fanned across normalized child tables in one transaction |
 | DTO | the matcher type stored verbatim (no adapter) | a separate `Person`/etc. model + adapter to the matcher type |

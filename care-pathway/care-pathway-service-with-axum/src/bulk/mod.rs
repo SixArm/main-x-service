@@ -41,7 +41,7 @@
 //!   [`crate::streaming::update_and_emit`] for every written row, so a
 //!   bulk-imported pathway gets exactly the same event + audit +
 //!   search-index side effects as one created interactively.
-//! - [`worker`] — the loco `BackgroundWorker` that drains `bulk_jobs`.
+//! - [`worker`] — the axa `BackgroundWorker` that drains `bulk_jobs`.
 //! - [`handlers`] — the REST surface (§4): `POST`/`GET
 //!   /api/care-pathways/import[/{id}]`, `POST`/`GET
 //!   /api/care-pathways/export[/{id}]`, `GET
@@ -77,7 +77,7 @@ pub mod pipeline;
 pub mod stable_key;
 /// Artifact storage abstraction + local-filesystem/S3 implementations.
 pub mod store;
-/// The loco `BackgroundWorker` draining `bulk_jobs`.
+/// The axa `BackgroundWorker` draining `bulk_jobs`.
 pub mod worker;
 
 use serde::{Deserialize, Serialize};

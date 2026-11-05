@@ -1,7 +1,7 @@
 //! Create the `users` table backing passwordless magic-link accounts.
 //!
 //! `email` and `api_key` are `UNIQUE`. The password/reset/verification
-//! columns are loco scaffolding; the passwordless flow relies on the
+//! columns are Loco scaffolding; the passwordless flow relies on the
 //! `magic_link_token` + `magic_link_expiration` pair (short-lived,
 //! single-use). The GDPR `deleted_at` column is added later by
 //! `m20220101_000004_users_deleted_at`.

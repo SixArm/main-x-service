@@ -192,7 +192,7 @@ fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
 }
 
 /// Bridge so the existing `State<AppState>` handlers can run as native
-/// loco controllers: loco's router state is [`AppContext`], and this
+/// axa controllers: axa's router state is [`AppContext`], and this
 /// extracts the (cheaply-cloneable) `AppState` from the context's shared
 /// store, which is populated once at boot in `App::after_routes`.
 impl axum::extract::FromRef<axa::AppContext> for AppState {

@@ -16,7 +16,7 @@
 +----------------------------+---------------------------------------+
                              | REST (JSON envelope, PUBLIC_API_BASE_URL)
 +----------------------------v---------------------------------------+
-|              place-service-with-axum (loco.rs / Axum)              |
+|              place-service-with-axum (axa / Axum)              |
 |  +---------------+ +----------------+ +-------------------------+   |
 |  |  Validation   | |  Matching      | |  Search (Tantivy)       |   |
 |  |  & Privacy    | |  adapter.rs ---+-+--> place-matcher crate  |   |

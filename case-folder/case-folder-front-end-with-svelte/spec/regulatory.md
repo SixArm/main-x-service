@@ -7,7 +7,7 @@
 ## Regulatory considerations
 
 Same as the API sibling (see
-[Loco regulatory](../../case-folder-service-with-rust/spec/regulatory.md)) plus
+[axa regulatory](../../case-folder-service-with-rust/spec/regulatory.md)) plus
 a client-side angle:
 
 - **DCB0129 / DCB0160** clinical risk management.

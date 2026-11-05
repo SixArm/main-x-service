@@ -221,7 +221,7 @@ See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
 - Rust 1.97+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL 18+
 - No extra CLI tooling required: migrations run through the built-in
-  loco CLI (`cargo loco db migrate`)
+  axa CLI (`cargo run -- db migrate`)
 
 ```bash
 # Clone repository
@@ -231,12 +231,12 @@ cd main-x-service/event/event-service-with-axum
 # Set up database
 createdb event_service
 cp .env.example .env
-# Set DATABASE_URL (loco reads it via config/development.yaml)
+# Set DATABASE_URL (axa reads it via config/development.yaml)
 export DATABASE_URL=postgres://localhost/event_service_development
 
-# Build and run (loco.rs). Migrations run automatically in development
-# (auto_migrate); or run them explicitly with `cargo loco db migrate`.
-cargo loco start            # or: cargo run -- start
+# Build and run (axa). Migrations run automatically in development
+# (auto_migrate); or run them explicitly with `cargo run -- db migrate`.
+cargo run -- start            # or: cargo run -- start
 ```
 
 ## Podman Deployment
@@ -293,7 +293,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 | **Language**         | Rust 1.97+ 2024 Edition              | Systems programming, performance, safety |
 | **Async Runtime**    | Tokio                                | Asynchronous I/O and concurrency         |
 | **Web Framework**    | Axum                                 | HTTP server and routing                  |
-| **Web Framework**    | Loco                                 | HTTP server and routing                  |
+| **Web Framework**    | axa                                 | HTTP server and routing                  |
 | **Database**         | PostgreSQL 18+                       | Data persistence                         |
 | **ORM**              | SeaORM                               | Async database object-relational mapper  |
 | **Search Engine**    | Tantivy                              | Full-text search indexing                |
@@ -784,7 +784,7 @@ Built with excellent Rust crates:
 - [Tokio](https://tokio.rs/) - Async runtime
 - [Axum](https://github.com/tokio-rs/axum) - Web framework
 - [SeaORM](https://www.sea-ql.org/SeaORM/) - Async ORM and query builder
-- [Loco](https://loco.rs/) - Web framework conventions (backend-only)
+- [Loco](https://axa/) - Web framework conventions (backend-only)
 - [OpenTelemetry](https://opentelemetry.io/) - Observability framework
 - [Tantivy](https://github.com/tantivy-search/tantivy) - Search engine
 - [Serde](https://serde.rs/) - Serialization

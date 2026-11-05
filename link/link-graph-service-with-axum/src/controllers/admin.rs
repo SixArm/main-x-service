@@ -20,7 +20,7 @@ use axum::http::StatusCode;
 use crate::auth;
 use crate::reconcile::{self, HttpAuthoritativeSource};
 
-/// Map an auth rejection `(status, reason)` to a loco error response.
+/// Map an auth rejection `(status, reason)` to an axa error response.
 fn auth_rejection((status, reason): (StatusCode, String)) -> Error {
     let code = if status == StatusCode::FORBIDDEN {
         "forbidden"

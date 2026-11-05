@@ -2,7 +2,7 @@
 
 > Part of the [Svelte edition specification](index.md). Cross-cutting
 > flow + token claims: [root auth](../../spec/auth.md). The API side:
-> [loco auth](../../case-folder-service-with-rust/spec/auth.md).
+> [axa auth](../../case-folder-service-with-rust/spec/auth.md).
 
 The client drives the magic-link UI and relies on the API's HttpOnly
 session cookie. It stores **no token in JavaScript**.
@@ -23,7 +23,7 @@ Both are **exempt** from the layout auth guard.
   `requestLink`, `verify`, `me`, `logout`. Base URL defaults to **relative**
   (`/api`) so requests are same-origin through the dev proxy.
 - **`vite.config.ts`** — `server.proxy` forwards `/api` (and `/healthz`)
-  to the Loco API (`LOCO_API_PROXY`, default `http://localhost:5150`), so
+  to the axa API (`LOCO_API_PROXY`, default `http://localhost:5150`), so
   the browser sees one origin and the HttpOnly cookie is first-party.
 - **`src/routes/+layout.ts`** — calls `api.auth.me()`; on `401` (and when
   not already on `/login` or `/auth/callback`) `throw redirect(307, '/login')`;

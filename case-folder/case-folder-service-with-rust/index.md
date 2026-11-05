@@ -1,6 +1,6 @@
 # Documentation index
 
-Case Tracking — Loco edition. JSON-only back-end API for tracking
+Case Tracking — Axum edition. JSON-only back-end API for tracking
 paper case-note folders across NHS hospital cabinets.
 
 ## Start here

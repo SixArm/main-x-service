@@ -7,7 +7,7 @@
 Client-side validation in
 [`src/lib/store/nhs.ts`](../src/lib/store/nhs.ts) — Modulus 11 with
 weights 10..2, `check == 10` → invalid, `check == 11` → digit 0.
-**Pre-flight only**; the Loco API runs the identical validator in
+**Pre-flight only**; the axa API runs the identical validator in
 [`src/nhs.rs`](../../case-folder-service-with-rust/src/nhs.rs) and is
 authoritative.
 

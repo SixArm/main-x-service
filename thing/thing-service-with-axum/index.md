@@ -43,10 +43,10 @@ Prerequisites: Rust 1.97+ (2024 edition), PostgreSQL 18+.
 ```bash
 cd thing/thing-service-with-axum   # within the main-x-service monorepo
 
-# Build and run (loco.rs): point DATABASE_URL at the database, then
+# Build and run (axa): point DATABASE_URL at the database, then
 # start. Migrations run automatically in development (auto_migrate).
 export DATABASE_URL=postgres://localhost/thing_service_development
-cargo loco start            # or: cargo run -- start
+cargo run -- start            # or: cargo run -- start
 
 # Service binds on the configured port (config/development.yaml):
 curl http://localhost:5150/api/health
@@ -128,7 +128,7 @@ curl -X POST http://localhost:8080/api/things/match \
 ## Configuration
 
 Configuration is loaded from `config/{development,test,production}.yaml`
-(Loco convention). Environment-overridable variables:
+(axa convention). Environment-overridable variables:
 
 | Variable             | Description                | Default                 |
 | -------------------- | -------------------------- | ----------------------- |
@@ -153,7 +153,7 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 > are **not read anywhere else in `src/`** — a pre-loco holdover. There
 > is no gRPC server ([T-3](spec/13-tasks.md) is still open) and no OTLP
 > exporter; the real REST bind address/port and DB pool size come from
-> loco's own `config/*.yaml`.
+> axa's own `config/*.yaml`.
 
 ## Testing
 

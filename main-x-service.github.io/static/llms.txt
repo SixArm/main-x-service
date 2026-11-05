@@ -1,6 +1,6 @@
 # Main X Index (main-x-service)
 
-> A federated identity index: ~55 self-contained Rust crates (loco.rs backend services + SvelteKit operator front-ends), one per real-world entity (person, worker, place, thing, event, course, organization, care pathway, case, plan/portfolio), each doing CRUD, probabilistic + deterministic matching, full-text search, record merge, an audit trail, and event streaming — plus a central SSO provider, a cross-service link-graph aggregator, and five consumer applications that build on the registries.
+> A federated identity index: ~55 self-contained Rust crates (axa backend services + SvelteKit operator front-ends), one per real-world entity (person, worker, place, thing, event, course, organization, care pathway, case, plan/portfolio), each doing CRUD, probabilistic + deterministic matching, full-text search, record merge, an audit trail, and event streaming — plus a central SSO provider, a cross-service link-graph aggregator, and five consumer applications that build on the registries.
 
 Each crate is self-contained (own REST API, own persistence, own matching algorithm) and shares an architecture and documentation layout, not code. Every subproject's spec/ directory is the single source of truth for that subproject; code conforms to the spec, not the reverse. This file describes the published documentation site (main-x-service.github.io), a curated front door — not the git checkout; every entry links to its GitHub source since the site itself renders only a handful of overview pages (see "This site" below).
 
@@ -35,7 +35,7 @@ Each crate is self-contained (own REST API, own persistence, own matching algori
 - [sixarm-services-skill/](https://github.com/SixArm/main-x-service/blob/main/sixarm-services-skill/SKILL.md): A Claude Code skill explaining this system's concepts, terminology, and worked examples
 - [sixarm-services-maintainer-skill/](https://github.com/SixArm/main-x-service/blob/main/sixarm-services-maintainer-skill/SKILL.md): A Claude Code skill for making a code/spec/infrastructure change here
 
-## Entity registry services (Rust, loco.rs)
+## Entity registry services (Rust, axa)
 
 - [person-service](https://github.com/SixArm/main-x-service/blob/main/person/person-service-with-axum/spec/index.md): Person (general) identity registry
 - [worker-service](https://github.com/SixArm/main-x-service/blob/main/worker/worker-service-with-axum/spec/index.md): Worker (workforce/professional) identity registry, plus assessments
@@ -113,8 +113,8 @@ Each crate is self-contained (own REST API, own persistence, own matching algori
 - [agents/share/restful.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/restful.md): RESTful API conventions and pagination
 - [agents/share/fhir.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/fhir.md): HL7 FHIR R5 API design and per-entity resource mapping
 - [agents/share/api-versioning.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/api-versioning.md): Header-based API versioning (Accepts-version)
-- [agents/share/loco.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/loco.md): The loco.rs framework conventions used family-wide
-- [agents/share/rust-loco-stack.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/rust-loco-stack.md): The full Rust + loco dependency stack
+- [agents/share/axa.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/axa.md): The axa framework conventions used family-wide
+- [agents/share/rust-axum-stack.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/rust-axum-stack.md): The full Rust + axa dependency stack
 - [agents/share/postgresql.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/postgresql.md): PostgreSQL setup, extensions, the local test database
 - [agents/share/compliance-for-healthcare.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/compliance-for-healthcare.md): HIPAA, NHS, EHDS, ONC/HTI, IEC 62304
 - [agents/share/compliance-for-technology.md](https://github.com/SixArm/main-x-service/blob/main/agents/share/compliance-for-technology.md): GDPR, ISO/IEC 27001, ISO/IEC 42001

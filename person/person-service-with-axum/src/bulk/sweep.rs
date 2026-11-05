@@ -11,7 +11,7 @@
 //! `bulk_jobs.artifact_deleted_at` so the same row is never processed
 //! twice.
 //!
-//! Run via the `bulk_artifact_sweep` loco task
+//! Run via the `bulk_artifact_sweep` axa task
 //! ([`crate::tasks::bulk_artifact_sweep`]) — see that module's doc for
 //! how to invoke and schedule it. This crate has no in-process
 //! periodic-timer convention (the `BulkJobWorker` is dispatched per job

@@ -8,8 +8,8 @@
 //! schema change to the indexed field set.
 //!
 //! ```text
-//! cargo loco task search_reindex            # rebuild everything
-//! cargo loco task search_reindex batch:1000 # tune the page size
+//! cargo axa task search_reindex            # rebuild everything
+//! cargo axa task search_reindex batch:1000 # tune the page size
 //! ```
 
 use axa::prelude::*;
@@ -160,7 +160,7 @@ pub struct SearchReindex;
 
 #[async_trait]
 impl Task for SearchReindex {
-    /// Task metadata (name + one-line description) for the loco CLI.
+    /// Task metadata (name + one-line description) for the axa CLI.
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "search_reindex".to_string(),

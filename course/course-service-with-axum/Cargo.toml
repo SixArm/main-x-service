@@ -32,7 +32,7 @@ axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5e
 clap = { version = "4", features = ["derive"] }
 migration = { path = "migration" }
 
-# Web framework (axum 0.8 to match loco 0.16)
+# Web framework (axum 0.8, matching axa)
 axum = { version = "0.8", features = ["macros"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.7", features = ["cors", "trace", "compression-full"] }

@@ -29,29 +29,29 @@ use utoipa_swagger_ui::SwaggerUi;
 /// batch processor is still holding. Set once by [`App::init_logger`].
 static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
-/// The loco application. Owns the boot lifecycle, config, migrations,
+/// The axa application. Owns the boot lifecycle, config, migrations,
 /// and the background queue; the REST surface is merged in via
 /// [`App::after_routes`].
 pub struct App;
 
 impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (repo
-    /// `tasks.md` PRO-H9), returning `true` so loco does **not** also
+    /// `tasks.md` PRO-H9), returning `true` so axa does **not** also
     /// install its own. Ported from person-service's `App::init_logger`
     /// (itself ported verbatim from link-graph-service's) — the
-    /// `Hooks::init_logger` seam is identical across all three crates'
+    /// `App::init_logger` seam is identical across all three crates'
     /// shapes despite the differing router layout (see
     /// `src/observability.rs`'s module docs and `after_routes` below for
     /// where this crate's shape genuinely diverges).
     ///
-    /// The stack is loco's — its [`EnvFilter`](axa::logger::init_env_filter)
+    /// The stack is axa's — its [`EnvFilter`](axa::logger::init_env_filter)
     /// policy and its formatted layer, so `RUST_LOG`, `logger.level`,
     /// `logger.format` and `logger.override_filter` keep behaving exactly as
     /// they did — **plus** the `tracing-opentelemetry` bridge over an
     /// OTLP/gRPC exporter.
     ///
     /// When OTLP export is off (`OTLP_ENDPOINT=""`) this returns `false` and
-    /// loco's untouched `logger::init` runs, so the disabled path is not a
+    /// axa's untouched `logger::init` runs, so the disabled path is not a
     /// re-implementation that could drift from it.
     ///
     /// # Errors
@@ -66,7 +66,7 @@ impl App {
         }
         let logger_config = &ctx.config.logger;
         // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise loco's module whitelist applies,
+        // the filter outright; otherwise axa's module whitelist applies,
         // and the whitelist has no `opentelemetry*` entry — so a failing
         // export would be silent unless widened.
         let operator_supplied =
@@ -103,7 +103,7 @@ impl App {
         }
     }
 
-    /// Registers the hand-written Axum route groups on top of loco's default
+    /// Registers the hand-written Axum route groups on top of axa's default
     /// routes: worker CRUD/search/match (`workers_routes`), FHIR R5
     /// (`fhir_routes`), and Prometheus exposition (`metrics_routes`).
     #[must_use]
@@ -115,21 +115,21 @@ impl App {
     }
 
     /// Post-routing hook: builds boot-time singletons, injects shared state,
-    /// and layers Swagger UI + permissive CORS onto loco's router.
+    /// and layers Swagger UI + permissive CORS onto axa's router.
     ///
     /// Constructs the domain [`Config`], the Tantivy [`SearchEngine`], and
-    /// the [`ProbabilisticMatcher`], bundles them with the loco DB handle
+    /// the [`ProbabilisticMatcher`], bundles them with the axa DB handle
     /// into [`AppState`], and stashes that in `ctx.shared_store` so handlers
     /// can retrieve it. Then merges the Swagger UI (served at `/swagger-ui`,
     /// spec at `/api-docs/openapi.json`) and a permissive CORS layer.
     ///
     /// # Errors
     ///
-    /// Returns a loco [`Result`] error if configuration loading or
+    /// Returns an axa [`Result`] error if configuration loading or
     /// search-engine initialization fails; domain errors are stringified
     /// into [`axa::Error::string`].
     pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
-        // Load domain config (env + defaults); map domain error to loco error.
+        // Load domain config (env + defaults); map domain error to axa error.
         let config = Config::from_env().map_err(|e| axa::Error::string(&e.to_string()))?;
         // Open/create the Tantivy index at the configured path.
         let search_engine = SearchEngine::new(&config.search.index_path)

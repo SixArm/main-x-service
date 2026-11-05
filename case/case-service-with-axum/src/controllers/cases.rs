@@ -150,7 +150,7 @@ struct ListParams {
 ///
 /// Family convention (OQ-1 resolution): validation failures return
 /// `422 Unprocessable Entity`, matching the person/place services.
-/// loco has no `unprocessable_entity` helper, so this uses
+/// axa has no `unprocessable_entity` helper, so this uses
 /// `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`.
 ///
 /// The concrete rules — required `title`, ISO-8601 `opened_date`,
@@ -297,7 +297,7 @@ async fn create(
 }
 
 /// Map a record-level authorization rejection (`(status, reason)`) to a
-/// loco error response. `403` = the policy denied the action given the
+/// axa error response. `403` = the policy denied the action given the
 /// record's attributes; `401` = a fail-safe when claims are missing
 /// behind the guard.
 fn record_rejection((status, reason): (StatusCode, String)) -> Error {
@@ -1597,7 +1597,7 @@ mod tests {
         assert_eq!(masked.title, "Housing benefit appeal");
     }
 
-    /// The 422 must survive loco's error-to-response conversion.
+    /// The 422 must survive axa's error-to-response conversion.
     #[test]
     fn blank_title_validation_response_status_is_422() {
         let err = validate(&Case::new("")).expect_err("blank title must fail");

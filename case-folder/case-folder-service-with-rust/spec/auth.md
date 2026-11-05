@@ -1,9 +1,9 @@
-# Authentication (Loco edition)
+# Authentication (Axum edition)
 
-> Part of the [Loco edition specification](index.md). Cross-cutting flow,
+> Part of the [Axum edition specification](index.md). Cross-cutting flow,
 > token claims, and config matrix: [root auth](../../spec/auth.md).
 
-The Loco edition is the authority for sessions. It mints + verifies
+The Axum edition is the authority for sessions. It mints + verifies
 signed JWTs, sends the magic-link email, and guards the domain API.
 
 ## Endpoints

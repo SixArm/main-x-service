@@ -5,7 +5,7 @@
 //! (`agents/share/bulk-import-export.md` §6) rather than silently
 //! withholding it or blindly creating an unreviewed duplicate. Mirrors
 //! the raw-SQL `review_queue` module the person/worker/place/thing/
-//! organization registries share, adapted to this crate's loco error
+//! organization registries share, adapted to this crate's axa error
 //! type and `chrono` timestamps — case has no pre-existing batch
 //! deduplication scan, so `provenance` is part of the table from the
 //! start rather than a follow-up migration (see the migration's module
@@ -28,7 +28,7 @@ use uuid::Uuid;
 const COLS: &str = "id, record_id_a, record_id_b, match_score, match_quality, \
      detection_method, score_breakdown, status, provenance, reviewed_by, created_at, reviewed_at";
 
-/// Map a `SeaORM` (or column-get) error onto the loco database error.
+/// Map a `SeaORM` (or column-get) error onto the axa database error.
 fn db_err<E: Into<sea_orm::DbErr>>(e: E) -> Error {
     Error::DB(e.into())
 }

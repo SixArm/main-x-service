@@ -1,6 +1,6 @@
 # Use cases → routes
 
-> Part of the [Loco edition specification](index.md). The use-case
+> Part of the [Axum edition specification](index.md). The use-case
 > catalogue (UC-1..UC-9 + negative cases) is shared and described in the
 > [root requirements](../../spec/requirements.md) and the
 > [Svelte routes file](../../case-folder-front-end-with-svelte/spec/routes.md)

@@ -24,7 +24,7 @@ person's port. All six of those crates' `AGENTS.md` document the
 adaptations each needed beyond link-graph-service's shape: the tower
 middleware wired onto **two** router-construction surfaces instead of
 one, for every crate that (like person/worker/event/course/place/thing)
-carries a hand-rolled `create_router` alongside the loco-native path;
+carries a hand-rolled `create_router` alongside the controller-style path;
 and — for a crate that **declares** a `tonic` Cargo dependency at all —
 a renamed dev-dependency, `otlp-test-tonic = { package = "tonic", … }`,
 so the in-process collector's tonic 0.14 does not collide with it in a
@@ -43,16 +43,16 @@ matrix**, before assuming either way.
 
 **organization** is the newest port (`tasks.md` PRO-H12 slice 4 of 7,
 2026-08-30, copying course's port) and the **first of the four
-loco-idiomatic registries** (organization, care-pathway, case,
+controller-style registries** (organization, care-pathway, case,
 portfolio — `src/controllers/`, not person-style `src/api/rest/`) to
 carry one. It settles, for itself, the open question the other six
 ports left for this group: organization has exactly **one**
 router-construction surface (`App::routes`/`App::after_routes`; even
-its own request-level test suite boots the real `App` via loco's
+its own request-level test suite boots the real `App` via axa's
 testing harness rather than a second hand-rolled router), so
 `trace_mw` is layered once, not twice — and it declares no `tonic`
 dependency at all, so it needed no rename either, same as course.
-**care-pathway** is the second loco-idiomatic port (`tasks.md` PRO-H12
+**care-pathway** is the second controller-style port (`tasks.md` PRO-H12
 slice 5 of 7, 2026-08-30, copying organization's port) and confirms
 rather than assumes organization's single-router-surface shape: a grep
 of `src/` and `tests/` for a second `Router::new()`/`create_router`
@@ -65,7 +65,7 @@ also the family's IEC 62304 SOUP-register reference
 (`compliance/soup.tsv`), so the port additionally needed eight new SOUP
 rows (five main dependencies, three test-only) — a bookkeeping step the
 person-style and organization ports had no equivalent of.
-**case** is the third loco-idiomatic port (`tasks.md` PRO-H12 slice 6
+**case** is the third controller-style port (`tasks.md` PRO-H12 slice 6
 of 7, 2026-09-02, copying care-pathway's port) and confirms rather
 than assumes the same single-router-surface shape a third time: a
 fresh grep of `src/` and `tests/` for a second
@@ -79,18 +79,18 @@ raised `cargo test --lib` from 253 to 261 (8 new
 care-pathway's 8) — case has no existing `reqwest` main dependency the
 middleware test could reuse, so `reqwest` itself needed a dev-only SOUP
 row care-pathway's port did not.
-**portfolio** is the fourth and last loco-idiomatic port (`tasks.md`
+**portfolio** is the fourth and last controller-style port (`tasks.md`
 PRO-H12 slice 7 of 7, 2026-09-02, copying case's port) and confirms
 rather than assumes the same single-router-surface shape a fourth
 time: a fresh grep of `src/` and `tests/` for a second
 `Router::new()`/`create_router` turned up one hit, again a unit test
 for the auth middleware itself, not an app-level router, so `trace_mw`
-is layered once in `after_routes` — four for four loco-idiomatic
+is layered once in `after_routes` — four for four controller-style
 registries now share the identical single-surface shape. It also
 declares no `tonic` dependency of its own, so it needed no rename
 either. Unlike care-pathway and case, portfolio carries **no** IEC
 62304 SOUP register, so this port needed no `compliance/soup.tsv`
-bookkeeping step at all — the simplest of the four loco-idiomatic
+bookkeeping step at all — the simplest of the four controller-style
 ports for exactly that reason. Landing this raised `cargo test --lib`
 from 353 to 361 (8 new `src/observability.rs` unit tests). **This
 closes PRO-H12**: every entity registry in the family — all ten,
@@ -103,13 +103,13 @@ metrics. Three things settled that this doc does not say:
   which does not match the `:4317` endpoint default below). person's
   0.27/0.28 pins are stale — 0.27's `install_batch(runtime::Tokio)`
   pipeline API no longer exists upstream.
-- **Where it hooks in.** loco 1.0's `Hooks::init_logger` returning
-  `Ok(true)`, composing loco's public `logger::init_env_filter` +
+- **Where it hooks in.** axa's `App::init_logger` returning
+  `Ok(true)`, composing axa's public `logger::init_env_filter` +
   `logger::init_layer` so the deployment's configured filter policy and
-  log format are reused rather than re-derived. `Hooks::on_shutdown`
+  log format are reused rather than re-derived. `App::on_shutdown`
   flushes.
 - **`RUST_LOG` gains a second job.** With the bridge layer installed the
-  filter governs what is **exported**, not only what is logged. Loco's
+  filter governs what is **exported**, not only what is logged. axa's
   module whitelist is what keeps the trace stream to the service's own
   spans — and, until widened, also swallows the SDK's own export-failure
   errors, so a broken exporter looks exactly like a working one.

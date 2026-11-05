@@ -29,16 +29,16 @@ use utoipa_swagger_ui::SwaggerUi;
 /// batch processor is still holding. Set once by [`App::init_logger`].
 static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
-/// The loco application. Owns the boot lifecycle, config, migrations,
+/// The axa application. Owns the boot lifecycle, config, migrations,
 /// and the background queue; the REST surface is merged in via
 /// [`App::after_routes`].
 pub struct App;
 
 impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (repo
-    /// `tasks.md` PRO-H12), returning `true` so loco does **not** also
+    /// `tasks.md` PRO-H12), returning `true` so axa does **not** also
     /// install its own. Ported from person-service's `App::init_logger`
-    /// (itself ported from link-graph-service's) — the `Hooks::init_logger`
+    /// (itself ported from link-graph-service's) — the `App::init_logger`
     /// seam is identical across crates' shapes despite the differing router
     /// layout (see `src/observability.rs`'s module docs and `after_routes`
     /// below for where this crate's shape actually diverges).
@@ -55,7 +55,7 @@ impl App {
         }
         let logger_config = &ctx.config.logger;
         // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise loco's module whitelist applies,
+        // the filter outright; otherwise axa's module whitelist applies,
         // and the whitelist has no `opentelemetry*` entry — so a failing
         // export would be silent unless widened.
         let operator_supplied =
@@ -92,7 +92,7 @@ impl App {
         }
     }
 
-    /// Register the loco route table: the framework defaults plus the
+    /// Register the axa route table: the framework defaults plus the
     /// hand-written `things_routes()` group and the root-level
     /// `metrics_routes()` Prometheus scrape route.
     #[must_use]
@@ -106,7 +106,7 @@ impl App {
     /// Post-routing hook where the hand-written Axum surface is attached.
     ///
     /// Builds the boot-time singletons (`Config`, `SearchEngine`,
-    /// `ProbabilisticMatcher`), stuffs the assembled [`AppState`] into loco's shared
+    /// `ProbabilisticMatcher`), stuffs the assembled [`AppState`] into axa's shared
     /// store so the legacy handlers can extract it, then mounts Swagger UI,
     /// the blanket auth-enforcement middleware
     /// (`auth::require_auth_mw` — a near-noop unless `THING_REQUIRE_AUTH`
@@ -123,7 +123,7 @@ impl App {
     ///
     /// # Errors
     ///
-    /// Returns a loco error if config load or search-index open fails.
+    /// Returns an axa error if config load or search-index open fails.
     pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         let config = Config::from_env().map_err(|e| axa::Error::string(&e.to_string()))?;
         let search_engine = SearchEngine::new(&config.search.index_path)

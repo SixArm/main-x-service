@@ -1,6 +1,6 @@
 # NHS Number rules
 
-> Part of the [Loco edition specification](index.md). The algorithm,
+> Part of the [Axum edition specification](index.md). The algorithm,
 > format, and worked examples are shared:
 > [root nhs-number](../../spec/nhs-number.md).
 

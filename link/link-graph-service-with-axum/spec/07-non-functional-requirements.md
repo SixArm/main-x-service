@@ -52,7 +52,7 @@
   horizontally scalable behind a load balancer. The consumer / relay /
   reconciliation workers are the only stateful-position components
   (offsets), tracked durably.
-- **NFR-12** — Health endpoints for orchestration (loco `/_health`,
+- **NFR-12** — Health endpoints for orchestration (axa `/_health`,
   `/_ping`); graceful shutdown; Podman health checks; non-root
   container.
 - **NFR-13** — Database connection pooling with configurable limits.
@@ -60,8 +60,8 @@
 ### 7.6 Stack conformance
 
 - **NFR-14** — Follows the family
-  [Rust + Loco stack](../../../agents/share/rust-loco-stack.md): Rust
-  2024 edition, Tokio, Axum + Loco (backend-only), SeaORM + PostgreSQL,
+  [Rust + axa stack](../../../agents/share/rust-axum-stack.md): Rust
+  2024 edition, Tokio, Axum + axa (backend-only), SeaORM + PostgreSQL,
   Tantivy where search is needed (not required for v1 graph reads),
   Fluvio for the bus, Utoipa OpenAPI, tracing + OpenTelemetry,
   MiMalloc on MUSL. Podman not Docker; PostgreSQL not SQLite.

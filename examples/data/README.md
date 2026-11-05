@@ -54,7 +54,7 @@ identify nothing.
 ## Loading into a running service — the `seed_examples` task (EX-4)
 
 The reliable way to get this data into a database today is each
-service's **`seed_examples` loco task**, not bulk import (see the
+service's **`seed_examples` axa task**, not bulk import (see the
 warning in [Importing](#importing) below — the demo compose stack's
 bulk-import path is currently broken, tracked as
 [`COMPOSE-WORKER`](../../tasks.md)). The task reads the same fixture
@@ -73,9 +73,9 @@ Run from each service crate's own directory, against its own database
 (`DATABASE_URL` / `config/development.yaml` as usual):
 
 ```sh
-cd person/person-service-with-axum       && cargo loco task seed_examples
-cd organization/organization-service-with-axum && cargo loco task seed_examples
-cd case/case-service-with-axum           && cargo loco task seed_examples
+cd person/person-service-with-axum       && cargo run -- task seed_examples
+cd organization/organization-service-with-axum && cargo run -- task seed_examples
+cd case/case-service-with-axum           && cargo run -- task seed_examples
 ```
 
 This seeds 50 persons, 20 organizations, and 10 cases. It does **not**
@@ -86,7 +86,7 @@ and case tasks have run; create them afterward via
 `POST /api/cases/{pid}/links` as that file describes.
 
 Once the tutorials TUT-1/TUT-2/TUT-4 exist (`tasks.md`), they should
-reference `cargo loco task seed_examples` in each of the three crates
+reference `cargo run -- task seed_examples` in each of the three crates
 as the seed step, rather than the bulk-import path below.
 
 ## Importing
@@ -120,7 +120,7 @@ curl -F file=@examples/data/cases.jsonl -F format=jsonl \
 > **Update 2026-08-04: fixed.** Earlier, all three commands above were
 > run against a live `full-family.yml` stack and all three were
 > accepted, returning a job id — but the job stayed `queued` forever.
-> The containers started with `CMD [..., "start"]`, which is loco's
+> The containers started with `CMD [..., "start"]`, which is axa's
 > server-only mode; `BulkJobWorker` is registered in `connect_workers`,
 > which only runs under `start --server-and-worker`. Both compose files
 > now set `command: ["/app/<bin>", "start", "--server-and-worker"]` on
@@ -129,7 +129,7 @@ curl -F file=@examples/data/cases.jsonl -F format=jsonl \
 > `completed` with `rows_created: 10`. TUT-5 verifies the same fix's
 > effect via `cargo run -- start --server-and-worker` directly (faster
 > to iterate against than a container rebuild) against person-service.
-> `cargo loco task seed_examples`
+> `cargo run -- task seed_examples`
 > ([above](#loading-into-a-running-service--the-seed_examples-task-ex-4))
 > remains a valid, even simpler way to load these fixtures when you
 > don't need the async job semantics themselves.

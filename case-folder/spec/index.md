@@ -25,11 +25,11 @@ missing records and prevents delays in patient care.
 
 | Subproject                                                | Role      | Stack                        |
 | --------------------------------------------------------- | --------- | ---------------------------- |
-| [`case-folder-service-with-rust`](../case-folder-service-with-rust/spec/index.md)     | Back-end  | Loco / Axum / Rust JSON API  |
+| [`case-folder-service-with-rust`](../case-folder-service-with-rust/spec/index.md)     | Back-end  | axa / Axum / Rust JSON API  |
 | [`case-folder-front-end-with-svelte`](../case-folder-front-end-with-svelte/spec/index.md) | Front-end | SvelteKit / TypeScript client |
 
 Both editions serve the **same domain** (see [domain-model.md](domain-model.md))
-with the same use cases, NHS Number rules, and invariants. The Loco
+with the same use cases, NHS Number rules, and invariants. The axa
 edition exposes a JSON API; the Svelte edition is a reference UI client.
 
 ## Specification (topic files)
@@ -85,5 +85,5 @@ code lands without the spec describing it.
 - [UK NHS Number — Wikipedia](https://en.wikipedia.org/wiki/NHS_number)
 - [NHS Synthetic Data Service](https://digital.nhs.uk/services/synthetic-data)
 - [GOV.UK Design System](https://design-system.service.gov.uk/)
-- [Loco](https://loco.rs) · [SvelteKit](https://svelte.dev/docs/kit)
+- [Loco](https://axa) · [SvelteKit](https://svelte.dev/docs/kit)
 - The five upstream Main-X-Services live under `~/git/sixarm/main-x-service/`.

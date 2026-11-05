@@ -1,6 +1,6 @@
 //! Organization Service binary entry-point.
 //!
-//! Boots the service through loco's CLI: parses subcommands (`start`,
+//! Boots the service through axa's CLI: parses subcommands (`start`,
 //! `db migrate`, …) and dispatches to the [`organization_service::app::App`]
 //! hooks. The REST router is mounted by the app's `after_routes` hook;
 //! see [`organization_service`] for the library surface and

@@ -1,6 +1,6 @@
 # RESTful API Reference — Care Pathway Entity
 
-The service is loco.rs and returns **raw JSON** — no
+The service is axa and returns **raw JSON** — no
 `{success, data, error}` envelope (unlike the pre-loco person
 service). Source:
 [`src/controllers/care_pathways.rs`](../care-pathway-service-with-axum/src/controllers/care_pathways.rs).
@@ -8,7 +8,7 @@ Base URL in development: `http://localhost:5150`.
 
 ## Endpoints
 
-### Health (loco built-ins)
+### Health (axa built-ins)
 
 | Method | Path | Description |
 |---|---|---|
@@ -74,7 +74,7 @@ in-memory stream. Durable broker is roadmap.
 | Code | Meaning |
 |---|---|
 | 200 | Success |
-| 400 | Malformed body (loco JSON rejection) |
+| 400 | Malformed body (axa JSON rejection) |
 | 404 | Unknown or soft-deleted `pid` |
 | 422 | Validation failure: blank `name` on create or update (family convention; OQ-1 resolved via T-2) |
 | 500 | Internal error |

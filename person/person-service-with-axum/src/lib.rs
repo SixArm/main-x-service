@@ -23,7 +23,7 @@
 // Module declarations
 /// REST, FHIR R5, and gRPC API layers plus shared response envelopes.
 pub mod api;
-/// Loco application hooks (boot, routes, migrations).
+/// axa application hooks (boot, routes, migrations).
 pub mod app;
 /// Bulk import/export — async `bg_pg` jobs, JSONL codec, artifact store.
 pub mod bulk;
@@ -54,7 +54,7 @@ pub mod relay;
 pub mod search;
 /// Event streaming (PersonEvent, producers, consumers).
 pub mod streaming;
-/// CLI tasks (loco extension point).
+/// CLI tasks (axa extension point).
 pub mod tasks;
 /// Data-quality validation, normalization, and standardization.
 pub mod validation;

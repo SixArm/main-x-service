@@ -6,11 +6,11 @@ machine-readable: `GET /api-docs/openapi.json`
 ([`src/openapi.rs`](../organization-service-with-axum/src/openapi.rs));
 contract summary: entity [spec §9](../spec/09-api-surface.md).
 
-Default base URL: `http://localhost:5150` (loco default port).
+Default base URL: `http://localhost:5150` (axa default port).
 
 ## Conventions
 
-- **Raw loco JSON — no `{success, data, error}` envelope** (this
+- **Raw axa JSON — no `{success, data, error}` envelope** (this
   differs from the older Axum-native entities like person).
 - Wire field names are **snake_case** (`legal_name`,
   `founding_date`, …).
@@ -66,7 +66,7 @@ Default base URL: `http://localhost:5150` (loco default port).
 |---|---|---|
 | GET | `/api-docs/openapi.json` | Hand-written OpenAPI 3 (the matcher crate has no `utoipa`; the doc is authored in `src/openapi.rs` — keep it in sync by hand) |
 | GET | `/swagger-ui` | Interactive docs |
-| GET | `/_health`, `/_ping` | loco defaults |
+| GET | `/_health`, `/_ping` | axa defaults |
 
 ## Worked example
 

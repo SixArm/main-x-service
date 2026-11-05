@@ -6,7 +6,7 @@
 > was **fully removed repo-wide 2026-08-21** (see
 > [agents/share/security.md](../../agents/share/security.md) §7 —
 > `cargo deny check` is clean, and the `rsa`/`jsonwebtoken` dependency
-> chain loco's JWT feature pulled in is gone). The **source of truth**
+> chain axa's JWT feature pulled in is gone). The **source of truth**
 > for the design is
 > [agents/share/authentication-sessions.md](../../agents/share/authentication-sessions.md)
 > (with the principle in [agents/share/jwt.md](../../agents/share/jwt.md));
@@ -68,8 +68,8 @@ mints credentials: the **authentication-service**. Everything else
 | Verification | **Offline** against the published Ed25519 key at `/.well-known/paseto-keys`. No shared secret, no per-request introspection hop. | Peers stay available and fast even if the auth service is briefly down; no token ever transits to a third party. |
 | Authorization | Each service authorizes **locally** from claims. The auth service issues identity, not roles. | Keeps the SSO minimal; per-entity policy stays in the entity service. |
 
-The auth service is also the family's **reference loco.rs application**;
-the loco conversion of the peer services adopts its `src/auth.rs`
+The auth service is also the family's **reference axa application**;
+the Loco conversion of the peer services adopts its `src/auth.rs`
 verification approach via the verifier library.
 
 ```
@@ -94,7 +94,7 @@ operator ───────────────────────�
 | Sessions + local revocation; GDPR account export/audit/erasure | **Implemented** (auth service). |
 | Per-email Postgres-backed rate limiter | **Implemented** (auth service). |
 | Multi-key set + zero-downtime key rotation | **Implemented** (operator-driven; no auto-rotation scheduler). |
-| Blanket `/api/*` enforcement middleware, `<ENTITY>_REQUIRE_AUTH` | **Implemented, default-off, on all ten entity registries** (person, worker, place, thing, event, course, organization, care-pathway, case, portfolio) — not limited to the three loco-native crates; activation is an ops decision. See [jwt-enforcement.md](../../agents/share/jwt-enforcement.md) and [security.md](../../agents/share/security.md) §4. |
+| Blanket `/api/*` enforcement middleware, `<ENTITY>_REQUIRE_AUTH` | **Implemented, default-off, on all ten entity registries** (person, worker, place, thing, event, course, organization, care-pathway, case, portfolio) — not limited to the three controller-style crates; activation is an ops decision. See [jwt-enforcement.md](../../agents/share/jwt-enforcement.md) and [security.md](../../agents/share/security.md) §4. |
 | ABAC authorization (subject/action/resource attributes, default read-allow/mutation-deny policy) | **Implemented**, family-wide since 2026-07-05 — see §7a below and [authorization-attributes.md](../../agents/share/authorization-attributes.md). |
 | Front-end **BFF** (browser holds only the httpOnly cookie; BFF mints/attaches PASETO server-side) | **Implemented** — replaced the prior SPA token-attachment + `localStorage` handoff (per [authentication-sessions.md §6](../../agents/share/authentication-sessions.md)); confirmed in the operator SPAs' `hooks.server.ts` / `src/lib/server/`. |
 | Prior front-end token attachment + cross-origin SSO handoff (RS256, `localStorage`) | **Removed** (historical) — no `mxi_access_token` / `localStorage` remains in the operator SPAs. |
@@ -338,7 +338,7 @@ this section summarises it and is subordinate to it.
 
 **It is shipped on all ten entity registries** — person, worker, place,
 thing, event, course, organization, care-pathway, case, and portfolio —
-not only the three loco-native crates that embed the verifier first.
+not only the three controller-style crates that embed the verifier first.
 Every registry's `src/app.rs` layers the guard (via `src/auth.rs`) and
 carries an `<ENTITY>_REQUIRE_AUTH` flag and a `tests/enforcement.rs`
 suite; see [security.md](../../agents/share/security.md) §4. The
@@ -544,7 +544,7 @@ posture.
 
 | Control | Statement |
 |---|---|
-| **Asymmetric signing (PASETO v4.public / Ed25519)** | Peers hold only the public key and verify offline. There is no shared secret to leak, and a peer compromise cannot mint tokens. Do **not** reintroduce loco's symmetric HS256 helper, and do **not** reintroduce RS256 JWT (decommissioned per [authentication-sessions.md](../../agents/share/authentication-sessions.md)). |
+| **Asymmetric signing (PASETO v4.public / Ed25519)** | Peers hold only the public key and verify offline. There is no shared secret to leak, and a peer compromise cannot mint tokens. Do **not** reintroduce axa's symmetric HS256 helper, and do **not** reintroduce RS256 JWT (decommissioned per [authentication-sessions.md](../../agents/share/authentication-sessions.md)). |
 | **No secrets in audit/logs** | `auth_events`, `sessions`, audit rows, and the GDPR export carry **no** tokens, key material, password hash, or api key. Magic-link tokens are never logged (dev links are logged as the full URL only because there is no SMTP in dev). |
 | **Short TTL bounds revocation staleness** | The 5-minute default access-token lifetime (`TOKEN_EXPIRATION`) bounds how long a revoked or erased subject's token remains honoured at offline-verifying peers (§5). |
 | **Passwordless** | No password is set, stored, or checked; the `users.password` column holds an unusable random hash purely to satisfy `NOT NULL`. |

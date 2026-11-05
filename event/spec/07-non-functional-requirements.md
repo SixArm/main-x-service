@@ -21,7 +21,7 @@ and marked as such.
 | NFR-12 | Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus text exposition at `/metrics.prom` |
 | NFR-13 | Determinism | Matcher: same inputs ⇒ same outputs, byte-for-byte; no unsafe code |
 | NFR-14 | Front-end resilience | Page shells render with the API down (banner shown, layout mounts) — pinned by Playwright smoke tests |
-| NFR-15 | Background jobs | Loco `BackgroundQueue` backed by PostgreSQL (`bg_pg`) — no external broker |
+| NFR-15 | Background jobs | axa `BackgroundQueue` backed by PostgreSQL (`bg_pg`) — no external broker |
 
 ### 7.1 Benchmarks
 

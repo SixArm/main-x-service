@@ -1,6 +1,6 @@
 # Main X Index (main-x-service)
 
-> A federated identity index: ~55 self-contained Rust crates (loco.rs
+> A federated identity index: ~55 self-contained Rust crates (axa
 > backend services + SvelteKit operator front-ends), one per real-world
 > entity (person, worker, place, thing, event, course, organization,
 > care pathway, case, plan/portfolio), each doing CRUD, probabilistic +
@@ -33,7 +33,7 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 - [sixarm-services-skill/](sixarm-services-skill/SKILL.md): a Claude Code skill explaining this system's concepts, terminology, and worked examples
 - [sixarm-services-maintainer-skill/](sixarm-services-maintainer-skill/SKILL.md): a Claude Code skill for making a code/spec/infrastructure change here
 
-## Entity registry services (Rust, loco.rs)
+## Entity registry services (Rust, axa)
 
 - [person-service](person/person-service-with-axum/spec/index.md): Person (general) identity registry
 - [worker-service](worker/worker-service-with-axum/spec/index.md): Worker (workforce/professional) identity registry, plus assessments
@@ -111,8 +111,8 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 - [agents/share/restful.md](agents/share/restful.md): RESTful API conventions and pagination
 - [agents/share/fhir.md](agents/share/fhir.md): HL7 FHIR R5 API design and per-entity resource mapping
 - [agents/share/api-versioning.md](agents/share/api-versioning.md): header-based API versioning (`Accepts-version`)
-- [agents/share/loco.md](agents/share/loco.md): the loco.rs framework conventions used family-wide
-- [agents/share/rust-loco-stack.md](agents/share/rust-loco-stack.md): the full Rust + loco dependency stack
+- [agents/share/axa.md](agents/share/axa.md): the axa framework conventions used family-wide
+- [agents/share/rust-axum-stack.md](agents/share/rust-axum-stack.md): the full Rust + axa dependency stack
 - [agents/share/postgresql.md](agents/share/postgresql.md): PostgreSQL setup, extensions, the local test database
 - [agents/share/compliance-for-healthcare.md](agents/share/compliance-for-healthcare.md): HIPAA, NHS, EHDS, ONC/HTI, IEC 62304
 - [agents/share/compliance-for-technology.md](agents/share/compliance-for-technology.md): GDPR, ISO/IEC 27001, ISO/IEC 42001

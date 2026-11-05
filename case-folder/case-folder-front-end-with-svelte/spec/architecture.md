@@ -21,7 +21,7 @@
 │  HTTP/JSON (CORS-friendly, same-origin in prod recommended)    │
 │                                                                │
 │                       ▼                                        │
-│  Loco JSON API on http://localhost:5150  — see                 │
+│  Axum JSON API on http://localhost:5150  — see                 │
 │  ../../case-folder-service-with-rust/spec/index.md                   │
 └──────────────────────────────────────────────────────────────┘
 ```

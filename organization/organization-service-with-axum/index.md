@@ -1,6 +1,6 @@
 # Organization Service — documentation index
 
-A loco.rs registry of organization identities (schema.org/Organization):
+An axa registry of organization identities (schema.org/Organization):
 CRUD + matching, embedding the canonical organization-matcher.
 
 ## Start here

@@ -2,11 +2,11 @@
 
 PostgreSQL via SeaORM. The schema source of truth is the
 hand-written, numbered SQL under `migrations/` (`up.sql` /
-`down.sql` per step). The sibling `migration/` crate is the loco
+`down.sql` per step). The sibling `migration/` crate is the axa
 SeaORM `Migrator`: each Rust migration wraps the corresponding SQL
-pair via `include_str!`, so loco can run the same SQL through
+pair via `include_str!`, so axa can run the same SQL through
 `auto_migrate: true` (on by default in development config) or
-explicitly via `cargo loco db migrate`.
+explicitly via `cargo run -- db migrate`.
 
 Tables (9 core + 7 collection child tables from the
 `normalize_course_collections` migration):
@@ -33,11 +33,11 @@ Tables (9 core + 7 collection child tables from the
 `sea-orm` is configured with the `with-time` feature (not
 `with-chrono`). This is the older-service convention carried over from
 the person-service copy-adapt and is consistent across the
-first-converted loco services (event / person / thing / place / worker /
+first-converted controller-style services (event / person / thing / place / worker /
 course). The crate also pulls `chrono` directly for its own
 domain-model timestamps (`DateTime<Utc>` on `ReviewQueueItem`, audit
 entries, etc.), so both crates are present in the tree. The shared
-stack note (`rust-loco-stack.md`) prescribes `with-chrono` as the
+stack note (`rust-axum-stack.md`) prescribes `with-chrono` as the
 loco-service default; reconciling these older services onto
 `with-chrono` is tracked as a cross-crate task (spec §13 T-17) rather
 than flipped piecemeal here, since it must land uniformly across the
@@ -53,8 +53,8 @@ import/export job (`kind`, `format`, `status`, `params`, the
 `rows_total`/`rows_created`/`rows_upserted`/`rows_to_review`/`rows_errored`
 counts, `actor`, artifact URLs, and `expires_at` TTL), with
 `UNIQUE (entity, kind, idempotency_key)` so a retried submit maps to the
-same job. Jobs run on the loco `worker` feature (Postgres-backed
-background jobs — renamed from `bg_pg` in the loco 0.16 → 1.0.1
+same job. Jobs run on the axa `worker` feature (Postgres-backed
+background jobs — renamed from `bg_pg` in the axa → 1.0.1
 migration this crate already carries); artifacts (uploaded source,
 export output, error report) live in the config-driven artifact store
 (S3-compatible in deployment, local fs in dev), referenced by short-lived

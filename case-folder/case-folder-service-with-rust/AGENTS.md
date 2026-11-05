@@ -6,7 +6,7 @@ subproject. Read this **before** opening a PR.
 ## What this project is
 
 A **back-end JSON API**, written in Rust on
-[Loco](https://loco.rs)/Axum, that tracks the physical location of
+[Loco](https://axa)/Axum, that tracks the physical location of
 paper case-note folders for a UK NHS hospital setting. There is **no
 built-in UI** — front-ends live elsewhere and consume this service
 over HTTP.
@@ -32,7 +32,7 @@ inferring from the code.
 | `src/nhs.rs`                   | Modulus 11 NHS Number validator + formatter               |
 | `tests/requests/`              | Request-level integration tests (stub upstreams)          |
 | `config/`                      | Dev / test / production YAML                              |
-| `migration/`                   | Empty SeaORM migrator (kept so Loco's boot still works)   |
+| `migration/`                   | Empty SeaORM migrator (kept so axa's boot still works)   |
 
 ## Working rules
 

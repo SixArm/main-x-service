@@ -7,7 +7,7 @@ CORS, the extra API layers, pagination, masking, and metrics.
 
 It is grounded in the actual code. Two generations of service coexist
 and they differ in concrete ways (response envelope, extra API layers),
-so each section calls out **loco services** (organization, care-pathway,
+so each section calls out **controller-style services** (organization, care-pathway,
 case, portfolio) versus the **older Axum services** (person, worker,
 place, thing, event, course) where they diverge.
 
@@ -29,7 +29,7 @@ and
   is the entity (`/api/organizations`, `/api/persons`, `/api/cases`, …).
   The event front-end calls under `/api/`; the rest are unversioned.
 - A record is addressed by its **public id** (`{pid}`) — a UUID string.
-  In the loco services this is the `pid` column, distinct from the
+  In the controller-style services this is the `pid` column, distinct from the
   internal row id; an unparseable pid is treated as not-found (or `400`
   on the audit sub-path — see §2).
 
@@ -62,7 +62,7 @@ privacy reads `GET /api/<plural>/{pid}/masked` and
 `GET /api/<plural>/{pid}/export` are **not** older-services-only any
 more: organization, care-pathway, case, and portfolio all expose them
 too (§7.3). `POST /api/<plural>/deduplicate` itself is the one
-older-services-only item left in this list among the loco crates —
+older-services-only item left in this list among the axa crates —
 organization has it, care-pathway/case/portfolio don't yet (§9,
 [`../merge/index.md`](../merge/index.md) §9).
 
@@ -72,14 +72,14 @@ does not shadow them. This ordering is a hard convention — see the
 `routes()` function in
 [`organizations.rs`](../../organization/organization-service-with-axum/src/controllers/organizations.rs).
 
-### 1.3 Response envelope: raw loco JSON vs `ApiResponse`
+### 1.3 Response envelope: raw axa JSON vs `ApiResponse`
 
 This is the main wire difference between the two generations.
 
-- **Loco services** (organization, care-pathway, case, portfolio) return **raw
-  loco JSON**: the handler's value is the body. Create/update/list/search
+- **Controller-style services** (organization, care-pathway, case, portfolio) return **raw
+  axa JSON**: the handler's value is the body. Create/update/list/search
   return a lightweight `{pid, name}` reference (`OrgRef`); `GET /{pid}`
-  returns the full stored payload; errors surface as loco's own JSON
+  returns the full stored payload; errors surface as axa's own JSON
   error shape with the right status code.
 - **Older Axum services** (person, worker, place, thing, event, course)
   wrap every response in an `ApiResponse` envelope:
@@ -97,7 +97,7 @@ This is the main wire difference between the two generations.
 
   Defined in `src/api/mod.rs` (`ApiResponse`, `ApiError`).
 
-New work follows the loco convention (raw JSON). Clients that talk to
+New work follows the axa convention (raw JSON). Clients that talk to
 both generations must handle both shapes.
 
 ---
@@ -109,18 +109,18 @@ repo-accurate; behaviour noted per generation where it differs.
 
 | Code | Meaning | When |
 |---|---|---|
-| `200` | OK | Successful read / create / update / match / merge (loco create returns `200`, not `201`) |
+| `200` | OK | Successful read / create / update / match / merge (axa create returns `200`, not `201`) |
 | `201` | Created | Create success in the older Axum services |
-| `204` | No Content | Delete success in the older Axum services (loco delete returns `200` with empty JSON) |
+| `204` | No Content | Delete success in the older Axum services (axa delete returns `200` with empty JSON) |
 | `400` | Bad Request | Malformed request: a blank/missing `q` on `/search` (an empty search would match everything); an invalid-UUID `pid` on `/{pid}/audit`; malformed FHIR in the older services |
-| `404` | Not Found | Unknown `pid` on get/update/delete/merge; in the loco services a soft-deleted or malformed pid also maps to not-found (`http_err` remaps SeaORM `EntityNotFound`, which loco would otherwise surface as `500`) |
+| `404` | Not Found | Unknown `pid` on get/update/delete/merge; in the controller-style services a soft-deleted or malformed pid also maps to not-found (`http_err` remaps SeaORM `EntityNotFound`, which axa would otherwise surface as `500`) |
 | `409` | Conflict | Duplicate detected during create (real-time duplicate detection); body carries the candidate matches |
 | `422` | Unprocessable Entity | Validation failure — e.g. a blank `name`/`title`, or `main_pid == duplicate_pid` on merge. **All validation problems are reported together**, not just the first. `422` is reserved for semantic validation; `400` is for malformed requests (see [`../validation/index.md`](../validation/index.md)) |
 | `429` | Too Many Requests | Rate limit on the authentication-service magic-link endpoints (see [`../authentication/index.md`](../authentication/index.md)) |
 | `500` | Internal Server Error | Unexpected server / database error |
 | `401` | Unauthorized | Missing or invalid bearer token on a protected route — see §4 |
 
-Note the loco-vs-older split on create/delete: loco returns `200`
+Note the loco-vs-older split on create/delete: axa returns `200`
 throughout (create `200`+`OrgRef`, delete `200`+empty JSON); the older
 services use `201` for create and `204` for delete.
 
@@ -129,9 +129,9 @@ services use `201` for create and `204` for delete.
 ## 3. OpenAPI / Swagger
 
 Both generations ship an OpenAPI 3 document and a Swagger UI, but the
-loco services author the spec **by hand** rather than deriving it:
+controller-style services author the spec **by hand** rather than deriving it:
 
-- The loco service DTO **is** the dependency-light matcher type (e.g.
+- The axa service DTO **is** the dependency-light matcher type (e.g.
   `organization_matcher::Organization`), which deliberately does not
   depend on `utoipa`. So the OpenAPI document is a hand-written
   `serde_json::Value` in
@@ -217,15 +217,15 @@ removed, not merely deprecated (see
 
 - **CORS** is configurable for browser front-ends (each entity has a
   sibling SvelteKit SPA that calls the REST API cross-origin). The
-  loco services configure CORS via loco middleware/config; the older
+  controller-style services configure CORS via axa middleware/config; the older
   services via `tower-http` `CorsLayer`.
 - **Content negotiation** is minimal and deliberate: requests and
   responses are JSON (`application/json`); the OpenAPI page is the one
   HTML response (`/swagger-ui`). There is no XML/CSV negotiation.
-- **Error handling** is centralized. Loco services map domain errors to
+- **Error handling** is centralized. Controller-style services map domain errors to
   HTTP via small helpers — `validate()` returns `422`
   (`Error::CustomError(UNPROCESSABLE_ENTITY, …)`), `http_err()` remaps
-  SeaORM `EntityNotFound` to `404` (loco's default would be `500`), and
+  SeaORM `EntityNotFound` to `404` (axa's default would be `500`), and
   `bad_request()` returns `400`. The older services convert their
   `Error` enum (11 variants, `thiserror`-derived) into the `ApiResponse`
   error envelope with the appropriate status code.
@@ -236,7 +236,7 @@ removed, not merely deprecated (see
 
 ## 6. Additional API layers
 
-FHIR R5 has landed in three loco services, so this section is no longer
+FHIR R5 has landed in three controller-style services, so this section is no longer
 "older services only" for that layer; gRPC is still older-services-only
 and still a stub.
 
@@ -251,22 +251,22 @@ and still a stub.
   [`agents/share/fhir.md`](../../agents/share/fhir.md) §6.
 - **Status:** implemented in the older Axum services (person, worker,
   place, thing, event — course is excluded, mapped instead to a
-  non-standard `Basic` resource per fhir.md §3) **and** in three loco
+  non-standard `Basic` resource per fhir.md §3) **and** in three axa
   services — **organization** (`Organization`, the reference
   implementation), **care-pathway** (`PlanDefinition`), and **case**
   (`Task`, carrying the `subject_of`-edge governance from
   [cross-service-linking.md](../../agents/share/cross-service-linking.md)
   §10). This corrects an earlier version of this section that said FHIR
-  was "not present in the loco services" — it is present in three of
-  the four; **portfolio** is the one loco service still out of FHIR
+  was "not present in the controller-style services" — it is present in three of
+  the four; **portfolio** is the one axa service still out of FHIR
   scope (no FHIR resource meaningfully models a plan/portfolio, per
   fhir.md §3). Resource converters and bundle handling live in
-  `src/api/fhir/` (older services) or `src/fhir/` (loco services).
+  `src/api/fhir/` (older services) or `src/fhir/` (controller-style services).
 
 ### 6.2 gRPC (Tonic)
 
 - Reserved high-throughput interface mirroring REST/FHIR. Not present
-  in any loco service (organization/care-pathway/case/portfolio) — see
+  in any axa service (organization/care-pathway/case/portfolio) — see
   [`agents/share/overview.md`](../../agents/share/overview.md)'s
   capability matrix, gRPC-stub row.
 - **Status: stub**, in the older services that declare it (person,
@@ -284,7 +284,7 @@ and still a stub.
 ### 7.1 Pagination — the family-wide header contract
 
 This section previously described pagination as ad hoc and
-inconsistent per service (a fixed loco list cap of 100, a fixed loco
+inconsistent per service (a fixed axa list cap of 100, a fixed axa
 search cap of 50, an older-service search default of 10/max 100, no
 shared contract). **That description is superseded.**
 [`agents/share/restful.md`](../../agents/share/restful.md)'s Pagination
@@ -296,7 +296,7 @@ it in full:
 - `?limit=` and `?offset=` query params on every collection read;
   totals/limit/offset are reported in **response headers**
   (`X-Total-Count`, `X-Limit`, `X-Offset`), not a body envelope — so a
-  bare-JSON-array endpoint (every loco endpoint, §1.3) keeps returning a
+  bare-JSON-array endpoint (every axa endpoint, §1.3) keeps returning a
   bare array.
 - **Omitting both params preserves each endpoint's pre-existing
   behaviour** — the old ad hoc numbers below are exactly what an
@@ -319,7 +319,7 @@ The pre-existing per-endpoint defaults this contract preserves:
   case, and portfolio, `check-duplicates` candidates are search-blocked
   via Tantivy instead (§7.2), so the cap there bounds the index result
   count, not a row-by-row DB scan.
-- **`/search`** (loco): historically a fixed cap of 50 with no client
+- **`/search`** (axa): historically a fixed cap of 50 with no client
   `limit`/`offset` — see §7.2; that has changed along with the Tantivy
   migration.
 - **The older services' search** default `limit` is 10, max 100 (now
@@ -332,7 +332,7 @@ Every entity registry's `/search` now takes `q`, `limit`, `offset`,
 `fuzzy` (bool), `phonetic` (bool) — Tantivy full-text is **implemented
 on all ten registries**, not just the older services (see
 [`../search/index.md`](../search/index.md) for the full, corrected
-picture; this document previously said the loco services "currently
+picture; this document previously said the controller-style services "currently
 expose only `q` (Postgres `ILIKE`; Tantivy full-text is deferred)",
 which is no longer the case — organization removed its `ILIKE` method
 entirely once Tantivy landed). `mask_sensitive` (bool) remains specific
@@ -344,13 +344,13 @@ additionally accepts `kind` as a filter.
 The older services support a `mask_sensitive=true` query option and
 dedicated `GET /api/<plural>/{pid}/masked` and
 `GET /api/<plural>/{pid}/export` (GDPR) endpoints. **Per-field masking
-and GDPR export are now implemented in the loco services too** —
+and GDPR export are now implemented in the controller-style services too** —
 organization, care-pathway, and portfolio each ship a `src/privacy.rs`
 module wired to the ABAC `mask` obligation; case masks and exports
 inline without a dedicated module. This corrects an earlier "deferred"
 claim here — see [`../privacy/index.md`](../privacy/index.md) §7 for
 the corrected per-crate table. `/search` itself carries no
-`mask_sensitive` option on the loco services because it returns only
+`mask_sensitive` option on the controller-style services because it returns only
 slim `{pid, name}`/`{pid, title}` refs with no sensitive fields to mask
 (same reasoning as [`../search/index.md`](../search/index.md) §6.2).
 
@@ -377,13 +377,13 @@ Configure the scraper with `metrics_path: /metrics.prom`. The metric
 inventory (entity-CRUD counters, an HTTP request counter, latency
 histograms) lives in each service's `src/metrics.rs`, with the handler
 in `src/api/rest/handlers.rs` (older services) or
-`src/controllers/metrics.rs` (loco services).
+`src/controllers/metrics.rs` (controller-style services).
 
 - **Status: implemented on every service, both generations** —
   person/worker/place/thing/event/course (older Axum) **and**
-  organization/care-pathway/case/portfolio/authentication (loco), each
+  organization/care-pathway/case/portfolio/authentication (axa), each
   via its own `src/metrics.rs` + handler. This corrects an earlier
-  version of this section that said the loco services "do not yet
+  version of this section that said the controller-style services "do not yet
   expose `/metrics.prom`" — they do; `/metrics.prom` (Prometheus) is
   separate from OTLP distributed tracing, which is a genuinely
   per-crate-varying picture (§9's OTLP row, and
@@ -394,16 +394,16 @@ in `src/api/rest/handlers.rs` (older services) or
 
 ## 9. Implemented vs deferred (summary)
 
-| Capability | Loco services (org / care-pathway / case / portfolio) | Older Axum services (person / …) |
+| Capability | Controller-style services (org / care-pathway / case / portfolio) | Older Axum services (person / …) |
 |---|---|---|
 | CRUD + soft-delete | Implemented | Implemented |
-| `ApiResponse` envelope | No (raw loco JSON) | Yes |
+| `ApiResponse` envelope | No (raw axa JSON) | Yes |
 | Search | **Tantivy full-text** (`q`,`fuzzy`,`phonetic`,paging) — historical `ILIKE` superseded, see [`../search/index.md`](../search/index.md) | Tantivy full-text (`q`,`fuzzy`,`phonetic`,paging) |
 | Match / check-duplicates / merge | Implemented; `check-duplicates` search-blocked via Tantivy on all four | Implemented |
 | Batch `deduplicate` | Implemented in **organization** only; care-pathway/case/portfolio don't yet expose it | Implemented |
 | OpenAPI / Swagger | Hand-written, test-pinned | Utoipa-derived |
 | Token auth (MaybeAuthUser / AuthUser / whoami) — PASETO v4.public, RS256/JWKS decommissioned | **Implemented** (shipped 2026-07-04; no code follow-up pending) | Implemented (same PASETO model, all six services) |
-| Blanket `/api/*` enforcement (`<ENTITY>_REQUIRE_AUTH`) | Implemented, flag off by default | **Implemented, flag off by default** — this corrects an earlier "—" here; all six older services carry it too, not just the loco four (§4) |
+| Blanket `/api/*` enforcement (`<ENTITY>_REQUIRE_AUTH`) | Implemented, flag off by default | **Implemented, flag off by default** — this corrects an earlier "—" here; all six older services carry it too, not just the axa four (§4) |
 | FHIR R5 | Organization/care-pathway/case: **implemented**; portfolio: no (no meaningful FHIR resource) | Implemented (partial; course maps to a non-standard `Basic` resource instead) |
 | gRPC (Tonic) | No | Stub, in person/worker/event only |
 | Privacy masking / GDPR export | **Implemented** — organization/care-pathway/portfolio via `src/privacy.rs`, case inline (§7.3) | Implemented |

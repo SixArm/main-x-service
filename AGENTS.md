@@ -45,7 +45,7 @@ discipline, including the anti-patterns.
 | [thing-service](thing/thing-service-with-axum/) | Thing (schema.org/Thing) | [spec](thing/thing-service-with-axum/spec/index.md) · [index](thing/thing-service-with-axum/index.md) |
 | [event-service](event/event-service-with-axum/) | Event (schema.org/Event, time-bounded) | [spec](event/event-service-with-axum/spec/index.md) · [index](event/event-service-with-axum/index.md) |
 | [course-service](course/course-service-with-axum/) | Course (+ `CourseInstance` sub-resource) | [spec](course/course-service-with-axum/spec/index.md) · [index](course/course-service-with-axum/index.md) |
-| [authentication-service](authentication/authentication-service-with-axum/) | User — the central SSO provider; **the reference loco.rs crate** | [spec](authentication/authentication-service-with-axum/spec/index.md) · [index](authentication/authentication-service-with-axum/index.md) |
+| [authentication-service](authentication/authentication-service-with-axum/) | User — the central SSO provider; **the reference axa crate** | [spec](authentication/authentication-service-with-axum/spec/index.md) · [index](authentication/authentication-service-with-axum/index.md) |
 | [organization-service](organization/organization-service-with-axum/) | Organization (schema.org/Organization) | [spec](organization/organization-service-with-axum/spec/index.md) · [index](organization/organization-service-with-axum/index.md) |
 | [care-pathway-service](care-pathway/care-pathway-service-with-axum/) | Care pathway (clinical pathway) | [spec](care-pathway/care-pathway-service-with-axum/spec/index.md) · [index](care-pathway/care-pathway-service-with-axum/index.md) |
 | [case-service](case/case-service-with-axum/) | Case (governmental case tracking) | [spec](case/case-service-with-axum/spec/index.md) · [index](case/case-service-with-axum/index.md) |
@@ -200,7 +200,7 @@ N-2 the MSRV's minor version now coincides with the
 carries a patch version the MSRV does not, so the two remain distinct
 numbers with distinct jobs (§3 of the policy doc), they simply moved
 closer together than they were at N-3. The binding constraint is still
-the dependency graph, not our code: loco-rs / sea-orm / sqlx require
+the dependency graph, not our code: axa / sea-orm / sqlx require
 1.94, so 1.97 clears it with three releases of headroom. See
 [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md) for the
 policy and the bump procedure.
@@ -301,8 +301,8 @@ CI runner, so no front-end code was ever actually exercised by a check.
 @agents/share/restful.md
 @agents/share/fhir.md
 @agents/share/api-versioning.md
-@agents/share/loco.md
-@agents/share/rust-loco-stack.md
+@agents/share/axa.md
+@agents/share/rust-axum-stack.md
 @agents/share/postgresql.md
 @agents/share/locales.md
 @agents/share/compliance-for-healthcare.md

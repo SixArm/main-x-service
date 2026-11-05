@@ -55,16 +55,16 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
     }
 }
 
-/// The loco application type. Carries no state; it exists to implement
-/// [`Hooks`], which loco's CLI drives to boot the service, register
+/// The axa application type. Carries no state; it exists to implement
+/// [`Hooks`], which axa's CLI drives to boot the service, register
 /// routes, and run migrations.
 pub struct App;
 impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (repo
-    /// `tasks.md` PRO-H12), returning `true` so loco does **not** also
+    /// `tasks.md` PRO-H12), returning `true` so axa does **not** also
     /// install its own. Ported from course-service's `App::init_logger`
     /// (itself ported from person-service's, itself link-graph-service's)
-    /// — the `Hooks::init_logger` seam is identical across crates' shapes
+    /// — the `App::init_logger` seam is identical across crates' shapes
     /// despite the differing router layout (see `src/observability.rs`'s
     /// module docs and `after_routes` below for where this crate's shape
     /// actually diverges).
@@ -81,7 +81,7 @@ impl App {
         }
         let logger_config = &ctx.config.logger;
         // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise loco's module whitelist applies,
+        // the filter outright; otherwise axa's module whitelist applies,
         // and the whitelist has no `opentelemetry*` entry — so a failing
         // export would be silent unless widened.
         let operator_supplied =
@@ -118,7 +118,7 @@ impl App {
         }
     }
 
-    /// Register the controller route trees on top of loco's defaults
+    /// Register the controller route trees on top of axa's defaults
     /// (`/_health`, `/_ping`): the bulk import/export routes (BLK-5), the
     /// organization CRUD/match/audit routes, the OpenAPI/Swagger docs
     /// routes, and the Prometheus metrics route (`/metrics.prom`,
@@ -148,7 +148,7 @@ impl App {
     ///
     /// # Errors
     ///
-    /// Never (returns `Ok`); the signature is loco's.
+    /// Never (returns `Ok`); the signature is axa's.
     pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the verifier before serving so `enforce()`/`AuthUser`
         // consult the boot-fetched key set from the first request on.
@@ -189,20 +189,20 @@ impl App {
 
     /// Register background-queue workers: the BLK-5 bulk import/export
     /// worker, which drains `bulk_jobs` under `queue.kind: Postgres`
-    /// (`workers.mode: BackgroundQueue` in `config/*.yaml`; the loco
+    /// (`workers.mode: BackgroundQueue` in `config/*.yaml`; the axa
     /// scaffold's unrelated `DownloadWorker` stub was removed — see
     /// entity spec §13 T-12).
     ///
     /// # Errors
     ///
-    /// Never (returns `Ok`); the signature is loco's.
+    /// Never (returns `Ok`); the signature is axa's.
     pub fn connect_workers(ctx: &AppContext, queue: &mut Queue) -> Result<()> {
         queue.register(crate::bulk::worker::BulkJobWorker::build(ctx));
         Ok(())
     }
 
     /// Register CLI tasks. None are registered; the inject marker is kept
-    /// so the loco generator can splice tasks in later.
+    /// so the Loco generator can splice tasks in later.
     #[allow(unused_variables)]
     pub fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::search::SearchReindex);

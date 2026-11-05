@@ -1,7 +1,7 @@
 //! Migration: create the `suggestion_runs` table — the durable per-pass
 //! audit trail for the periodic cross-service `same_identity` suggestion
 //! job (spec T-33, design §16 OQ-9(d)). SQL is the source of truth; this
-//! wrapper bridges it into the loco `Migrator`.
+//! wrapper bridges it into the axa `Migrator`.
 
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::ConnectionTrait;

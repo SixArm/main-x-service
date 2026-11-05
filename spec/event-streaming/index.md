@@ -55,9 +55,9 @@ outbox + Fluvio path that now sits **behind** this default on all ten
 entity registries; nothing below changes until a deployment flips the
 transport.
 
-### 2.1 Loco services — canonical envelope + publisher seam
+### 2.1 Controller-style services — canonical envelope + publisher seam
 
-The loco services (organization, care-pathway, case, portfolio)
+The controller-style services (organization, care-pathway, case, portfolio)
 implement **Phase 1** of the durable-bus design: the canonical versioned
 envelope and the publisher trait, wired to an in-memory ring buffer by
 default. Reference implementation: `care-pathway-service-with-axum/src/streaming.rs`.
@@ -139,11 +139,11 @@ enum:
 **The Fluvio-backed transport is no longer just the stated target — it
 has shipped in all six of these services** (`src/relay.rs` +
 `FluvioSink`, alongside course's own `course_outbox` table and
-`src/db/outbox.rs`), on the same terms as the loco services (§4): a
+`src/db/outbox.rs`), on the same terms as the controller-style services (§4): a
 Postgres outbox behind `<ENTITY>_EVENT_TRANSPORT=outbox` and a relay
 worker behind the `fluvio` Cargo feature, both off by default. The
 durable design (§4) **unified both shapes** behind one `EventPublisher`
-trait and one `Envelope`; the loco free functions became a thin
+trait and one `Envelope`; the axa free functions became a thin
 `InMemoryPublisher`, and the legacy `EventProducer` was adapted to the
 same seam.
 
@@ -187,11 +187,11 @@ nine sinks are wired and idle until a deployment sets their own
 ### 4.1 Transactional outbox (no lost events)
 
 The crash window — *"DB committed, broker publish not yet sent"* — is
-closed with the **transactional outbox** pattern, which fits loco's
+closed with the **transactional outbox** pattern, which fits axa's
 Postgres-backed workers exactly:
 
 ```
- request handler:                          relay worker (loco bg job):
+ request handler:                          relay worker (axa bg job):
    BEGIN                                      poll event_outbox
      INSERT/UPDATE the entity row               WHERE published_at IS NULL
      INSERT one row into event_outbox           ORDER BY id FOR UPDATE SKIP LOCKED
@@ -215,8 +215,8 @@ outbox's.
 
 ### 4.2 Relay worker → Fluvio — shipped on all ten registries
 
-A **loco Postgres-backed worker** (`queue.kind: Postgres`, per
-[`agents/share/loco.md`](../../agents/share/loco.md)) drains the outbox
+A **axa Postgres-backed worker** (`queue.kind: Postgres`, per
+[`agents/share/axa.md`](../../agents/share/axa.md)) drains the outbox
 to a `FluvioSink` (behind a `fluvio` cargo feature, off by default). The
 sink — not the request path — holds the Fluvio client, so request
 latency is unaffected and a Fluvio outage only **backs up the outbox**;
@@ -329,8 +329,8 @@ shape per crate — no shared `mxi-events` crate exists, §4.6),
 
 ### 6.1 To background jobs
 
-The relay worker is a **loco Postgres-backed background job**
-(`queue.kind: Postgres`; per [`agents/share/loco.md`](../../agents/share/loco.md),
+The relay worker is a **axa Postgres-backed background job**
+(`queue.kind: Postgres`; per [`agents/share/axa.md`](../../agents/share/axa.md),
 not SQLite-backed). It polls `event_outbox` with `FOR UPDATE
 SKIP LOCKED`, which is the same Postgres concurrency primitive the job
 queue itself uses. See
@@ -354,7 +354,7 @@ See [`agents/share/auditability.md`](../../agents/share/auditability.md).
 
 ### 6.3 To merge
 
-A merge emits a single `Merged` (loco) / `Merged { source, target }`
+A merge emits a single `Merged` (axa) / `Merged { source, target }`
 (legacy) event, alongside the merge-history record. The durable envelope
 adds `merged_from` on `kind = merged`. See
 [`spec/merge/index.md`](../merge/index.md).
@@ -368,7 +368,7 @@ adds `merged_from` on `kind = merged`. See
 | Fluvio-gated | feature `fluvio` + broker/test container | relay → topic → consumer round-trip; per-`pid` ordering; at-least-once redelivery dedup on `event_id` |
 
 The Phase 1 in-memory tests (publish/read-back, monotonic `seq`, Serde
-round-trip, frozen `EventView` keys) live in each loco service's
+round-trip, frozen `EventView` keys) live in each axa service's
 `src/streaming.rs` and are entirely DB-free, keeping `cargo test`
 infrastructure-free.
 
@@ -376,7 +376,7 @@ infrastructure-free.
 
 | Capability | State |
 |---|---|
-| Canonical versioned `Envelope` (loco services) | IMPLEMENTED (Phase 1, default `memory`) |
+| Canonical versioned `Envelope` (controller-style services) | IMPLEMENTED (Phase 1, default `memory`) |
 | `EventPublisher` seam + `InMemoryPublisher` ring buffer (cap 1000) | IMPLEMENTED (Phase 1, default `memory`) |
 | `EventView` projection at `/events/recent` | IMPLEMENTED |
 | Legacy `EventProducer` / `EventConsumer` + `InMemoryEventPublisher` | IMPLEMENTED (legacy Axum services) |
@@ -390,7 +390,7 @@ infrastructure-free.
 ## See also
 
 - [`agents/share/event-bus.md`](../../agents/share/event-bus.md) — the full durable-bus design (primary source)
-- [`agents/share/loco.md`](../../agents/share/loco.md) — Postgres-backed workers
+- [`agents/share/axa.md`](../../agents/share/axa.md) — Postgres-backed workers
 - [`agents/share/auditability.md`](../../agents/share/auditability.md) — audit log + event-stream summary
 - [`spec/postgresql/index.md`](../postgresql/index.md) — §10 background jobs, SKIP LOCKED
 - [`spec/architecture/index.md`](../architecture/index.md) — family architecture

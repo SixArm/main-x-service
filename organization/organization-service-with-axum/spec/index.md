@@ -22,7 +22,7 @@
 
 A registry of organization identities (schema.org/Organization) for the
 Main X Index family: create/read/update/delete records and detect
-duplicates with the canonical organization-matcher. Built on loco.rs.
+duplicates with the canonical organization-matcher. Built on axa.
 
 ## 2. Scope
 
@@ -146,7 +146,7 @@ are never fed to the matcher. See §8 and
 
 ## 7. Non-functional requirements
 
-loco-idiomatic; Postgres persistence; deterministic matching via the
+controller-style; Postgres persistence; deterministic matching via the
 embedded library; soft-delete with audit-friendly timestamps.
 
 ### Configuration environment variables
@@ -164,7 +164,7 @@ embedded library; soft-delete with audit-friendly timestamps.
 | `ORGANIZATION_EVENT_TRANSPORT` | `memory` | Durable event-bus transport ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §7). `memory` ⇒ the process-wide ring buffer (Phase 1; no DB, no tx — today's behaviour). `outbox` ⇒ the transactional outbox (Phase 2): every CRUD/merge handler writes one `event_outbox` row **on the same transaction** as the entity mutation, so the change and its event commit or roll back together. Unrecognised value ⇒ `memory` (fail-safe). Read once at boot and cached. |
 | `ORGANIZATION_EVENT_RELAY` | off | Phase-3 relay switch. Truthy (`1`/`true`/`yes`/`on`) **and** `EVENT_TRANSPORT=outbox` ⇒ `App::after_routes` spawns the background relay loop (`src/relay.rs`: drain `event_outbox` → `EventSink` → `mark_published`, + periodic retention purge). Off by default ⇒ no loop. |
 | `ORGANIZATION_EVENT_RELAY_INTERVAL_SECS` | `5` | Relay drain-loop tick interval (floored at 1). |
-| `ORGANIZATION_SEARCH_INDEX_PATH` | `data/search-index` | Directory holding the Tantivy full-text index (`src/search/`), created if absent. The index is a **derived artifact**: Postgres remains the source of truth and every hit is resolved against it, so a stale index degrades (a missing hit) rather than corrupts (it can never resurrect a deleted record). If the directory cannot be opened, search and `check-duplicates` return `503` rather than an empty result. An **empty index over a non-empty table triggers a background rebuild at boot**, so an upgrade or a lost volume self-heals; `cargo loco task search_reindex` rebuilds on demand. |
+| `ORGANIZATION_SEARCH_INDEX_PATH` | `data/search-index` | Directory holding the Tantivy full-text index (`src/search/`), created if absent. The index is a **derived artifact**: Postgres remains the source of truth and every hit is resolved against it, so a stale index degrades (a missing hit) rather than corrupts (it can never resurrect a deleted record). If the directory cannot be opened, search and `check-duplicates` return `503` rather than an empty result. An **empty index over a non-empty table triggers a background rebuild at boot**, so an upgrade or a lost volume self-heals; `cargo run -- task search_reindex` rebuilds on demand. |
 | `ORGANIZATION_SEARCH_BOOT_REINDEX` | unset ⇒ **on** | Boot-time self-heal: when the index is empty **and** the table is not, rebuild in the background (`App::after_routes`). Falsy (`0`/`false`/`no`/`off`) ⇒ skip, for a deployment large enough to want the rebuild scheduled by hand. Anything else (including an unrecognised value) leaves it on, because the failure it prevents is silent. |
 | `ORGANIZATION_EVENT_RETENTION_DAYS` | `7` | Outbox row TTL. **Enforced** by the Phase-3 relay's periodic `purge_published` (deletes `published_at < now() - INTERVAL '<n> days'`) when the relay runs ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3). |
 | `ORGANIZATION_BULK_ARTIFACT_DIR` | system temp dir + `organization-bulk-artifacts` | Base directory for BLK-5 bulk import/export artifacts (uploaded input, export output, error report) — `src/bulk/store.rs`, local-filesystem only this rollout step (§10.7). |
@@ -173,7 +173,7 @@ embedded library; soft-delete with audit-friendly timestamps.
 
 ## 8. Architecture
 
-loco `App` (`src/app.rs`) registers the organizations controller. One
+axa `App` (`src/app.rs`) registers the organizations controller. One
 `organizations` table stores `pid` + denormalised `name` + the full
 `Organization` JSONB `data`. Matching calls `organization-matcher`
 directly on the deserialised payloads — no adapter.
@@ -206,7 +206,7 @@ list, by design; see §10.7), the CSV column set, and export sensitivity.
 
 ## 9. API surface
 
-See §6. Responses are raw loco JSON. `404` for unknown `pid`; `422
+See §6. Responses are raw axa JSON. `404` for unknown `pid`; `422
 Unprocessable Entity` for validation failures (blank `name` on create
 or replace — family convention); `400` for malformed requests (blank
 search `q`, invalid audit pid).
@@ -400,7 +400,7 @@ counter increment in `metrics::tests`, streaming, and `auth::tests` —
 `enforce`/`parse_bool` decision: off+no-token ⇒ ok, on+public ⇒ ok,
 on+protected without/expired/tampered ⇒ `401`, on+protected+valid ⇒
 ok). Request-level tests (`tests/requests/organizations.rs`): boot the
-real app via loco's `testing` harness and cover create round-trip,
+real app via axa's `testing` harness and cover create round-trip,
 blank-name `422` (create + update), unknown-pid `404`, search
 (keyword hit; index follows update + delete; fuzzy / phonetic modes),
 check-duplicates (including identifier-only blocking), merge, `whoami` `401`, the blanket-enforcement
@@ -715,7 +715,7 @@ organization is not a data subject.
   and never fails a committed request. `GET /search` gains `fuzzy` /
   `phonetic` (§6.11); `check-duplicates` now **blocks** on the index
   instead of scanning up to 1000 rows, so a duplicate beyond the old
-  cap is reachable. Recovery: `cargo loco task search_reindex`
+  cap is reachable. Recovery: `cargo run -- task search_reindex`
   (`src/tasks/search.rs`, paginated, clears first, skips unreadable
   payloads) plus an automatic boot rebuild when the index is empty and
   the table is not. Tests: 16 DB-free unit pins (exact / fuzzy /
@@ -767,7 +767,7 @@ organization is not a data subject.
   (person/worker/place/thing/event/course), which all carry a dedicated
   `merged_from: Option<String>` populated by a `for_merge`/`merge_envelope`
   constructor. *(verified: `grep -rln merged_from */*/src/streaming.rs`
-  found no hit under any of the four loco-idiomatic registries —
+  found no hit under any of the four controller-style registries —
   organization, care-pathway, case, portfolio — before this fix; the six
   person-style crates all had it.)* Added `merged_from: Option<String>`
   to `Envelope` (`#[serde(skip_serializing_if = "Option::is_none",
@@ -828,7 +828,7 @@ organization is not a data subject.
     (fetched verifier accepts a token signed by that key) + fast-failing
     URL fallback (no panic) + no-URL env path.
   - [x] **AU-2: key rotation + ABAC policy hot-reload without a
-    restart** *(2026-08-01; the loco-style half of the rollout — case
+    restart** *(2026-08-01; the controller-style half of the rollout — case
     was the reference, the five axum-style services landed the same
     day as AU-1)*. The verifier and the ABAC policy were boot-only
     `OnceLock` snapshots, so a rotated key set or an edited policy file
@@ -878,7 +878,7 @@ organization is not a data subject.
   in-scope services.
 
 - [x] **Fix: fresh-Postgres `db migrate` failed in the `event_outbox`
-  migration (2026-07-18).** The loco `create_table` helper pluralizes
+  migration (2026-07-18).** The axa `create_table` helper pluralizes
   table names (`cruet::to_plural`: `event_outbox` → `event_outboxes`),
   so the migration's own index DDL (`ON event_outbox`) failed and
   rolled the whole fresh migrate back — no tables were ever created.
@@ -924,7 +924,7 @@ organization is not a data subject.
   `Count` collector, not the page length. Details in §6.2/§6.11.
 
 - [x] **`seed_examples` CLI task (EX-4)** *(2026-08-04)*.
-  `cargo loco task seed_examples` loads the repo's shared demo fixture
+  `cargo run -- task seed_examples` loads the repo's shared demo fixture
   (`examples/data/organizations.jsonl`, 20 rows) via the model-layer
   create (no duplicate check, no audit row, no event — deliberate for a
   seed task); refuses to insert into a non-empty `organizations` table.
@@ -974,7 +974,7 @@ organization is not a data subject.
 - [x] **Real OpenTelemetry OTLP export (PRO-H12 slice 4 of 7)**
   *(2026-08-30)*. New `src/observability.rs` — this crate carried no
   observability module at all before this change, and is the first of
-  the four remaining loco-idiomatic registries (organization,
+  the four remaining controller-style registries (organization,
   care-pathway, case, portfolio) to carry it; PRO-H12 slices 1–3
   (course, place, thing) were all person-style crates. Close port of
   course-service's, itself a port of person-service's, itself a port of
@@ -988,7 +988,7 @@ organization is not a data subject.
   Real adaptation, confirmed rather than assumed: this crate has
   exactly **one** router-construction surface
   (`App::routes`/`App::after_routes`; even its own request-level test
-  suite boots the real `App` via loco's testing harness rather than a
+  suite boots the real `App` via axa's testing harness rather than a
   second hand-rolled router), unlike the person-style crates' two, so
   `observability::trace_mw` is layered once, as the outermost
   middleware in `after_routes`. No `tonic` dev-dependency rename was
@@ -1102,7 +1102,7 @@ organization is not a data subject.
   over an unrelated Tantivy hiccup would be a far larger availability
   regression than refusing one explicit check. A hit returns `409` with
   `ErrorDetail { error: "duplicate_detected", description, errors:
-  <candidate ScoredRef array> }` (loco's `ErrorDetail.errors` field is
+  <candidate ScoredRef array> }` (axa's `ErrorDetail.errors` field is
   built for exactly this — arbitrary structured detail alongside the
   message) and the record is never created.
   **A real, non-obvious side effect found only by running the DB-gated
@@ -1226,7 +1226,7 @@ organization is not a data subject.
 
 ## 14. Implementation status
 
-Done: loco boot; organizations table + migration; CRUD (blank name →
+Done: axa boot; organizations table + migration; CRUD (blank name →
 `422`, unknown pid → `404`) with `?limit=&offset=` pagination
 (`X-Total-Count`/`X-Limit`/`X-Offset`, SEC-G7-bounded); `/match` and
 `/check-duplicates` embedding organization-matcher, blocked on the
@@ -1260,7 +1260,7 @@ local-filesystem artifact store; keyless rows route to the review
 queue with `provenance = "import"`); the `seed_examples` CLI task
 (EX-4); DB-free tests; request-level test suite plus five dedicated
 Postgres-gated test binaries (`enforcement`, `masking`, `outbox_audit`,
-`seed_examples_db`, `fluvio_relay`; §11); loco scaffolding leftovers
+`seed_examples_db`, `fluvio_relay`; §11); Loco scaffolding leftovers
 removed (no workers/tasks/data stubs); real **OpenTelemetry OTLP
 export** (`src/observability.rs`, PRO-H12 slice 4 of 7 — structured
 logging plus a `tracing-opentelemetry` bridge over an OTLP/gRPC
@@ -1306,7 +1306,7 @@ import/export, key rotation + policy hot-reload (AU-2).
 
 ## 17. References
 
-- schema.org/Organization; loco.rs; the organization-matcher spec.
+- schema.org/Organization; axa; the organization-matcher spec.
 
 ## 18. Change control
 

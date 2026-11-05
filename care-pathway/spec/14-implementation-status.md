@@ -12,7 +12,7 @@ Aspirational items live in §15, not here.
 | matcher | Probabilistic matching | Name (Jaro-Winkler + Soundex bonus), condition-code Jaccard, pathway code, care setting, interventions/keywords Jaccard; renormalised weights; presets strict/default/lenient |
 | matcher | Quality bar | No `unsafe`/`unwrap`/`panic`; deterministic; diacritic-preserving; unit + public-API tests + doctests; demo binary |
 | matcher | Docs | `spec/index.md` (§1–§25, single file), `AGENTS.md` + 4 AGENTS guides, README, CHANGELOG |
-| service | loco.rs chassis | loco 0.16, Axum 0.8, SeaORM 1.1; `cargo loco start`; config yamls; port 5150 |
+| service | axa chassis | axa, Axum 0.8, SeaORM 1.1; `cargo run -- start`; config yamls; port 5150 |
 | service | Persistence | `care_pathways` table (pid, name, JSONB `data`, active, `deleted_at`); migration; auto-migrate in dev |
 | service | CRUD | Create / list (cap 100) / read / replace / soft-delete; `404` unknown pid; blank-name rejection (`422`, create + update) |
 | service | Validation | `condition_codes` format-checked per `system` — ICD-10, ICD-11, SNOMED CT (SCTID Verhoeff); all problems reported in one `422` (`src/validation.rs`) |
@@ -22,7 +22,7 @@ Aspirational items live in §15, not here.
 | service | Name search | `GET /search?q=` — Postgres `ILIKE` substring match on the denormalised `name` (cap 50, wildcards escaped); blank `q` → `400` |
 | service | Record merge | `POST /merge` folds a duplicate into a survivor (union fields, former-title alias, soft-delete, `merge_records` history, `Merged` event); pure `src/merge.rs`; `/merges/recent` history |
 | service | Token verification | Offline bearer-token verification against the auth-service's published key (`src/auth.rs`, embeds `authentication-verifier`); `AuthUser`/`MaybeAuthUser` extractors; `/whoami` protected; audit `actor` stamped from the token. Credential is **PASETO v4 public** (Ed25519) per [`authentication-sessions.md`](../../agents/share/authentication-sessions.md) — originally RS256-JWT, since switched (T-7) |
-| service | Tests | DB-free `tests/matching.rs` (matcher embedding + JSON round-trip) + controller validation unit tests (422 pin); request-level loco tests `tests/requests/care_pathways.rs` (`#[ignore]`-gated on Postgres); green build + clippy |
+| service | Tests | DB-free `tests/matching.rs` (matcher embedding + JSON round-trip) + controller validation unit tests (422 pin); request-level axa tests `tests/requests/care_pathways.rs` (`#[ignore]`-gated on Postgres); green build + clippy |
 | front-end | Routes | `/`, `/new`, `/[pid]` (detail + delete + check-duplicates), `/[pid]/edit` |
 | front-end | API layer | Lean raw-JSON client, `CarePathwayRepository`, hand-mirrored TS types |
 | front-end | Form | Full-DTO editing incl. condition-code and identifier row editors |

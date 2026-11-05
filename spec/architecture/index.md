@@ -63,20 +63,20 @@ and [../../agents/share/authentication-sessions.md](../../agents/share/authentic
 There are **two** service-crate architectures in the repo. This is a
 deliberate, in-progress convergence — not an accident.
 
-### 2a. loco.rs services (the reference style)
+### 2a. axa services (the reference style)
 
 Entities: **authentication, organization, care-pathway, case, portfolio,
 link-graph-service.**
 
-These are real [loco.rs](https://loco.rs/) 0.16 services (Axum 0.8
+These are real [axa](https://axa/) 0.16 services (Axum 0.8
 under the hood). Characteristics:
 
-- An `App` type implements loco's `Hooks` (`boot`, `routes`,
+- An `App` type implements axa's `Hooks` (`boot`, `routes`,
   `after_routes`, `connect_workers`, `truncate`, `seed`). It carries no
   state; the framework supplies `AppContext` (DB handle, config) per
   request. See `organization/organization-service-with-axum/src/app.rs`.
-- Endpoints are **loco controllers** (`src/controllers/*.rs`) registered
-  via `AppRoutes::with_default_routes().add_route(...)`. loco supplies
+- Endpoints are **axa controllers** (`src/controllers/*.rs`) registered
+  via `AppRoutes::with_default_routes().add_route(...)`. axa supplies
   default `/_health` and `/_ping`.
 - Migrations are `sea-orm-migration` migrations under `migration/`.
 - Persistence is **DTO-as-JSONB**: the matcher's domain type *is* the
@@ -96,7 +96,7 @@ under the hood). Characteristics:
 
 Entities: **person, worker, place, thing, event, course.**
 
-These predate the loco conversion and follow a hand-rolled,
+These predate the Loco conversion and follow a hand-rolled,
 master-patient-index-style layout with explicit layered modules. From
 `person/person-service-with-axum/src/lib.rs`:
 
@@ -113,42 +113,42 @@ src/
 ├── config/  observability/  error.rs  lib.rs
 ```
 
-Differences from the loco style:
+Differences from the axa style:
 
 - A hand-built Axum router + `AppState` (`src/api/rest/state.rs`) holding
-  `Arc`-wrapped shared services, rather than loco `Hooks`/`AppContext`.
+  `Arc`-wrapped shared services, rather than axa `Hooks`/`AppContext`.
 - A **normalized schema**: every repeating collection is its own child
   table with a FK and ordering column (names, identifiers, addresses,
   contacts, links, …) — not DTO-as-JSONB. JSONB is reserved for opaque
   snapshots only (audit old/new values, merge `transferred_data`,
   review-queue `score_breakdown`). See [../data-modeling.md](../data-modeling.md).
 - A broader surface: FHIR R5 endpoints, privacy/GDPR endpoints, batch
-  deduplication — features the loco services (largely) deferred in
+  deduplication — features the controller-style services (largely) deferred in
   favour of a thinner first cut. Tantivy search is **not** one of
   these: it is live on every entity registry regardless of style (§6).
 
 ### Why both — and the convergence plan
 
 The older services were built first as full-featured MPI services. The
-loco services were built later as the **reference target**: loco.rs is
+controller-style services were built later as the **reference target**: axa is
 the chosen framework going forward (`authentication-service` was the
-first real loco crate; `organization`, `care-pathway`, `case`
-followed). The intent is for the older six to converge onto the loco
-shape over time. Until then, both styles coexist; treat the loco
+first real axa crate; `organization`, `care-pathway`, `case`
+followed). The intent is for the older six to converge onto the axa
+shape over time. Until then, both styles coexist; treat the axa
 services as the canonical pattern when scaffolding or refactoring. (A
-prior bulk loco-conversion mounted the older services under loco but
+prior bulk loco-conversion mounted the older services under axa but
 left their idiomatic-controller rewrite deferred.)
 
-| Aspect | loco style | MPI style |
+| Aspect | axa style | MPI style |
 | ------ | ---------- | --------- |
 | Entities | authentication, organization, care-pathway, case, portfolio, link-graph-service | person, worker, place, thing, event, course |
-| Framework seam | loco `Hooks` + `AppContext` | hand-built Axum `Router` + `AppState` |
-| Endpoints | loco controllers | `api/rest` handlers (+ `api/fhir`, `api/grpc`) |
+| Framework seam | axa `Hooks` + `AppContext` | hand-built Axum `Router` + `AppState` |
+| Endpoints | axa controllers | `api/rest` handlers (+ `api/fhir`, `api/grpc`) |
 | Migrations | `sea-orm-migration` | SeaORM migrations |
 | Persistence | matcher DTO as JSONB (+ denormalised handles) | normalized child tables |
 | Matching | embedded matcher crate, same type stored & matched | embedded matcher + service-side adapter |
 | Search | Tantivy full-text (live on every entity registry) | Tantivy full-text |
-| Role | reference target | converging toward loco |
+| Role | reference target | converging toward axa |
 
 ---
 
@@ -182,7 +182,7 @@ Shared-services wiring differs by style but plays the same role:
 - **MPI style:** `AppState` (`src/api/rest/state.rs`) holds
   `db`, `*_repository`, `event_publisher`, `audit_log`, `search_engine`,
   `matcher`, `config` — all `Arc`-shared, injected into handlers.
-- **loco style:** loco's `AppContext` carries the DB + config; the
+- **axa style:** axa's `AppContext` carries the DB + config; the
   matcher is invoked directly inside controllers; auth verifier and event
   publisher are process-wide `OnceLock`s rather than state.
 
@@ -221,7 +221,7 @@ SQL).
 ## 5. Request lifecycle / data flows
 
 The three core write/read flows are identical in intent across both
-styles (the loco services implement thinner first cuts in some areas —
+styles (the controller-style services implement thinner first cuts in some areas —
 e.g. no privacy step in case — but candidate selection is Tantivy on
 both styles, not `ILIKE`). Canonical flow reference:
 [../../agents/share/dataflow.md](../../agents/share/dataflow.md).
@@ -265,7 +265,7 @@ Equal pids → `422`; unknown pid → `404`. See
 ## 6. Shared building blocks every service provides
 
 Every service offers the same conceptual surface (implemented fully in
-the MPI services; partially, with documented deferrals, in the loco
+the MPI services; partially, with documented deferrals, in the axa
 services).
 
 | Block | Summary | Reference |
@@ -278,11 +278,11 @@ services).
 | Audit logging | HIPAA-style who/what/when, old/new values as JSON | [../../agents/share/auditability.md](../../agents/share/auditability.md) |
 | Event streaming | `*Created/*Updated/*Deleted/*Merged` on every change | [../../agents/share/event-bus.md](../../agents/share/event-bus.md) |
 | Validation | Required fields, format/range checks, normalization → `422` | [../../agents/share/overview.md](../../agents/share/overview.md) |
-| Privacy | Masking, GDPR export, consent (MPI services; deferred in loco) | [../../agents/share/privacy.md](../../agents/share/privacy.md) |
+| Privacy | Masking, GDPR export, consent (MPI services; deferred in axa) | [../../agents/share/privacy.md](../../agents/share/privacy.md) |
 | REST + OpenAPI | JSON REST API with Utoipa/Swagger docs | [../../agents/share/restful.md](../../agents/share/restful.md) |
 | Observability | tracing + OpenTelemetry; Prometheus text exposition | [../../agents/share/observability.md](../../agents/share/observability.md) |
 
-**Implemented vs planned (loco services):** CRUD, matching, Tantivy
+**Implemented vs planned (controller-style services):** CRUD, matching, Tantivy
 full-text search, merge, audit, event streaming (durable outbox,
 default-off), OpenAPI/Swagger, and offline cross-service token
 verification (PASETO v4.public) are wired. **Deferred (varies by
@@ -302,7 +302,7 @@ PostgreSQL 18, Tantivy, Utoipa, OpenTelemetry, strsim, geo/haversine,
 Podman, …) and its hard constraints (Podman not Docker, PostgreSQL not
 SQLite, chrono, MiMalloc not jemalloc) are specified in:
 
-- [../../agents/share/rust-loco-stack.md](../../agents/share/rust-loco-stack.md) — the canonical stack table + constraints
-- [../../agents/share/loco.md](../../agents/share/loco.md) — loco backend conventions (no view tier; Postgres-backed background jobs)
+- [../../agents/share/rust-axum-stack.md](../../agents/share/rust-axum-stack.md) — the canonical stack table + constraints
+- [../../agents/share/axa.md](../../agents/share/axa.md) — axa backend conventions (no view tier; Postgres-backed background jobs)
 - [../postgresql/index.md](../postgresql/index.md) — PostgreSQL spec
 - [../../agents/share/postgresql.md](../../agents/share/postgresql.md) — PostgreSQL extensions

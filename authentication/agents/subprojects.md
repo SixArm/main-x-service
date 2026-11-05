@@ -16,7 +16,7 @@ matcher — nothing to match.
 
 | Subproject | Kind | Responsibility |
 |---|---|---|
-| [authentication-service-with-axum](../authentication-service-with-axum/) | loco.rs web service | **Issuance.** Magic-link sign up / sign in / sign out, cookie-session establishment, short-lived PASETO v4.public minting, published-key publication at `/.well-known/paseto-keys`, session recording + revocation. Also the family's reference loco.rs application. *(RS256-era runtime until the spec §13 follow-up.)* |
+| [authentication-service-with-axum](../authentication-service-with-axum/) | axa web service | **Issuance.** Magic-link sign up / sign in / sign out, cookie-session establishment, short-lived PASETO v4.public minting, published-key publication at `/.well-known/paseto-keys`, session recording + revocation. Also the family's reference axa application. *(RS256-era runtime until the spec §13 follow-up.)* |
 | [authentication-verifier-rust-crate](../authentication-verifier-rust-crate/) | Rust library | **Verification.** Offline PASETO v4.public verification against the published Ed25519 key(s): `kid`-based key selection, signature + `iss`/`aud`/`exp` checks. Dependency-light by design; `fetch` feature adds HTTP key loading via reqwest. (Already harmonized.) |
 | [authentication-front-end-with-svelte](../authentication-front-end-with-svelte/) | SvelteKit SPA + BFF | **Operator UI.** `/signup`, `/signin`, `/verify`, `/` (dashboard + sign out). The SvelteKit server acts as a **BFF**: the browser holds only the httpOnly `__Host-mxi_session` cookie (no token, no `localStorage`); the BFF mints/forwards the PASETO server-side. Deliberately dependency-light — no data grid, no Lily/SVAR. (Already harmonized.) |
 
@@ -55,7 +55,7 @@ authentication-verifier ──────► authentication-service
 ```bash
 cd authentication-service-with-axum
 export DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_development
-cargo loco start          # http://localhost:5150 (auto-migrates in dev)
+cargo run -- start          # http://localhost:5150 (auto-migrates in dev)
 cargo test --lib          # DB-free unit tests
 cargo clippy --bins
 ```

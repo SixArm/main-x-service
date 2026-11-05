@@ -2,7 +2,7 @@
 
 A registry of **organization identities**
 ([schema.org/Organization](https://schema.org/Organization)): CRUD +
-matching, built on **loco.rs** and embedding the canonical
+matching, built on **axa** and embedding the canonical
 [organization-matcher](../organization-matcher-rust-crate).
 
 - Spec: [spec/index.md](./spec/index.md)
@@ -58,7 +58,7 @@ Requires PostgreSQL.
 
 ```bash
 export DATABASE_URL=postgres://loco:loco@localhost:5432/organization_service_development
-cargo loco start        # migrations auto-run in development
+cargo run -- start        # migrations auto-run in development
 
 curl -s localhost:5150/api/organizations -H 'content-type: application/json' \
   -d '{"name":"Acme, Inc.","jurisdiction":"US","url":"https://acme.com"}'

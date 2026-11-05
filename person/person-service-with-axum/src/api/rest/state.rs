@@ -232,7 +232,7 @@ fn empty_verifier(issuer: &str, audience: &str) -> Verifier {
     Verifier::from_paseto_keys_value(&empty, issuer, audience).expect("empty key set always builds")
 }
 
-/// Bridge so the existing `State<AppState>` handlers run as native loco
+/// Bridge so the existing `State<AppState>` handlers run as native axa
 /// controllers: extracts the cheaply-cloneable `AppState` from the
 /// `AppContext` shared store (populated once at boot in `after_routes`).
 impl axum::extract::FromRef<axa::AppContext> for AppState {

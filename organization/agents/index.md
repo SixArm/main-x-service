@@ -42,7 +42,7 @@ The shared reference docs live at the project root under
 | [restful.md](../../agents/share/restful.md) | REST API conventions |
 | [postgresql.md](../../agents/share/postgresql.md) | PostgreSQL setup |
 | [locales.md](../../agents/share/locales.md) | i18n & l10n |
-| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Rust / Loco dependency stack |
+| [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Rust / axa dependency stack |
 | [compliance-for-technology.md](../../agents/share/compliance-for-technology.md) | ISO, GDPR, UK DPA |
 
 ## See also

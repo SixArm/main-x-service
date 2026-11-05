@@ -389,7 +389,7 @@ pub async fn fhir_metadata() -> Response {
     fhir_json(StatusCode::OK, &statement)
 }
 
-/// Loco `Routes` for the FHIR surface, mounted under `/fhir` and added in
+/// axa `Routes` for the FHIR surface, mounted under `/fhir` and added in
 /// `App::routes()`, so the routes inherit the blanket auth+ABAC guard
 /// layered in `after_routes`. Handlers extract `AppState` from the
 /// `AppContext` shared store via `FromRef` (like the native controllers).

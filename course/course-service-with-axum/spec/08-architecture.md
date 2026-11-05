@@ -1,17 +1,17 @@
 ## 8. Architecture
 
-The service is a [loco.rs](https://loco.rs) application (loco 0.16 on
-Axum 0.8). Loco owns the lifecycle — CLI, environment config,
+The service is a [axa](https://axa) application (axa on
+Axum 0.8). axa owns the lifecycle — CLI, environment config,
 database connection, migrations, background queue — and the REST
-surface is registered as native loco controllers. This crate is the
+surface is registered as native axa controllers. This crate is the
 family's reference for the idiomatic-controller shape.
 
 ### 8.1 Module layout
 
 ```
 src/
-├── bin/main.rs              # binary entry — loco CLI: cli::main::<App, Migrator>()
-├── app.rs                   # loco Hooks impl (boot, routes, after_routes)
+├── bin/main.rs              # binary entry — axa CLI: cli::main::<App, Migrator>()
+├── app.rs                   # `App` functions impl (boot, routes, after_routes)
 ├── api/
 │   ├── mod.rs               # ApiResponse, ApiError
 │   └── rest/                # controllers: handlers + courses_routes() + ApiDoc + AppState
@@ -28,21 +28,21 @@ src/
 ├── relay.rs                    # outbox relay + retention + FluvioSink (T-22/T-23)
 ├── config/                  # domain Config (search / matching / streaming knobs)
 └── error.rs
-config/                      # loco environment config (development / test / production YAML)
-migration/                   # loco SeaORM Migrator crate (wraps migrations/*.sql)
+config/                      # axa environment config (development / test / production YAML)
+migration/                   # axa SeaORM Migrator crate (wraps migrations/*.sql)
 migrations/                  # hand-written SQL up.sql / down.sql (source of truth)
 ```
 
 ### 8.2 Boot sequence
 
-`cargo loco start` (or `cargo run -- start`) → loco CLI →
+`cargo run -- start` (or `cargo run -- start`) → axa CLI →
 `App::boot` (`create_app::<App, Migrator>`) loads
 `config/<environment>.yaml` — server port `8084` / binding in
 development, PostgreSQL `database` + Postgres-backed `queue`,
 `auto_migrate: true` — then:
 
-1. `App::routes` registers loco's default routes (`/_health`,
-   `/_ping`) plus `courses_routes()`, a loco `Routes` table with
+1. `App::routes` registers axa's default routes (`/_health`,
+   `/_ping`) plus `courses_routes()`, an axa `Routes` table with
    prefix `/api`.
 2. `App::after_routes` builds the boot-time singletons — domain
    `Config::from_env` → `SearchEngine::new` → `CourseMatcher::new` →
@@ -53,19 +53,19 @@ development, PostgreSQL `database` + Postgres-backed `queue`,
 Handlers keep their `State<AppState>` signatures; a
 `FromRef<AppContext>` impl on `AppState` (in `src/api/rest/state.rs`)
 retrieves the state from the shared store, so the same handlers run
-as native loco controllers. The hand-built Axum router
+as native axa controllers. The hand-built Axum router
 (`create_router`) is retained solely for the `tower::oneshot`
 integration tests.
 
 This boot shape mirrors the
 [authentication-service](../../../authentication/authentication-service-with-axum/),
-the family's first loco crate.
+the family's first axa crate.
 
 ### 8.3 Layering rules
 
 1. `models/` MAY NOT depend on `db/`, `api/`, `search/`.
 2. `api/` MAY depend on every other module; nothing depends on
-   `api/` except `app.rs` (which wires it into loco).
+   `api/` except `app.rs` (which wires it into axa).
 3. `matching/` is a thin adapter over the canonical
    [`course-matcher`](../../course-matcher-rust-crate/) crate.
 4. `search/` MAY depend on `models/` only.

@@ -24,7 +24,7 @@ Endpoint detail: [`agents/restful.md`](../agents/restful.md); source:
 | GET | `/api-docs/openapi.json` | OpenAPI 3 document for the API | `OpenAPI` JSON |
 | GET | `/swagger-ui` | Swagger UI rendering the spec (CDN assets) | HTML |
 
-Plus loco's built-in `/_health` and `/_ping`.
+Plus axa's built-in `/_health` and `/_ping`.
 
 Every create / update / delete / merge writes a best-effort `audit_logs`
 row (action + JSON snapshot, durable in Postgres) and publishes a
@@ -43,7 +43,7 @@ present (`MaybeAuthUser`). Blanket `/api/*` enforcement is wired but
 **default-off** (`CARE_PATHWAY_REQUIRE_AUTH`); paseto-keys-over-HTTP
 fetch at boot remains a follow-up (§13 T-7).
 
-Conventions: **raw loco JSON** (no `{success, data, error}` envelope
+Conventions: **raw axa JSON** (no `{success, data, error}` envelope
 — this is the loco-era convention, unlike the pre-loco person
 service). `404` for unknown / soft-deleted `pid`; `422` for a
 validation failure (blank `name` on create/update — family

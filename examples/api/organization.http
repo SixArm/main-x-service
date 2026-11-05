@@ -1,5 +1,5 @@
 ### organization-service — example requests
-# organization/organization-service-with-axum — loco-idiomatic layout
+# organization/organization-service-with-axum — controller-style layout
 # (src/controllers/). Envelope: BARE loco JSON — a success body is the
 # resource/array itself, no wrapper; non-2xx is loco's own
 # {"error":"...","description":"..."} (ErrorDetail). Gated by

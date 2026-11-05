@@ -183,7 +183,7 @@ delivery, [event-bus.md §6](event-bus.md)).
 
 ### 4.3 Read side — `link-graph-service-with-axum` (the aggregator)
 
-A new standalone loco service, modelled on the service-crate template but
+A new standalone axa service, modelled on the service-crate template but
 **read-only to the world** (its writes are event-driven). It is the §9
 consumer foreshadowed in [event-bus.md](event-bus.md).
 
@@ -447,7 +447,7 @@ knowing one exists discloses nothing about anybody.
      the additive `Envelope.data` via the transactional emit seam, §10
      read-the-case authz + audit, depends on the `entity-ref` crate). This
      deviates from the nominal step-2 wording (person + worker
-     `same_identity` first): case is the first **loco** service that both
+     `same_identity` first): case is the first **axa** service that both
      *originates* a v1 edge (§9) AND already has the durable-bus
      outbox/streaming to emit the events, whereas person/worker are older
      axum-style services with no event bus. Their `same_identity`

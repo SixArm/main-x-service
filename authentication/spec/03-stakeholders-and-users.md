@@ -8,4 +8,4 @@
 | Security team | Key custody and rotation, token lifetime policy, anti-enumeration behaviour, abuse / rate-limit posture, incident response. |
 | Auditors / regulators | GDPR / UK DPA / ISO 27001 evidence: who authenticated when, issuance and revocation trails, personal-data minimisation (email addresses). |
 | Operations / DBA | PostgreSQL schema + migration discipline; the auth service is the availability-critical hub — its uptime and key-serving posture gate the whole federation's sign-in. |
-| Developers / agents | The service is the family's **reference loco.rs application**; the verifier is the reference for adding PASETO enforcement (post-pivot; was JWT) to peer services during the loco conversion. |
+| Developers / agents | The service is the family's **reference axa application**; the verifier is the reference for adding PASETO enforcement (post-pivot; was JWT) to peer services during the Loco conversion. |

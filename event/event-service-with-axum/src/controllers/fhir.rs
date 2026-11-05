@@ -8,7 +8,7 @@
 //! clean FHIR analog (see [`crate::fhir`]); the `CapabilityStatement`
 //! declares the partial surface honestly.
 //!
-//! Handlers return an Axum [`Response`] directly (not loco's `Result`) so
+//! Handlers return an Axum [`Response`] directly (not axa's `Result`) so
 //! every response carries `application/fhir+json` and every non-2xx body
 //! is a FHIR `OperationOutcome` (§5). Conversions bridge the wire ⇄
 //! stored [`Event`](crate::models::Event) via [`crate::fhir`]; writes
@@ -352,9 +352,9 @@ pub fn routes() -> Routes {
 /// The same FHIR handlers as [`routes`], assembled as a plain
 /// `axum::Router` (already `/fhir`-relative — nest it under `/fhir`).
 ///
-/// Production serves FHIR via [`routes`] on the loco `App`; the
+/// Production serves FHIR via [`routes`] on the axa `App`; the
 /// hand-written [`create_router`](crate::api::rest::create_router) test
-/// harness is axum-native and cannot mount a loco `Routes`, so it uses
+/// harness is axum-native and cannot mount an axa `Routes`, so it uses
 /// this builder — keeping the integration-test surface identical to
 /// production instead of the old `501` stub.
 pub fn axum_router(state: AppState) -> axum::Router {

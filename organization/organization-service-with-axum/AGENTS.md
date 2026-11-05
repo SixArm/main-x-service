@@ -11,7 +11,7 @@ crate: a registry of **organization identities**
 
 ## What this is
 
-A **loco.rs** service for organization records: CRUD + matching,
+A **axa** service for organization records: CRUD + matching,
 embedding the canonical [`organization-matcher`](../organization-matcher-rust-crate).
 Notably, the API DTO **is** `organization_matcher::Organization` — the
 service stores it verbatim (JSONB) and matches with the same type, so
@@ -19,9 +19,9 @@ there is no separate model or adapter to drift.
 
 | Question | Answer |
 |---|---|
-| Framework | loco.rs 1.1.0 (`Hooks`/`AppContext`/CLI, loco config, `sea-orm-migration` 2.0). |
+| Framework | axa (`Hooks`/`AppContext`/CLI, axa config, `sea-orm-migration` 2.0). |
 | Build / test | `cargo build` · `cargo test` (DB-free) · `cargo test -- --ignored` (request-level suite; needs Postgres). |
-| Run | `cargo loco start` (needs Postgres). |
+| Run | `cargo run -- start` (needs Postgres). |
 | Persistence | One `organizations` table: `pid`, `name`, `data` (JSONB Organization), `active`, soft-delete. |
 
 ## API surface
@@ -56,7 +56,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/swagger-ui` · `/api-docs/openapi.json` | API docs |
 | GET | `/metrics.prom` | Prometheus metrics (text-exposition; root path, public) |
 
-Plus loco's default `/_health`, `/_ping`.
+Plus axa's default `/_health`, `/_ping`.
 
 **FHIR R5 — family reference implementation.** `GET`/`POST`/`PUT`/`DELETE
 /fhir/Organization{,/{id}}`, `GET /fhir/Organization?<params>` (a
@@ -90,7 +90,7 @@ Blanket `/api/*` (and `/fhir/*`) auth enforcement is implemented
 `ILIKE` name search: fuzzy + phonetic retrieval, and `check-duplicates`
 blocks on the index rather than scanning. The index is derived — every
 hit is resolved against Postgres — and rebuildable via
-`cargo loco task search_reindex` (plus an automatic boot rebuild when it
+`cargo run -- task search_reindex` (plus an automatic boot rebuild when it
 is empty and the table is not). **Privacy** (`src/privacy.rs`) provides
 field masking, the masked view, and the audited GDPR export, wired to
 the ABAC `mask` obligation; there is deliberately **no consent model**
@@ -105,7 +105,7 @@ the service always boots) and **refreshed periodically thereafter**
 (`ORGANIZATION_PASETO_KEYS_REFRESH_SECS`, default hourly; AU-2); the
 ABAC policy file is likewise watched and hot-reloaded without a
 restart. For a quick demo dataset,
-`cargo loco task seed_examples` loads the repository's shared fixture
+`cargo run -- task seed_examples` loads the repository's shared fixture
 (`examples/data/organizations.jsonl`, 20 rows) via the model-layer
 create (no duplicate check, no audit row, no event — deliberate for a
 seed task); it refuses to insert into a non-empty table (EX-4).
@@ -155,7 +155,7 @@ changed. See
 ## Golden rules
 
 1. **Spec-first.** Update `spec/index.md` with behavioural changes.
-2. **Loco-idiomatic.** Endpoints are loco controllers in `app.rs`; new
+2. **Controller-style.** Endpoints are axa controllers in `app.rs`; new
    tables are `sea-orm-migration` migrations.
 3. **Reuse the matcher type.** Do not fork an `Organization` DTO — the
    service uses `organization_matcher::Organization` directly.
@@ -167,8 +167,8 @@ changed. See
 
 ```
 src/
-├── app.rs                 loco Hooks (routes, truncate)
-├── bin/main.rs            loco CLI entrypoint
+├── app.rs                 `App` functions (routes, truncate)
+├── bin/main.rs            axa CLI entrypoint
 ├── version.rs              header-based API versioning (`Accepts-version`,
 │                           `require_version_mw`, layered in `after_routes`)
 ├── auth.rs                 offline PASETO v4.public verify + ABAC; AU-2's
@@ -233,10 +233,10 @@ config/                   development/production/test yaml
 — itself a port of person-service's, itself of link-graph-service's,
 the family's first working exporter. This crate carried **no**
 `src/observability` module at all before this change, and is the
-**first of the four remaining loco-idiomatic registries**
+**first of the four remaining controller-style registries**
 (organization, care-pathway, case, portfolio — `src/controllers/`, not
 `src/api/rest/`) to carry it; PRO-H12 slices 1–3 (course, place, thing)
-were all person-style crates. `App::init_logger` installs it (loco's
+were all person-style crates. `App::init_logger` installs it (axa's
 own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
 bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it.
 Export is **on by default** — set `OTLP_ENDPOINT=""` to disable it —
@@ -251,11 +251,11 @@ not the per-service `ORGANIZATION_*` convention
 than assumed:
 
 - **Exactly one router-construction surface**, unlike the person-style
-  crates' two. This crate is genuinely loco-idiomatic: `App::routes` +
+  crates' two. This crate is genuinely controller-style: `App::routes` +
   `App::after_routes` in `src/app.rs` is the only place a router gets
   built — even the request-level test suite (`tests/enforcement.rs`,
-  `tests/masking.rs`, …) boots the real `App` via loco's own testing
-  harness (`loco_rs::testing::prelude`) rather than a second
+  `tests/masking.rs`, …) boots the real `App` via axa's own testing
+  harness (`axa::testing::prelude`) rather than a second
   hand-rolled router. `observability::trace_mw` is therefore layered
   **once**, as the outermost middleware in `after_routes` — the same
   precedent `require_auth_mw` and `require_version_mw` already set by
@@ -297,10 +297,10 @@ Postgres, and `GET /_health` returns `200`. This exercise found and
 fixed a real bug: `config/production.yaml`'s `mailer.smtp.auth.user`/
 `password` used an unquoted Tera `{{ get_env(name="…", default="") }}`
 call, which renders as YAML `null` (not `""`) when the env var is
-unset — loco's `SmtpAuth` fields are `String`, not `Option<String>`, so
+unset — axa's `SmtpAuth` fields are `String`, not `Option<String>`, so
 this failed config parsing at boot with "invalid type: unit value,
 expected a string". The fix is quoting the Tera output. This crate's
-`.gitignore` also excluded `config/production.yaml` entirely (a loco
+`.gitignore` also excluded `config/production.yaml` entirely (an axa
 scaffold default nobody had removed), which is why the bug had never
 been caught — the file never left this machine, so no other checkout
 could exercise it. Both are fixed (the file is now tracked; see the
@@ -314,10 +314,10 @@ not yet written.
 [`agents/share/runbooks/first-deployment.md`](../../agents/share/runbooks/first-deployment.md)'s
 T-28o exercise (run against project-portfolio-management-service, then
 rolled here), which found two more real defects the 2026-08-03 pass had
-not: (2) the same dead loco JWT `auth:` block as portfolio's — a
+not: (2) the same dead axa JWT `auth:` block as portfolio's — a
 `JWT_SECRET` env-var lookup with no `default` crashed a fresh container
-with the var unset, for a value this crate reads nowhere (`loco-rs` is
-built without the `auth` feature; PASETO, never JWT). loco's
+with the var unset, for a value this crate reads nowhere (`axa` is
+built without the `auth` feature; PASETO, never JWT). axa's
 `Config.auth` is `Option<Auth>`, so the fix is deleting the block, not
 defaulting it. (3) The Dockerfile never `COPY`'d `benches/` either,
 the same gap portfolio's and case's had — this crate's `Cargo.toml`

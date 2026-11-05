@@ -8,7 +8,7 @@ This spec owns the **cross-subproject contract**:
 - The DTO contract: the API request/response body **is**
   `care_pathway_matcher::CarePathway`, stored verbatim as JSONB
   (§5). There is no separate service model and no adapter.
-- The service ↔ front-end wire contract: raw loco JSON (no
+- The service ↔ front-end wire contract: raw axa JSON (no
   envelope), TypeScript type mirroring (§5.4).
 - Shared invariants that more than one subproject must uphold (§5.5).
 - Entity-wide goals: national-health-system scale, multi-locale,
@@ -24,7 +24,7 @@ This spec owns the **cross-subproject contract**:
   pathways).
 - One `care_pathways` table: `pid` + denormalised `name` + the full
   `CarePathway` JSONB `data`.
-- loco.rs app structure, migrations, configuration.
+- axa app structure, migrations, configuration.
 
 **care-pathway-matcher-rust-crate** owns:
 

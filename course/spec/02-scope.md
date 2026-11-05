@@ -29,8 +29,8 @@ This spec owns the **cross-subproject contract**:
   auto-merge, merge with transferred-data snapshots.
 - Validation (FR-21..FR-28 in its spec), privacy masking, GDPR
   Article 15 export.
-- REST API (loco.rs / Axum) + OpenAPI / Swagger; PostgreSQL via
-  SeaORM; loco boot lifecycle, config, migrations, background queue.
+- REST API (axa / Axum) + OpenAPI / Swagger; PostgreSQL via
+  SeaORM; axa boot lifecycle, config, migrations, background queue.
 
 **course-matcher-rust-crate** owns:
 

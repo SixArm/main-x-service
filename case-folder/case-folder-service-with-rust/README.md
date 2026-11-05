@@ -1,8 +1,8 @@
-# Case Tracking — Loco JSON API
+# Case Tracking — Axum JSON API
 
 A back-end **JSON API** that tracks the physical location of paper
 case-note folders in a UK NHS hospital setting. Implemented in Rust on
-[Loco](https://loco.rs) (Axum + SeaORM). There is no built-in user
+[Loco](https://axa) (Axum + SeaORM). There is no built-in user
 interface — front-ends consume this service over HTTP.
 
 **Domain.** Case Tracking is a **pure aggregator API** — it
@@ -23,8 +23,8 @@ label (patient details, cabinet labels, worker name + role) so the
 audit log remains useful even when the upstream services rename
 records or go offline.
 
-- **[Loco](https://loco.rs)** 0.16 — Rails-style Rust web framework on Axum
-- **PostgreSQL** dependency is currently *vestigial* — Loco still needs a database connection at boot, but the tracker has zero local tables.
+- **[Loco](https://axa)** 0.16 — Rails-style Rust web framework on Axum
+- **PostgreSQL** dependency is currently *vestigial* — axa still needs a database connection at boot, but the tracker has zero local tables.
 - **[person-service-with-axum](../../person/person-service-with-axum)** — Main Patient Service backend
 - **[place-service-with-axum](../../place/place-service-with-axum)** — Main Place Service backend
 - **[worker-service-with-axum](../../worker/worker-service-with-axum)** — Main Worker Service backend
@@ -34,7 +34,7 @@ records or go offline.
 > ⚠️ **Thing-service caveat.** As of writing, `main-thing-service`
 > ships a working web UI but **no REST endpoints yet** — its spec
 > describes 15 endpoints at `/api/things/*`, but those routes aren't
-> wired in the crate's `web::routes::router()`. The Loco app's HTTP
+> wired in the crate's `web::routes::router()`. The axa app's HTTP
 > client targets the spec'd surface and works against the in-process
 > stub used in tests; against a real deployment it will fail until the
 > upstream crate exposes the routes.
@@ -62,7 +62,7 @@ and treats every request as the current version.
   - **Main Place Service** on `http://localhost:5153` — env override `MAIN_PLACE_SERVICE_BASE_URL`
   - **Main Thing Service** on `http://localhost:5154` — env override `MAIN_THING_SERVICE_BASE_URL`
   - **Main Event Service** on `http://localhost:5155` — env override `MAIN_EVENT_SERVICE_BASE_URL`
-- (Optional) the Loco CLI: `cargo install loco`
+- (Optional) the axa CLI: `# no extra CLI needed`
 
 ## Quick start
 
@@ -168,7 +168,7 @@ DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test \
 ```
 
 The request tests need a Postgres database (`case_folder_test`
-by default) for Loco's boot, but no migrations run. Create it once
+by default) for axa's boot, but no migrations run. Create it once
 with `createdb case_folder_test`. Tests run serially
 (`#[serial]`) and call `clean_db()` at the top of each test which
 resets every in-process stub service.

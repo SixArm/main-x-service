@@ -31,8 +31,8 @@ The shared reference docs live at the project root under
 |---|---|
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
-| [rust-loco-stack.md](../../agents/share/rust-loco-stack.md) | Dependency stack |
-| [loco.md](../../agents/share/loco.md) | Loco framework conventions |
+| [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Dependency stack |
+| [loco.md](../../agents/share/axa.md) | axa framework conventions |
 | [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [dataflow.md](../../agents/share/dataflow.md) | Create / search / merge data flows |
 | [privacy.md](../../agents/share/privacy.md) | Masking, GDPR, consent (priority for this entity — §12) |

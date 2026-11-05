@@ -7,7 +7,7 @@ This spec owns the **cross-subproject contract**:
 - Composition: front-end → service REST API → embedded matcher.
 - The DTO contract: `organization_matcher::Organization` is the API
   body, the JSONB-persisted payload, and the matching input (§5).
-- The service ↔ front-end wire contract: raw loco JSON, no response
+- The service ↔ front-end wire contract: raw axa JSON, no response
   envelope; snake_case field names (§5.4, §9).
 - Shared invariants that more than one subproject must uphold (§5.5).
 - Entity-wide goals: register scale, multi-jurisdiction,
@@ -17,7 +17,7 @@ This spec owns the **cross-subproject contract**:
 
 **organization-service-with-axum** owns:
 
-- Organization CRUD with soft delete (`deleted_at` stamp) — loco.rs
+- Organization CRUD with soft delete (`deleted_at` stamp) — axa
   controllers over one `organizations` table.
 - Name search (PostgreSQL `ILIKE`, capped 50).
 - `/match` (rank an explicit candidate set) and `/check-duplicates`

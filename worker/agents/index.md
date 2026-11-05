@@ -33,7 +33,7 @@ The shared reference docs live at the project root under
 [`../../agents/share/`](../../agents/share/) — overview, architecture,
 dataflow, match/search/merge, privacy, auditability, availability,
 observability, locales, compliance, PostgreSQL, REST conventions,
-Rust/Loco stack. Index:
+Rust/axa stack. Index:
 [`agents/share/index.md`](../../agents/share/index.md).
 
 ## See also

@@ -45,10 +45,10 @@ glance, virtual ward), plus the NHS **SAFER patient flow bundle** and
 
 | Subproject | Role | Stack |
 |---|---|---|
-| [patient-flow-service-with-rust](../patient-flow-service-with-rust/) | Back-end JSON API | Rust, Loco (Axum + SeaORM), PostgreSQL |
+| [patient-flow-service-with-rust](../patient-flow-service-with-rust/) | Back-end JSON API | Rust, axa (Axum + SeaORM), PostgreSQL |
 | [patient-flow-front-end-with-svelte](../patient-flow-front-end-with-svelte/) | Ward whiteboard / touchscreen UI | SvelteKit 2, Svelte 5 runes, TypeScript |
 
-Both serve the same domain. The Loco edition exposes the API and owns
+Both serve the same domain. The Axum edition exposes the API and owns
 the operational data; the Svelte edition is the whiteboard and
 operations client (large-format ward touchscreens plus desktop/mobile).
 

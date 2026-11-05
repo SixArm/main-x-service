@@ -2,7 +2,7 @@
 
 > Part of the [Svelte edition specification](index.md). The use-case
 > catalogue is shared; the API side of each UC is in the
-> [Loco routes](../../case-folder-service-with-rust/spec/routes.md).
+> [axa routes](../../case-folder-service-with-rust/spec/routes.md).
 
 ## Use cases → routes
 

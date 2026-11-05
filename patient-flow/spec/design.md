@@ -22,7 +22,7 @@ PF-R4, PF-R9; [scope.md](scope.md) boundary table)
 
 ## PF-D3 — Normalized schema, not DTO-as-JSONB
 
-The loco entity services store the matcher DTO as JSONB; Patient
+The axa entity services store the matcher DTO as JSONB; Patient
 Flow instead uses proper relational tables with FKs, enums, and
 state columns, because its value is **constraints and transitions**
 (one occupant per bed, legal state changes) which the database
@@ -87,7 +87,7 @@ same thing (resolve a display name from a `GET
 {PATIENT_FLOW_<TYPE>_SERVICE_URL}/api/<type>s/{id}`), so a trait per
 service would have four near-identical impls. (→ PF-R15)
 
-## PF-D12 — Loco-idiomatic layout
+## PF-D12 — Controller-style layout
 
 `src/controllers/` shape (organization/case template), crate-root
 `migration/`, family fixtures (`#![forbid(unsafe_code)]`, thiserror,

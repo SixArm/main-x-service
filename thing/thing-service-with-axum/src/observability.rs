@@ -18,8 +18,8 @@
 //! [`init`] builds one [`Resource`] (`service.name` + `service.version`,
 //! plus whatever the SDK's own detectors add) and hangs three things off it:
 //!
-//! 1. a `tracing-subscriber` **fmt layer** in the format loco's own config
-//!    asks for, filtered by loco's own [`EnvFilter`] policy (so `RUST_LOG`
+//! 1. a `tracing-subscriber` **fmt layer** in the format axa's own config
+//!    asks for, filtered by axa's own [`EnvFilter`] policy (so `RUST_LOG`
 //!    and the `logger:` config block keep working exactly as before);
 //! 2. a [`tracing_opentelemetry`] **bridge layer** over an OTLP/gRPC
 //!    [`SdkTracerProvider`], so every `tracing` span becomes an exported
@@ -33,7 +33,7 @@
 //!
 //! | Variable | Default | Effect |
 //! |---|---|---|
-//! | `RUST_LOG` | loco's whitelist at the configured level | `EnvFilter` directive |
+//! | `RUST_LOG` | axa's whitelist at the configured level | `EnvFilter` directive |
 //! | `OTLP_SERVICE_NAME` | `thing-service` | `service.name` resource attribute |
 //! | `OTLP_ENDPOINT` | `http://localhost:4317` | OTLP/gRPC collector endpoint |
 //!
@@ -53,7 +53,7 @@
 //!
 //! `RUST_LOG` is **not** only a log-verbosity knob once the bridge layer is
 //! installed: the filter sits above both sinks, so it also decides what is
-//! exported. Loco's default is a module whitelist, which keeps the trace
+//! exported. axa's default is a module whitelist, which keeps the trace
 //! stream to this service's own spans; a blanket `RUST_LOG=trace` would ship
 //! every internal `h2` / `hyper` / `sqlx` span to the collector as well.
 //! That is a volume problem, not a correctness one, but it is worth knowing
@@ -103,7 +103,7 @@ pub const DEFAULT_OTLP_ENDPOINT: &str = "http://localhost:4317";
 /// The `service.name` used when `OTLP_SERVICE_NAME` is unset.
 pub const DEFAULT_SERVICE_NAME: &str = "thing-service";
 
-/// The boxed formatting layer type loco's
+/// The boxed formatting layer type axa's
 /// [`init_layer`](axa::logger::init_layer) returns, accepted by
 /// [`init`] so the log format a deployment configured is reused verbatim
 /// rather than re-derived here.
@@ -283,7 +283,7 @@ pub fn build_meter_provider(
 ///
 /// Dropping this without calling [`Telemetry::shutdown`] loses whatever is
 /// still queued, which is why [`crate::app::App`] holds it in a `OnceLock`
-/// and shuts it down from loco's `on_shutdown` hook.
+/// and shuts it down from axa's `on_shutdown` hook.
 #[derive(Debug, Default)]
 pub struct Telemetry {
     tracer_provider: Option<SdkTracerProvider>,
@@ -334,7 +334,7 @@ const EXPORTER_DIAGNOSTIC_TARGETS: [&str; 3] =
 /// swallowed.
 ///
 /// Found the hard way in link-graph-service, by booting that service with
-/// no collector and watching **nothing** appear in the log: loco's default
+/// no collector and watching **nothing** appear in the log: axa's default
 /// filter is a fixed module whitelist, and `opentelemetry*` is not on it,
 /// so every failed export was invisible. A silent exporter is worse than
 /// no exporter — it looks like it is working.
@@ -363,10 +363,10 @@ pub fn with_exporter_diagnostics(
 
 /// Install process-wide logging plus OTLP export.
 ///
-/// `env_filter` and `fmt_layer` come from loco (`logger::init_env_filter`
-/// and `logger::init_layer`), so overriding loco's logger does not quietly
+/// `env_filter` and `fmt_layer` come from axa (`logger::init_env_filter`
+/// and `logger::init_layer`), so overriding axa's logger does not quietly
 /// change the filter policy or the log format a deployment already
-/// configured — the *only* difference from loco's own `logger::init` is the
+/// configured — the *only* difference from axa's own `logger::init` is the
 /// extra OpenTelemetry layer.
 ///
 /// Must be called exactly once: the global `tracing` subscriber can only be
@@ -388,7 +388,7 @@ pub fn init(
         tracing_opentelemetry::layer().with_tracer(provider.tracer(config.service_name.clone()))
     });
 
-    // Layer order matches loco's own `logger::init`: sinks first, the
+    // Layer order matches axa's own `logger::init`: sinks first, the
     // `EnvFilter` last, so it filters everything beneath it.
     tracing_subscriber::registry()
         .with(fmt_layer)
@@ -447,7 +447,7 @@ fn http_metrics() -> &'static HttpMetrics {
 /// the DB-gated integration tests) and [`crate::app::App::after_routes`]
 /// (the loco-booted production router) — so tracing behaves identically
 /// regardless of which one a caller builds. link-graph-service has only
-/// one router-construction path (pure loco), so this two-surface wiring
+/// one router-construction path (pure axa), so this two-surface wiring
 /// has no analogue there.
 pub async fn trace_mw(req: Request, next: Next) -> Response {
     let method = req.method().clone();
@@ -527,12 +527,12 @@ mod tests {
         assert!(build_meter_provider(&config).expect("build").is_none());
     }
 
-    /// Loco's whitelist has no `opentelemetry*` entry, so a failed export
+    /// axa's whitelist has no `opentelemetry*` entry, so a failed export
     /// is invisible until the filter is widened. Pinned with the concrete
     /// symptom: an SDK error event must pass the filter.
     #[test]
     fn exporter_diagnostics_are_added_to_a_default_filter() {
-        // Loco's whitelist, standing in for what `init_env_filter` builds.
+        // axa's whitelist, standing in for what `init_env_filter` builds.
         let base = || tracing_subscriber::EnvFilter::new("thing_service=info");
 
         assert!(

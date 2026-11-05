@@ -14,19 +14,19 @@
 //!
 //! ```text
 //! # show one user's current attributes
-//! cargo loco task user_attributes email:alice@example.com
-//! cargo loco task user_attributes op:show pid:0c4f1e2a-…
+//! cargo axa task user_attributes email:alice@example.com
+//! cargo axa task user_attributes op:show pid:0c4f1e2a-…
 //!
 //! # set (replace) one key's value list
-//! cargo loco task user_attributes op:set email:alice@example.com key:access values:write
-//! cargo loco task user_attributes op:set email:alice@example.com key:dept   values:cardiology,oncology
+//! cargo axa task user_attributes op:set email:alice@example.com key:access values:write
+//! cargo axa task user_attributes op:set email:alice@example.com key:dept   values:cardiology,oncology
 //!
 //! # grant a machine peer everything
-//! cargo loco task user_attributes op:set email:peer@svc key:svc values:true
+//! cargo axa task user_attributes op:set email:peer@svc key:svc values:true
 //!
 //! # remove one key, or clear every attribute (back to read-only)
-//! cargo loco task user_attributes op:unset email:alice@example.com key:dept
-//! cargo loco task user_attributes op:clear email:alice@example.com
+//! cargo axa task user_attributes op:unset email:alice@example.com key:dept
+//! cargo axa task user_attributes op:clear email:alice@example.com
 //! ```
 //!
 //! The parsing / validation / map-mutation core (`AttrCommand`,
@@ -378,7 +378,7 @@ pub struct UserAttributes;
 
 #[async_trait]
 impl Task for UserAttributes {
-    /// Task metadata (name + one-line description) for the loco CLI listing.
+    /// Task metadata (name + one-line description) for the axa CLI listing.
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "user_attributes".to_string(),

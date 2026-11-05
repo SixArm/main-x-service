@@ -17,5 +17,5 @@ infrastructure lands.
 | NFR-8 | Observability | OTLP traces / metrics / logs; `traceparent` per request; Prometheus exposition at `/metrics.prom` ([agents/share/observability.md](../../agents/share/observability.md)) |
 | NFR-9 | Determinism / explainability | Same match inputs ⇒ same outputs byte-for-byte; every score carries a per-field breakdown — the audit trail for automated decisions (ISO/IEC 42001 relevance, §12) |
 | NFR-10 | Front-end performance | List page ≤ 250 kB gzipped JS; first interaction < 1 s warm; WAI-ARIA conformance ([front-end §7](../thing-front-end-with-svelte/spec/07-non-functional-requirements.md)) |
-| NFR-11 | Background jobs | Loco `BackgroundQueue` on PostgreSQL (`bg_pg`) — no external broker |
+| NFR-11 | Background jobs | axa `BackgroundQueue` on PostgreSQL (`bg_pg`) — no external broker |
 | NFR-12 | Data durability | Soft delete only; merges keep a full transferred-data snapshot; backup / DR runbook is **roadmap** |

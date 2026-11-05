@@ -11,11 +11,11 @@ these are **dev/demo** stacks that run the actual service binaries.
 | [`single-service.yml`](single-service.yml) | One service (case-service) + its own Postgres — the minimal pattern, template for any other crate |
 | [`full-family.yml`](full-family.yml) | All ten entity registries + authentication-service + link-graph-service, one shared Postgres (twelve databases) |
 | [`enforced.yml`](enforced.yml) | An **override** on top of `full-family.yml`: `<ENTITY>_REQUIRE_AUTH` on everywhere, an ABAC policy mounted, PASETO key-fetch wired to authentication-service |
-| [`authentication-dev.yml`](authentication-dev.yml) | authentication-service alone, in `LOCO_ENV=development` — the mode that logs a real magic-link URL to the console (SEC-A3) instead of emailing it, for anything that needs to complete a real passwordless sign-in without SMTP (person-front-end-with-svelte's live-integration suite is the reference consumer — `tests/integration/auth.setup.ts`) |
+| [`authentication-dev.yml`](authentication-dev.yml) | authentication-service alone, in `APP_ENV=development` — the mode that logs a real magic-link URL to the console (SEC-A3) instead of emailing it, for anything that needs to complete a real passwordless sign-in without SMTP (person-front-end-with-svelte's live-integration suite is the reference consumer — `tests/integration/auth.setup.ts`) |
 
 ## Prerequisites
 
-- Podman, not Docker (`agents/share/rust-loco-stack.md`). `podman
+- Podman, not Docker (`agents/share/rust-axum-stack.md`). `podman
   compose` shells out to a compose provider (Homebrew's `docker-compose`
   on macOS) — the warning it prints on every invocation is expected.
 - Run every command from **anywhere**; each file's `build.context` is

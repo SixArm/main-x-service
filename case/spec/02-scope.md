@@ -8,7 +8,7 @@ This spec owns the **cross-subproject contract**:
 - The DTO contract: the API request/response body **is**
   `case_matcher::Case`, stored verbatim as JSONB (§5). There is no
   separate service model and no adapter.
-- The service ↔ front-end wire contract: raw loco JSON (no
+- The service ↔ front-end wire contract: raw axa JSON (no
   envelope), TypeScript type mirroring (§5.4).
 - Shared invariants that more than one subproject must uphold (§5.5).
 - Entity-wide goals: worldwide-governmental scale, multi-locale,
@@ -31,7 +31,7 @@ This spec owns the **cross-subproject contract**:
 - The `cases` table (`pid`, denormalised `title`, the full `Case`
   JSONB `data`, `active`, `deleted_at`) plus `audit_logs` and
   `merge_records`.
-- loco.rs app structure, migrations, configuration.
+- axa app structure, migrations, configuration.
 
 **case-matcher-rust-crate** owns:
 

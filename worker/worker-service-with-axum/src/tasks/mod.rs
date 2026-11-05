@@ -1,4 +1,4 @@
-//! CLI tasks (loco extension point).
+//! CLI tasks (axa extension point).
 
 /// Generate, check, or report the integrity MAC key.
 pub mod integrity_key;

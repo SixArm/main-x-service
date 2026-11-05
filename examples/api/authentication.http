@@ -5,10 +5,10 @@
 # {"error":"...","description":"..."} (or, for the always-200 signup/
 # magic-link endpoints, `{}`). See 00-auth-handshake.http for the full
 # walkthrough with inline curl-verified commentary on retrieving a
-# magic-link token in this compose (LOCO_ENV=production is baked into
+# magic-link token in this compose (APP_ENV=production is baked into
 # the image — SEC-A1 fail-closed — so the usual "read it from the dev
 # console log" trick needs a throwaway container overridden to
-# LOCO_ENV=development; see that file). This file is the flatter
+# APP_ENV=development; see that file). This file is the flatter
 # per-endpoint reference; run 00-auth-handshake.http first if you want
 # working values for @sessionCookie / @csrfToken / @token / @pid below.
 

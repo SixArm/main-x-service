@@ -10,7 +10,7 @@
 
 A registry of governmental case records for the Main X Index family:
 create/read/update/delete and detect duplicates with the canonical
-case-matcher. Built on loco.rs.
+case-matcher. Built on axa.
 
 ## 2. Scope
 
@@ -132,7 +132,7 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
 
 ## 7. Non-functional requirements
 
-loco-idiomatic; Postgres persistence; deterministic matching via the
+controller-style; Postgres persistence; deterministic matching via the
 embedded library; soft-delete with audit-friendly timestamps.
 
 **Configuration (environment).** PASETO keys / verification:
@@ -169,12 +169,12 @@ the default `memory` transport never starts it.
 `CASE_EVENT_RELAY_INTERVAL_SECS` (default `5`, floored at `1`) — the
 relay poll interval. `CASE_EVENT_RETENTION_DAYS` (default `7`) — outbox
 row TTL, **enforced by the relay**: it periodically deletes rows with
-`published_at < now() - INTERVAL '<n>'` (§3). Plus loco's own
+`published_at < now() - INTERVAL '<n>'` (§3). Plus axa's own
 `DATABASE_URL` etc.
 
 ## 8. Architecture
 
-loco `App` (`src/app.rs`) registers the cases controller. One `cases`
+axa `App` (`src/app.rs`) registers the cases controller. One `cases`
 table stores `pid` + denormalised `title` + the full `Case` JSONB
 `data`. Matching calls `case-matcher` directly on the deserialised
 payloads — no adapter.
@@ -244,7 +244,7 @@ Cross-service links are never read by the matcher (the partition rule,
 **Status: landed (BLK-5, 2026-08-03).** The uniform async, job-based
 bulk contract is fixed family-wide in
 [bulk import / export](../../../agents/share/bulk-import-export.md)
-(execution model on the loco `worker` feature, the `bulk_jobs` table,
+(execution model on the axa `worker` feature, the `bulk_jobs` table,
 the five endpoints, import dedupe semantics, the per-row error report,
 and the export privacy/audit posture). This section declares what the
 Case Service differs on (per
@@ -399,7 +399,7 @@ concurrent-importer race safety is a follow-up needing either a
 `ConnectionTrait`-generic `create_and_emit`/`update_and_emit` variant or
 a dedicated transaction-scoped bulk write path.
 
-**New tables.** `bulk_jobs` (loco-idiomatic `sea-orm-migration`, one
+**New tables.** `bulk_jobs` (controller-style `sea-orm-migration`, one
 `SeaORM` entity — modelled on care-pathway's own `bulk_jobs` migration,
 which is closer to this crate's layout than person's) and — new to this
 crate — `review_queue` (raw-SQL migration, modelled on
@@ -409,7 +409,7 @@ backward-compatible).
 
 ## 9. API surface
 
-See §6. Raw loco JSON. `404` for unknown `pid`; `422` for a validation
+See §6. Raw axa JSON. `404` for unknown `pid`; `422` for a validation
 failure (blank `title`, malformed `opened_date`, blank identifier value,
 or blank `subjects` / `keywords` entry — family convention, via
 `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`, with every
@@ -569,7 +569,7 @@ This table is never read by the matcher (the partition rule, §5).
 UNIQUE, `match_score`, `match_quality`, `detection_method`,
 `score_breakdown` JSONB, `status` default `pending`, `provenance`
 default `operator`, `reviewed_by`, `created_at`, `reviewed_at`) and
-`m20260803_000013_bulk_jobs` (loco-idiomatic `sea-orm-migration`; `id`,
+`m20260803_000013_bulk_jobs` (controller-style `sea-orm-migration`; `id`,
 `kind`, `entity`, `format`, `status`, `params` JSONB, the `rows_*`
 counters, `actor`, `idempotency_key` with a `UNIQUE (entity, kind,
 idempotency_key)` index, `input_url`/`result_url`/`error_report_url`,
@@ -602,7 +602,7 @@ and controller validation unit tests (blank-title and malformed-date →
 `422` pins; the `check-duplicates` ranking — `score_desc` ordering
 incl. NaN, and a DB-free reproduction of the in-memory scan that pins a
 deterministic docket twin scoring `1.0` ahead of an unrelated case).
-Request-level tests (`tests/requests/cases.rs`, loco testing
+Request-level tests (`tests/requests/cases.rs`, axa testing
 harness) cover the CRUD + match endpoints, the audit/event trail
 (including the merge's two audit actions — `merged` on the survivor and
 `merged_into` on the duplicate — and the duplicate's `deleted` event),
@@ -1279,7 +1279,7 @@ the other v1 edge kinds even though it shares the same edge shape.
   Case owns the `subject_of` (case → person) edge — the
   highest-governance v1 kind. (The design nominally names person + worker
   `same_identity` for step 2, but those are older axum-style services with
-  no event bus; case is the first loco service that both *originates* a v1
+  no event bus; case is the first axa service that both *originates* a v1
   edge AND has the durable-bus outbox to emit `linked`/`unlinked` — so it
   ships the write side first. person/worker `same_identity` awaits their
   own event infrastructure.)
@@ -1333,7 +1333,7 @@ the other v1 edge kinds even though it shares the same edge shape.
 - [x] **Bulk import / export (BLK-5, landed 2026-08-03).** See §8.7 and
   the family contract
   [bulk import / export](../../../agents/share/bulk-import-export.md).
-  Async, job-based on the loco `worker` feature. JSONL + CSV only (no
+  Async, job-based on the axa `worker` feature. JSONL + CSV only (no
   Parquet, no S3 — §8.7 "Formats").
   - [x] Migrations `m20260803_000012_review_queue` (new to this crate;
     `provenance` from the start) and `m20260803_000013_bulk_jobs`
@@ -1450,7 +1450,7 @@ the other v1 edge kinds even though it shares the same edge shape.
     edge exists).
 
 - [x] **Fix: fresh-Postgres `db migrate` failed in the `event_outbox`
-  migration (2026-07-18).** The loco `create_table` helper pluralizes
+  migration (2026-07-18).** The axa `create_table` helper pluralizes
   table names (`cruet::to_plural`: `event_outbox` → `event_outboxes`),
   so the migration's own index DDL (`ON event_outbox`) failed and
   rolled the whole fresh migrate back — no tables were ever created.
@@ -1476,7 +1476,7 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 14. Implementation status
 
-Done: loco boot; cases table + migration; CRUD with `422` validation on
+Done: axa boot; cases table + migration; CRUD with `422` validation on
 create/update (blank `title`, `opened_date` format, non-blank
 identifier / subject / keyword, all problems reported together);
 Tantivy full-text/fuzzy/phonetic search; `/match`, `/check-duplicates`, and `/merge`
@@ -1554,7 +1554,7 @@ checkpoints, keyed MAC, SBOM (§12.0/§12.0.1, 2026-07-25..27), FHIR R5
 
 ## 17. References
 
-- The case-matcher spec; loco.rs; schema.org case-management vocabulary.
+- The case-matcher spec; axa; schema.org case-management vocabulary.
 
 ## 18. Change control
 

@@ -1,4 +1,4 @@
-//! FHIR Bulk Data `$export` worker (loco `BackgroundWorker` on `bg_pg`).
+//! FHIR Bulk Data `$export` worker (axa `BackgroundWorker` on `bg_pg`).
 //!
 //! `$export` kickoff enqueues a job here and returns `202` immediately;
 //! this worker materialises the NDJSON, writes it to the
@@ -33,7 +33,7 @@ use crate::models::care_pathways::Model as PathwayModel;
 
 /// Background worker that materialises a queued `$export` job.
 pub struct BulkExportWorker {
-    /// The shared loco application context (database, queue, config).
+    /// The shared axa application context (database, queue, config).
     pub ctx: AppContext,
 }
 

@@ -155,7 +155,7 @@ struct ListParams {
 ///
 /// Family convention (OQ-1 resolution): validation failures return
 /// `422 Unprocessable Entity`, matching the person/place services.
-/// loco has no `unprocessable_entity` helper, so this uses
+/// axa has no `unprocessable_entity` helper, so this uses
 /// `Error::CustomError(StatusCode::UNPROCESSABLE_ENTITY, …)`.
 ///
 /// The concrete rules — required `name`, and ICD-10 / ICD-11 / SNOMED CT
@@ -197,7 +197,7 @@ fn audit_unavailable(_: crate::compliance::disclosure::AuditWriteRefused) -> Err
 }
 
 /// Map a record-level authorization rejection (`(status, reason)`) to a
-/// loco error response. `403` = the policy denied the action given the
+/// axa error response. `403` = the policy denied the action given the
 /// record's attributes; `401` = a fail-safe when claims are missing
 /// behind the guard.
 fn record_rejection((status, reason): (StatusCode, String)) -> Error {
@@ -974,7 +974,7 @@ async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
 /// Build the `/api/care-pathways` route table (CRUD + match +
 /// check-duplicates + audit / event endpoints).
 ///
-/// Loco matches routes most-specific-first, so the fixed sub-paths
+/// axa matches routes most-specific-first, so the fixed sub-paths
 /// (`/search`, `/match`, `/merge`, …) are registered before the `/{pid}`
 /// catch-alls to avoid the parameter route shadowing them.
 pub fn routes() -> Routes {
@@ -1024,7 +1024,7 @@ mod tests {
         }
     }
 
-    /// The 422 must survive loco's error-to-response conversion.
+    /// The 422 must survive axa's error-to-response conversion.
     #[test]
     fn blank_name_validation_response_status_is_422() {
         let err = validate(&CarePathway::new("")).expect_err("blank name must fail");

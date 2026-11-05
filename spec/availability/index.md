@@ -21,7 +21,7 @@ balancer, all durable state in PostgreSQL, health-checked containers.
 > observability
 > ([`agents/share/observability.md`](../../agents/share/observability.md)),
 > and the stack
-> ([`agents/share/rust-loco-stack.md`](../../agents/share/rust-loco-stack.md)).
+> ([`agents/share/rust-axum-stack.md`](../../agents/share/rust-axum-stack.md)).
 
 ## 1. Stateless design enables horizontal scaling
 
@@ -37,7 +37,7 @@ a path to resolution:
 | Per-instance state | Status | Coordination |
 |---|---|---|
 | **Rate limiter** (magic-link throttle) | **Postgres-backed** — `auth_rate_limits` table + `pg_advisory_xact_lock(hashtext(email_key))`. Correct across replicas. | Shared DB row; transaction-scoped advisory lock. See [authentication](../authentication/index.md) and [postgresql §9](../postgresql/index.md). |
-| **Event stream** (CRUD fan-out) | **In-memory ring buffer today** — `OnceLock` ring (cap 1000, per-process `seq`) in the loco services; `EventProducer` trait in the legacy Axum services. Process-local and volatile. | Not yet cross-replica correct. Durable bus is the roadmap (§8). See [`agents/share/event-bus.md`](../../agents/share/event-bus.md). |
+| **Event stream** (CRUD fan-out) | **In-memory ring buffer today** — `OnceLock` ring (cap 1000, per-process `seq`) in the controller-style services; `EventProducer` trait in the legacy Axum services. Process-local and volatile. | Not yet cross-replica correct. Durable bus is the roadmap (§8). See [`agents/share/event-bus.md`](../../agents/share/event-bus.md). |
 
 Everything else — entity records, audit log, merge history, review
 queue, sessions, background-job queue — is in PostgreSQL. The only
@@ -55,7 +55,7 @@ Each service holds a SeaORM/`sqlx` connection pool to its own database.
 Pooling plus statelessness is what makes horizontal scaling safe — see
 [postgresql §3](../postgresql/index.md) for the authoritative table.
 
-**loco services** configure the pool in `config/*.yaml` under
+**controller-style services** configure the pool in `config/*.yaml` under
 `database:`:
 
 | Key | Dev default | Production guidance |
@@ -98,12 +98,12 @@ connectivity?) probes, and for container `HEALTHCHECK` directives.
 
 | Endpoint | Provided by | Purpose |
 |---|---|---|
-| `GET /_health` | loco services (organization, care-pathway, case, portfolio, authentication, link-graph-service) | loco's built-in readiness check (verifies DB/queue) |
-| `GET /_ping` | loco services | loco's lightweight liveness ping |
+| `GET /_health` | controller-style services (organization, care-pathway, case, portfolio, authentication, link-graph-service) | axa's built-in readiness check (verifies DB/queue) |
+| `GET /_ping` | controller-style services | axa's lightweight liveness ping |
 | `GET /api/health` | legacy Axum services (Dockerfile `HEALTHCHECK`) | service health check |
 | `GET /api/health` | event-service and some compose health probes | versioned health check |
 
-This split is **accepted drift**: the loco services use loco's
+This split is **accepted drift**: the controller-style services use axa's
 conventional `/_health` + `/_ping`; the older Axum services predate the
 conversion and keep `/api/health` (the event-service mounts under
 `/api`). Orchestrator probes and load-balancer checks must target
@@ -134,14 +134,14 @@ container is marked unhealthy.
 The family standardizes on **Podman, not Docker** (the `Dockerfile` /
 `docker-compose.yml` filenames stay Docker-compatible, so Docker works
 if a contributor has it, but Podman is the supported runtime — see
-[`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md)).
+[`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md)).
 
 | Aspect | Choice | Rationale |
 |---|---|---|
 | Runtime | **Podman** (rootless) | no daemon, rootless by default, drop-in CLI |
 | Build | **multi-stage** | `rust:1.96-slim` builder stage → `debian:13-slim` runtime stage; the toolchain never ships in the runtime image |
 | Base image | **Debian 13 slim** (Trixie) | small, current stable, `libpq5`/`libssl3` available |
-| Allocator | **MiMalloc** for MUSL static builds | faster allocator under `cfg(target_env = "musl")`; see the global-allocator snippet in [`rust-loco-stack.md`](../../agents/share/rust-loco-stack.md) |
+| Allocator | **MiMalloc** for MUSL static builds | faster allocator under `cfg(target_env = "musl")`; see the global-allocator snippet in [`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md) |
 | Health | container `HEALTHCHECK` | `curl --fail` the health endpoint (§3) |
 | Security | non-root `USER` (§4) | unprivileged runtime user |
 
@@ -214,8 +214,8 @@ What scales cleanly and what needs coordination:
 | **Database** | One database per service (no cross-DB access). Scale reads with Postgres read replicas if needed; writes go to the primary. |
 | **Rate limiter** | **Correct across replicas today** — `auth_rate_limits` row + `pg_advisory_xact_lock` make the throttle exact regardless of which replica handles the request. See [authentication](../authentication/index.md), [postgresql §9](../postgresql/index.md). |
 | **Event stream** | **Not yet cross-replica correct** — the in-memory ring is per-process, so `recent(limit)` only reflects events that replica emitted, and a subscriber bound to one replica misses events from the others. This is the one feature that constrains multi-instance correctness until the durable bus lands (§8). |
-| **Search index** | Each replica keeps its own node-local Tantivy volume (a cache, not source of truth); rebuildable from the database. Today's loco services use Postgres `ILIKE` instead, which is stateless and scales freely. See [search](../search/index.md). |
-| **Background jobs** | Postgres-backed queue (the loco `worker` feature, `queue.kind: Postgres`) in the service's own DB — workers across replicas coordinate through the shared queue tables. |
+| **Search index** | Each replica keeps its own node-local Tantivy volume (a cache, not source of truth); rebuildable from the database. Today's controller-style services use Postgres `ILIKE` instead, which is stateless and scales freely. See [search](../search/index.md). |
+| **Background jobs** | Postgres-backed queue (the axa `worker` feature, `queue.kind: Postgres`) in the service's own DB — workers across replicas coordinate through the shared queue tables. |
 
 The load balancer should use the service's health endpoint (§3) for
 member health and may round-robin or least-connections; **no sticky
@@ -245,5 +245,5 @@ the stateless service processes.
 | Postgres-backed rate limiter (cross-replica correct) | **Implemented** |
 | Per-database `pg_dump` backups | **Implemented** |
 | **Durable event bus** for true multi-instance fan-out | **Roadmap** — move the in-memory ring to a durable, replayable bus (Fluvio transport + transactional outbox); design in [`agents/share/event-bus.md`](../../agents/share/event-bus.md). Until then, event subscription/fan-out is only correct on a single instance. |
-| Tantivy full-text search across the family | **Roadmap** (loco services use `ILIKE` interim — see [search](../search/index.md)) |
+| Tantivy full-text search across the family | **Roadmap** (controller-style services use `ILIKE` interim — see [search](../search/index.md)) |
 | Read replicas / PgBouncer pooler at scale | **Roadmap** (sizing rule in §2 holds in the interim) |

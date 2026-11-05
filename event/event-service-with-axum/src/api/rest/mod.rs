@@ -176,7 +176,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/audit/user", get(handlers::get_user_audit_logs))
         .with_state(state.clone());
 
-    // FHIR R5 `Appointment` surface — the SAME real handlers the loco
+    // FHIR R5 `Appointment` surface — the SAME real handlers the axa
     // production router serves (`controllers::fhir`), assembled as an
     // axum router so this hand-written harness stays identical to
     // production (it replaced the earlier `/fhir/Event` `501` stub).
@@ -213,8 +213,8 @@ pub fn create_router(state: AppState) -> Router {
         .layer(axum::middleware::from_fn(crate::observability::trace_mw))
 }
 
-/// Native loco controller routes (idiomatic path): the `/api` surface
-/// as a loco `Routes`; handlers extract `AppState` from the `AppContext`
+/// Native axa controller routes (idiomatic path): the `/api` surface
+/// as an axa `Routes`; handlers extract `AppState` from the `AppContext`
 /// shared store via `FromRef`. `create_router` is retained for the
 /// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
 #[must_use]

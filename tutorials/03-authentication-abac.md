@@ -35,7 +35,7 @@ policy file in this walkthrough).
 
 ## 1. Start two services at once
 
-Both crates default to **port 5150** (loco's scaffold default) and to
+Both crates default to **port 5150** (axa's scaffold default) and to
 **Postgres port 5432** for their throwaway test databases — running two
 at once needs both moved for one of them.
 
@@ -55,7 +55,7 @@ test-db: mxi-case-test-db ready
 ```
 
 Migrate both (same `cargo run -- db migrate` pattern TUT-2 established —
-`cargo loco db migrate` still doesn't work in this environment: no
+`cargo run -- db migrate` still doesn't work in this environment: no
 `cargo-loco` shim is installed here, only the standalone `loco`
 generator CLI, confirmed again for this tutorial):
 
@@ -87,7 +87,7 @@ Note `environment=development` in both — that matters in the next step.
 
 `authentication-service`'s `config/development.yaml` fixes `server.port:
 5150` with no templating, and so does case-service's. Rather than edit
-either crate's tracked config, this tutorial uses loco's own documented
+either crate's tracked config, this tutorial uses axa's own documented
 override mechanism: a `config/development.local.yaml` next to
 `development.yaml`, deep-merged onto it at boot, and **already
 gitignored** by this crate's own `.gitignore` (`**/config/*.local.yaml`)
@@ -183,13 +183,13 @@ contract (`src/controllers/auth.rs`, SEC-A5/A6); it never reveals whether
 the email was new. The magic link itself never appears in the HTTP
 response. In this **locally-run, non-compose** setup the mechanism is
 simpler than [EX-3](../examples/api/README.md) found for the shipped
-compose stack: EX-3 had to spin up a **throwaway `LOCO_ENV=development`
+compose stack: EX-3 had to spin up a **throwaway `APP_ENV=development`
 container**, because the shipped `compose/full-family.yml` bakes
-`LOCO_ENV=production` (SEC-A1's fail-closed default) into the image, and
+`APP_ENV=production` (SEC-A1's fail-closed default) into the image, and
 in production the token is deliberately never logged (SEC-A3) — only
-issuance is. Here, `cargo run -- start` with no `LOCO_ENV` set already
+issuance is. Here, `cargo run -- start` with no `APP_ENV` set already
 booted as `environment: development` (confirmed in step 1), which is
-loco's own default when the flag is absent — so the token is right there
+axa's own default when the flag is absent — so the token is right there
 in the console log, no override needed:
 
 ```sh

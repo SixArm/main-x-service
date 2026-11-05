@@ -27,7 +27,7 @@
 //! case's `fluvio_relay_publishes_an_outbox_row_to_a_real_topic`
 //! (`case/case-service-with-axum/tests/fluvio_relay.rs`, BUS-1).
 //!
-//! This crate has no loco `request::<App, _, _>` test harness (course's
+//! This crate has no axa `request::<App, _, _>` test harness (course's
 //! integration suite drives the router directly via `tower::oneshot`
 //! against an env-configured `DATABASE_URL`, see `tests/common/mod.rs`
 //! and `src/db/mod.rs`'s `outbox_atomicity_tests`), so this test follows

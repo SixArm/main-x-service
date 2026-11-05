@@ -4,7 +4,7 @@
 #   scripts/ci-check.sh test-db case/case-service-with-axum
 #   scripts/test-db.sh down case/case-service-with-axum
 #
-# Podman, not Docker (agents/share/rust-loco-stack.md). The file is plain
+# Podman, not Docker (agents/share/rust-axum-stack.md). The file is plain
 # Compose spec, so `podman compose -f compose.test.yaml up -d` drives it
 # directly if you would rather not use the script.
 #

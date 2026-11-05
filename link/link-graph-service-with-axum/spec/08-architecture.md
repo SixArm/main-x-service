@@ -27,7 +27,7 @@ It owns no entity writes; its only state changes come from the bus.
        │              entity_presence (existence oracle)                 │
        │  integrity: status lifecycle from presence (FR-9/10)            │
        │             lazy verify-on-read (interim, FR-11)                │
-       │  periodic workers (Tokio tasks, not loco `worker` jobs):         │
+       │  periodic workers (Tokio tasks, not axa `worker` jobs):         │
        │    reconciliation (FR-21) — GET peer entity_links, diff, repair │
        │    suggestion job (FR-23..28, LNK-4) — GET person+worker,       │
        │      block+score, POST matcher_suggested edges to person   ─┐  │
@@ -58,10 +58,10 @@ about this service's own inbound surface (§1.3,
 | **Graph projector** | Applies `linked` / `unlinked` to `edges`; canonicalises symmetric kinds; applies `merged` repointing. |
 | **Presence oracle** | Applies `created` / `deleted` to `entity_presence`; recomputes affected edge `status`. |
 | **Verifier (interim)** | Lazy verify-on-read: resolves unknown presence with a one-shot `GET /{id}` to the source service via the `entity_type → service` map; caches the verdict. |
-| **Read API** | loco.rs controllers serving `/neighbors`, `/edges`, `/single-view`, `/health/freshness`; attaches `as_of`; enforces `case ↔ person` governance (§12). |
-| **Reconciliation worker** | Periodic Tokio task (`src/reconcile.rs`, `run_periodic`, spawned from `after_routes`, not a loco `worker` job); diffs read-model vs each service's authoritative `entity_links` via an authenticated `HttpAuthoritativeSource`; emits divergence; repairs. |
+| **Read API** | axa controllers serving `/neighbors`, `/edges`, `/single-view`, `/health/freshness`; attaches `as_of`; enforces `case ↔ person` governance (§12). |
+| **Reconciliation worker** | Periodic Tokio task (`src/reconcile.rs`, `run_periodic`, spawned from `after_routes`, not an axa `worker` job); diffs read-model vs each service's authoritative `entity_links` via an authenticated `HttpAuthoritativeSource`; emits divergence; repairs. |
 | **Suggestion job (LNK-4)** | Periodic Tokio task (`src/suggest/job.rs`, `run_periodic`, spawned from `after_routes`); fetches person + worker via `HttpIdentitySource`, blocks + scores via `src/suggest/mod.rs`, `POST`s survivors to person via `HttpSuggestionSink`; writes one `suggestion_runs` row per completed pass (§6.8, §10.7). |
-| **Observability** | Prometheus metrics (`src/metrics.rs`: lag, divergence, status counts, suggestion-run gauge) **and real OpenTelemetry OTLP export** (`src/observability.rs`, T-22 — the family's first): a `tracing_opentelemetry` bridge over an OTLP/gRPC `SdkTracerProvider` + `SdkMeterProvider`, installed through loco's `Hooks::init_logger` alongside loco's own fmt layer and `EnvFilter`, flushed from `on_shutdown`; `trace_mw` opens one span per request and returns its W3C `traceparent`. On by default at `OTLP_ENDPOINT` (`http://localhost:4317`); `OTLP_ENDPOINT=""` disables. |
+| **Observability** | Prometheus metrics (`src/metrics.rs`: lag, divergence, status counts, suggestion-run gauge) **and real OpenTelemetry OTLP export** (`src/observability.rs`, T-22 — the family's first): a `tracing_opentelemetry` bridge over an OTLP/gRPC `SdkTracerProvider` + `SdkMeterProvider`, installed through axa's `App::init_logger` alongside axa's own fmt layer and `EnvFilter`, flushed from `on_shutdown`; `trace_mw` opens one span per request and returns its W3C `traceparent`. On by default at `OTLP_ENDPOINT` (`http://localhost:4317`); `OTLP_ENDPOINT=""` disables. |
 
 ### 8.2 Integrity lifecycle (state machine)
 
@@ -113,8 +113,8 @@ before the "copy per project" plan was ever built.
 ```
 src/
 ├── lib.rs               crate root, family lint header
-├── bin/main.rs           loco entry point
-├── app.rs                loco `Hooks` — routes, workers, boot init;
+├── bin/main.rs           axa entry point
+├── app.rs                axa `Hooks` — routes, workers, boot init;
 │                         spawns the reconciliation + suggestion
 │                         periodic tasks from after_routes
 ├── graph.rs              pure projection logic: canonical (symmetric
@@ -168,6 +168,6 @@ Migrations live in the crate-root `migration/` directory (a
 `sea-orm-migration` migrator over hand-written SQL pairs, §10), not
 under `src/`. There is no `db/` module — SeaORM entities live under
 `src/models/_entities/`, hand-written models beside them under
-`src/models/`, matching the family's loco-idiomatic layout
+`src/models/`, matching the family's controller-style layout
 ([architecture.md](../../../agents/share/architecture.md)) rather than
 the person-style `src/db/` layout.

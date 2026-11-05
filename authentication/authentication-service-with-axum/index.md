@@ -4,7 +4,7 @@ The central single sign-on provider for the Main X Index family:
 passwordless email magic-link auth establishing a server-side cookie
 session; short-lived PASETO v4.public tokens (published Ed25519 key at
 `/.well-known/paseto-keys`) for offline cross-service verification. Built
-on loco.rs.
+on axa.
 
 > **Auth model source of truth:**
 > [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md).
@@ -67,7 +67,7 @@ curl -s localhost:5150/metrics.prom
 
 ## Relationship to the family
 
-This is the first **real** loco.rs crate in the repo. The other service
-crates declare `loco-rs` but run hand-rolled Axum; they will be converted
-to idiomatic loco using this crate as the reference. See the root
+This is the first **real** axa crate in the repo. The other service
+crates declare `axa` but run hand-rolled Axum; they will be converted
+to idiomatic axa using this crate as the reference. See the root
 [AGENTS.md](../../AGENTS.md).

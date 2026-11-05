@@ -1,4 +1,4 @@
-//! CLI tasks (loco extension point).
+//! CLI tasks (axa extension point).
 
 /// Physically delete artifacts of expired bulk jobs (SEC-B4 follow-up).
 pub mod bulk_artifact_sweep;

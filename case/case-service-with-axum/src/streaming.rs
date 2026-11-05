@@ -22,7 +22,7 @@
 //! shape consumed by the front-end — served from the ring buffer
 //! (`memory`) or the outbox (`outbox`) via [`recent_events`], identically.
 //!
-//! In loco there is no per-request shared state for this, so the buffer
+//! In axa there is no per-request shared state for this, so the buffer
 //! is a `OnceLock`-initialised global.
 
 use std::collections::VecDeque;
@@ -389,7 +389,7 @@ async fn audit_best_effort(
 /// consequence — a live case invisible to search, and so invisible to
 /// the duplicate detector that blocks on the index — is silent until
 /// someone notices a missing hit. The repair is
-/// `cargo loco task search_reindex`.
+/// `cargo axa task search_reindex`.
 fn index_best_effort(pid: Uuid, case: &Case) {
     let Some(engine) = crate::search::engine() else {
         return;

@@ -63,5 +63,5 @@ are what the service actually runs.
 - The Tantivy index is derived state — rebuildable from PostgreSQL;
   index writes follow every database write (see
   [`agents/share/dataflow.md`](../../agents/share/dataflow.md)).
-- Background jobs use Loco `BackgroundQueue` on the same PostgreSQL
+- Background jobs use axa `BackgroundQueue` on the same PostgreSQL
   (`bg_pg`) — no external broker.

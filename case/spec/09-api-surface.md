@@ -24,7 +24,7 @@ Endpoint detail: [`agents/restful.md`](../agents/restful.md); source:
 | GET | `/api-docs/openapi.json` | OpenAPI 3 document for the API | `OpenAPI` JSON |
 | GET | `/swagger-ui` | Swagger UI rendering the spec (CDN assets) | HTML |
 
-Plus loco's built-in `/_health` and `/_ping`.
+Plus axa's built-in `/_health` and `/_ping`.
 
 Every create / update / delete / merge writes a best-effort `audit_logs`
 row (action + JSON snapshot, durable in Postgres) and publishes a
@@ -43,7 +43,7 @@ is protected by it, and create/update/delete/merge stamp the audit
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (supersedes the RS256-JWT + JWKS model).
 
-Conventions: **raw loco JSON** (no `{success, data, error}` envelope —
+Conventions: **raw axa JSON** (no `{success, data, error}` envelope —
 this is the loco-era convention, unlike the pre-loco person service).
 `404` for unknown / soft-deleted `pid`; `422` for a validation failure
 (blank `title`, malformed `opened_date`, blank identifier value, blank

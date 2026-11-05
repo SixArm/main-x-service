@@ -19,7 +19,7 @@ metrics over OTLP —
 PRO-H12 slices 1–3),
 [`organization-service`](../../organization/organization-service-with-axum/)
 (`src/observability.rs`, ported from course's under `tasks.md` PRO-H12
-slice 4) — the **first of the four loco-idiomatic registries**
+slice 4) — the **first of the four controller-style registries**
 (`src/controllers/`, not person-style `src/api/rest/`) to carry it —
 [`care-pathway-service`](../../care-pathway/care-pathway-service-with-axum/)
 (`src/observability.rs`, ported from organization's under `tasks.md`
@@ -29,15 +29,15 @@ PRO-H12 slice 5),
 PRO-H12 slice 6), and now
 [`project-portfolio-management-service`](../../project-portfolio-management/project-portfolio-management-service-with-loco/)
 (`src/observability.rs`, ported from case's under `tasks.md` PRO-H12
-slice 7 — the last). Each of the four loco-idiomatic registries
+slice 7 — the last). Each of the four controller-style registries
 independently **confirmed** rather than assumed organization's
 single-router-surface shape held for it too (a fresh
 `Router::new()`/`create_router` grep every time, never carried over
 from an earlier finding) — all four land on the identical shape, four
 for four. **Every entity registry in the family now exports real
-OTLP/gRPC traces and metrics.** Copying any of the four loco-idiomatic
+OTLP/gRPC traces and metrics.** Copying any of the four controller-style
 ports (case's or portfolio's, not a person-style crate's) is the
-reference for a genuinely loco-idiomatic crate's shape — exactly
+reference for a genuinely controller-style crate's shape — exactly
 **one** router-construction surface, so the tower middleware is
 layered once rather than on two — should a future entity registry
 join the family.
@@ -51,7 +51,7 @@ showing `–` on the gRPC-stub row, because each already declares
 `tonic` + `tonic-build` in anticipation of a not-yet-built gRPC server
 (place's spec T-4, thing's T-3) — thing's own `AGENTS.md` even already
 said as much in its "Running this crate" section before this landed.
-None of the four loco-idiomatic registries (organization, care-pathway,
+None of the four controller-style registries (organization, care-pathway,
 case, portfolio) declares a `tonic` dependency at all, so none needed
 the rename. Check a crate's actual `Cargo.toml` before assuming either
 way, not the capability matrix.
@@ -78,11 +78,11 @@ needed its own dev-only row). Organization and portfolio carry no
 SOUP register at all, so their ports needed no such step. Check
 whether a crate has `compliance/soup.tsv` before assuming either way.
 
-All four loco-idiomatic crates (organization, care-pathway, case,
+All four controller-style crates (organization, care-pathway, case,
 portfolio) now have a confirmed router-construction surface count and
 layering point — one surface each, `trace_mw` layered once in
 `after_routes`. See
 [rust-tracing-opentelemetry-stack.md](rust-tracing-opentelemetry-stack.md)
-for the full Loco-specific guide and
+for the full axa-specific guide and
 [overview.md](overview.md) for the honest per-crate picture; this file is
 the short summary.

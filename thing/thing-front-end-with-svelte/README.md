@@ -30,7 +30,7 @@ SvelteKit front-end for the **[Thing Service](../thing-service-with-axum/)** in 
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Thing Service — see [`../thing-service-with-axum/README.md`](../thing-service-with-axum/README.md). Default: `http://localhost:5150` (loco dev default; see Configuration below).
+- A running Thing Service — see [`../thing-service-with-axum/README.md`](../thing-service-with-axum/README.md). Default: `http://localhost:5150` (axa dev default; see Configuration below).
 - A running Authentication Service for sign-in — see [`../../authentication/authentication-service-with-axum/README.md`](../../authentication/authentication-service-with-axum/README.md). Default: `http://localhost:5150` (a distinct instance/port in a real deployment).
 
 ## Quick start

@@ -25,7 +25,7 @@ mod m20260728_000001_add_audit_mac;
 mod m20260803_000001_processed_events;
 mod m20260804_000001_suggestion_runs;
 
-/// The migration runner this crate exposes to loco / `sea-orm-migration`.
+/// The migration runner this crate exposes to axa / `sea-orm-migration`.
 pub struct Migrator;
 
 #[async_trait::async_trait]

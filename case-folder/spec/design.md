@@ -30,7 +30,7 @@ one source of truth (the move log) for "where is it now".
 
 ## D-4 — API-first contract (NFR-6)
 
-The Loco edition is the contract. New capability is specified there (and
+The Axum edition is the contract. New capability is specified there (and
 at the root if cross-cutting) before any client consumes it. Responses
 go through typed structs; clients map a documented snake→camel shape.
 _Rationale:_ schema-stable output; the UI can never outrun the API.

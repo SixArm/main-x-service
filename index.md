@@ -130,7 +130,7 @@ not a gap).
 
 ## Status
 
-Rust backend services (loco.rs) plus SvelteKit operator front-ends —
+Rust backend services (axa) plus SvelteKit operator front-ends —
 this repo is no longer backend-only, and has not been since the
 front-end projects landed. See `overview.md`'s capability matrix for
 what's actually implemented per crate today, and

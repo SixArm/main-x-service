@@ -51,13 +51,13 @@
 // Module declarations.
 /// HTTP / RPC surface: REST (Axum), FHIR stubs, gRPC stub.
 pub mod api;
-/// Loco application hooks (boot, routes, migrations).
+/// axa application hooks (boot, routes, migrations).
 pub mod app;
 /// Compliance controls: row-level integrity and keyed MACs.
 pub mod compliance;
 /// Runtime configuration (server, database, search, matching).
 pub mod config;
-/// Loco-idiomatic controllers (the FHIR R5 `Appointment` surface).
+/// axa-idiomatic controllers (the FHIR R5 `Appointment` surface).
 pub mod controllers;
 /// PostgreSQL persistence (SeaORM entities, repositories, audit log).
 pub mod db;

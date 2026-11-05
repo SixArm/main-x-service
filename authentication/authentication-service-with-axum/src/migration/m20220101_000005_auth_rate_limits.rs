@@ -9,7 +9,7 @@
 //! replaces the former process-local in-memory limiter, so the quota is now
 //! shared across horizontally-scaled instances.
 //!
-//! (`create_table` also adds loco's conventional `created_at`/`updated_at`
+//! (`create_table` also adds axa's conventional `created_at`/`updated_at`
 //! audit columns; the limiter ignores them and uses `requested_at`, which it
 //! sets explicitly so tests can inject a synthetic "now".)
 

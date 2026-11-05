@@ -9,7 +9,7 @@ crate's `config/*.yaml` Tera templates, last re-verified 2026-08-30 —
 not in prior docs, several of which had drifted (see §7).
 
 This is a **reference**, not a tutorial. For how these variables fit
-together operationally, see [`loco.md`](loco.md) (the config/Tera
+together operationally, see [`axa.md`](axa.md) (the config/Tera
 mechanism), [`jwt-enforcement.md`](jwt-enforcement.md) (the activation
 gate), [`authorization-attributes.md`](authorization-attributes.md)
 (ABAC), [`authentication-sessions.md`](authentication-sessions.md)
@@ -25,7 +25,7 @@ here — file a follow-up if this doc needs to cover them too.
 
 ## 1. Two independent config paths — read this first
 
-**Every crate** (all twelve) boots through **loco's own Tera-templated
+**Every crate** (all twelve) boots through **axa's own Tera-templated
 YAML** (`config/{development,production,test}.yaml`), which is where
 `DATABASE_URL`, `PORT`, `HOST`, `JWT_SECRET`, and the `DB_*`/`SMTP_*`
 variables in §2 are actually consumed (`{{ get_env(name="...",
@@ -36,14 +36,14 @@ easy for a naive grep to miss entirely).
 older "person-style" layout (`agents/share/architecture.md`) — **also**
 run a second, independent `Config::from_env()` (`src/config/mod.rs`)
 for their own `AppState`, with its **own** `SERVER_PORT`/`DATABASE_URL`
-reads (§3). The two paths can disagree — e.g. loco's yaml binds the
+reads (§3). The two paths can disagree — e.g. axa's yaml binds the
 Axum server on `PORT` while these six crates' own state-config also
 reads `SERVER_PORT` for a value that, in the shipped Dockerfiles, only
 matters to code paths outside the loco-served router. Don't assume
 setting one env var reconfigures both surfaces in these six crates;
 check which path the behaviour you're changing actually goes through.
 
-## 2. Loco Tera-config variables (all twelve crates)
+## 2. axa Tera-config variables (all twelve crates)
 
 Read from `config/production.yaml` (the shape below is the same
 default value only for entries the family agrees on — course and
@@ -55,13 +55,13 @@ table).
 | `DATABASE_URL` | **none in production** (boot fails if unset); dev/test default to `postgres://localhost/<entity>_service_{development,test}` | `database.uri` (and `queue.uri`, where the crate uses the Postgres-backed job queue) |
 | `PORT` | `8080` (person, worker, place, thing, event) · `8084` (course) · `5150` (organization, care-pathway, case, portfolio, authentication) · `5160` (link-graph) | `server.port` |
 | `HOST` | `http://localhost` | `server.host` |
-| `JWT_SECRET` | **none** in production for every crate except course (`default="unused-course-service-does-not-issue-tokens"`); link-graph has no `auth:` block at all, so it is not read there | `auth.jwt.secret` — a loco config-schema requirement, **not** how any of these crates actually authenticate (that's PASETO, §4; see [`jwt.md`](jwt.md)) |
+| `JWT_SECRET` | **none** in production for every crate except course (`default="unused-course-service-does-not-issue-tokens"`); link-graph has no `auth:` block at all, so it is not read there | `auth.jwt.secret` — an axa config-schema requirement, **not** how any of these crates actually authenticate (that's PASETO, §4; see [`jwt.md`](jwt.md)) |
 | `DB_CONNECT_TIMEOUT` | `500` (ms) | Pool connect timeout — organization, care-pathway, case, portfolio, authentication, link-graph, course only; person/worker/place/thing/event hardcode this in yaml |
 | `DB_IDLE_TIMEOUT` | `500` (ms) | Pool idle timeout — same six crates |
 | `DB_MIN_CONNECTIONS` | `2` (course/link-graph: `1`) | Pool floor — same six |
 | `DB_MAX_CONNECTIONS` | `20` (link-graph: `10`) | Pool ceiling — same six |
 | `SMTP_HOST` / `SMTP_PORT` | `localhost` / `587` | Mailer transport — organization, care-pathway, case, portfolio, authentication only (person/worker/place/thing/event/course/link-graph disable mail or have no mailer block at all) |
-| `SMTP_USER` / `SMTP_PASSWORD` | `""` / `""` | Mailer auth — same five crates. Must be **quoted** in the YAML (`"{{ get_env(...) }}"`) — an unset var renders empty, and an unquoted empty value after `key: ` is YAML `null`, not `""`, which fails loco's `SmtpAuth: String` schema at boot |
+| `SMTP_USER` / `SMTP_PASSWORD` | `""` / `""` | Mailer auth — same five crates. Must be **quoted** in the YAML (`"{{ get_env(...) }}"`) — an unset var renders empty, and an unquoted empty value after `key: ` is YAML `null`, not `""`, which fails axa's `SmtpAuth: String` schema at boot |
 
 ## 3. Person-family `Config::from_env()` (person, worker, place, thing, event, course only)
 
@@ -172,7 +172,7 @@ siblings' — there is no `<P>_` pattern to fit into.
 |---|---|---|
 | `TOKEN_PRIVATE_KEY_SEED` | falls through to `_FILE`, then a built-in dev seed | Inline base64url 32-byte Ed25519 signing seed |
 | `TOKEN_PRIVATE_KEY_FILE` | — | File holding the same seed |
-| `LOCO_ENV` / `RUST_ENV` | — | Either `== production` **refuses** the dev-seed fallback outright (SEC-A1 fail-closed) — a production deploy that forgets the real seed does not boot, rather than silently signing with a public value |
+| `APP_ENV` / `RUST_ENV` | — | Either `== production` **refuses** the dev-seed fallback outright (SEC-A1 fail-closed) — a production deploy that forgets the real seed does not boot, rather than silently signing with a public value |
 | `TOKEN_ADDITIONAL_PUBLIC_KEYS` | none | Comma-separated base64url verify-only public keys, for rotation overlap |
 | `TOKEN_ISSUER` | `authentication-service` | Issued `iss` |
 | `TOKEN_AUDIENCE` | `main-x-service` | Issued `aud` |

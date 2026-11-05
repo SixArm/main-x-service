@@ -29,9 +29,9 @@ revoke, and one set of keys to trust.
 > ([`../../spec/index.md`](../../spec/index.md)) carries the full
 > contract; this file mirrors it.
 
-It is also the family's **reference loco.rs application**. The existing
-service crates declare `loco-rs` but run hand-rolled Axum; they will be
-converted to idiomatic loco using this crate as the template.
+It is also the family's **reference axa application**. The existing
+service crates declare `axa` but run hand-rolled Axum; they will be
+converted to idiomatic Loco using this crate as the template.
 
 ## 2. Scope
 
@@ -110,14 +110,14 @@ sign-in.
   timestamps. The durable authentication audit trail (T-10). Never
   stores tokens or secrets.
 
-**Removed loco scaffolding (2026-09-06).** The generated mailer
+**Removed Loco scaffolding (2026-09-06).** The generated mailer
 (`src/mailers/auth.rs`) used to carry `Emailer::send_welcome` /
 `Emailer::forgot_password`, the `welcome` / `forgot` embedded template
 dirs, and the password-era model helper `users::set_forgot_password_sent`.
-They were **unwired** loco starter code from the start: the passwordless
+They were **unwired** axa starter code from the start: the passwordless
 flow never checks a password and no route ever called them. Retained for
 a period to keep the generated schema/model surface intact and ease
-diffs against fresh loco scaffolds, they are now removed per the §13
+diffs against fresh Loco scaffolds, they are now removed per the §13
 task, along with the password-era model test (`can_set_forgot_password_sent`)
 that only existed to exercise them. The `reset_token`/`reset_sent_at`
 columns and the (also-dead, but not named by the removal task)
@@ -292,7 +292,7 @@ single-use (cleared on consumption).
     unlike care-pathway/case/person/worker (see
     [`agents/share/runbooks/integrity-activation.md`](../../../agents/share/runbooks/integrity-activation.md),
     which scopes to those four). **Decided (§16, PRO-P23): requires a
-    bearer token, not admin-gated.** Unlike the sibling loco-idiomatic
+    bearer token, not admin-gated.** Unlike the sibling controller-style
     services (e.g. case-service's equivalent, gated behind its blanket
     `CASE_REQUIRE_AUTH` guard), this crate has no blanket `/api/*`
     guard to sit behind, so the handler now gates itself directly with
@@ -335,7 +335,7 @@ single-use (cleared on consumption).
 
 ## 8. Architecture
 
-loco.rs `App` (`src/app.rs`) registers the `auth`, `token`,
+axa `App` (`src/app.rs`) registers the `auth`, `token`,
 `paseto_keys`, `docs`, and `metrics` controllers and the
 Postgres-backed worker queue. Token crypto is a self-contained module
 (`src/auth`); it mints + verifies **PASETO v4.public**
@@ -368,7 +368,7 @@ scheduler (follow-up).
 
 ## 9. API surface
 
-See §6. Responses are raw loco JSON (no envelope). Errors use loco's
+See §6. Responses are raw axa JSON (no envelope). Errors use axa's
 standard error responses (`401` unauthorized, `400` bad request, `403`
 CSRF failure, `429` too many requests on throttled issuance). The
 login/verify path returns `Set-Cookie: __Host-mxi_session`; `POST /token`
@@ -442,10 +442,10 @@ decommissioned.
   (verify-only) key still verifies via footer-`kid` lookup, and an
   unknown `kid` is
   rejected. Run with `cargo test --lib`.
-- **Request tests:** loco's `tests/requests/auth.rs` exercises the §6
+- **Request tests:** axa's `tests/requests/auth.rs` exercises the §6
   magic-link surface (signup / magic-link / redeem incl. single-use and
   anti-enumeration / me / signout / paseto-keys). The HTTP tests require a
-  Postgres instance (standard loco) and are `#[ignore]`d so plain
+  Postgres instance (standard axa) and are `#[ignore]`d so plain
   `cargo test` stays green; run them with `cargo test -- --ignored`.
   DB-free route-table and params-contract assertions always run.
 - **Rate-limit tests:** the pure key normalisation is unit-tested DB-free
@@ -677,7 +677,7 @@ only by that subject.
       `load_seed()` fell back to the committed `DEV_SEED` with no
       environment guard, so a prod deploy missing `TOKEN_PRIVATE_KEY_SEED`
       would sign forgeable PASETOs. Now the `DEV_SEED` fallback is refused
-      when `LOCO_ENV`/`RUST_ENV` = `production` (`load_keys()` errors →
+      when `APP_ENV`/`RUST_ENV` = `production` (`load_keys()` errors →
       `keys()` boot-panics); dev/test still fall back. Pure
       `dev_seed_fallback` + unit test. (Repo tasks.md Phase 5 SEC-A1.)
 - [x] Rework `tests/requests/auth.rs` + snapshots for the magic-link /
@@ -688,7 +688,7 @@ only by that subject.
       `cargo test -- --ignored`); the old password-flow snapshots are
       removed.
 - [x] A reusable verifier crate/snippet for peer services to consume the
-      JWKS (input to the loco conversion of the other crates). Done:
+      JWKS (input to the Loco conversion of the other crates). Done:
       [`../authentication-verifier-rust-crate/`](../../authentication-verifier-rust-crate/index.md)
       — offline RS256 verification (`Verifier::from_jwks_value` /
       `from_jwks_url` behind the `fetch` feature), mirrored `Claims`.
@@ -760,7 +760,7 @@ only by that subject.
       + params + mailer-bridge render unit tests + a DB-gated
       anti-enumeration request test. *(2026-06-15.)*
 - [ ] Optional Mailpit docker-compose service for realistic dev email.
-- [x] Remove the unwired password-era loco scaffolding (mailer
+- [x] Remove the unwired password-era Loco scaffolding (mailer
       `send_welcome` / `forgot_password`, the `welcome` / `forgot`
       template dirs, `users::set_forgot_password_sent` and the password-era
       model tests) now that the decision to retain them is recorded (§5).
@@ -850,9 +850,9 @@ only by that subject.
       and still verifies). *(2026-07-05.)*
 - [x] **ABAC attribute assignment surface — CLI task** (follow-up to
       the above, per shared authorization-attributes.md §6). The
-      `user_attributes` loco task (`src/tasks/attributes.rs`, registered
+      `user_attributes` axa task (`src/tasks/attributes.rs`, registered
       in `App::register_tasks`) sets/inspects `users.attributes` for one
-      operator-selected user: `cargo loco task user_attributes
+      operator-selected user: `cargo run -- task user_attributes
       (email:<addr>|pid:<uuid>) [op:show|set|unset|clear] [key:<name>]
       [values:<v1,v2,…>]`. `set` replaces a key's value list, `unset`
       removes a key, `clear` empties the map, `show` (default) prints it;
@@ -912,14 +912,14 @@ only by that subject.
         `CURRENT_API_VERSION = "1.0"`, and `require_version_mw`,
         layered in a new `after_routes` (this crate had none before —
         it is the only router-construction surface, matching every
-        other loco-idiomatic crate). Versions `/api/auth/*` **and**
+        other controller-style crate). Versions `/api/auth/*` **and**
         `/api/compliance/*` uniformly (`path == "/api" ||
         path.starts_with("/api/")`); `/.well-known/paseto-keys`,
         `/api-docs/*`, and `/metrics.prom` are exempt. 5 new DB-free
         unit tests in `src/version.rs`. The task text's "DB-free
         request test" line turned out not to be achievable in this
         crate: `tests/requests/*`'s `request()` harness boots a real
-        loco `App` (a real Postgres connection) to run at all — *every*
+        axa `App` (a real Postgres connection) to run at all — *every*
         existing HTTP-level test in this crate is already `#[ignore]`d
         for that reason, with no DB-free exception. The new
         `tests/requests/auth.rs::api_responses_carry_the_accepts_version_header`
@@ -954,10 +954,10 @@ only by that subject.
       `auth_events.source_ip` are populated on real requests; GDPR
       export includes the field.
       **Resolved.** Used the connecting-peer address via
-      `axum::extract::ConnectInfo<SocketAddr>` (the family's `loco-rs`
+      `axum::extract::ConnectInfo<SocketAddr>` (the family's `axa`
       already binds `into_make_service_with_connect_info` both in
-      production, `loco_rs::app`, and in the `loco_rs::testing`
-      request harness — confirmed by reading loco-rs's own source
+      production, `axa::app`, and in the `axa::testing`
+      request harness — confirmed by reading axa's own source
       rather than assumed — so the DB-gated round-trip test observes a
       real peer address with no extra test-harness wiring). `X-
       Forwarded-For` is a documented follow-up, not implemented: behind
@@ -1273,8 +1273,8 @@ only by that subject.
         `openssl` + `libxml2` + `libxslt` and a C toolchain at build
         time. This is exactly the class of dependency this family has
         avoided everywhere else (rustls over openssl,
-        `agents/share/rust-loco-stack.md`'s "rustls" constraint; every
-        loco crate's `default-features = false` without `auth` to keep
+        `agents/share/rust-axum-stack.md`'s "rustls" constraint; every
+        axa crate's `default-features = false` without `auth` to keep
         `rsa`/OpenSSL-adjacent transitive dependencies out,
         `security.md`'s 2026-08-21 update) — a materially larger,
         unaudited-by-us attack surface than any crate this family has
@@ -1311,7 +1311,7 @@ only by that subject.
 > landed (§13, 2026-07-05); remaining refinements are Mailpit and an
 > auto-rotation scheduler (§15).
 
-Done: real loco scaffold; passwordless magic-link flow; PASETO
+Done: real Loco scaffold; passwordless magic-link flow; PASETO
 v4.public signing (Ed25519); `/.well-known/paseto-keys` key set;
 cookie sessions (`__Host-mxi_session`) + `POST /token` session→PASETO
 exchange + signout; console magic links; Postgres queue;
@@ -1360,7 +1360,7 @@ pattern, and RS256 + JWKS decommissioned — per
 This **supersedes** the JWT model. The CSRF synchroniser token +
 origin backstop and the sessions-table TTL reshape have both landed;
 remaining v0.2 items: Mailpit, an auto-rotation scheduler. v0.3: begin
-loco conversion of the sibling services using this as the template
+Loco conversion of the sibling services using this as the template
 (peers adopt the PASETO `authentication-verifier`); **ABAC** — both
 the sourcing side (attributes → session → `attrs` claim) *and* the
 operator attribute-assignment surface (CLI task + HTTP admin API) have
@@ -1426,7 +1426,7 @@ attribute-based, not a fixed role list).
 
 ## 17. References
 
-- loco.rs — https://loco.rs/
+- axa — https://axa/
 - [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
   (session + PASETO design — the pivot's source of truth);
   [`agents/share/jwt.md`](../../../agents/share/jwt.md) (the principle).

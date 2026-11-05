@@ -1,6 +1,6 @@
 # Architecture
 
-> Part of the [Loco edition specification](index.md). Project-level view
+> Part of the [Axum edition specification](index.md). Project-level view
 > of how the two editions fit: [root architecture](../../spec/architecture.md).
 
 ## Layered diagram
@@ -28,7 +28,7 @@
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-## Loco lifecycle
+## axa lifecycle
 
 ```
 cargo run -- start

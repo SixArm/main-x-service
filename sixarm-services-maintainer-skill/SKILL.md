@@ -47,7 +47,7 @@ directory (`person/`, `place/`, `organization/`, …):
   are **not** being converted into each other: the older
   **person-style** shape (`src/api/rest/`, `src/db/`, a separate domain
   model — person, worker, place, thing, event, course) and the newer
-  **loco-idiomatic** shape (`src/controllers/`, `src/models/` where the
+  **controller-style** shape (`src/controllers/`, `src/models/` where the
   API DTO *is* the matcher crate's type stored as JSONB — organization,
   care-pathway, case, portfolio). Check which shape a crate uses before
   assuming where a router, a middleware layer, or a model lives — the
@@ -80,7 +80,7 @@ Layered request flow and the two internal shapes in detail:
 
 Matcher first, then service (API DTO = the matcher's type, stored as
 JSONB — no separate model to drift), then front-end (copy-adapt a
-sibling). Do not invent a fifth internal shape; pick loco-idiomatic
+sibling). Do not invent a fifth internal shape; pick controller-style
 unless there's a specific reason to match the older layout. See a
 recent trio (organization, care-pathway, case, portfolio) as the
 reference recipe.
@@ -153,14 +153,14 @@ TEST_DB_PORT=5433 scripts/test-db.sh up <crate>   # a second one alongside
 
 ## Family-wide conventions that are easy to violate by accident
 
-- **PostgreSQL, not SQLite.** Loco's `queue.kind` for background jobs
-  is `Postgres`, never `SQLite`, even though loco itself supports both.
+- **PostgreSQL, not SQLite.** axa's `queue.kind` for background jobs
+  is `Postgres`, never `SQLite`, even though axa itself supports both.
 - **Podman, not Docker.** Every `compose*.yaml` and container doc
   assumes Podman.
 - **PASETO v4.public, never JWT, for anything session- or
   auth-shaped.** See [`agents/share/jwt.md`](../agents/share/jwt.md) —
   this is a hard rule with a stated rationale, not a style preference;
-  a past incident (RUSTSEC-2023-0071) is why loco's own `auth`
+  a past incident (RUSTSEC-2023-0071) is why axa's own `auth`
   Cargo feature is dropped family-wide rather than merely unused.
 - **`<ENTITY>_REQUIRE_AUTH` defaults off.** The blanket auth+ABAC guard
   exists in every registry but ships open; activating it is a tracked

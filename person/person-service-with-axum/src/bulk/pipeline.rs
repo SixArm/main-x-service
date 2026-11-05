@@ -3,7 +3,7 @@
 //!
 //! [`process_import_job`] and [`process_export_job`] carry the whole
 //! per-row / per-job logic and take their collaborators (database
-//! connection, repository, search engine) as arguments, so the loco
+//! connection, repository, search engine) as arguments, so the axa
 //! background worker ([`crate::bulk::worker`]) is a thin adapter and the
 //! logic is exercised directly by DB-gated tests without booting the app
 //! or the live `bg_pg` drain.

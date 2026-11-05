@@ -1,6 +1,6 @@
 # authentication-service in **development** mode — its own Postgres,
-# `LOCO_ENV=development` overriding the image's baked-in
-# `LOCO_ENV=production` default (authentication-service-with-axum/
+# `APP_ENV=development` overriding the image's baked-in
+# `APP_ENV=production` default (authentication-service-with-axum/
 # Dockerfile).
 #
 # This is deliberately a SEPARATE file from single-service.yml's
@@ -97,9 +97,9 @@ services:
         exec /app/authentication-service-cli start --server-and-worker
     restart: unless-stopped
     environment:
-      # Overrides the image's baked-in `LOCO_ENV=production` — this is
+      # Overrides the image's baked-in `APP_ENV=production` — this is
       # the entire point of this file (see header comment).
-      LOCO_ENV: development
+      APP_ENV: development
       DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication_service_development
       AUTH_ALLOWED_FRONTENDS: ${AUTH_ALLOWED_FRONTENDS:-http://localhost:4173}
       RUST_LOG: ${RUST_LOG:-info}

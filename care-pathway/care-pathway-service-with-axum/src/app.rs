@@ -1,4 +1,4 @@
-//! loco.rs application wiring: the [`App`] `Hooks` implementation that
+//! axa application wiring: the [`App`] `Hooks` implementation that
 //! registers routes, background workers, and the truncate/seed
 //! lifecycle for `care-pathway-service`.
 
@@ -60,18 +60,18 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
     }
 }
 
-/// The loco.rs application hooks for `care-pathway-service`.
+/// The axa application hooks for `care-pathway-service`.
 ///
 /// Implements [`Hooks`] to register routes, background workers, and the
 /// truncate/seed lifecycle; the binary entrypoint drives it via the
-/// loco CLI.
+/// axa CLI.
 pub struct App;
 impl App {
     /// Install this crate's own logging + `OpenTelemetry` stack (repo
-    /// `tasks.md` PRO-H12), returning `true` so loco does **not** also
+    /// `tasks.md` PRO-H12), returning `true` so axa does **not** also
     /// install its own. Ported from organization-service's
     /// `App::init_logger` (itself course's, itself person's) — the
-    /// `Hooks::init_logger` seam is identical across crates' shapes
+    /// `App::init_logger` seam is identical across crates' shapes
     /// despite the differing router layout (see `src/observability.rs`'s
     /// module docs and `after_routes` below for where this crate's shape
     /// actually diverges).
@@ -88,7 +88,7 @@ impl App {
         }
         let logger_config = &ctx.config.logger;
         // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise loco's module whitelist applies,
+        // the filter outright; otherwise axa's module whitelist applies,
         // and the whitelist has no `opentelemetry*` entry — so a failing
         // export would be silent unless widened.
         let operator_supplied =
@@ -125,7 +125,7 @@ impl App {
         }
     }
 
-    /// Assemble the route table: loco's default routes (`/_health`,
+    /// Assemble the route table: axa's default routes (`/_health`,
     /// `/_ping`, …) plus the care-pathway controller, the API-docs
     /// controller, and the root-level Prometheus `/metrics.prom` endpoint.
     #[must_use]
@@ -162,7 +162,7 @@ impl App {
     ///
     /// # Errors
     ///
-    /// Infallible here; the signature is loco's.
+    /// Infallible here; the signature is axa's.
     pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
         // Seed the verifier before serving so `enforce()`/`AuthUser`
         // consult the boot-fetched key set from the first request on.
@@ -216,7 +216,7 @@ impl App {
     }
 
     /// Register CLI tasks — none for the MVP (the inject marker is kept so
-    /// `cargo loco generate task` can splice new tasks in).
+    /// `cargo axa generate task` can splice new tasks in).
     #[allow(unused_variables)]
     pub fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::search::SearchReindex);
@@ -226,7 +226,7 @@ impl App {
         // tasks-inject (do not remove)
     }
 
-    /// Truncate all tables for the loco test harness, in
+    /// Truncate all tables for the axa test harness, in
     /// foreign-key-safe order: history/audit children first, then the
     /// `care_pathways` parent.
     ///
