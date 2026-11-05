@@ -28,15 +28,14 @@ pub const CSRF_HEADER: &str = "x-csrf-token";
 /// [`CSRF_HEADER`].
 pub const CSRF_COOKIE: &str = "__Host-mxi_csrf";
 
-/// Length (chars) of a generated CSRF token — 32 chars of the loco
-/// alphanumeric random alphabet (~190 bits), plenty for an unguessable
-/// per-session token.
+/// Length (chars) of a generated CSRF token — 32 chars of the alphanumeric
+/// alphabet (~190 bits), plenty for an unguessable per-session token.
 const CSRF_TOKEN_LEN: usize = 32;
 
 /// Mint a fresh, unguessable CSRF token for a new session.
 #[must_use]
 pub fn generate_token() -> String {
-    loco_rs::hash::random_string(CSRF_TOKEN_LEN)
+    crate::hash::random_string(CSRF_TOKEN_LEN)
 }
 
 /// Build the `Set-Cookie` value delivering the CSRF token to the client:

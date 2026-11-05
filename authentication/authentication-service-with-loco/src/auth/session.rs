@@ -9,10 +9,10 @@
 //! (constant-time compared against the stored hash). The resulting
 //! [`Claims`] carry the session's `sid` and ABAC `attrs`.
 
+use axa::AppContext;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use axum::http::{Method, StatusCode};
-use loco_rs::app::AppContext;
 
 use super::{AuthUser, Claims};
 use crate::models::{sessions, users};

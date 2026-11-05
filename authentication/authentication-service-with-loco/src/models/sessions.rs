@@ -2,8 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use axa::prelude::*;
 use chrono::offset::Local;
-use loco_rs::prelude::*;
 use sea_orm::QueryOrder;
 use uuid::Uuid;
 
@@ -162,11 +162,7 @@ impl Model {
         // SEC-A9: the DB stores the hash of the session id, so match on the
         // hash of the presented (cookie / `sid`-claim) value.
         let session = sessions::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(sessions::Column::Jid, crate::secret_hash::hash(jid))
-                    .build(),
-            )
+            .filter(sessions::Column::Jid.eq(crate::secret_hash::hash(jid)))
             .one(db)
             .await?;
         session.ok_or_else(|| ModelError::EntityNotFound)
@@ -184,11 +180,7 @@ impl Model {
         user_pid: Uuid,
     ) -> ModelResult<Vec<Self>> {
         let rows = sessions::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(sessions::Column::UserPid, user_pid)
-                    .build(),
-            )
+            .filter(sessions::Column::UserPid.eq(user_pid))
             .order_by_desc(sessions::Column::Id)
             .all(db)
             .await?;

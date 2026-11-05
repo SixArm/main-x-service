@@ -30,6 +30,8 @@ pub mod cookie;
 pub mod csrf;
 /// Static data loaders (loco `data/` convention).
 pub mod data;
+/// Password hashing and random strings.
+pub mod hash;
 /// Localised user-facing copy (magic-link email subject + bodies).
 pub mod i18n;
 /// Loco app initializers.
@@ -53,7 +55,7 @@ pub mod openapi;
 pub mod rate_limit;
 /// Hash-at-rest of bearer-equivalent secrets (SEC-A9).
 pub mod secret_hash;
-/// Loco CLI tasks.
+/// Command-line tasks.
 pub mod tasks;
 /// Header-based API versioning (`Accepts-version`; agents/share/api-versioning.md).
 pub mod version;

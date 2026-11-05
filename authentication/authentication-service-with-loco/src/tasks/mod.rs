@@ -1,6 +1,6 @@
 //! Loco CLI tasks.
 //!
-//! loco [`Task`](loco_rs::task::Task) implementations, registered in
+//! loco [`Task`](axa::task::Task) implementations, registered in
 //! `App::register_tasks` (see [`crate::app`]).
 //!
 //! - [`attributes::UserAttributes`] (`user_attributes`) — the operator

@@ -32,10 +32,10 @@
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::extract::{ConnectInfo, Path};
 use axum::http::StatusCode;
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{

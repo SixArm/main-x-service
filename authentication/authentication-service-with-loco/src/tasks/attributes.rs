@@ -40,7 +40,7 @@
 
 use std::collections::BTreeMap;
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 
 use crate::models::{auth_events::Model as AuthEvent, users};
 

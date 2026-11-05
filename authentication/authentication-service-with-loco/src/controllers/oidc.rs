@@ -58,13 +58,13 @@ use std::net::SocketAddr;
 use std::sync::OnceLock;
 use std::time::Duration;
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::extract::{ConnectInfo, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Redirect;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use openidconnect::core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata};
 use openidconnect::{
     AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, PkceCodeChallenge,

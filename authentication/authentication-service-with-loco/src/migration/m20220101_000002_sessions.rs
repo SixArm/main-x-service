@@ -5,7 +5,7 @@
 //! rejects a revoked session even though a cached token's PASETO
 //! signature still verifies. `expires_at` lets stale rows be reaped.
 
-use loco_rs::schema::{ColType, create_table, drop_table};
+use axa::schema::{ColType, create_table, drop_table};
 use sea_orm_migration::prelude::*;
 
 /// The `sessions`-table migration (name derived from the module path).

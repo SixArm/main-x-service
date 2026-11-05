@@ -81,14 +81,6 @@ COPY --from=builder --chown=authsvc:authsvc \
     /app/authentication/authentication-service-with-loco/target/release/authentication-service-cli \
     /app/authentication-service-cli
 
-# loco reads config/<environment>.yaml at runtime (not baked into the
-# binary); LOCO_ENV below selects `production.yaml`. `config/keys/`
-# holds only a README in the repo — no signing key is ever baked into
-# the image; TOKEN_PRIVATE_KEY_SEED / TOKEN_PRIVATE_KEY_FILE are
-# supplied at `podman run` time (agents/share/security.md SEC-A1: the
-# service fails closed in production without one — see ENV comment
-# below).
-COPY --chown=authsvc:authsvc authentication/authentication-service-with-loco/config ./config
 
 RUN chown -R authsvc:authsvc /app
 
@@ -108,7 +100,7 @@ EXPOSE 5150
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:5150/_health || exit 1
 
-# Runtime defaults; override at `podman run -e …`. LOCO_ENV selects
+# Runtime defaults; override at `podman run -e …`. APP_ENV selects
 # config/production.yaml — a container with no override boots safely
 # in production mode rather than defaulting to loco's own "development".
 # TOKEN_PRIVATE_KEY_SEED (or TOKEN_PRIVATE_KEY_FILE) is REQUIRED in
@@ -116,7 +108,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 # explicitly non-production environment (SEC-A1, fail-closed). Set it
 # via `podman run -e TOKEN_PRIVATE_KEY_SEED=…` or a secret-mounted file;
 # never bake a real seed into an image layer.
-ENV LOCO_ENV=production \
+ENV APP_ENV=production \
     PORT=5150
 
 # loco's CLI entry point: `<bin> start` runs the server (see

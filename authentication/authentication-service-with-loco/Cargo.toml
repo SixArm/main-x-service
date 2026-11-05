@@ -18,14 +18,6 @@ include = ["src/**/*", "LICENSE.md", "README.md", "llms.txt", "llms.json"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[workspace.dependencies]
-# `auth` is deliberately absent from this feature list. It is loco's JWT
-# support (`dep:jsonwebtoken`, and therefore `rsa` / RUSTSEC-2023-0071),
-# and this family issues PASETO v4.public rather than JWT — see
-# agents/share/jwt.md. Dropping it removes the vulnerable crate from the
-# dependency graph rather than suppressing the advisory.
-loco-rs = { version = "1.2.0", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
-
 [dependencies]
 # Keyed integrity MACs with production-grade key handling — one audited
 # implementation shared by every service. Distinct from the PASETO
@@ -36,7 +28,8 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # an advance against one design family does not transfer.
 sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
-loco-rs = { workspace = true  }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm"] }
+clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -58,9 +51,8 @@ sea-orm = { version = "2.0", features = [
 # prelude directly.
 sea-orm-migration = { version = "2.0", features = ["runtime-tokio-rustls"] }
 chrono = { version = "0.4" }
-validator = { version = "0.20" }
-uuid = { version = "1.29", features = ["v4"] }
-include_dir = { version = "0.7" }
+validator = { version = "0.20", features = ["derive"] }
+uuid = { version = "1.29", features = ["serde", "v4"] }
 # PASETO v4.public token signing + Ed25519 public-key publication. As the
 # central auth provider, other services verify tokens offline against the
 # published Ed25519 keys at /.well-known/paseto-keys — no shared secret,
@@ -72,6 +64,11 @@ base64 = { version = "0.23" }
 # Prometheus text-exposition metrics served at GET /metrics.prom, for
 # parity with the older Axum services in the family.
 prometheus = { version = "0.14" }
+# Magic-link email over SMTP.
+lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"] }
+# The deliberately slow hash for SEC-A5, and CSRF token generation.
+argon2 = { version = "0.5", features = ["std"] }
+rand = "0.9"
 
 [features]
 # PASETO v4.public token issuance (`POST /api/auth/token`), the published
@@ -125,7 +122,7 @@ required-features = []
 # this service signs PASETO v4.public, the verifier crate verifies, the
 # claims round-trip.
 authentication-verifier = { path = "../authentication-verifier-rust-crate", default-features = false, features = ["paseto"] }
-loco-rs = { workspace = true, features = ["testing"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "testing"] }
 serial_test = { version = "4.0.1" }
 rstest = { version = "0.28" }
 insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }

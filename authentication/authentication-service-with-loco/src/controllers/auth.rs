@@ -25,13 +25,13 @@
 
 use std::net::SocketAddr;
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::extract::ConnectInfo;
 use axum::http::{HeaderMap, StatusCode, header::USER_AGENT};
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use loco_rs::environment::Environment;
+use axa::Environment;
 
 use crate::{
     auth::{AuthUser, Claims},
@@ -156,7 +156,7 @@ fn default_name(email: &str) -> String {
 /// Logs the magic link to the console (dev) and best-effort emails it
 /// (prod), rendering the email in `locale`. The console log is
 /// authoritative in development.
-async fn deliver_magic_link(ctx: &AppContext, user: &users::Model, locale: &str, frontend: &str) {
+fn deliver_magic_link(ctx: &AppContext, user: &users::Model, locale: &str, frontend: &str) {
     let Some(token) = user.magic_link_token.as_ref() else {
         return;
     };
@@ -176,7 +176,7 @@ async fn deliver_magic_link(ctx: &AppContext, user: &users::Model, locale: &str,
     } else {
         tracing::info!(email = %user.email, locale = %locale, "magic link issued");
     }
-    if let Err(err) = Emailer::send_magic_link(ctx, user, locale, frontend).await {
+    if let Err(err) = Emailer::send_magic_link(ctx, user, locale, frontend) {
         tracing::debug!(error = %err, "magic link email not sent");
     }
 }
@@ -199,7 +199,7 @@ fn log_magic_link_url(env: &Environment) -> bool {
 /// so the work is observable to a test; the caller discards it.
 #[must_use]
 fn constant_work_hash() -> String {
-    loco_rs::hash::hash_password(&uuid::Uuid::new_v4().to_string()).unwrap_or_default()
+    crate::hash::hash_password(&uuid::Uuid::new_v4().to_string()).unwrap_or_default()
 }
 
 /// SEC-A10 — the CSRF decision for `POST /token` once the session is loaded.
@@ -345,7 +345,7 @@ async fn signup(
         &allowed_frontends(),
         &default_frontend(),
     );
-    deliver_magic_link(&ctx, &user, &locale, &frontend).await;
+    deliver_magic_link(&ctx, &user, &locale, &frontend);
     format::empty_json()
 }
 
@@ -405,7 +405,7 @@ async fn request_magic_link(
         &allowed_frontends(),
         &default_frontend(),
     );
-    deliver_magic_link(&ctx, &user, &locale, &frontend).await;
+    deliver_magic_link(&ctx, &user, &locale, &frontend);
     format::empty_json()
 }
 
@@ -830,9 +830,9 @@ mod tests {
     use super::csrf_token_gate;
     use super::{choose_frontend, claims_have_admin, constant_work_hash, log_magic_link_url};
     use crate::auth::Claims;
+    use axa::Environment;
     #[cfg(feature = "paseto")]
     use axum::http::StatusCode;
-    use loco_rs::environment::Environment;
     use std::collections::BTreeMap;
 
     /// SEC-A10: the `POST /token` CSRF gate. A session with a synchroniser
@@ -932,7 +932,7 @@ mod tests {
         assert!(log_magic_link_url(&Environment::Development));
         assert!(!log_magic_link_url(&Environment::Production));
         assert!(!log_magic_link_url(&Environment::Test));
-        assert!(!log_magic_link_url(&Environment::Any(
+        assert!(!log_magic_link_url(&Environment::Other(
             "staging".to_string()
         )));
     }

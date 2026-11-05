@@ -5,7 +5,7 @@
 //! introspection round-trip to this service on the hot path. The document
 //! is an OKP/Ed25519 JWK set the `authentication-verifier` crate parses.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 
 /// The Ed25519 public key(s) used to sign access tokens.
 #[debug_handler]

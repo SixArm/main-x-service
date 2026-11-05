@@ -6,7 +6,7 @@ use authentication_service::{
     models::sessions::{self, session_data},
     secret_hash,
 };
-use loco_rs::testing::prelude::*;
+use axa::testing::prelude::*;
 use sea_orm::EntityTrait;
 use serial_test::serial;
 use uuid::Uuid;

@@ -13,9 +13,9 @@
 //! the no-secret-labels contract).
 
 use crate::metrics::{CONTENT_TYPE, Metrics};
+use axa::prelude::*;
 use axum::http::{HeaderValue, header::CONTENT_TYPE as CONTENT_TYPE_HEADER};
 use axum::response::IntoResponse;
-use loco_rs::prelude::*;
 
 /// `GET /metrics.prom` — render the Prometheus registry as
 /// `text/plain; version=0.0.4`.

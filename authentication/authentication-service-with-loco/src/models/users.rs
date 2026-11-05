@@ -25,14 +25,14 @@
 
 use std::collections::BTreeMap;
 
-use async_trait::async_trait;
+use axa::prelude::*;
 use chrono::{Duration, offset::Local};
-use loco_rs::{hash, prelude::*};
 use sea_orm::FromQueryResult;
 use sea_orm::sea_query::{Expr, ExprTrait, Func};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use uuid::Uuid;
+use validator::Validate;
 
 /// Re-export the generated `users` entity (module + `ActiveModel` /
 /// `Entity` / `Model`) so callers use `users::Model` etc. through this
@@ -172,15 +172,34 @@ pub struct Validator {
     pub email: String,
 }
 
-impl Validatable for ActiveModel {
-    /// Yield the field [`Validator`] for this `ActiveModel`, so loco runs
-    /// name/email validation in `before_save`.
-    fn validator(&self) -> Box<dyn Validate> {
-        Box::new(Validator {
+impl ActiveModel {
+    /// Check the name and email, reporting failures as a `DbErr` whose text
+    /// is a JSON map of field name to error list.
+    fn validate(&self) -> Result<(), DbErr> {
+        let fields = Validator {
             name: self.name.as_ref().to_owned(),
             email: self.email.as_ref().to_owned(),
-        })
+        };
+        fields
+            .validate()
+            .map_err(|errors| DbErr::Custom(validation_json(&errors)))
     }
+}
+
+/// Render validation errors as `{"field":[{"code":..,"message":..}]}`.
+fn validation_json(errors: &validator::ValidationErrors) -> String {
+    let fields: BTreeMap<String, Vec<serde_json::Value>> = errors
+        .field_errors()
+        .into_iter()
+        .map(|(field, errors)| {
+            let errors = errors
+                .iter()
+                .map(|error| serde_json::json!({ "code": error.code, "message": error.message }))
+                .collect();
+            (field.to_string(), errors)
+        })
+        .collect();
+    serde_json::to_string(&fields).unwrap_or_default()
 }
 
 #[async_trait::async_trait]
@@ -207,42 +226,6 @@ impl ActiveModelBehavior for super::_entities::users::ActiveModel {
         } else {
             Ok(self)
         }
-    }
-}
-
-#[async_trait]
-impl Authenticable for Model {
-    /// loco `Authenticable` hook: resolve a user from an api-key bearer.
-    /// Present for loco's middleware; the magic-link surface authenticates
-    /// via PASETO v4.public tokens (see [`crate::auth`]) rather than api
-    /// keys.
-    ///
-    /// # Errors
-    ///
-    /// [`ModelError::EntityNotFound`] when no user has that api key, plus
-    /// the usual DB errors.
-    async fn find_by_api_key(db: &DatabaseConnection, api_key: &str) -> ModelResult<Self> {
-        let user = users::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(users::Column::ApiKey, api_key)
-                    .build(),
-            )
-            .one(db)
-            .await?;
-        user.ok_or_else(|| ModelError::EntityNotFound)
-    }
-
-    /// loco `Authenticable` hook: resolve a user from the JWT claims key.
-    /// Our claims key is the `pid`, so this delegates to
-    /// [`Self::find_by_pid`].
-    ///
-    /// # Errors
-    ///
-    /// [`ModelError::EntityNotFound`] when no user matches, plus parse / DB
-    /// errors.
-    async fn find_by_claims_key(db: &DatabaseConnection, claims_key: &str) -> ModelResult<Self> {
-        Self::find_by_pid(db, claims_key).await
     }
 }
 
@@ -276,11 +259,7 @@ impl Model {
         token: &str,
     ) -> ModelResult<Self> {
         let user = users::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(users::Column::EmailVerificationToken, token)
-                    .build(),
-            )
+            .filter(users::Column::EmailVerificationToken.eq(token))
             .one(db)
             .await?;
         user.ok_or_else(|| ModelError::EntityNotFound)
@@ -326,14 +305,7 @@ impl Model {
         // SEC-A9: the DB stores the token's hash; match on the hash of the
         // presented plaintext.
         let user = users::Entity::find()
-            .filter(
-                query::condition()
-                    .eq(
-                        users::Column::MagicLinkToken,
-                        crate::secret_hash::hash(token),
-                    )
-                    .build(),
-            )
+            .filter(users::Column::MagicLinkToken.eq(crate::secret_hash::hash(token)))
             .one(db)
             .await?;
 
@@ -365,11 +337,7 @@ impl Model {
     /// When could not find user by the given token or DB query error
     pub async fn find_by_reset_token(db: &DatabaseConnection, token: &str) -> ModelResult<Self> {
         let user = users::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(users::Column::ResetToken, token)
-                    .build(),
-            )
+            .filter(users::Column::ResetToken.eq(token))
             .one(db)
             .await?;
         user.ok_or_else(|| ModelError::EntityNotFound)
@@ -383,11 +351,7 @@ impl Model {
     pub async fn find_by_pid(db: &DatabaseConnection, pid: &str) -> ModelResult<Self> {
         let parse_uuid = Uuid::parse_str(pid).map_err(|e| ModelError::Any(e.into()))?;
         let user = users::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(users::Column::Pid, parse_uuid)
-                    .build(),
-            )
+            .filter(users::Column::Pid.eq(parse_uuid))
             .one(db)
             .await?;
         user.ok_or_else(|| ModelError::EntityNotFound)
@@ -432,11 +396,7 @@ impl Model {
     /// When could not find user by the given token or DB query error
     pub async fn find_by_api_key(db: &DatabaseConnection, api_key: &str) -> ModelResult<Self> {
         let user = users::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(users::Column::ApiKey, api_key)
-                    .build(),
-            )
+            .filter(users::Column::ApiKey.eq(api_key))
             .one(db)
             .await?;
         user.ok_or_else(|| ModelError::EntityNotFound)
@@ -449,7 +409,7 @@ impl Model {
     /// when could not verify password
     #[must_use]
     pub fn verify_password(&self, password: &str) -> bool {
-        hash::verify_password(password, &self.password)
+        crate::hash::verify_password(password, &self.password)
     }
 
     /// Asynchronously creates a user with a password and saves it to the
@@ -465,11 +425,7 @@ impl Model {
         let txn = db.begin().await?;
 
         if users::Entity::find()
-            .filter(
-                model::query::condition()
-                    .eq(users::Column::Email, &params.email)
-                    .build(),
-            )
+            .filter(users::Column::Email.eq(&params.email))
             .one(&txn)
             .await?
             .is_some()
@@ -478,7 +434,7 @@ impl Model {
         }
 
         let password_hash =
-            hash::hash_password(&params.password).map_err(|e| ModelError::Any(e.into()))?;
+            crate::hash::hash_password(&params.password).map_err(|e| ModelError::Any(e.into()))?;
         let user = users::ActiveModel {
             email: ActiveValue::set(params.email.clone()),
             password: ActiveValue::set(password_hash),
@@ -520,7 +476,7 @@ impl Model {
             return Err(ModelError::EntityAlreadyExists {});
         }
 
-        let unusable = hash::hash_password(&Uuid::new_v4().to_string())
+        let unusable = crate::hash::hash_password(&Uuid::new_v4().to_string())
             .map_err(|e| ModelError::Any(e.into()))?;
         let user = users::ActiveModel {
             email: ActiveValue::set(email),
@@ -583,8 +539,9 @@ impl ActiveModel {
         db: &DatabaseConnection,
         password: &str,
     ) -> ModelResult<Model> {
-        self.password =
-            ActiveValue::set(hash::hash_password(password).map_err(|e| ModelError::Any(e.into()))?);
+        self.password = ActiveValue::set(
+            crate::hash::hash_password(password).map_err(|e| ModelError::Any(e.into()))?,
+        );
         self.reset_token = ActiveValue::Set(None);
         self.reset_sent_at = ActiveValue::Set(None);
         self.update(db).await.map_err(ModelError::from)
@@ -603,7 +560,7 @@ impl ActiveModel {
         // `hash(plaintext)`, then hand the caller back a model carrying the
         // *plaintext* (for the email/log) — so the usable token is never read
         // back out of the DB.
-        let plaintext = hash::random_string(MAGIC_LINK_LENGTH as usize);
+        let plaintext = crate::hash::random_string(MAGIC_LINK_LENGTH as usize);
         let expired = Local::now() + Duration::minutes(MAGIC_LINK_EXPIRATION_MIN.into());
 
         self.magic_link_token = ActiveValue::set(Some(crate::secret_hash::hash(&plaintext)));

@@ -24,7 +24,7 @@ use authentication_service::{
     models::_entities::sessions,
     models::{auth_events::Model as AuthEvent, users},
 };
-use loco_rs::testing::prelude::*;
+use axa::testing::prelude::*;
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serial_test::serial;
 
@@ -76,7 +76,7 @@ async fn signup_with_existing_email_still_returns_200() {
     // Anti-enumeration (spec §6.1): an existing email must not be
     // distinguishable from a fresh one — it gets a new link, same 200.
     request::<App, _, _>(|request, ctx| async move {
-        seed::<App>(&ctx).await.unwrap();
+        crate::seed_users(&ctx).await.unwrap();
 
         let payload = serde_json::json!({
             "email": "user1@example.com",
@@ -143,7 +143,7 @@ async fn signup_is_case_insensitive_and_does_not_duplicate_accounts() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn can_request_magic_link_for_existing_account() {
     request::<App, _, _>(|request, ctx| async move {
-        seed::<App>(&ctx).await.unwrap();
+        crate::seed_users(&ctx).await.unwrap();
 
         let payload = serde_json::json!({ "email": "user1@example.com" });
         let response = request.post("/api/auth/magic-link").json(&payload).await;
@@ -191,7 +191,7 @@ async fn magic_link_for_unknown_email_still_returns_200() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn can_redeem_magic_link_for_access_token() {
     request::<App, _, _>(|request, ctx| async move {
-        seed::<App>(&ctx).await.unwrap();
+        crate::seed_users(&ctx).await.unwrap();
 
         let payload = serde_json::json!({ "email": "user1@example.com" });
         let response = request.post("/api/auth/magic-link").json(&payload).await;
@@ -312,7 +312,7 @@ async fn source_ip_is_captured_on_signup_and_redeem() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn concurrent_magic_link_redemptions_only_one_wins() {
     request::<App, _, _>(|request, ctx| async move {
-        seed::<App>(&ctx).await.unwrap();
+        crate::seed_users(&ctx).await.unwrap();
 
         let payload = serde_json::json!({ "email": "user1@example.com" });
         assert_eq!(
@@ -355,7 +355,7 @@ async fn concurrent_magic_link_redemptions_only_one_wins() {
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn invalid_magic_link_token_is_rejected() {
     request::<App, _, _>(|request, ctx| async move {
-        seed::<App>(&ctx).await.unwrap();
+        crate::seed_users(&ctx).await.unwrap();
 
         let response = request.get("/api/auth/magic-link/invalid-token").await;
         assert_eq!(

@@ -13,8 +13,8 @@ use authentication_service::{
     app::App,
     models::{auth_events, users},
 };
-use loco_rs::testing::prelude::*;
-use loco_rs::{TestServer, app::AppContext};
+use axa::testing::prelude::*;
+use axa::{AppContext, TestServer};
 use serial_test::serial;
 
 use super::prepare_data::auth_header;

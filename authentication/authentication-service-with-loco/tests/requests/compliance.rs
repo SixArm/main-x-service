@@ -16,7 +16,7 @@
 //! ```
 
 use authentication_service::app::App;
-use loco_rs::testing::prelude::*;
+use axa::testing::prelude::*;
 use serial_test::serial;
 
 use super::prepare_data::{auth_header, init_user_login};

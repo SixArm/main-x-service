@@ -2,8 +2,8 @@
 //! flow end-to-end to obtain a signed-in user + PASETO bearer token.
 
 use authentication_service::{models::users, views::auth::LoginResponse};
+use axa::{AppContext, TestServer};
 use axum::http::{HeaderName, HeaderValue};
-use loco_rs::{TestServer, app::AppContext};
 use sea_orm::IntoActiveModel;
 
 const USER_EMAIL: &str = "test@loco.com";

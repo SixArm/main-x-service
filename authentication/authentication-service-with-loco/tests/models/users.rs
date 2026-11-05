@@ -7,9 +7,9 @@ use authentication_service::{
     app::App,
     models::users::{self, Model, RegisterParams},
 };
+use axa::testing::prelude::*;
 use chrono::{Duration, offset::Local};
 use insta::assert_debug_snapshot;
-use loco_rs::testing::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue, IntoActiveModel};
 use serial_test::serial;
 
@@ -66,7 +66,7 @@ async fn can_create_with_password() {
     let res = Model::create_with_password(&boot.app_context.db, &params).await;
 
     insta::with_settings!({
-        filters => cleanup_user_model()
+        filters => crate::cleanup_user_model()
     }, {
         assert_debug_snapshot!(res);
     });
@@ -83,7 +83,7 @@ async fn handle_create_with_password_with_duplicate() {
     let boot = boot_test::<App>()
         .await
         .expect("Failed to boot test application");
-    seed::<App>(&boot.app_context)
+    crate::seed_users(&boot.app_context)
         .await
         .expect("Failed to seed database");
 
@@ -111,7 +111,7 @@ async fn can_find_by_email() {
     let boot = boot_test::<App>()
         .await
         .expect("Failed to boot test application");
-    seed::<App>(&boot.app_context)
+    crate::seed_users(&boot.app_context)
         .await
         .expect("Failed to seed database");
 
@@ -134,7 +134,7 @@ async fn can_find_by_pid() {
     let boot = boot_test::<App>()
         .await
         .expect("Failed to boot test application");
-    seed::<App>(&boot.app_context)
+    crate::seed_users(&boot.app_context)
         .await
         .expect("Failed to seed database");
 
@@ -158,7 +158,7 @@ async fn can_verification_token() {
     let boot = boot_test::<App>()
         .await
         .expect("Failed to boot test application");
-    seed::<App>(&boot.app_context)
+    crate::seed_users(&boot.app_context)
         .await
         .expect("Failed to seed database");
 
@@ -207,7 +207,7 @@ async fn can_verified() {
     let boot = boot_test::<App>()
         .await
         .expect("Failed to boot test application");
-    seed::<App>(&boot.app_context)
+    crate::seed_users(&boot.app_context)
         .await
         .expect("Failed to seed database");
 
@@ -248,7 +248,7 @@ async fn can_reset_password() {
     let boot = boot_test::<App>()
         .await
         .expect("Failed to boot test application");
-    seed::<App>(&boot.app_context)
+    crate::seed_users(&boot.app_context)
         .await
         .expect("Failed to seed database");
 
@@ -287,7 +287,7 @@ async fn can_reset_password() {
 #[serial]
 async fn magic_link() {
     let boot = boot_test::<App>().await.unwrap();
-    seed::<App>(&boot.app_context).await.unwrap();
+    crate::seed_users(&boot.app_context).await.unwrap();
 
     let user = Model::find_by_pid(&boot.app_context.db, "11111111-1111-1111-1111-111111111111")
         .await

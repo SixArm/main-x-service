@@ -8,11 +8,11 @@
 //! no `rsa`/RUSTSEC-2023-0071 exposure, dev-dependency only.
 
 use authentication_service::app::App;
+use axa::testing::prelude::*;
 use axum::Json;
 use axum::extract::State;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use loco_rs::testing::prelude::*;
 use p256::ecdsa::signature::Signer;
 use p256::ecdsa::{Signature, SigningKey};
 use serde_json::{Value, json};

@@ -10,8 +10,8 @@
 //! DB-free in the module itself.
 
 use authentication_service::{app::App, rate_limit};
+use axa::testing::prelude::*;
 use chrono::{Duration, Utc};
-use loco_rs::testing::prelude::*;
 use serial_test::serial;
 
 /// The window as a `chrono::Duration`, for building injected `now` offsets.

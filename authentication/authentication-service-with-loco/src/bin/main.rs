@@ -1,6 +1,6 @@
-//! Loco CLI entrypoint for the authentication-service single sign-on provider.
+//! Command-line entry point for the authentication-service single sign-on provider.
 //!
-//! Boots the loco `App` (routes, workers, migrations) via `cli::main`.
+//! Parses the shared command line and hands it to [`App::run`].
 //! See the crate library docs and `spec/index.md` for the service shape.
 #![warn(clippy::pedantic)]
 #![forbid(unsafe_code)]
@@ -11,10 +11,15 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use authentication_service::app::App;
-use authentication_service::migration::Migrator;
-use loco_rs::cli;
+use axa::cli::Cli;
+use clap::Parser;
 
+/// Parse the command line and run it.
+///
+/// # Errors
+///
+/// Returns the failure from [`App::run`].
 #[tokio::main]
-async fn main() -> loco_rs::Result<()> {
-    cli::main::<App, Migrator>().await
+async fn main() -> axa::Result<()> {
+    App::run(Cli::parse()).await
 }

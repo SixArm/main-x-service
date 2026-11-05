@@ -163,17 +163,50 @@ fn jwk_for(kid: &str, public: &[u8; 32]) -> serde_json::Value {
     })
 }
 
-/// True when the service is running in the `production` loco environment.
+/// The variables that name the environment. `APP_ENV` is the one the shared
+/// configuration reads; the other two are older names still honoured here so
+/// a deployment that sets any of them is covered.
+const ENVIRONMENT_VARS: [&str; 3] = ["APP_ENV", "LOCO_ENV", "RUST_ENV"];
+
+/// True when any environment variable names a production-like environment.
 ///
-/// Loco selects the production config via `LOCO_ENV=production` (the older
-/// `RUST_ENV` is accepted as a fallback signal). We key the [`DEV_SEED`]
-/// refusal on this so a production deploy that forgets to set a real signing
-/// seed fails closed instead of silently signing forgeable tokens (SEC-A1).
-fn is_production_env() -> bool {
-    ["LOCO_ENV", "RUST_ENV"]
+/// We key the [`DEV_SEED`] refusal on this so a production deploy that
+/// forgets to set a real signing seed fails closed instead of silently
+/// signing forgeable tokens (SEC-A1). Anything but `development` and `test`
+/// counts, so `staging` or a typo gets the strict behaviour too.
+///
+/// Takes the lookup as a parameter so every case can be tested without
+/// mutating the process environment.
+fn names_production(lookup: impl Fn(&str) -> Option<String>) -> bool {
+    ENVIRONMENT_VARS
         .iter()
-        .filter_map(|k| std::env::var(k).ok())
-        .any(|v| v.trim().eq_ignore_ascii_case("production"))
+        .filter_map(|name| lookup(name))
+        .any(|value| axa::Environment::parse(&value).is_production_like())
+}
+
+/// True when the process environment names a production-like environment.
+fn is_production_env() -> bool {
+    names_production(|name| std::env::var(name).ok())
+}
+
+/// Refuse to boot in `production` with no signing seed configured.
+///
+/// [`is_production_env`] cannot see `--environment production` on the command
+/// line, so boot calls this with the resolved environment. The failure then
+/// comes at startup rather than on the first token, and a flag cannot get
+/// past the SEC-A1 guard.
+///
+/// # Errors
+///
+/// Fails in production when neither `TOKEN_PRIVATE_KEY_SEED` nor
+/// `TOKEN_PRIVATE_KEY_FILE` is set.
+pub fn ensure_signing_seed(production: bool) -> Result<(), AuthError> {
+    let configured = std::env::var_os("TOKEN_PRIVATE_KEY_SEED").is_some()
+        || std::env::var_os("TOKEN_PRIVATE_KEY_FILE").is_some();
+    if configured {
+        return Ok(());
+    }
+    dev_seed_fallback(production).map(|_| ())
 }
 
 /// Resolve the primary signing seed: `TOKEN_PRIVATE_KEY_SEED` (inline
@@ -458,6 +491,50 @@ mod tests {
     // otherwise sign forgeable tokens. In production the fallback errors
     // (boot fails via `keys()`); in dev/test it still yields DEV_SEED so
     // local runs and this suite work offline.
+    #[test]
+    fn app_env_production_is_recognised() {
+        // The regression this pins: the images set `APP_ENV`, so a guard that
+        // read only `LOCO_ENV` would let production sign with the public dev
+        // seed.
+        let lookup = |name: &str| (name == "APP_ENV").then(|| "production".to_string());
+        assert!(names_production(lookup));
+    }
+
+    #[test]
+    fn older_environment_names_are_still_honoured() {
+        for var in ["LOCO_ENV", "RUST_ENV"] {
+            assert!(names_production(
+                |name| (name == var).then(|| "Production".to_string())
+            ));
+        }
+    }
+
+    #[test]
+    fn unknown_environments_fail_closed() {
+        assert!(names_production(|name| {
+            (name == "APP_ENV").then(|| "staging".to_string())
+        }));
+    }
+
+    #[test]
+    fn development_and_test_may_use_the_dev_seed() {
+        assert!(!names_production(|_| None));
+        for value in ["development", "test"] {
+            assert!(!names_production(|name| {
+                (name == "APP_ENV").then(|| value.to_string())
+            }));
+        }
+    }
+
+    #[test]
+    fn any_production_signal_wins_over_a_development_one() {
+        assert!(names_production(|name| match name {
+            "APP_ENV" => Some("development".to_string()),
+            "RUST_ENV" => Some("production".to_string()),
+            _ => None,
+        }));
+    }
+
     #[test]
     fn dev_seed_fallback_refused_in_production() {
         assert!(

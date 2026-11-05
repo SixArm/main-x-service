@@ -1,27 +1,21 @@
-//! Loco application wiring: the [`App`] type and its `Hooks` impl.
-//!
-//! This is the composition root. `Hooks` is where loco asks the
-//! application to register its routes, background workers, CLI tasks,
-//! seed data, and table-truncation logic. The auth service mounts four
-//! controller route groups (magic-link auth, the published PASETO key
-//! set, docs, Prometheus metrics) and otherwise keeps the surface
-//! minimal.
+//! Application wiring: routes, tasks, table truncation, the command line,
+//! and the boot used by tests. The auth service mounts its controller route
+//! groups (magic-link auth, the published PASETO key set, docs, Prometheus
+//! metrics) and otherwise keeps the surface minimal.
 
 use crate::migration::Migrator;
-use async_trait::async_trait;
-use axum::Router as AxumRouter;
-use loco_rs::{
-    Result,
-    app::{AppContext, Hooks, Initializer},
-    bgworker::Queue,
-    boot::{BootResult, StartMode, create_app},
-    config::Config,
-    controller::AppRoutes,
-    db::{self, truncate_table},
-    environment::Environment,
+use axa::{
+    AppContext, Environment, Error, Result,
+    boot::{BootResult, TestApp},
+    cli::{Cli, Command, DbCommand, parse_vars},
+    config::{Config as ServiceConfig, Defaults, MB},
+    db::truncate_table,
+    routes::AppRoutes,
+    server,
     task::Tasks,
 };
-use std::path::Path;
+use axum::Router as AxumRouter;
+use sea_orm_migration::MigratorTrait;
 
 #[allow(unused_imports)]
 use crate::{
@@ -33,58 +27,13 @@ use crate::{
 /// Loco application type. Implements [`Hooks`] to wire up routes,
 /// workers, tasks, seeding, and table truncation for the auth service.
 pub struct App;
-#[async_trait]
-impl Hooks for App {
-    /// Loco application name (the crate name), used in logs and banners.
-    fn app_name() -> &'static str {
-        env!("CARGO_CRATE_NAME")
-    }
-
-    /// Human-readable version: the crate version plus the build commit
-    /// SHA when one was injected at build time (`BUILD_SHA` /
-    /// `GITHUB_SHA`), else `dev`. Surfaced in startup logs so a deployed
-    /// instance is traceable to a commit.
-    fn app_version() -> String {
-        format!(
-            "{} ({})",
-            env!("CARGO_PKG_VERSION"),
-            option_env!("BUILD_SHA")
-                .or(option_env!("GITHUB_SHA"))
-                .unwrap_or("dev")
-        )
-    }
-
-    /// Boot the loco app for the given run mode/environment/config,
-    /// binding our `Migrator` so `cargo loco db migrate` runs this
-    /// crate's migrations.
-    ///
-    /// # Errors
-    ///
-    /// Propagates any loco boot error (config load, DB connect, …).
-    async fn boot(
-        mode: StartMode,
-        environment: &Environment,
-        config: Config,
-    ) -> Result<BootResult> {
-        create_app::<Self, Migrator>(mode, environment, config).await
-    }
-
-    /// App initializers. None are needed; key material is lazily loaded
-    /// on first use (see `crate::auth::keys`, `paseto` feature) rather than via an
-    /// initializer.
-    ///
-    /// # Errors
-    ///
-    /// Never returns an error today; the signature is loco's.
-    async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
-        Ok(vec![])
-    }
-
+impl App {
     /// Register the HTTP routes: loco's defaults plus our four
     /// controller groups — magic-link auth (`/api/auth`), the public
     /// key set (`/.well-known/paseto-keys`), the docs (`/api-docs` +
     /// `/swagger-ui`), and the Prometheus metrics (`/metrics.prom`).
-    fn routes(_ctx: &AppContext) -> AppRoutes {
+    #[must_use]
+    pub fn routes(_ctx: &AppContext) -> AppRoutes {
         let routes = AppRoutes::with_default_routes() // controller routes below
             .add_route(controllers::auth::routes())
             .add_route(controllers::compliance::routes())
@@ -110,29 +59,20 @@ impl Hooks for App {
     /// # Errors
     ///
     /// Never returns an error today; the signature is loco's.
-    async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
+    pub fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         Ok(router.layer(axum::middleware::from_fn(
             crate::version::require_version_mw,
         )))
     }
 
-    /// Register background workers on the Postgres-backed queue. None are
-    /// wired today; the queue config stays in place for a future worker.
-    ///
-    /// # Errors
-    ///
-    /// Propagates queue registration failures.
-    async fn connect_workers(_ctx: &AppContext, _queue: &Queue) -> Result<()> {
-        Ok(())
-    }
-
     /// Register loco CLI tasks. `user_attributes` is the operator surface
     /// for ABAC attribute assignment (`agents/share/authorization-attributes.md`
     /// §6).
-    fn register_tasks(tasks: &mut Tasks) {
+    pub fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::attributes::UserAttributes);
         // tasks-inject (do not remove)
     }
+
     /// Truncate all application tables (used by the test harness between
     /// runs). Order matters only insofar as we clear the audit/session
     /// children before users; none carry FK constraints that forbid it.
@@ -140,20 +80,121 @@ impl Hooks for App {
     /// # Errors
     ///
     /// Propagates any truncate failure from the database.
-    async fn truncate(ctx: &AppContext) -> Result<()> {
+    pub async fn truncate(ctx: &AppContext) -> Result<()> {
         truncate_table(&ctx.db, auth_events::Entity).await?;
         truncate_table(&ctx.db, sessions::Entity).await?;
         truncate_table(&ctx.db, users::Entity).await?;
         Ok(())
     }
-    /// Seed the database from `base/users.yaml` (loco seed convention).
+}
+
+/// Service defaults. The environment overrides them; see `axa::config`.
+fn defaults() -> Defaults {
+    Defaults {
+        database: "authentication_service",
+        port: 5150,
+        production_port: None,
+        body_limit: 2 * MB,
+        max_connections: 1,
+    }
+}
+
+impl App {
+    /// Connect the database and build the context.
     ///
     /// # Errors
     ///
-    /// Propagates seed/parse/insert failures.
-    async fn seed(ctx: &AppContext, base: &Path) -> Result<()> {
-        db::seed::<users::ActiveModel>(&ctx.db, &base.join("users.yaml").display().to_string())
-            .await?;
+    /// Fails when the database cannot be reached.
+    pub async fn context(environment: Environment, config: ServiceConfig) -> Result<AppContext> {
+        let db = axa::db::connect(&config.database).await?;
+        Ok(AppContext::new(environment, db, config))
+    }
+
+    /// Build the full router: the routes under the standard middleware,
+    /// then this service's own layers.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the service's setup fails.
+    pub fn router(ctx: &AppContext) -> Result<AxumRouter> {
+        let router = Self::routes(ctx).into_app(ctx.clone())?;
+        Self::after_routes(router, ctx)
+    }
+
+    /// Run a database command.
+    async fn db(ctx: &AppContext, command: DbCommand) -> Result<()> {
+        match command {
+            DbCommand::Migrate => Migrator::up(&ctx.db, None).await?,
+            DbCommand::Down { steps } => Migrator::down(&ctx.db, Some(steps)).await?,
+            DbCommand::Reset => Migrator::fresh(&ctx.db).await?,
+            DbCommand::Status => Migrator::status(&ctx.db).await?,
+            DbCommand::Truncate => Self::truncate(ctx).await?,
+        }
         Ok(())
+    }
+
+    /// Run the command line.
+    ///
+    /// # Errors
+    ///
+    /// Fails when boot, a command, or the server fails.
+    pub async fn run(cli: Cli) -> Result<()> {
+        let environment = cli
+            .environment
+            .as_deref()
+            .map_or_else(Environment::from_env, Environment::parse);
+        // SEC-A1: stop here rather than on the first token.
+        #[cfg(feature = "paseto")]
+        crate::auth::ensure_signing_seed(environment.is_production_like())
+            .map_err(|error| Error::Message(error.to_string()))?;
+        let mut config = ServiceConfig::from_env(&environment, &defaults())?;
+        if let Command::Start { binding, port, .. } = &cli.command {
+            if let Some(binding) = binding {
+                config.server.binding.clone_from(binding);
+            }
+            if let Some(port) = port {
+                config.server.port = *port;
+            }
+        }
+        let ctx = Self::context(environment, config).await?;
+        axa::logger::init(env!("CARGO_CRATE_NAME"), &ctx.config.logger);
+        if ctx.config.database.auto_migrate && !matches!(cli.command, Command::Db { .. }) {
+            Migrator::up(&ctx.db, None).await?;
+        }
+        match cli.command {
+            Command::Start { .. } => {
+                let router = Self::router(&ctx)?;
+                server::serve(router, &ctx.config.server).await?;
+                Ok(())
+            }
+            Command::Db { command } => Self::db(&ctx, command).await,
+            Command::Task { name, params } => {
+                let mut tasks = Tasks::default();
+                Self::register_tasks(&mut tasks);
+                let Some(name) = name else {
+                    for task in tasks.list() {
+                        println!("{}\t{}", task.name, task.detail);
+                    }
+                    return Ok(());
+                };
+                tasks.run(&name, &ctx, &parse_vars(&params)?).await
+            }
+        }
+    }
+}
+
+impl TestApp for App {
+    async fn boot_test() -> Result<BootResult> {
+        let environment = Environment::Test;
+        let config = ServiceConfig::from_env(&environment, &defaults())?;
+        let ctx = Self::context(environment, config).await?;
+        // Every boot starts from an empty, freshly migrated schema, so no
+        // table can carry rows from an earlier test.
+        Migrator::fresh(&ctx.db).await.map_err(Error::from)?;
+        let router = Self::router(&ctx)?;
+        Ok(BootResult {
+            app_context: ctx,
+            router: Some(router),
+        })
     }
 }

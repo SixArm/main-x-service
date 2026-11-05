@@ -9,7 +9,7 @@
 //! internally, but it must not let a reader of the HTTP response infer
 //! account existence (anti-enumeration is preserved at the wire).
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{ColumnTrait, Condition, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
