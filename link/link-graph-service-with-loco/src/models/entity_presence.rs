@@ -1,6 +1,6 @@
 //! `entity_presence` model — the existence oracle (spec §10.2 / §6 FR-8).
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, ConnectionTrait};
 

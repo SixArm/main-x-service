@@ -20,17 +20,16 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use loco_rs::cli;
-use migration::Migrator;
+use axa::cli::Cli;
+use clap::Parser;
 use person_service::app::App;
 
-/// Binary entry point: hand control to the loco CLI.
+/// Parse the command line and run it.
 ///
-/// `cli::main::<App, Migrator>()` parses the loco subcommands
-/// (`start`, `db migrate`, `task`, …) and dispatches against this
-/// crate's [`App`] hooks and the migration crate's `Migrator`. Returns
-/// loco's `Result` so a boot/CLI failure propagates as a non-zero exit.
+/// # Errors
+///
+/// Returns the failure from [`App::run`].
 #[tokio::main]
-async fn main() -> loco_rs::Result<()> {
-    cli::main::<App, Migrator>().await
+async fn main() -> axa::Result<()> {
+    App::run(Cli::parse()).await
 }

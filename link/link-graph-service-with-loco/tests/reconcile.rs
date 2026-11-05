@@ -7,12 +7,12 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test reconcile -- --ignored`.
 
+use axa::prelude::{ModelError, ModelResult};
+use axa::testing::prelude::*;
 use entity_ref::{EdgeKind, EntityRef, EntityType};
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, LinkedEvent, apply_event};
 use link_graph_service::reconcile::{self, AuthoritativeSource};
-use loco_rs::prelude::{ModelError, ModelResult};
-use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
 use uuid::Uuid;

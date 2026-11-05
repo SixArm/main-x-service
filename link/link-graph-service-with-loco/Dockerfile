@@ -81,9 +81,6 @@ COPY --from=builder --chown=linkgraph:linkgraph \
     /app/link/link-graph-service-with-loco/target/release/link-graph-service \
     /app/link-graph-service
 
-# loco reads config/<environment>.yaml at runtime (not baked into the
-# binary); LOCO_ENV below selects `production.yaml`.
-COPY --chown=linkgraph:linkgraph link/link-graph-service-with-loco/config ./config
 
 USER linkgraph
 
@@ -100,10 +97,10 @@ EXPOSE 5160
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:5160/_health || exit 1
 
-# Runtime defaults; override at `podman run -e …`. LOCO_ENV selects
+# Runtime defaults; override at `podman run -e …`. APP_ENV selects
 # config/production.yaml — a container with no override boots safely
 # in production mode rather than defaulting to loco's own "development".
-ENV LOCO_ENV=production \
+ENV APP_ENV=production \
     PORT=5160
 
 # loco's CLI entry point: `<bin> start` runs the server (see

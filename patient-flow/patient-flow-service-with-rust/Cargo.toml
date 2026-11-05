@@ -16,16 +16,9 @@ keywords = ["hospital", "patient-flow", "bed-management", "whiteboard", "nhs"]
 categories = ["development-tools", "rust-patterns"]
 include = ["src/**/*", "README.md"]
 
-[workspace.dependencies]
-# `auth` is deliberately absent from this feature list. It is loco's JWT
-# support (`dep:jsonwebtoken`, and therefore `rsa` / RUSTSEC-2023-0071),
-# and this family issues PASETO v4.public rather than JWT — see
-# agents/share/jwt.md. Dropping it removes the vulnerable crate from the
-# dependency graph rather than suppressing the advisory.
-loco-rs = { version = "1.2.0", default-features = false, features = ["cli", "with-db", "cache_inmem", "worker"] }
-
 [dependencies]
-loco-rs = { workspace = true }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm"] }
+clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -78,7 +71,7 @@ required-features = []
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
-loco-rs = { workspace = true, features = ["testing"] }
+axa = { git = "https://github.com/publicprojects-io/axa", rev = "5a82afa968c1c5ef6b20193074f22858269b9894", features = ["sea-orm", "testing"] }
 # Name the `TestServer` type in shared request-test helpers (same
 # version loco's testing feature uses internally).
 axum-test = { version = "21.1.0" }

@@ -34,11 +34,11 @@
 
 use std::time::Duration;
 
+use axa::testing::prelude::*;
 use fluvio::{Fluvio, FluvioConfig};
 use link_graph_service::app::App;
 use link_graph_service::consumer;
 use link_graph_service::models::edges;
-use loco_rs::testing::prelude::*;
 use sea_orm::EntityTrait;
 use serde_json::json;
 use serial_test::serial;

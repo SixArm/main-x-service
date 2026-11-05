@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Loco replaced by axa
+
+- **Loco removed.** The service is now plain Axum plus shared helpers from
+  [`axa`](https://github.com/publicprojects-io/axa). `App` holds ordinary
+  functions, and `config/*.yaml` is gone: settings come from the environment
+  (`APP_ENV`, `PORT`, `DATABASE_URL`, and the others listed in `axa::config`).
+- **CORS is off in production** unless `CORS_ALLOWED_ORIGINS` lists origins.
+- Production gains a 60-second request timeout and HSTS, and every response
+  gains `x-content-type-options`, `x-frame-options`, and `referrer-policy`.
+  `x-powered-by` and the automatic `ETag` handling are gone.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

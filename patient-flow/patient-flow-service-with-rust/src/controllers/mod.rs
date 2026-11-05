@@ -1,9 +1,9 @@
 //! Axum controllers (loco `Routes`), one module per surface, plus the
 //! shared error helpers.
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::http::StatusCode;
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 
 pub mod audits;
 pub mod bed_requests;

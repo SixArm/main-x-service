@@ -15,13 +15,13 @@
 //! `cargo test --test concealment -- --ignored`.
 #![cfg(feature = "paseto")]
 
+use axa::testing::prelude::*;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ed25519_dalek::SigningKey;
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event};
 use link_graph_service::models::_entities::audit_log;
-use loco_rs::testing::prelude::*;
 use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};

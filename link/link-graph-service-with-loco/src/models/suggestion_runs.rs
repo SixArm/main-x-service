@@ -17,7 +17,7 @@
 //! case — there are no counts worth keeping from a run that never
 //! fetched anything.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{ActiveValue, ConnectionTrait};
 use uuid::Uuid;
 

@@ -2,7 +2,7 @@
 //! `bed-management.md`; PF-D7: the allocator advises, the operator
 //! decides).
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

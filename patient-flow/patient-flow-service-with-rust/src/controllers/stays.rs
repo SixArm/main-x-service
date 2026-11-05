@@ -7,7 +7,7 @@
 //! audited and honours the ABAC `mask` obligation.
 
 use authentication_verifier::Action;
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

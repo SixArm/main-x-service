@@ -4,7 +4,7 @@
 //! Both paths are public (see `auth::is_public_path`), so the blanket read
 //! guard never gates the docs.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 
 /// `GET /api-docs/openapi.json` — the hand-written `OpenAPI` document.
 #[debug_handler]

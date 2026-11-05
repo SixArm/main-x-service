@@ -8,7 +8,7 @@
 //! All the per-row logic lives in the pipeline so it can be tested
 //! directly (DB-gated) without the live `bg_pg` drain.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -42,7 +42,7 @@ impl BackgroundWorker<BulkJobArgs> for BulkJobWorker {
     async fn perform(&self, args: BulkJobArgs) -> Result<()> {
         run_bulk_job(&self.ctx, args.job_id)
             .await
-            .map_err(|e| loco_rs::Error::string(&e.to_string()))
+            .map_err(|e| axa::Error::string(&e.to_string()))
     }
 }
 

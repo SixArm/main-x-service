@@ -7,7 +7,7 @@
 //! `IntoResponse` catch-all turns an unmapped model error into a 500,
 //! so mapping here keeps every `GET /…/{pid}` contract an honest 404.
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 

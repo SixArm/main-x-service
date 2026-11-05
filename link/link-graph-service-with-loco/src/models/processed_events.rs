@@ -5,8 +5,8 @@
 //! read-model and calls [`Model::mark_processed`] after a successful
 //! apply.
 
+use axa::prelude::*;
 use chrono::Utc;
-use loco_rs::prelude::*;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, ConnectionTrait, EntityTrait};
 use uuid::Uuid;

@@ -8,11 +8,11 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test suggestion_runs -- --ignored`.
 
+use axa::testing::prelude::*;
 use chrono::Utc;
 use link_graph_service::app::App;
 use link_graph_service::models::_entities::suggestion_runs;
 use link_graph_service::models::suggestion_runs::{Model, SuggestionRunRecord};
-use loco_rs::testing::prelude::*;
 use sea_orm::EntityTrait;
 use serial_test::serial;
 

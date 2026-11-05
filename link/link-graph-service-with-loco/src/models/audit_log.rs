@@ -3,8 +3,8 @@
 //! service audits access to the underlying record; the aggregator audits
 //! access to the link, so the two trails are consistent.
 
+use axa::prelude::*;
 use chrono::Utc;
-use loco_rs::prelude::*;
 use sea_orm::{ActiveValue, ConnectionTrait};
 use uuid::Uuid;
 

@@ -8,11 +8,11 @@
 //! consumer lag) are refreshed here at scrape time; the processed-events
 //! counter is incremented in `apply_event`.
 
+use axa::prelude::*;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use chrono::Utc;
-use loco_rs::prelude::*;
 
 use crate::events::entity_from_topic;
 use crate::metrics::{self, Metrics};

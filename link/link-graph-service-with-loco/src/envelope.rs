@@ -4,8 +4,8 @@
 //! and failure. Graph responses additionally carry an `as_of` watermark,
 //! which lives inside the per-endpoint `data` payload (spec §6 FR-17).
 
+use axa::prelude::*;
 use axum::response::IntoResponse;
-use loco_rs::prelude::*;
 use serde::Serialize;
 
 /// The standard response wrapper. `data` is present on success; `error`

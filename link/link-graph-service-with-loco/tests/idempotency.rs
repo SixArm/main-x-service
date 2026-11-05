@@ -12,10 +12,10 @@
 //!   cargo test --test idempotency -- --ignored
 //! ```
 
+use axa::testing::prelude::*;
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event_idempotent};
 use link_graph_service::models::{edges, entity_presence, processed_events};
-use loco_rs::testing::prelude::*;
 use sea_orm::EntityTrait;
 use serde_json::json;
 use serial_test::serial;

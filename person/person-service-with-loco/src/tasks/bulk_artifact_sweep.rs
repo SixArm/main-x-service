@@ -37,7 +37,7 @@
 //! (daily is more than sufficient against the 7-day
 //! [`crate::bulk::BULK_ARTIFACT_TTL_SECS`] window).
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 
 use crate::bulk::sweep::{self, SweepOutcome};
 

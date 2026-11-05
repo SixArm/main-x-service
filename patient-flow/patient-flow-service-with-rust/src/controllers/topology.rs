@@ -5,7 +5,7 @@
 //! entry, and (under the `outbox` transport) its event share a commit
 //! boundary (PF-D9).
 
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

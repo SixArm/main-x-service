@@ -1,8 +1,8 @@
 //! `consumer_offsets` model — per-topic bus position + freshness
 //! watermark (spec §10.3 / §6 FR-16/17).
 
+use axa::prelude::*;
 use chrono::{DateTime, FixedOffset};
-use loco_rs::prelude::*;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, ConnectionTrait};
 

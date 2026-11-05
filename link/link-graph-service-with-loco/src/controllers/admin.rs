@@ -13,9 +13,9 @@
 //! own read-model against a source it is already configured to trust is
 //! the same category of action the periodic worker already performs.
 
+use axa::error::ErrorDetail;
+use axa::prelude::*;
 use axum::http::StatusCode;
-use loco_rs::controller::ErrorDetail;
-use loco_rs::prelude::*;
 
 use crate::auth;
 use crate::reconcile::{self, HttpAuthoritativeSource};

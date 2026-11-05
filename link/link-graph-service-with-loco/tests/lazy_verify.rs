@@ -8,11 +8,11 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test lazy_verify -- --ignored`.
 
+use axa::testing::prelude::*;
 use entity_ref::{EntityRef, EntityType};
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event};
 use link_graph_service::probe::{self, PresenceProbe, ProbeOutcome};
-use loco_rs::testing::prelude::*;
 use serde_json::{Value, json};
 use serial_test::serial;
 use uuid::Uuid;

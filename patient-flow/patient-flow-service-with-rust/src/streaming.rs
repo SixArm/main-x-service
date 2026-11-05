@@ -179,14 +179,14 @@ pub async fn emit_on<C: ConnectionTrait>(
     name: &str,
     actor: Option<&str>,
     data: Option<serde_json::Value>,
-) -> loco_rs::Result<()> {
+) -> axa::Result<()> {
     let env = envelope(entity, kind, pid, name, actor, data);
     if transport().is_outbox() {
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
-            .map_err(loco_rs::Error::Model)?
+            .map_err(axa::Error::Model)?
             .insert_on(conn)
             .await
-            .map_err(loco_rs::Error::Model)?;
+            .map_err(axa::Error::Model)?;
     } else {
         let mut events = publisher()
             .events

@@ -394,8 +394,8 @@ pub async fn fhir_metadata() -> Response {
 /// layered in `after_routes`. Handlers extract `AppState` from the
 /// `AppContext` shared store via `FromRef` (like the native controllers).
 #[must_use]
-pub fn routes() -> loco_rs::controller::Routes {
-    use loco_rs::prelude::{Routes, get};
+pub fn routes() -> axa::routes::Routes {
+    use axa::prelude::{Routes, get};
     Routes::new()
         .prefix("/fhir")
         .add("/metadata", get(fhir_metadata))

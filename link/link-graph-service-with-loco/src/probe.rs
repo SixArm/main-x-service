@@ -18,7 +18,7 @@
 //! probed. All of it is gated by `LINK_GRAPH_LAZY_VERIFY` (off by default).
 
 use async_trait::async_trait;
-use loco_rs::prelude::*;
+use axa::prelude::*;
 use sea_orm::ConnectionTrait;
 
 use entity_ref::{EntityRef, EntityType};

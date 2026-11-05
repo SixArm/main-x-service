@@ -4,7 +4,7 @@
 //! **double-placement race** (two concurrent admits to one bed ⇒
 //! exactly one succeeds; PF-D9's `FOR UPDATE` pin).
 
-use loco_rs::testing::prelude::*;
+use axa::testing::prelude::*;
 use patient_flow_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;
