@@ -96,6 +96,7 @@ fn defaults() -> Defaults {
         production_port: None,
         body_limit: 2 * MB,
         max_connections: 1,
+        ..Defaults::default()
     }
 }
 
@@ -143,6 +144,10 @@ impl App {
             .environment
             .as_deref()
             .map_or_else(Environment::from_env, Environment::parse);
+        // `check` reads settings only, so it runs before anything connects.
+        if matches!(cli.command, Command::Check) {
+            return axa::cli::check(&environment, &defaults());
+        }
         // SEC-A1: stop here rather than on the first token.
         #[cfg(feature = "paseto")]
         crate::auth::ensure_signing_seed(environment.is_production_like())
@@ -162,6 +167,7 @@ impl App {
             Migrator::up(&ctx.db, None).await?;
         }
         match cli.command {
+            Command::Check => Ok(()),
             Command::Start { .. } => {
                 let router = Self::router(&ctx)?;
                 server::serve(router, &ctx.config.server).await?;

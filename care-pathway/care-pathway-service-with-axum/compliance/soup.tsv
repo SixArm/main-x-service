@@ -15,7 +15,6 @@
 # Blank lines and lines starting with '#' are ignored.
 #
 axa	Shared Axum service library: routes, middleware, configuration, CLI, background jobs, model error types.	SECURITY-RELEVANT. Sets the HTTP middleware stack, including body limits, security headers, CORS, and generic 500 responses that keep internal errors from reaching clients.
-clap	Command-line parsing for the service binary.	Not security-relevant. Parses operator-supplied arguments only, never network input.
 serde	Serialization framework for every wire type and the stored JSONB payload.	Safety-relevant. A mis-serialized payload could corrupt a stored pathway or an audit snapshot. De facto Rust standard; extremely widely exercised.
 serde_json	JSON encoding/decoding, and the canonical form the audit hash chain digests.	Safety-relevant. Key ordering (BTreeMap, preserve_order disabled) is load-bearing for chain verification across a JSONB round-trip.
 tokio	Async runtime.	Safety-relevant. Runtime failure means service unavailability, not data corruption. Industry standard.

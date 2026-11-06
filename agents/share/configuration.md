@@ -53,6 +53,7 @@ table).
 | Variable | Default | Effect |
 |---|---|---|
 | `DATABASE_URL` | **none in production** (boot fails if unset); dev/test default to `postgres://localhost/<entity>_service_{development,test}` | `database.uri` (and `queue.uri`, where the crate uses the Postgres-backed job queue) |
+| `DB_ALLOW_INSECURE` | `false` | Lets production reach a database without demanding TLS, for a network that protects its own traffic. Otherwise `DATABASE_URL` must set `sslmode` |
 | `PORT` | `8080` (person, worker, place, thing, event) · `8084` (course) · `5150` (organization, care-pathway, case, portfolio, authentication) · `5160` (link-graph) | `server.port` |
 | `HOST` | `http://localhost` | `server.host` |
 | `JWT_SECRET` | **none** in production for every crate except course (`default="unused-course-service-does-not-issue-tokens"`); link-graph has no `auth:` block at all, so it is not read there | `auth.jwt.secret` — an axa config-schema requirement, **not** how any of these crates actually authenticate (that's PASETO, §4; see [`jwt.md`](jwt.md)) |

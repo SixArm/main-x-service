@@ -223,7 +223,7 @@ the outbox must behave identically, and their tests are not edited to pass.
 |---|---|
 | Rust edition (target) | 2024 |
 | MSRV | **Rust 1.96** — current stable minus two, declared per crate and enforced in CI ([`../rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md)) |
-| axa | pinned git revision |
+| axa | 0.5, from crates.io |
 | Axum | 0.8 |
 | SeaORM | 2.0 |
 | PostgreSQL | 18+ |

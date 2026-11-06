@@ -13,8 +13,7 @@ license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "queue"] }
-clap = { version = "4", features = ["derive"] }
+axa = { version = "0.5", features = ["sea-orm", "queue"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -164,7 +163,7 @@ authentication-verifier = { path = "../../authentication/authentication-verifier
 criterion = { version = "0.8", features = ["html_reports"] }
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).
 tempfile = "3"
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "queue", "testing"] }
+axa = { version = "0.5", features = ["sea-orm", "queue", "testing"] }
 # `mock`: a `DatabaseConnection` that errors on any query, standing in
 # for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
 # prove a code path never touches the database (src/compliance/disclosure.rs).

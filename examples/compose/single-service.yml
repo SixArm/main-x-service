@@ -65,6 +65,8 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       DATABASE_URL: postgresql://loco:loco@postgres:5432/case # <- swap
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
       JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
     depends_on:
       postgres:
@@ -88,6 +90,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://loco:loco@postgres:5432/case # <- swap
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
       # Required by loco's config schema (auth.jwt.secret has no
       # default); unused by this crate's actual auth flow, which is
       # offline PASETO verification (see agents/share/jwt.md).

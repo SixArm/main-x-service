@@ -413,7 +413,6 @@ dependencies = [
  "axum-test 17.3.0",
  "base64 0.23.1",
  "chrono",
- "clap",
  "ed25519-dalek 3.0.0",
  "insta",
  "integrity-mac",
@@ -439,7 +438,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
- "validator",
+ "validator 0.20.0",
 ]
 
 [[package]]
@@ -490,29 +489,40 @@ dependencies = [
 
 [[package]]
 name = "axa"
-version = "0.1.0"
-source = "git+https://github.com/publicprojects-io/axa?rev=b1824627a745e68f5d15fd4421911f8f631bdff1#b1824627a745e68f5d15fd4421911f8f631bdff1"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "701b64579d3cfa2affd9e2a6d45bacf8d66d8cb2f32dc30b682604cadb7f9d15"
 dependencies = [
  "async-trait",
+ "axa-environment",
  "axa-seaorm",
  "axum",
  "axum-test 21.1.0",
  "clap",
+ "hyper",
+ "hyper-util",
  "sea-orm",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
- "tower-http",
+ "tower-http 0.7.1",
  "tracing",
  "tracing-subscriber",
  "uuid",
 ]
 
 [[package]]
+name = "axa-environment"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aeb36293430bafb06d1e29f5e213623d127444cdd234003b413a46207c03bbd3"
+
+[[package]]
 name = "axa-seaorm"
-version = "0.1.0"
-source = "git+https://github.com/publicprojects-io/axa?rev=b1824627a745e68f5d15fd4421911f8f631bdff1#b1824627a745e68f5d15fd4421911f8f631bdff1"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c76135da6ce92267ca75dd3fb77e95435c470b919ffd21853326bc051e30dd6c"
 dependencies = [
  "cruet",
  "heck 0.5.0",
@@ -521,7 +531,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
- "validator",
+ "validator 0.21.0",
 ]
 
 [[package]]
@@ -1086,11 +1096,10 @@ checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
 name = "cruet"
-version = "0.15.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7a9ae414b9768aada1b316493261653e41af05c9d2ccc9c504a8fc051c6a790"
+checksum = "28049cb85be0d073a0e90983c15b50d730f59292985cd17bfab0ce090f158c31"
 dependencies = [
- "once_cell",
  "regex",
 ]
 
@@ -3664,7 +3673,7 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tower",
- "tower-http",
+ "tower-http 0.6.11",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -3701,7 +3710,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower",
- "tower-http",
+ "tower-http 0.6.11",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -5094,6 +5103,24 @@ version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
 dependencies = [
+ "bitflags 2.13.2",
+ "bytes",
+ "futures-util",
+ "http",
+ "http-body",
+ "pin-project-lite",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "url",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08a05a66a4fdd61cbbe0a1d755ffe0ca6aba159dd4820936a0ff8a8278245b9c"
+dependencies = [
  "async-compression",
  "bitflags 2.13.2",
  "bytes",
@@ -5102,14 +5129,13 @@ dependencies = [
  "http",
  "http-body",
  "http-body-util",
+ "percent-encoding",
  "pin-project-lite",
  "tokio",
  "tokio-util",
- "tower",
  "tower-layer",
  "tower-service",
  "tracing",
- "url",
 ]
 
 [[package]]
@@ -5346,6 +5372,20 @@ dependencies = [
  "serde_json",
  "url",
  "validator_derive",
+]
+
+[[package]]
+name = "validator"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d68c6633c483df6780cc5277a417c7c2d1bceee2649d06c8ab6b0fd2dd3c81"
+dependencies = [
+ "idna",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "url",
 ]
 
 [[package]]

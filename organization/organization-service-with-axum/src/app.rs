@@ -252,6 +252,7 @@ fn defaults() -> Defaults {
         production_port: None,
         body_limit: 2 * MB,
         max_connections: 1,
+        ..Defaults::default()
     }
 }
 
@@ -306,6 +307,10 @@ impl App {
             .environment
             .as_deref()
             .map_or_else(Environment::from_env, Environment::parse);
+        // `check` reads settings only, so it runs before anything connects.
+        if matches!(cli.command, Command::Check) {
+            return axa::cli::check(&environment, &defaults());
+        }
         let mut config = service_config(&environment)?;
         if let Command::Start { binding, port, .. } = &cli.command {
             if let Some(binding) = binding {
@@ -323,6 +328,7 @@ impl App {
             Migrator::up(&ctx.db, None).await?;
         }
         match cli.command {
+            Command::Check => Ok(()),
             Command::Start { worker, all, .. } => {
                 warn_if_unserved(&ctx, worker || all);
                 let (stop, stopped) = tokio::sync::watch::channel(false);

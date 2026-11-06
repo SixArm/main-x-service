@@ -94,9 +94,14 @@ pub async fn run(cli: Cli) -> Result<()> {
         .environment
         .as_deref()
         .map_or_else(Environment::from_env, Environment::parse);
+    // `check` reads settings only, so it runs before anything connects.
+    if matches!(cli.command, Command::Check) {
+        return axa::cli::check(&environment, &defaults());
+    }
     let mut config = Config::from_env(&environment, &defaults())?;
     axa::logger::init(env!("CARGO_CRATE_NAME"), &config.logger);
     match cli.command {
+        Command::Check => Ok(()),
         Command::Start { binding, port, .. } => {
             if let Some(binding) = binding {
                 config.server.binding = binding;

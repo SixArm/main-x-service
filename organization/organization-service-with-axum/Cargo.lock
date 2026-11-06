@@ -557,30 +557,41 @@ dependencies = [
 
 [[package]]
 name = "axa"
-version = "0.1.0"
-source = "git+https://github.com/publicprojects-io/axa?rev=b1824627a745e68f5d15fd4421911f8f631bdff1#b1824627a745e68f5d15fd4421911f8f631bdff1"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "701b64579d3cfa2affd9e2a6d45bacf8d66d8cb2f32dc30b682604cadb7f9d15"
 dependencies = [
  "async-trait",
+ "axa-environment",
  "axa-seaorm",
  "axum",
  "axum-test",
  "clap",
+ "hyper",
+ "hyper-util",
  "sea-orm",
  "serde",
  "serde_json",
  "sqlx",
  "thiserror 2.0.21",
  "tokio",
- "tower-http",
+ "tower-http 0.7.1",
  "tracing",
  "tracing-subscriber",
  "uuid",
 ]
 
 [[package]]
+name = "axa-environment"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aeb36293430bafb06d1e29f5e213623d127444cdd234003b413a46207c03bbd3"
+
+[[package]]
 name = "axa-seaorm"
-version = "0.1.0"
-source = "git+https://github.com/publicprojects-io/axa?rev=b1824627a745e68f5d15fd4421911f8f631bdff1#b1824627a745e68f5d15fd4421911f8f631bdff1"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c76135da6ce92267ca75dd3fb77e95435c470b919ffd21853326bc051e30dd6c"
 dependencies = [
  "cruet",
  "heck 0.5.0",
@@ -589,7 +600,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
- "validator 0.20.0",
+ "validator",
 ]
 
 [[package]]
@@ -1319,11 +1330,10 @@ checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
 name = "cruet"
-version = "0.15.0"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7a9ae414b9768aada1b316493261653e41af05c9d2ccc9c504a8fc051c6a790"
+checksum = "28049cb85be0d073a0e90983c15b50d730f59292985cd17bfab0ce090f158c31"
 dependencies = [
- "once_cell",
  "regex",
 ]
 
@@ -3866,7 +3876,6 @@ dependencies = [
  "axum-test",
  "base64 0.23.1",
  "chrono",
- "clap",
  "criterion",
  "csv",
  "ed25519-dalek 3.0.0",
@@ -3902,7 +3911,7 @@ dependencies = [
  "tracing-opentelemetry",
  "tracing-subscriber",
  "uuid",
- "validator 0.21.0",
+ "validator",
 ]
 
 [[package]]
@@ -4329,7 +4338,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -4669,7 +4678,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower",
- "tower-http",
+ "tower-http 0.6.11",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -4707,7 +4716,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower",
- "tower-http",
+ "tower-http 0.6.11",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -5566,7 +5575,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -6416,6 +6425,24 @@ version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
 dependencies = [
+ "bitflags 2.13.2",
+ "bytes",
+ "futures-util",
+ "http",
+ "http-body",
+ "pin-project-lite",
+ "tower",
+ "tower-layer",
+ "tower-service",
+ "url",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08a05a66a4fdd61cbbe0a1d755ffe0ca6aba159dd4820936a0ff8a8278245b9c"
+dependencies = [
  "async-compression",
  "bitflags 2.13.2",
  "bytes",
@@ -6424,14 +6451,13 @@ dependencies = [
  "http",
  "http-body",
  "http-body-util",
+ "percent-encoding",
  "pin-project-lite",
  "tokio",
  "tokio-util",
- "tower",
  "tower-layer",
  "tower-service",
  "tracing",
- "url",
 ]
 
 [[package]]
@@ -6721,21 +6747,6 @@ dependencies = [
  "js-sys",
  "serde_core",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "validator"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43fb22e1a008ece370ce08a3e9e4447a910e92621bb49b85d6e48a45397e7cfa"
-dependencies = [
- "idna",
- "once_cell",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "url",
 ]
 
 [[package]]

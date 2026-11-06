@@ -40,6 +40,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-course_user}:${POSTGRES_PASSWORD:-course_password}@postgres:5432/${POSTGRES_DB:-course}
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
       DATABASE_MAX_CONNECTIONS: 10
       DATABASE_MIN_CONNECTIONS: 2
       SERVER_HOST: 0.0.0.0

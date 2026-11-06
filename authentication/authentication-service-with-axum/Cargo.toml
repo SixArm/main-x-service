@@ -28,8 +28,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # an advance against one design family does not transfer.
 sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm"] }
-clap = { version = "4", features = ["derive"] }
+axa = { version = "0.5", features = ["sea-orm"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -122,7 +121,7 @@ required-features = []
 # this service signs PASETO v4.public, the verifier crate verifies, the
 # claims round-trip.
 authentication-verifier = { path = "../authentication-verifier-rust-crate", default-features = false, features = ["paseto"] }
-axa = { git = "https://github.com/publicprojects-io/axa", rev = "b1824627a745e68f5d15fd4421911f8f631bdff1", features = ["sea-orm", "testing"] }
+axa = { version = "0.5", features = ["sea-orm", "testing"] }
 serial_test = { version = "4.0.1" }
 rstest = { version = "0.28" }
 insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }

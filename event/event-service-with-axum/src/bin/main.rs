@@ -11,8 +11,7 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-use axa::cli::Cli;
-use clap::Parser;
+use axa::cli;
 use event_service::app::App;
 
 /// Parse the command line and run it.
@@ -22,5 +21,10 @@ use event_service::app::App;
 /// Returns the failure from [`App::run`].
 #[tokio::main]
 async fn main() -> axa::Result<()> {
-    App::run(Cli::parse()).await
+    App::run(cli::parse(
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_DESCRIPTION"),
+    ))
+    .await
 }

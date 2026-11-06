@@ -45,6 +45,8 @@ services:
     environment:
       # Database configuration
       DATABASE_URL: postgresql://${POSTGRES_USER:-person_user}:${POSTGRES_PASSWORD:-person_password}@postgres:5432/${POSTGRES_DB:-person_service}
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
       DATABASE_MIN_CONNECTIONS: ${DATABASE_MIN_CONNECTIONS:-2}
 

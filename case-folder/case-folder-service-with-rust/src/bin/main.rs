@@ -8,9 +8,8 @@
 #![deny(missing_docs)]
 #![warn(clippy::pedantic)]
 
-use axa::cli::Cli;
+use axa::cli;
 use case_folder_service_with_rust::app;
-use clap::Parser;
 
 /// Parse the command line and run it.
 ///
@@ -19,5 +18,10 @@ use clap::Parser;
 /// Returns the failure from [`app::run`].
 #[tokio::main]
 async fn main() -> axa::Result<()> {
-    app::run(Cli::parse()).await
+    app::run(cli::parse(
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        env!("CARGO_PKG_DESCRIPTION"),
+    ))
+    .await
 }

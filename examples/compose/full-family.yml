@@ -82,6 +82,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/person
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +104,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/person
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8081:8080"]
     depends_on:
       person-migrate:
@@ -123,6 +127,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/worker
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,6 +143,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/worker
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8082:8080"]
     depends_on:
       worker-migrate:
@@ -158,6 +166,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/place
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -172,6 +182,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/place
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8083:8080"]
     depends_on:
       place-migrate:
@@ -193,6 +205,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/thing
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -207,6 +221,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/thing
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8084:8080"]
     depends_on:
       thing-migrate:
@@ -228,6 +244,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/event
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -242,6 +260,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/event
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8085:8080"]
     depends_on:
       event-migrate:
@@ -263,6 +283,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/course
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -277,6 +299,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/course
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8086:8080"]
     depends_on:
       course-migrate:
@@ -298,6 +322,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/organization
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -312,6 +338,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/organization
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8087:5150"]
     depends_on:
       organization-migrate:
@@ -333,6 +361,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/care_pathway
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -347,6 +377,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/care_pathway
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8088:5150"]
     depends_on:
       care-pathway-migrate:
@@ -368,6 +400,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/case
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -382,6 +416,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/case
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
     ports: ["8089:5150"]
     depends_on:
       case-migrate:
@@ -403,6 +439,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
       # SEC-A1 fail-closed: APP_ENV=production (baked into the image)
       # refuses the crate's dev-seed fallback, so a real seed is
       # required even for this one-shot migrate step. Dev-only
@@ -425,6 +463,8 @@ services:
     environment:
       <<: *common-env
       DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
       TOKEN_PRIVATE_KEY_SEED: ${TOKEN_PRIVATE_KEY_SEED:-dv-Nv3h-Q3THpU3sgs5VvzwuWe4MbHy7uEjNjNLGEws}
     ports: ["8091:5150"]
     depends_on:
@@ -452,6 +492,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://loco:loco@postgres:5432/link_graph
+      # Plain traffic stays on this host's private network.
+      DB_ALLOW_INSECURE: "true"
       RUST_LOG: ${RUST_LOG:-info}
     ports: ["8092:5160"]
     depends_on:

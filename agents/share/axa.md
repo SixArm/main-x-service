@@ -12,7 +12,7 @@ axa is a library, not a framework. Each service's `src/app.rs` holds ordinary
 functions, and its `main.rs` calls them. axa's own specification is
 [`spec/index.md`](https://github.com/publicprojects-io/axa/blob/main/spec/index.md).
 
-Services take it as a pinned git dependency.
+Services take it from crates.io, as `axa = "0.5"`.
 
 ## Stack
 
@@ -44,6 +44,20 @@ when nothing here serves the queue.
 A job gets one attempt by default, because a retry repeats its work. Raise
 `max_attempts` only for jobs written to be repeated. Finished rows are deleted
 after seven days.
+
+## Production database
+
+In production `DATABASE_URL` must set `sslmode` to `require`, `verify-ca`, or
+`verify-full`, or the service refuses to start. `require` encrypts without checking
+who answers, so use `verify-full` across a network. A loopback address or socket is
+exempt. `DB_ALLOW_INSECURE=true` is the way out for a network that protects its own
+traffic, such as one host's private bridge in `examples/compose`.
+
+## Destructive commands
+
+`db down`, `db reset`, and `db truncate` run only in development or test, with
+`AXA_DESTROY_DATA=true`. `axa::cli::parse` refuses them before the service does
+anything, and `--environment` cannot lift that.
 
 ## Limits
 
