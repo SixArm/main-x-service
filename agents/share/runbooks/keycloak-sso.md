@@ -182,14 +182,16 @@ audit are identical.
 | `<ENTITY>_KEYCLOAK_REQUIRE_VERIFIED_EMAIL` | default on; `false`/`off` disables |
 
 What the verifier enforces, fail-closed: HTTPS-only URL; the token's `iss`
-must equal `{url}/realms/{realm}` (the engine checks signature and audience
-but not issuer); at least one audience; `email_verified` when an `email` is
-present; and **an unmapped Keycloak role grants nothing**, so an
+must equal `{url}/realms/{realm}`; every token must name a configured audience,
+so a token with no `aud` is refused; only an access token passes, never an ID
+or refresh token; `nbf` and `iat` must not be in the future; `email_verified`
+when an `email` is present; and **an unmapped Keycloak role grants nothing**, so an
 unconfigured realm yields read-only callers under the default policy. A
 half-configured Keycloak logs an error and leaves Keycloak off (its tokens
-are refused); the service still boots. Add a client audience mapper in
-Keycloak so access tokens carry your `aud` (Client scopes → Add mapper →
-*Audience*), and mapper(s) for roles as in step 4, since the same
+are refused); the service still boots. **The audience mapper is required:**
+Keycloak puts a client in `aud` only through one, and without it every token
+is refused. Add it in Keycloak (Client scopes → Add mapper → *Audience*), and
+mapper(s) for roles as in step 4, since the same
 `realm_access` / `resource_access` claims are read here.
 
 **PASETO off.** `--no-default-features --features keycloak` builds a service

@@ -1,6 +1,6 @@
 [package]
 name = "authentication-verifier"
-version = "0.9.1"
+version = "0.9.2"
 edition = "2024"
 rust-version = "1.97"
 authors = ["Joel Parker Henderson <joel@joelparkerhenderson.com>"]
@@ -41,7 +41,7 @@ reqwest = { version = "0.13", default-features = false, features = [
 
 # Keycloak/OIDC access-token verification (feature `keycloak`). rustls, like
 # the rest of the family: no native-tls / OpenSSL.
-axum-keycloak-auth = { version = "0.8.3", default-features = false, features = ["rustls-tls"], optional = true }
+axum-keycloak-auth = { version = "0.8.4", default-features = false, features = ["rustls-tls"], optional = true }
 
 jsonwebtoken = { version = "9.3", optional = true }
 tokio = { version = "1", features = ["net", "io-util", "rt"], optional = true }

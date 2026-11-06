@@ -281,8 +281,11 @@ fixed here.
   token is mapped onto the same `Claims`, so authorization is
   identical. Keycloak verification is fail-closed: HTTPS-only URL
   (loopback excepted), issuer must equal `{url}/realms/{realm}`, at
-  least one audience, verified email when an email is present, and
-  roles become attributes only via an explicit `role_map`.
+  least one audience configured and named by every token, only an
+  access token (never an ID or refresh token), `nbf` and `iat` not in
+  the future, verified email when an email is present, and roles
+  become attributes only via an explicit `role_map`. The engine's
+  strict policy enforces the token checks; its default does not.
 
 ## 8. Architecture
 

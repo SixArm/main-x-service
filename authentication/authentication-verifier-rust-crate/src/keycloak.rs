@@ -15,10 +15,13 @@
 //!
 //! - **HTTPS only** for the Keycloak URL (loopback excepted), like
 //!   `Verifier::from_paseto_keys_url`.
-//! - **Issuer check.** The engine checks signature and audience but not
-//!   `iss`; the token's issuer must equal `{url}/realms/{realm}`.
-//! - **At least one audience** is mandatory: an empty list would accept a
-//!   token minted for any client of the realm.
+//! - **The strict policy.** The engine's default passes a token with no
+//!   audience, an ID or refresh token, and one dated in the future. Its strict
+//!   policy, named here, refuses all of these.
+//! - **Issuer check.** The token's issuer must equal `{url}/realms/{realm}`.
+//!   The strict policy checks this, and this module checks it again.
+//! - **At least one audience** is mandatory, and every token must name one:
+//!   anything less accepts a token minted for any client of the realm.
 //! - **Verified email.** When the token carries an `email`, it must have
 //!   `email_verified: true` (unless disabled): `$email` templates in ABAC
 //!   policies would otherwise be spoofable.
@@ -41,6 +44,7 @@ use axum_keycloak_auth::{
     instance::{KeycloakAuthInstance, KeycloakConfig},
     layer::KeycloakAuthLayer,
     role::KeycloakRole,
+    validation::ValidationPolicy,
 };
 use serde::Deserialize;
 
@@ -277,9 +281,17 @@ impl KeycloakVerifier {
                 .realm(settings.realm.clone())
                 .build(),
         );
+        // The library's default policy is its legacy one, which passes a token with no
+        // audience, an ID or refresh token, and one dated in the future.
+        let policy = ValidationPolicy::strict()
+            .expected_issuers([settings.expected_issuer()])
+            .expected_audiences(settings.audiences.clone())
+            .build()
+            .map_err(|e| VerifyError::Keycloak(e.to_string()))?;
         let layer = KeycloakAuthLayer::<String, KeycloakExtra>::builder()
             .instance(instance)
             .expected_audiences(settings.audiences.clone())
+            .validation_policy(policy)
             .build();
         Ok(Self {
             layer,
@@ -288,8 +300,12 @@ impl KeycloakVerifier {
         })
     }
 
-    /// Verify a Keycloak access token (signature, audience, expiry via the
-    /// engine; issuer and verified email here) and map it onto [`Claims`].
+    /// Verify a Keycloak access token and map it onto [`Claims`]. The engine
+    /// checks the signature, issuer, audience, token type, and times, and this
+    /// checks the issuer again and the verified email.
+    ///
+    /// A token must name one of the configured audiences. Keycloak adds a client
+    /// to `aud` only through an audience mapper, so a realm may need one.
     ///
     /// # Errors
     ///

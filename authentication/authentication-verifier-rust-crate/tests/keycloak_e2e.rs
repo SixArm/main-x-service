@@ -72,10 +72,47 @@ async fn a_token_for_another_audience_is_rejected() {
 }
 
 #[tokio::test]
+async fn only_a_current_access_token_for_this_audience_is_accepted() {
+    let (v, idp) = verifier().await;
+    let ahead = json!(now() + 3600);
+    let refused = [
+        (
+            "no audience",
+            idp.token(|c| drop(c.as_object_mut().unwrap().remove("aud"))),
+        ),
+        (
+            "no audience, issued to another client",
+            idp.token(|c| {
+                c.as_object_mut().unwrap().remove("aud");
+                c["azp"] = json!("other-client");
+            }),
+        ),
+        ("ID token", idp.token(|c| c["typ"] = json!("ID"))),
+        ("refresh token", idp.token(|c| c["typ"] = json!("Refresh"))),
+        ("nbf ahead", idp.token(|c| c["nbf"] = ahead.clone())),
+        ("iat ahead", idp.token(|c| c["iat"] = ahead.clone())),
+    ];
+    for (name, token) in refused {
+        assert!(
+            matches!(v.verify(&token).await, Err(VerifyError::Keycloak(_))),
+            "{name}"
+        );
+    }
+
+    // The checks refuse the token, not everything that carries one of these claims.
+    let token = idp.token(|c| c["nbf"] = json!(1_000_000_000));
+    assert!(v.verify(&token).await.is_ok());
+}
+
+#[tokio::test]
 async fn a_wrong_issuer_is_rejected_even_with_a_valid_signature() {
     let (v, idp) = verifier().await;
     let t = idp.token(|c| c["iss"] = json!("https://evil.example.com/realms/mxi"));
-    assert!(matches!(v.verify(&t).await, Err(VerifyError::Claim(_))));
+    // The strict policy refuses it first, and `claims_from_token` would too.
+    assert!(matches!(
+        v.verify(&t).await,
+        Err(VerifyError::Keycloak(_) | VerifyError::Claim(_))
+    ));
 }
 
 #[tokio::test]

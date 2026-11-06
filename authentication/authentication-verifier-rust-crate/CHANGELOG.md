@@ -10,6 +10,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-06
+
+### Security
+
+- **`KeycloakVerifier` now uses the engine's strict validation policy.** The default
+  legacy policy accepted a token with no `aud`, an ID or refresh token, and one with
+  `nbf` or `iat` in the future. A token with no `aud` kept its full role map, so one
+  minted for another client of the realm was accepted here. This needs
+  `axum-keycloak-auth` 0.8.4.
+
+  A token must now name a configured audience. Keycloak adds a client to `aud` only
+  through an audience mapper, so a realm without one will see every token refused.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
