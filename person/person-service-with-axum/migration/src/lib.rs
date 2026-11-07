@@ -33,6 +33,7 @@ mod m20260727_000009_drop_blake3;
 mod m20260727_000011_integrity_mac;
 mod m20260802_000001_review_queue_provenance;
 mod m20260805_000001_bulk_jobs_artifact_deleted_at;
+mod m20260901_000001_audit_address_commitment;
 
 /// The migration runner this crate exposes to axa / `sea-orm-migration`.
 pub struct Migrator;
@@ -62,6 +63,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260727_000011_integrity_mac::Migration),
             Box::new(m20260802_000001_review_queue_provenance::Migration),
             Box::new(m20260805_000001_bulk_jobs_artifact_deleted_at::Migration),
+            Box::new(m20260901_000001_audit_address_commitment::Migration),
         ]
     }
 }

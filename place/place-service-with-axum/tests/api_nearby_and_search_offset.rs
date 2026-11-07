@@ -10,15 +10,12 @@
 //! `tests/integration_geo_radius.rs` pins the `within_radius` primitive
 //! in isolation, this file pins the wired HTTP surface.
 
+use axa::testing::TestApp;
 use std::sync::OnceLock;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use place_service::api::rest::{AppState, create_router};
-use place_service::config::Config;
-use place_service::db::create_connection;
-use place_service::matching::PlaceMatcher;
-use place_service::search::SearchEngine;
+use place_service::app::App;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 use tower::ServiceExt;
@@ -66,13 +63,11 @@ async fn test_router() -> (axum::Router, TempDir) {
     unsafe {
         std::env::set_var("SEARCH_INDEX_PATH", index_dir.path());
     }
-    let config = Config::from_env().expect("load config from env");
-    let search_engine = SearchEngine::new(&config.search.index_path).expect("search engine");
-    let matcher = PlaceMatcher::new(&config.matching);
-    let db = create_connection(&config.database)
+    let app = App::boot_test()
         .await
-        .expect("Postgres connection — set DATABASE_URL to a running, migrated database");
-    let app = create_router(AppState::new(db, search_engine, matcher, config));
+        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .router
+        .expect("boot_test builds the router");
     (app, index_dir)
 }
 

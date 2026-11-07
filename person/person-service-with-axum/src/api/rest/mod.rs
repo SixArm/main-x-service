@@ -1,20 +1,12 @@
-//! Axum REST API: OpenAPI doc, router wiring, and server bootstrap.
+//! Axum REST API: OpenAPI doc and route tables.
 //!
-//! [`ApiDoc`](crate::api::rest::ApiDoc) is the utoipa-generated OpenAPI 3 document (served at
-//! `/api-docs/openapi.json` and rendered by Swagger UI at `/swagger-ui`).
-//! [`create_router`](crate::api::rest::create_router) maps every endpoint onto a handler in [`handlers`](crate::api::rest::handlers)
-//! and nests them under `/api`, plus the Prometheus `/metrics.prom`
-//! scrape path and a permissive CORS layer. [`serve`](crate::api::rest::serve) binds the
-//! configured host/port and runs the server. [`AppState`](crate::api::rest::AppState) (re-exported
+//! [`ApiDoc`](crate::api::rest::ApiDoc) is the utoipa-generated OpenAPI 3 document.
+//! [`persons_routes`](crate::api::rest::persons_routes) maps every endpoint onto a handler in [`handlers`](crate::api::rest::handlers)
+//! under `/api`, and [`metrics_routes`](crate::api::rest::metrics_routes) adds the Prometheus
+//! `/metrics.prom` scrape path. `App::routes` mounts both. [`AppState`](crate::api::rest::AppState) (re-exported
 //! from [`state`](crate::api::rest::state)) is the shared state injected into each handler.
 
-use axum::{
-    Router,
-    routing::{delete, get, post, put},
-};
-use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 
 /// Bearer-token authentication extractor, `whoami` endpoint, and the
 /// blanket `/api/*` enforcement middleware (`PERSON_REQUIRE_AUTH`).
@@ -130,121 +122,9 @@ pub use state::AppState;
 )]
 pub struct ApiDoc;
 
-/// Build the fully-wired Axum [`Router`] for the service.
-///
-/// Mounts the entity/search/match/merge/privacy/audit routes under
-/// `/api`, exposes `/metrics.prom` and the Swagger UI, and applies the
-/// blanket-auth-enforcement middleware (default-off, gated by
-/// `PERSON_REQUIRE_AUTH` — snapshotted here, so changing the env var
-/// requires a restart) and a permissive CORS layer. The given
-/// [`AppState`] is moved into the router as shared state.
-pub fn create_router(state: AppState) -> Router {
-    let enforcement = auth::Enforcement::from_env();
-    let api_routes = Router::new()
-        // Health
-        .route("/health", get(handlers::health_check))
-        // Auth — echo verified bearer-token claims
-        .route("/whoami", get(auth::whoami))
-        // Person CRUD (+ the plain database-backed collection list, GET
-        // /persons — deliberately not Tantivy-backed; see
-        // `handlers::list_persons`'s doc comment)
-        .route(
-            "/persons",
-            post(handlers::create_person).get(handlers::list_persons),
-        )
-        .route("/persons/{id}", get(handlers::get_person))
-        .route("/persons/{id}", put(handlers::update_person))
-        .route("/persons/{id}", delete(handlers::delete_person))
-        // Search
-        .route("/persons/search", get(handlers::search_persons))
-        // Matching
-        .route("/persons/match", post(handlers::match_person))
-        // Duplicate detection & deduplication
-        .route(
-            "/persons/check-duplicates",
-            post(handlers::check_duplicates),
-        )
-        .route("/persons/merge", post(handlers::merge_persons))
-        .route("/persons/deduplicate", post(handlers::batch_deduplicate))
-        .route("/persons/review-queue", get(handlers::get_review_queue))
-        .route(
-            "/persons/review-queue/{id}/decision",
-            post(handlers::review_decision),
-        )
-        // Cross-service entity links (§4.1): the aggregator's bulk
-        // reconciliation pull (static — must precede the `{id}` routes),
-        // then a person's outbound-edge create/list/withdraw.
-        .route("/persons/links", get(links::bulk_links))
-        .route(
-            "/persons/{id}/links",
-            post(links::create_link).get(links::list_links),
-        )
-        .route("/persons/{id}/links/{link_id}", delete(links::delete_link))
-        // Privacy
-        .route("/persons/{id}/export", get(handlers::export_person_data))
-        .route("/persons/{id}/masked", get(handlers::get_person_masked))
-        // Audit
-        .route("/persons/{id}/audit", get(handlers::get_person_audit_logs))
-        .route("/persons/{id}/erase", post(handlers::erase_person))
-        .route(
-            "/persons/{id}/audit/disclosures",
-            get(handlers::get_person_disclosures),
-        )
-        .route("/audit/recent", get(handlers::get_recent_audit_logs))
-        .route("/audit/verify", get(handlers::verify_audit_chain))
-        .route("/audit/checkpoint", get(handlers::take_audit_checkpoint))
-        .route(
-            "/audit/checkpoint/verify",
-            post(handlers::verify_audit_checkpoint),
-        )
-        .route("/records/verify", get(handlers::verify_record_integrity))
-        .route("/audit/user", get(handlers::get_user_audit_logs))
-        // Compliance evidence. Guarded like everything else under `/api`:
-        // the SBOM names every dependency version in the running binary,
-        // which is exactly what an attacker needs to match a deployment
-        // against published advisories.
-        .route("/compliance", get(handlers::compliance_identification))
-        .route("/compliance/sbom", get(handlers::compliance_sbom))
-        .with_state(state.clone());
-
-    // FHIR R5 surface (`/fhir/Patient{,/{id}}`, `/fhir/Person{,/{id}}`
-    // alias, `/fhir/metadata`). Merged onto the outer router below,
-    // *before* the auth layer, so `/fhir/*` inherits the same blanket
-    // guard as `/api/*` (it is not on the public allow-list).
-    let fhir_routes = crate::api::fhir::handlers::fhir_router(state);
-
-    // Mount under `/api`. Documented in agents/restful.md and
-    // consumed by `../person-front-end-with-svelte` at `/api/persons`.
-    // No service uses a `/api/v1` URL segment anymore; API
-    // versioning is negotiated via the `Accepts-version` header.
-    Router::new()
-        .nest("/api", api_routes)
-        .merge(fhir_routes)
-        .route("/metrics.prom", get(handlers::metrics_prom))
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .layer(axum::middleware::from_fn_with_state(
-            enforcement,
-            auth::require_auth_middleware,
-        ))
-        // Header-based API versioning (`Accepts-version`): negotiates the
-        // version for `/api/*` and stamps it on the response
-        // (`agents/share/api-versioning.md`).
-        .layer(axum::middleware::from_fn(version::require_version_mw))
-        .layer(CorsLayer::permissive())
-        // Outermost layer runs first, so the request span wraps CORS,
-        // versioning, and the auth guard too (PRO-H9). Wired onto this
-        // standalone surface as well as `App::after_routes` — the two
-        // router-construction paths this crate carries (see
-        // `crate::observability::trace_mw`'s doc comment) must behave
-        // identically, the same precedent `auth::require_auth_middleware`
-        // already set by being layered on both.
-        .layer(axum::middleware::from_fn(crate::observability::trace_mw))
-}
-
 /// Native axa controller routes (idiomatic path): the `/api` surface as
 /// an axa `Routes`; handlers extract `AppState` from the `AppContext`
-/// shared store via `FromRef`. `create_router` is retained for the
-/// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
+/// shared store via `FromRef`. The root `/metrics.prom` route is [`metrics_routes`].
 #[must_use]
 pub fn persons_routes() -> axa::routes::Routes {
     use axa::prelude::{Routes, delete, get, post};
@@ -252,6 +132,8 @@ pub fn persons_routes() -> axa::routes::Routes {
         .prefix("/api")
         .add("/health", get(handlers::health_check))
         .add("/whoami", get(auth::whoami))
+        .add("/compliance", get(handlers::compliance_identification))
+        .add("/compliance/sbom", get(handlers::compliance_sbom))
         // Cross-service entity links (§4.1): bulk reconciliation pull
         // (static, before `{id}`), then per-person create/list/withdraw.
         .add("/persons/links", get(links::bulk_links))

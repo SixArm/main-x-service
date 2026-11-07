@@ -442,19 +442,8 @@ fn http_metrics() -> &'static HttpMetrics {
 /// reasoning link-graph-service applied to its own `EntityRef`-shaped
 /// paths, here for plain UUID path segments instead.
 ///
-/// Wired onto **both** of this crate's router-construction surfaces —
-/// [`crate::api::rest::create_router`] (the hand-rolled `Router` used by
-/// the DB-gated integration tests) and [`crate::app::App::after_routes`]
-/// (the loco-booted production router) — so tracing behaves identically
-/// regardless of which one a caller builds. link-graph-service has only
-/// one router-construction path (pure axa), so this two-surface wiring
-/// has no analogue there.
-///
-/// This is a **second**, complementary middleware to
-/// [`crate::metrics::track_http_requests_mw`] (T-18's Prometheus
-/// `http_requests_total{path,status}` counter) — the two are independent
-/// sinks (`OTel` export vs. `/metrics.prom` scraping) layered side by side,
-/// not a replacement of one by the other.
+/// Wired in [`crate::app::App::after_routes`], the one router this crate
+/// builds.
 pub async fn trace_mw(req: Request, next: Next) -> Response {
     let method = req.method().clone();
     // A fixed span name, not the semconv-preferred `{method} {route}`: a

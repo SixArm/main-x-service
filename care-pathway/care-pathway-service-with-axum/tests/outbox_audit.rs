@@ -29,6 +29,16 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
     // read once into a process-wide OnceLock). `set_var` is `unsafe` in
     // edition 2024; single-threaded test setup.
     unsafe {
+        // Keep this binary's Tantivy index out of the working directory
+        // and its boot rebuild out of the way (see tests/requests/mod.rs).
+        std::env::set_var(
+            "CARE_PATHWAY_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!(
+                "care-pathway-outbox-audit-index-{}",
+                std::process::id()
+            )),
+        );
+        std::env::set_var("CARE_PATHWAY_SEARCH_BOOT_REINDEX", "0");
         std::env::set_var("CARE_PATHWAY_EVENT_TRANSPORT", "outbox");
     }
 

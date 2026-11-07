@@ -54,13 +54,13 @@
 //! two documented leans: auto-provisioning would let the `IdP` control
 //! account creation, which a deployment should opt into, not inherit.
 
-use std::net::SocketAddr;
 use std::sync::OnceLock;
 use std::time::Duration;
 
+use axa::client::ClientAddr;
 use axa::error::ErrorDetail;
 use axa::prelude::*;
-use axum::extract::{ConnectInfo, Query, State};
+use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Redirect;
 use base64::Engine;
@@ -292,7 +292,7 @@ async fn find_or_provision_user(
     ctx: &AppContext,
     email: &str,
     config: &OidcConfig,
-    source_ip: &str,
+    source_ip: Option<&str>,
 ) -> Result<users::Model> {
     match users::Model::find_by_email(&ctx.db, email).await {
         Ok(user) if !user.is_deleted() => Ok(user),
@@ -306,7 +306,7 @@ async fn find_or_provision_user(
                 Some(email),
                 None,
                 Some("no_account"),
-                Some(source_ip),
+                source_ip,
             )
             .await;
             Err(forbidden_oidc(
@@ -331,7 +331,7 @@ async fn bridge_to_frontend(
     ctx: &AppContext,
     user: &users::Model,
     frontend: &str,
-    source_ip: &str,
+    source_ip: Option<&str>,
 ) -> Result<axum::response::Response> {
     let bridged = user
         .clone()
@@ -349,7 +349,7 @@ async fn bridge_to_frontend(
         Some(&user.email),
         Some(user.pid),
         Some("ok"),
-        Some(source_ip),
+        source_ip,
     )
     .await;
 
@@ -368,11 +368,11 @@ async fn bridge_to_frontend(
 #[debug_handler]
 async fn callback(
     State(ctx): State<AppContext>,
-    connect_info: ConnectInfo<SocketAddr>,
+    ClientAddr(client): ClientAddr,
     headers: HeaderMap,
     Query(query): Query<CallbackQuery>,
 ) -> Result<axum::response::Response> {
-    let source_ip = connect_info.0.ip().to_string();
+    let source_ip = client.map(|address| address.to_string());
     let Some(config) = OidcConfig::from_env() else {
         return Err(Error::NotFound);
     };
@@ -384,7 +384,7 @@ async fn callback(
             None,
             None,
             Some(&format!("idp_error:{error}")),
-            Some(&source_ip),
+            source_ip.as_deref(),
         )
         .await;
         return Err(unauthorized_oidc(
@@ -405,7 +405,7 @@ async fn callback(
             None,
             None,
             Some("state_mismatch"),
-            Some(&source_ip),
+            source_ip.as_deref(),
         )
         .await;
         return Err(unauthorized_oidc("state mismatch"));
@@ -421,7 +421,7 @@ async fn callback(
         );
     }
 
-    let user = find_or_provision_user(&ctx, &email, &config, &source_ip).await?;
+    let user = find_or_provision_user(&ctx, &email, &config, source_ip.as_deref()).await?;
     let updated = user
         .into_active_model()
         .set_attributes(&ctx.db, users::attributes_to_value(&attrs))
@@ -434,7 +434,7 @@ async fn callback(
         .await
         .map_err(|e| Error::string(&e.to_string()))?;
 
-    let response = bridge_to_frontend(&ctx, &updated, &frontend, &source_ip).await?;
+    let response = bridge_to_frontend(&ctx, &updated, &frontend, source_ip.as_deref()).await?;
     Ok(response)
 }
 

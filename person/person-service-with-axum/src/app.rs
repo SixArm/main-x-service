@@ -24,8 +24,6 @@ use crate::{
     observability::{self, Telemetry, TelemetryConfig},
     search::SearchEngine,
 };
-use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 
 /// The installed telemetry providers, so `on_shutdown` can flush what the
 /// batch processor is still holding. Set once by [`App::init_logger`].
@@ -113,12 +111,18 @@ impl App {
             .add_route(metrics_routes())
     }
 
-    /// Add this service's state and layers to the router.
+    /// The boot-time singletons, built once and kept in the shared store. A job reads them
+    /// from there, so a process that serves the queue must call this before its first job
+    /// can be claimed: `start --worker` never builds the router, and `start --all` claims
+    /// jobs while it does.
     ///
     /// # Errors
     ///
-    /// Fails when the service's setup fails.
-    pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
+    /// Fails when a setting is invalid or the search index cannot be opened.
+    async fn shared_state(ctx: &AppContext) -> Result<AppState> {
+        if let Some(state) = ctx.shared_store.get::<AppState>() {
+            return Ok(state.clone());
+        }
         let config = Config::from_env().map_err(|e| axa::Error::string(&e.to_string()))?;
         let search_engine = SearchEngine::new(&config.search.index_path)
             .map_err(|e| axa::Error::string(&e.to_string()))?;
@@ -133,14 +137,25 @@ impl App {
         // verify against the same key set. Fetch failure falls back to
         // the env path — the service always boots.
         auth::init().await;
+        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config)
+            .await
+            .map_err(|e| axa::Error::string(&e.to_string()))?;
+        ctx.shared_store.insert(state.clone());
+        Ok(state)
+    }
+
+    /// Add this service's state and layers to the router.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the service's setup fails.
+    pub async fn after_routes(router: AxumRouter, ctx: &AppContext) -> Result<AxumRouter> {
+        let state = Self::shared_state(ctx).await?;
         // Key rotation and policy edits without a restart: both loops are
         // no-ops unless their source is configured (`PERSON_PASETO_KEYS_URL`
         // / `PERSON_ABAC_POLICY_FILE`).
         auth::spawn_key_refresh();
         auth::spawn_policy_watcher();
-        let state = AppState::new(ctx.db.clone(), search_engine, matcher, config.clone())
-            .await
-            .map_err(|e| axa::Error::string(&e.to_string()))?;
         // Blanket auth enforcement (default-off, `PERSON_REQUIRE_AUTH`),
         // snapshotted here at boot — changing the env var requires a
         // restart. Layered unconditionally; the flag is the only switch.
@@ -156,20 +171,22 @@ impl App {
         // "always boot" posture for other best-effort subsystems (key
         // refresh, policy watch, the outbox relay).
         let grpc_state = state.clone();
-        let grpc_config = config.server.clone();
+        let grpc_config = state.config.server.clone();
         tokio::spawn(async move {
             if let Err(e) = crate::api::grpc::serve(grpc_config, grpc_state).await {
                 tracing::error!("gRPC server failed to start or exited: {e}");
             }
         });
-        ctx.shared_store.insert(state);
         // Durable event bus Phase 3: start the outbox relay loop. Gated
         // internally — a no-op unless the transport is `outbox`
         // (`PERSON_EVENT_TRANSPORT`) and `PERSON_EVENT_RELAY` is truthy —
         // so default (`memory`) boots behave exactly as before.
         crate::relay::spawn(ctx.db.clone());
         let router = router
-            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            .merge(axa::openapi::router(
+                axa::openapi::spec_of::<ApiDoc>(),
+                "Person Service API",
+            ))
             .layer(axum::middleware::from_fn_with_state(
                 enforcement,
                 auth::require_auth_middleware,
@@ -180,8 +197,8 @@ impl App {
             .layer(axum::middleware::from_fn(
                 crate::api::rest::version::require_version_mw,
             ))
-            // Outermost layer runs first, so the request span wraps CORS,
-            // versioning, and the auth guard too — a 401/403 is part of the
+            // Outermost of these runs first, so the request span wraps
+            // versioning and the auth guard too — a 401/403 is part of the
             // trace, not invisible to it (same reasoning as
             // link-graph-service's `after_routes`).
             .layer(axum::middleware::from_fn(observability::trace_mw));
@@ -254,15 +271,18 @@ impl App {
         Ok(ctx)
     }
 
-    /// Build the full router: the routes under the standard middleware,
-    /// then this service's own layers.
+    /// Build the full router: the routes, this service's own layers, then
+    /// the standard middleware outside them, so that a refusal from a guard
+    /// still gets a request id, security headers, CORS, and the panic and
+    /// timeout protection.
     ///
     /// # Errors
     ///
     /// Fails when the service's setup fails.
     pub async fn router(ctx: &AppContext) -> Result<AxumRouter> {
-        let router = Self::routes(ctx).into_app(ctx.clone())?;
-        Self::after_routes(router, ctx).await
+        let router = Self::routes(ctx).into_router(ctx.clone());
+        let router = Self::after_routes(router, ctx).await?;
+        axa::middleware::apply(router, &ctx.config.http)
     }
 
     /// Run a database command.
@@ -311,6 +331,11 @@ impl App {
             Command::Check => Ok(()),
             Command::Start { worker, all, .. } => {
                 warn_if_unserved(&ctx, worker || all);
+                crate::bulk::reconcile::spawn(&ctx, worker || all);
+                crate::compliance::address_retention::spawn(ctx.db.clone())?;
+                if worker || all {
+                    Self::shared_state(&ctx).await?;
+                }
                 let (stop, stopped) = tokio::sync::watch::channel(false);
                 let jobs = (worker || all)
                     .then(|| ctx.queue_provider.clone())

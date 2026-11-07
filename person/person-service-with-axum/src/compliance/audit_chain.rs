@@ -47,6 +47,21 @@ use crate::db::models::audit_log;
 /// hashed field set cannot be confused with tampering.
 pub const CHAIN_VERSION: &str = "p1";
 
+/// The version of a row that binds a commitment to its address rather than
+/// the address. Everything else in the pre-image is as in [`CHAIN_VERSION`].
+///
+/// An address is personal data with a retention limit, and an audit row is
+/// evidence with none. Binding the address itself would force a choice
+/// between keeping it for ever and breaking the chain when it goes. So a
+/// row binds `SHA-256(label, salt, address)`, the address and salt sit
+/// beside it, and [`super::address_retention`] removes those two. What is
+/// left verifies and says nothing: without the salt the commitment cannot be
+/// matched against a guessed address.
+///
+/// [`input_for`] picks the version from the row, and the version is bound,
+/// so removing a commitment to make a row read as `p1` breaks it.
+pub const CHAIN_VERSION_COMMITTED: &str = "p2";
+
 /// Field separator inside the digest pre-image: ASCII 31 (unit separator).
 const SEP: char = '\u{1f}';
 
@@ -71,8 +86,10 @@ pub struct ChainInput<'a> {
     pub old_values: Option<&'a serde_json::Value>,
     /// Post-change snapshot, if any.
     pub new_values: Option<&'a serde_json::Value>,
-    /// Request IP, if captured.
+    /// Request IP, if captured. Bound only by a `p1` row.
     pub ip_address: Option<&'a str>,
+    /// The commitment to the request IP, which makes this a `p2` row.
+    pub ip_commitment: Option<&'a str>,
     /// Request user-agent, if captured.
     pub user_agent: Option<&'a str>,
     /// Request/processing context, if any.
@@ -109,7 +126,11 @@ pub(crate) fn preimage(input: &ChainInput<'_>) -> Vec<u8> {
         buf.extend_from_slice(value.as_bytes());
         buf.push(SEP as u8);
     };
-    field(CHAIN_VERSION);
+    field(if input.ip_commitment.is_some() {
+        CHAIN_VERSION_COMMITTED
+    } else {
+        CHAIN_VERSION
+    });
     field(input.prev_hash.unwrap_or(""));
     field(&input.id.to_string());
     field(&input.timestamp_micros.to_string());
@@ -119,7 +140,7 @@ pub(crate) fn preimage(input: &ChainInput<'_>) -> Vec<u8> {
     field(&input.entity_id.to_string());
     field(&canonical_json(input.old_values));
     field(&canonical_json(input.new_values));
-    field(input.ip_address.unwrap_or(""));
+    field(input.ip_commitment.or(input.ip_address).unwrap_or(""));
     field(input.user_agent.unwrap_or(""));
     field(&canonical_json(input.context));
     field(if input.disclosure { "1" } else { "0" });
@@ -135,6 +156,41 @@ fn canonical_json(value: Option<&serde_json::Value>) -> String {
     match value {
         None => String::new(),
         Some(v) => serde_json::to_string(v).unwrap_or_else(|_| "\u{0}unserializable".to_string()),
+    }
+}
+
+/// A salt and a commitment for `address`, for a new row.
+#[must_use]
+pub fn commit_address(address: &str) -> (String, String) {
+    let salt = Uuid::new_v4().to_string();
+    let commitment = address_commitment(&salt, address);
+    (salt, commitment)
+}
+
+/// `SHA-256(label, salt, address)` as lowercase hex.
+#[must_use]
+pub fn address_commitment(salt: &str, address: &str) -> String {
+    let mut hasher = Sha256::new();
+    for part in ["audit-address", salt, address] {
+        hasher.update(part.as_bytes());
+        hasher.update([SEP as u8]);
+    }
+    to_hex(&hasher.finalize())
+}
+
+/// Whether a row's address and salt agree with its commitment.
+///
+/// A `p2` row's hash covers only the commitment, so this is what notices an
+/// edited address. Both present and matching passes, and both gone is a row
+/// past retention. Anything else is a row someone changed.
+fn address_intact(row: &audit_log::Model) -> bool {
+    let Some(commitment) = row.ip_commitment.as_deref() else {
+        return row.ip_salt.is_none();
+    };
+    match (row.ip_address.as_deref(), row.ip_salt.as_deref()) {
+        (None, None) => true,
+        (Some(address), Some(salt)) => address_commitment(salt, address) == commitment,
+        _ => false,
     }
 }
 
@@ -183,6 +239,7 @@ pub fn input_for<'a>(row: &'a audit_log::Model, prev: Option<&'a str>) -> ChainI
         old_values: row.old_values.as_ref(),
         new_values: row.new_values.as_ref(),
         ip_address: row.ip_address.as_deref(),
+        ip_commitment: row.ip_commitment.as_deref(),
         user_agent: row.user_agent.as_deref(),
         context: row.context.as_ref(),
         disclosure: row.disclosure,
@@ -340,6 +397,14 @@ pub fn verify(rows: &[audit_log::Model]) -> ChainReport {
                     &preimage(&input_for(row, row.prev_hash.as_deref())),
                 ),
             );
+            if !address_intact(row) {
+                report.breaks.push(ChainBreak {
+                    seq: row.seq,
+                    id: row.id.to_string(),
+                    kind: "content",
+                    detail: "row address does not match its stored commitment".to_string(),
+                });
+            }
             if !sha256_ok || !sha3_ok || !mac_ok {
                 // Name every algorithm that disagreed. All three means the
                 // content changed; a subset means those digest columns
@@ -398,6 +463,7 @@ mod tests {
             old_values: None,
             new_values: None,
             ip_address: Some("198.51.100.9"),
+            ip_commitment: None,
             user_agent: Some("curl/8"),
             context: None,
             disclosure: false,
@@ -406,6 +472,86 @@ mod tests {
             row_hash(&input),
             "52c1c6f0f443e6a952852ef6cc7a7988b8f3172273a8143d53ecf0260f13b4dc"
         );
+    }
+
+    /// A committed row binds its commitment and its version, not the address.
+    #[test]
+    fn a_committed_row_hashes_the_same_with_its_address_gone() {
+        let (salt, commitment) = commit_address("198.51.100.9");
+        let base = ChainInput {
+            prev_hash: None,
+            id: Uuid::from_u128(7),
+            timestamp_micros: 1,
+            user_id: None,
+            action: "CREATE",
+            entity_type: "Person",
+            entity_id: Uuid::from_u128(42),
+            old_values: None,
+            new_values: None,
+            ip_address: Some("198.51.100.9"),
+            ip_commitment: Some(&commitment),
+            user_agent: None,
+            context: None,
+            disclosure: false,
+        };
+        let gone = ChainInput {
+            ip_address: None,
+            ..base
+        };
+        assert_eq!(row_hash(&base), row_hash(&gone));
+        let stripped = ChainInput {
+            ip_commitment: None,
+            ..base
+        };
+        assert_ne!(row_hash(&base), row_hash(&stripped));
+        // The same bytes in the address field, read as `p1`: only the bound
+        // version tells this row from the one it was.
+        let disguised = ChainInput {
+            ip_address: Some(&commitment),
+            ip_commitment: None,
+            ..base
+        };
+        assert_ne!(row_hash(&base), row_hash(&disguised));
+        assert_eq!(address_commitment(&salt, "198.51.100.9"), commitment);
+        assert_ne!(commit_address("198.51.100.9").1, commitment, "salted");
+    }
+
+    fn committed_row() -> audit_log::Model {
+        let (salt, commitment) = commit_address("203.0.113.7");
+        let mut model = row(1, None, "CREATE");
+        model.ip_address = Some("203.0.113.7".to_string());
+        model.ip_salt = Some(salt);
+        model.ip_commitment = Some(commitment);
+        model.hash = Some(row_hash(&input_for(&model, None)));
+        model.hash_sha3 = Some(row_hash_sha3(&input_for(&model, None)));
+        model
+    }
+
+    #[test]
+    fn removing_an_address_and_its_salt_keeps_the_row_verifying() {
+        let mut model = committed_row();
+        assert!(verify(std::slice::from_ref(&model)).verified);
+        model.ip_address = None;
+        model.ip_salt = None;
+        let report = verify(std::slice::from_ref(&model));
+        assert!(report.verified, "{:?}", report.breaks);
+        assert_eq!(report.intact, 1, "the content check still ran");
+    }
+
+    #[test]
+    fn editing_a_committed_address_is_a_content_break() {
+        let mut model = committed_row();
+        model.ip_address = Some("198.51.100.1".to_string());
+        let report = verify(&[model]);
+        assert!(!report.verified);
+        assert_eq!(report.breaks[0].kind, "content");
+    }
+
+    #[test]
+    fn a_salt_without_its_address_is_a_content_break() {
+        let mut model = committed_row();
+        model.ip_address = None;
+        assert!(!verify(&[model]).verified);
     }
 
     /// The version tag is published in this entity's
@@ -453,6 +599,8 @@ mod tests {
             context: None,
             disclosure: false,
             redacted_at: None,
+            ip_salt: None,
+            ip_commitment: None,
         };
         model.hash = Some(row_hash(&input_for(&model, prev)));
         model.hash_sha3 = Some(row_hash_sha3(&input_for(&model, prev)));

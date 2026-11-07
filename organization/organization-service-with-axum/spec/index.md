@@ -311,6 +311,14 @@ added to the existing `review_queue` table
 `matcher_suggested`, backfilled `operator`, set once on insert and never
 touched by a re-scan upsert).
 
+**Lost jobs (`src/bulk/reconcile.rs`).** A worker process
+reconciles `bulk_jobs` with `axa_queue` at start and every five minutes, linking
+them by the queue row's `name` and `args->>'job_id'`. A `queued` or `running` job
+moves to `failed` when no queue row for it is alive and either one has `failed`,
+or it has none and has not changed for 15 minutes (the row commits before the job
+is queued). See
+[bulk import/export §3](../../../agents/share/bulk-import-export.md).
+
 **Stable key** (priority order, `src/bulk/stable_key.rs`):
 
 1. An **LEI** identifier (`IdentifierScheme::Lei`) with a non-blank value.

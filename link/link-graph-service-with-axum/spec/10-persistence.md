@@ -110,6 +110,13 @@ CREATE TABLE audit_log (                  -- reads & state changes touching subj
 
 Inherits the case service's audit posture (§6 FR-19, §12).
 
+`user_ip` holds what `axa::client::ClientAddr` resolved: the connecting peer,
+or, when that peer is listed in `TRUSTED_PROXIES`, the rightmost
+`X-Forwarded-For` entry not written by a listed proxy. A caller cannot choose
+it by sending the header. With `TRUSTED_PROXIES` unset, a service behind a proxy
+records the proxy's address. It is `NULL` on a bus-driven write, where no
+request exists.
+
 ### 10.5 SeaORM time-type feature
 
 Follow the prevailing family convention at scaffold time. The shared

@@ -100,21 +100,26 @@ fn bearer(token: &str) -> (axum::http::HeaderName, axum::http::HeaderValue) {
     )
 }
 
-#[tokio::test]
-#[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test concealment -- --ignored`"]
-async fn case_read_sees_governed_edges_that_others_have_concealed() {
-    let (keys, kid) = keys_and_kid();
-    // A restrictive policy: any authenticated caller may read the
-    // aggregator (so both pass the blanket guard), but case-read — which
-    // gates the governed subject_of edge — needs `dept=cases`.
-    let policy = json!({
+/// A restrictive policy: any authenticated caller may read the aggregator (so
+/// both pass the blanket guard), but case-read, which gates the governed
+/// `subject_of` edge, needs `dept=cases`. The policy is a process-wide
+/// `OnceLock`, so every test in this binary has to install this same one.
+fn restrictive_policy() -> Value {
+    json!({
         "rules": [
             { "effect": "allow", "actions": ["read"], "when": { "entity": ["link_graph"] } },
             { "effect": "allow", "actions": ["read"], "when": { "entity": ["case"], "dept": ["cases"] } },
             { "effect": "deny",  "actions": ["read"], "when": { "entity": ["case"] } }
         ]
-    });
+    })
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test concealment -- --ignored`"]
+async fn case_read_sees_governed_edges_that_others_have_concealed() {
+    let (keys, kid) = keys_and_kid();
+    let policy = restrictive_policy();
     // Set all three globals BEFORE the app boots (each is a OnceLock).
     unsafe {
         std::env::set_var("LINK_GRAPH_REQUIRE_AUTH", "1");
@@ -257,4 +262,85 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
         );
     })
     .await;
+}
+
+/// One read of a surfaced `subject_of` edge through the real stack, sending
+/// `forwarded` as `X-Forwarded-For`, returning the `user_ip` on its audit row.
+/// `TRUSTED_PROXIES` is read at boot, so `trusted` is set before the app boots.
+async fn audited_address(
+    case: u128,
+    person: u128,
+    trusted: Option<&str>,
+    forwarded: &str,
+) -> String {
+    let (keys, kid) = keys_and_kid();
+    let policy = restrictive_policy();
+    unsafe {
+        std::env::set_var("LINK_GRAPH_REQUIRE_AUTH", "1");
+        std::env::set_var("LINK_GRAPH_PASETO_KEYS", keys.to_string());
+        std::env::set_var("LINK_GRAPH_ABAC_POLICY", policy.to_string());
+        match trusted {
+            Some(list) => std::env::set_var("TRUSTED_PROXIES", list),
+            None => std::env::remove_var("TRUSTED_PROXIES"),
+        }
+    }
+    let address = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+    let found = address.clone();
+    let forwarded = forwarded.to_string();
+    request::<App, _, _>(|request, ctx| async move {
+        let case = format!("case:{}", u(case));
+        let person = format!("person:{}", u(person));
+        apply_event(
+            &ctx.db,
+            linked_env(Uuid::new_v4(), &case, &person, "subject_of", 1),
+        )
+        .await
+        .unwrap();
+        let token = mint(&kid, &[("dept", &["cases"])]);
+        let (hk, hv) = bearer(&token);
+        let response = request
+            .get(&format!("/api/neighbors/{case}"))
+            .add_header(hk, hv)
+            .add_header(
+                axum::http::HeaderName::from_static("x-forwarded-for"),
+                axum::http::HeaderValue::from_str(&forwarded).unwrap(),
+            )
+            .await;
+        response.assert_status_ok();
+        let row = audit_log::Entity::find()
+            .filter(audit_log::Column::Action.eq("read_edge"))
+            .filter(audit_log::Column::FromRef.eq(case.as_str()))
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .expect("the surfaced subject_of read is audited");
+        *found.lock().unwrap() = row.user_ip.expect("the row records an address");
+    })
+    .await;
+    unsafe { std::env::remove_var("TRUSTED_PROXIES") };
+    std::sync::Arc::into_inner(address)
+        .unwrap()
+        .into_inner()
+        .unwrap()
+}
+
+/// A caller that is not a listed proxy cannot choose the address on its audit
+/// row. The first hop used to be believed whoever sent it.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test concealment -- --ignored`"]
+async fn a_forged_forwarded_header_does_not_reach_the_audit_row() {
+    let address = audited_address(101, 102, None, "6.6.6.6").await;
+    assert_eq!(address, "127.0.0.1", "the row names the connecting peer");
+}
+
+/// Behind a listed proxy, the row names the entry that proxy appended, not the
+/// one the caller wrote to its left.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test concealment -- --ignored`"]
+async fn a_listed_proxy_is_believed_for_the_entry_it_wrote() {
+    let forwarded = "6.6.6.6, 198.51.100.7";
+    let address = audited_address(103, 104, Some("127.0.0.0/8"), forwarded).await;
+    assert_eq!(address, "198.51.100.7");
 }

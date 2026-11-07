@@ -35,11 +35,14 @@
 //! come from a different place than an Axum extractor); `ListWorkers`'
 //! per-record read-visibility filtering (this RPC applies only the
 //! blanket `Read` check today); and `UpdateWorker` entirely (no RPC for
-//! it yet). Unlike person's repository, this crate's `WorkerRepository`
-//! methods take no `AuditContext` — audit logging is wired internally
-//! via the repository's `with_*` builders — so there is no
-//! `audit_context_of` equivalent to call here.
+//! it yet). As with person's repository, this crate's `WorkerRepository`
+//! methods' audit rows are built from [`auth::audit_context_of`], with the
+//! client's address from [`grpc_client_addr`].
 
+use std::net::SocketAddr;
+use std::sync::OnceLock;
+
+use axa::client::{ClientAddr, ProxyNet};
 use uuid::Uuid;
 
 use authentication_verifier::{Action, Claims};
@@ -147,6 +150,34 @@ async fn grpc_enforce(metadata: &MetadataMap, action: Action) -> Result<Option<C
     }
 }
 
+/// The proxies this transport believes, from `TRUSTED_PROXIES`, read as
+/// `axa::config` reads it for HTTP: a list with any bad entry trusts none.
+fn trusted_proxies() -> &'static [ProxyNet] {
+    static TRUSTED: OnceLock<Vec<ProxyNet>> = OnceLock::new();
+    TRUSTED.get_or_init(|| {
+        std::env::var("TRUSTED_PROXIES")
+            .ok()
+            .and_then(|list| list.split(',').map(|net| net.trim().parse().ok()).collect())
+            .unwrap_or_default()
+    })
+}
+
+/// The client's address for a gRPC call. This server is not behind
+/// `axa::middleware::apply`, so it resolves the address itself, by the same
+/// rule: `X-Forwarded-For` counts only from a peer in `trusted`.
+fn client_addr(
+    peer: Option<SocketAddr>,
+    metadata: &MetadataMap,
+    trusted: &[ProxyNet],
+) -> ClientAddr {
+    ClientAddr(peer.map(|peer| axa::client::resolve(peer.ip(), metadata.as_ref(), trusted)))
+}
+
+/// [`client_addr`] for `request`, against `TRUSTED_PROXIES`.
+fn grpc_client_addr<T>(request: &Request<T>) -> ClientAddr {
+    client_addr(request.remote_addr(), request.metadata(), trusted_proxies())
+}
+
 /// Map [`crate::api::rest::auth::authorize_record`]'s `(StatusCode,
 /// String)` rejection onto the two `tonic::Status` codes it can
 /// actually produce (`401`→`UNAUTHENTICATED`, `403`→
@@ -252,7 +283,8 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
         &self,
         request: Request<proto::CreateWorkerRequest>,
     ) -> Result<Response<proto::Worker>, Status> {
-        grpc_enforce(request.metadata(), Action::Write).await?;
+        let claims = grpc_enforce(request.metadata(), Action::Write).await?;
+        let client = grpc_client_addr(&request);
 
         let proto_worker = request
             .into_inner()
@@ -284,7 +316,10 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
         let created = self
             .state
             .worker_repository
-            .create(&worker)
+            .create(
+                &worker,
+                &auth::audit_context_of(&MaybeAuthUser(claims), client),
+            )
             .await
             .map_err(|e| Status::internal(format!("failed to create worker: {e}")))?;
         if let Err(e) = self.state.search_engine.index_worker(&created) {
@@ -367,6 +402,7 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
         request: Request<proto::DeleteWorkerRequest>,
     ) -> Result<Response<proto::DeleteWorkerResponse>, Status> {
         let claims = grpc_enforce(request.metadata(), Action::Delete).await?;
+        let client = grpc_client_addr(&request);
         let id = parse_uuid(&request.into_inner().id)?;
 
         let worker = self
@@ -377,8 +413,9 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
             .map_err(|e| Status::internal(format!("failed to retrieve worker: {e}")))?
             .ok_or_else(|| Status::not_found(format!("worker '{id}' not found")))?;
 
+        let caller = MaybeAuthUser(claims);
         auth::authorize_record(
-            &MaybeAuthUser(claims),
+            &caller,
             Action::Delete,
             &auth::worker_resource_attrs(&worker),
         )
@@ -386,12 +423,44 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
 
         self.state
             .worker_repository
-            .delete(&id)
+            .delete(&id, &auth::audit_context_of(&caller, client))
             .await
             .map_err(|e| Status::internal(format!("failed to delete worker: {e}")))?;
         if let Err(e) = self.state.search_engine.delete_worker(&id.to_string()) {
             tracing::warn!("gRPC DeleteWorker: failed to remove from search engine: {e}");
         }
         Ok(Response::new(proto::DeleteWorkerResponse {}))
+    }
+}
+
+#[cfg(test)]
+mod client_address_tests {
+    use super::*;
+
+    fn forwarded(value: &str) -> MetadataMap {
+        let mut metadata = MetadataMap::new();
+        metadata.insert("x-forwarded-for", value.parse().unwrap());
+        metadata
+    }
+
+    #[test]
+    fn an_untrusted_peer_cannot_name_an_address() {
+        let peer = "203.0.113.9:4000".parse().ok();
+        let client = client_addr(peer, &forwarded("6.6.6.6"), &[]);
+        assert_eq!(client.0, "203.0.113.9".parse().ok());
+    }
+
+    #[test]
+    fn a_trusted_peer_is_believed_for_the_entry_it_wrote() {
+        let peer = "10.0.0.1:4000".parse().ok();
+        let trusted = ["10.0.0.0/8".parse().unwrap()];
+        let client = client_addr(peer, &forwarded("6.6.6.6, 198.51.100.7"), &trusted);
+        assert_eq!(client.0, "198.51.100.7".parse().ok());
+    }
+
+    #[test]
+    fn no_peer_is_no_address() {
+        let client = client_addr(None, &forwarded("6.6.6.6"), &[]);
+        assert_eq!(client.0, None);
     }
 }

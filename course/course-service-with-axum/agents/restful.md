@@ -12,21 +12,21 @@ API URLs are version-free; select the version with the `Accepts-version`
 header (default `1.0`), stamped back on the response — see
 [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
 Implemented by `version::require_version_mw` (`src/api/rest/version.rs`),
-layered on both router surfaces (`create_router` + `App::after_routes`).
+layered in `App::after_routes`.
 
 ## Library API
 
 ```rust
 use course_service::app::App;                  // `App` functions (boot, routes, after_routes)
-use course_service::api::rest::{create_router, courses_routes, AppState};
+use course_service::api::rest::{courses_routes, AppState};
 use course_service::api::{ApiResponse, ApiError};
 use course_service::models::{Course, CourseInstance, CourseIdentifier};
 use course_service::matching::{CourseMatcher, MatchResult, MatchConfidence};
 ```
 
-The binary boots through the axa CLI (`cargo run -- start`);
-`create_router` is retained for the `tower::oneshot` integration
-tests.
+The binary boots through the axa CLI (`cargo run -- start`); the
+`tower::oneshot` integration tests drive the same router through
+`App::boot_test`.
 
 ## Health & ops
 
@@ -230,7 +230,7 @@ The full spec is rendered at runtime by [`utoipa`](https://docs.rs/utoipa):
   store and layers Swagger UI + CORS in `after_routes`
 - `src/api/mod.rs` — `ApiResponse`, `ApiError`
 - `src/api/rest/mod.rs` — `courses_routes()` (axa `Routes`, prefix
-  `/api`), `create_router` (test-only Axum router), `ApiDoc`
+  `/api`), `ApiDoc`
   aggregator
 - `src/api/rest/handlers.rs` — endpoint handlers (FR-1..FR-9 + FR-14..FR-18 wired)
 - `src/api/rest/state.rs` — `AppState` + `FromRef<AppContext>` bridge

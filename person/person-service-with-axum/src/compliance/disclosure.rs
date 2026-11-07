@@ -44,6 +44,8 @@
 //! - **on** — refuse the read with `503`, disclosing nothing the service
 //!   cannot account for. Recommended for a HIPAA-facing deployment.
 
+use std::net::IpAddr;
+
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use uuid::Uuid;
@@ -117,6 +119,10 @@ pub struct AccessContext {
     pub recipient: Option<String>,
     /// Declared destination region (GDPR Ch. V).
     pub destination: Option<String>,
+    /// The client's address, as resolved from the connection and any trusted
+    /// proxies. Unlike the fields above it is observed, not declared, so it
+    /// goes in the row's own `ip_address` and never in [`Self::to_json`].
+    pub client: Option<IpAddr>,
 }
 
 impl AccessContext {
@@ -127,6 +133,7 @@ impl AccessContext {
             purpose: UNSPECIFIED.to_string(),
             recipient: None,
             destination: None,
+            client: None,
         }
     }
 
@@ -141,7 +148,15 @@ impl AccessContext {
             purpose: normalize_purpose(purpose),
             recipient: sanitize(recipient),
             destination: sanitize(destination),
+            client: None,
         }
+    }
+
+    /// The same context, with the client's address.
+    #[must_use]
+    pub fn with_client(mut self, client: Option<IpAddr>) -> Self {
+        self.client = client;
+        self
     }
 
     /// Whether this access is an outward **disclosure** (§164.528): either
@@ -181,11 +196,13 @@ impl<S: Send + Sync> FromRequestParts<S> for AccessContext {
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let header = |name: &str| parts.headers.get(name).and_then(|v| v.to_str().ok());
-        Ok(Self::from_parts(
+        let context = Self::from_parts(
             header(PURPOSE_HEADER),
             header(RECIPIENT_HEADER),
             header(DESTINATION_HEADER),
-        ))
+        );
+        // `axa::middleware::apply` puts the resolved address here.
+        Ok(context.with_client(parts.extensions.get::<IpAddr>().copied()))
     }
 }
 
@@ -285,13 +302,14 @@ pub async fn record_access(
     if !super::audit_reads() {
         return Ok(());
     }
-    // The verified caller is the actor. IP and user-agent are not plumbed
-    // through to read handlers today, so they stay `None` rather than
-    // being invented — the disclosure recipient and purpose, which *are*
-    // declared, go into the row's `context` instead.
+    // The verified caller is the actor, and the address is the one resolved
+    // for this request. User-agent is not plumbed through to read handlers
+    // today, so it stays `None` rather than being invented. The disclosure
+    // recipient and purpose, which *are* declared, go into the row's
+    // `context` instead.
     let audit_ctx = crate::db::AuditContext {
         user_id: actor.map(ToString::to_string),
-        ip_address: None,
+        ip_address: ctx.client.map(|address| address.to_string()),
         user_agent: None,
     };
     let Err(error) = audit
@@ -325,6 +343,15 @@ mod tests {
 
     /// Every declared purpose survives normalisation, case- and
     /// separator-insensitively.
+    /// The address is observed, not declared, so it goes in the row's own
+    /// column and stays out of the declared `context`.
+    #[test]
+    fn the_client_address_is_not_part_of_the_declaration() {
+        let ctx = AccessContext::internal().with_client("203.0.113.7".parse().ok());
+        assert_eq!(ctx.client, "203.0.113.7".parse().ok());
+        assert_eq!(ctx.to_json(), AccessContext::internal().to_json());
+    }
+
     #[test]
     fn known_purposes_normalize() {
         for purpose in PURPOSES {

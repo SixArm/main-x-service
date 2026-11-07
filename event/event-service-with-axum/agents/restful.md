@@ -82,8 +82,7 @@ route except the public `/api/health` and `/fhir/metadata`.
 Root-level `/_health`, `/_ping`, `/api-docs/openapi.json`,
 `/swagger-ui*`, and `/metrics.prom` sit outside the enforced scope and
 stay public. The flag is read once at `AppState` construction —
-restart the service to change it. Wired on both router surfaces
-(`create_router` and the axa router in `App::after_routes`). Family
+restart the service to change it. Wired in `App::after_routes`. Family
 contract:
 [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).
 

@@ -407,6 +407,14 @@ organization's, with `provenance` in the initial schema rather than a
 follow-up migration, since there was no pre-existing table to keep
 backward-compatible).
 
+**Lost jobs (`src/bulk/reconcile.rs`).** A worker process
+reconciles `bulk_jobs` with `axa_queue` at start and every five minutes, linking
+them by the queue row's `name` and `args->>'job_id'`. A `queued` or `running` job
+moves to `failed` when no queue row for it is alive and either one has `failed`,
+or it has none and has not changed for 15 minutes (the row commits before the job
+is queued). See
+[bulk import/export §3](../../../agents/share/bulk-import-export.md).
+
 ## 9. API surface
 
 See §6. Raw axa JSON. `404` for unknown `pid`; `422` for a validation

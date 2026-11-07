@@ -81,7 +81,7 @@ Per-crate `spec.md`:
 | [runbooks/keycloak-sso.md](runbooks/keycloak-sso.md) | Runbook: Keycloak (any OIDC provider) as the enterprise sign-in via authentication-service — client settings, `AUTH_OIDC_*`, claim mappers to ABAC attributes, why `loco-keycloak-auth` is not used, symptom → check → action |
 | [runbooks/reconciliation-divergence.md](runbooks/reconciliation-divergence.md) | Runbook: link-graph reconciliation divergence — what a pass does, the gauge's two sharp edges, symptom → check → action |
 | [runbooks/event-bus-outage-replay.md](runbooks/event-bus-outage-replay.md) | Runbook: event-bus outage detection and containment — there is no replay yet; what "sent" can silently lie about |
-| [runbooks/bulk-job-recovery.md](runbooks/bulk-job-recovery.md) | Runbook: bulk import/export job failure recovery — a `running` job can be stuck forever, stable-key vs idempotency-key, symptom → check → action |
+| [runbooks/bulk-job-recovery.md](runbooks/bulk-job-recovery.md) | Runbook: bulk import/export job failure recovery — how a lost job reaches `failed`, stable-key vs idempotency-key, symptom → check → action |
 | [security.md](security.md)                                       | Security audit summary, cross-cutting invariants, the `<ENTITY>_REQUIRE_AUTH` activation gate, secret-handling, threat model |
 | [rust-axum-stack.md](rust-axum-stack.md)                         | Stack for Rust, axa (database, search, …)             |
 | [loco.md](axa.md)                                               | axa framework (backend-only conventions)              |

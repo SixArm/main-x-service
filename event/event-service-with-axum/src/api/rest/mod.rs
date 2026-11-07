@@ -1,30 +1,14 @@
 //! RESTful API implementation with Axum.
 //!
-//! This module wires the HTTP surface together:
 //! [`ApiDoc`](crate::api::rest::ApiDoc) is the utoipa OpenAPI document,
-//! [`create_router`](crate::api::rest::create_router) mounts every
-//! handler under `/api` (plus `/metrics.prom` and the Swagger UI at
-//! `/swagger-ui`), and [`serve`](crate::api::rest::serve) binds the
-//! configured host/port and runs the server. Handlers live in
+//! and [`events_routes`](crate::api::rest::events_routes) and
+//! [`metrics_routes`](crate::api::rest::metrics_routes) are the route
+//! tables `App::routes` mounts. Handlers live in
 //! [`handlers`](crate::api::rest::handlers), shared services in
 //! [`state`](crate::api::rest::state)
 //! ([`AppState`](crate::api::rest::AppState)).
-//!
-//! ```ignore
-//! use event_service::api::rest::{create_router, serve, AppState};
-//!
-//! // `state` is an AppState built from a DB connection + services.
-//! let app = create_router(state.clone());   // an axum::Router
-//! serve(state).await?;                        // binds and serves
-//! ```
 
-use axum::{
-    Router,
-    routing::{delete, get, post, put},
-};
-use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 
 /// Bearer-token authentication extractor + `whoami` endpoint.
 pub mod auth;
@@ -134,89 +118,9 @@ pub use state::AppState;
 )]
 pub struct ApiDoc;
 
-/// Build the full `axum::Router`: every `/api/*` route bound to its
-/// handler with shared [`AppState`], plus the top-level
-/// `/metrics.prom` scrape endpoint, the Swagger UI, and a permissive
-/// CORS layer.
-///
-/// The blanket-enforcement middleware ([`auth::require_auth_mw`]) is
-/// layered unconditionally (inside CORS, so preflight requests still
-/// pass); it is a near-noop unless `EVENT_REQUIRE_AUTH` was truthy at
-/// [`AppState`] construction.
-pub fn create_router(state: AppState) -> Router {
-    let api_routes = Router::new()
-        // Health
-        .route("/health", get(handlers::health_check))
-        // Auth — echo verified bearer-token claims
-        .route("/whoami", get(auth::whoami))
-        // Event CRUD
-        .route("/events", post(handlers::create_event))
-        .route("/events/{id}", get(handlers::get_event))
-        .route("/events/{id}", put(handlers::update_event))
-        .route("/events/{id}", delete(handlers::delete_event))
-        // Search
-        .route("/events/search", get(handlers::search_events))
-        // Matching
-        .route("/events/match", post(handlers::match_event))
-        // Duplicate detection & deduplication
-        .route("/events/check-duplicates", post(handlers::check_duplicates))
-        .route("/events/merge", post(handlers::merge_events))
-        .route("/events/deduplicate", post(handlers::batch_deduplicate))
-        // Privacy
-        .route("/events/{id}/export", get(handlers::export_event_data))
-        .route("/events/{id}/masked", get(handlers::get_event_masked))
-        // Audit
-        .route("/events/{id}/audit", get(handlers::get_event_audit_logs))
-        .route("/audit/recent", get(handlers::get_recent_audit_logs))
-        // Integrity verification. Guarded like everything else under
-        // `/api`, and reads, so the default ABAC policy admits any
-        // authenticated caller.
-        .route("/records/verify", get(handlers::verify_record_integrity))
-        .route("/audit/verify", get(handlers::verify_audit_integrity))
-        .route("/audit/user", get(handlers::get_user_audit_logs))
-        .with_state(state.clone());
-
-    // FHIR R5 `Appointment` surface — the SAME real handlers the axa
-    // production router serves (`controllers::fhir`), assembled as an
-    // axum router so this hand-written harness stays identical to
-    // production (it replaced the earlier `/fhir/Event` `501` stub).
-    let fhir_routes = crate::controllers::fhir::axum_router(state.clone());
-
-    Router::new()
-        // All entity/audit routes live under `/api`; `/metrics.prom`
-        // sits at the root so a default Prometheus scrape config finds
-        // it, and the Swagger UI is mounted at the root as well.
-        .nest("/api", api_routes)
-        .nest("/fhir", fhir_routes)
-        .route("/metrics.prom", get(handlers::metrics_prom))
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        // Blanket auth enforcement (default-off; scoped to /api by
-        // `auth::enforce`); layered inside CORS so preflights pass.
-        .layer(axum::middleware::from_fn_with_state(
-            state,
-            auth::require_auth_mw,
-        ))
-        // Header-based API versioning (`Accepts-version`): negotiates the
-        // version for `/api/*` and stamps it on the response
-        // (`agents/share/api-versioning.md`).
-        .layer(axum::middleware::from_fn(version::require_version_mw))
-        // Permissive CORS: this is a backend service fronted elsewhere;
-        // tighten if exposed directly to browsers.
-        .layer(CorsLayer::permissive())
-        // Outermost layer runs first, so the request span wraps CORS,
-        // versioning, and the auth guard too (PRO-H9). Wired onto this
-        // standalone surface as well as `App::after_routes` — the two
-        // router-construction paths this crate carries (see
-        // `crate::observability::trace_mw`'s doc comment) must behave
-        // identically, the same precedent `auth::require_auth_mw` already
-        // set by being layered on both.
-        .layer(axum::middleware::from_fn(crate::observability::trace_mw))
-}
-
 /// Native axa controller routes (idiomatic path): the `/api` surface
 /// as an axa `Routes`; handlers extract `AppState` from the `AppContext`
-/// shared store via `FromRef`. `create_router` is retained for the
-/// integration tests. The root `/metrics.prom` route is [`metrics_routes`].
+/// shared store via `FromRef`. The root `/metrics.prom` route is [`metrics_routes`].
 #[must_use]
 pub fn events_routes() -> axa::routes::Routes {
     use axa::prelude::{Routes, get, post};

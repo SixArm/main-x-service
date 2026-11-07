@@ -9,13 +9,11 @@
 //! not a defect worth deleting helpers over.
 #![allow(dead_code)]
 
+use axa::{AppContext, Environment, config::Defaults, testing::TestApp};
 use axum::Router;
 use worker_service::{
-    api::rest::{AppState, create_router},
-    config::Config,
-    db::create_connection,
-    matching::ProbabilisticMatcher,
-    search::SearchEngine,
+    api::rest::AppState, app::App, config::Config, db::create_connection,
+    matching::ProbabilisticMatcher, search::SearchEngine,
 };
 
 /// Builds a fully wired [`AppState`] for tests: loads config from the
@@ -50,33 +48,44 @@ pub async fn create_test_app_state() -> AppState {
     AppState::new(db, search_engine, matcher, config)
 }
 
-/// Builds the full application [`Router`] over a fresh test [`AppState`],
-/// ready to drive with `tower`'s `oneshot`.
+/// Boot the real application: the router production serves.
 pub async fn create_test_router() -> Router {
-    let state = create_test_app_state().await;
-    create_router(state)
+    let config = Config::from_env().expect("Failed to load test config");
+    // `after_routes` opens the index but does not create its directory.
+    std::fs::create_dir_all(&config.search.index_path)
+        .expect("Failed to create the search index directory");
+    App::boot_test()
+        .await
+        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .router
+        .expect("boot_test builds the router")
 }
 
-/// Builds the full application [`Router`] over an [`AppState`] backed by a
-/// **disconnected** `SeaORM` connection and a throwaway search index — no live
-/// database required.
+/// The real application router over a **disconnected** `SeaORM` connection and
+/// a throwaway search index, so no live database is required.
 ///
 /// Suitable only for tests that assert on routing/extractor behaviour *before*
 /// any database access (e.g. a malformed path that the `Path<Uuid>` extractor
 /// rejects with `400`). Any handler that actually queries the database will
 /// fail against this router.
-pub fn create_test_router_no_db() -> Router {
-    let config = Config::default();
-    let temp_dir = tempfile::tempdir().expect("Failed to create temp dir for search index");
-    let search_engine = SearchEngine::new(temp_dir.path().to_str().unwrap())
-        .expect("Failed to create search engine");
-    let matcher = ProbabilisticMatcher::new(config.matching.clone());
-    let db = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
-    let state = AppState::new(db, search_engine, matcher, config);
+pub async fn create_test_router_no_db() -> Router {
+    let index = tempfile::tempdir().expect("Failed to create temp dir for search index");
+    // SAFETY: the only un-gated test using this helper runs before any other
+    // thread in this binary reads the variable, and the DB-gated suites run
+    // with `--test-threads=1` (`ci-check.sh test-db`).
+    unsafe {
+        std::env::set_var("SEARCH_INDEX_PATH", index.path());
+    }
     // Keep the temp index alive for the lifetime of the test by leaking it;
     // tests are short-lived processes and this avoids a dangling index dir.
-    std::mem::forget(temp_dir);
-    create_router(state)
+    std::mem::forget(index);
+    let environment = Environment::Test;
+    let config = axa::config::Config::from_env(&environment, &Defaults::default())
+        .expect("Failed to load test config");
+    let db = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
+    App::router(&AppContext::new(environment, db, config))
+        .await
+        .expect("Failed to build the router")
 }
 
 /// Returns a worker family name unique to this instant

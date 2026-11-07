@@ -83,7 +83,23 @@ static ENGINE: OnceLock<Option<SearchEngine>> = OnceLock::new();
 /// [`DEFAULT_INDEX_PATH`].
 #[must_use]
 pub fn index_path() -> String {
-    std::env::var(INDEX_PATH_ENV).unwrap_or_else(|_| DEFAULT_INDEX_PATH.to_string())
+    std::env::var(INDEX_PATH_ENV).unwrap_or_else(|_| default_index_path())
+}
+
+/// [`DEFAULT_INDEX_PATH`].
+#[cfg(not(test))]
+fn default_index_path() -> String {
+    DEFAULT_INDEX_PATH.to_string()
+}
+
+/// A per-process directory, because unit tests that reach the engine share one
+/// process and have no setup of their own to set [`INDEX_PATH_ENV`] in.
+#[cfg(test)]
+fn default_index_path() -> String {
+    std::env::temp_dir()
+        .join(format!("case-service-unit-index-{}", std::process::id()))
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// The process-wide search engine, or `None` when the index could not be

@@ -273,6 +273,7 @@ pub async fn erase<C: ConnectionTrait>(
             db,
             id,
             actor,
+            ctx.client,
             erasure_context(
                 ctx,
                 audit_rows_redacted,

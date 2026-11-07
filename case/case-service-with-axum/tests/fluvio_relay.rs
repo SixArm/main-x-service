@@ -43,6 +43,13 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
 
     // Durable transport, so `create_and_emit` writes an outbox row.
     unsafe {
+        // Keep this binary's Tantivy index out of the working directory
+        // and its boot rebuild out of the way (see tests/requests/mod.rs).
+        std::env::set_var(
+            "CASE_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!("case-fluvio-relay-index-{}", std::process::id())),
+        );
+        std::env::set_var("CASE_SEARCH_BOOT_REINDEX", "0");
         std::env::set_var("CASE_EVENT_TRANSPORT", "outbox");
     }
 

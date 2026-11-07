@@ -44,7 +44,8 @@ is no hand-rolled `Config::from_env → AppState → serve` path.
   cloned `AppState` — a bind/serve failure is logged, not fatal, so the
   REST surface still boots even if `grpc_port` is unavailable — inserts
   the original `AppState` into axa's `shared_store`, and merges the
-  Swagger UI plus a permissive CORS layer onto axa's Axum router.
+  Swagger UI onto axa's Axum router. CORS comes from
+  `axa::middleware::apply`, per `CORS_ALLOWED_ORIGINS`.
 
 `proto/person.proto` (crate root, alongside `Cargo.toml`) and `build.rs`
 are the gRPC codegen inputs: `build.rs` compiles the `.proto` via
@@ -56,9 +57,8 @@ the generated code is never checked in.
 Migrations run via the axa CLI (`cargo run -- db migrate`) and are
 **auto-run in development** (`auto_migrate`, per
 [`README.md`](../README.md) / `config/development.yaml`); production
-applies them explicitly. The hand-written `create_router` /
-`SeaOrmPersonRepository`-backed `AppState` is retained for the
-integration tests.
+applies them explicitly. Integration tests drive the production router
+through `App::boot_test`.
 
 ### 8.2 Layering rules
 

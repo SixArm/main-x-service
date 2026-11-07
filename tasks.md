@@ -488,6 +488,9 @@
   row, and one address on every row looks like evidence while being
   none. 16 DB-gated green; the capture is pinned in
   `tests/concealment.rs`.
+  Later replaced: the first hop was the caller's to forge, so the address now
+  comes from `axa::client::ClientAddr`, which believes the header only from a
+  peer listed in `TRUSTED_PROXIES`.
 
   **Deferred then, on OTLP (spec T-22) — the premise was wrong.** The
   task assumed there was an OTLP pattern to adopt. There is not: person,

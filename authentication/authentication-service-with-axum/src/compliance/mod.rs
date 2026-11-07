@@ -36,5 +36,8 @@
 /// `integrity-mac` crate.
 pub mod mac;
 
+/// How long a row keeps the client's address.
+pub mod address_retention;
+
 /// Keyed integrity over `auth_events` rows.
 pub mod audit_integrity;

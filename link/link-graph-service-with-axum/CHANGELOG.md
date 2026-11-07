@@ -14,6 +14,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **A caller can no longer forge the address on a governed audit row.**
+  `user_ip` took the first `X-Forwarded-For` hop as sent, so any caller could
+  write any address into the trail. It now comes from `axa::client::ClientAddr`,
+  which believes that header only from a peer listed in `TRUSTED_PROXIES`, and
+  then reads it from the right. **Set `TRUSTED_PROXIES` in production behind a
+  proxy**, or every row records the proxy's address.
+
 ### Changed — Loco replaced by axa
 
 - **Loco removed.** The service is now plain Axum plus shared helpers from

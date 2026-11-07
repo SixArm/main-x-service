@@ -78,6 +78,8 @@ pub mod handlers;
 pub mod jsonl;
 /// The import/export per-row/per-job pipeline (the testable core).
 pub mod pipeline;
+/// Reconcile `bulk_jobs` with the job queue, so a lost job reaches `failed`.
+pub mod reconcile;
 /// Organization's declared upsert stable key (§10.7: LEI → DUNS → `pid`).
 pub mod stable_key;
 /// Artifact storage abstraction + local-filesystem implementation.

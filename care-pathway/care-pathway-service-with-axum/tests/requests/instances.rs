@@ -13,6 +13,7 @@ use serial_test::serial;
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 #[allow(clippy::too_many_lines)] // one seeded pathway, the whole instance surface
 async fn instance_layer_round_trip() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         // A chronic-condition template (PrimaryCare).
         let template: Value = request

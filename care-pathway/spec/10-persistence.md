@@ -100,3 +100,13 @@ Care-pathway-specific notes:
   full `CarePathway` payload, so JSONL round-trips losslessly and CSV
   flattens per §9.4 (every repeated / nested field is a JSON-encoded cell);
   no bulk path bypasses the JSONB round-trip invariant (§5.5).
+
+**Lost jobs (`src/bulk/reconcile.rs`).** A worker process
+reconciles `bulk_jobs` with `axa_queue` at start and every five minutes, linking
+them by the queue row's `name` and `args->>'job_id'`. A `queued` or `running` job
+moves to `failed` when no queue row for it is alive and either one has `failed`,
+or it has none and has not changed for 15 minutes (the row commits before the job
+is queued). Both workers count: `BulkJobWorker` for native jobs and
+`BulkExportWorker` for FHIR `$export`. `error` records `lost by the job queue`.
+See [bulk import/export §3](../../agents/share/bulk-import-export.md).
+

@@ -93,6 +93,16 @@ object store (S3-compatible in deployment, local fs in dev — config-driven,
 §12), referenced by short-lived, access-controlled URLs. Rows + artifacts are
 TTL'd (`expires_at`).
 
+### Lost jobs
+
+`bulk_jobs` and `axa_queue` are separate bookkeeping, linked by the queue row's
+`name` and `args->>'job_id'`. A worker that dies cannot write `failed`, so
+`crate::bulk::reconcile` does, on a timer, in every process serving the queue. A
+`queued` or `running` job moves to `failed` when no queue row for it is alive and
+either one has failed, or it has none and has not changed for 15 minutes. A job
+axa requeued still has a live row, so it is left alone. See
+[runbooks/bulk-job-recovery.md](runbooks/bulk-job-recovery.md).
+
 ## 4. API surface (uniform, per entity service)
 
 ```

@@ -4,13 +4,7 @@
 //! `CourseRepository`). Swagger UI is served at `/swagger-ui` with the
 //! raw `OpenAPI` 3 JSON at `/api-docs/openapi.json`.
 
-use axum::{
-    Router,
-    routing::{get, post},
-};
-use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 
 /// Bearer-token authentication extractor + `whoami` endpoint + blanket
 /// enforcement middleware.
@@ -113,102 +107,9 @@ pub use state::AppState;
 /// JSON at `/api-docs/openapi.json`.
 pub struct ApiDoc;
 
-/// Build the REST router with the given application state.
-pub fn create_router(state: AppState) -> Router {
-    let api_routes = Router::new()
-        .route("/health", get(handlers::health))
-        // Auth — echo verified bearer-token claims.
-        .route("/whoami", get(auth::whoami))
-        // Course list + create.
-        .route(
-            "/courses",
-            get(handlers::not_implemented).post(handlers::create_course),
-        )
-        // Literal segments declared before the `/{id}` catch-all.
-        .route("/courses/search", get(handlers::search_courses))
-        .route("/courses/match", post(handlers::match_course))
-        .route(
-            "/courses/check-duplicates",
-            post(handlers::check_duplicates),
-        )
-        .route("/courses/merge", post(handlers::merge_courses))
-        .route("/courses/deduplicate", post(handlers::deduplicate))
-        // Persisted review queue (T-27).
-        .route("/courses/review-queue", get(handlers::get_review_queue))
-        .route(
-            "/courses/review-queue/{id}/decision",
-            post(handlers::review_decision),
-        )
-        // Course CRUD by id.
-        .route(
-            "/courses/{id}",
-            get(handlers::get_course)
-                .put(handlers::update_course)
-                .delete(handlers::delete_course),
-        )
-        // CourseInstance sub-resource (T-8, FR-10..FR-13).
-        .route(
-            "/courses/{id}/instances",
-            get(handlers::list_instances).post(handlers::create_instance),
-        )
-        .route(
-            "/courses/{id}/instances/{instance_id}",
-            get(handlers::get_instance)
-                .put(handlers::update_instance_handler)
-                .delete(handlers::delete_instance),
-        )
-        // Privacy / GDPR (T-10, FR-15 + FR-16).
-        .route("/courses/{id}/export", get(handlers::export_course_data))
-        .route("/courses/{id}/masked", get(handlers::masked_course))
-        // Audit (T-9, FR-14 + FR-17).
-        .route("/courses/{id}/audit", get(handlers::audit_for_course))
-        .route("/audit/recent", get(handlers::audit_recent))
-        // Integrity verification. Guarded like everything else under
-        // `/api`, and reads, so the default ABAC policy admits any
-        // authenticated caller.
-        .route("/records/verify", get(handlers::verify_record_integrity))
-        .route("/audit/verify", get(handlers::verify_audit_integrity))
-        .with_state(state.clone());
-
-    Router::new()
-        .nest("/api", api_routes)
-        // Prometheus metrics at the application root (not under `/api`),
-        // alongside the docs. Public — no bearer token needed to scrape.
-        .route("/metrics.prom", get(handlers::metrics_prom))
-        // Observe every request on `http_requests_total{path,status}`
-        // (T-18). `route_layer`, not `layer`: it must run after route
-        // matching so `MatchedPath` resolves — see
-        // `crate::metrics::track_http_requests_mw`.
-        .route_layer(axum::middleware::from_fn(
-            crate::metrics::track_http_requests_mw,
-        ))
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        // Blanket auth enforcement (default-off; scoped to /api + /fhir by
-        // `auth::enforce`); layered inside CORS so preflights pass.
-        .layer(axum::middleware::from_fn_with_state(
-            state,
-            auth::require_auth_mw,
-        ))
-        // Header-based API versioning (`Accepts-version`): negotiates the
-        // version for `/api/*` and stamps it on the response
-        // (`agents/share/api-versioning.md`).
-        .layer(axum::middleware::from_fn(version::require_version_mw))
-        .layer(CorsLayer::permissive())
-        // Outermost layer runs first, so the request span wraps CORS,
-        // versioning, and the auth guard too (PRO-H12). Wired onto this
-        // standalone surface as well as `App::after_routes` — the two
-        // router-construction paths this crate carries (see
-        // `crate::observability::trace_mw`'s doc comment) must behave
-        // identically, the same precedent `auth::require_auth_mw` already
-        // set by being layered on both.
-        .layer(axum::middleware::from_fn(crate::observability::trace_mw))
-}
-
-/// Native axa controller routes (idiomatic path). Mirrors
-/// [`create_router`]'s `/api` surface, but as an axa `Routes` whose
-/// handlers extract `AppState` from the `AppContext` shared store via
-/// `FromRef`. Registered in `App::routes`; `create_router` is retained
-/// for the `tower::oneshot`-based integration tests.
+/// Native axa controller routes (idiomatic path): the `/api` surface as an axa
+/// `Routes` whose handlers extract `AppState` from the `AppContext` shared
+/// store via `FromRef`. Registered in `App::routes`.
 #[must_use]
 pub fn courses_routes() -> axa::routes::Routes {
     use axa::prelude::{Routes, get, post};
@@ -306,13 +207,15 @@ mod tests {
     #[tokio::test]
     async fn metrics_endpoint_serves_text_exposition_and_reflects_increments() {
         use axum::{
+            Router,
             body::Body,
             http::{Method, Request, StatusCode, header::CONTENT_TYPE as CT_HEADER},
+            routing::get,
         };
         use tower::ServiceExt;
 
         // The metrics handler reaches the process-wide registry directly,
-        // so no AppState is needed — mirror the root mount in `create_router`.
+        // so no AppState is needed — mirror the root mount in `metrics_routes`.
         let app = Router::new().route("/metrics.prom", get(handlers::metrics_prom));
 
         let scrape = |app: Router| async move {

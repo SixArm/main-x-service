@@ -9,6 +9,7 @@
 //! `Bundle` of type `searchset`, and `GET /fhir/metadata` returns the
 //! `CapabilityStatement`. No doctests — these require a live [`AppState`].
 
+use axa::client::ClientAddr;
 use axum::{
     body::Body,
     extract::{Path, Query, State},
@@ -20,6 +21,7 @@ use uuid::Uuid;
 
 use super::{FhirOperationOutcome, FhirWorker, from_fhir_worker, to_fhir_worker};
 use crate::api::rest::AppState;
+use crate::api::rest::auth::{MaybeAuthUser, audit_context_of};
 
 /// Builds an `application/fhir+json` [`Response`] with the given status and an
 /// optional `Location` header.
@@ -110,6 +112,8 @@ pub async fn get_fhir_worker(State(state): State<AppState>, Path(id): Path<Uuid>
 /// indexes, and returns the created resource (`201`) with a `Location` header.
 pub async fn create_fhir_worker(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
+    client: ClientAddr,
     body: axum::body::Bytes,
 ) -> Response {
     let fhir_worker: FhirWorker = match serde_json::from_slice(&body) {
@@ -127,7 +131,11 @@ pub async fn create_fhir_worker(
             if worker.id == Uuid::nil() {
                 worker.id = Uuid::new_v4();
             }
-            match state.worker_repository.create(&worker).await {
+            match state
+                .worker_repository
+                .create(&worker, &audit_context_of(&caller, client))
+                .await
+            {
                 Ok(created_worker) => {
                     if let Err(e) = state.search_engine.index_worker(&created_worker) {
                         tracing::warn!("Failed to index worker in search engine: {}", e);
@@ -163,6 +171,8 @@ pub async fn create_fhir_worker(
 pub async fn update_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+    client: ClientAddr,
     body: axum::body::Bytes,
 ) -> Response {
     let fhir_worker: FhirWorker = match serde_json::from_slice(&body) {
@@ -178,7 +188,11 @@ pub async fn update_fhir_worker(
     match from_fhir_worker(&fhir_worker) {
         Ok(mut worker) => {
             worker.id = id;
-            match state.worker_repository.update(&worker).await {
+            match state
+                .worker_repository
+                .update(&worker, &audit_context_of(&caller, client))
+                .await
+            {
                 Ok(updated_worker) => {
                     if let Err(e) = state.search_engine.index_worker(&updated_worker) {
                         tracing::warn!("Failed to update worker in search engine: {}", e);
@@ -198,8 +212,17 @@ pub async fn update_fhir_worker(
 
 /// `DELETE /fhir/Practitioner/{id}` — soft-deletes the worker, returning `204`
 /// (empty body) or a `database-error` outcome (`500`).
-pub async fn delete_fhir_worker(State(state): State<AppState>, Path(id): Path<Uuid>) -> Response {
-    match state.worker_repository.delete(&id).await {
+pub async fn delete_fhir_worker(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+    client: ClientAddr,
+) -> Response {
+    match state
+        .worker_repository
+        .delete(&id, &audit_context_of(&caller, client))
+        .await
+    {
         Ok(()) => fhir_response(StatusCode::NO_CONTENT, Vec::new(), None),
         Err(e) => fhir_error(
             StatusCode::INTERNAL_SERVER_ERROR,

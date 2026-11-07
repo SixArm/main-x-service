@@ -23,11 +23,9 @@
 //! key set at `/.well-known/paseto-keys`. In development the magic link
 //! is written to the tracing log (no SMTP required).
 
-use std::net::SocketAddr;
-
+use axa::client::ClientAddr;
 use axa::error::ErrorDetail;
 use axa::prelude::*;
-use axum::extract::ConnectInfo;
 use axum::http::{HeaderMap, StatusCode, header::USER_AGENT};
 use serde::{Deserialize, Serialize};
 
@@ -42,15 +40,14 @@ use crate::{
     views::auth::{AccountAuditExport, AccountExport, CurrentResponse, LoginResponse},
 };
 
-/// The best-effort connecting-peer address (T-14), as recorded on
-/// sessions/`auth_events`. This is the raw TCP peer, not
-/// `X-Forwarded-For` — behind a reverse proxy it names the proxy, not
-/// the original client; adding proxy-awareness is a documented follow-up
-/// rather than silently assumed (spec §16). Advisory audit context, like
-/// `user_agent`: never authenticated, never trusted for a security
+/// The client's address (T-14), as recorded on sessions/`auth_events`.
+/// [`ClientAddr`] resolves it: the connecting peer, or behind a proxy listed in
+/// `TRUSTED_PROXIES`, the entry that proxy wrote in `X-Forwarded-For`. Without
+/// `TRUSTED_PROXIES` set, a service behind a proxy records the proxy's address.
+/// Advisory audit context, like `user_agent`: never trusted for a security
 /// decision.
-fn source_ip_of(addr: &ConnectInfo<SocketAddr>) -> String {
-    addr.0.ip().to_string()
+fn source_ip_of(ClientAddr(client): ClientAddr) -> Option<String> {
+    client.map(|address| address.to_string())
 }
 
 /// The `User-Agent` request header, if present and valid UTF-8 — the
@@ -257,10 +254,10 @@ fn warn_missing_allowed_origins() {
 #[debug_handler]
 async fn signup(
     State(ctx): State<AppContext>,
-    connect_info: ConnectInfo<SocketAddr>,
+    client: ClientAddr,
     Json(params): Json<SignupParams>,
 ) -> Result<Response> {
-    let source_ip = source_ip_of(&connect_info);
+    let source_ip = source_ip_of(client);
     // Throttle per email before any work, so abuse cannot email-bomb a
     // victim or probe for accounts. Over the limit → 429, no token issued.
     if rate_limit::check(&ctx.db, &params.email).await.is_err() {
@@ -271,7 +268,7 @@ async fn signup(
             Some(&params.email),
             None,
             Some("rate_limited"),
-            Some(&source_ip),
+            source_ip.as_deref(),
         )
         .await;
         return Err(rate_limited());
@@ -301,7 +298,7 @@ async fn signup(
                         Some(&params.email),
                         None,
                         Some("rejected"),
-                        Some(&source_ip),
+                        source_ip.as_deref(),
                     )
                     .await;
                     return format::empty_json();
@@ -315,7 +312,7 @@ async fn signup(
                     Some(&params.email),
                     None,
                     Some("rejected"),
-                    Some(&source_ip),
+                    source_ip.as_deref(),
                 )
                 .await;
                 return format::empty_json();
@@ -332,7 +329,7 @@ async fn signup(
         Some(&user.email),
         Some(user.pid),
         Some(if existing { "existing" } else { "created" }),
-        Some(&source_ip),
+        source_ip.as_deref(),
     )
     .await;
     // Locale selection affects only the rendered email language; the
@@ -354,10 +351,10 @@ async fn signup(
 #[debug_handler]
 async fn request_magic_link(
     State(ctx): State<AppContext>,
-    connect_info: ConnectInfo<SocketAddr>,
+    client: ClientAddr,
     Json(params): Json<MagicLinkParams>,
 ) -> Result<Response> {
-    let source_ip = source_ip_of(&connect_info);
+    let source_ip = source_ip_of(client);
     // Throttle per email before any lookup (see `signup`).
     if rate_limit::check(&ctx.db, &params.email).await.is_err() {
         Metrics::global().rate_limited_total.inc();
@@ -367,7 +364,7 @@ async fn request_magic_link(
             Some(&params.email),
             None,
             Some("rate_limited"),
-            Some(&source_ip),
+            source_ip.as_deref(),
         )
         .await;
         return Err(rate_limited());
@@ -383,7 +380,7 @@ async fn request_magic_link(
             Some(&params.email),
             None,
             Some("unknown_email"),
-            Some(&source_ip),
+            source_ip.as_deref(),
         )
         .await;
         return format::empty_json();
@@ -395,7 +392,7 @@ async fn request_magic_link(
         Some(&user.email),
         Some(user.pid),
         Some("issued"),
-        Some(&source_ip),
+        source_ip.as_deref(),
     )
     .await;
     Metrics::global().magic_link_issued_total.inc();
@@ -415,10 +412,10 @@ async fn request_magic_link(
 async fn verify(
     Path(token): Path<String>,
     State(ctx): State<AppContext>,
-    connect_info: ConnectInfo<SocketAddr>,
+    client: ClientAddr,
     headers: HeaderMap,
 ) -> Result<Response> {
-    let source_ip = source_ip_of(&connect_info);
+    let source_ip = source_ip_of(client);
     // SEC-A4: atomically consume the token — the clear-and-return is a single
     // UPDATE, so two concurrent redemptions of the same link cannot both
     // succeed (only one gets a row; the loser gets `EntityNotFound` → 401).
@@ -431,7 +428,7 @@ async fn verify(
             None,
             None,
             Some("invalid_or_expired"),
-            Some(&source_ip),
+            source_ip.as_deref(),
         )
         .await;
         return unauthorized("invalid or expired magic link");
@@ -478,7 +475,7 @@ async fn verify(
         &sid,
         user.pid,
         user_agent_of(&headers),
-        Some(source_ip.clone()),
+        source_ip.clone(),
         sessions::session_data(&user.attributes, &csrf_token),
     )
     .await?;
@@ -489,7 +486,7 @@ async fn verify(
         Some(&user.email),
         Some(user.pid),
         Some("ok"),
-        Some(&source_ip),
+        source_ip.as_deref(),
     )
     .await;
     Metrics::global().magic_link_redeemed_total.inc();
@@ -644,7 +641,7 @@ async fn me(auth: AuthUser, State(ctx): State<AppContext>) -> Result<Response> {
 async fn signout(
     auth: AuthUser,
     State(ctx): State<AppContext>,
-    connect_info: ConnectInfo<SocketAddr>,
+    client: ClientAddr,
 ) -> Result<Response> {
     let AuthUser(claims) = auth;
     if let Ok(session) = sessions::Model::find_by_jid(&ctx.db, &claims.sid).await {
@@ -656,7 +653,7 @@ async fn signout(
         Some(&claims.email),
         uuid::Uuid::parse_str(&claims.sub).ok(),
         None,
-        Some(&source_ip_of(&connect_info)),
+        source_ip_of(client).as_deref(),
     )
     .await;
     Metrics::global().signout_total.inc();
@@ -769,7 +766,7 @@ async fn account_audit(auth: AuthUser, State(ctx): State<AppContext>) -> Result<
 async fn delete_account(
     auth: AuthUser,
     State(ctx): State<AppContext>,
-    connect_info: ConnectInfo<SocketAddr>,
+    client: ClientAddr,
 ) -> Result<Response> {
     let AuthUser(claims) = auth;
     let user = require_active_user(&ctx, &claims).await?;
@@ -794,7 +791,7 @@ async fn delete_account(
         None,
         Some(pid),
         Some("ok"),
-        Some(&source_ip_of(&connect_info)),
+        source_ip_of(client).as_deref(),
     )
     .await;
 

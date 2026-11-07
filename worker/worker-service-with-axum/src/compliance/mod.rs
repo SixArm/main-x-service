@@ -30,6 +30,8 @@
 //! | `WORKER_AUDIT_FAIL_CLOSED` | off | Refuse a read (`503`) when its audit row cannot be written, rather than serving data unaccounted for. |
 
 /// Tamper-evident audit history: the SHA-256 hash chain over `audit_log`.
+/// How long an audit row keeps the address of the caller.
+pub mod address_retention;
 pub mod audit_chain;
 /// Read/disclosure auditing: purpose-of-use capture and access records.
 /// External witness: signed chain checkpoints kept off-box, so wholesale

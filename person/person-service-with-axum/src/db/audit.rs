@@ -350,12 +350,13 @@ impl AuditLogRepository {
         conn: &C,
         entity_id: Uuid,
         actor: Option<&str>,
+        client: Option<std::net::IpAddr>,
         context: JsonValue,
         disclosure: bool,
     ) -> Result<()> {
         let ctx = AuditContext {
             user_id: actor.map(ToString::to_string),
-            ip_address: None,
+            ip_address: client.map(|address| address.to_string()),
             user_agent: None,
         };
         self.log_chained(
@@ -411,6 +412,8 @@ impl AuditLogRepository {
         // Truncated to microseconds so the value hashed here is the value
         // Postgres returns (see `compliance::audit_chain`).
         let timestamp = audit_chain::trunc_micros(time::OffsetDateTime::now_utc());
+        let committed = ctx.ip_address.as_deref().map(audit_chain::commit_address);
+        let (ip_salt, ip_commitment) = committed.unzip();
         let mut chain_input = audit_chain::ChainInput {
             prev_hash: prev_hash.as_deref(),
             id,
@@ -422,6 +425,7 @@ impl AuditLogRepository {
             old_values: old_values.as_ref(),
             new_values: new_values.as_ref(),
             ip_address: ctx.ip_address.as_deref(),
+            ip_commitment: ip_commitment.as_deref(),
             user_agent: ctx.user_agent.as_deref(),
             context: context.as_ref(),
             disclosure,
@@ -456,6 +460,8 @@ impl AuditLogRepository {
             context: Set(context),
             disclosure: Set(disclosure),
             redacted_at: Set(None),
+            ip_salt: Set(ip_salt),
+            ip_commitment: Set(ip_commitment),
             // `seq` is a BIGSERIAL: let Postgres assign the append order.
             seq: sea_orm::ActiveValue::NotSet,
         };
@@ -836,6 +842,42 @@ mod chain_tests {
         // crate — a tampered row left here surfaced later as a `content`
         // break in the integration suite's `/api/audit/verify` test,
         // which looked like a product defect and was not.
+        clear(&db).await;
+    }
+
+    /// The sweep empties an old row's address and leaves the row verifying
+    /// with its content still checked, which `redacted_at` would not.
+    #[tokio::test]
+    #[serial]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn an_old_address_goes_and_the_chain_still_verifies() {
+        use crate::compliance::address_retention::{scrub, unscrubbable};
+
+        let db = connect().await;
+        clear(&db).await;
+        let repo = AuditLogRepository::new(db.clone());
+        for _ in 0..2 {
+            repo.log_create("person", Uuid::new_v4(), serde_json::json!({}), &ctx())
+                .await
+                .expect("log create");
+        }
+
+        assert_eq!(scrub(&db, 7).await.expect("scrub"), 0, "nothing is old yet");
+        // A retention of no days takes every row before this moment.
+        assert_eq!(scrub(&db, 0).await.expect("scrub"), 2);
+        assert_eq!(scrub(&db, 0).await.expect("scrub"), 0, "nothing left to do");
+
+        let rows = repo.chain_tail(10).await.expect("rows");
+        assert!(
+            rows.iter()
+                .all(|row| row.ip_address.is_none() && row.ip_salt.is_none())
+        );
+        assert!(rows.iter().all(|row| row.ip_commitment.is_some()));
+        let report = repo.verify_chain(1000).await.expect("verify");
+        assert!(report.verified, "{:?}", report.breaks);
+        assert_eq!(report.intact, 2, "content was checked, not skipped");
+        assert_eq!(report.redacted, 0);
+        assert_eq!(unscrubbable(&db, 0).await.expect("count"), 0);
         clear(&db).await;
     }
 

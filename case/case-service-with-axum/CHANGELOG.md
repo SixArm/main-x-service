@@ -9,7 +9,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **`/api/compliance/sbom` needs a verified caller,** even with `CASE_REQUIRE_AUTH` off.
+
 ### Fixed
+
+- **The test suite no longer writes to `data/search-index`.** Isolation was
+  opt-in per test, and the first test to touch the engine pins its path for the
+  whole process, so one test without it put every later test on the default
+  directory. Stale documents from earlier runs then used up the result cap, and
+  search tests failed with no hits from the second or third run on. Every test
+  target now uses a temporary directory.
+
+- **Lost bulk jobs now reach `failed`.** When axa gave up on a job, `axa_queue`
+  said `failed` but `bulk_jobs` stayed `queued` or `running` for ever, because
+  the worker that would have updated it was the thing that died. A worker
+  process now reconciles the two at start and every five minutes.
 
 - **Bulk jobs now run in production.** The image starts with `start --all`.
   Nothing ran a worker before, so a production import was accepted and then sat

@@ -28,6 +28,7 @@
 //! **bulk endpoint** ([`bulk_links`]) remains the aggregator's sync
 //! reconciliation path (design §8).
 
+use axa::client::ClientAddr;
 use std::collections::BTreeMap;
 
 use axum::Json;
@@ -44,9 +45,8 @@ use authentication_verifier::Action;
 use sea_orm::TransactionTrait;
 use time::OffsetDateTime;
 
-use super::auth::{MaybeAuthUser, authorize_record, person_resource_attrs};
+use super::auth::{MaybeAuthUser, audit_context_of, authorize_record, person_resource_attrs};
 use super::state::AppState;
-use crate::db::AuditContext;
 use crate::db::entity_links::{self, NewEdge};
 use crate::db::models::entity_links::Model as EntityLinkModel;
 use crate::db::outbox::OutboxInsert;
@@ -245,19 +245,6 @@ pub fn validate_edge(kind: &str, to_ref: &str) -> Result<(EdgeKind, EntityRef), 
     Ok((edge_kind, to))
 }
 
-/// Build the best-effort audit context for a link mutation from the
-/// verified caller (its `sub`, or `system` when unauthenticated).
-fn audit_ctx(caller: &MaybeAuthUser) -> AuditContext {
-    AuditContext {
-        user_id: caller
-            .claims()
-            .map(|c| c.sub.clone())
-            .or_else(|| Some("system".to_string())),
-        ip_address: None,
-        user_agent: None,
-    }
-}
-
 /// `404` — unknown person id. Wrapped in the crate's uniform
 /// `{success,data,error}` envelope ([`ApiResponse`]) like every other
 /// person REST endpoint — these link endpoints previously returned bare
@@ -416,6 +403,7 @@ pub async fn create_link(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(req): Json<LinkRequest>,
 ) -> Response {
     let person = match state.person_repository.get_by_id(&id).await {
@@ -482,7 +470,12 @@ pub async fn create_link(
     if let Ok(new_values) = serde_json::to_value(&view)
         && let Err(e) = state
             .audit_log
-            .log_create("person_link", link.id, new_values, &audit_ctx(&caller))
+            .log_create(
+                "person_link",
+                link.id,
+                new_values,
+                &audit_context_of(&caller, client),
+            )
             .await
     {
         tracing::warn!("failed to audit person link create: {e}");
@@ -674,6 +667,7 @@ pub async fn delete_link(
     State(state): State<AppState>,
     Path((id, link_id)): Path<(Uuid, Uuid)>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
 ) -> Response {
     let person = match state.person_repository.get_by_id(&id).await {
         Ok(Some(p)) => p,
@@ -706,7 +700,12 @@ pub async fn delete_link(
             if let Some(old_values) = old_values
                 && let Err(e) = state
                     .audit_log
-                    .log_delete("person_link", deleted.id, old_values, &audit_ctx(&caller))
+                    .log_delete(
+                        "person_link",
+                        deleted.id,
+                        old_values,
+                        &audit_context_of(&caller, client),
+                    )
                     .await
             {
                 tracing::warn!("failed to audit person link delete: {e}");
@@ -759,6 +758,7 @@ fn governed_bulk_authz() -> (Action, BTreeMap<String, Vec<String>>) {
 pub async fn bulk_links(
     State(state): State<AppState>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Query(params): Query<BulkParams>,
 ) -> Response {
     if let Err(r) = authorize_bulk(&caller) {
@@ -790,7 +790,7 @@ pub async fn bulk_links(
                     "person_links_bulk",
                     Uuid::nil(),
                     json!({ "kind": "same_identity", "count": edges.len(), "since": params.since }),
-                    &audit_ctx(&caller),
+                    &audit_context_of(&caller, client),
                 )
                 .await
             {

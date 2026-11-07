@@ -21,6 +21,7 @@
 //! (`/fhir/*` is **not** on the public allow-list); the action is derived
 //! from the HTTP method exactly as for REST (§8).
 
+use axa::client::ClientAddr;
 use axum::{
     body::Body,
     extract::{Path, Query, State},
@@ -161,6 +162,7 @@ fn render(person: &crate::models::Person, resource_type: &str) -> FhirPerson {
 pub async fn create_fhir_patient(
     State(state): State<AppState>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     body: axum::body::Bytes,
 ) -> Response {
     let fhir: FhirPerson = match serde_json::from_slice(&body) {
@@ -180,7 +182,7 @@ pub async fn create_fhir_patient(
     if person.id == Uuid::nil() {
         person.id = Uuid::new_v4();
     }
-    let ctx = audit_context_of(&caller);
+    let ctx = audit_context_of(&caller, client);
     match state.person_repository.create(&person, &ctx).await {
         Ok(created) => {
             if let Err(e) = state.search_engine.index_person(&created) {
@@ -213,6 +215,7 @@ pub async fn update_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     body: axum::body::Bytes,
 ) -> Response {
     let Some(id) = parse_id(&id) else {
@@ -233,7 +236,7 @@ pub async fn update_fhir_patient(
         Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", &e.to_string()),
     };
     person.id = id;
-    let ctx = audit_context_of(&caller);
+    let ctx = audit_context_of(&caller, client);
     match state.person_repository.update(&person, &ctx).await {
         Ok(updated) => {
             if let Err(e) = state.search_engine.index_person(&updated) {
@@ -256,11 +259,12 @@ pub async fn delete_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
 ) -> Response {
     let Some(id) = parse_id(&id) else {
         return bad_id();
     };
-    let ctx = audit_context_of(&caller);
+    let ctx = audit_context_of(&caller, client);
     match state.person_repository.delete(&id, &ctx).await {
         Ok(()) => fhir_response(StatusCode::NO_CONTENT, Vec::new(), None),
         Err(e) => fhir_error(
@@ -411,29 +415,6 @@ pub fn routes() -> axa::routes::Routes {
         )
         .add("/Person", get(search_fhir_person_alias))
         .add("/Person/{id}", get(get_fhir_person_alias))
-}
-
-/// The FHIR surface as a plain Axum [`Router`](axum::Router) carrying its
-/// own `AppState`, for the hand-written `create_router` test surface.
-/// Merged into the outer router **before** the auth layer, so `/fhir/*`
-/// is guarded exactly like `/api/*`.
-pub fn fhir_router(state: AppState) -> axum::Router {
-    use axum::routing::get;
-    axum::Router::new()
-        .route("/fhir/metadata", get(fhir_metadata))
-        .route(
-            "/fhir/Patient",
-            get(search_fhir_patients).post(create_fhir_patient),
-        )
-        .route(
-            "/fhir/Patient/{id}",
-            get(get_fhir_patient)
-                .put(update_fhir_patient)
-                .delete(delete_fhir_patient),
-        )
-        .route("/fhir/Person", get(search_fhir_person_alias))
-        .route("/fhir/Person/{id}", get(get_fhir_person_alias))
-        .with_state(state)
 }
 
 #[cfg(test)]

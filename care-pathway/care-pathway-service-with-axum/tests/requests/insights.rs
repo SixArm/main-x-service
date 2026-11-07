@@ -12,6 +12,7 @@ use serial_test::serial;
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 #[allow(clippy::too_many_lines)] // one seeded registry, five views
 async fn insight_views_round_trip() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let create = async |body: Value| {
             let response = request.post("/api/care-pathways").json(&body).await;

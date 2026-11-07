@@ -30,11 +30,11 @@
 //!     ../../../agents/share/authorization-attributes.md
 
 use std::collections::BTreeMap;
-use std::net::SocketAddr;
 
+use axa::client::ClientAddr;
 use axa::error::ErrorDetail;
 use axa::prelude::*;
-use axum::extract::{ConnectInfo, Path};
+use axum::extract::Path;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
@@ -134,7 +134,7 @@ async fn show_attributes(
     auth: AuthUser,
     Path(pid): Path<String>,
     State(ctx): State<AppContext>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    ClientAddr(client): ClientAddr,
 ) -> Result<Response> {
     let AuthUser(claims) = auth;
     require_admin(&claims)?;
@@ -146,7 +146,7 @@ async fn show_attributes(
         Some(&user.email),
         user.pid,
         &format!("pid:{}", claims.sub),
-        Some(&addr.ip().to_string()),
+        client.map(|address| address.to_string()).as_deref(),
     )
     .await;
     format::json(AttributesResponse::new(&user))
@@ -161,7 +161,7 @@ async fn replace_attributes(
     auth: AuthUser,
     Path(pid): Path<String>,
     State(ctx): State<AppContext>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    ClientAddr(client): ClientAddr,
     Json(body): Json<ReplaceAttributesBody>,
 ) -> Result<Response> {
     let AuthUser(claims) = auth;
@@ -192,7 +192,7 @@ async fn replace_attributes(
         "replace",
         None,
         &format!("pid:{}", claims.sub),
-        Some(&addr.ip().to_string()),
+        client.map(|address| address.to_string()).as_deref(),
     )
     .await;
     tracing::info!(target_pid = %target_pid, actor_pid = %claims.sub, "admin replaced user ABAC attributes");

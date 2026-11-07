@@ -1234,6 +1234,7 @@ async fn masked_view_and_export_are_404_for_unknown_pid() {
 async fn an_import_over_the_default_body_limit_is_accepted() {
     use axum_test::multipart::{MultipartForm, Part};
 
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let form = MultipartForm::new().add_text("format", "jsonl").add_part(
             "file",
@@ -1243,6 +1244,19 @@ async fn an_import_over_the_default_body_limit_is_accepted() {
         );
         let response = request.post("/api/cases/import").multipart(form).await;
         assert_eq!(response.status_code(), 202);
+    })
+    .await;
+}
+
+/// The SBOM names every dependency's exact version, so it needs a verified
+/// caller with `CASE_REQUIRE_AUTH` off too, when the guard lets everyone by.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn sbom_needs_a_caller_with_enforcement_off() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        assert_eq!(request.get("/api/compliance/sbom").await.status_code(), 401);
     })
     .await;
 }

@@ -249,8 +249,8 @@ bearer token on **every** route except the public allow-list:
 
 The list is the `PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` constants in
 `src/api/rest/auth.rs`; the pure `auth::enforce` decision is layered
-via `axum::middleware::from_fn_with_state` on both router surfaces
-(`create_router` and the axa router in `src/app.rs`). The flag is
+via `axum::middleware::from_fn_with_state` on the axa router in
+`src/app.rs`. The flag is
 read once at router construction — restart the service to change it.
 Unauthenticated requests to any non-public path return `401`. See
 `agents/share/jwt-enforcement.md` for the family-wide contract.

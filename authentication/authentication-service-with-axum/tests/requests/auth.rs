@@ -21,7 +21,7 @@
 
 use authentication_service::{
     app::App,
-    models::_entities::sessions,
+    models::_entities::{auth_events, sessions},
     models::{auth_events::Model as AuthEvent, users},
 };
 use axa::testing::prelude::*;
@@ -234,11 +234,119 @@ async fn can_redeem_magic_link_for_access_token() {
     .await;
 }
 
+/// Sign up a new email, sending `forwarded`, and return the address on its
+/// audit row. `TRUSTED_PROXIES` is read at boot, so `trusted` is set first.
+async fn signup_source_ip(trusted: Option<&str>, forwarded: &'static str) -> Option<String> {
+    unsafe {
+        match trusted {
+            Some(list) => std::env::set_var("TRUSTED_PROXIES", list),
+            None => std::env::remove_var("TRUSTED_PROXIES"),
+        }
+    }
+    let email = format!("client-address-{}@example.com", uuid::Uuid::new_v4());
+    let found = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let seen = found.clone();
+    request::<App, _, _>(|request, ctx| async move {
+        let response = request
+            .post("/api/auth/signup")
+            .add_header(
+                axum::http::HeaderName::from_static("x-forwarded-for"),
+                axum::http::HeaderValue::from_static(forwarded),
+            )
+            .json(&serde_json::json!({ "email": email }))
+            .await;
+        assert_eq!(response.status_code(), 200);
+        let event = auth_events::Entity::find()
+            .filter(auth_events::Column::Email.eq(email.as_str()))
+            .one(&ctx.db)
+            .await
+            .unwrap()
+            .expect("signup writes an audit row");
+        *seen.lock().unwrap() = event.source_ip;
+    })
+    .await;
+    unsafe { std::env::remove_var("TRUSTED_PROXIES") };
+    std::sync::Arc::into_inner(found)
+        .unwrap()
+        .into_inner()
+        .unwrap()
+}
+
+/// A caller that is not a listed proxy cannot choose the address on the trail.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn a_forged_forwarded_header_does_not_reach_the_audit_row() {
+    let address = signup_source_ip(None, "6.6.6.6").await;
+    assert_eq!(address.as_deref(), Some("127.0.0.1"));
+}
+
+/// Behind a listed proxy the row names the client, not the proxy, and not the
+/// entry the caller wrote to the left of the one the proxy appended.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn behind_a_listed_proxy_the_audit_row_names_the_client() {
+    let address = signup_source_ip(Some("127.0.0.0/8"), "6.6.6.6, 198.51.100.7").await;
+    assert_eq!(address.as_deref(), Some("198.51.100.7"));
+}
+
 /// T-14: a real signup → redeem round trip stores a non-null
+/// An address past its retention leaves both tables, and the audit rows
+/// still verify, because `source_ip` is outside their pre-image.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn an_old_address_leaves_sessions_and_events() {
+    use authentication_service::compliance::address_retention::scrub;
+
+    request::<App, _, _>(|request, ctx| async move {
+        let email = "ip-retention@example.com";
+        let payload = serde_json::json!({ "email": email });
+        request.post("/api/auth/signup").json(&payload).await;
+        let user = users::Model::find_by_email(&ctx.db, email)
+            .await
+            .expect("signup should have created the user");
+        let user_pid = user.pid;
+        let token = user
+            .into_active_model()
+            .create_magic_link(&ctx.db)
+            .await
+            .expect("mint magic link")
+            .magic_link_token
+            .expect("create_magic_link returns the plaintext token");
+        request.get(&format!("/api/auth/magic-link/{token}")).await;
+
+        let held = || async {
+            let sessions = sessions::Entity::find()
+                .filter(sessions::Column::UserPid.eq(user_pid))
+                .all(&ctx.db)
+                .await
+                .expect("query sessions");
+            let events = AuthEvent::for_subject(&ctx.db, user_pid, email)
+                .await
+                .expect("query auth_events");
+            sessions
+                .iter()
+                .filter(|row| row.source_ip.is_some())
+                .count()
+                + events.iter().filter(|row| row.source_ip.is_some()).count()
+        };
+        let before = held().await;
+        assert!(before >= 3, "one session and two events: {before}");
+
+        scrub(&ctx.db, 7).await.expect("scrub");
+        assert_eq!(held().await, before, "a new address stays");
+        scrub(&ctx.db, 0).await.expect("scrub");
+        assert_eq!(held().await, 0, "an address past the limit goes");
+    })
+    .await;
+}
+
 /// `source_ip` on both the issued session and every `auth_events` row
-/// the flow writes — the connecting-peer address the loco/`axum-test`
-/// harness binds to a real socket for (`ConnectInfo<SocketAddr>`), the
-/// same mechanism production boots with.
+/// the flow writes — the address `axa::client::ClientAddr` resolves from
+/// the connection the `axum-test` harness supplies, the same mechanism
+/// production boots with.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]

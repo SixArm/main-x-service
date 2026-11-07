@@ -13,13 +13,10 @@
 //!
 //! Run via the `bulk_artifact_sweep` axa task
 //! ([`crate::tasks::bulk_artifact_sweep`]) — see that module's doc for
-//! how to invoke and schedule it. This crate has no in-process
-//! periodic-timer convention (the `BulkJobWorker` is dispatched per job
-//! via `perform_later`, never on a clock), so scheduling is external
-//! (cron, a Kubernetes `CronJob`, …) invoking the task, matching how
-//! this crate already treats other operator-triggered maintenance
-//! (`integrity_resign`) rather than inventing a new in-process
-//! scheduling primitive.
+//! how to invoke and schedule it. Scheduling is external (cron, a
+//! Kubernetes `CronJob`, …) invoking the task, matching how this crate
+//! already treats other operator-triggered maintenance
+//! (`integrity_resign`).
 
 use time::OffsetDateTime;
 

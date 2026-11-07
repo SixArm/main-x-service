@@ -389,6 +389,8 @@ CREATE TABLE audit_log (
     old_values          JSONB,
     new_values          JSONB,
     ip_address          VARCHAR(64),
+    ip_salt             TEXT,
+    ip_commitment       TEXT,
     user_agent          VARCHAR(512)
 );
 CREATE INDEX idx_audit_log_entity    ON audit_log (entity_type, entity_id);

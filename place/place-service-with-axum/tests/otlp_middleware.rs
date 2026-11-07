@@ -4,9 +4,7 @@
 //! `tests/otlp_export.rs` proves the export pipeline; this proves the
 //! thing the service actually runs — the exact
 //! [`observability::trace_mw`](place_service::observability::trace_mw)
-//! layer both `App::after_routes` and `api::rest::create_router` install
-//! (see that function's doc comment for why it is wired onto both of this
-//! crate's router-construction surfaces). It layers `trace_mw` onto a
+//! layer `App::after_routes` installs. It layers `trace_mw` onto a
 //! minimal, real Axum router — rather than booting the full application,
 //! which would need a database — serves it over a real socket, makes a
 //! real HTTP request, and then asserts that

@@ -110,6 +110,13 @@ async fn read_is_concealed_on_every_path_for_a_denied_caller() {
         ]
     });
     unsafe {
+        // Keep this binary's Tantivy index out of the working directory
+        // and its boot rebuild out of the way (see tests/requests/mod.rs).
+        std::env::set_var(
+            "CASE_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!("case-masking-index-{}", std::process::id())),
+        );
+        std::env::set_var("CASE_SEARCH_BOOT_REINDEX", "0");
         std::env::set_var("CASE_REQUIRE_AUTH", "1");
         std::env::set_var("CASE_PASETO_KEYS", keys.to_string());
         std::env::set_var("CASE_ABAC_POLICY", policy.to_string());

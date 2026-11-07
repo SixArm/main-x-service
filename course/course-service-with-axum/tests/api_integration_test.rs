@@ -273,7 +273,7 @@ async fn batch_dedup_returns_response_shape() {
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored"]
 async fn review_queue_persists_across_a_rescan_and_decides_once() {
-    let state = common::create_test_app_state().await;
+    let (app, state) = common::boot().await;
 
     // Two near-duplicate courses, seeded directly through the repository
     // (bypassing the create endpoint's real-time duplicate check — see
@@ -286,8 +286,6 @@ async fn review_queue_persists_across_a_rescan_and_decides_once() {
     let name_b = format!("{token} ReviewQueuePersist Beta");
     let a = common::seed_course(&state, &name_a).await;
     let b = common::seed_course(&state, &name_b).await;
-
-    let app = course_service::api::rest::create_router(state);
 
     // Run the batch scan. A wide gap between the two thresholds keeps
     // this robust to the exact matcher score: well above `threshold`

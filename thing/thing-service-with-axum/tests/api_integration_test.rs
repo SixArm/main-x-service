@@ -14,15 +14,13 @@
 //! discarded. Same defect, same fix, as the event service's
 //! `created_at`/`updated_at` fix (2026-08-01).
 
+use axa::testing::TestApp;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::{Value, json};
-use thing_service::api::rest::{AppState, create_router};
+use thing_service::app::App;
 use thing_service::config::Config;
-use thing_service::db::create_connection;
-use thing_service::matching::ProbabilisticMatcher;
 use thing_service::models::thing::Thing;
-use thing_service::search::SearchEngine;
 use tower::ServiceExt;
 
 /// Build the real router against the environment-configured database and
@@ -31,12 +29,11 @@ use tower::ServiceExt;
 async fn test_router() -> axum::Router {
     let config = Config::from_env().expect("load config from env");
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
-    let search_engine = SearchEngine::new(&config.search.index_path).expect("search engine");
-    let matcher = ProbabilisticMatcher::new(&config.matching);
-    let db = create_connection(&config.database)
+    App::boot_test()
         .await
-        .expect("Postgres connection — set DATABASE_URL to a running, migrated database");
-    create_router(AppState::new(db, search_engine, matcher, config))
+        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .router
+        .expect("boot_test builds the router")
 }
 
 /// `POST` a hand-built JSON body, returning the status **and** the parsed

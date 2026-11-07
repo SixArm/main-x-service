@@ -13,14 +13,13 @@
 //! `#[ignore]`d — run explicitly with
 //! `DATABASE_URL=… cargo test --test review_queue_score_breakdown -- --ignored`.
 
+use axa::testing::TestApp;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use place_service::api::rest::{AppState, create_router};
+use place_service::app::App;
 use place_service::config::Config;
 use place_service::db::{PlaceRepository, create_connection};
-use place_service::matching::PlaceMatcher;
 use place_service::models::place::Place;
-use place_service::search::SearchEngine;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
@@ -29,12 +28,11 @@ use tower::ServiceExt;
 async fn test_router() -> axum::Router {
     let config = Config::from_env().expect("load config from env");
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
-    let search_engine = SearchEngine::new(&config.search.index_path).expect("search engine");
-    let matcher = PlaceMatcher::new(&config.matching);
-    let db = create_connection(&config.database)
+    App::boot_test()
         .await
-        .expect("Postgres connection — set DATABASE_URL to a running, migrated database");
-    create_router(AppState::new(db, search_engine, matcher, config))
+        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .router
+        .expect("boot_test builds the router")
 }
 
 async fn post(app: &axum::Router, uri: &str, body: &Value) -> (StatusCode, Value) {

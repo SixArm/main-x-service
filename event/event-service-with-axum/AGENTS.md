@@ -103,20 +103,10 @@ siblings use.
 "person-style" crates per `agents/share/architecture.md`), so the port
 needed the same two adaptations, confirmed rather than assumed:
 
-- **Two router-construction surfaces**, not link-graph-service's one:
-  the controller-style one (`api::rest::events_routes()` +
-  `controllers::fhir::routes()`, mounted via `App::routes`/
-  `App::after_routes`) and a standalone hand-rolled one
-  (`api::rest::create_router`, used by the DB-gated integration tests
-  and by `controllers::fhir::axum_router` for its FHIR surface). Event
-  was flagged as possibly "mid-conversion" with an additional
-  `src/controllers/` route-registration surface beyond person's two —
-  verified directly rather than assumed, and it does **not** add a
-  third: `controllers::fhir` contributes routes to *both* of the
-  existing two surfaces (an axa `routes()` registered in `App::routes`,
-  and an `axum_router` merged inside `create_router`) rather than
-  booting its own router. `observability::trace_mw` is layered as the
-  outermost middleware on both surfaces, exactly as person's is.
+- **One router-construction surface**, as in link-graph-service:
+  `api::rest::events_routes()` + `controllers::fhir::routes()`, mounted
+  via `App::routes`/`App::after_routes`. Tests boot that same router.
+  `observability::trace_mw` is its outermost service layer.
 - **A renamed `tonic` dev-dependency — gone as of the prost 0.14
   migration (2026-09-07).** This crate originally depended on
   `tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the

@@ -100,3 +100,11 @@ script. The stack still works correctly without it (the read-model
 updates from the event stream regardless; reconciliation is the
 periodic integrity check on top, not the only path); the file explains
 the one manual step to complete it.
+
+## Client addresses
+
+These files run no proxy in front of the services, so they leave
+`TRUSTED_PROXIES` unset and audit rows record the connecting address. If you put
+a reverse proxy or load balancer in front, set `TRUSTED_PROXIES` on every service
+to that proxy's addresses or CIDR ranges, or every row records the proxy instead.
+See [configuration.md](../../agents/share/configuration.md).

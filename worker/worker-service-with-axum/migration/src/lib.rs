@@ -35,6 +35,7 @@ mod m20260727_000006_blake3_digests;
 mod m20260727_000008_sha3_digests;
 mod m20260727_000010_drop_blake3;
 mod m20260727_000012_integrity_mac;
+mod m20260901_000001_audit_address_commitment;
 
 /// The migration runner this crate exposes to axa / `sea-orm-migration`.
 pub struct Migrator;
@@ -66,6 +67,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260727_000008_sha3_digests::Migration),
             Box::new(m20260727_000010_drop_blake3::Migration),
             Box::new(m20260727_000012_integrity_mac::Migration),
+            Box::new(m20260901_000001_audit_address_commitment::Migration),
         ]
     }
 }

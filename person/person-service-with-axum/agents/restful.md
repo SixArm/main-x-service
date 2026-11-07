@@ -123,8 +123,8 @@ route require a valid PASETO bearer token, except the public
 allow-list: `/api/health`, axa's `/_health` / `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom`.
 Unauthorised requests get `401`. The middleware
-(`auth::require_auth_middleware`) is layered unconditionally on both
-router surfaces (`create_router` and the axa `after_routes` hook);
+(`auth::require_auth_middleware`) is layered unconditionally in the axa
+`after_routes` hook;
 the flag is read once at router construction, so changing it requires
 a restart. Family contract: `agents/share/jwt-enforcement.md`.
 

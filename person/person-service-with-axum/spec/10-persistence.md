@@ -71,6 +71,14 @@ export output, error report) live in the config-driven artifact store
 (S3-compatible in deployment, local fs in dev), referenced by short-lived
 access-controlled URLs.
 
+**Lost jobs (`src/bulk/reconcile.rs`).** A worker process
+reconciles `bulk_jobs` with `axa_queue` at start and every five minutes, linking
+them by the queue row's `name` and `args->>'job_id'`. A `queued` or `running` job
+moves to `failed` when no queue row for it is alive and either one has `failed`,
+or it has none and has not changed for 15 minutes (the row commits before the job
+is queued). See
+[bulk import/export §3](../../../agents/share/bulk-import-export.md).
+
 Person-specific notes:
 
 - **Idempotency** is anchored on the §9.2 stable keys (scheme-scoped
@@ -248,3 +256,16 @@ test is `#[ignore]`d (documented `MinIO` invocation in its doc comment)
 since CI has no object store to test against — everything else about
 the S3 backend (key safety, reference parsing, path-style default, the
 without-the-feature error) is unit-tested without one.
+
+### 10.9 Client address on audit rows
+
+`audit_log.ip_address` holds what `axa::client::ClientAddr` resolved: the
+connecting peer, or, when that peer is listed in `TRUSTED_PROXIES`, the rightmost
+`X-Forwarded-For` entry not written by a listed proxy. A caller cannot choose it
+by sending the header. With `TRUSTED_PROXIES` unset, a service behind a proxy
+records the proxy's address. gRPC resolves it by the same rule from the peer
+address and request metadata.
+
+It is `NULL` where no request is behind the row: bulk jobs and the seed task. Erasure clears a
+row's old and new values, not its `ip_address`, which is the caller's address and
+not the data subject's.

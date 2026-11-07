@@ -6,12 +6,13 @@
 //! merging, masking, audit queries), and returns an [`ApiResponse`] wrapped in
 //! the appropriate HTTP status. The `#[utoipa::path(...)]` attributes feed the
 //! OpenAPI document assembled in [`super::ApiDoc`]; the route table that maps
-//! paths to these functions lives in [`super::create_router`].
+//! paths to these functions lives in [`super::workers_routes`].
 //!
 //! Handlers are not shown with runnable doctests: they require a live
 //! [`AppState`] (database, search index, matcher) that cannot be constructed
 //! in a doctest. Behaviour is pinned by the integration tests in `tests/`.
 
+use axa::client::ClientAddr;
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -25,7 +26,9 @@ use uuid::Uuid;
 
 use authentication_verifier::Action;
 
-use super::auth::{MaybeAuthUser, authorize_record, worker_resource_attrs};
+use super::auth::{
+    AuthUser, MaybeAuthUser, audit_context_of, authorize_record, worker_resource_attrs,
+};
 use super::state::AppState;
 use crate::api::ApiResponse;
 use crate::compliance::disclosure::{self, AccessContext};
@@ -112,6 +115,8 @@ pub struct CreateWorkerRequest {
 )]
 pub async fn create_worker(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(mut payload): Json<Worker>,
 ) -> impl IntoResponse {
     // Step 1 — validate. Required-field / format failures map to 422
@@ -165,7 +170,11 @@ pub async fn create_worker(
     // Step 4 — persist. The repository INSERT also fans out the event publish
     // and audit-log write (wired in `AppState::new`), so a successful create
     // already emitted `WorkerCreated` and an audit row.
-    match state.worker_repository.create(&payload).await {
+    match state
+        .worker_repository
+        .create(&payload, &audit_context_of(&caller, client))
+        .await
+    {
         Ok(worker) => {
             // Step 5 — index in the search engine. A failure here is logged but
             // NOT fatal: the record exists in the DB and can be re-indexed
@@ -405,6 +414,7 @@ pub async fn update_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(mut payload): Json<Worker>,
 ) -> impl IntoResponse {
     // Validate
@@ -457,7 +467,11 @@ pub async fn update_worker(
         }
     }
 
-    match state.worker_repository.update(&payload).await {
+    match state
+        .worker_repository
+        .update(&payload, &audit_context_of(&caller, client))
+        .await
+    {
         Ok(worker) => {
             // Refresh the search index; index failure is logged, not fatal
             // (the DB is the source of truth), so we still return 200.
@@ -495,6 +509,7 @@ pub async fn delete_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
 ) -> impl IntoResponse {
     // Record-level ABAC on the stored record before deleting.
     match state.worker_repository.get_by_id(&id).await {
@@ -521,7 +536,11 @@ pub async fn delete_worker(
 
     // The repository `delete` is a soft delete (marks the row inactive); the
     // row is retained for the audit trail rather than physically removed.
-    match state.worker_repository.delete(&id).await {
+    match state
+        .worker_repository
+        .delete(&id, &audit_context_of(&caller, client))
+        .await
+    {
         Ok(()) => {
             // Drop the worker from the search index so it stops appearing in
             // results; index failure is logged, not fatal.
@@ -1071,6 +1090,8 @@ fn transfer_worker_data(
 )]
 pub async fn merge_workers(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(req): Json<crate::models::MergeRequest>,
 ) -> impl IntoResponse {
     // Fetch both workers up front; a missing main or duplicate is a 404 (the
@@ -1130,7 +1151,11 @@ pub async fn merge_workers(
     // in one transaction; the repository enqueues the `Merged` (+`merged_from`)
     // and `Deleted` outbox rows and publishes the in-memory `Merged`/`Deleted`
     // stream events.
-    if let Err(e) = state.worker_repository.merge(&merged, &duplicate.id).await {
+    if let Err(e) = state
+        .worker_repository
+        .merge(&merged, &duplicate.id, &audit_context_of(&caller, client))
+        .await
+    {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::<crate::models::MergeResponse>::error(
@@ -2361,8 +2386,9 @@ pub async fn compliance_identification() -> impl IntoResponse {
 /// Deliberately **not** on the guard's public allow-list: it names the
 /// exact version of every dependency in the running binary, which is what
 /// an attacker needs to match this deployment against published
-/// advisories. Publishing it is an operator's explicit decision.
-pub async fn compliance_sbom() -> impl IntoResponse {
+/// advisories, so it needs a verified caller even with
+/// `WORKER_REQUIRE_AUTH` off, when the guard lets everyone through.
+pub async fn compliance_sbom(_caller: AuthUser) -> impl IntoResponse {
     (StatusCode::OK, Json(crate::compliance::soup::sbom()))
 }
 

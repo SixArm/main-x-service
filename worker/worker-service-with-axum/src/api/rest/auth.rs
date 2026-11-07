@@ -15,9 +15,8 @@
 //!
 //! When `WORKER_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as an Axum
-//! middleware layer via [`apply_enforcement`] on **both** router
-//! surfaces (`create_router` and the axa router in
-//! `App::after_routes`) — requires a valid PASETO `v4.public` bearer
+//! middleware layer via [`apply_enforcement`] on the axa router in
+//! `App::after_routes` — requires a valid PASETO `v4.public` bearer
 //! token on every route except the public allow-list in
 //! [`PUBLIC_PATHS`] / [`PUBLIC_PATH_PREFIXES`] (health probes, the
 //! `OpenAPI` document + Swagger UI, and the Prometheus scrape endpoint).
@@ -46,6 +45,7 @@
 //! the service always boots. **401** = missing/bad credential; **403**
 //! = valid credential, policy denied (body carries the deciding rule).
 
+use axa::client::ClientAddr;
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
@@ -247,7 +247,7 @@ pub async fn enforce_request(
 /// Layer the blanket-enforcement middleware onto a finished router. The
 /// flag, verifier, and ABAC policy are captured **at construction**
 /// (restart to change); when the flag is off the middleware is a
-/// near-noop, so both router surfaces wire it unconditionally and
+/// near-noop, so it is wired unconditionally and
 /// `WORKER_REQUIRE_AUTH` is the only switch. Applied beneath the CORS
 /// layer so preflight `OPTIONS` requests are answered by CORS before
 /// enforcement runs.
@@ -269,7 +269,16 @@ pub fn apply_enforcement(router: Router, require_auth: bool) -> Router {
             .await
             {
                 Ok(()) => next.run(req).await,
-                Err(reject) => reject.into_response(),
+                Err((status, reason)) => {
+                    // The reason goes to the log, never to the caller.
+                    tracing::warn!(status = status.as_u16(), %reason, "auth_refused");
+                    let text = if status == StatusCode::UNAUTHORIZED {
+                        "invalid token"
+                    } else {
+                        "forbidden"
+                    };
+                    (status, text).into_response()
+                }
             }
         },
     ))
@@ -700,6 +709,27 @@ pub fn authorize_record(
         Ok(decision.obligations)
     } else {
         Err((StatusCode::FORBIDDEN, decision.reason))
+    }
+}
+
+/// Build an [`AuditContext`](crate::db::AuditContext) for a request from the
+/// caller's verified claims and client address. `user_id` is the bearer `sub`
+/// when a valid token was presented, else the `"system"` actor. `client` is the
+/// address [`ClientAddr`] resolved, which believes `X-Forwarded-For` only from a
+/// peer listed in `TRUSTED_PROXIES`. No per-request user-agent capture exists in
+/// this crate yet, so that stays `None`.
+#[must_use]
+pub fn audit_context_of(
+    caller: &MaybeAuthUser,
+    ClientAddr(client): ClientAddr,
+) -> crate::db::AuditContext {
+    crate::db::AuditContext {
+        user_id: caller
+            .claims()
+            .map(|c| c.sub.clone())
+            .or_else(|| Some("system".to_string())),
+        ip_address: client.map(|address| address.to_string()),
+        user_agent: None,
     }
 }
 

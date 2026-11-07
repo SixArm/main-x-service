@@ -109,6 +109,8 @@ pub mod handlers;
 pub mod jsonl;
 /// The import/export per-row/per-job pipeline (the testable core).
 pub mod pipeline;
+/// Reconcile `bulk_jobs` with the job queue, so a lost job reaches `failed`.
+pub mod reconcile;
 /// The bulk wire envelope ([`row::BulkCaseRow`]) — `Case` plus the
 /// out-of-band `pid` it does not itself carry.
 pub mod row;

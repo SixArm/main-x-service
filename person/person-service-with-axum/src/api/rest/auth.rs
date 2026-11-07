@@ -15,8 +15,7 @@
 //!
 //! When `PERSON_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as an Axum
-//! middleware layer on both router surfaces (`create_router` and the
-//! axa `after_routes` hook) — requires a valid bearer token on every
+//! middleware layer in the axa `after_routes` hook — requires a valid bearer token on every
 //! route except the public allow-list in [`PUBLIC_PATHS`]. It is **off
 //! by default**: unset/blank/junk ⇒ today's behaviour, where the
 //! extractor is opt-in per handler and `GET /api/whoami` proves
@@ -43,6 +42,7 @@
 //! the service always boots. **401** = missing/bad credential; **403**
 //! = valid credential, policy denied (body carries the deciding rule).
 
+use axa::client::ClientAddr;
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
@@ -281,7 +281,7 @@ impl Default for Enforcement {
 
 /// Axum middleware applying the blanket [`enforce`] decision to every
 /// request on the router it is layered onto. A near-noop when the flag
-/// is off, so it is wired unconditionally on both router surfaces and
+/// is off, so it is wired unconditionally and
 /// `PERSON_REQUIRE_AUTH` is the only switch.
 pub async fn require_auth_middleware(
     State(enforcement): State<Enforcement>,
@@ -301,7 +301,16 @@ pub async fn require_auth_middleware(
     .await
     {
         Ok(()) => next.run(request).await,
-        Err(rejection) => rejection.into_response(),
+        Err((status, reason)) => {
+            // The reason goes to the log, never to the caller.
+            tracing::warn!(status = status.as_u16(), %reason, "auth_refused");
+            let text = if status == axum::http::StatusCode::UNAUTHORIZED {
+                "invalid token"
+            } else {
+                "forbidden"
+            };
+            (status, text).into_response()
+        }
     }
 }
 
@@ -771,17 +780,21 @@ pub fn read_visibility(caller: &MaybeAuthUser, person: &Person) -> Option<Vec<St
 /// public/internal path) — the same fallback
 /// [`AuditContext::default()`](crate::db::AuditContext) already uses,
 /// spelled out here so the repository never has to fabricate an actor
-/// itself. No per-request IP/user-agent capture exists in this crate yet,
-/// so both stay `None`, matching the existing `review_decision` handler's
-/// pattern this helper generalizes.
+/// itself. `client` is the address [`ClientAddr`] resolved, which believes
+/// `X-Forwarded-For` only from a peer listed in `TRUSTED_PROXIES`. No
+/// per-request user-agent capture exists in this crate yet, so that stays
+/// `None`.
 #[must_use]
-pub fn audit_context_of(caller: &MaybeAuthUser) -> crate::db::AuditContext {
+pub fn audit_context_of(
+    caller: &MaybeAuthUser,
+    ClientAddr(client): ClientAddr,
+) -> crate::db::AuditContext {
     crate::db::AuditContext {
         user_id: caller
             .claims()
             .map(|c| c.sub.clone())
             .or_else(|| Some("system".to_string())),
-        ip_address: None,
+        ip_address: client.map(|address| address.to_string()),
         user_agent: None,
     }
 }
@@ -1526,14 +1539,18 @@ mod tests {
         };
         let authenticated = MaybeAuthUser(Some(claims));
         assert_eq!(
-            audit_context_of(&authenticated).user_id.as_deref(),
+            audit_context_of(&authenticated, ClientAddr(None))
+                .user_id
+                .as_deref(),
             Some("user-123"),
             "the real bearer sub is threaded, not \"system\""
         );
 
         let anonymous = MaybeAuthUser(None);
         assert_eq!(
-            audit_context_of(&anonymous).user_id.as_deref(),
+            audit_context_of(&anonymous, ClientAddr(None))
+                .user_id
+                .as_deref(),
             Some("system"),
             "no caller ⇒ the legitimate \"system\" fallback"
         );

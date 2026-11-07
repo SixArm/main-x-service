@@ -819,6 +819,15 @@ pub mod audit_log {
         pub disclosure: bool,
         /// When the row's content was destroyed under GDPR Art. 17.
         pub redacted_at: Option<TimeDateTimeWithTimeZone>,
+        /// Salt of `ip_commitment`, removed with the address. A reader has
+        /// no use for it, and it would let a commitment be matched to a
+        /// guessed address, so it is never serialized.
+        #[serde(skip)]
+        pub ip_salt: Option<String>,
+        /// What the hash binds in place of the address, which makes this
+        /// row chain format `p2`. Kept for good.
+        #[serde(skip)]
+        pub ip_commitment: Option<String>,
     }
 
     /// No outbound relations: audit rows reference entities loosely by

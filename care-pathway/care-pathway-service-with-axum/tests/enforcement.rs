@@ -23,6 +23,16 @@ use serial_test::serial;
 async fn require_auth_gates_api_but_not_openapi() {
     // SAFETY: single-threaded test setup; this binary's only test.
     unsafe {
+        // Keep this binary's Tantivy index out of the working directory
+        // and its boot rebuild out of the way (see tests/requests/mod.rs).
+        std::env::set_var(
+            "CARE_PATHWAY_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!(
+                "care-pathway-enforcement-index-{}",
+                std::process::id()
+            )),
+        );
+        std::env::set_var("CARE_PATHWAY_SEARCH_BOOT_REINDEX", "0");
         std::env::set_var("CARE_PATHWAY_REQUIRE_AUTH", "1");
     }
     request::<App, _, _>(|request, _ctx| async move {

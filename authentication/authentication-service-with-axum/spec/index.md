@@ -963,6 +963,11 @@ only by that subject.
       Forwarded-For` is a documented follow-up, not implemented: behind
       a reverse proxy the captured address would name the proxy, which
       is honestly scoped rather than silently wrong (added to §16).
+      **Superseded.** `source_ip` now comes from `axa::client::ClientAddr`:
+      the connecting peer, or, when that peer is listed in `TRUSTED_PROXIES`,
+      the rightmost `X-Forwarded-For` entry not written by a listed proxy. A
+      caller cannot choose it by sending the header. With `TRUSTED_PROXIES`
+      unset, a service behind a proxy records the proxy's address.
       **Deliberately excluded `source_ip` from the `auth_events`
       keyed-integrity pre-image** (`compliance::audit_integrity::
       AuditInput`/`AUDIT_MAC_VERSION`) — that pre-image has no per-row
@@ -1370,15 +1375,6 @@ attribute-based, not a fixed role list).
 
 ## 16. Open questions
 
-- **`source_ip` capture is the raw TCP peer, not `X-Forwarded-For`
-  (T-14).** Behind a reverse proxy / load balancer the recorded address
-  would name the proxy, not the original client. Adding
-  `X-Forwarded-For`-awareness (first hop, behind a documented trust
-  boundary — only honour it from a configured trusted proxy CIDR, per
-  the family's general SSRF/spoofing posture) is a real follow-up, not
-  implemented here; it was scoped out to keep T-14's landing
-  well-bounded rather than bundling a trust-boundary design into a
-  small audit-completeness fix.
 - Refresh tokens vs. short-lived tokens only? (Post-pivot the human
   session is a cookie session with idle + absolute TTLs; the
   cross-service PASETO is ~5 min and re-minted from the session.)

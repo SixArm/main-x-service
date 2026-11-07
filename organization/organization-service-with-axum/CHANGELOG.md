@@ -11,6 +11,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Lost bulk jobs now reach `failed`.** When axa gave up on a job, `axa_queue`
+  said `failed` but `bulk_jobs` stayed `queued` or `running` for ever, because
+  the worker that would have updated it was the thing that died. A worker
+  process now reconciles the two at start and every five minutes.
+
 - **Bulk jobs now run in production.** The image starts with `start --all`.
   Nothing ran a worker before, so a production import was accepted and then sat
   in `queued` forever.

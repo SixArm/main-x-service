@@ -165,8 +165,7 @@ Search parameters: `name`, `family`, `given`,
 
 **Status:** the FHIR handlers are implemented and **mounted** on the
 axa router — `App::routes` registers `fhir_routes()` alongside the
-REST and metrics route groups, and `create_router` mirrors the same
-`/fhir/Practitioner` surface for the integration-test harness. The mount is
+REST and metrics route groups. The mount is
 pinned by `tests/api_integration_test.rs::test_fhir_practitioner_route_is_mounted`
 (un-gated, asserts the route is reachable via a `400` from the
 `Path<Uuid>` extractor) and

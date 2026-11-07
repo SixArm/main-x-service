@@ -11,14 +11,12 @@
 //! a property of the layout, not a defect worth deleting helpers over.
 #![allow(dead_code)]
 
+use axa::testing::TestApp;
 use axum::Router;
 use chrono::Utc;
 use person_service::{
-    api::rest::{AppState, create_router},
-    config::Config,
-    db::create_connection,
-    matching::ProbabilisticMatcher,
-    search::SearchEngine,
+    api::rest::AppState, app::App, config::Config, db::create_connection,
+    matching::ProbabilisticMatcher, search::SearchEngine,
 };
 
 /// Create a test application state for integration tests
@@ -47,10 +45,17 @@ pub async fn create_test_app_state() -> AppState {
         .expect("Failed to build application state (bulk artifact store)")
 }
 
-/// Create a test router with test application state
+/// Boot the real application: the router production serves.
 pub async fn create_test_router() -> Router {
-    let state = create_test_app_state().await;
-    create_router(state)
+    let config = Config::from_env().expect("Failed to load test config");
+    // `after_routes` opens the index but does not create its directory.
+    std::fs::create_dir_all(&config.search.index_path)
+        .expect("Failed to create the search index directory");
+    App::boot_test()
+        .await
+        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .router
+        .expect("boot_test builds the router")
 }
 
 /// Create a unique test person name to avoid conflicts

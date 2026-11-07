@@ -48,14 +48,14 @@ development, PostgreSQL `database` + Postgres-backed `queue`,
    `Config::from_env` → `SearchEngine::new` → `CourseMatcher::new` →
    `AppState::new` — places `AppState` in the `AppContext` shared
    store, and merges Swagger UI (`/swagger-ui`,
-   `/api-docs/openapi.json`) plus permissive CORS onto the router.
+   `/api-docs/openapi.json`) onto the router. CORS comes from
+   `axa::middleware::apply`, per `CORS_ALLOWED_ORIGINS`.
 
 Handlers keep their `State<AppState>` signatures; a
 `FromRef<AppContext>` impl on `AppState` (in `src/api/rest/state.rs`)
 retrieves the state from the shared store, so the same handlers run
-as native axa controllers. The hand-built Axum router
-(`create_router`) is retained solely for the `tower::oneshot`
-integration tests.
+as native axa controllers. Tests drive this same router through
+`App::boot_test`.
 
 This boot shape mirrors the
 [authentication-service](../../../authentication/authentication-service-with-axum/),

@@ -99,8 +99,7 @@ A small, pure helper + a thin edge:
 - **Controller-style services** put the helper in `src/version.rs` and layer
   the middleware in `app.rs` (next to the auth layer). **api/rest-layout
   services** (event, worker, …) put it beside `src/api/rest/auth.rs` and
-  layer it in `create_router` + `after_routes`, exactly like the auth
-  middleware.
+  layer it in `after_routes`, exactly like the auth middleware.
 - The version middleware is **additive and near-noop**: with no header and
   one supported version, it only stamps the response header.
 

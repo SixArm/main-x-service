@@ -348,22 +348,3 @@ pub fn routes() -> Routes {
         .add("/Appointment/{id}", put(update))
         .add("/Appointment/{id}", delete(remove))
 }
-
-/// The same FHIR handlers as [`routes`], assembled as a plain
-/// `axum::Router` (already `/fhir`-relative — nest it under `/fhir`).
-///
-/// Production serves FHIR via [`routes`] on the axa `App`; the
-/// hand-written [`create_router`](crate::api::rest::create_router) test
-/// harness is axum-native and cannot mount an axa `Routes`, so it uses
-/// this builder — keeping the integration-test surface identical to
-/// production instead of the old `501` stub.
-pub fn axum_router(state: AppState) -> axum::Router {
-    axum::Router::new()
-        .route("/Appointment", axum::routing::post(create).get(search))
-        .route(
-            "/Appointment/{id}",
-            axum::routing::get(read).put(update).delete(remove),
-        )
-        .route("/metadata", axum::routing::get(metadata))
-        .with_state(state)
-}

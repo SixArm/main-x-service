@@ -121,17 +121,11 @@ siblings use.
 
 **Where this crate's shape forced real adaptation**, beyond the
 `App::init_logger`/`on_shutdown` seam (which ported close to
-verbatim): this crate carries **two** router-construction surfaces —
-the controller-style one (`api::rest::persons_routes()`, mounted via
-`App::routes`/`App::after_routes`) and a standalone hand-rolled one
-(`api::rest::create_router`, used only by the DB-gated integration
-tests) — where link-graph-service has exactly one (pure axa). The
+verbatim): the router is `api::rest::persons_routes()`, mounted via
+`App::routes`/`App::after_routes`, and tests boot that same router. The
 `observability::trace_mw` tower middleware (per-request span +
 `http.server.request.duration` histogram + W3C `traceparent` response
-header) is layered onto **both**, as the outermost layer in each, so
-tracing behaves identically regardless of which router a caller or
-test builds — the same precedent `auth::require_auth_middleware`
-already set by being layered on both surfaces.
+header) is its outermost service layer.
 
 A second, narrower adaptation applied at the time: this crate's own
 gRPC stub (`src/api/grpc/`) originally sat on `tonic = "0.12"` while

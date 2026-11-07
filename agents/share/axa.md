@@ -59,6 +59,20 @@ traffic, such as one host's private bridge in `examples/compose`.
 `AXA_DESTROY_DATA=true`. `axa::cli::parse` refuses them before the service does
 anything, and `--environment` cannot lift that.
 
+## Router order
+
+`App::router` builds the routes with `into_router`, adds the service's own layers in
+`after_routes`, and calls `axa::middleware::apply` last. Anything layered after `apply`
+sits outside it, so a response from that layer has no request id, security headers,
+or CORS headers, and gets no panic or timeout protection. A guard's refusal sends only
+`invalid token` or `forbidden`, and the reason goes to the log.
+
+## Swagger UI
+
+Serve it through `axa::openapi`, behind the `openapi` feature. The page names one exact
+version with integrity hashes and sends `PAGE_CSP`, because axa's production default of
+`default-src 'none'` would otherwise blank it.
+
 ## Limits
 
 Keep the service-wide body limit small. A route that needs more, such as a bulk

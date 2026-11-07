@@ -28,13 +28,12 @@ sha3 = { version = "0.12" }
 # Async runtime
 tokio = { version = "1.54", features = ["full"] }
 
-axa = { version = "0.5", features = ["sea-orm"] }
+axa = { version = "0.5", features = ["sea-orm", "openapi"] }
 migration = { path = "migration" }
 
 # Web framework (axum 0.8, matching axa)
 axum = { version = "0.8", features = ["macros"] }
 tower = { version = "0.5", features = ["full"] }
-tower-http = { version = "0.7", features = ["cors", "trace", "compression-full"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -48,7 +47,6 @@ tantivy = "0.27"
 
 # OpenAPI documentation
 utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid"] }
-utoipa-swagger-ui = { version = "10", features = ["axum"] }
 
 # Common types
 chrono = { version = "0.4", features = ["serde"] }
@@ -124,7 +122,7 @@ keycloak = ["authentication-verifier/keycloak"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa = { version = "0.5", features = ["sea-orm", "testing"] }
+axa = { version = "0.5", features = ["sea-orm", "testing", "openapi"] }
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }

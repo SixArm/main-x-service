@@ -498,6 +498,7 @@ async fn bulk_jobs_lists_recent_jobs() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn an_import_over_the_default_body_limit_is_accepted() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         submit_import(&request, vec![b'\n'; 3_000_000], "jsonl").await;
     })

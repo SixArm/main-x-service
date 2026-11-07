@@ -15,7 +15,7 @@
 //!
 //! When `COURSE_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as the
-//! [`require_auth_mw`] middleware on both router surfaces — requires a
+//! [`require_auth_mw`] middleware in `App::after_routes` — requires a
 //! valid bearer token on **every** route except the small public
 //! allow-list ([`is_public_path`]: health/ping, OpenAPI/Swagger,
 //! Prometheus metrics, `/api/health`, `/fhir/metadata`). It is
@@ -531,9 +531,8 @@ fn file_mtime(path: &str) -> Option<std::time::SystemTime> {
 /// Axum middleware wrapping [`enforce`]: reads the construction-time
 /// flag (`AppState::require_auth`), the ABAC policy
 /// (`AppState::policy`), and the shared verifier, and rejects with
-/// `401`/`403` before any handler runs. Wired on **both** router
-/// surfaces — the hand-written `create_router` and the axa router in
-/// `App::after_routes` — via `axum::middleware::from_fn_with_state`.
+/// `401`/`403` before any handler runs. Wired in `App::after_routes` via
+/// `axum::middleware::from_fn_with_state`.
 /// Added unconditionally: it is a near-noop when the flag is off, so
 /// the wiring stays static and the env var is the only switch.
 pub async fn require_auth_mw(State(state): State<AppState>, req: Request, next: Next) -> Response {
@@ -551,7 +550,16 @@ pub async fn require_auth_mw(State(state): State<AppState>, req: Request, next: 
     .await;
     match decision {
         Ok(()) => next.run(req).await,
-        Err(reject) => reject.into_response(),
+        Err((status, reason)) => {
+            // The reason goes to the log, never to the caller.
+            tracing::warn!(status = status.as_u16(), %reason, "auth_refused");
+            let text = if status == axum::http::StatusCode::UNAUTHORIZED {
+                "invalid token"
+            } else {
+                "forbidden"
+            };
+            (status, text).into_response()
+        }
     }
 }
 

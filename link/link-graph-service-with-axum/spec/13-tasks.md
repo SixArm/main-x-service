@@ -165,8 +165,9 @@
   `neighbors`/`edges`, `read_single_view` on `single-view` — with the
   caller `sub` + `User-Agent`; a concealed read audits nothing. Writes
   audit `apply_linked` for governed `subject_of` edges (no actor —
-  bus-driven). DB-gated test pins the write-audit row. `user_ip` capture
-  (ConnectInfo) deferred.)*
+  bus-driven). DB-gated test pins the write-audit row. `user_ip` is captured
+  through `axa::client::ClientAddr` (§10.4); `tests/concealment.rs` pins that
+  a forged `X-Forwarded-For` does not reach the row.)*
 - [ ] T-18: Privacy masking parity with the case service on graph
   responses (§6 FR-20).
 

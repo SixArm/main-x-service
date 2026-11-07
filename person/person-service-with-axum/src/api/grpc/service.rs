@@ -28,9 +28,9 @@
 //! writes the HIPAA §164.528 disclosure-accounting audit row REST
 //! writes on every read (T-36): [`grpc_access_context`] is the
 //! gRPC-metadata counterpart of the Axum
-//! [`crate::compliance::disclosure::AccessContext`] extractor — client
-//! IP / user-agent still have nowhere to come from on this transport,
-//! same as REST, so both stay `None` there too. `ListPersons` now also
+//! [`crate::compliance::disclosure::AccessContext`] extractor. The
+//! client's address comes from [`grpc_client_addr`], and user-agent stays
+//! `None`, same as REST. `ListPersons` now also
 //! applies REST's SEC-G3 per-record read-visibility filtering/masking
 //! (T-37), via the shared, `pub(crate)`
 //! [`crate::api::rest::handlers::search_result_disposition`] — a denied
@@ -43,6 +43,10 @@
 //! than silently absent (this crate's spec `T-6`): `UpdatePerson`
 //! entirely (no RPC for it yet).
 
+use std::net::SocketAddr;
+use std::sync::OnceLock;
+
+use axa::client::{ClientAddr, ProxyNet};
 use uuid::Uuid;
 
 use authentication_verifier::{Action, Claims};
@@ -175,6 +179,34 @@ fn grpc_access_context(metadata: &MetadataMap) -> disclosure::AccessContext {
     )
 }
 
+/// The proxies this transport believes, from `TRUSTED_PROXIES`, read as
+/// `axa::config` reads it for HTTP: a list with any bad entry trusts none.
+fn trusted_proxies() -> &'static [ProxyNet] {
+    static TRUSTED: OnceLock<Vec<ProxyNet>> = OnceLock::new();
+    TRUSTED.get_or_init(|| {
+        std::env::var("TRUSTED_PROXIES")
+            .ok()
+            .and_then(|list| list.split(',').map(|net| net.trim().parse().ok()).collect())
+            .unwrap_or_default()
+    })
+}
+
+/// The client's address for a gRPC call. This server is not behind
+/// `axa::middleware::apply`, so it resolves the address itself, by the same
+/// rule: `X-Forwarded-For` counts only from a peer in `trusted`.
+fn client_addr(
+    peer: Option<SocketAddr>,
+    metadata: &MetadataMap,
+    trusted: &[ProxyNet],
+) -> ClientAddr {
+    ClientAddr(peer.map(|peer| axa::client::resolve(peer.ip(), metadata.as_ref(), trusted)))
+}
+
+/// [`client_addr`] for `request`, against `TRUSTED_PROXIES`.
+fn grpc_client_addr<T>(request: &Request<T>) -> ClientAddr {
+    client_addr(request.remote_addr(), request.metadata(), trusted_proxies())
+}
+
 /// Map [`crate::api::rest::auth::authorize_record`]'s `(StatusCode,
 /// String)` rejection onto the two `tonic::Status` codes it can
 /// actually produce (`401`→`UNAUTHENTICATED`, `403`→
@@ -264,6 +296,7 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
         request: Request<proto::CreatePersonRequest>,
     ) -> Result<Response<proto::Person>, Status> {
         let claims = grpc_enforce(request.metadata(), Action::Write).await?;
+        let client = grpc_client_addr(&request);
 
         let proto_person = request
             .into_inner()
@@ -292,7 +325,7 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
             )));
         }
 
-        let ctx = auth::audit_context_of(&MaybeAuthUser(claims));
+        let ctx = auth::audit_context_of(&MaybeAuthUser(claims), client);
         let created = self
             .state
             .person_repository
@@ -316,7 +349,8 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
         request: Request<proto::GetPersonRequest>,
     ) -> Result<Response<proto::Person>, Status> {
         let claims = grpc_enforce(request.metadata(), Action::Read).await?;
-        let access = grpc_access_context(request.metadata());
+        let access =
+            grpc_access_context(request.metadata()).with_client(grpc_client_addr(&request).0);
         let caller = MaybeAuthUser(claims);
         let id = parse_uuid(&request.into_inner().id)?;
 
@@ -418,6 +452,7 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
         request: Request<proto::DeletePersonRequest>,
     ) -> Result<Response<proto::DeletePersonResponse>, Status> {
         let claims = grpc_enforce(request.metadata(), Action::Delete).await?;
+        let client = grpc_client_addr(&request);
         let id = parse_uuid(&request.into_inner().id)?;
 
         let person = self
@@ -435,7 +470,7 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
         )
         .map_err(map_record_authz_error)?;
 
-        let ctx = auth::audit_context_of(&MaybeAuthUser(claims));
+        let ctx = auth::audit_context_of(&MaybeAuthUser(claims), client);
         self.state
             .person_repository
             .delete(&id, &ctx)
@@ -445,5 +480,37 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
             tracing::warn!("gRPC DeletePerson: failed to remove from search engine: {e}");
         }
         Ok(Response::new(proto::DeletePersonResponse {}))
+    }
+}
+
+#[cfg(test)]
+mod client_address_tests {
+    use super::*;
+
+    fn forwarded(value: &str) -> MetadataMap {
+        let mut metadata = MetadataMap::new();
+        metadata.insert("x-forwarded-for", value.parse().unwrap());
+        metadata
+    }
+
+    #[test]
+    fn an_untrusted_peer_cannot_name_an_address() {
+        let peer = "203.0.113.9:4000".parse().ok();
+        let client = client_addr(peer, &forwarded("6.6.6.6"), &[]);
+        assert_eq!(client.0, "203.0.113.9".parse().ok());
+    }
+
+    #[test]
+    fn a_trusted_peer_is_believed_for_the_entry_it_wrote() {
+        let peer = "10.0.0.1:4000".parse().ok();
+        let trusted = ["10.0.0.0/8".parse().unwrap()];
+        let client = client_addr(peer, &forwarded("6.6.6.6, 198.51.100.7"), &trusted);
+        assert_eq!(client.0, "198.51.100.7".parse().ok());
+    }
+
+    #[test]
+    fn no_peer_is_no_address() {
+        let client = client_addr(None, &forwarded("6.6.6.6"), &[]);
+        assert_eq!(client.0, None);
     }
 }

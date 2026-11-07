@@ -55,7 +55,16 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
     .await
     {
         Ok(()) => next.run(req).await,
-        Err((status, msg)) => (status, msg).into_response(),
+        Err((status, reason)) => {
+            // The reason goes to the log, never to the caller.
+            tracing::warn!(status = status.as_u16(), %reason, "auth_refused");
+            let text = if status == axum::http::StatusCode::UNAUTHORIZED {
+                "invalid token"
+            } else {
+                "forbidden"
+            };
+            (status, text).into_response()
+        }
     }
 }
 
@@ -244,15 +253,18 @@ impl App {
         Ok(AppContext::new(environment, db, config))
     }
 
-    /// Build the full router: the routes under the standard middleware,
-    /// then this service's own layers.
+    /// Build the full router: the routes, this service's own layers, then
+    /// the standard middleware outside them, so that a refusal from a guard
+    /// still gets a request id, security headers, CORS, and the panic and
+    /// timeout protection.
     ///
     /// # Errors
     ///
     /// Fails when the service's setup fails.
     pub async fn router(ctx: &AppContext) -> Result<AxumRouter> {
-        let router = Self::routes(ctx).into_app(ctx.clone())?;
-        Self::after_routes(router, ctx).await
+        let router = Self::routes(ctx).into_router(ctx.clone());
+        let router = Self::after_routes(router, ctx).await?;
+        axa::middleware::apply(router, &ctx.config.http)
     }
 
     /// Run a database command.

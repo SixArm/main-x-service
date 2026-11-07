@@ -111,15 +111,18 @@ impl App {
         Ok(AppContext::new(environment, db, config))
     }
 
-    /// Build the full router: the routes under the standard middleware,
-    /// then this service's own layers.
+    /// Build the full router: the routes, this service's own layers, then
+    /// the standard middleware outside them, so that a refusal from a guard
+    /// still gets a request id, security headers, CORS, and the panic and
+    /// timeout protection.
     ///
     /// # Errors
     ///
     /// Fails when the service's setup fails.
     pub fn router(ctx: &AppContext) -> Result<AxumRouter> {
-        let router = Self::routes(ctx).into_app(ctx.clone())?;
-        Self::after_routes(router, ctx)
+        let router = Self::routes(ctx).into_router(ctx.clone());
+        let router = Self::after_routes(router, ctx)?;
+        axa::middleware::apply(router, &ctx.config.http)
     }
 
     /// Run a database command.
@@ -169,6 +172,7 @@ impl App {
         match cli.command {
             Command::Check => Ok(()),
             Command::Start { .. } => {
+                crate::compliance::address_retention::spawn(ctx.db.clone())?;
                 let router = Self::router(&ctx)?;
                 server::serve(router, &ctx.config.server).await?;
                 Ok(())

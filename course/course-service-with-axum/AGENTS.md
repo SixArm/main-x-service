@@ -80,18 +80,12 @@ siblings use.
 **Where this crate's shape forced real adaptation** — confirmed rather
 than assumed:
 
-- **Two router-construction surfaces**, exactly as person/worker/event
-  needed: this crate carries the controller-style one
-  (`api::rest::courses_routes()`, mounted via `App::routes`/
-  `App::after_routes`) and a standalone hand-rolled one
-  (`api::rest::create_router`, used only by the DB-gated integration
-  tests) — where link-graph-service has exactly one (pure axa). The
-  `observability::trace_mw` tower middleware (per-request span +
-  `http.server.request.duration` histogram + W3C `traceparent` response
-  header) is layered onto **both**, as the outermost layer in each, so
-  tracing behaves identically regardless of which router a caller or
-  test builds — the same precedent `auth::require_auth_mw` already set
-  by being layered on both surfaces. It is a **second**, complementary
+- **One router-construction surface**, `api::rest::courses_routes()`
+  mounted via `App::routes`/`App::after_routes`, as in link-graph-service.
+  Tests boot that same router. The `observability::trace_mw` tower
+  middleware (per-request span + `http.server.request.duration` histogram
+  + W3C `traceparent` response header) is its outermost service layer. It
+  is a **second**, complementary
   middleware to the existing `metrics::track_http_requests_mw` (T-18's
   Prometheus counter) — the two are independent sinks layered side by
   side, not a replacement of one by the other.

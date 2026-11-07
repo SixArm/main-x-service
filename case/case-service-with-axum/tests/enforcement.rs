@@ -100,6 +100,13 @@ async fn enforcement_on_gates_the_real_stack() {
     // auth OnceLocks read these on first use). `set_var` is `unsafe` in
     // edition 2024; this is a single-threaded test setup step.
     unsafe {
+        // Keep this binary's Tantivy index out of the working directory
+        // and its boot rebuild out of the way (see tests/requests/mod.rs).
+        std::env::set_var(
+            "CASE_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!("case-enforcement-index-{}", std::process::id())),
+        );
+        std::env::set_var("CASE_SEARCH_BOOT_REINDEX", "0");
         std::env::set_var("CASE_REQUIRE_AUTH", "1");
         std::env::set_var("CASE_PASETO_KEYS", keys.to_string());
         // No CASE_ABAC_POLICY ⇒ the built-in default policy (read allow,
@@ -133,6 +140,15 @@ async fn enforcement_on_gates_the_real_stack() {
         // Valid token, empty attrs ⇒ read allowed (default allow-read),
         // write denied (default deny-mutation).
         let (rk, rv) = auth_header(&mint(&kid, &[]));
+        assert_eq!(
+            request
+                .get("/api/compliance/sbom")
+                .add_header(rk.clone(), rv.clone())
+                .await
+                .status_code(),
+            200,
+            "a verified caller gets the SBOM"
+        );
         assert_eq!(
             request
                 .get("/api/cases")
@@ -182,6 +198,13 @@ async fn enforcement_on_gates_the_real_stack() {
 async fn bulk_links_requires_elevated_authority() {
     let (keys, kid) = keys_and_kid();
     unsafe {
+        // Keep this binary's Tantivy index out of the working directory
+        // and its boot rebuild out of the way (see tests/requests/mod.rs).
+        std::env::set_var(
+            "CASE_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!("case-enforcement-index-{}", std::process::id())),
+        );
+        std::env::set_var("CASE_SEARCH_BOOT_REINDEX", "0");
         std::env::set_var("CASE_REQUIRE_AUTH", "1");
         std::env::set_var("CASE_PASETO_KEYS", keys.to_string());
     }

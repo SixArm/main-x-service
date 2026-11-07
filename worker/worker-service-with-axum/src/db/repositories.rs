@@ -317,7 +317,7 @@ pub trait WorkerRepository: Send + Sync {
     ///
     /// Returns an error if the transactional insert fails, or if reloading the
     /// just-written record fails (e.g. a missing primary name).
-    async fn create(&self, worker: &Worker) -> Result<Worker>;
+    async fn create(&self, worker: &Worker, ctx: &AuditContext) -> Result<Worker>;
 
     /// Fetches a non-deleted worker by ID, or `None` if absent/soft-deleted.
     ///
@@ -333,7 +333,7 @@ pub trait WorkerRepository: Send + Sync {
     ///
     /// Returns an error if the transactional update fails, or if the worker is
     /// not found after the update.
-    async fn update(&self, worker: &Worker) -> Result<Worker>;
+    async fn update(&self, worker: &Worker, ctx: &AuditContext) -> Result<Worker>;
 
     /// Merges the `duplicate_id` record into `survivor`: applies the
     /// survivor's parent + child row updates and soft-deletes the
@@ -348,14 +348,19 @@ pub trait WorkerRepository: Send + Sync {
     /// Returns an error if the transaction or any query fails, or
     /// [`crate::Error::Validation`] if the survivor cannot be re-read after
     /// the merge.
-    async fn merge(&self, survivor: &Worker, duplicate_id: &Uuid) -> Result<Worker>;
+    async fn merge(
+        &self,
+        survivor: &Worker,
+        duplicate_id: &Uuid,
+        ctx: &AuditContext,
+    ) -> Result<Worker>;
 
     /// Soft-deletes a worker by stamping its `deleted_at` column.
     ///
     /// # Errors
     ///
     /// Returns an error if the update fails.
-    async fn delete(&self, id: &Uuid) -> Result<()>;
+    async fn delete(&self, id: &Uuid, ctx: &AuditContext) -> Result<()>;
 
     /// Returns a page of active, non-deleted workers.
     ///
@@ -1061,7 +1066,7 @@ impl SeaOrmWorkerRepository {
 // event and records an audit entry after the commit.
 #[async_trait::async_trait]
 impl WorkerRepository for SeaOrmWorkerRepository {
-    async fn create(&self, worker: &Worker) -> Result<Worker> {
+    async fn create(&self, worker: &Worker, ctx: &AuditContext) -> Result<Worker> {
         // All inserts share one transaction so a partial worker is never left.
         let txn = self.db.begin().await?;
 
@@ -1135,14 +1140,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 
         // Log audit
         if let Ok(worker_json) = serde_json::to_value(&result) {
-            self.log_audit(
-                "CREATE",
-                result.id,
-                None,
-                Some(worker_json),
-                &AuditContext::default(),
-            )
-            .await;
+            self.log_audit("CREATE", result.id, None, Some(worker_json), ctx)
+                .await;
         }
 
         Ok(result)
@@ -1173,7 +1172,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         Ok(Some(worker))
     }
 
-    async fn update(&self, worker: &Worker) -> Result<Worker> {
+    async fn update(&self, worker: &Worker, ctx: &AuditContext) -> Result<Worker> {
         // Capture the pre-update state for the audit diff.
         let old_worker = self.get_by_id(&worker.id).await?;
 
@@ -1273,20 +1272,19 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             .and_then(|p| serde_json::to_value(p).ok())
             && let Ok(new_json) = serde_json::to_value(&result)
         {
-            self.log_audit(
-                "UPDATE",
-                result.id,
-                Some(old_json),
-                Some(new_json),
-                &AuditContext::default(),
-            )
-            .await;
+            self.log_audit("UPDATE", result.id, Some(old_json), Some(new_json), ctx)
+                .await;
         }
 
         Ok(result)
     }
 
-    async fn merge(&self, survivor: &Worker, duplicate_id: &Uuid) -> Result<Worker> {
+    async fn merge(
+        &self,
+        survivor: &Worker,
+        duplicate_id: &Uuid,
+        ctx: &AuditContext,
+    ) -> Result<Worker> {
         // Snapshots for the audit trail: the survivor's pre-image for the
         // UPDATE row, the duplicate's pre-image for the DELETE row (and to
         // build the duplicate's `Deleted` outbox envelope).
@@ -1375,32 +1373,20 @@ impl WorkerRepository for SeaOrmWorkerRepository {
             .and_then(|p| serde_json::to_value(p).ok())
             && let Ok(new_json) = serde_json::to_value(&result)
         {
-            self.log_audit(
-                "UPDATE",
-                result.id,
-                Some(old_json),
-                Some(new_json),
-                &AuditContext::default(),
-            )
-            .await;
+            self.log_audit("UPDATE", result.id, Some(old_json), Some(new_json), ctx)
+                .await;
         }
         if let Some(dup) = old_duplicate
             && let Ok(dup_json) = serde_json::to_value(&dup)
         {
-            self.log_audit(
-                "DELETE",
-                *duplicate_id,
-                Some(dup_json),
-                None,
-                &AuditContext::default(),
-            )
-            .await;
+            self.log_audit("DELETE", *duplicate_id, Some(dup_json), None, ctx)
+                .await;
         }
 
         Ok(result)
     }
 
-    async fn delete(&self, id: &Uuid) -> Result<()> {
+    async fn delete(&self, id: &Uuid, ctx: &AuditContext) -> Result<()> {
         // Capture the pre-delete state for the audit record.
         let old_worker = self.get_by_id(id).await?;
 
@@ -1459,14 +1445,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         if let Some(old_worker) = old_worker
             && let Ok(old_json) = serde_json::to_value(&old_worker)
         {
-            self.log_audit(
-                "DELETE",
-                *id,
-                Some(old_json),
-                None,
-                &AuditContext::default(),
-            )
-            .await;
+            self.log_audit("DELETE", *id, Some(old_json), None, ctx)
+                .await;
         }
 
         Ok(())
@@ -1511,7 +1491,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 /// bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
-    use super::{SeaOrmWorkerRepository, WorkerRepository};
+    use super::{AuditContext, SeaOrmWorkerRepository, WorkerRepository};
     /// The `workers.gender` CHECK constraint's vocabulary, copied from
     /// `migrations/2024122800000002_create_workers/up.sql`. A value
     /// outside this set is rejected by `PostgreSQL` at insert time.
@@ -1582,6 +1562,45 @@ mod tests {
         Worker::new(name, Gender::Unknown)
     }
 
+    /// A merge's audit rows carry the caller's context on both records, rather
+    /// than the `system` default the repository used to build for itself.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn merge_audit_rows_carry_the_callers_context() {
+        use crate::db::audit::AuditLogRepository;
+        use crate::db::models::audit_log;
+
+        let db = connect().await;
+        let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
+        let repo = SeaOrmWorkerRepository::new(db.clone()).with_audit_log(audit);
+        let system = AuditContext::default();
+        let survivor = repo.create(&a_worker("Survivor"), &system).await.unwrap();
+        let duplicate = repo.create(&a_worker("Duplicate"), &system).await.unwrap();
+
+        let caller = AuditContext {
+            user_id: Some("operator-merge-42".to_string()),
+            ip_address: Some("198.51.100.7".to_string()),
+            user_agent: None,
+        };
+        repo.merge(&survivor, &duplicate.id, &caller).await.unwrap();
+
+        for (id, action) in [(survivor.id, "UPDATE"), (duplicate.id, "DELETE")] {
+            let row = audit_log::Entity::find()
+                .filter(audit_log::Column::EntityId.eq(id))
+                .filter(audit_log::Column::Action.eq(action))
+                .one(&db)
+                .await
+                .unwrap()
+                .expect("the merge writes an audit row");
+            assert_eq!(
+                row.user_id.as_deref(),
+                Some("operator-merge-42"),
+                "{action}"
+            );
+            assert_eq!(row.ip_address.as_deref(), Some("198.51.100.7"), "{action}");
+        }
+    }
+
     /// Create writes, in one transaction: exactly one `created` outbox row
     /// for the new worker under the outbox transport.
     #[tokio::test]
@@ -1590,7 +1609,10 @@ mod tests {
         let db = connect().await;
         let repo = SeaOrmWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
-        let worker = repo.create(&a_worker("Created")).await.unwrap();
+        let worker = repo
+            .create(&a_worker("Created"), &AuditContext::default())
+            .await
+            .unwrap();
 
         let rows = event_outbox::Entity::find()
             .filter(event_outbox::Column::EntityPid.eq(worker.id))
@@ -1611,10 +1633,19 @@ mod tests {
         let db = connect().await;
         let repo = SeaOrmWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
-        let survivor = repo.create(&a_worker("Survivor")).await.unwrap();
-        let duplicate = repo.create(&a_worker("Duplicate")).await.unwrap();
+        let survivor = repo
+            .create(&a_worker("Survivor"), &AuditContext::default())
+            .await
+            .unwrap();
+        let duplicate = repo
+            .create(&a_worker("Duplicate"), &AuditContext::default())
+            .await
+            .unwrap();
 
-        let merged = repo.merge(&survivor, &duplicate.id).await.unwrap();
+        let merged = repo
+            .merge(&survivor, &duplicate.id, &AuditContext::default())
+            .await
+            .unwrap();
         assert_eq!(merged.id, survivor.id);
 
         // Survivor: exactly one `merged` row, carrying the duplicate pid.

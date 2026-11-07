@@ -15,8 +15,7 @@
 //!
 //! When `PLACE_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 //! case-insensitive), the [`enforce`] decision — wired as an Axum
-//! middleware layer on both router surfaces (`create_router` and the
-//! axa router in `src/app.rs`) — requires a valid bearer token on
+//! middleware layer on the axa router in `src/app.rs` — requires a valid bearer token on
 //! every route except the public allow-list ([`PUBLIC_PATHS`] +
 //! [`PUBLIC_PATH_PREFIXES`]: health, OpenAPI/Swagger docs, Prometheus
 //! metrics). It is **off by default**: unset/blank/`0`/junk ⇒ today's
@@ -502,7 +501,16 @@ pub async fn require_auth_middleware(
     .await;
     match decision {
         Ok(()) => next.run(request).await,
-        Err(rejection) => rejection.into_response(),
+        Err((status, reason)) => {
+            // The reason goes to the log, never to the caller.
+            tracing::warn!(status = status.as_u16(), %reason, "auth_refused");
+            let text = if status == axum::http::StatusCode::UNAUTHORIZED {
+                "invalid token"
+            } else {
+                "forbidden"
+            };
+            (status, text).into_response()
+        }
     }
 }
 

@@ -8,6 +8,23 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security
+
+- **An audit row keeps the caller's address for a week.** `WORKER_AUDIT_ADDRESS_RETENTION_DAYS`
+  sets the limit, and an hourly sweep removes the address after it. New rows are chain
+  format `p2`, which binds a salted commitment to the address, so the row keeps verifying
+  once the address has gone. Needs the `audit_address_commitment` migration.
+- **`/api/compliance/sbom` needs a verified caller,** even with `WORKER_REQUIRE_AUTH` off.
+- **Audit rows now record the client's address.** `ip_address` was `NULL` on every
+  row. Mutations, reads, link and assessment writes, erasures, and gRPC calls now
+  carry the address from `axa::client::ClientAddr`, which believes
+  `X-Forwarded-For` only from a peer listed in `TRUSTED_PROXIES`. **Set
+  `TRUSTED_PROXIES` in production behind a proxy**, or every row records the
+  proxy's address.
+- **Worker mutations now audit the real actor.** `WorkerRepository`'s `create`,
+  `update`, `merge`, and `delete` take an `AuditContext`, as person's do. Their
+  rows used to say `system` whoever called, and now carry the bearer `sub`.
+
 ### Changed — Loco replaced by axa
 
 - **Loco removed.** The service is now plain Axum plus shared helpers from

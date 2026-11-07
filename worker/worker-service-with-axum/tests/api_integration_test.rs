@@ -526,7 +526,7 @@ async fn test_get_worker_not_found() {
 /// FHIR surface is reachable) without a live database.
 #[tokio::test]
 async fn test_fhir_practitioner_route_is_mounted() {
-    let app = common::create_test_router_no_db();
+    let app = common::create_test_router_no_db().await;
 
     let response = app
         .oneshot(
@@ -1616,11 +1616,12 @@ async fn test_compliance_identification_is_mounted() {
     assert!(body_str.contains("IEC 62304"));
 }
 
-/// `GET /api/compliance/sbom` serves a `CycloneDX` document covering the
-/// real dependency graph, with SOUP annotations attached.
+/// `GET /api/compliance/sbom` names every dependency's exact version, so
+/// it needs a verified caller even with `WORKER_REQUIRE_AUTH` off. The
+/// document itself is checked in `tests/enforcement.rs`, which has a token.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
-async fn test_compliance_sbom_is_mounted() {
+async fn test_compliance_sbom_needs_a_caller_with_enforcement_off() {
     let app = common::create_test_router().await;
 
     let response = app
@@ -1633,19 +1634,7 @@ async fn test_compliance_sbom_is_mounted() {
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
-
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    let body_str = String::from_utf8(body.to_vec()).unwrap();
-
-    assert!(body_str.contains("CycloneDX"));
-    assert!(body_str.contains("pkg:cargo/"));
-    // A SOUP annotation reached the wire, so the register is actually
-    // merged in rather than the SBOM being a bare lockfile dump.
-    assert!(body_str.contains("mxi:soup"));
-    assert!(body_str.contains("SECURITY-CRITICAL"));
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
 /// Regression pin: the cross-service link endpoints (`api/rest/links.rs`)

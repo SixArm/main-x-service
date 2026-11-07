@@ -19,6 +19,7 @@ use axum::extract::Query;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
+use crate::auth::AuthUser;
 use crate::compliance::checkpoint::Checkpoint;
 use crate::compliance::{Posture, soup};
 use crate::models::audit_logs::Model as AuditModel;
@@ -93,8 +94,11 @@ async fn posture() -> Result<Response> {
 /// # Errors
 ///
 /// None beyond response serialization.
+///
+/// The caller is required here as well as by the guard, because with
+/// `CARE_PATHWAY_REQUIRE_AUTH` off the guard lets everyone through.
 #[debug_handler]
-async fn sbom() -> Result<Response> {
+async fn sbom(_caller: AuthUser) -> Result<Response> {
     format::json(soup::sbom())
 }
 

@@ -143,6 +143,33 @@ async fn enforcement_on_gates_the_real_router() {
 
     let app = common::create_test_router().await;
 
+    // The SBOM reaches a verified caller, with its SOUP annotations merged
+    // in rather than a bare lockfile dump, and nobody else.
+    assert_eq!(
+        get(&app, "/api/compliance/sbom", None).await,
+        StatusCode::UNAUTHORIZED
+    );
+    let token = mint(&kid, &[]);
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/compliance/sbom")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let body = String::from_utf8(body.to_vec()).unwrap();
+    for expected in ["CycloneDX", "pkg:cargo/", "mxi:soup", "SECURITY-CRITICAL"] {
+        assert!(body.contains(expected), "{expected}");
+    }
+
     assert_eq!(
         get(&app, "/api/health", None).await,
         StatusCode::OK,

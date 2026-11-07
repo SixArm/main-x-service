@@ -73,6 +73,8 @@ pub mod handlers;
 pub mod jsonl;
 /// The import/export per-row/per-job pipeline (the testable core).
 pub mod pipeline;
+/// Reconcile `bulk_jobs` with the job queue, so a lost job reaches `failed`.
+pub mod reconcile;
 /// Care-pathway's declared upsert stable key (§9.4).
 pub mod stable_key;
 /// Artifact storage abstraction + local-filesystem/S3 implementations.

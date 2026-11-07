@@ -170,9 +170,8 @@ clearly described manual check confirms the acceptance criterion.
     (`CreateWorker`), the shared duplicate-detection core
     (`check_duplicates_internal`, bumped from private to `pub(crate)`
     rather than copied), the same `WorkerRepository` trait methods
-    (`create`/`get_by_id`/`list_active`/`delete` — this crate's
-    repository takes no `AuditContext`, unlike person's, so there is
-    no `audit_context_of` equivalent needed here), and
+    (`create`/`get_by_id`/`list_active`/`delete`, whose mutations take
+    the `AuditContext` from `audit_context_of`), and
     `auth::authorize_record` + `crate::privacy::mask_worker` for
     `GetWorker`'s record-level ABAC + masking, matching
     `handlers::get_worker`'s own logic exactly. `worker_type` parses

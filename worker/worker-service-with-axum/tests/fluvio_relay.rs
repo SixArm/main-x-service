@@ -71,7 +71,10 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
     // transaction as the worker insert.
     let repo = SeaOrmWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
     let worker = repo
-        .create(&a_worker("FluvioRelayRoundTrip"))
+        .create(
+            &a_worker("FluvioRelayRoundTrip"),
+            &worker_service::db::AuditContext::default(),
+        )
         .await
         .expect("create under outbox transport");
 

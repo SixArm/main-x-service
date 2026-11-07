@@ -195,9 +195,8 @@ requires a valid bearer token on **every** `/api/*` route except the
 public `/api/health`. Root-level `/_health`, `/_ping`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom` sit
 outside the `/api` scope and stay public. The flag is read once at
-`AppState` construction — restart the service to change it. Wired on
-both router surfaces (`create_router` and the axa router in
-`App::after_routes`). Unauthenticated requests to any protected path
+`AppState` construction — restart the service to change it. Wired in
+`App::after_routes`. Unauthenticated requests to any protected path
 return `401`; a valid token the ABAC policy denies (below) returns
 `403`. Family contract:
 [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md).

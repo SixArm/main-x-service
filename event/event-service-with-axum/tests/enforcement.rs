@@ -13,27 +13,22 @@
 //! integration suite in the same process would otherwise cache the flag
 //! as off before this test sets it.
 //!
-//! `#[ignore]`d — the router opens a database connection. Run with
+//! `#[ignore]`d — this boots the app, so it needs PostgreSQL. Run with
 //! `cargo test --test enforcement -- --ignored`.
 
 #![cfg(feature = "paseto")]
 
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axa::testing::prelude::*;
+use axum::http::StatusCode;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ed25519_dalek::SigningKey;
-use event_service::api::rest::{AppState, create_router};
-use event_service::config::Config;
-use event_service::db::create_connection;
-use event_service::matching::ProbabilisticMatcher;
+use event_service::app::App;
 use event_service::models::event::Event;
-use event_service::search::SearchEngine;
 use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
 use serde_json::{Value, json};
 use serial_test::serial;
 use sha2::{Digest, Sha256};
-use tower::ServiceExt;
 
 /// Throwaway Ed25519 seed: mints test tokens and the matching published
 /// key set in-process. Not a secret, never used in production.
@@ -83,25 +78,6 @@ fn mint(kid: &str, attrs: &[(&str, &[&str])]) -> String {
     builder.try_sign(&private).expect("sign")
 }
 
-/// Build the real router against the environment-configured database and
-/// a temp search index.
-///
-/// This crate has no shared HTTP test harness — its `tests/` are library
-/// tests over pure functions — so the activation proof brings its own.
-/// It is deliberately the **production** `create_router`, since what is
-/// being proved is that the middleware is wired onto the router the
-/// service actually serves.
-async fn test_router() -> axum::Router {
-    let config = Config::from_env().expect("load config from env");
-    std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
-    let search_engine = SearchEngine::new(&config.search.index_path).expect("search engine");
-    let matcher = ProbabilisticMatcher::new(config.matching.clone());
-    let db = create_connection(&config.database)
-        .await
-        .expect("Postgres connection — set DATABASE_URL to a running, migrated database");
-    create_router(AppState::new(db, search_engine, matcher, config))
-}
-
 /// A valid event payload with a unique name, so a create that reaches
 /// the handler is not turned away as a duplicate.
 ///
@@ -124,64 +100,35 @@ fn event_body() -> Value {
     .expect("serialize")
 }
 
+/// The `Authorization` value for a bearer token.
+fn bearer(token: &str) -> axum::http::HeaderValue {
+    format!("Bearer {token}").parse().unwrap()
+}
+
 /// `GET` the path with an optional bearer, returning the status.
-async fn get(app: &axum::Router, path: &str, token: Option<&str>) -> StatusCode {
-    let mut builder = Request::builder().method("GET").uri(path);
+async fn get(server: &TestServer, path: &str, token: Option<&str>) -> StatusCode {
+    let mut request = server.get(path);
     if let Some(token) = token {
-        builder = builder.header("authorization", format!("Bearer {token}"));
+        request = request.add_header(axum::http::header::AUTHORIZATION, bearer(token));
     }
-    app.clone()
-        .oneshot(builder.body(Body::empty()).unwrap())
-        .await
-        .unwrap()
-        .status()
+    request.await.status_code()
 }
 
 /// `POST` an event payload, returning the status **and** the body, so a
 /// refusal reports the server's reason rather than only a status
 /// mismatch.
-async fn post_event_verbose(app: &axum::Router, token: Option<&str>) -> (StatusCode, String) {
-    let mut builder = Request::builder()
-        .method("POST")
-        .uri("/api/events")
-        .header("content-type", "application/json");
+async fn post_event_verbose(server: &TestServer, token: Option<&str>) -> (StatusCode, String) {
+    let mut request = server.post("/api/events").json(&event_body());
     if let Some(token) = token {
-        builder = builder.header("authorization", format!("Bearer {token}"));
+        request = request.add_header(axum::http::header::AUTHORIZATION, bearer(token));
     }
-    let response = app
-        .clone()
-        .oneshot(
-            builder
-                .body(Body::from(serde_json::to_vec(&event_body()).unwrap()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = response.status();
-    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    (status, String::from_utf8_lossy(&bytes).to_string())
+    let response = request.await;
+    (response.status_code(), response.text())
 }
 
 /// `POST` an event payload with an optional bearer, returning the status.
-async fn post_event(app: &axum::Router, token: Option<&str>) -> StatusCode {
-    let mut builder = Request::builder()
-        .method("POST")
-        .uri("/api/events")
-        .header("content-type", "application/json");
-    if let Some(token) = token {
-        builder = builder.header("authorization", format!("Bearer {token}"));
-    }
-    app.clone()
-        .oneshot(
-            builder
-                .body(Body::from(serde_json::to_vec(&event_body()).unwrap()))
-                .unwrap(),
-        )
-        .await
-        .unwrap()
-        .status()
+async fn post_event(server: &TestServer, token: Option<&str>) -> StatusCode {
+    post_event_verbose(server, token).await.0
 }
 
 /// With enforcement on: public paths stay open, protected paths need a
@@ -192,71 +139,76 @@ async fn post_event(app: &axum::Router, token: Option<&str>) -> StatusCode {
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test enforcement -- --ignored`"]
 async fn enforcement_on_gates_the_real_router() {
     let (keys, kid) = keys_and_kid();
+    let index =
+        std::env::temp_dir().join(format!("event-enforcement-index-{}", std::process::id()));
+    std::fs::create_dir_all(&index).expect("create search index dir");
     // Set BEFORE the router is built — the flag, the key set and the
     // policy are read into process-wide `OnceLock`s on first use.
     // `set_var` is `unsafe` in edition 2024; single-threaded setup.
     unsafe {
         std::env::set_var("EVENT_REQUIRE_AUTH", "1");
+        std::env::set_var("SEARCH_INDEX_PATH", &index);
         std::env::set_var("EVENT_PASETO_KEYS", keys.to_string());
         // No EVENT_ABAC_POLICY ⇒ the built-in default policy: read
         // allow, mutation deny, `access=write` writes.
     }
 
-    let app = test_router().await;
+    request::<App, _, _>(|server, _ctx| async move {
+        assert_eq!(
+            get(&server, "/api/health", None).await,
+            StatusCode::OK,
+            "a public path stays open with enforcement on"
+        );
+        assert_eq!(
+            get(&server, "/metrics.prom", None).await,
+            StatusCode::OK,
+            "metrics stay scrapeable without a token"
+        );
 
-    assert_eq!(
-        get(&app, "/api/health", None).await,
-        StatusCode::OK,
-        "a public path stays open with enforcement on"
-    );
-    assert_eq!(
-        get(&app, "/metrics.prom", None).await,
-        StatusCode::OK,
-        "metrics stay scrapeable without a token"
-    );
+        assert_eq!(
+            get(&server, "/api/events/search?q=anyone", None).await,
+            StatusCode::UNAUTHORIZED,
+            "a protected read without a token is 401"
+        );
+        assert_eq!(
+            post_event(&server, None).await,
+            StatusCode::UNAUTHORIZED,
+            "a protected write without a token is 401"
+        );
 
-    assert_eq!(
-        get(&app, "/api/events/search?q=anyone", None).await,
-        StatusCode::UNAUTHORIZED,
-        "a protected read without a token is 401"
-    );
-    assert_eq!(
-        post_event(&app, None).await,
-        StatusCode::UNAUTHORIZED,
-        "a protected write without a token is 401"
-    );
+        // A garbage bearer is a 401, not a 500 — the guard must reject
+        // malformed credentials rather than fall over on them.
+        assert_eq!(
+            get(&server, "/api/events/search?q=anyone", Some("not-a-token")).await,
+            StatusCode::UNAUTHORIZED,
+            "a malformed bearer is 401"
+        );
 
-    // A garbage bearer is a 401, not a 500 — the guard must reject
-    // malformed credentials rather than fall over on them.
-    assert_eq!(
-        get(&app, "/api/events/search?q=anyone", Some("not-a-token")).await,
-        StatusCode::UNAUTHORIZED,
-        "a malformed bearer is 401"
-    );
+        // Valid token, no attributes: the default policy allows the read and
+        // denies the write — 403, distinct from the 401 above. The
+        // 401/403 split is the contract in authorization-attributes.md §5.
+        let reader = mint(&kid, &[]);
+        assert_eq!(
+            get(&server, "/api/events/search?q=anyone", Some(&reader)).await,
+            StatusCode::OK,
+            "any authenticated caller may read"
+        );
+        assert_eq!(
+            post_event(&server, Some(&reader)).await,
+            StatusCode::FORBIDDEN,
+            "a caller without access=write is denied by policy, not by authentication"
+        );
 
-    // Valid token, no attributes: the default policy allows the read and
-    // denies the write — 403, distinct from the 401 above. The
-    // 401/403 split is the contract in authorization-attributes.md §5.
-    let reader = mint(&kid, &[]);
-    assert_eq!(
-        get(&app, "/api/events/search?q=anyone", Some(&reader)).await,
-        StatusCode::OK,
-        "any authenticated caller may read"
-    );
-    assert_eq!(
-        post_event(&app, Some(&reader)).await,
-        StatusCode::FORBIDDEN,
-        "a caller without access=write is denied by policy, not by authentication"
-    );
-
-    // `access=write` reaches the handler and does real database work.
-    let writer = mint(&kid, &[("access", &["write"])]);
-    let (status, body) = post_event_verbose(&app, Some(&writer)).await;
-    assert_eq!(
-        status,
-        StatusCode::CREATED,
-        "access=write may create: {body}"
-    );
+        // `access=write` reaches the handler and does real database work.
+        let writer = mint(&kid, &[("access", &["write"])]);
+        let (status, body) = post_event_verbose(&server, Some(&writer)).await;
+        assert_eq!(
+            status,
+            StatusCode::CREATED,
+            "access=write may create: {body}"
+        );
+    })
+    .await;
 
     unsafe {
         std::env::remove_var("EVENT_REQUIRE_AUTH");

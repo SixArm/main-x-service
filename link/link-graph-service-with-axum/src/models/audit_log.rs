@@ -20,7 +20,8 @@ impl ActiveModelBehavior for ActiveModel {}
 pub struct AuditContext<'a> {
     /// The caller's verified bearer `sub`, if any.
     pub actor: Option<&'a str>,
-    /// The caller IP (best-effort; `None` in v1).
+    /// The client's address, from `axa::client::ClientAddr`. `None` when no
+    /// request is behind the write, as with a bus-driven `apply_linked`.
     pub user_ip: Option<&'a str>,
     /// The caller `User-Agent` header, if present.
     pub user_agent: Option<&'a str>,

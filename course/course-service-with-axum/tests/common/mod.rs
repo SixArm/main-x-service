@@ -16,13 +16,8 @@ use axum::Router;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use course_service::{
-    api::rest::{AppState, create_router},
-    config::Config,
-    db::create_connection,
-    matching::CourseMatcher,
-    search::SearchEngine,
-};
+use axa::testing::TestApp;
+use course_service::{api::rest::AppState, app::App};
 
 /// Held for the lifetime of the process so the search index dir
 /// doesn't disappear before the tests finish.
@@ -31,31 +26,30 @@ fn index_dir() -> &'static TempDir {
     DIR.get_or_init(|| TempDir::new().expect("create search index dir"))
 }
 
-/// Build an `AppState` against the env-configured Postgres + a
-/// per-process temp Tantivy index. Panics with a clear message if the
-/// DB isn't reachable.
-pub async fn create_test_app_state() -> AppState {
-    let mut config = Config::from_env().expect("load test config from env");
-    config.search.index_path = index_dir().path().to_string_lossy().into_owned();
-
-    let db = create_connection(&config.database).await.expect(
-        "Postgres connection failed — set DATABASE_URL to a running, migrated DB before \
-             running integration tests",
-    );
-
-    let search_engine =
-        SearchEngine::new(&config.search.index_path).expect("create Tantivy search engine");
-
-    let matcher = CourseMatcher::new(config.matching);
-
-    AppState::new(db, search_engine, matcher, config)
+/// Boot the real application: the router production serves, plus the
+/// [`AppState`] that router holds, so a test seeding through the state
+/// writes to the same search index the routes read.
+pub async fn boot() -> (Router, AppState) {
+    // SAFETY: the DB-gated suites run with `--test-threads=1`
+    // (`ci-check.sh test-db`), so no other thread reads the environment
+    // concurrently with this write.
+    unsafe {
+        std::env::set_var("SEARCH_INDEX_PATH", index_dir().path());
+    }
+    let boot = App::boot_test()
+        .await
+        .expect("boot the app: set DATABASE_URL to a running PostgreSQL");
+    let state = boot
+        .app_context
+        .shared_store
+        .get::<AppState>()
+        .expect("after_routes stores the AppState");
+    (boot.router.expect("boot_test builds the router"), state)
 }
 
-/// Convenience wrapper: build the test [`AppState`] and mount it on the
-/// full production router, ready to drive via `oneshot`.
+/// The full production router, ready to drive via `oneshot`.
 pub async fn create_test_router() -> Router {
-    let state = create_test_app_state().await;
-    create_router(state)
+    boot().await.0
 }
 
 /// Generate a per-test unique course name so tests don't step on each

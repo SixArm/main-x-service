@@ -162,3 +162,16 @@ invariant 2).
 
 Migration: `m20260723_000001_create_worker_assessments`
 (`migrations/2026072300000001_create_worker_assessments/{up,down}.sql`).
+
+### 10.6 Client address on audit rows
+
+`audit_log.ip_address` holds what `axa::client::ClientAddr` resolved: the
+connecting peer, or, when that peer is listed in `TRUSTED_PROXIES`, the rightmost
+`X-Forwarded-For` entry not written by a listed proxy. A caller cannot choose it
+by sending the header. With `TRUSTED_PROXIES` unset, a service behind a proxy
+records the proxy's address. gRPC resolves it by the same rule from the peer
+address and request metadata.
+
+It is `NULL` where no request is behind the row: system actions. Erasure clears a
+row's old and new values, not its `ip_address`, which is the caller's address and
+not the data subject's.

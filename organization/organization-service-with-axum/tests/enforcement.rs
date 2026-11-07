@@ -133,6 +133,27 @@ async fn enforcement_on_gates_the_real_router() {
             401,
             "a protected read without a token is 401"
         );
+
+        // The refusal comes through axa's standard middleware, and tells the
+        // caller nothing about why.
+        let refused = request.get("/api/organizations").await;
+        assert_eq!(refused.text(), "invalid token");
+        assert!(
+            refused.maybe_header("x-request-id").is_some(),
+            "a refusal has a request id"
+        );
+        assert_eq!(refused.header("x-content-type-options"), "nosniff");
+
+        // So does a version refusal, which sits outside the auth guard.
+        let unsupported = request
+            .get("/api/organizations")
+            .add_header("accepts-version", "99.0")
+            .await;
+        assert_eq!(unsupported.status_code(), 406);
+        assert!(
+            unsupported.maybe_header("x-request-id").is_some(),
+            "a version refusal has a request id"
+        );
         assert_eq!(
             request
                 .post("/api/organizations")

@@ -22,8 +22,6 @@ use crate::{
     observability::{self, Telemetry, TelemetryConfig},
     search::SearchEngine,
 };
-use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 
 /// The installed telemetry providers, so `on_shutdown` can flush what the
 /// batch processor is still holding. Set once by [`App::init_logger`].
@@ -112,7 +110,7 @@ impl App {
     /// extraction can reach it. Then mounts Swagger UI, the blanket
     /// auth-enforcement middleware (default-off, gated by
     /// `PLACE_REQUIRE_AUTH` — read here, at construction, so changing the
-    /// flag requires a restart), and a permissive CORS layer.
+    /// flag requires a restart). [`App::router`] adds axa's CORS layer outside it.
     ///
     /// The PASETO verifier is finalised **first** via
     /// [`crate::api::rest::state::boot_verifier`] — when
@@ -146,7 +144,10 @@ impl App {
         // so the default `memory` transport is unaffected.
         crate::relay::spawn(ctx.db.clone());
         let router = router
-            .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+            .merge(axa::openapi::router(
+                axa::openapi::spec_of::<ApiDoc>(),
+                "Place Service API",
+            ))
             .layer(axum::middleware::from_fn_with_state(
                 enforcement,
                 auth::require_auth_middleware,
@@ -154,8 +155,8 @@ impl App {
             .layer(axum::middleware::from_fn(
                 crate::api::rest::version::require_version_mw,
             ))
-            // Outermost layer runs first, so the request span wraps CORS,
-            // versioning, and the auth guard too — a 401/403 is part of the
+            // Outermost of these runs first, so the request span wraps
+            // versioning and the auth guard too — a 401/403 is part of the
             // trace, not invisible to it (same reasoning as person-service's
             // and link-graph-service's `after_routes`).
             .layer(axum::middleware::from_fn(observability::trace_mw));
@@ -186,15 +187,18 @@ impl App {
         Ok(AppContext::new(environment, db, config))
     }
 
-    /// Build the full router: the routes under the standard middleware,
-    /// then this service's own layers.
+    /// Build the full router: the routes, this service's own layers, then
+    /// the standard middleware outside them, so that a refusal from a guard
+    /// still gets a request id, security headers, CORS, and the panic and
+    /// timeout protection.
     ///
     /// # Errors
     ///
     /// Fails when the service's setup fails.
     pub async fn router(ctx: &AppContext) -> Result<AxumRouter> {
-        let router = Self::routes(ctx).into_app(ctx.clone())?;
-        Self::after_routes(router, ctx).await
+        let router = Self::routes(ctx).into_router(ctx.clone());
+        let router = Self::after_routes(router, ctx).await?;
+        axa::middleware::apply(router, &ctx.config.http)
     }
 
     /// Run a database command.

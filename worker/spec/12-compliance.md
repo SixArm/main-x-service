@@ -1019,6 +1019,8 @@ test pins that redaction cannot be used to detach the following row.
 
 **Version tag: `p1`.** Shared with the person service, whose chain format is byte-identical — the tag names the *format*, not the crate, and the `p` prefix is a legacy of the port rather than a claim about persons. Renaming it would invalidate every stored digest, so it stays.
 
+**Version tag: `p2`.** A row with an address, since the `WORKER_AUDIT_ADDRESS_RETENTION_DAYS` work. It is `p1` with the address field replaced by `ip_commitment`, which is `SHA-256("audit-address", salt, address)` hex. The address is personal data with a retention limit (a week by default) and the row is evidence with none, so after the limit the address and `ip_salt` are removed and the commitment stays. The row still gets its full content check, unlike a redacted one. While both are held, verification recomputes the commitment, so an edited address is a `content` break. A `p1` row binds the address itself and cannot be scrubbed; the sweep counts such rows and warns. Removing an address early cannot be told from removing it on time.
+
 #### The record content hash
 
 Each `workers` row carries `content_hash`, recomputed on **every** write.

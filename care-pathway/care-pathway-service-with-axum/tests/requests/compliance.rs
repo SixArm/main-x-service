@@ -71,6 +71,7 @@ async fn verify(request: &TestServer) -> Value {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn chain_survives_a_jsonb_round_trip() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = create(&request, &rich_pathway()).await;
         // Update and delete, so the chain spans several rows and several
@@ -111,6 +112,7 @@ async fn chain_survives_a_jsonb_round_trip() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn tampering_with_a_row_breaks_verification() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         create(&request, &rich_pathway()).await;
         assert_eq!(verify(&request).await["verified"], true);
@@ -148,6 +150,7 @@ async fn tampering_with_a_row_breaks_verification() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn erasure_destroys_content_but_keeps_the_chain_verifiable() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = create(&request, &rich_pathway()).await;
         // A second record proves erasure is scoped to its subject.
@@ -230,6 +233,7 @@ async fn erasure_destroys_content_but_keeps_the_chain_verifiable() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn erasure_is_idempotent() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = create(&request, &rich_pathway()).await;
         let first: Value = request
@@ -277,6 +281,7 @@ async fn erasure_is_idempotent() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn disclosure_accounting_declares_its_completeness() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let pid = create(&request, &rich_pathway()).await;
         // A read that declares a research purpose and an external
@@ -322,6 +327,7 @@ async fn verify_records(request: &TestServer) -> Value {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn out_of_band_record_edit_is_detected() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         let pid = create(&request, &rich_pathway()).await;
         create(&request, &rich_pathway()).await;
@@ -361,6 +367,7 @@ async fn out_of_band_record_edit_is_detected() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn every_write_path_rehashes() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let updated_pid = create(&request, &rich_pathway()).await;
         let mut changed = rich_pathway();
@@ -407,6 +414,7 @@ async fn every_write_path_rehashes() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn posture_reports_controls_and_disclaimers() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/api/compliance").await;
         assert_eq!(response.status_code(), 200);
@@ -436,8 +444,14 @@ async fn posture_reports_controls_and_disclaimers() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn sbom_is_served_and_annotated() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
-        let body: Value = request.get("/api/compliance/sbom").await.json();
+        // Not open to everyone, even with enforcement off here.
+        let refused = request.get("/api/compliance/sbom").await;
+        assert_eq!(refused.status_code(), 401);
+
+        let body = serde_json::to_value(care_pathway_service::compliance::soup::sbom())
+            .expect("the SBOM serializes");
         assert_eq!(body["bomFormat"], "CycloneDX");
         assert_eq!(body["specVersion"], "1.5");
         let components = body["components"].as_array().expect("components");
@@ -462,6 +476,7 @@ async fn sbom_is_served_and_annotated() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn fhir_validate_checks_profile_and_terminology() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let valid = json!({
             "resourceType": "PlanDefinition",
@@ -516,6 +531,7 @@ async fn fhir_validate_checks_profile_and_terminology() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn smart_discovery_is_absent_unless_configured() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let response = request.get("/fhir/.well-known/smart-configuration").await;
         // The test environment configures no SMART server.
@@ -538,6 +554,7 @@ async fn smart_discovery_is_absent_unless_configured() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn capability_statement_declares_profile_and_operations() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         let body: Value = request.get("/fhir/metadata").await.json();
         assert_eq!(body["resourceType"], "CapabilityStatement");
@@ -581,6 +598,7 @@ async fn capability_statement_declares_profile_and_operations() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn bulk_export_kickoff_status_and_output() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         create(&request, &rich_pathway()).await;
         create(&request, &rich_pathway()).await;
@@ -668,6 +686,7 @@ async fn bulk_export_kickoff_status_and_output() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn queued_export_reports_progress_not_a_manifest() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         let job = care_pathway_service::models::bulk_jobs::Model::submit(
             &ctx.db,
@@ -705,6 +724,7 @@ async fn queued_export_reports_progress_not_a_manifest() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn cancelling_an_export_makes_its_output_unreachable() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         // A live (queued) job, created directly for the reason above.
         let job = care_pathway_service::models::bulk_jobs::Model::submit(
@@ -764,6 +784,7 @@ async fn cancelling_an_export_makes_its_output_unreachable() {
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
 async fn export_state_is_durable_not_in_process() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         create(&request, &rich_pathway()).await;
         let location = request
@@ -818,6 +839,7 @@ async fn export_state_is_durable_not_in_process() {
 // the rows it witnessed, confirm the chain still says "verified", and
 // confirm the checkpoint says otherwise.
 async fn a_recorded_checkpoint_detects_wholesale_deletion() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
         use sea_orm::ConnectionTrait as _;
 
@@ -891,6 +913,7 @@ async fn a_recorded_checkpoint_detects_wholesale_deletion() {
 // checkpoint would be able to manufacture an apparent tampering incident
 // — or, worse, an investigation would start in the wrong place.
 async fn an_altered_checkpoint_accuses_itself_not_the_chain() {
+    super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         request
             .post("/api/care-pathways")

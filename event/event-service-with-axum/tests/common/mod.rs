@@ -14,12 +14,10 @@
 //! already use.
 #![allow(dead_code)]
 
+use axa::testing::TestApp;
 use axum::Router;
 use event_service::{
-    api::rest::{AppState, create_router},
-    config::Config,
-    db,
-    matching::ProbabilisticMatcher,
+    api::rest::AppState, app::App, config::Config, db, matching::ProbabilisticMatcher,
     search::SearchEngine,
 };
 
@@ -38,10 +36,23 @@ pub async fn create_test_app_state() -> AppState {
     AppState::new(db, search_engine, matcher, config)
 }
 
-/// Build a fully-wired test [`Router`] over a fresh test [`AppState`].
+/// Boot the real application, the router production serves, over a
+/// private search index.
 pub async fn create_test_router() -> Router {
-    let state = create_test_app_state().await;
-    create_router(state)
+    let index = tempfile::tempdir().expect("tempdir for search index");
+    // SAFETY: the DB-gated suites run with `--test-threads=1`
+    // (`ci-check.sh test-db`), so no other thread reads the environment
+    // concurrently with this write.
+    unsafe {
+        std::env::set_var("SEARCH_INDEX_PATH", index.path());
+    }
+    // Keep the tempdir alive for the duration of the test by leaking it.
+    std::mem::forget(index);
+    App::boot_test()
+        .await
+        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .router
+        .expect("boot_test builds the router")
 }
 
 /// Unique title suffix to avoid clashes across parallel tests.

@@ -97,12 +97,9 @@ siblings use.
 **Where this crate's shape forced real adaptation** — confirmed rather
 than assumed:
 
-- **Two router-construction surfaces**, exactly as person/worker/event/
-  course needed: the controller-style one (`api::rest::places_routes()`,
-  mounted via `App::routes`/`App::after_routes`) and a standalone
-  hand-rolled one (`api::rest::create_router`, used only by the
-  DB-gated integration tests). `observability::trace_mw` is layered
-  onto **both**, as the outermost layer in each.
+- **One router-construction surface**: `api::rest::places_routes()`,
+  mounted via `App::routes`/`App::after_routes`. Tests boot that same
+  router. `observability::trace_mw` is its outermost service layer.
 - **A renamed `tonic` dev-dependency was needed after all** — the one
   place where this crate's port diverged from course's (PRO-H12 slice
   1), which needed no rename. The capability matrix in

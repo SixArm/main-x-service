@@ -42,7 +42,7 @@ impl Model {
     /// applicable; `user_pid` the subject when known; `detail` an
     /// outcome marker (e.g. `rate_limited`, `unknown_email`,
     /// `expired_token`). Pass no token or secret here. `source_ip` is the
-    /// best-effort connecting-peer address (T-14) — stored as a plain
+    /// client's address (T-14), from `axa::client::ClientAddr` — stored as a plain
     /// column, deliberately **not** part of the MAC/hash pre-image (see
     /// `crate::compliance::audit_integrity`, whose fixed-format pre-image
     /// has no per-row version marker; widening it would make every

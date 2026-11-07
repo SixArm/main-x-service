@@ -23,6 +23,20 @@ use serial_test::serial;
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test --test seed_examples_db -- --ignored"]
 async fn seed_examples_seeds_the_fixture_and_is_idempotent() {
+    // `set_var` is `unsafe` in edition 2024; single-threaded test setup.
+    unsafe {
+        // Keep this binary's Tantivy index out of the working directory
+        // and its boot rebuild out of the way (see tests/requests/mod.rs).
+        std::env::set_var(
+            "CASE_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!(
+                "case-seed-examples-db-index-{}",
+                std::process::id()
+            )),
+        );
+        std::env::set_var("CASE_SEARCH_BOOT_REINDEX", "0");
+    }
+
     request::<App, _, _>(|_request, ctx| async move {
         // Clean slate: this test asserts on the whole table's row
         // count, so it needs sole ownership of the starting state

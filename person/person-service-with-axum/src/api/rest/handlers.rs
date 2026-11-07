@@ -7,6 +7,7 @@
 //! repository, and search-index synchronization. The `#[utoipa::path]`
 //! attributes feed [`ApiDoc`](crate::api::rest::ApiDoc) for OpenAPI/Swagger.
 
+use axa::client::ClientAddr;
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -21,7 +22,8 @@ use uuid::Uuid;
 use authentication_verifier::Action;
 
 use super::auth::{
-    MaybeAuthUser, audit_context_of, authorize_record, person_resource_attrs, read_visibility,
+    AuthUser, MaybeAuthUser, audit_context_of, authorize_record, person_resource_attrs,
+    read_visibility,
 };
 use super::links;
 use super::state::AppState;
@@ -107,6 +109,7 @@ pub struct CreatePersonRequest {
 pub async fn create_person(
     State(state): State<AppState>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(mut payload): Json<Person>,
 ) -> impl IntoResponse {
     // Validate person data
@@ -150,7 +153,7 @@ pub async fn create_person(
     }
 
     // Insert into database
-    let ctx = audit_context_of(&caller);
+    let ctx = audit_context_of(&caller, client);
     match state.person_repository.create(&payload, &ctx).await {
         Ok(person) => {
             // Index in search engine
@@ -394,6 +397,7 @@ pub async fn update_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(mut payload): Json<Person>,
 ) -> impl IntoResponse {
     // Validate
@@ -445,7 +449,7 @@ pub async fn update_person(
         }
     }
 
-    let ctx = audit_context_of(&caller);
+    let ctx = audit_context_of(&caller, client);
     match state.person_repository.update(&payload, &ctx).await {
         Ok(person) => {
             // Update search index
@@ -482,6 +486,7 @@ pub async fn delete_person(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
 ) -> impl IntoResponse {
     // Record-level ABAC on the stored record before deleting.
     match state.person_repository.get_by_id(&id).await {
@@ -506,7 +511,7 @@ pub async fn delete_person(
         }
     }
 
-    let ctx = audit_context_of(&caller);
+    let ctx = audit_context_of(&caller, client);
     match state.person_repository.delete(&id, &ctx).await {
         Ok(()) => {
             // Remove from search index
@@ -1110,6 +1115,7 @@ fn merge_duplicate_into_main(
 pub async fn merge_persons(
     State(state): State<AppState>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(req): Json<crate::models::MergeRequest>,
 ) -> impl IntoResponse {
     // SEC-B5: a record cannot be merged into itself. Without this guard,
@@ -1183,7 +1189,7 @@ pub async fn merge_persons(
     // outbox transport) a `Merged` + `Deleted` outbox row are enqueued on
     // that same transaction. The repository also publishes the in-memory
     // `Merged`/`Deleted` events, so the handler no longer publishes them.
-    let ctx = audit_context_of(&caller);
+    let ctx = audit_context_of(&caller, client);
     if let Err(e) = state
         .person_repository
         .merge(&merged, &duplicate.id, &ctx)
@@ -1518,6 +1524,7 @@ pub async fn get_review_queue(
 pub async fn review_decision(
     State(state): State<AppState>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Path(id): Path<Uuid>,
     Json(req): Json<crate::models::ReviewDecisionRequest>,
 ) -> axum::response::Response {
@@ -1530,11 +1537,7 @@ pub async fn review_decision(
         Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => {
             // A decision is a review-state mutation: record it on the
             // audit trail (actor = the verified caller, else "system").
-            let ctx = crate::db::AuditContext {
-                user_id: reviewed_by.clone().or_else(|| Some("system".to_string())),
-                ip_address: None,
-                user_agent: None,
-            };
+            let ctx = audit_context_of(&caller, client);
             if let Err(e) = state
                 .audit_log
                 .log_action_on(
@@ -2439,8 +2442,9 @@ pub async fn compliance_identification() -> impl IntoResponse {
 /// Deliberately **not** on the guard's public allow-list: it names the
 /// exact version of every dependency in the running binary, which is what
 /// an attacker needs to match this deployment against published
-/// advisories. Publishing it is an operator's explicit decision.
-pub async fn compliance_sbom() -> impl IntoResponse {
+/// advisories, so it needs a verified caller even with
+/// `PERSON_REQUIRE_AUTH` off, when the guard lets everyone through.
+pub async fn compliance_sbom(_caller: AuthUser) -> impl IntoResponse {
     (StatusCode::OK, Json(crate::compliance::soup::sbom()))
 }
 

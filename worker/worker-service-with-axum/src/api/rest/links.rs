@@ -28,6 +28,7 @@
 //! **bulk endpoint** ([`bulk_links`]) remains the aggregator's sync
 //! reconciliation path (design §8).
 
+use axa::client::ClientAddr;
 use std::collections::BTreeMap;
 
 use axum::Json;
@@ -44,7 +45,7 @@ use authentication_verifier::Action;
 use sea_orm::TransactionTrait;
 use time::OffsetDateTime;
 
-use super::auth::{MaybeAuthUser, authorize_record, worker_resource_attrs};
+use super::auth::{MaybeAuthUser, audit_context_of, authorize_record, worker_resource_attrs};
 use super::state::AppState;
 use crate::db::AuditContext;
 use crate::db::audit::AuditActor;
@@ -231,19 +232,6 @@ pub fn validate_edge(kind: &str, to_ref: &str) -> Result<(EdgeKind, EntityRef), 
     Ok((edge_kind, to))
 }
 
-/// Build the best-effort audit context for a link mutation from the
-/// verified caller (its `sub`, or `system` when unauthenticated).
-fn audit_ctx(caller: &MaybeAuthUser) -> AuditContext {
-    AuditContext {
-        user_id: caller
-            .claims()
-            .map(|c| c.sub.clone())
-            .or_else(|| Some("system".to_string())),
-        ip_address: None,
-        user_agent: None,
-    }
-}
-
 /// Borrow an [`AuditContext`] as the [`AuditActor`] the audit-log helpers
 /// take (worker's audit repository borrows its actor metadata).
 fn actor(ctx: &AuditContext) -> AuditActor<'_> {
@@ -412,6 +400,7 @@ pub async fn create_link(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(req): Json<LinkRequest>,
 ) -> Response {
     let worker = match state.worker_repository.get_by_id(&id).await {
@@ -460,7 +449,7 @@ pub async fn create_link(
     };
     // Best-effort audit: a link write is a mutation of a worker record.
     let view = LinkView::of(&link);
-    let ctx = audit_ctx(&caller);
+    let ctx = audit_context_of(&caller, client);
     if let Ok(new_values) = serde_json::to_value(&view)
         && let Err(e) = state
             .audit_log
@@ -515,6 +504,7 @@ pub async fn delete_link(
     State(state): State<AppState>,
     Path((id, link_id)): Path<(Uuid, Uuid)>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
 ) -> Response {
     let worker = match state.worker_repository.get_by_id(&id).await {
         Ok(Some(w)) => w,
@@ -544,7 +534,7 @@ pub async fn delete_link(
     let actor_sub = caller.claims().map(|c| c.sub.as_str());
     match soft_delete_and_emit(&state, &worker, row, actor_sub).await {
         Ok(deleted) => {
-            let ctx = audit_ctx(&caller);
+            let ctx = audit_context_of(&caller, client);
             if let Some(old_values) = old_values
                 && let Err(e) = state
                     .audit_log
@@ -601,6 +591,7 @@ fn governed_bulk_authz() -> (Action, BTreeMap<String, Vec<String>>) {
 pub async fn bulk_links(
     State(state): State<AppState>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Query(params): Query<BulkParams>,
 ) -> Response {
     if let Err(r) = authorize_bulk(&caller) {
@@ -626,7 +617,7 @@ pub async fn bulk_links(
             let edges: Vec<EdgeDetail> = rows.iter().map(EdgeDetail::of).collect();
             // Audit every bulk surfacing of same_identity edges. There is no
             // single worker, so the entity id is nil (a system/bulk marker).
-            let ctx = audit_ctx(&caller);
+            let ctx = audit_context_of(&caller, client);
             if let Err(e) = state
                 .audit_log
                 .log_export(

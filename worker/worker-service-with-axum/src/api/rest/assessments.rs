@@ -29,6 +29,7 @@
 //! machine ([`AssessmentStatus::can_transition_to`]), so an assessment
 //! cannot be walked backwards or resurrected from a terminal state.
 
+use axa::client::ClientAddr;
 use std::collections::BTreeMap;
 
 use axum::Json;
@@ -42,7 +43,7 @@ use uuid::Uuid;
 
 use authentication_verifier::Action;
 
-use super::auth::{MaybeAuthUser, authorize_record, worker_resource_attrs};
+use super::auth::{MaybeAuthUser, audit_context_of, authorize_record, worker_resource_attrs};
 use super::state::AppState;
 use crate::db::AuditContext;
 use crate::db::assessments::{self, AssessmentUpdate};
@@ -430,19 +431,6 @@ fn parse_status(token: &str) -> Result<AssessmentStatus, String> {
     })
 }
 
-/// Build the best-effort audit context for an assessment access from the
-/// verified caller (its `sub`, or `system` when unauthenticated).
-fn audit_ctx(caller: &MaybeAuthUser) -> AuditContext {
-    AuditContext {
-        user_id: caller
-            .claims()
-            .map(|c| c.sub.clone())
-            .or_else(|| Some("system".to_string())),
-        ip_address: None,
-        user_agent: None,
-    }
-}
-
 /// Borrow an [`AuditContext`] as the [`AuditActor`] the audit-log
 /// helpers take.
 fn actor(ctx: &AuditContext) -> AuditActor<'_> {
@@ -517,6 +505,7 @@ pub async fn create_assessment(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(req): Json<CreateAssessmentRequest>,
 ) -> Response {
     let (worker, _obligations) =
@@ -557,7 +546,7 @@ pub async fn create_assessment(
         Err(e) => return db_error(&e),
     };
 
-    let ctx = audit_ctx(&caller);
+    let ctx = audit_context_of(&caller, client);
     if let Ok(new_values) = serde_json::to_value(&created)
         && let Err(e) = state
             .audit_log
@@ -600,6 +589,7 @@ pub async fn list_assessments(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Query(query): Query<ListAssessmentsQuery>,
 ) -> Response {
     let (worker, obligations) =
@@ -633,7 +623,7 @@ pub async fn list_assessments(
     let filtered = apply_filters(all, category, status, query.valid_on);
     let view: Vec<Assessment> = filtered.iter().map(|a| project(a, masked)).collect();
 
-    let ctx = audit_ctx(&caller);
+    let ctx = audit_context_of(&caller, client);
     if let Err(e) = state
         .audit_log
         .log_export(
@@ -676,6 +666,7 @@ pub async fn get_assessment(
     State(state): State<AppState>,
     Path((id, assessment_id)): Path<(Uuid, Uuid)>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
 ) -> Response {
     let (worker, obligations) =
         match worker_and_obligations(&state, id, &caller, Action::Read).await {
@@ -693,7 +684,7 @@ pub async fn get_assessment(
     };
     let masked = wants_mask(&obligations);
 
-    let ctx = audit_ctx(&caller);
+    let ctx = audit_context_of(&caller, client);
     if let Err(e) = state
         .audit_log
         .log_export(
@@ -739,6 +730,7 @@ pub async fn update_assessment(
     State(state): State<AppState>,
     Path((id, assessment_id)): Path<(Uuid, Uuid)>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Json(req): Json<UpdateAssessmentRequest>,
 ) -> Response {
     let (worker, _obligations) =
@@ -825,7 +817,7 @@ pub async fn update_assessment(
         Err(e) => return db_error(&e),
     };
 
-    let ctx = audit_ctx(&caller);
+    let ctx = audit_context_of(&caller, client);
     if let (Ok(old_values), Ok(new_values)) = (
         serde_json::to_value(&current),
         serde_json::to_value(&updated),
@@ -871,6 +863,7 @@ pub async fn delete_assessment(
     State(state): State<AppState>,
     Path((id, assessment_id)): Path<(Uuid, Uuid)>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
 ) -> Response {
     let (worker, _obligations) =
         match worker_and_obligations(&state, id, &caller, Action::Delete).await {
@@ -888,7 +881,7 @@ pub async fn delete_assessment(
 
     match assessments::soft_delete(&state.db, stored).await {
         Ok(deleted) => {
-            let ctx = audit_ctx(&caller);
+            let ctx = audit_context_of(&caller, client);
             if let Some(old_values) = old_values
                 && let Err(e) = state
                     .audit_log
@@ -931,6 +924,7 @@ pub async fn assessment_profile(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    client: ClientAddr,
     Query(query): Query<ProfileQuery>,
 ) -> Response {
     let (worker, obligations) =
@@ -954,7 +948,7 @@ pub async fn assessment_profile(
     let masked = wants_mask(&obligations);
     let profile = build_profile(worker.id, &all, as_of, masked);
 
-    let ctx = audit_ctx(&caller);
+    let ctx = audit_context_of(&caller, client);
     if let Err(e) = state
         .audit_log
         .log_export(

@@ -109,18 +109,11 @@ layering (see `src/config/mod.rs`'s `ObservabilityConfig` doc comment).
 **Where this crate's shape forced real adaptation** — both exactly as
 person-service anticipated, confirmed rather than assumed:
 
-- **Two router-construction surfaces.** This crate carries the
-  controller-style one (`api::rest::workers_routes()`, mounted via
-  `App::routes`/`App::after_routes`) and a standalone hand-rolled one
-  (`api::rest::create_router`, used only by the DB-gated integration
-  tests) — where link-graph-service has exactly one (pure axa). The
-  `observability::trace_mw` tower middleware (per-request span +
-  `http.server.request.duration` histogram + W3C `traceparent` response
-  header) is layered onto **both**, as the outermost layer in each, so
-  tracing behaves identically regardless of which router a caller or
-  test builds — the same precedent `auth::apply_enforcement` already set
-  by being layered on both surfaces. No third surface exists (verified
-  by grepping for `Router::new` and `create_router` rather than assumed).
+- **One router-construction surface**: `api::rest::workers_routes()`,
+  mounted via `App::routes`/`App::after_routes`, as in link-graph-service.
+  Tests boot that same router. The `observability::trace_mw` tower
+  middleware (per-request span + `http.server.request.duration` histogram
+  + W3C `traceparent` response header) is its outermost service layer.
 - **A renamed `tonic` dev-dependency — gone as of the prost 0.14
   migration (2026-09-07).** This crate originally depended on
   `tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
@@ -169,10 +162,9 @@ gRPC port is unavailable.
 `WorkerGrpcService` calls the exact same functions the REST handlers
 do: `crate::validation::validate_worker`, the shared duplicate-detection
 core (`handlers::check_duplicates_internal`, bumped to `pub(crate)`
-rather than copied), the same `WorkerRepository` trait methods (which
-take no `AuditContext`, unlike person-service's — audit logging is
-wired internally via the repository's `with_*` builders, so there is
-no `audit_context_of` call here), and `auth::authorize_record` +
+rather than copied), the same `WorkerRepository` trait methods (whose
+mutations take the `AuditContext` from `auth::audit_context_of`, as
+person-service's do), and `auth::authorize_record` +
 `crate::privacy::mask_worker` for `GetWorker`'s record-level ABAC +
 masking — the wire format differs, the rules do not. `worker_type`
 parses via the domain enum's existing `serde` implementation

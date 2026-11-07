@@ -78,9 +78,9 @@ impl Model {
     /// is the session payload JSONB — build it with [`session_data`] so
     /// the user's ABAC attributes and CSRF token ride along. The legacy
     /// `expires_at` column is set to the absolute ceiling for coherence.
-    /// `source_ip` is the best-effort connecting-peer address (T-14),
-    /// captured the same way as `user_agent` — neither is verified or
-    /// authenticated, both are advisory audit context.
+    /// `source_ip` is the client's address (T-14), from
+    /// `axa::client::ClientAddr`. Like `user_agent` it is advisory audit
+    /// context, never trusted for a security decision.
     ///
     /// # Errors
     ///

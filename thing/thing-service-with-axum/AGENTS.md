@@ -100,12 +100,9 @@ siblings use.
 than assumed, and identical to place's slice (PRO-H12 slice 2) before
 it:
 
-- **Two router-construction surfaces**: the controller-style one
-  (`api::rest::things_routes()`, mounted via `App::routes`/
-  `App::after_routes`) and a standalone hand-rolled one
-  (`api::rest::create_router`, used only by the DB-gated integration
-  tests). `observability::trace_mw` is layered onto **both**, as the
-  outermost layer in each.
+- **One router-construction surface**: `api::rest::things_routes()`,
+  mounted via `App::routes`/`App::after_routes`. Tests boot that same
+  router. `observability::trace_mw` is its outermost service layer.
 - **A renamed `tonic` dev-dependency was needed**, exactly as place's
   slice needed and course's did not: this crate's own "Running this
   crate" section below already stated the gRPC dependency is "unwired

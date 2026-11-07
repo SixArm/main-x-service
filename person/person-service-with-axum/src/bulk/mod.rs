@@ -63,6 +63,8 @@ pub mod jsonl;
 pub mod parquet_format;
 /// The import/export per-row/per-job pipeline (the testable core).
 pub mod pipeline;
+/// Reconcile `bulk_jobs` with the job queue, so a lost job reaches `failed`.
+pub mod reconcile;
 /// Person's declared upsert stable key (§10.1).
 pub mod stable_key;
 /// Artifact storage abstraction + local-filesystem implementation (§12).

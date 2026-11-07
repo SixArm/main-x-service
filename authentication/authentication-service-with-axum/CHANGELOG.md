@@ -10,6 +10,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security
+
+- **A client address is kept for a week.** `AUTH_AUDIT_ADDRESS_RETENTION_DAYS` sets the
+  limit, and an hourly sweep empties `source_ip` on `auth_events` and `sessions` after it.
+
+### Fixed
+
+- **Behind a proxy, sessions and `auth_events` now record the client.**
+  `source_ip` was the raw connection, which is the proxy's address on every row.
+  It now comes from `axa::client::ClientAddr`, which believes `X-Forwarded-For`
+  only from a peer listed in `TRUSTED_PROXIES`. **Set `TRUSTED_PROXIES` in
+  production behind a proxy**, or rows keep recording the proxy. The rate limiter
+  keys on email, so this changes the audit trail and nothing else.
+
 ### Changed — Loco replaced by axa
 
 - **Loco removed.** The service is now plain Axum plus shared helpers from

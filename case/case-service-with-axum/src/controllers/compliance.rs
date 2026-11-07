@@ -29,6 +29,7 @@
 use axa::prelude::*;
 use serde::Serialize;
 
+use crate::auth::AuthUser;
 use crate::compliance::{Build, soup};
 
 /// The service-identification document served at `GET /api/compliance`.
@@ -85,8 +86,11 @@ async fn identification() -> Result<Response> {
 /// # Errors
 ///
 /// None beyond response serialization.
+///
+/// The caller is required here as well as by the guard, because with
+/// `CASE_REQUIRE_AUTH` off the guard lets everyone through.
 #[debug_handler]
-async fn sbom() -> Result<Response> {
+async fn sbom(_caller: AuthUser) -> Result<Response> {
     format::json(soup::sbom())
 }
 
