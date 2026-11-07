@@ -24,7 +24,7 @@ three.
 | §7 Non-Functional Requirements | benches, profiling, deployment config |
 | §8 Architecture | `src/lib.rs`, `src/app.rs` (`App` functions), `src/bin/main.rs`, module layout |
 | §9 API Surface | `src/api/rest/mod.rs` + `agents/restful.md` |
-| §10 Persistence | `migrations/` + `migration/` (axa Migrator), `src/db/` |
+| §10 Persistence | `migrations/` (run by `sqlx::migrate!`), `.sqlx/`, `src/db/` (all SQL) |
 | §11 Testing Strategy | `tests/`, `agents/testing.md` |
 | §12 Compliance | `src/privacy/`, audit-log writes |
 | §13 Tasks | live work queue — the only place tasks live |

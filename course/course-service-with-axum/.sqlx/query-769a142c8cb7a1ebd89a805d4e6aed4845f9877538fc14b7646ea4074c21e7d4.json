@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE course_instances SET\n             course_id = $2, name = $3, course_mode = $4, status = $5, location = $6,\n             location_id = $7, maximum_attendee_capacity = $8, enrolled_count = $9,\n             enrollment_opens = $10, enrollment_closes = $11, schedule_start_date = $12,\n             schedule_end_date = $13, schedule_time_zone = $14, schedule_recurrence = $15,\n             created_at = $16, updated_at = $17, deleted_at = $18\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "769a142c8cb7a1ebd89a805d4e6aed4845f9877538fc14b7646ea4074c21e7d4"
+}

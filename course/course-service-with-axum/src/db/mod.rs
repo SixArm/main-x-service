@@ -1,20 +1,21 @@
-//! Database access — connection pool + repository.
+//! Database access — the connection pool, the migrator, and the
+//! repository. **Every SQL statement this service runs is in this
+//! directory** (spec/tech-stack §5.2), written as a `sqlx::query!` /
+//! `query_as!` / `query_scalar!` literal so the compiler checks it against
+//! the schema.
 //!
-//! `SeaOrmCourseRepository` round-trips a domain [`Course`] against the
-//! relational schema: scalar fields and JSONB collections live on the
-//! `courses` row; `identifiers` and `links` live in their own child
-//! tables. Sub-resources (`instances`, `syllabus_sections`) have their
-//! own dedicated API surface and are intentionally not loaded here —
-//! they ship with T-8.
+//! [`PgCourseRepository`] round-trips a domain [`Course`] against the
+//! relational schema: scalar fields live on the `courses` row; the
+//! string-list fields live in `course_text_values`, the two credentials in
+//! `course_credentials`, and `identifiers` and `links` in their own child
+//! tables. Sub-resources (`instances`, `syllabus_sections`) have their own
+//! dedicated API surface and are intentionally not loaded with a course.
 
 mod convert;
-use convert::{offset_to_ts, ts_to_offset};
-use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, Database, DatabaseConnection,
-    EntityTrait, QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
-};
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::Result;
@@ -34,10 +35,14 @@ pub mod models;
 pub mod outbox;
 
 use models::{
-    course_credentials, course_identifiers, course_instance_instructors, course_instance_languages,
-    course_instance_sessions, course_instances, course_links, course_merge_records,
-    course_text_values, courses,
+    CourseCredentialRow, CourseInstanceRow, CourseRow, CourseTextValueRow, ReviewQueueRow,
 };
+
+/// The schema migrations: the plain SQL files under `migrations/`, one
+/// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
+/// time. `course-service db migrate | down | reset | status` and the boot
+/// auto-migrate run these through `axa::sqlx`.
+pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// Open a connection pool from a `DatabaseConfig`.
 ///
@@ -45,11 +50,11 @@ use models::{
 ///
 /// Returns [`enum@crate::Error`] if the pool cannot connect to the
 /// configured database URL.
-pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
-    let mut opt = sea_orm::ConnectOptions::new(&config.url);
-    opt.max_connections(config.max_connections)
-        .min_connections(config.min_connections);
-    Database::connect(opt)
+pub async fn create_connection(config: &DatabaseConfig) -> Result<PgPool> {
+    PgPoolOptions::new()
+        .max_connections(config.max_connections)
+        .min_connections(config.min_connections)
+        .connect(&config.url)
         .await
         .map_err(|e| crate::Error::Pool(e.to_string()))
 }
@@ -126,11 +131,11 @@ pub trait CourseRepository: Send + Sync {
     ) -> Result<DecideOutcome>;
 }
 
-/// SeaORM-backed [`CourseRepository`] implementation over a `PostgreSQL`
+/// sqlx-backed [`CourseRepository`] implementation over a `PostgreSQL`
 /// connection pool.
-pub struct SeaOrmCourseRepository {
-    /// The shared `SeaORM` connection pool.
-    db: DatabaseConnection,
+pub struct PgCourseRepository {
+    /// The shared connection pool.
+    db: PgPool,
     /// Which event transport is active (durable event bus, Phase 2).
     /// [`EventTransport::Memory`] (default) keeps only the post-commit
     /// in-memory publish (done by the handlers); [`EventTransport::Outbox`]
@@ -139,12 +144,12 @@ pub struct SeaOrmCourseRepository {
     transport: EventTransport,
 }
 
-impl SeaOrmCourseRepository {
+impl PgCourseRepository {
     /// Wrap an existing connection pool in a repository, with the default
     /// [`EventTransport::Memory`] transport (behaviour unchanged from
     /// before the outbox landed).
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self {
             db,
             transport: EventTransport::Memory,
@@ -162,17 +167,11 @@ impl SeaOrmCourseRepository {
 
     /// When the outbox transport is active, enqueue one `course_outbox`
     /// row for `kind` applied to `course` **on `conn`** — pass the open
-    /// `&DatabaseTransaction` so the row commits with the entity write
-    /// (the outbox atomicity guarantee). A no-op under
-    /// [`EventTransport::Memory`].
-    ///
-    /// The `ConnectionTrait` generic lives here on a concrete method (not
-    /// on the object-safe [`CourseRepository`] trait), which is how a
-    /// `dyn`-trait repository threads the outbox insert into its own
-    /// transaction.
-    async fn enqueue_outbox<C: ConnectionTrait>(
+    /// transaction so the row commits with the entity write (the outbox
+    /// atomicity guarantee). A no-op under [`EventTransport::Memory`].
+    async fn enqueue_outbox(
         &self,
-        conn: &C,
+        conn: &mut PgConnection,
         course: &Course,
         kind: EventKind,
     ) -> Result<()> {
@@ -183,27 +182,79 @@ impl SeaOrmCourseRepository {
         }
         Ok(())
     }
+
+    /// Read one `courses` row by id, soft-deleted or not.
+    async fn find_row(&self, id: Uuid) -> Result<Option<CourseRow>> {
+        let row = sqlx::query_as!(
+            CourseRow,
+            "SELECT id, name, content_hash, content_hash_sha3, content_mac, description,
+                    disambiguating_description, url, additional_type, audience, license,
+                    typical_age_range, time_required, version, is_accessible_for_free,
+                    educational_level, educational_use, learning_resource_type,
+                    interactivity_type, course_code, number_of_credits,
+                    total_historical_enrollment, status, active, provider_id,
+                    created_at, updated_at, deleted_at
+             FROM courses
+             WHERE id = $1",
+            id,
+        )
+        .fetch_optional(&self.db)
+        .await?;
+        Ok(row)
+    }
+
+    /// Load a course's child collections and assemble the domain
+    /// [`Course`].
+    async fn hydrate(&self, row: CourseRow) -> Result<Course> {
+        let id = row.id;
+        let identifiers = load_identifiers(&self.db, id).await?;
+        let links = load_links(&self.db, id).await?;
+        let (text_values, credentials) = load_course_collections(&self.db, id).await?;
+        hydrate_course(row, identifiers, links, &text_values, &credentials)
+    }
+
+    /// Read one `course_instances` row by id, scoped to its parent course,
+    /// soft-deleted or not.
+    async fn find_instance_row(
+        &self,
+        course_id: Uuid,
+        instance_id: Uuid,
+    ) -> Result<Option<CourseInstanceRow>> {
+        let row = sqlx::query_as!(
+            CourseInstanceRow,
+            "SELECT id, course_id, name, course_mode, status, location, location_id,
+                    maximum_attendee_capacity, enrolled_count, enrollment_opens,
+                    enrollment_closes, schedule_start_date, schedule_end_date,
+                    schedule_time_zone, schedule_recurrence, created_at, updated_at, deleted_at
+             FROM course_instances
+             WHERE id = $1 AND course_id = $2",
+            instance_id,
+            course_id,
+        )
+        .fetch_optional(&self.db)
+        .await?;
+        Ok(row)
+    }
 }
 
 #[async_trait::async_trait]
-impl CourseRepository for SeaOrmCourseRepository {
+impl CourseRepository for PgCourseRepository {
     async fn create(&self, course: &Course) -> Result<Course> {
         // One transaction so the parent row and every child collection
         // (identifiers, links, text-values, credentials) commit atomically.
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        let active = to_course_active(course, false)?;
-        active.insert(&txn).await.map_err(|e| map_db(&e))?;
-        insert_identifiers(&txn, course.id, &course.identifiers).await?;
-        insert_links(&txn, course.id, &course.links).await?;
-        insert_course_collections(&txn, course).await?;
+        let mut txn = self.db.begin().await?;
+        insert_course_row(&mut txn, &course_row(course, false)?).await?;
+        insert_identifiers(&mut txn, course.id, &course.identifiers).await?;
+        insert_links(&mut txn, course.id, &course.links).await?;
+        insert_course_collections(&mut txn, course).await?;
         // Durable event bus (Phase 2): under the outbox transport, write
         // the `course_outbox` row **inside this same transaction**, before
         // the commit, so the entity rows and the event commit atomically
         // (or roll back together). A no-op under the memory transport,
         // which keeps the post-commit in-memory publish in the handler.
-        self.enqueue_outbox(&txn, course, EventKind::Created)
+        self.enqueue_outbox(&mut txn, course, EventKind::Created)
             .await?;
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        txn.commit().await?;
         // Re-read through the normal hydrate path so the returned value
         // reflects exactly what was persisted (defaults, ordering, etc).
         self.get_by_id(&course.id)
@@ -212,98 +263,79 @@ impl CourseRepository for SeaOrmCourseRepository {
     }
 
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Course>> {
-        let row = courses::Entity::find_by_id(*id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let Some(row) = row else { return Ok(None) };
+        let Some(row) = self.find_row(*id).await? else {
+            return Ok(None);
+        };
         // Soft-deleted rows read as absent — callers never see them.
         if row.deleted_at.is_some() {
             return Ok(None);
         }
-        let identifiers = load_identifiers(&self.db, *id).await?;
-        let links = load_links(&self.db, *id).await?;
-        let (text_values, credentials) = load_course_collections(&self.db, *id).await?;
-        Ok(Some(hydrate_course(
-            row,
-            identifiers,
-            links,
-            &text_values,
-            &credentials,
-        )?))
+        Ok(Some(self.hydrate(row).await?))
     }
 
     async fn update(&self, course: &Course) -> Result<Course> {
-        let exists = courses::Entity::find_by_id(course.id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        if exists.is_none() {
+        if self.find_row(course.id).await?.is_none() {
             return Err(crate::Error::NotFound);
         }
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        apply_course_update(&txn, course).await?;
+        let mut txn = self.db.begin().await?;
+        apply_course_update(&mut txn, course).await?;
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, course, EventKind::Updated)
+        self.enqueue_outbox(&mut txn, course, EventKind::Updated)
             .await?;
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        txn.commit().await?;
         self.get_by_id(&course.id)
             .await?
             .ok_or(crate::Error::NotFound)
     }
 
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
-        let row = courses::Entity::find_by_id(*id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?
-            .ok_or(crate::Error::NotFound)?;
+        if self.find_row(*id).await?.is_none() {
+            return Err(crate::Error::NotFound);
+        }
         // Soft delete: flip `active` off and stamp `deleted_at` rather
         // than removing the row, preserving it for the audit trail.
-        let mut active: courses::ActiveModel = row.into();
-        active.active = Set(false);
-        active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
-        active.updated_at = Set(OffsetDateTime::now_utc());
         // Under the outbox transport, open a transaction so the tombstone
         // write and the `deleted` outbox row commit atomically; the memory
         // transport keeps the plain, tx-free update. The domain course is
         // reloaded (still visible pre-delete) to build the deleted envelope.
         if self.transport.is_outbox() {
             let old = self.get_by_id(id).await?;
-            let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-            active.update(&txn).await.map_err(|e| map_db(&e))?;
+            let mut txn = self.db.begin().await?;
+            mark_course_deleted(&mut txn, *id).await?;
             if let Some(old) = old.as_ref() {
-                self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
+                self.enqueue_outbox(&mut txn, old, EventKind::Deleted)
+                    .await?;
             }
-            txn.commit().await.map_err(|e| map_db(&e))?;
+            txn.commit().await?;
         } else {
-            active.update(&self.db).await.map_err(|e| map_db(&e))?;
+            let mut conn = self.db.acquire().await?;
+            mark_course_deleted(&mut conn, *id).await?;
         }
         Ok(())
     }
 
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Course>> {
-        let rows = courses::Entity::find()
-            .filter(courses::Column::DeletedAt.is_null())
-            .order_by_desc(courses::Column::CreatedAt)
-            .limit(limit)
-            .offset(offset)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
+        let rows = sqlx::query_as!(
+            CourseRow,
+            "SELECT id, name, content_hash, content_hash_sha3, content_mac, description,
+                    disambiguating_description, url, additional_type, audience, license,
+                    typical_age_range, time_required, version, is_accessible_for_free,
+                    educational_level, educational_use, learning_resource_type,
+                    interactivity_type, course_code, number_of_credits,
+                    total_historical_enrollment, status, active, provider_id,
+                    created_at, updated_at, deleted_at
+             FROM courses
+             WHERE deleted_at IS NULL
+             ORDER BY created_at DESC
+             LIMIT $1 OFFSET $2",
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(&self.db)
+        .await?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
-            let id = row.id;
-            let identifiers = load_identifiers(&self.db, id).await?;
-            let links = load_links(&self.db, id).await?;
-            let (text_values, credentials) = load_course_collections(&self.db, id).await?;
-            out.push(hydrate_course(
-                row,
-                identifiers,
-                links,
-                &text_values,
-                &credentials,
-            )?);
+            out.push(self.hydrate(row).await?);
         }
         Ok(out)
     }
@@ -311,12 +343,18 @@ impl CourseRepository for SeaOrmCourseRepository {
     // ──────────── CourseInstance sub-resource ────────────
 
     async fn list_instances(&self, course_id: &Uuid) -> Result<Vec<CourseInstance>> {
-        let rows = course_instances::Entity::find()
-            .filter(course_instances::Column::CourseId.eq(*course_id))
-            .filter(course_instances::Column::DeletedAt.is_null())
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
+        let rows = sqlx::query_as!(
+            CourseInstanceRow,
+            "SELECT id, course_id, name, course_mode, status, location, location_id,
+                    maximum_attendee_capacity, enrolled_count, enrollment_opens,
+                    enrollment_closes, schedule_start_date, schedule_end_date,
+                    schedule_time_zone, schedule_recurrence, created_at, updated_at, deleted_at
+             FROM course_instances
+             WHERE course_id = $1 AND deleted_at IS NULL",
+            course_id,
+        )
+        .fetch_all(&self.db)
+        .await?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
             out.push(hydrate_instance(&self.db, row).await?);
@@ -332,12 +370,9 @@ impl CourseRepository for SeaOrmCourseRepository {
         course_id: &Uuid,
         instance_id: &Uuid,
     ) -> Result<Option<CourseInstance>> {
-        let row = course_instances::Entity::find_by_id(*instance_id)
-            .filter(course_instances::Column::CourseId.eq(*course_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let Some(row) = row else { return Ok(None) };
+        let Some(row) = self.find_instance_row(*course_id, *instance_id).await? else {
+            return Ok(None);
+        };
         if row.deleted_at.is_some() {
             return Ok(None);
         }
@@ -345,73 +380,78 @@ impl CourseRepository for SeaOrmCourseRepository {
     }
 
     async fn create_instance(&self, instance: &CourseInstance) -> Result<CourseInstance> {
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        to_instance_active(instance, false)?
-            .insert(&txn)
-            .await
-            .map_err(|e| map_db(&e))?;
-        insert_instance_collections(&txn, instance).await?;
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        let mut txn = self.db.begin().await?;
+        insert_instance_row(&mut txn, &instance_row(instance, false)?).await?;
+        insert_instance_collections(&mut txn, instance).await?;
+        txn.commit().await?;
         self.get_instance(&instance.course_id, &instance.id)
             .await?
             .ok_or_else(|| crate::Error::Database("instance not found after insert".into()))
     }
 
     async fn update_instance(&self, instance: &CourseInstance) -> Result<CourseInstance> {
-        let exists = course_instances::Entity::find_by_id(instance.id)
-            .filter(course_instances::Column::CourseId.eq(instance.course_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let Some(row) = exists else {
+        let Some(row) = self
+            .find_instance_row(instance.course_id, instance.id)
+            .await?
+        else {
             return Err(crate::Error::NotFound);
         };
         if row.deleted_at.is_some() {
             return Err(crate::Error::NotFound);
         }
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        to_instance_active(instance, true)?
-            .update(&txn)
-            .await
-            .map_err(|e| map_db(&e))?;
-        delete_instance_collections(&txn, instance.id).await?;
-        insert_instance_collections(&txn, instance).await?;
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        let mut txn = self.db.begin().await?;
+        update_instance_row(&mut txn, &instance_row(instance, true)?).await?;
+        delete_instance_collections(&mut txn, instance.id).await?;
+        insert_instance_collections(&mut txn, instance).await?;
+        txn.commit().await?;
         self.get_instance(&instance.course_id, &instance.id)
             .await?
             .ok_or(crate::Error::NotFound)
     }
 
     async fn soft_delete_instance(&self, course_id: &Uuid, instance_id: &Uuid) -> Result<()> {
-        let row = course_instances::Entity::find_by_id(*instance_id)
-            .filter(course_instances::Column::CourseId.eq(*course_id))
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?
+        let row = self
+            .find_instance_row(*course_id, *instance_id)
+            .await?
             .ok_or(crate::Error::NotFound)?;
         if row.deleted_at.is_some() {
             return Err(crate::Error::NotFound);
         }
-        let mut active: course_instances::ActiveModel = row.into();
-        active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
-        active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&self.db).await.map_err(|e| map_db(&e))?;
+        let done = sqlx::query!(
+            "UPDATE course_instances SET deleted_at = $2, updated_at = $3 WHERE id = $1",
+            row.id,
+            Utc::now(),
+            Utc::now(),
+        )
+        .execute(&self.db)
+        .await?;
+        // As under the ORM, an update that touches no row is an error.
+        if done.rows_affected() == 0 {
+            return Err(crate::Error::Database(
+                "course instance not deleted: no such row".into(),
+            ));
+        }
         Ok(())
     }
 
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord> {
-        let active = course_merge_records::ActiveModel {
-            id: Set(rec.id),
-            main_course_id: Set(rec.main_course_id),
-            duplicate_course_id: Set(rec.duplicate_course_id),
-            status: Set(enum_to_string(&rec.status)?),
-            merged_by: Set(rec.merged_by.clone()),
-            merge_reason: Set(rec.merge_reason.clone()),
-            match_score: Set(rec.match_score),
-            transferred_data: Set(rec.transferred_data.clone()),
-            merged_at: Set(ts_to_offset(rec.merged_at)),
-        };
-        active.insert(&self.db).await.map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO course_merge_records
+                 (id, main_course_id, duplicate_course_id, status, merged_by, merge_reason,
+                  match_score, transferred_data, merged_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            rec.id,
+            rec.main_course_id,
+            rec.duplicate_course_id,
+            enum_to_string(&rec.status)?,
+            rec.merged_by,
+            rec.merge_reason,
+            rec.match_score,
+            rec.transferred_data,
+            rec.merged_at,
+        )
+        .execute(&self.db)
+        .await?;
         Ok(rec.clone())
     }
 
@@ -422,13 +462,13 @@ impl CourseRepository for SeaOrmCourseRepository {
 
         // The whole merge — survivor row updates + duplicate soft-delete +
         // both outbox rows — commits (or rolls back) under one transaction.
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
+        let mut txn = self.db.begin().await?;
 
         // Apply the survivor's parent + child rows (shared with `update`).
-        apply_course_update(&txn, survivor).await?;
+        apply_course_update(&mut txn, survivor).await?;
 
         // Soft-delete the duplicate (shared shape with `soft_delete`).
-        apply_course_soft_delete(&txn, *duplicate_id).await?;
+        apply_course_soft_delete(&mut txn, *duplicate_id).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the
         // survivor (carrying the duplicate's pid via `merged_from`, so a
@@ -437,16 +477,16 @@ impl CourseRepository for SeaOrmCourseRepository {
         // transaction. A no-op under the memory transport.
         if self.transport.is_outbox() {
             OutboxInsert::for_merge(survivor, duplicate_id)?
-                .insert_on(&txn)
+                .insert_on(&mut txn)
                 .await?;
             if let Some(dup) = old_duplicate.as_ref() {
                 OutboxInsert::for_event(dup, EventKind::Deleted)?
-                    .insert_on(&txn)
+                    .insert_on(&mut txn)
                     .await?;
             }
         }
 
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        txn.commit().await?;
 
         self.get_by_id(&survivor.id)
             .await?
@@ -454,48 +494,43 @@ impl CourseRepository for SeaOrmCourseRepository {
     }
 
     async fn upsert_review_items(&self, items: &[NewReviewItem]) -> Result<Vec<ReviewQueueItem>> {
-        use models::course_match_scores;
-        use sea_orm::sea_query::OnConflict;
-
+        let pending = enum_to_string(&ReviewStatus::Pending)?;
         let mut out = Vec::with_capacity(items.len());
         for item in items {
             // Normalize the pair order so (a, b) and (b, a) share one row
             // under the migration's plain `UNIQUE (course_id, candidate_id)`
             // constraint (T-27).
             let (course_id, candidate_id) = canonical_pair(item.course_id_a, item.course_id_b);
-            let active = course_match_scores::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                course_id: Set(course_id),
-                candidate_id: Set(candidate_id),
-                match_score: Set(item.match_score),
-                match_quality: Set(item.match_quality.clone()),
-                detection_method: Set(item.detection_method.clone()),
-                score_breakdown: Set(item.score_breakdown.clone()),
-                status: Set(enum_to_string(&ReviewStatus::Pending)?),
-                reviewed_by: Set(None),
-                created_at: Set(OffsetDateTime::now_utc()),
-                reviewed_at: Set(None),
-            };
             // On conflict, refresh only the score-describing columns — the
             // row's `id`, `status`, `reviewed_by`, and `reviewed_at` are
             // left untouched, so a re-scan never clobbers a decided item.
-            let on_conflict = OnConflict::columns([
-                course_match_scores::Column::CourseId,
-                course_match_scores::Column::CandidateId,
-            ])
-            .update_columns([
-                course_match_scores::Column::MatchScore,
-                course_match_scores::Column::MatchQuality,
-                course_match_scores::Column::DetectionMethod,
-                course_match_scores::Column::ScoreBreakdown,
-            ])
-            .to_owned();
-            let model = course_match_scores::Entity::insert(active)
-                .on_conflict(on_conflict)
-                .exec_with_returning(&self.db)
-                .await
-                .map_err(|e| map_db(&e))?;
-            out.push(review_row_to_item(model)?);
+            let row = sqlx::query_as!(
+                ReviewQueueRow,
+                "INSERT INTO course_match_scores
+                     (id, course_id, candidate_id, match_score, match_quality, detection_method,
+                      score_breakdown, status, reviewed_by, created_at, reviewed_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, $9, NULL)
+                 ON CONFLICT (course_id, candidate_id) DO UPDATE SET
+                     match_score = EXCLUDED.match_score,
+                     match_quality = EXCLUDED.match_quality,
+                     detection_method = EXCLUDED.detection_method,
+                     score_breakdown = EXCLUDED.score_breakdown
+                 RETURNING id, course_id, candidate_id, match_score, match_quality,
+                           detection_method, score_breakdown, status, reviewed_by,
+                           created_at, reviewed_at",
+                Uuid::new_v4(),
+                course_id,
+                candidate_id,
+                item.match_score,
+                item.match_quality,
+                item.detection_method,
+                item.score_breakdown,
+                pending,
+                Utc::now(),
+            )
+            .fetch_one(&self.db)
+            .await?;
+            out.push(review_row_to_item(row)?);
         }
         Ok(out)
     }
@@ -505,16 +540,20 @@ impl CourseRepository for SeaOrmCourseRepository {
         status: Option<ReviewStatus>,
         limit: u64,
     ) -> Result<Vec<ReviewQueueItem>> {
-        use models::course_match_scores;
-
-        let mut query = course_match_scores::Entity::find()
-            .order_by_desc(course_match_scores::Column::CreatedAt)
-            .order_by_asc(course_match_scores::Column::Id)
-            .limit(limit.min(500));
-        if let Some(status) = status {
-            query = query.filter(course_match_scores::Column::Status.eq(enum_to_string(&status)?));
-        }
-        let rows = query.all(&self.db).await.map_err(|e| map_db(&e))?;
+        let status = status.as_ref().map(enum_to_string).transpose()?;
+        let rows = sqlx::query_as!(
+            ReviewQueueRow,
+            "SELECT id, course_id, candidate_id, match_score, match_quality, detection_method,
+                    score_breakdown, status, reviewed_by, created_at, reviewed_at
+             FROM course_match_scores
+             WHERE ($1::text IS NULL OR status = $1)
+             ORDER BY created_at DESC, id ASC
+             LIMIT $2",
+            status,
+            to_i64(limit.min(500)),
+        )
+        .fetch_all(&self.db)
+        .await?;
         rows.into_iter().map(review_row_to_item).collect()
     }
 
@@ -524,48 +563,33 @@ impl CourseRepository for SeaOrmCourseRepository {
         status: ReviewStatus,
         reviewed_by: Option<&str>,
     ) -> Result<DecideOutcome> {
-        use models::course_match_scores;
-        use sea_orm::sea_query::Expr;
-
         // The transition guard is the `WHERE status = 'Pending'` filter on
         // this single UPDATE statement: it runs atomically in Postgres, so
         // concurrent decisions cannot double-apply — exactly one caller's
         // update matches a row, the rest affect zero rows.
-        let result = course_match_scores::Entity::update_many()
-            .col_expr(
-                course_match_scores::Column::Status,
-                Expr::value(enum_to_string(&status)?),
-            )
-            .col_expr(
-                course_match_scores::Column::ReviewedBy,
-                Expr::value(reviewed_by.map(ToString::to_string)),
-            )
-            .col_expr(
-                course_match_scores::Column::ReviewedAt,
-                Expr::value(OffsetDateTime::now_utc()),
-            )
-            .filter(course_match_scores::Column::Id.eq(id))
-            .filter(course_match_scores::Column::Status.eq(enum_to_string(&ReviewStatus::Pending)?))
-            .exec(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
+        let done = sqlx::query!(
+            "UPDATE course_match_scores
+             SET status = $1, reviewed_by = $2, reviewed_at = $3
+             WHERE id = $4 AND status = $5",
+            enum_to_string(&status)?,
+            reviewed_by,
+            Utc::now(),
+            id,
+            enum_to_string(&ReviewStatus::Pending)?,
+        )
+        .execute(&self.db)
+        .await?;
 
-        if result.rows_affected == 1 {
-            let row = course_match_scores::Entity::find_by_id(id)
-                .one(&self.db)
-                .await
-                .map_err(|e| map_db(&e))?
+        if done.rows_affected() == 1 {
+            let row = find_review_row(&self.db, id)
+                .await?
                 .ok_or(crate::Error::NotFound)?;
             return Ok(DecideOutcome::Decided(Box::new(review_row_to_item(row)?)));
         }
 
         // No row was affected: either the id doesn't exist, or it exists
         // but isn't `Pending`. Probe to tell the two apart.
-        match course_match_scores::Entity::find_by_id(id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?
-        {
+        match find_review_row(&self.db, id).await? {
             Some(row) => Ok(DecideOutcome::AlreadyDecided(enum_from_string(
                 &row.status,
             )?)),
@@ -574,9 +598,24 @@ impl CourseRepository for SeaOrmCourseRepository {
     }
 }
 
+/// Read one `course_match_scores` row by id.
+async fn find_review_row(db: &PgPool, id: Uuid) -> Result<Option<ReviewQueueRow>> {
+    let row = sqlx::query_as!(
+        ReviewQueueRow,
+        "SELECT id, course_id, candidate_id, match_score, match_quality, detection_method,
+                score_breakdown, status, reviewed_by, created_at, reviewed_at
+         FROM course_match_scores
+         WHERE id = $1",
+        id,
+    )
+    .fetch_optional(db)
+    .await?;
+    Ok(row)
+}
+
 /// Map a stored `course_match_scores` row onto the wire
 /// [`ReviewQueueItem`] shape (T-27).
-fn review_row_to_item(row: models::course_match_scores::Model) -> Result<ReviewQueueItem> {
+fn review_row_to_item(row: ReviewQueueRow) -> Result<ReviewQueueItem> {
     Ok(ReviewQueueItem {
         id: row.id,
         course_id_a: row.course_id,
@@ -587,34 +626,60 @@ fn review_row_to_item(row: models::course_match_scores::Model) -> Result<ReviewQ
         score_breakdown: row.score_breakdown,
         status: enum_from_string(&row.status)?,
         reviewed_by: row.reviewed_by,
-        created_at: offset_to_ts(row.created_at),
-        reviewed_at: row.reviewed_at.map(offset_to_ts),
+        created_at: row.created_at,
+        reviewed_at: row.reviewed_at,
     })
+}
+
+/// The rows `GET /api/records/verify` recomputes, most recently updated
+/// first, soft-deleted ones included (the handler's reassembly skips
+/// those).
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
+pub async fn rows_for_verification(db: &PgPool, limit: u64) -> Result<Vec<CourseRow>> {
+    let rows = sqlx::query_as!(
+        CourseRow,
+        "SELECT id, name, content_hash, content_hash_sha3, content_mac, description,
+                disambiguating_description, url, additional_type, audience, license,
+                typical_age_range, time_required, version, is_accessible_for_free,
+                educational_level, educational_use, learning_resource_type,
+                interactivity_type, course_code, number_of_credits,
+                total_historical_enrollment, status, active, provider_id,
+                created_at, updated_at, deleted_at
+         FROM courses
+         ORDER BY updated_at DESC
+         LIMIT $1",
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
 }
 
 /// Apply the merged `course`'s parent-row update + wholesale child-row
 /// replacement on `conn`. Shared by [`CourseRepository::update`] and
-/// [`CourseRepository::merge`]: updates the `courses` row (stamping
-/// `updated_at`), then replaces the identifier / link / text-value /
+/// [`CourseRepository::merge`]: rewrites every column of the `courses`
+/// row (stamping `updated_at`; `created_at` is written from the course,
+/// as it always was), then replaces the identifier / link / text-value /
 /// credential child rows from the incoming course (PUT semantics). Runs
 /// on the caller's connection/transaction so it shares that commit
 /// boundary.
-async fn apply_course_update<C: ConnectionTrait>(conn: &C, course: &Course) -> Result<()> {
-    let active = to_course_active(course, true)?;
-    active.update(conn).await.map_err(|e| map_db(&e))?;
+async fn apply_course_update(conn: &mut PgConnection, course: &Course) -> Result<()> {
+    update_course_row(conn, &course_row(course, true)?).await?;
     // Child collections are replace-not-merge: delete the existing rows
     // then re-insert from the incoming course, so the persisted state
     // mirrors the request body exactly.
-    course_identifiers::Entity::delete_many()
-        .filter(course_identifiers::Column::CourseId.eq(course.id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    course_links::Entity::delete_many()
-        .filter(course_links::Column::CourseId.eq(course.id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+    sqlx::query!(
+        "DELETE FROM course_identifiers WHERE course_id = $1",
+        course.id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!("DELETE FROM course_links WHERE course_id = $1", course.id)
+        .execute(&mut *conn)
+        .await?;
     delete_course_collections(conn, course.id).await?;
     insert_identifiers(conn, course.id, &course.identifiers).await?;
     insert_links(conn, course.id, &course.links).await?;
@@ -622,32 +687,58 @@ async fn apply_course_update<C: ConnectionTrait>(conn: &C, course: &Course) -> R
     Ok(())
 }
 
+/// Soft-delete one course on `conn` (the plain soft delete): flip `active`
+/// off and stamp `deleted_at` / `updated_at`, leaving every other column —
+/// the stored digests included — in place.
+async fn mark_course_deleted(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE courses SET active = false, deleted_at = $2, updated_at = $3 WHERE id = $1",
+        id,
+        Utc::now(),
+        Utc::now(),
+    )
+    .execute(conn)
+    .await?;
+    // As under the ORM, an update that touches no row is an error.
+    if done.rows_affected() == 0 {
+        return Err(crate::Error::Database(
+            "course not deleted: no such row".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Soft-delete the course `id` on `conn` by stamping `deleted_at` /
 /// `updated_at` and flipping `active` off, leaving every other column in
 /// place. Factored so [`CourseRepository::merge`] can reuse it on its own
-/// transaction (a partial UPDATE via `..Default::default()`).
-async fn apply_course_soft_delete<C: ConnectionTrait>(conn: &C, id: Uuid) -> Result<()> {
-    let now = OffsetDateTime::now_utc();
-    let active = courses::ActiveModel {
-        id: Set(id),
-        active: Set(false),
-        deleted_at: Set(Some(now)),
-        updated_at: Set(now),
-        // Clear the digests rather than leave ones that no longer
-        // describe the row. This is a partial update — the record is not
-        // loaded here, and reassembling it would add several queries to a
-        // path `merge` also uses — so recomputing is not available.
-        //
-        // The consequence is stated rather than hidden: a soft-deleted
-        // course reports as `unhashed`, not as verified and not as
-        // tampered. That is the honest reading, and it avoids the worse
-        // outcome of every soft delete surfacing as a false finding.
-        content_hash: Set(None),
-        content_hash_sha3: Set(None),
-        content_mac: Set(None),
-        ..Default::default()
-    };
-    active.update(conn).await.map_err(|e| map_db(&e))?;
+/// transaction (a partial UPDATE).
+async fn apply_course_soft_delete(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    let now = Utc::now();
+    // Clear the digests rather than leave ones that no longer describe
+    // the row. This is a partial update — the record is not loaded here,
+    // and reassembling it would add several queries to a path `merge`
+    // also uses — so recomputing is not available.
+    //
+    // The consequence is stated rather than hidden: a soft-deleted
+    // course reports as `unhashed`, not as verified and not as tampered.
+    // That is the honest reading, and it avoids the worse outcome of
+    // every soft delete surfacing as a false finding.
+    let done = sqlx::query!(
+        "UPDATE courses SET
+             active = false, deleted_at = $2, updated_at = $2,
+             content_hash = NULL, content_hash_sha3 = NULL, content_mac = NULL
+         WHERE id = $1",
+        id,
+        now,
+    )
+    .execute(conn)
+    .await?;
+    // As under the ORM, an update that touches no row is an error.
+    if done.rows_affected() == 0 {
+        return Err(crate::Error::Database(
+            "course not deleted: no such row".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -658,16 +749,16 @@ fn schedule_start(i: &CourseInstance) -> Option<chrono::DateTime<chrono::Utc>> {
 
 // ────────────────── Domain ↔ DB conversion ──────────────────
 
-/// Build a `courses` `SeaORM` `ActiveModel` from a domain [`Course`],
-/// serialising collection fields to JSONB. On update, `updated_at` is
-/// stamped to now; on insert the model's own timestamp is kept.
-fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveModel> {
-    let now = OffsetDateTime::now_utc();
+/// Build the full `courses` row from a domain [`Course`], integrity
+/// digests included. On update, `updated_at` is stamped to now; on insert
+/// the course's own timestamp is kept.
+fn course_row(course: &Course, is_update: bool) -> Result<CourseRow> {
+    let now = Utc::now();
     // All three digests from one call over the **assembled** record, so
     // the child collections are covered too. Computed here rather than
     // stamped afterwards, so one statement writes the row and its
-    // integrity values together — and every full write builds its active
-    // model through this function.
+    // integrity values together — and every full write builds its row
+    // through this function.
     let digests = crate::compliance::record_integrity::digests(
         &crate::compliance::record_integrity::RecordInput {
             id: course.id,
@@ -675,56 +766,156 @@ fn to_course_active(course: &Course, is_update: bool) -> Result<courses::ActiveM
             active: course.active,
         },
     );
-    Ok(courses::ActiveModel {
-        id: Set(course.id),
-        content_hash: Set(Some(digests.sha256)),
-        content_hash_sha3: Set(Some(digests.sha3)),
-        content_mac: Set(digests.mac),
-        name: Set(course.name.clone()),
-        description: Set(course.description.clone()),
-        disambiguating_description: Set(course.disambiguating_description.clone()),
-        url: Set(course.url.clone()),
-        additional_type: Set(course.additional_type.clone()),
-        audience: Set(course.audience.clone()),
-        license: Set(course.license.clone()),
-        typical_age_range: Set(course.typical_age_range.clone()),
-        time_required: Set(course.time_required.clone()),
-        version: Set(course.version.clone()),
-        is_accessible_for_free: Set(course.is_accessible_for_free),
-        educational_level: Set(course
+    Ok(CourseRow {
+        id: course.id,
+        content_hash: Some(digests.sha256),
+        content_hash_sha3: Some(digests.sha3),
+        content_mac: digests.mac,
+        name: course.name.clone(),
+        description: course.description.clone(),
+        disambiguating_description: course.disambiguating_description.clone(),
+        url: course.url.clone(),
+        additional_type: course.additional_type.clone(),
+        audience: course.audience.clone(),
+        license: course.license.clone(),
+        typical_age_range: course.typical_age_range.clone(),
+        time_required: course.time_required.clone(),
+        version: course.version.clone(),
+        is_accessible_for_free: course.is_accessible_for_free,
+        educational_level: course
             .educational_level
             .as_ref()
             .map(enum_to_string)
-            .transpose()?),
-        educational_use: Set(course.educational_use.clone()),
-        learning_resource_type: Set(course
+            .transpose()?,
+        educational_use: course.educational_use.clone(),
+        learning_resource_type: course
             .learning_resource_type
             .as_ref()
             .map(enum_to_string)
-            .transpose()?),
-        interactivity_type: Set(course
+            .transpose()?,
+        interactivity_type: course
             .interactivity_type
             .as_ref()
             .map(enum_to_string)
-            .transpose()?),
-        course_code: Set(course.course_code.clone()),
-        number_of_credits: Set(course
+            .transpose()?,
+        course_code: course.course_code.clone(),
+        number_of_credits: course
             .number_of_credits
-            .map(|v| i32::try_from(v).unwrap_or(i32::MAX))),
-        total_historical_enrollment: Set(course
+            .map(|v| i32::try_from(v).unwrap_or(i32::MAX)),
+        total_historical_enrollment: course
             .total_historical_enrollment
-            .map(|v| i64::try_from(v).unwrap_or(i64::MAX))),
-        status: Set(enum_to_string(&course.status)?),
-        active: Set(course.active),
-        provider_id: Set(course.provider_id),
-        created_at: Set(ts_to_offset(course.created_at)),
-        updated_at: Set(if is_update {
-            now
-        } else {
-            ts_to_offset(course.updated_at)
-        }),
-        deleted_at: Set(course.deleted_at.map(ts_to_offset)),
+            .map(|v| i64::try_from(v).unwrap_or(i64::MAX)),
+        status: enum_to_string(&course.status)?,
+        active: course.active,
+        provider_id: course.provider_id,
+        created_at: course.created_at,
+        updated_at: if is_update { now } else { course.updated_at },
+        deleted_at: course.deleted_at,
     })
+}
+
+/// `INSERT` one whole `courses` row.
+async fn insert_course_row(conn: &mut PgConnection, row: &CourseRow) -> Result<()> {
+    sqlx::query!(
+        "INSERT INTO courses (
+             id, name, content_hash, content_hash_sha3, content_mac, description,
+             disambiguating_description, url, additional_type, audience, license,
+             typical_age_range, time_required, version, is_accessible_for_free,
+             educational_level, educational_use, learning_resource_type,
+             interactivity_type, course_code, number_of_credits,
+             total_historical_enrollment, status, active, provider_id,
+             created_at, updated_at, deleted_at
+         ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+             $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+         )",
+        row.id,
+        row.name,
+        row.content_hash,
+        row.content_hash_sha3,
+        row.content_mac,
+        row.description,
+        row.disambiguating_description,
+        row.url,
+        row.additional_type,
+        row.audience,
+        row.license,
+        row.typical_age_range,
+        row.time_required,
+        row.version,
+        row.is_accessible_for_free,
+        row.educational_level,
+        row.educational_use,
+        row.learning_resource_type,
+        row.interactivity_type,
+        row.course_code,
+        row.number_of_credits,
+        row.total_historical_enrollment,
+        row.status,
+        row.active,
+        row.provider_id,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// `UPDATE` every column of one `courses` row except `id`, `created_at`
+/// included, exactly as the ORM's full-row update did.
+async fn update_course_row(conn: &mut PgConnection, row: &CourseRow) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE courses SET
+             name = $2, content_hash = $3, content_hash_sha3 = $4, content_mac = $5,
+             description = $6, disambiguating_description = $7, url = $8,
+             additional_type = $9, audience = $10, license = $11, typical_age_range = $12,
+             time_required = $13, version = $14, is_accessible_for_free = $15,
+             educational_level = $16, educational_use = $17, learning_resource_type = $18,
+             interactivity_type = $19, course_code = $20, number_of_credits = $21,
+             total_historical_enrollment = $22, status = $23, active = $24,
+             provider_id = $25, created_at = $26, updated_at = $27, deleted_at = $28
+         WHERE id = $1",
+        row.id,
+        row.name,
+        row.content_hash,
+        row.content_hash_sha3,
+        row.content_mac,
+        row.description,
+        row.disambiguating_description,
+        row.url,
+        row.additional_type,
+        row.audience,
+        row.license,
+        row.typical_age_range,
+        row.time_required,
+        row.version,
+        row.is_accessible_for_free,
+        row.educational_level,
+        row.educational_use,
+        row.learning_resource_type,
+        row.interactivity_type,
+        row.course_code,
+        row.number_of_credits,
+        row.total_historical_enrollment,
+        row.status,
+        row.active,
+        row.provider_id,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+    )
+    .execute(conn)
+    .await?;
+    // A row that vanished is an error, as it was when the ORM reported
+    // "no record updated".
+    if done.rows_affected() == 0 {
+        return Err(crate::Error::Database(
+            "course not updated: no such row".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// The course string-list fields, as `(field tag, &Vec<String>)` pairs, so
@@ -747,22 +938,20 @@ fn course_text_fields(course: &Course) -> [(&'static str, &Vec<String>); 12] {
 }
 
 /// Insert the `course_text_values` + `course_credentials` rows for `course`.
-async fn insert_course_collections<C: sea_orm::ConnectionTrait>(
-    conn: &C,
-    course: &Course,
-) -> Result<()> {
+async fn insert_course_collections(conn: &mut PgConnection, course: &Course) -> Result<()> {
     for (field, values) in course_text_fields(course) {
         for (i, value) in values.iter().enumerate() {
-            course_text_values::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                course_id: Set(course.id),
-                field: Set(field.to_string()),
-                value: Set(value.clone()),
-                position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-            }
-            .insert(conn)
-            .await
-            .map_err(|e| map_db(&e))?;
+            sqlx::query!(
+                "INSERT INTO course_text_values (id, course_id, field, value, position)
+                 VALUES ($1, $2, $3, $4, $5)",
+                Uuid::new_v4(),
+                course.id,
+                field,
+                value,
+                position(i),
+            )
+            .execute(&mut *conn)
+            .await?;
         }
     }
     if let Some(cred) = &course.educational_credential_awarded {
@@ -775,70 +964,73 @@ async fn insert_course_collections<C: sea_orm::ConnectionTrait>(
 }
 
 /// Insert one credential row in the given `role`.
-async fn insert_credential<C: sea_orm::ConnectionTrait>(
-    conn: &C,
+async fn insert_credential(
+    conn: &mut PgConnection,
     course_id: Uuid,
     role: &str,
     cred: &crate::models::EducationalCredential,
 ) -> Result<()> {
-    course_credentials::ActiveModel {
-        id: Set(Uuid::new_v4()),
-        course_id: Set(course_id),
-        role: Set(role.to_string()),
-        name: Set(cred.name.clone()),
-        category: Set(cred.category.as_ref().map(enum_to_string).transpose()?),
-        educational_level: Set(cred.educational_level.clone()),
-        recognized_by: Set(cred.recognized_by.clone()),
-        url: Set(cred.url.clone()),
-    }
-    .insert(conn)
-    .await
-    .map_err(|e| map_db(&e))?;
+    sqlx::query!(
+        "INSERT INTO course_credentials
+             (id, course_id, role, name, category, educational_level, recognized_by, url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        Uuid::new_v4(),
+        course_id,
+        role,
+        cred.name,
+        cred.category.as_ref().map(enum_to_string).transpose()?,
+        cred.educational_level,
+        cred.recognized_by,
+        cred.url,
+    )
+    .execute(conn)
+    .await?;
     Ok(())
 }
 
 /// Delete the `course_text_values` + `course_credentials` rows for a course.
-async fn delete_course_collections<C: sea_orm::ConnectionTrait>(
-    conn: &C,
-    course_id: Uuid,
-) -> Result<()> {
-    course_text_values::Entity::delete_many()
-        .filter(course_text_values::Column::CourseId.eq(course_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    course_credentials::Entity::delete_many()
-        .filter(course_credentials::Column::CourseId.eq(course_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+async fn delete_course_collections(conn: &mut PgConnection, course_id: Uuid) -> Result<()> {
+    sqlx::query!(
+        "DELETE FROM course_text_values WHERE course_id = $1",
+        course_id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM course_credentials WHERE course_id = $1",
+        course_id
+    )
+    .execute(&mut *conn)
+    .await?;
     Ok(())
 }
 
 /// Load the `course_text_values` + `course_credentials` rows for a course.
 async fn load_course_collections(
-    db: &DatabaseConnection,
+    db: &PgPool,
     course_id: Uuid,
-) -> Result<(
-    Vec<course_text_values::Model>,
-    Vec<course_credentials::Model>,
-)> {
-    let text_values = course_text_values::Entity::find()
-        .filter(course_text_values::Column::CourseId.eq(course_id))
-        .order_by_asc(course_text_values::Column::Position)
-        .all(db)
-        .await
-        .map_err(|e| map_db(&e))?;
-    let credentials = course_credentials::Entity::find()
-        .filter(course_credentials::Column::CourseId.eq(course_id))
-        .all(db)
-        .await
-        .map_err(|e| map_db(&e))?;
+) -> Result<(Vec<CourseTextValueRow>, Vec<CourseCredentialRow>)> {
+    let text_values = sqlx::query_as!(
+        CourseTextValueRow,
+        "SELECT field, value FROM course_text_values WHERE course_id = $1 ORDER BY position",
+        course_id,
+    )
+    .fetch_all(db)
+    .await?;
+    let credentials = sqlx::query_as!(
+        CourseCredentialRow,
+        "SELECT role, name, category, educational_level, recognized_by, url
+         FROM course_credentials
+         WHERE course_id = $1",
+        course_id,
+    )
+    .fetch_all(db)
+    .await?;
     Ok((text_values, credentials))
 }
 
 /// Collect the values of one tagged field from loaded text-value rows.
-fn texts(rows: &[course_text_values::Model], field: &str) -> Vec<String> {
+fn texts(rows: &[CourseTextValueRow], field: &str) -> Vec<String> {
     rows.iter()
         .filter(|r| r.field == field)
         .map(|r| r.value.clone())
@@ -847,7 +1039,7 @@ fn texts(rows: &[course_text_values::Model], field: &str) -> Vec<String> {
 
 /// Reconstruct an [`EducationalCredential`] from a row, or `None`.
 fn credential_of(
-    rows: &[course_credentials::Model],
+    rows: &[CourseCredentialRow],
     role: &str,
 ) -> Result<Option<crate::models::EducationalCredential>> {
     rows.iter()
@@ -865,15 +1057,15 @@ fn credential_of(
 }
 
 /// Reconstruct a domain [`Course`] from its `courses` row plus the
-/// child identifier/link collections, deserialising JSONB columns.
+/// child identifier/link/text-value/credential collections.
 /// Sub-resources (`syllabus_sections`, `instances`) are left empty —
 /// they load via their own endpoints.
 fn hydrate_course(
-    row: courses::Model,
+    row: CourseRow,
     identifiers: Vec<CourseIdentifier>,
     links: Vec<CourseLink>,
-    text_values: &[course_text_values::Model],
-    credentials: &[course_credentials::Model],
+    text_values: &[CourseTextValueRow],
+    credentials: &[CourseCredentialRow],
 ) -> Result<Course> {
     Ok(Course {
         id: row.id,
@@ -930,167 +1122,242 @@ fn hydrate_course(
         status: enum_from_string::<CourseStatus>(&row.status)?,
         links,
         provider_id: row.provider_id,
-        deleted_at: row.deleted_at.map(offset_to_ts),
-        created_at: offset_to_ts(row.created_at),
-        updated_at: offset_to_ts(row.updated_at),
+        deleted_at: row.deleted_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
     })
 }
 
 // ────────────────── Instance round-trip ──────────────────
 
-/// Build a `course_instances` `ActiveModel` from a domain
-/// [`CourseInstance`], serialising collection/schedule fields to JSONB.
-fn to_instance_active(
-    i: &CourseInstance,
-    is_update: bool,
-) -> Result<course_instances::ActiveModel> {
-    let now = OffsetDateTime::now_utc();
+/// Build the full `course_instances` row from a domain
+/// [`CourseInstance`], flattening its schedule onto the row. On update,
+/// `updated_at` is stamped to now; on insert the instance's own timestamp
+/// is kept. `deleted_at` is always written `NULL`.
+fn instance_row(i: &CourseInstance, is_update: bool) -> Result<CourseInstanceRow> {
+    let now = Utc::now();
     let sched = i.schedule.as_ref();
-    Ok(course_instances::ActiveModel {
-        id: Set(i.id),
-        course_id: Set(i.course_id),
-        name: Set(i.name.clone()),
-        course_mode: Set(i.course_mode.as_ref().map(enum_to_string).transpose()?),
-        status: Set(enum_to_string(&i.status)?),
-        location: Set(i.location.clone()),
-        location_id: Set(i.location_id),
-        maximum_attendee_capacity: Set(i
+    Ok(CourseInstanceRow {
+        id: i.id,
+        course_id: i.course_id,
+        name: i.name.clone(),
+        course_mode: i.course_mode.as_ref().map(enum_to_string).transpose()?,
+        status: enum_to_string(&i.status)?,
+        location: i.location.clone(),
+        location_id: i.location_id,
+        maximum_attendee_capacity: i
             .maximum_attendee_capacity
-            .map(|v| i32::try_from(v).unwrap_or(i32::MAX))),
-        enrolled_count: Set(i
+            .map(|v| i32::try_from(v).unwrap_or(i32::MAX)),
+        enrolled_count: i
             .enrolled_count
-            .map(|v| i32::try_from(v).unwrap_or(i32::MAX))),
-        enrollment_opens: Set(i.enrollment_opens.map(ts_to_offset)),
-        enrollment_closes: Set(i.enrollment_closes.map(ts_to_offset)),
-        schedule_start_date: Set(sched.and_then(|s| s.start_date).map(ts_to_offset)),
-        schedule_end_date: Set(sched.and_then(|s| s.end_date).map(ts_to_offset)),
-        schedule_time_zone: Set(sched.and_then(|s| s.time_zone.clone())),
-        schedule_recurrence: Set(sched.and_then(|s| s.recurrence.clone())),
-        created_at: Set(ts_to_offset(i.created_at)),
-        updated_at: Set(if is_update {
-            now
-        } else {
-            ts_to_offset(i.updated_at)
-        }),
-        deleted_at: Set(None),
+            .map(|v| i32::try_from(v).unwrap_or(i32::MAX)),
+        enrollment_opens: i.enrollment_opens,
+        enrollment_closes: i.enrollment_closes,
+        schedule_start_date: sched.and_then(|s| s.start_date),
+        schedule_end_date: sched.and_then(|s| s.end_date),
+        schedule_time_zone: sched.and_then(|s| s.time_zone.clone()),
+        schedule_recurrence: sched.and_then(|s| s.recurrence.clone()),
+        created_at: i.created_at,
+        updated_at: if is_update { now } else { i.updated_at },
+        deleted_at: None,
     })
+}
+
+/// `INSERT` one whole `course_instances` row.
+async fn insert_instance_row(conn: &mut PgConnection, row: &CourseInstanceRow) -> Result<()> {
+    sqlx::query!(
+        "INSERT INTO course_instances (
+             id, course_id, name, course_mode, status, location, location_id,
+             maximum_attendee_capacity, enrolled_count, enrollment_opens, enrollment_closes,
+             schedule_start_date, schedule_end_date, schedule_time_zone, schedule_recurrence,
+             created_at, updated_at, deleted_at
+         ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+         )",
+        row.id,
+        row.course_id,
+        row.name,
+        row.course_mode,
+        row.status,
+        row.location,
+        row.location_id,
+        row.maximum_attendee_capacity,
+        row.enrolled_count,
+        row.enrollment_opens,
+        row.enrollment_closes,
+        row.schedule_start_date,
+        row.schedule_end_date,
+        row.schedule_time_zone,
+        row.schedule_recurrence,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// `UPDATE` every column of one `course_instances` row except `id`,
+/// `created_at` and `course_id` included, exactly as the ORM's full-row
+/// update did.
+async fn update_instance_row(conn: &mut PgConnection, row: &CourseInstanceRow) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE course_instances SET
+             course_id = $2, name = $3, course_mode = $4, status = $5, location = $6,
+             location_id = $7, maximum_attendee_capacity = $8, enrolled_count = $9,
+             enrollment_opens = $10, enrollment_closes = $11, schedule_start_date = $12,
+             schedule_end_date = $13, schedule_time_zone = $14, schedule_recurrence = $15,
+             created_at = $16, updated_at = $17, deleted_at = $18
+         WHERE id = $1",
+        row.id,
+        row.course_id,
+        row.name,
+        row.course_mode,
+        row.status,
+        row.location,
+        row.location_id,
+        row.maximum_attendee_capacity,
+        row.enrolled_count,
+        row.enrollment_opens,
+        row.enrollment_closes,
+        row.schedule_start_date,
+        row.schedule_end_date,
+        row.schedule_time_zone,
+        row.schedule_recurrence,
+        row.created_at,
+        row.updated_at,
+        row.deleted_at,
+    )
+    .execute(conn)
+    .await?;
+    // As under the ORM, an update that touches no row is an error.
+    if done.rows_affected() == 0 {
+        return Err(crate::Error::Database(
+            "course instance not updated: no such row".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Insert an instance's normalized child collections (languages,
 /// instructors, sessions) on connection `conn`.
-async fn insert_instance_collections<C: sea_orm::ConnectionTrait>(
-    conn: &C,
-    i: &CourseInstance,
-) -> Result<()> {
+async fn insert_instance_collections(conn: &mut PgConnection, i: &CourseInstance) -> Result<()> {
     for (idx, lang) in i.in_language.iter().enumerate() {
-        course_instance_languages::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            instance_id: Set(i.id),
-            language: Set(lang.clone()),
-            position: Set(i32::try_from(idx).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO course_instance_languages (id, instance_id, language, position)
+             VALUES ($1, $2, $3, $4)",
+            Uuid::new_v4(),
+            i.id,
+            lang,
+            position(idx),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     // Instructor ids and names are parallel lists in the domain model; emit
     // one row per position, carrying whichever of (id, name) is present.
     let n = i.instructor_ids.len().max(i.instructor_names.len());
     for idx in 0..n {
-        course_instance_instructors::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            instance_id: Set(i.id),
-            instructor_id: Set(i.instructor_ids.get(idx).copied()),
-            instructor_name: Set(i.instructor_names.get(idx).cloned()),
-            position: Set(i32::try_from(idx).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO course_instance_instructors
+                 (id, instance_id, instructor_id, instructor_name, position)
+             VALUES ($1, $2, $3, $4, $5)",
+            Uuid::new_v4(),
+            i.id,
+            i.instructor_ids.get(idx).copied(),
+            i.instructor_names.get(idx),
+            position(idx),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     if let Some(s) = &i.schedule {
         for (idx, session) in s.sessions.iter().enumerate() {
-            course_instance_sessions::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                instance_id: Set(i.id),
-                start_at: Set(ts_to_offset(session.start)),
-                end_at: Set(session.end.map(ts_to_offset)),
-                label: Set(session.label.clone()),
-                position: Set(i32::try_from(idx).unwrap_or(i32::MAX)),
-            }
-            .insert(conn)
-            .await
-            .map_err(|e| map_db(&e))?;
+            sqlx::query!(
+                "INSERT INTO course_instance_sessions
+                     (id, instance_id, start_at, end_at, label, position)
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+                Uuid::new_v4(),
+                i.id,
+                session.start,
+                session.end,
+                session.label,
+                position(idx),
+            )
+            .execute(&mut *conn)
+            .await?;
         }
     }
     Ok(())
 }
 
 /// Delete an instance's normalized child collections on connection `conn`.
-async fn delete_instance_collections<C: sea_orm::ConnectionTrait>(
-    conn: &C,
-    instance_id: Uuid,
-) -> Result<()> {
-    course_instance_languages::Entity::delete_many()
-        .filter(course_instance_languages::Column::InstanceId.eq(instance_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    course_instance_instructors::Entity::delete_many()
-        .filter(course_instance_instructors::Column::InstanceId.eq(instance_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    course_instance_sessions::Entity::delete_many()
-        .filter(course_instance_sessions::Column::InstanceId.eq(instance_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+async fn delete_instance_collections(conn: &mut PgConnection, instance_id: Uuid) -> Result<()> {
+    sqlx::query!(
+        "DELETE FROM course_instance_languages WHERE instance_id = $1",
+        instance_id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM course_instance_instructors WHERE instance_id = $1",
+        instance_id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM course_instance_sessions WHERE instance_id = $1",
+        instance_id
+    )
+    .execute(&mut *conn)
+    .await?;
     Ok(())
 }
 
-/// Reconstruct a domain [`CourseInstance`] from its row, deserialising
-/// JSONB columns and widening the stored `i32` counts back to `u32`.
-async fn hydrate_instance(
-    db: &DatabaseConnection,
-    row: course_instances::Model,
-) -> Result<CourseInstance> {
+/// Reconstruct a domain [`CourseInstance`] from its row plus its child
+/// collections, widening the stored `i32` counts back to `u32`.
+async fn hydrate_instance(db: &PgPool, row: CourseInstanceRow) -> Result<CourseInstance> {
     let id = row.id;
 
-    let lang_rows = course_instance_languages::Entity::find()
-        .filter(course_instance_languages::Column::InstanceId.eq(id))
-        .order_by_asc(course_instance_languages::Column::Position)
-        .all(db)
-        .await
-        .map_err(|e| map_db(&e))?;
-    let in_language = lang_rows.into_iter().map(|r| r.language).collect();
+    let in_language = sqlx::query_scalar!(
+        "SELECT language FROM course_instance_languages WHERE instance_id = $1 ORDER BY position",
+        id,
+    )
+    .fetch_all(db)
+    .await?;
 
-    let inst_rows = course_instance_instructors::Entity::find()
-        .filter(course_instance_instructors::Column::InstanceId.eq(id))
-        .order_by_asc(course_instance_instructors::Column::Position)
-        .all(db)
-        .await
-        .map_err(|e| map_db(&e))?;
+    let inst_rows = sqlx::query!(
+        "SELECT instructor_id, instructor_name
+         FROM course_instance_instructors
+         WHERE instance_id = $1
+         ORDER BY position",
+        id,
+    )
+    .fetch_all(db)
+    .await?;
     let instructor_ids = inst_rows.iter().filter_map(|r| r.instructor_id).collect();
     let instructor_names = inst_rows
         .into_iter()
         .filter_map(|r| r.instructor_name)
         .collect();
 
-    let session_rows = course_instance_sessions::Entity::find()
-        .filter(course_instance_sessions::Column::InstanceId.eq(id))
-        .order_by_asc(course_instance_sessions::Column::Position)
-        .all(db)
-        .await
-        .map_err(|e| map_db(&e))?;
-    let sessions: Vec<crate::models::course_instance::Session> = session_rows
-        .into_iter()
-        .map(|s| crate::models::course_instance::Session {
-            start: offset_to_ts(s.start_at),
-            end: s.end_at.map(offset_to_ts),
-            label: s.label,
-        })
-        .collect();
+    let sessions: Vec<crate::models::course_instance::Session> = sqlx::query!(
+        "SELECT start_at, end_at, label
+         FROM course_instance_sessions
+         WHERE instance_id = $1
+         ORDER BY position",
+        id,
+    )
+    .fetch_all(db)
+    .await?
+    .into_iter()
+    .map(|s| crate::models::course_instance::Session {
+        start: s.start_at,
+        end: s.end_at,
+        label: s.label,
+    })
+    .collect();
 
     let has_schedule = row.schedule_start_date.is_some()
         || row.schedule_end_date.is_some()
@@ -1098,8 +1365,8 @@ async fn hydrate_instance(
         || row.schedule_recurrence.is_some()
         || !sessions.is_empty();
     let schedule = has_schedule.then(|| Schedule {
-        start_date: row.schedule_start_date.map(offset_to_ts),
-        end_date: row.schedule_end_date.map(offset_to_ts),
+        start_date: row.schedule_start_date,
+        end_date: row.schedule_end_date,
         time_zone: row.schedule_time_zone.clone(),
         recurrence: row.schedule_recurrence.clone(),
         sessions,
@@ -1124,41 +1391,42 @@ async fn hydrate_instance(
             .maximum_attendee_capacity
             .map(|v| u32::try_from(v).unwrap_or(0)),
         enrolled_count: row.enrolled_count.map(|v| u32::try_from(v).unwrap_or(0)),
-        enrollment_opens: row.enrollment_opens.map(offset_to_ts),
-        enrollment_closes: row.enrollment_closes.map(offset_to_ts),
+        enrollment_opens: row.enrollment_opens,
+        enrollment_closes: row.enrollment_closes,
         schedule,
-        created_at: offset_to_ts(row.created_at),
-        updated_at: offset_to_ts(row.updated_at),
+        created_at: row.created_at,
+        updated_at: row.updated_at,
     })
 }
 
 // ────────────────── Child-table round-trip ──────────────────
 
 /// Insert each [`CourseIdentifier`] as a `course_identifiers` child row
-/// under `course_id`. Generic over the connection so it runs inside a
+/// under `course_id`, on the caller's connection so it runs inside a
 /// transaction.
-async fn insert_identifiers<C>(
-    conn: &C,
+async fn insert_identifiers(
+    conn: &mut PgConnection,
     course_id: Uuid,
     identifiers: &[CourseIdentifier],
-) -> Result<()>
-where
-    C: sea_orm::ConnectionTrait,
-{
+) -> Result<()> {
     for (i, ident) in identifiers.iter().enumerate() {
         let (property_id, custom_label) = ident_type_parts(&ident.property_id)?;
-        let row = course_identifiers::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            course_id: Set(course_id),
-            property_id: Set(property_id),
-            custom_label: Set(custom_label),
-            value: Set(ident.value.clone()),
-            name: Set(ident.name.clone()),
-            url: Set(ident.url.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-            created_at: Set(OffsetDateTime::now_utc()),
-        };
-        row.insert(conn).await.map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO course_identifiers
+                 (id, course_id, property_id, custom_label, value, name, url, position, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            Uuid::new_v4(),
+            course_id,
+            property_id,
+            custom_label,
+            ident.value,
+            ident.name,
+            ident.url,
+            position(i),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     Ok(())
 }
@@ -1183,69 +1451,80 @@ fn parse_ident_type(tag: &str, custom_label: Option<String>) -> Result<Identifie
 }
 
 /// Insert each [`CourseLink`] as a `course_links` child row under
-/// `course_id`. Generic over the connection so it runs in a transaction.
-async fn insert_links<C>(conn: &C, course_id: Uuid, links: &[CourseLink]) -> Result<()>
-where
-    C: sea_orm::ConnectionTrait,
-{
+/// `course_id`, on the caller's connection so it runs in a transaction.
+async fn insert_links(
+    conn: &mut PgConnection,
+    course_id: Uuid,
+    links: &[CourseLink],
+) -> Result<()> {
     for link in links {
-        let row = course_links::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            course_id: Set(course_id),
-            other_course_id: Set(link.other_course_id),
-            link_type: Set(enum_to_string(&link.link_type)?),
-            created_at: Set(OffsetDateTime::now_utc()),
-        };
-        row.insert(conn).await.map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO course_links (id, course_id, other_course_id, link_type, created_at)
+             VALUES ($1, $2, $3, $4, $5)",
+            Uuid::new_v4(),
+            course_id,
+            link.other_course_id,
+            enum_to_string(&link.link_type)?,
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     Ok(())
 }
 
 /// Load and deserialise all `course_identifiers` rows for `course_id`.
-async fn load_identifiers(
-    db: &DatabaseConnection,
-    course_id: Uuid,
-) -> Result<Vec<CourseIdentifier>> {
-    let rows = course_identifiers::Entity::find()
-        .filter(course_identifiers::Column::CourseId.eq(course_id))
-        .order_by_asc(course_identifiers::Column::Position)
-        .all(db)
-        .await
-        .map_err(|e| map_db(&e))?;
-    rows.into_iter()
-        .map(|r| {
-            Ok(CourseIdentifier {
-                property_id: parse_ident_type(&r.property_id, r.custom_label)?,
-                value: r.value,
-                name: r.name,
-                url: r.url,
-            })
+async fn load_identifiers(db: &PgPool, course_id: Uuid) -> Result<Vec<CourseIdentifier>> {
+    sqlx::query!(
+        "SELECT property_id, custom_label, value, name, url
+         FROM course_identifiers
+         WHERE course_id = $1
+         ORDER BY position",
+        course_id,
+    )
+    .fetch_all(db)
+    .await?
+    .into_iter()
+    .map(|r| {
+        Ok(CourseIdentifier {
+            property_id: parse_ident_type(&r.property_id, r.custom_label)?,
+            value: r.value,
+            name: r.name,
+            url: r.url,
         })
-        .collect()
+    })
+    .collect()
 }
 
 /// Load and deserialise all `course_links` rows for `course_id`.
-async fn load_links(db: &DatabaseConnection, course_id: Uuid) -> Result<Vec<CourseLink>> {
-    let rows = course_links::Entity::find()
-        .filter(course_links::Column::CourseId.eq(course_id))
-        .all(db)
-        .await
-        .map_err(|e| map_db(&e))?;
-    rows.into_iter()
-        .map(|r| {
-            Ok(CourseLink {
-                other_course_id: r.other_course_id,
-                link_type: enum_from_string::<LinkType>(&r.link_type)?,
-            })
+async fn load_links(db: &PgPool, course_id: Uuid) -> Result<Vec<CourseLink>> {
+    sqlx::query!(
+        "SELECT other_course_id, link_type FROM course_links WHERE course_id = $1",
+        course_id,
+    )
+    .fetch_all(db)
+    .await?
+    .into_iter()
+    .map(|r| {
+        Ok(CourseLink {
+            other_course_id: r.other_course_id,
+            link_type: enum_from_string::<LinkType>(&r.link_type)?,
         })
-        .collect()
+    })
+    .collect()
 }
 
 // ────────────────── Helpers ──────────────────
 
-/// Map a `SeaORM` error into the crate's [`Error::Database`](crate::Error).
-fn map_db(e: &sea_orm::DbErr) -> crate::Error {
-    crate::Error::Database(e.to_string())
+/// A list index as the `INTEGER` `position` column.
+fn position(i: usize) -> i32 {
+    i32::try_from(i).unwrap_or(i32::MAX)
+}
+
+/// A `LIMIT` / `OFFSET` bound: Postgres takes `BIGINT`, the callers count
+/// in `u64`.
+fn to_i64(n: u64) -> i64 {
+    i64::try_from(n).unwrap_or(i64::MAX)
 }
 
 /// Serialise a string-valued enum to its bare string form (used for
@@ -1300,19 +1579,19 @@ mod tests {
         }
     }
 
-    /// `to_course_active` copies scalar fields onto the `ActiveModel`.
+    /// `course_row` copies scalar fields onto the `courses` row.
     #[test]
-    fn course_active_model_carries_all_scalar_fields() {
+    fn course_row_carries_all_scalar_fields() {
         let mut course = Course::new("Intro to CS");
         course.course_code = Some("CS101".into());
         course.number_of_credits = Some(3);
         course.educational_level = Some(EducationalLevel::Undergraduate);
         course.keywords = vec!["programming".into(), "algorithms".into()];
-        let active = to_course_active(&course, false).unwrap();
-        assert!(matches!(active.name, Set(ref n) if n == "Intro to CS"));
-        assert!(matches!(active.course_code, Set(Some(ref c)) if c == "CS101"));
-        assert!(matches!(active.number_of_credits, Set(Some(3))));
-        assert!(matches!(active.status, Set(ref s) if s == "published"));
+        let row = course_row(&course, false).unwrap();
+        assert!(matches!(row.name, ref n if n == "Intro to CS"));
+        assert!(matches!(row.course_code, Some(ref c) if c == "CS101"));
+        assert!(matches!(row.number_of_credits, Some(3)));
+        assert!(matches!(row.status, ref s if s == "published"));
     }
 }
 
@@ -1323,15 +1602,14 @@ mod tests {
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod outbox_atomicity_tests {
-    use super::{CourseRepository, SeaOrmCourseRepository};
-    use crate::db::models::course_outbox;
+    use super::{CourseRepository, PgCourseRepository};
+    use crate::db::outbox;
     use crate::models::Course;
     use crate::streaming::EventTransport;
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-    async fn connect() -> sea_orm::DatabaseConnection {
+    async fn connect() -> sqlx::PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        sqlx::PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
@@ -1342,16 +1620,11 @@ mod outbox_atomicity_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
-        let repo = SeaOrmCourseRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgCourseRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let course = repo.create(&Course::new("Intro to CS")).await.unwrap();
 
-        let rows = course_outbox::Entity::find()
-            .filter(course_outbox::Column::EntityPid.eq(course.id))
-            .filter(course_outbox::Column::Kind.eq("created"))
-            .all(&db)
-            .await
-            .unwrap();
+        let rows = outbox::rows_for(&db, course.id, "created").await.unwrap();
         assert_eq!(rows.len(), 1, "one created outbox row for the new course");
     }
 
@@ -1362,7 +1635,7 @@ mod outbox_atomicity_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
-        let repo = SeaOrmCourseRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgCourseRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let survivor = repo.create(&Course::new("Survivor")).await.unwrap();
         let duplicate = repo.create(&Course::new("Duplicate")).await.unwrap();
@@ -1371,12 +1644,7 @@ mod outbox_atomicity_tests {
         assert_eq!(merged.id, survivor.id);
 
         // Survivor: exactly one `merged` row, carrying the duplicate pid.
-        let merged_rows = course_outbox::Entity::find()
-            .filter(course_outbox::Column::EntityPid.eq(survivor.id))
-            .filter(course_outbox::Column::Kind.eq("merged"))
-            .all(&db)
-            .await
-            .unwrap();
+        let merged_rows = outbox::rows_for(&db, survivor.id, "merged").await.unwrap();
         assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
         assert_eq!(
             merged_rows[0].payload["merged_from"],
@@ -1385,10 +1653,7 @@ mod outbox_atomicity_tests {
         );
 
         // Duplicate: a `deleted` row.
-        let deleted_rows = course_outbox::Entity::find()
-            .filter(course_outbox::Column::EntityPid.eq(duplicate.id))
-            .filter(course_outbox::Column::Kind.eq("deleted"))
-            .all(&db)
+        let deleted_rows = outbox::rows_for(&db, duplicate.id, "deleted")
             .await
             .unwrap();
         assert_eq!(

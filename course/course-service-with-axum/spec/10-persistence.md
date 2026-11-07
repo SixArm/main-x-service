@@ -1,12 +1,58 @@
 ## 10. Persistence
 
-PostgreSQL via SeaORM. The schema source of truth is the
-hand-written, numbered SQL under `migrations/` (`up.sql` /
-`down.sql` per step). The sibling `migration/` crate is the axa
-SeaORM `Migrator`: each Rust migration wraps the corresponding SQL
-pair via `include_str!`, so axa can run the same SQL through
-`auto_migrate: true` (on by default in development config) or
-explicitly via `cargo run -- db migrate`.
+PostgreSQL via **sqlx**, with no ORM (since 2026-11-07, T-31; SeaORM
+before). The schema source of truth is the hand-written, numbered SQL
+under `migrations/`, in sqlx's reversible flat layout
+(`<version>_<name>.up.sql` / `.down.sql`), embedded by
+`sqlx::migrate!` as `db::MIGRATOR` and tracked in `_sqlx_migrations`.
+`course-service db migrate | down [steps] | reset | status` and the
+boot auto-migrate (`auto_migrate`, on by default in development) run
+them through `axa::sqlx`. The SQL is the same SQL the former SeaORM
+`migration/` wrapper crate ran; a `pg_dump --schema-only` of a database
+migrated each way is identical apart from the bookkeeping table
+(`seaql_migrations` → `_sqlx_migrations`).
+
+The rules, from the family's `spec/tech-stack/index.md` §5.2:
+
+- **All SQL is in `src/db/`.** `mod.rs` (the course and instance
+  repository, the review queue, the merge, the pool, the migrator, the
+  integrity-verification read), `audit.rs`, and `outbox.rs` (including
+  the relay's poll, ack and retention purge). Nothing outside that
+  directory runs a statement. `models.rs` holds plain row structs
+  (`CourseRow`, `CourseInstanceRow`, `CourseTextValueRow`,
+  `CourseCredentialRow`, `ReviewQueueRow`, `AuditLogRow`, `OutboxRow`),
+  one field per column, with no behaviour.
+- **Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`
+  literal**, checked at compile time against the schema. The check data
+  is committed in `.sqlx/` and the build reads it offline
+  (`SQLX_OFFLINE=true`); `scripts/ci-check.sh test-db` runs `cargo sqlx
+  prepare --check` against a freshly migrated database, so a query that
+  no longer matches the schema fails CI. Regenerate after any query or
+  migration change with `cargo sqlx prepare -- --all-targets` against a
+  migrated database.
+- **No dynamic SQL.** There is no `QueryBuilder`, `raw_sql` or
+  `AssertSqlSafe` in this crate. The one optional filter, the review
+  queue's `status`, is a bound parameter: `($1::text IS NULL OR status = $1)`.
+- **Transactions.** A helper that runs several statements takes
+  `&mut PgConnection`, so it runs inside the caller's transaction. A
+  course write's child rows and its `course_outbox` row commit in the
+  same transaction as the `courses` row; an instance write's child rows
+  commit with the instance row; a merge's survivor update, child
+  replacement, duplicate soft delete and both outbox rows commit
+  together.
+- **Full-row updates stay full-row.** A course or instance update
+  writes every column, `created_at` included, as the SeaORM full-row
+  `ActiveModel` update did; a soft delete writes only its tombstone
+  columns. An update or soft delete that matches no row is still an
+  error (`Error::Database`, `500`).
+- **Timestamps** are `chrono::DateTime<Utc>` in the row structs, as in
+  the domain model, so the persistence boundary no longer converts to
+  the `time` crate (only the outbox's pure envelope→row mapping still
+  takes a `time::OffsetDateTime`). axa enables sqlx's `chrono`, and
+  enabling `time` as well makes sqlx 0.9.0's macros warn on every
+  timestamp column. Every sqlx error is `Error::Database` carrying
+  sqlx's message; a unique violation is not singled out, as it was not
+  before.
 
 Tables (9 core + 7 collection child tables from the
 `normalize_course_collections` migration):
@@ -28,20 +74,14 @@ Tables (9 core + 7 collection child tables from the
 - `course_merge_records` — merge audit trail with transferred-data snapshot.
 - `audit_log` — HIPAA / FERPA-style trail for who / what / when.
 
-### SeaORM time-type feature
+### Time types
 
-`sea-orm` is configured with the `with-time` feature (not
-`with-chrono`). This is the older-service convention carried over from
-the person-service copy-adapt and is consistent across the
-first-converted controller-style services (event / person / thing / place / worker /
-course). The crate also pulls `chrono` directly for its own
-domain-model timestamps (`DateTime<Utc>` on `ReviewQueueItem`, audit
-entries, etc.), so both crates are present in the tree. The shared
-stack note (`rust-axum-stack.md`) prescribes `with-chrono` as the
-loco-service default; reconciling these older services onto
-`with-chrono` is tracked as a cross-crate task (spec §13 T-17) rather
-than flipped piecemeal here, since it must land uniformly across the
-six services to avoid SeaORM time-type drift between siblings.
+Until T-31 this section recorded why `sea-orm` ran with `with-time`
+rather than `with-chrono` (T-17). With SeaORM gone the question is
+closed: the row structs use `chrono`, the same type as the domain
+model, and sqlx's `time` feature stays off (see the timestamp rule
+above). The `time` crate remains a direct dependency only for the
+outbox mapping's `OffsetDateTime` argument.
 
 ### 10.5 Bulk import / export — `bulk_jobs`
 

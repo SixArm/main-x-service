@@ -29,10 +29,9 @@
 
 use std::time::Duration;
 
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sqlx::PgPool;
 
-use crate::db::models::course_outbox::{Column as OutboxColumn, Entity as OutboxEntity};
-use crate::db::outbox::Model as OutboxRow;
+use crate::db::outbox;
 
 /// A boxed, thread-safe error from a sink send (a bus/broker failure).
 pub type SinkError = Box<dyn std::error::Error + Send + Sync>;
@@ -137,16 +136,14 @@ impl EventSink for FluvioSink {
 ///
 /// When the outbox poll or the `mark_published` ack query fails.
 pub async fn drain_once<S: EventSink + ?Sized>(
-    db: &DatabaseConnection,
+    db: &PgPool,
     sink: &S,
     batch: u64,
 ) -> crate::Result<usize> {
     // SEC-B6: claim rows under a transaction with FOR UPDATE SKIP LOCKED
     // (in `unpublished`) so parallel relay instances can't double-ship.
-    let txn = sea_orm::TransactionTrait::begin(db)
-        .await
-        .map_err(|e| crate::Error::Database(e.to_string()))?;
-    let rows = OutboxRow::unpublished(&txn, batch).await?;
+    let mut txn = db.begin().await?;
+    let rows = outbox::unpublished(&mut txn, batch).await?;
     let mut published: Vec<i64> = Vec::with_capacity(rows.len());
     for row in &rows {
         match sink
@@ -163,11 +160,9 @@ pub async fn drain_once<S: EventSink + ?Sized>(
         }
     }
     if !published.is_empty() {
-        OutboxRow::mark_published(&txn, &published).await?;
+        outbox::mark_published(&mut txn, &published).await?;
     }
-    txn.commit()
-        .await
-        .map_err(|e| crate::Error::Database(e.to_string()))?;
+    txn.commit().await?;
     Ok(published.len())
 }
 
@@ -178,15 +173,9 @@ pub async fn drain_once<S: EventSink + ?Sized>(
 /// # Errors
 ///
 /// When the delete query fails.
-pub async fn purge_published(db: &DatabaseConnection, retention_days: i64) -> crate::Result<u64> {
-    let cutoff = time::OffsetDateTime::now_utc() - time::Duration::days(retention_days.max(0));
-    let res = OutboxEntity::delete_many()
-        .filter(OutboxColumn::PublishedAt.is_not_null())
-        .filter(OutboxColumn::PublishedAt.lt(cutoff))
-        .exec(db)
-        .await
-        .map_err(|e| crate::Error::Database(e.to_string()))?;
-    Ok(res.rows_affected)
+pub async fn purge_published(db: &PgPool, retention_days: i64) -> crate::Result<u64> {
+    let cutoff = chrono::Utc::now() - chrono::Duration::days(retention_days.max(0));
+    outbox::purge_published(db, cutoff).await
 }
 
 /// Whether the relay background loop should run: `COURSE_EVENT_RELAY`
@@ -294,12 +283,7 @@ async fn build_sink(_endpoint: Option<&str>) -> Box<dyn EventSink> {
 }
 
 /// The drain + retention loop, generic over the already-connected sink.
-async fn run_drain_loop(
-    db: DatabaseConnection,
-    sink: Box<dyn EventSink>,
-    interval: u64,
-    retention: i64,
-) {
+async fn run_drain_loop(db: PgPool, sink: Box<dyn EventSink>, interval: u64, retention: i64) {
     let mut ticks: u64 = 0;
     loop {
         if let Err(err) = drain_once(&db, sink.as_ref(), 100).await {
@@ -328,7 +312,7 @@ async fn run_drain_loop(
 /// refusal to start the relay at all (logged at `error`) rather than a
 /// silent `LoggingSink` fallback — see `build_sink`'s doc comment in this
 /// file for why a fallback here would be worse than not running.
-pub fn spawn(db: DatabaseConnection) {
+pub fn spawn(db: PgPool) {
     if !crate::streaming::transport().is_outbox() || !relay_enabled() {
         return;
     }

@@ -21,7 +21,7 @@
 |  +----------------+ +-----------------+ +------------------+  |
 |  +----------------+ +-----------------+ +------------------+  |
 |  | Repositories   | | SearchEngine    | | Audit + events   |  |
-|  | (SeaORM)       | | (Tantivy)       | | (in-memory MVP)  |  |
+|  | (sqlx)         | | (Tantivy)       | | (in-memory MVP)  |  |
 |  +----------------+ +-----------------+ +------------------+  |
 |  +-----------------------------------------------------------+|
 |  | matching/adapter.rs  →  course_matcher::MatchingEngine     ||
@@ -31,7 +31,7 @@
 +-------v--------+   +---------v---------+   +------------------+
 |  PostgreSQL    |   |  Tantivy index    |   | course-matcher-  |
 |  9 tables      |   |  (local dir)      |   | rust-crate (pure |
-|  (SeaORM)      |   |                   |   | lib, no IO)      |
+|  (sqlx)        |   |                   |   | lib, no IO)      |
 +----------------+   +-------------------+   +------------------+
 ```
 

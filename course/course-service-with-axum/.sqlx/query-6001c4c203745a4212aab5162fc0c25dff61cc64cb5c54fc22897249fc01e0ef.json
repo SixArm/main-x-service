@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT other_course_id, link_type FROM course_links WHERE course_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "other_course_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "course_links",
+            "name": "other_course_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "link_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_links",
+            "name": "link_type"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "6001c4c203745a4212aab5162fc0c25dff61cc64cb5c54fc22897249fc01e0ef"
+}

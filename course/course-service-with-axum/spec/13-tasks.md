@@ -10,8 +10,8 @@
   keeps FR-22, BCP-47 entries keep FR-24. Unit tested. (Repo tasks.md Phase 5
   SEC-M1.)
 - [x] T-1: Scaffold skeleton (Cargo.toml, src/, migrations, Dockerfile, docker-compose, spec, AGENTS docs).
-- [x] T-2: SeaORM entity modules in `db/models.rs` matching the migration schema.
-- [x] T-3: `SeaOrmCourseRepository` CRUD + soft-delete (courses + identifiers + links round-trip; transactional). Audit-log writes landed with T-9.
+- [x] T-2: SeaORM entity modules in `db/models.rs` matching the migration schema. *(Since T-31, plain sqlx row structs.)*
+- [x] T-3: `SeaOrmCourseRepository` (since T-31 `PgCourseRepository`) CRUD + soft-delete (courses + identifiers + links round-trip; transactional). Audit-log writes landed with T-9.
 - [x] T-4: Tantivy `SearchEngine::index_course` + `search` + `fuzzy_search` + `search_by_name_and_provider` + `delete_course` (reader-reload after every commit).
 - [x] T-5: Validation module enforcing FR-21..FR-28 (`src/validation/`; nested-instance errors carry path prefixes).
 - [x] T-6: Adapter `matching::adapter::to_matcher_course` + `CourseMatcher` drives `course_matcher::MatchingEngine` (1:1 enum routing for `IdentifierScheme` / `EducationalLevel` / `LearningResourceType`).
@@ -25,7 +25,7 @@
 - [x] T-14: OpenAPI schema via utoipa derive annotations. Every wired handler carries `#[utoipa::path]`; every public domain type derives `ToSchema`; `SearchQuery` + `AuditQuery` derive `IntoParams`. `ApiDoc` aggregator + Swagger UI at `/swagger-ui`, raw spec at `/api-docs/openapi.json`.
 - [x] T-15: Authentication + authorization blanket guard — adopt the family-wide auth rollout ([`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md), [`agents/share/jwt-enforcement.md`](../../../agents/share/jwt-enforcement.md), [`agents/share/authorization-attributes.md`](../../../agents/share/authorization-attributes.md)). Offline **PASETO v4.public** (Ed25519) bearer verification via the `authentication-verifier` crate (no shared secret, no introspection hop) + **ABAC** authorization over the token's `attrs` claim (shared policy engine). `src/api/rest/auth.rs`: `bearer_claims` extractor + `AuthUser` + `GET /api/whoami` + the `require_auth_mw` blanket guard (`enforce`) wired on both router surfaces (`create_router` and the loco router in `app.rs`), layered inside CORS so preflights pass. Blanket enforcement is **default-off** via `COURSE_REQUIRE_AUTH`; when on, every `/api/*` and `/fhir/*` route requires a valid bearer token except the public `/api/health` and `/fhir/metadata` (root `/_health`, `/_ping`, `/api-docs/*`, `/swagger-ui*`, `/metrics.prom` are out of the enforced scope). Verifier finalised in `after_routes` via `state::boot_verifier` (boot-time HTTP key fetch when `COURSE_PASETO_KEYS_URL` is set; falls back to `COURSE_PASETO_KEYS` env; always boots). ABAC policy from `COURSE_ABAC_POLICY` / `COURSE_ABAC_POLICY_FILE` (unset/unparsable ⇒ built-in default: read for any subject, `access=write` writes, `access=admin` adds destructive, `svc=true` does everything). `401` = missing/bad credential; `403` = valid credential, policy denied. Destructive named POSTs (`auth::DESTRUCTIVE_POST_SUFFIXES` = `/merge`, `/deduplicate`, `/import`). **Done (2026-07-08):** module copied from the event service reference and renamed `EVENT_*`→`COURSE_*`; full auth test matrix passes (mint→verify, enforce off/on, 401 vs 403, ABAC empty-attrs read-only / `access=write` / `access=admin` / `svc=true`, first-match deny, FHIR paths guarded + `/fhir/metadata` public, boot-time key fetch). `cargo test --lib` green (85 passed); `cargo clippy --lib` clean under pedantic. Not rewired: per-handler audit `actor` from token (optional future enhancement).
 - [x] T-16: Prometheus metrics — `GET /metrics.prom`. Process-wide `prometheus::Registry` (`src/metrics.rs`, behind a `OnceLock` reached via `Metrics::global()`) served at the application **root** in text-exposition format (`text/plain; version=0.0.4`) by a loco controller route (`metrics_routes()` in `api/rest/mod.rs`, mounted at root alongside the docs; also wired into `create_router` for the Axum test surface). Counters `course_created_total`, `course_updated_total`, `course_deleted_total`, `course_merged_total` (one `.inc()` per success path in the create/update/delete/merge handlers) plus a labelled `http_requests_total{path,status}`, wired to the live request path by T-18. DB-free tests: registry render + counter increment (`metrics::tests`); root-mounting of the metrics route + a live `GET /metrics.prom` (via `tower::oneshot`) asserting `200` + `text/plain; version=0.0.4` + a reflected increment (`api::rest::tests`).
-- [ ] T-17: Harmonize the SeaORM time-type feature across the six first-converted loco services (course / event / person / thing / place / worker) from `with-time` to the `with-chrono` loco-service default prescribed by `rust-loco-stack.md`. Must land uniformly to avoid time-type drift between siblings; see §10 "SeaORM time-type feature". Not a course-only change.
+- [x] T-17: Harmonize the SeaORM time-type feature across the six first-converted loco services (course / event / person / thing / place / worker) from `with-time` to the `with-chrono` loco-service default prescribed by `rust-loco-stack.md`. Must land uniformly to avoid time-type drift between siblings; see §10 "Time types". Not a course-only change. *(Superseded 2026-11-07 by T-31: this crate no longer uses SeaORM, and its row structs map timestamps to `chrono` through sqlx.)*
 - [x] T-18 (2026-08-29, PRO-P8): **Request-path observability middleware**, landed. `crate::metrics::track_http_requests_mw` (`src/metrics.rs`) increments `http_requests_total{path,status}` on the live request path, layered via `route_layer` (not `layer`) on both router surfaces — the loco production router (`App::after_routes` in `src/app.rs`) and the `tower::oneshot` test router (`create_router` in `src/api/rest/mod.rs`). `route_layer` is required rather than the family's usual top-level `layer`, because reading `axum::extract::MatchedPath` (used for the `path` label, so a course `pid` never mints its own label series) only resolves *after* route matching. DB-free test `track_http_requests_mw_labels_by_matched_route_template` (`metrics::tests`) pins that a dynamic-segment route is labelled by its template, not the concrete id in the URL. **Deviation from the original wording**: family-wide investigation (PRO-P8) found no sibling loco service actually wires this counter either — `http_requests_total` is declared-but-dead in all nine other entity services too — so there was no existing pattern to "match"; this is a fresh, from-scratch implementation, offered as the copy source for the family-wide rollout instead of the reverse. The end-to-end create→scrape integration-test half of this task (asserting `course_created_total`/`course_merged_total` increment after a real create/merge through the API) remains deferred to the `#[ignore]` integration suite, as originally scoped — out of PRO-P8's remit.
 - [ ] T-19: Bulk import / export. See §9.2, §10.5 and [bulk import/export](../../../agents/share/bulk-import-export.md).
   - [ ] Migration creating the `bulk_jobs` table (shared doc §3 schema, with the `UNIQUE (entity, kind, idempotency_key)` key).
@@ -203,3 +203,35 @@
       `enforce_request` used by the middleware and extractors;
       `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
       KC-1; reference: organization-service.
+
+- [x] **T-31 (M) — SeaORM → sqlx.** *(Done 2026-11-07;
+  spec/tech-stack §5, following place, thing and event.)* Replaced
+  SeaORM with direct sqlx so a reviewer can read every statement the
+  service runs (§10). All SQL is in `src/db/` as 49 `query!` /
+  `query_as!` / `query_scalar!` literals, compile-checked against the
+  committed `.sqlx/`; no `QueryBuilder`, `raw_sql` or `AssertSqlSafe`,
+  so no `ci/sql-allowlist.txt` entry. `SeaOrmCourseRepository` became
+  `PgCourseRepository` over a `sqlx::PgPool`; the fifteen SeaORM entity
+  modules in `src/db/models.rs` became seven plain row structs, and the
+  persistence boundary maps timestamps to `chrono` directly instead of
+  through the `time` crate. Two handler queries (`GET /api/records/verify`,
+  `GET /api/audit/verify`) and the relay's retention delete moved into
+  `src/db/`. The `migration/` crate is gone: its seven migrations are
+  the same SQL in sqlx's flat `.up.sql` / `.down.sql` layout (the
+  seventh's SQL had been duplicated inline in Rust; its existing
+  `.sql` file is the one kept), run by `sqlx::migrate!` through
+  `axa::sqlx` (`db migrate | down | reset | status`, boot
+  auto-migrate). Proved: a `pg_dump --schema-only` of a database
+  migrated by the old code and one migrated by the new code is
+  identical once the bookkeeping tables are excluded. Compliance
+  behaviour unchanged and its tests not edited to pass: the only test
+  edits replace SeaORM connections, the `ActiveModel` assertion and
+  outbox-row lookups with `sqlx::PgPool`, the `CourseRow` and
+  `db::outbox::rows_for`, keeping every assertion. One test changed
+  shape: the relay poll's `FOR UPDATE SKIP LOCKED` pin read the SQL
+  SeaORM generated, which a `query!` literal does not expose, so it
+  became a DB-gated test proving a second relay skips rows the first
+  holds. Unit tests 152 → 151, DB-gated suite 16 → 17, all passing.
+  Dependencies 377 → 342 unique normal crates. The crate-local
+  `quality.yml` loses its `migration` clippy job, and `test.yml` builds
+  with `SQLX_OFFLINE=true`.

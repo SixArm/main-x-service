@@ -24,7 +24,7 @@
 - A **non-standard FHIR surface** at `/fhir/Basic` — see §2.1b.
 - Row-level integrity digests + audit-log MAC verification
   (`GET /api/records/verify`, `GET /api/audit/verify`) — see §2.1c.
-- PostgreSQL persistence via SeaORM, with migrations.
+- PostgreSQL persistence via sqlx (compile-checked SQL, no ORM), with plain-SQL migrations.
 - Structured tracing (`tracing`) **plus real OpenTelemetry OTLP
   export** (`axa::opentelemetry`, T-26) — see §2.1d.
 

@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO course_instances (\n             id, course_id, name, course_mode, status, location, location_id,\n             maximum_attendee_capacity, enrolled_count, enrollment_opens, enrollment_closes,\n             schedule_start_date, schedule_end_date, schedule_time_zone, schedule_recurrence,\n             created_at, updated_at, deleted_at\n         ) VALUES (\n             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18\n         )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "029c5cdcd3330c9e7c62c5a321aa14492eca0b3b18b90d9f3537cf9ecf9a323c"
+}

@@ -53,7 +53,7 @@ Shared reference docs live at the project root under
 | Benchmarks | `benches/` (T-13, three criterion files) |
 | OpenAPI | served at `/swagger-ui` + `/api-docs/openapi.json` (T-14) |
 | Metrics | `src/metrics.rs` (process-wide Prometheus registry, `OnceLock`); served at root `/metrics.prom` via `metrics_routes()` in `src/api/rest/mod.rs` (T-16) |
-| Migrations | `migrations/` |
+| Migrations | `migrations/` (plain SQL, `sqlx::migrate!`) |
 
 ## OpenTelemetry OTLP export
 
@@ -83,6 +83,35 @@ the collector as a span and a metric, and its `traceparent` names the
 exported trace. axa tests its own pipeline. None of this needs a database.
 The collector's `tonic = "0.14"` dev-dependency needs no rename, because
 this crate declares no other `tonic`.
+
+## Database: sqlx, all SQL in `src/db/`
+
+Since 2026-11-07 this crate is on sqlx, not SeaORM (spec §10, §13 T-31;
+the repo's `spec/tech-stack/index.md` §5; place-service was the pilot).
+The rules that keep it reviewable:
+
+- Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`
+  literal in `src/db/`. Handlers, the relay and tests call functions
+  there; they never hold SQL.
+- No `QueryBuilder`, `raw_sql` or `AssertSqlSafe`. The clippy stage
+  refuses them unless `ci/sql-allowlist.txt` names the file. Write an
+  optional filter as `($1::text IS NULL OR col = $1)` instead.
+- A helper running several statements takes `&mut PgConnection`, so the
+  outbox row and the child rows commit in the caller's transaction.
+- Course and instance updates write every column, `created_at`
+  included, as the SeaORM full-row update did. Keep it that way unless
+  the spec changes; an update or soft delete that matches no row is
+  an error.
+- Builds read `.sqlx/` with `SQLX_OFFLINE=true`. After changing a query
+  or a migration, migrate a database and run `SQLX_OFFLINE=false cargo
+  sqlx prepare -- --all-targets`, then commit `.sqlx/`. CI's `test-db`
+  stage runs `cargo sqlx prepare --check`.
+- Migrations are `migrations/<version>_<name>.up.sql` / `.down.sql`,
+  embedded by `sqlx::migrate!` as `db::MIGRATOR`. Never edit an applied
+  one: sqlx checks each file's checksum and refuses a changed one.
+- Timestamps are `chrono` in the row structs. Do not turn on sqlx's
+  `time` feature: axa enables `chrono`, and with both, sqlx 0.9.0's
+  macros warn on every timestamp column.
 
 ## Container image
 

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT start_at, end_at, label\n         FROM course_instance_sessions\n         WHERE instance_id = $1\n         ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "start_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instance_sessions",
+            "name": "start_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "end_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instance_sessions",
+            "name": "end_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "label",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_instance_sessions",
+            "name": "label"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "e95ff33fd227b843b01caeacd22339233a5d00b8952ec1c1b38a3d2cebb91511"
+}

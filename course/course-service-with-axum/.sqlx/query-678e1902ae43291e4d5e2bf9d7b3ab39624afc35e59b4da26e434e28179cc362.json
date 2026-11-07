@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, course_id, candidate_id, match_score, match_quality, detection_method,\n                score_breakdown, status, reviewed_by, created_at, reviewed_at\n         FROM course_match_scores\n         WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "course_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "course_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "candidate_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "candidate_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "match_score",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "match_score"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "match_quality",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "match_quality"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "detection_method",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "detection_method"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "score_breakdown",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "score_breakdown"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "reviewed_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "reviewed_by"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "reviewed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "reviewed_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "678e1902ae43291e4d5e2bf9d7b3ab39624afc35e59b4da26e434e28179cc362"
+}

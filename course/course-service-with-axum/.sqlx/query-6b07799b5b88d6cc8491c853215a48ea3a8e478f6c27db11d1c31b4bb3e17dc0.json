@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT property_id, custom_label, value, name, url\n         FROM course_identifiers\n         WHERE course_id = $1\n         ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "property_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_identifiers",
+            "name": "property_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "custom_label",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_identifiers",
+            "name": "custom_label"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_identifiers",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_identifiers",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_identifiers",
+            "name": "url"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "6b07799b5b88d6cc8491c853215a48ea3a8e478f6c27db11d1c31b4bb3e17dc0"
+}

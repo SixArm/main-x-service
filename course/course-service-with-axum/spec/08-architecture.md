@@ -17,7 +17,7 @@ src/
 │   └── rest/                # controllers: handlers + courses_routes() + ApiDoc + AppState
 │                             #   + auth.rs (T-15) + fhir.rs (T-20 controller)
 ├── models/                  # Course, CourseInstance, Provider, identifier, …
-├── db/                      # SeaORM entities + repository trait + audit + outbox (T-21)
+├── db/                      # all SQL (sqlx query! literals): row structs + repository + audit + outbox (T-21, T-31)
 ├── matching/                # service-side adapter onto course_matcher::MatchingEngine
 ├── search/                  # Tantivy index + query
 ├── validation/               # FR-21..FR-28 + input-size caps (SEC-M1, T-5)
@@ -29,14 +29,14 @@ src/
 ├── config/                  # domain Config (search / matching / streaming knobs)
 └── error.rs
 config/                      # axa environment config (development / test / production YAML)
-migration/                   # axa SeaORM Migrator crate (wraps migrations/*.sql)
-migrations/                  # hand-written SQL up.sql / down.sql (source of truth)
+migrations/                  # hand-written SQL <version>_<name>.up.sql / .down.sql, run by sqlx::migrate!
+.sqlx/                       # committed query! check data (build with SQLX_OFFLINE=true)
 ```
 
 ### 8.2 Boot sequence
 
 `cargo run -- start` (or `cargo run -- start`) → axa CLI →
-`App::boot` (`create_app::<App, Migrator>`) loads
+`App::run` (auto-migrating through `db::MIGRATOR`, T-31) loads
 `config/<environment>.yaml` — server port `8084` / binding in
 development, PostgreSQL `database` + Postgres-backed `queue`,
 `auto_migrate: true` — then:

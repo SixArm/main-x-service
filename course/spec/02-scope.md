@@ -30,7 +30,7 @@ This spec owns the **cross-subproject contract**:
 - Validation (FR-21..FR-28 in its spec), privacy masking, GDPR
   Article 15 export.
 - REST API (axa / Axum) + OpenAPI / Swagger; PostgreSQL via
-  SeaORM; axa boot lifecycle, config, migrations, background queue.
+  sqlx (no ORM); axa boot lifecycle, config, migrations, background queue.
 
 **course-matcher-rust-crate** owns:
 

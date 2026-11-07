@@ -201,8 +201,9 @@ as the sibling services: `MergeRequest` /
 
 ## Database mapping
 
-SeaORM entity modules (in `src/db/models.rs`, T-2 shipped) map to
-these tables:
+The repository in `src/db/` reads and writes these tables with sqlx
+`query!` literals; `src/db/models.rs` holds plain row structs for the
+tables read whole (spec §10, T-31):
 
 - `providers` — issuing organisations.
 - `courses` — Course (scalar fields + JSONB collections for
@@ -215,8 +216,8 @@ these tables:
 - `course_merge_records` — merge audit trail.
 - `audit_log` — HIPAA / FERPA trail.
 
-Migrations live in `migrations/` as numbered SQL `up.sql` /
-`down.sql` pairs.
+Migrations live in `migrations/` as numbered SQL
+`<version>_<name>.up.sql` / `.down.sql` pairs, run by `sqlx::migrate!`.
 
 ## Invariants
 

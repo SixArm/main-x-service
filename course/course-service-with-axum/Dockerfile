@@ -24,7 +24,7 @@
 FROM rust:1.97-slim AS builder
 
 # Build dependencies — `libssl-dev` for openssl-sys, `libpq-dev` for
-# the PostgreSQL C client headers SeaORM links against via sqlx.
+# the PostgreSQL C client headers (sqlx itself is pure Rust).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         libssl-dev \
@@ -45,28 +45,31 @@ COPY authentication/authentication-verifier-rust-crate authentication/authentica
 COPY course/course-matcher-rust-crate course/course-matcher-rust-crate
 
 # This crate itself: manifests first (better layer caching), then the
-# nested `migration` sub-crate (loco's sea-orm-migration bridge —
-# depended on as `migration = { path = "migration" }`), the sibling
-# `migrations/` directory of raw SQL the migration crate embeds via
-# `include_str!("../../migrations/…")`, `benches/` (Cargo.toml declares
+# plain-SQL `migrations/` that `sqlx::migrate!` embeds, the `.sqlx/`
+# query data the `query!` macros check against (no database at build
+# time), `benches/` (Cargo.toml declares
 # `[[bench]]` targets — cargo refuses to parse the manifest for ANY
 # target, including `--bin`-only builds, if a declared bench file is
 # missing; this crate has no `compliance/` directory), then sources.
 COPY course/course-service-with-axum/Cargo.toml course/course-service-with-axum/Cargo.lock course/course-service-with-axum/
-COPY course/course-service-with-axum/migration course/course-service-with-axum/migration
 COPY course/course-service-with-axum/migrations course/course-service-with-axum/migrations
+COPY course/course-service-with-axum/.sqlx course/course-service-with-axum/.sqlx
 COPY course/course-service-with-axum/benches course/course-service-with-axum/benches
 COPY course/course-service-with-axum/src course/course-service-with-axum/src
 
 WORKDIR /app/course/course-service-with-axum
 
-# Build the binary target declared by src/bin/main.rs.
+# Build the binary target declared by src/bin/main.rs. Migration SQL
+# is embedded into the binary at compile time by `sqlx::migrate!`.
+# `SQLX_OFFLINE=true` makes the `query!` macros read `.sqlx/` instead of
+# connecting to a database.
+ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin course-service
 
 # Stage 2: runtime — minimal Debian 13 slim base.
 FROM debian:13-slim
 
-# Runtime libraries. libpq5 for the SeaORM PostgreSQL connector,
+# Runtime libraries. libpq5 for the PostgreSQL connector,
 # libssl3 for openssl, ca-certificates for HTTPS chains (PASETO
 # key-set fetch), curl for the HEALTHCHECK below.
 RUN apt-get update && apt-get install -y --no-install-recommends \

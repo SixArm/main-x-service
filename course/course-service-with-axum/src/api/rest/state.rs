@@ -4,10 +4,10 @@ use std::sync::Arc;
 
 #[cfg(feature = "paseto")]
 use authentication_verifier::Verifier;
-use sea_orm::DatabaseConnection;
+use sqlx::PgPool;
 
 use crate::config::Config;
-use crate::db::{CourseRepository, SeaOrmCourseRepository, audit::AuditLogRepository};
+use crate::db::{CourseRepository, PgCourseRepository, audit::AuditLogRepository};
 use crate::matching::CourseMatcher;
 use crate::search::SearchEngine;
 use crate::streaming::{EventPublisher, InMemoryEventPublisher};
@@ -16,8 +16,9 @@ use crate::streaming::{EventPublisher, InMemoryEventPublisher};
 /// need. Cloned per request by Axum; the inner services are `Arc`-shared.
 #[derive(Clone)]
 pub struct AppState {
-    /// Raw connection pool (for ad-hoc queries outside the repository).
-    pub db: DatabaseConnection,
+    /// The connection pool, for the `crate::db` functions outside the
+    /// repository (integrity verification).
+    pub db: PgPool,
     /// Course CRUD repository.
     pub course_repository: Arc<dyn CourseRepository>,
     /// Audit-log repository.
@@ -43,17 +44,17 @@ pub struct AppState {
 
 impl AppState {
     /// Assemble state from the externally-built services, constructing
-    /// the `SeaORM` repository, audit log, and in-memory event publisher
+    /// the sqlx repository, audit log, and in-memory event publisher
     /// from the shared connection.
     #[must_use]
     pub fn new(
-        db: DatabaseConnection,
+        db: PgPool,
         search_engine: SearchEngine,
         matcher: CourseMatcher,
         config: Config,
     ) -> Self {
         let course_repository: Arc<dyn CourseRepository> = Arc::new(
-            SeaOrmCourseRepository::new(db.clone()).with_transport(crate::streaming::transport()),
+            PgCourseRepository::new(db.clone()).with_transport(crate::streaming::transport()),
         );
         let audit_log = Arc::new(AuditLogRepository::new(db.clone()));
         let event_publisher: Arc<dyn EventPublisher> = Arc::new(InMemoryEventPublisher::new());

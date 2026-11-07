@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE courses SET\n             name = $2, content_hash = $3, content_hash_sha3 = $4, content_mac = $5,\n             description = $6, disambiguating_description = $7, url = $8,\n             additional_type = $9, audience = $10, license = $11, typical_age_range = $12,\n             time_required = $13, version = $14, is_accessible_for_free = $15,\n             educational_level = $16, educational_use = $17, learning_resource_type = $18,\n             interactivity_type = $19, course_code = $20, number_of_credits = $21,\n             total_historical_enrollment = $22, status = $23, active = $24,\n             provider_id = $25, created_at = $26, updated_at = $27, deleted_at = $28\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Int8",
+        "Varchar",
+        "Bool",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3e174663ba4ea1fc733abca4c00718149acd06a9d3f408b75bb42cdd5ab13239"
+}

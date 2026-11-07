@@ -9,6 +9,42 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — SeaORM replaced by sqlx
+
+- **Persistence is sqlx with no ORM** (spec §10, §13 T-31;
+  `spec/tech-stack/index.md` §5, after place, thing and event). All SQL
+  is in `src/db/`, as 49 `query!` / `query_as!` / `query_scalar!`
+  literals checked at compile time against the committed `.sqlx/`;
+  there is no dynamic SQL. `SeaOrmCourseRepository` is now
+  `PgCourseRepository`, over a `sqlx::PgPool`; `src/db/models.rs` holds
+  seven plain row structs instead of fifteen SeaORM entities, with
+  `chrono` timestamps, so the persistence boundary no longer converts
+  to the `time` crate. The SQL of the two integrity-verification
+  handlers and of the relay's retention purge moved into `src/db/`.
+- **The `migration/` crate is removed.** The same seven migrations are
+  sqlx's flat `migrations/<version>_<name>.up.sql` / `.down.sql`,
+  embedded by `sqlx::migrate!` and recorded in `_sqlx_migrations`
+  instead of `seaql_migrations`. `db migrate | down | reset | status`
+  and the boot auto-migrate run through `axa::sqlx`. The resulting
+  schema is identical (`pg_dump --schema-only` diff). An existing
+  database migrated by the old code has no `_sqlx_migrations`, so sqlx
+  would try to re-create its tables; there is no deployed data, so
+  recreate it. The crate-local `.github/workflows/quality.yml` loses
+  its `migration` clippy job; `test.yml` builds with
+  `SQLX_OFFLINE=true`, since the macros would otherwise query its
+  not-yet-migrated database at compile time.
+- `axa` takes its `sqlx` feature instead of `sea-orm`; `sea-orm` and
+  `sea-orm-migration` are gone from the tree (377 → 342 unique normal
+  dependencies).
+- A database error's message is now sqlx's text rather than SeaORM's
+  (still `Error::Database`, still `500`); an update or soft delete
+  that finds no row says so in this crate's words instead of SeaORM's
+  "None of the records are updated". `db status` prints one line per
+  migration to stdout.
+- `[profile.release.build-override] strip = false`: with `strip = true`
+  reaching proc macros, macOS refuses to load the stripped `sqlx-macros`
+  dylib and a release build fails. The shipped binary is still stripped.
+
 ### Added
 
 - Request limits per client through `axa::ratelimit`, in

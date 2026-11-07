@@ -1,0 +1,232 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, course_id, name, course_mode, status, location, location_id,\n                    maximum_attendee_capacity, enrolled_count, enrollment_opens,\n                    enrollment_closes, schedule_start_date, schedule_end_date,\n                    schedule_time_zone, schedule_recurrence, created_at, updated_at, deleted_at\n             FROM course_instances\n             WHERE course_id = $1 AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "course_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "course_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "course_mode",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "course_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "location",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "location"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "location_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "location_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "maximum_attendee_capacity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "maximum_attendee_capacity"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "enrolled_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "enrolled_count"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "enrollment_opens",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "enrollment_opens"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "enrollment_closes",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "enrollment_closes"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "schedule_start_date",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "schedule_start_date"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "schedule_end_date",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "schedule_end_date"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "schedule_time_zone",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "schedule_time_zone"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "schedule_recurrence",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "schedule_recurrence"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "course_instances",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "ece9d5b657538f93917abcfcdacbe1e748ccd7d0930942d7ca1a5a368ba5e643"
+}

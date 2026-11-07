@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE course_match_scores\n             SET status = $1, reviewed_by = $2, reviewed_at = $3\n             WHERE id = $4 AND status = $5",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b041d83b85e4c410c9f8d89998a65250362fb4bb3ef24107d95d47487d1b27a0"
+}

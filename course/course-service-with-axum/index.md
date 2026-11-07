@@ -72,6 +72,26 @@ cargo run -- start            # or: cargo run -- start
 cargo run -- db migrate
 ```
 
+### Database
+
+Persistence is sqlx with no ORM; every statement is a `query!` literal
+in `src/db/`, and spec §10 has the rules. The macros check queries
+against the committed `.sqlx/` data, so build with `SQLX_OFFLINE=true`
+(CI does) unless `DATABASE_URL` points at a **migrated** database: with
+it set and the schema missing, the build fails with "relation does not
+exist".
+
+```bash
+cargo run -- db migrate             # apply migrations/*.up.sql
+cargo run -- db status              # each migration, applied or pending
+AXA_DESTROY_DATA=true cargo run -- db down 1   # development / test only
+AXA_DESTROY_DATA=true cargo run -- db reset    # drop everything, migrate
+
+# After changing a query or a migration, regenerate .sqlx/ against a
+# migrated database, and commit it:
+SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets
+```
+
 ## API
 
 REST routes mount under `/api/courses/*` and `/api/courses/{id}/instances/*`.
@@ -236,8 +256,9 @@ bring-up the integration suite expects to be migrated against.
 
 ## Status
 
-- **Persistence**: SeaORM entities + transactional repository CRUD
-  (T-2 / T-3); CourseInstance sub-resource (T-8); merge bookkeeping.
+- **Persistence**: sqlx, no ORM — every statement a `query!` literal in
+  `src/db/`, transactional repository CRUD (T-3, T-31); CourseInstance
+  sub-resource (T-8); merge bookkeeping.
 - **Search**: Tantivy `SearchEngine` with exact / fuzzy / blocking
   queries; reader reload after every commit (T-4).
 - **Matching**: canonical [`course-matcher`](../course-matcher-rust-crate/)

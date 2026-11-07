@@ -3,8 +3,8 @@
 | Area | Status |
 |---|---|
 | Skeleton (compiles, binary runs end-to-end) | ✅ |
-| Loco conversion (Hooks boot, native controllers, config/*.yaml, Postgres queue, axa Migrator) | ✅ family reference |
-| SeaORM entities | ✅ 15 modules (providers, courses, identifiers, links, instances, syllabus_sections, audit_log, course_match_scores, course_merge_records + the normalized collection child tables) |
+| Loco conversion (Hooks boot, native controllers, config/*.yaml, Postgres queue) | ✅ family reference; migrations run by `sqlx::migrate!` since T-31 |
+| Persistence | ✅ `PgCourseRepository`: sqlx `query!` CRUD with transactions, soft delete; 7 row structs (`src/db/models.rs`); plain-SQL `sqlx::migrate!` migrations; all SQL in `src/db/` (§10, T-31) |
 | Repository CRUD | ✅ courses + identifiers + links + instances + merge records; syllabus_sections still UI-only |
 | Search engine | ✅ index / fuzzy / exact / blocking-query / delete |
 | Validation | ✅ FR-21..FR-28 |
@@ -19,5 +19,5 @@
 | OpenTelemetry export | ✅ real OTLP/gRPC traces + metrics via `axa::opentelemetry` (T-26; the crate's own `src/observability.rs` was replaced 2026-11-07) |
 | Bulk import / export | – designed (§9.2) but not built (T-19) |
 | Metrics | ✅ Prometheus `GET /metrics.prom` (T-16) — process-wide registry; `course_{created,updated,deleted,merged}_total` counters + labelled `http_requests_total{path,status}`, observed on the live request path by a `route_layer` middleware (T-18) |
-| Tests | ✅ 123 unit + 2 DB-gated `#[ignore]` unit (`db::outbox_atomicity_tests`) + 14 bridge + 12 `#[ignore]` integration + 1 `#[ignore]` auth-activation (`tests/enforcement.rs`) + 1 feature-gated `#[ignore]` Fluvio round-trip (`tests/fluvio_relay.rs`) + 3 criterion benches — run `cargo test --lib` for the live count |
+| Tests | ✅ 130 unit + 3 DB-gated `#[ignore]` unit (`db::outbox_atomicity_tests`, `db::outbox::relay_poll`) + 14 bridge + 1 Keycloak guard + 3 OTLP export + 13 `#[ignore]` integration + 1 `#[ignore]` auth-activation (`tests/enforcement.rs`) + 1 feature-gated `#[ignore]` Fluvio round-trip (`tests/fluvio_relay.rs`) + 3 criterion benches — counted 2026-11-07 (T-31); run `cargo test` for the live count |
 

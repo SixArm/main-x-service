@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT role, name, category, educational_level, recognized_by, url\n         FROM course_credentials\n         WHERE course_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "role",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_credentials",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_credentials",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "category",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_credentials",
+            "name": "category"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "educational_level",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_credentials",
+            "name": "educational_level"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "recognized_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_credentials",
+            "name": "recognized_by"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "course_credentials",
+            "name": "url"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "8b2b50d534834c511245a85ea7a88665fcca54cffc659c98ca0bf4ebd51d9c60"
+}

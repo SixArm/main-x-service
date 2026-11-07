@@ -231,7 +231,8 @@ point here rather than repeat it.
 | organization | sqlx | `7614a5a3`, 2026-11-07 |
 | thing | sqlx | 2026-11-07 |
 | event | sqlx | 2026-11-07 |
-| course, link-graph, patient-flow, authentication, case | SeaORM, next | |
+| course | sqlx | 2026-11-07 |
+| link-graph, patient-flow, authentication, case | SeaORM, next | |
 | care-pathway, person, worker | SeaORM, last | |
 
 Each crate on sqlx proves its schema unchanged with a `pg_dump --schema-only`
