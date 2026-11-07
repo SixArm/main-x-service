@@ -731,6 +731,39 @@ unblocked.
   survivor's `seq`. Migrating rows already holding a process counter
   needs a one-off reset of `last_seq`. Found 2026-11-07.
 
+- [x] **T-38 — SeaORM → sqlx.** *(Done 2026-11-07;
+  [`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5,
+  following organization's ORG-SQLX.)* Replaced SeaORM with direct sqlx
+  so a reviewer can read every statement the service runs (§10).
+  `src/models/` is the one SQL area: the `_entities/` SeaORM entities
+  became plain row structs beside their helpers, and the one query that
+  lived elsewhere (the audit-verify read in `controllers/compliance.rs`)
+  and `App::truncate` moved into it. 30 `query!` / `query_as!` /
+  `query_scalar!` literals, all compile-checked against the committed
+  `.sqlx/`; no `QueryBuilder`, `raw_sql` or `AssertSqlSafe`, so no
+  `ci/sql-allowlist.txt` entry. `neighbors` and `GET /api/edges` filter
+  with static optional parameters instead of a built condition; the
+  traversal stays the breadth-first walk in Rust (it was never a
+  recursive CTE). `axa`'s `sea-orm` feature is now `sqlx`; `sea-orm`,
+  `sea-orm-migration` and the `migration/` crate are gone (327 → 286
+  unique normal dependencies). Six migrations were already hand-written
+  SQL and moved unchanged into sqlx's flat `migrations/` layout; the
+  seventh (`add_audit_mac`, SeaORM schema-builder Rust) was written out
+  from a `pg_dump`. A `pg_dump --schema-only` of a database migrated by
+  the old code and one by the new differ only in `seaql_migrations` vs
+  `_sqlx_migrations`. `db migrate | down | reset | status` run through
+  `axa::sqlx` and were each exercised against a real database.
+  `models::ModelError` / `ModelResult` replace axa's SeaORM-only ones
+  and convert into the same `axa::Error`. Every helper takes an
+  `axa::sqlx::Db`; `apply_event` / `apply_event_idempotent` take one
+  connection for the whole event instead of one per statement (still
+  no transaction, as before), while `reconcile` and the lazy probe's
+  `verify_unknown` take the pool and do not hold a connection across
+  their HTTP calls. An `UPDATE` in merge repointing or status recompute
+  that matches no row is still an error. Unit tests 111, DB suite 28,
+  both unchanged. This crate has no record digests, so INT-V1 does not
+  apply.
+
 ### Reconciliation gauge hardening
 
 - [x] T-34 (M): *(resolved 2026-09-04.)* Label `link_graph_reconciliation_divergence` per entity,

@@ -16,7 +16,6 @@ use axa::testing::prelude::*;
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event_idempotent};
 use link_graph_service::models::{edges, entity_presence, processed_events};
-use sea_orm::EntityTrait;
 use serde_json::json;
 use serial_test::serial;
 use uuid::Uuid;
@@ -75,8 +74,7 @@ async fn redelivered_linked_event_does_not_duplicate() {
             .await
             .expect("redelivered apply must not error");
 
-        let count = edges::Entity::find()
-            .all(&ctx.db)
+        let count = edges::Model::all_edge_ids(&ctx.db)
             .await
             .expect("load edges")
             .len();
@@ -151,8 +149,7 @@ async fn envelope_with_no_event_id_applies_every_time() {
         .expect("second apply, no event_id to dedupe on");
 
         let ref_str = format!("person:{pid}");
-        let row = entity_presence::Entity::find_by_id(ref_str)
-            .one(&ctx.db)
+        let row = entity_presence::Model::find(&ctx.db, &ref_str)
             .await
             .expect("query entity_presence")
             .expect("row exists");

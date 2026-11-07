@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM consumer_offsets",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "62844c3a2674ba9124aad7061be1da113d5be5097e3d61d1fdc6597b63db9917"
+}

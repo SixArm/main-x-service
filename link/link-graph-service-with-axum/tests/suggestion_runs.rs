@@ -11,9 +11,7 @@
 use axa::testing::prelude::*;
 use chrono::Utc;
 use link_graph_service::app::App;
-use link_graph_service::models::_entities::suggestion_runs;
 use link_graph_service::models::suggestion_runs::{Model, SuggestionRunRecord};
-use sea_orm::EntityTrait;
 use serial_test::serial;
 
 #[tokio::test]
@@ -37,10 +35,7 @@ async fn record_durably_persists_one_row_per_completed_pass() {
             .await
             .expect("recording a completed pass succeeds");
 
-        let rows = suggestion_runs::Entity::find()
-            .all(&ctx.db)
-            .await
-            .expect("query succeeds");
+        let rows = Model::all(&ctx.db).await.expect("query succeeds");
         assert_eq!(rows.len(), 1, "exactly one durable row per completed pass");
         let row = &rows[0];
         assert_eq!(row.persons_fetched, 25);
@@ -74,10 +69,7 @@ async fn record_durably_persists_one_row_per_completed_pass() {
         Model::record(&ctx.db, &rec2)
             .await
             .expect("recording a second completed pass succeeds");
-        let rows_after = suggestion_runs::Entity::find()
-            .all(&ctx.db)
-            .await
-            .expect("query succeeds");
+        let rows_after = Model::all(&ctx.db).await.expect("query succeeds");
         assert_eq!(rows_after.len(), 2, "history accumulates, not overwrites");
     })
     .await;

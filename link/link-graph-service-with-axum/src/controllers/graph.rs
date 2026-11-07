@@ -20,7 +20,7 @@ use crate::auth::{self, MaybeAuthUser};
 use crate::events::entity_from_topic;
 use crate::graph::{self, EdgeStatus};
 use crate::models::audit_log::{self, AuditContext};
-use crate::models::{consumer_offsets, edges};
+use crate::models::{ModelResult, consumer_offsets, edges};
 use crate::probe;
 use crate::responses;
 
@@ -64,7 +64,7 @@ fn audit_context<'a>(
 /// only fires when a governed edge was actually returned to the caller —
 /// a concealed read audits nothing.
 async fn audit_surfaced_edges(
-    db: &DatabaseConnection,
+    db: &sqlx::PgPool,
     ctx: &AuditContext<'_>,
     action: &str,
     rows: &[edges::Model],
@@ -170,7 +170,7 @@ struct FreshnessData {
 /// Bounded breadth-first collection of edges incident to `start`, up to
 /// `depth` hops (spec §6 FR-7/13). Edges dedupe on `edge_id`.
 async fn collect_neighbors(
-    db: &DatabaseConnection,
+    db: &sqlx::PgPool,
     start: EntityRef,
     kind: Option<EdgeKind>,
     direction: edges::Direction,

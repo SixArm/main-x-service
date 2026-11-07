@@ -61,7 +61,7 @@
 
 - **NFR-14** — Follows the family
   [Rust + axa stack](../../../agents/share/rust-axum-stack.md): Rust
-  2024 edition, Tokio, Axum + axa (backend-only), SeaORM + PostgreSQL,
+  2024 edition, Tokio, Axum + axa (backend-only), sqlx (no ORM) + PostgreSQL,
   Tantivy where search is needed (not required for v1 graph reads),
   Fluvio for the bus, Utoipa OpenAPI, tracing + OpenTelemetry,
   MiMalloc on MUSL. Podman not Docker; PostgreSQL not SQLite.

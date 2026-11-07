@@ -151,23 +151,24 @@ src/
 │   ├── docs.rs             OpenAPI JSON + Swagger UI
 │   ├── metrics.rs          GET /metrics.prom
 │   └── compliance.rs
-├── models/
+├── models/                every SQL statement the service runs (sqlx
+│   │                        `query!` literals) + `MIGRATOR` + `ModelError`
 │   ├── mod.rs
 │   ├── edges.rs             the edges read-model + repository helpers
 │   ├── entity_presence.rs
 │   ├── consumer_offsets.rs
 │   ├── processed_events.rs
 │   ├── audit_log.rs
-│   ├── suggestion_runs.rs   LNK-4 T-33 durable per-pass audit (§10.7)
-│   └── _entities/           SeaORM-generated entities (one per table)
+│   └── suggestion_runs.rs   LNK-4 T-33 durable per-pass audit (§10.7)
 ├── openapi.rs               hand-written OpenAPI 3.0.3 doc
 └── metrics.rs                Prometheus registry (process-wide)
 ```
 
-Migrations live in the crate-root `migration/` directory (a
-`sea-orm-migration` migrator over hand-written SQL pairs, §10), not
-under `src/`. There is no `db/` module — SeaORM entities live under
-`src/models/_entities/`, hand-written models beside them under
-`src/models/`, matching the family's controller-style layout
+Migrations live in the crate-root `migrations/` directory (plain SQL
+`<version>_<name>.up.sql` / `.down.sql` pairs run by `sqlx::migrate!`,
+§10), not under `src/`, and `.sqlx/` holds the offline query data the
+`query!` macros check against. There is no `db/` module — the row
+structs and all their SQL live under `src/models/`, matching the
+family's controller-style layout
 ([architecture.md](../../../agents/share/architecture.md)) rather than
 the person-style `src/db/` layout.

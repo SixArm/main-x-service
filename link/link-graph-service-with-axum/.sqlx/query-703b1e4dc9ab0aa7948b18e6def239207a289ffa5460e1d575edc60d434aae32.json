@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM entity_presence",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "703b1e4dc9ab0aa7948b18e6def239207a289ffa5460e1d575edc60d434aae32"
+}

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO entity_presence (ref, alive, last_seq)\n             VALUES ($1, $2, $3)\n             ON CONFLICT (ref) DO UPDATE\n                 SET alive = excluded.alive,\n                     last_seq = excluded.last_seq",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bool",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "56695cf3eaba00fe26369464eddc76b278d618ff2898089f6512c57053cc67b5"
+}

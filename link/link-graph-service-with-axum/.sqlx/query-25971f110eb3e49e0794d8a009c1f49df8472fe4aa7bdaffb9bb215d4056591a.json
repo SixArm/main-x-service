@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT edge_id FROM edges",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "edge_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "edges",
+            "name": "edge_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "25971f110eb3e49e0794d8a009c1f49df8472fe4aa7bdaffb9bb215d4056591a"
+}

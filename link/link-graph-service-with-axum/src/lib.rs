@@ -18,7 +18,8 @@
 //! - [`graph`] — pure, DB-free projection logic (canonicalisation,
 //!   status lifecycle, single-view walk).
 //! - [`events`] — event decode + the `apply_event` seam.
-//! - [`models`] — `SeaORM` entities + query/projection helpers.
+//! - [`models`] — row structs and every SQL statement the service runs
+//!   (sqlx `query!` literals), plus the migrator.
 //! - [`controllers`] — the read-only Axum controllers.
 //! - [`responses`] — bare JSON successes and RFC 9457 problem errors.
 //! - [`suggest`] — the cross-service `same_identity` suggestion

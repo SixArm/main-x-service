@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO consumer_offsets (topic, offset_val, last_occurred_at)\n             VALUES ($1, $2, $3)\n             ON CONFLICT (topic) DO UPDATE\n                 SET offset_val = excluded.offset_val,\n                     last_occurred_at = excluded.last_occurred_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e8157974bf857ddf918ef462c402afeb2bb9c72217b9abeafab4eb7d89847d06"
+}

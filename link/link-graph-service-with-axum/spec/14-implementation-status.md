@@ -20,19 +20,20 @@ disagree, §13 wins.**
 
 - **Scaffold** — axa crate (`Cargo.toml`, `src/lib.rs` +
   `src/bin/main.rs` with the family lint header, `src/app.rs` `Hooks`,
-  `config/{development,test,production}.yaml`, the `migration/` bridge
-  crate). Read-only to the world; no write controllers of its own
+  `config/{development,test,production}.yaml`; plain-SQL `migrations/`
+  run by `sqlx::migrate!`, §13 T-38). Read-only to the world; no write controllers of its own
   (§1.3, §9). Depends on the sibling
   **[`entity-ref`](../../entity-ref-rust-crate)** crate for the shared
   `EntityType` / `EntityRef` / `EdgeKind` / `Sensitivity` contracts (the
   T-2/T-3 "copy" is superseded — see §13).
-- **Persistence** — six tables, hand-written SQL bridged via
-  `include_str!` (§10): the three v1 read-model tables `edges` (+
+- **Persistence** — six tables, hand-written SQL under `migrations/`
+  run by `sqlx::migrate!`, every statement a `query!` literal in
+  `src/models/` (§10, §13 T-38): the three v1 read-model tables `edges` (+
   `edges_from` / `edges_to` / `edges_status` indexes), `entity_presence`,
   `consumer_offsets`; plus `processed_events` (idempotency, T-6),
   `audit_log` (governed-edge access, T-17), and `suggestion_runs`
-  (per-pass job audit, T-33, §10.7). SeaORM entities under
-  `src/models/_entities/`. `with-chrono` time types (§10.5, OQ-5).
+  (per-pass job audit, T-33, §10.7). Plain row structs in
+  `src/models/`, chrono time types (§10.5, OQ-5).
 - **Pure projection logic** (`src/graph.rs`, DB-free, fully unit-tested)
   — `canonical` (symmetric ordering, FR-6), `edge_status`
   (unverified/verified/dangling lifecycle, FR-9), `single_view`

@@ -39,7 +39,6 @@ use fluvio::{Fluvio, FluvioConfig};
 use link_graph_service::app::App;
 use link_graph_service::consumer;
 use link_graph_service::models::edges;
-use sea_orm::EntityTrait;
 use serde_json::json;
 use serial_test::serial;
 use uuid::Uuid;
@@ -101,8 +100,7 @@ async fn bus_consumer_applies_a_produced_linked_event() {
         let mut applied = false;
         for _ in 0..20 {
             tokio::time::sleep(Duration::from_millis(500)).await;
-            if edges::Entity::find_by_id(edge_id)
-                .one(&ctx.db)
+            if edges::Model::find(&ctx.db, edge_id)
                 .await
                 .expect("query edges")
                 .is_some()

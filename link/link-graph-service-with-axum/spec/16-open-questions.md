@@ -27,12 +27,9 @@ opens a §13 task.
   consumer exists — same call as `mxi-events`, design §12.)* Affects
   §13 T-2 / T-3.
 
-- **OQ-5 — SeaORM time-type feature.** Adopt `with-chrono` from the
-  start (the [rust-axum-stack.md](../../../agents/share/rust-axum-stack.md)
-  default), or match whatever the first-converted siblings are running
-  to avoid drift while course-service §13 T-17 is open? *(Lean:
-  `with-chrono` — this is a brand-new crate with no carry-over to
-  preserve.)* See §10.5.
+- ~~**OQ-5 — SeaORM time-type feature.**~~ — RESOLVED: `with-chrono`
+  from the start, and on the move to sqlx (2026-11-07, §13 T-38) sqlx's
+  `chrono` feature, never `time`. See §10.5.
 
 - **OQ-6 — `dangling`-edge retention.** Keep `dangling` edges
   indefinitely (surfaced as a data-quality signal), tombstone them after

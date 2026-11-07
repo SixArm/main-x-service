@@ -47,7 +47,7 @@
   [`spec/16-open-questions.md`](16-open-questions.md) OQ-9.
 - **Observability.** Tracing + OpenTelemetry OTLP; Prometheus metrics
   including consumer lag and reconciliation divergence.
-- PostgreSQL persistence via SeaORM, with migrations.
+- PostgreSQL persistence via sqlx (no ORM), with plain-SQL migrations.
 
 ### 2.2 Out of scope (MVP)
 

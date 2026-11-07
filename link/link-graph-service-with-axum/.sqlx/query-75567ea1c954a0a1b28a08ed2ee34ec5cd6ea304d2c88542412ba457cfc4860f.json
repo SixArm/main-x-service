@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM suggestion_runs",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "75567ea1c954a0a1b28a08ed2ee34ec5cd6ea304d2c88542412ba457cfc4860f"
+}

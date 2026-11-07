@@ -18,12 +18,11 @@
 //! probed. All of it is gated by `LINK_GRAPH_LAZY_VERIFY` (off by default).
 
 use async_trait::async_trait;
-use axa::prelude::*;
-use sea_orm::ConnectionTrait;
+use sqlx::PgPool;
 
 use entity_ref::{EntityRef, EntityType};
 
-use crate::models::{edges, entity_presence};
+use crate::models::{ModelResult, edges, entity_presence};
 
 /// The outcome of probing a record's presence at its source service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,8 +147,8 @@ impl PresenceProbe for HttpPresenceProbe {
 /// # Errors
 ///
 /// When a presence lookup, cache write, or status recompute fails.
-pub async fn verify_unknown<C: ConnectionTrait>(
-    db: &C,
+pub async fn verify_unknown(
+    db: &PgPool,
     probe: &dyn PresenceProbe,
     refs: &[EntityRef],
 ) -> ModelResult<u64> {

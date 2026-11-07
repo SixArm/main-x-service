@@ -22,11 +22,10 @@
 
 use axa::extract::Query;
 use axa::prelude::*;
-use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 
 use crate::compliance::audit_integrity;
-use crate::models::_entities::audit_log;
+use crate::models::audit_log;
 
 /// Default rows examined in one call.
 pub const VERIFY_DEFAULT_LIMIT: u64 = 1000;
@@ -64,11 +63,7 @@ async fn verify_audit(
     State(ctx): State<AppContext>,
     Query(params): Query<VerifyParams>,
 ) -> Result<Response> {
-    let rows = audit_log::Entity::find()
-        .order_by_desc(audit_log::Column::Id)
-        .limit(params.limit())
-        .all(&ctx.db)
-        .await?;
+    let rows = audit_log::Model::recent(&ctx.db, params.limit()).await?;
     format::json(audit_integrity::verify(&rows))
 }
 

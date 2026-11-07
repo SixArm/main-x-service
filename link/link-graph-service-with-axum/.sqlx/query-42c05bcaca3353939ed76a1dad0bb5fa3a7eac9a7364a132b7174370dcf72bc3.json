@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE edges SET status = $2 WHERE edge_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "42c05bcaca3353939ed76a1dad0bb5fa3a7eac9a7364a132b7174370dcf72bc3"
+}

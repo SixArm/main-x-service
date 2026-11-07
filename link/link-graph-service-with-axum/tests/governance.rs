@@ -15,8 +15,7 @@
 use axa::testing::prelude::*;
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event};
-use link_graph_service::models::_entities::audit_log;
-use sea_orm::EntityTrait;
+use link_graph_service::models::audit_log;
 use serde_json::json;
 use serial_test::serial;
 use uuid::Uuid;
@@ -89,7 +88,7 @@ async fn enforcement_blocks_unauthenticated_reads_and_audits_governed_writes() {
 
         // The governed WRITE was audited (apply_linked, no actor); the
         // blocked reads produced no read audit.
-        let audits = audit_log::Entity::find().all(&ctx.db).await.unwrap();
+        let audits = audit_log::Model::all(&ctx.db).await.unwrap();
         assert_eq!(audits.len(), 1, "only the subject_of apply_linked audited");
         assert_eq!(audits[0].action, "apply_linked");
         assert_eq!(audits[0].edge_kind.as_deref(), Some("subject_of"));

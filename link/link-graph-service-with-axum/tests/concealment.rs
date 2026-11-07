@@ -21,9 +21,8 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ed25519_dalek::SigningKey;
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event};
-use link_graph_service::models::_entities::audit_log;
+use link_graph_service::models::audit_log;
 use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use serial_test::serial;
 use sha2::{Digest, Sha256};
@@ -150,11 +149,12 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
         assert!(edges.iter().any(|e| e["kind"] == "subject_of"));
 
         // ...and that governed read was audited with the caller's sub.
-        let reads = audit_log::Entity::find()
-            .filter(audit_log::Column::Action.eq("read_edge"))
-            .all(&ctx.db)
+        let reads = audit_log::Model::all(&ctx.db)
             .await
-            .unwrap();
+            .unwrap()
+            .into_iter()
+            .filter(|row| row.action == "read_edge")
+            .collect::<Vec<_>>();
         assert_eq!(reads.len(), 1, "the surfaced subject_of read is audited");
         assert_eq!(reads[0].edge_kind.as_deref(), Some("subject_of"));
         assert_eq!(
@@ -180,11 +180,12 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
         assert!(!edges.iter().any(|e| e["kind"] == "subject_of"));
 
         // The concealed read added no further read_edge audit row.
-        let reads = audit_log::Entity::find()
-            .filter(audit_log::Column::Action.eq("read_edge"))
-            .all(&ctx.db)
+        let reads = audit_log::Model::all(&ctx.db)
             .await
-            .unwrap();
+            .unwrap()
+            .into_iter()
+            .filter(|row| row.action == "read_edge")
+            .collect::<Vec<_>>();
         assert_eq!(reads.len(), 1, "a concealed read audits nothing");
 
         // spec §11.4: the SAME governance holds on `/neighbors`, not only
@@ -228,11 +229,12 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
             affiliations.iter().any(|a| a["kind"] == "subject_of"),
             "case-reader's single-view sees the subject_of affiliation: {affiliations:?}"
         );
-        let single_view_reads = audit_log::Entity::find()
-            .filter(audit_log::Column::Action.eq("read_single_view"))
-            .all(&ctx.db)
+        let single_view_reads = audit_log::Model::all(&ctx.db)
             .await
-            .unwrap();
+            .unwrap()
+            .into_iter()
+            .filter(|row| row.action == "read_single_view")
+            .collect::<Vec<_>>();
         assert_eq!(
             single_view_reads.len(),
             1,
@@ -250,11 +252,12 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
             !affiliations.iter().any(|a| a["kind"] == "subject_of"),
             "non-case caller's single-view must not reveal subject_of: {affiliations:?}"
         );
-        let single_view_reads = audit_log::Entity::find()
-            .filter(audit_log::Column::Action.eq("read_single_view"))
-            .all(&ctx.db)
+        let single_view_reads = audit_log::Model::all(&ctx.db)
             .await
-            .unwrap();
+            .unwrap()
+            .into_iter()
+            .filter(|row| row.action == "read_single_view")
+            .collect::<Vec<_>>();
         assert_eq!(
             single_view_reads.len(),
             1,
@@ -307,12 +310,11 @@ async fn audited_address(
             )
             .await;
         response.assert_status_ok();
-        let row = audit_log::Entity::find()
-            .filter(audit_log::Column::Action.eq("read_edge"))
-            .filter(audit_log::Column::FromRef.eq(case.as_str()))
-            .one(&ctx.db)
+        let row = audit_log::Model::all(&ctx.db)
             .await
             .unwrap()
+            .into_iter()
+            .find(|row| row.action == "read_edge" && row.from_ref.as_deref() == Some(case.as_str()))
             .expect("the surfaced subject_of read is audited");
         *found.lock().unwrap() = row.user_ip.expect("the row records an address");
     })

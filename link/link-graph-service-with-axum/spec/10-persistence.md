@@ -1,9 +1,36 @@
 ## 10. Persistence
 
-PostgreSQL via SeaORM. The schema source of truth is the hand-written,
-numbered SQL under `migrations/` (`up.sql` / `down.sql` per step),
-bridged into the axa SeaORM `Migrator` (each Rust migration wraps the
-SQL pair via `include_str!`), consistent with the sibling service crates.
+PostgreSQL via **sqlx**, with no ORM (since 2026-11-07, §13 T-38;
+[`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5).
+**Every statement the service runs is in `src/models/`**, one module
+per table, as a `sqlx::query!` / `query_as!` / `query_scalar!` literal
+compile-checked against the committed `.sqlx/` (`SQLX_OFFLINE=true` in
+CI and the image; `scripts/ci-check.sh test-db` runs `cargo sqlx
+prepare --check` against the migrated schema). There is no dynamic
+SQL: no `QueryBuilder`, `raw_sql` or `AssertSqlSafe`, so this crate has
+no `ci/sql-allowlist.txt` entry. The optional filters of `neighbors`
+and `GET /api/edges` are static parameters, `($4::text IS NULL OR kind
+= $4)` and `(($2 AND from_ref = $1) OR ($3 AND to_ref = $1))` for the
+direction. The bounded `neighbors` traversal (§9.2) is a breadth-first
+walk in Rust over that one lookup, not a recursive CTE. `ctx.db` is
+axa's `sqlx::PgPool` (axa's `sqlx` feature). Every helper takes an
+`axa::sqlx::Db` (the pool, or a connection the caller holds), and
+`apply_event` runs all the statements of one event on one connection.
+
+The schema is the hand-written SQL under `migrations/`, seven
+reversible `<version>_<name>.up.sql` / `.down.sql` pairs (edges, entity
+presence, consumer offsets, audit log, the audit digests and MAC,
+processed events, suggestion runs), embedded by `sqlx::migrate!` and
+recorded in `_sqlx_migrations`. `db migrate | down [steps] | reset |
+status` run through `axa::sqlx`. Six of the pairs are the SQL the
+SeaORM `migration/` bridge already wrapped, moved unchanged; the
+seventh (`2026072800000001_add_audit_mac`) was SeaORM schema-builder
+Rust and is now written out from a `pg_dump` of what it built. A
+`pg_dump --schema-only` of a database migrated by the old code and one
+migrated by the new differs only in the bookkeeping table
+(`seaql_migrations` vs `_sqlx_migrations`), so a database the old code
+migrated must be recreated rather than migrated in place (there is no
+deployed data).
 
 All tables here hold a **derived read-model**; none is a system of
 record. The whole schema is reconstructable from a topic replay
@@ -117,15 +144,13 @@ it by sending the header. With `TRUSTED_PROXIES` unset, a service behind a proxy
 records the proxy's address. It is `NULL` on a bus-driven write, where no
 request exists.
 
-### 10.5 SeaORM time-type feature
+### 10.5 Time types
 
-Follow the prevailing family convention at scaffold time. The shared
-stack note ([rust-axum-stack.md](../../../agents/share/rust-axum-stack.md))
-prescribes `with-chrono` as the loco-service default; this new crate
-SHOULD adopt `with-chrono` from the start rather than inheriting the
-older `with-time` carry-over that the first-converted services are
-still reconciling (course-service spec §13 T-17). Recorded as OQ-5 (§16)
-in case a sibling-uniformity constraint forces otherwise.
+`chrono`, through sqlx's `chrono` feature (never its `time` feature:
+with both on, sqlx 0.9.0's macros warn on every timestamp column).
+Timestamps are `DateTime<FixedOffset>` and dates `NaiveDate`, read with
+`"col: _"` overrides, so the rows the graph endpoints serialize keep
+the JSON shape they had under SeaORM's `with-chrono` (OQ-5, resolved).
 
 ### 10.6 What is NOT persisted here
 

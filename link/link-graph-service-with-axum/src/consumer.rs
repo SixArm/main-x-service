@@ -46,7 +46,7 @@ use std::time::Duration;
 
 #[cfg(feature = "fluvio")]
 use entity_ref::EntityType;
-use sea_orm::DatabaseConnection;
+use sqlx::PgPool;
 
 #[cfg(feature = "fluvio")]
 use crate::events;
@@ -106,7 +106,7 @@ pub fn purge_interval_secs() -> u64 {
         clippy::needless_return
     )
 )]
-pub fn spawn(db: DatabaseConnection) {
+pub fn spawn(db: PgPool) {
     let Some(endpoint) = fluvio_endpoint() else {
         return;
     };
@@ -137,7 +137,7 @@ pub fn spawn(db: DatabaseConnection) {
 /// [`retention_days`] — a short-lived dedup window, not durable history
 /// (event-bus.md §3).
 #[cfg(feature = "fluvio")]
-async fn purge_loop(db: DatabaseConnection) {
+async fn purge_loop(db: PgPool) {
     let interval = purge_interval_secs();
     let retention = retention_days();
     loop {
@@ -161,7 +161,7 @@ const RECONNECT_BACKOFF_SECS: u64 = 5;
 /// retried after a backoff rather than propagated — this runs detached
 /// via [`tokio::spawn`], so there is no caller to propagate an error to.
 #[cfg(feature = "fluvio")]
-async fn run_topic_consumer(db: DatabaseConnection, endpoint: String, entity: EntityType) {
+async fn run_topic_consumer(db: PgPool, endpoint: String, entity: EntityType) {
     let topic = events::topic_for(entity.as_str());
     loop {
         if let Err(err) = consume_once(&db, &endpoint, &topic).await {
@@ -178,7 +178,7 @@ async fn run_topic_consumer(db: DatabaseConnection, endpoint: String, entity: En
 /// whole topic.
 #[cfg(feature = "fluvio")]
 async fn consume_once(
-    db: &DatabaseConnection,
+    db: &PgPool,
     endpoint: &str,
     topic: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

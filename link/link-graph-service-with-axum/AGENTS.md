@@ -48,9 +48,9 @@ reconciliation in `src/reconcile.rs`, offline PASETO auth in
 comparison/blocking; `job.rs` — the `reqwest`-backed fetch → block →
 score → POST pipeline against person/worker, LNK-4 T-29..33), OpenAPI/
 Swagger, and Prometheus `/metrics.prom`), and the
-`m20260709_000001_edges` … `_000004_audit_log`,
-`m20260803_000001_processed_events`, `m20260804_000001_suggestion_runs`
-migrations (the last backs `src/models/suggestion_runs.rs`, one durable
+`migrations/2026070900000001_edges` … `_000004_audit_log`,
+`2026072800000001_add_audit_mac`, `2026080300000001_processed_events`,
+`2026080400000001_suggestion_runs` (plain SQL run by `sqlx::migrate!`) (the last backs `src/models/suggestion_runs.rs`, one durable
 row per completed suggestion pass). The cross-service `same_identity`
 matcher round (LNK-4, T-29..33) is **complete** — see
 [`spec/13-tasks.md`](spec/13-tasks.md) and `spec/16-open-questions.md`
@@ -113,8 +113,23 @@ the shared design doc first, then the three above.
 
 - Family [Rust + axa stack](../../agents/share/rust-axum-stack.md):
   Rust 2024, Tokio, Axum + axa (backend-only — no Tera/HTMX/views),
-  SeaORM + PostgreSQL, Fluvio for the bus, tracing + OpenTelemetry,
-  MiMalloc on MUSL.
+  sqlx (no ORM) + PostgreSQL, Fluvio for the bus, tracing +
+  OpenTelemetry, MiMalloc on MUSL.
+- **All SQL in `src/models/`** (spec §10, §13 T-38). Every statement is
+  a `sqlx::query!` / `query_as!` / `query_scalar!` literal; never
+  `QueryBuilder`, `raw_sql` or `AssertSqlSafe` (the clippy stage
+  refuses them outside `ci/sql-allowlist.txt`). An optional filter is a
+  static parameter, `($1::text IS NULL OR col = $1)`. After changing a
+  query or a migration, run `cargo sqlx prepare -- --all-targets`
+  against a migrated database and commit `.sqlx/`; every build is
+  `SQLX_OFFLINE=true`. Helpers take an `axa::sqlx::Db` (the pool, or
+  `&mut *conn`); a helper that runs several statements takes one
+  connection and passes it on. The pool defaults to **one** connection
+  (`max_connections: 1`), so a function holding a connection must never
+  also ask the pool for another — it would wait on itself.
+- Migrations are plain SQL, `migrations/<version>_<name>.up.sql` /
+  `.down.sql`; `db migrate | down | reset | status` run through
+  `axa::sqlx`.
 - **OpenAPI is hand-written, not Utoipa-generated.** `src/openapi.rs`
   builds the `OpenAPI` 3 document by hand with `serde_json::json!` —
   there is no `utoipa` dependency in this crate's `Cargo.toml` and no
@@ -122,7 +137,7 @@ the shared design doc first, then the three above.
   (see the module doc comment): dependency-light and easier to keep
   accurate to the enveloped wire format than a derive macro would be.
 - **Podman not Docker. PostgreSQL not SQLite. Tokio not async_std.**
-- Prefer `with-chrono` for SeaORM time types on this new crate (OQ-5).
+- Time types are `chrono` through sqlx's `chrono` feature, never `time` (OQ-5, spec §10.5).
 - **`EntityRef` is a real Cargo `path` dependency, not copied.**
   `Cargo.toml` carries `entity-ref = { path = "../entity-ref-rust-crate"
   }`; this crate takes the `EntityType`/`EntityRef`/`EdgeKind` types from

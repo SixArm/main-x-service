@@ -1,15 +1,22 @@
 //! `consumer_offsets` model — per-topic bus position + freshness
 //! watermark (spec §10.3 / §6 FR-16/17).
 
-use axa::prelude::*;
+use axa::sqlx::Db;
 use chrono::{DateTime, FixedOffset};
-use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveValue, ConnectionTrait};
+use serde::{Deserialize, Serialize};
 
-pub use super::_entities::consumer_offsets::{self, ActiveModel, Column, Entity, Model};
+use super::ModelResult;
 
-/// Default `SeaORM` active-model behaviour — no custom hooks.
-impl ActiveModelBehavior for ActiveModel {}
+/// A persisted per-topic offset + freshness watermark row.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// The bus topic (`mxi.<entity>.events`).
+    pub topic: String,
+    /// The last committed bus offset for this topic.
+    pub offset_val: i64,
+    /// The `occurred_at` of the last consumed event on this topic.
+    pub last_occurred_at: DateTime<FixedOffset>,
+}
 
 impl Model {
     /// Record the latest position + freshness watermark for `topic`.
@@ -18,25 +25,25 @@ impl Model {
     /// # Errors
     ///
     /// When the upsert fails.
-    pub async fn record<C: ConnectionTrait>(
-        db: &C,
+    pub async fn record(
+        db: impl Into<Db<'_>>,
         topic: &str,
         offset: i64,
         occurred_at: DateTime<FixedOffset>,
     ) -> ModelResult<()> {
-        let am = consumer_offsets::ActiveModel {
-            topic: ActiveValue::set(topic.to_string()),
-            offset_val: ActiveValue::set(offset),
-            last_occurred_at: ActiveValue::set(occurred_at),
-        };
-        Entity::insert(am)
-            .on_conflict(
-                OnConflict::column(Column::Topic)
-                    .update_columns([Column::OffsetVal, Column::LastOccurredAt])
-                    .to_owned(),
-            )
-            .exec(db)
-            .await?;
+        let mut conn = db.into().acquire().await?;
+        sqlx::query!(
+            "INSERT INTO consumer_offsets (topic, offset_val, last_occurred_at)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (topic) DO UPDATE
+                 SET offset_val = excluded.offset_val,
+                     last_occurred_at = excluded.last_occurred_at",
+            topic,
+            offset,
+            occurred_at,
+        )
+        .execute(&mut *conn)
+        .await?;
         Ok(())
     }
 
@@ -45,10 +52,17 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn freshness<C: ConnectionTrait>(
-        db: &C,
+    pub async fn freshness(
+        db: impl Into<Db<'_>>,
     ) -> ModelResult<Vec<(String, DateTime<FixedOffset>)>> {
-        let rows = Entity::find().all(db).await?;
+        let mut conn = db.into().acquire().await?;
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT topic, offset_val, last_occurred_at AS "last_occurred_at: _"
+               FROM consumer_offsets"#,
+        )
+        .fetch_all(&mut *conn)
+        .await?;
         Ok(rows
             .into_iter()
             .map(|m| (m.topic, m.last_occurred_at))
@@ -62,9 +76,7 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn watermark<C: ConnectionTrait>(
-        db: &C,
-    ) -> ModelResult<Option<DateTime<FixedOffset>>> {
+    pub async fn watermark(db: impl Into<Db<'_>>) -> ModelResult<Option<DateTime<FixedOffset>>> {
         let latest = Self::freshness(db).await?.into_iter().map(|(_, t)| t).max();
         Ok(latest)
     }

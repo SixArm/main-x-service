@@ -12,8 +12,8 @@
 //! remains a separate, still-live path (spec §13 T-10).
 
 use axa::prelude::*;
+use axa::sqlx::Db;
 use chrono::{DateTime, FixedOffset, Utc};
-use sea_orm::ConnectionTrait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -134,7 +134,14 @@ pub fn entity_from_topic(topic: &str) -> &str {
 ///
 /// Propagates decode errors (malformed `linked`/`unlinked` payloads,
 /// unknown `edge_kind`) and any database error.
-pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Result<()> {
+pub async fn apply_event(db: impl Into<Db<'_>>, envelope: Envelope) -> Result<()> {
+    let mut conn = db.into().acquire().await?;
+    apply_event_on(&mut conn, envelope).await
+}
+
+/// [`apply_event`] on a connection the caller holds, so every statement
+/// of one event runs on one connection.
+async fn apply_event_on(conn: &mut sqlx::PgConnection, envelope: Envelope) -> Result<()> {
     let occurred_at = envelope
         .occurred_at
         .unwrap_or_else(|| Utc::now().fixed_offset());
@@ -145,9 +152,9 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
         "created" | "deleted" => {
             if let Some(r) = presence_ref(&envelope) {
                 let alive = envelope.kind == "created";
-                entity_presence::Model::mark(db, &r, alive, seq).await?;
+                entity_presence::Model::mark(&mut *conn, &r, alive, seq).await?;
                 // FR-10: a presence flip may change incident edge status.
-                edges::Model::recompute_status_for(db, &r).await?;
+                edges::Model::recompute_status_for(&mut *conn, &r).await?;
             } else {
                 tracing::warn!(entity = %envelope.entity, "unknown entity token; presence skipped");
             }
@@ -155,12 +162,12 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
         "linked" => {
             let ev: LinkedEvent = serde_json::from_value(envelope.data.clone())?;
             let source_event_id = envelope.event_id.unwrap_or(ev.edge_id);
-            edges::Model::apply_linked(db, &ev, source_event_id, occurred_at).await?;
+            edges::Model::apply_linked(&mut *conn, &ev, source_event_id, occurred_at).await?;
             // Governed (case↔person) links are audited on write too, with
             // no actor (bus-driven) — design §10.
             if crate::auth::is_governed(ev.edge_kind) {
                 crate::models::audit_log::Model::record(
-                    db,
+                    &mut *conn,
                     &crate::models::audit_log::AuditContext::default(),
                     "apply_linked",
                     ev.edge_kind.as_str(),
@@ -172,7 +179,7 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
         }
         "unlinked" => {
             let ev: UnlinkedEvent = serde_json::from_value(envelope.data.clone())?;
-            edges::Model::apply_unlinked(db, ev.edge_id).await?;
+            edges::Model::apply_unlinked(&mut *conn, ev.edge_id).await?;
         }
         "merged" => {
             // Merge-repointing (spec §13 T-9 / design §5.3): the survivor
@@ -182,11 +189,12 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
                 let ev: MergedEvent = serde_json::from_value(envelope.data.clone())?;
                 let merged_from = EntityRef::new(survivor.entity_type, ev.merged_from);
                 // The duplicate is retired; record it and move its edges.
-                entity_presence::Model::mark(db, &merged_from, false, seq).await?;
-                let repointed = edges::Model::repoint_all(db, &merged_from, &survivor).await?;
+                entity_presence::Model::mark(&mut *conn, &merged_from, false, seq).await?;
+                let repointed =
+                    edges::Model::repoint_all(&mut *conn, &merged_from, &survivor).await?;
                 // The survivor is alive; edges now pointing at it may leave
                 // `dangling` for `verified`/`unverified`.
-                edges::Model::recompute_status_for(db, &survivor).await?;
+                edges::Model::recompute_status_for(&mut *conn, &survivor).await?;
                 tracing::debug!(%survivor, %merged_from, repointed, "merge repointed edges");
             } else {
                 tracing::warn!(entity = %envelope.entity, "merged: unknown entity token; skipped");
@@ -198,7 +206,7 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
     }
 
     let topic = topic_for(&envelope.entity);
-    consumer_offsets::Model::record(db, &topic, seq, occurred_at).await?;
+    consumer_offsets::Model::record(&mut *conn, &topic, seq, occurred_at).await?;
     Ok(())
 }
 
@@ -224,16 +232,17 @@ pub async fn apply_event<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Resu
 ///
 /// Propagates [`apply_event`]'s errors, plus any `processed_events`
 /// query/insert failure.
-pub async fn apply_event_idempotent<C: ConnectionTrait>(db: &C, envelope: Envelope) -> Result<()> {
+pub async fn apply_event_idempotent(db: impl Into<Db<'_>>, envelope: Envelope) -> Result<()> {
+    let mut conn = db.into().acquire().await?;
     let Some(event_id) = envelope.event_id else {
-        return apply_event(db, envelope).await;
+        return apply_event_on(&mut conn, envelope).await;
     };
-    if processed_events::Model::is_processed(db, event_id).await? {
+    if processed_events::Model::is_processed(&mut *conn, event_id).await? {
         tracing::trace!(%event_id, "duplicate event skipped (already processed)");
         return Ok(());
     }
-    apply_event(db, envelope).await?;
-    processed_events::Model::mark_processed(db, event_id).await?;
+    apply_event_on(&mut conn, envelope).await?;
+    processed_events::Model::mark_processed(&mut *conn, event_id).await?;
     Ok(())
 }
 

@@ -14,17 +14,16 @@
 use std::collections::HashSet;
 
 use async_trait::async_trait;
-use axa::prelude::*;
 use chrono::Utc;
-use sea_orm::{ConnectionTrait, DatabaseConnection};
 use serde::Deserialize;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use entity_ref::EntityType;
 
 use crate::events::LinkedEvent;
 use crate::metrics::Metrics;
-use crate::models::edges;
+use crate::models::{ModelError, ModelResult, edges};
 
 /// A source of a service's **authoritative** outbound edges (its
 /// `entity_links`), for reconciliation. Each edge is described by the same
@@ -101,9 +100,8 @@ pub fn diff<H: std::hash::BuildHasher>(
 /// # Errors
 ///
 /// When the fetch, a read-model query, or a repair write fails.
-pub async fn reconcile<C, S>(db: &C, source: &S) -> ModelResult<usize>
+pub async fn reconcile<S>(db: &PgPool, source: &S) -> ModelResult<usize>
 where
-    C: ConnectionTrait,
     S: AuthoritativeSource + ?Sized,
 {
     let authoritative = source.fetch_all().await?;
@@ -277,7 +275,7 @@ impl AuthoritativeSource for HttpAuthoritativeSource {
 /// `LINK_GRAPH_RECONCILE_SECS` (default 300); the first tick is skipped so
 /// boot is not blocked. A failed pass is logged and retried next tick.
 /// Spawned from `App::after_routes` only when a source is configured.
-pub async fn run_periodic<S: AuthoritativeSource>(db: DatabaseConnection, source: S) {
+pub async fn run_periodic<S: AuthoritativeSource>(db: PgPool, source: S) {
     let secs = std::env::var("LINK_GRAPH_RECONCILE_SECS")
         .ok()
         .and_then(|v| v.trim().parse::<u64>().ok())

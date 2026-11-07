@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM edges",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "6b1b8f76eb3e1bad8b686a052070fcd87c180b7567c2a652ee5757ba4f95940a"
+}

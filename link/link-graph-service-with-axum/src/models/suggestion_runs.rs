@@ -17,14 +17,40 @@
 //! case — there are no counts worth keeping from a run that never
 //! fetched anything.
 
-use axa::prelude::*;
-use sea_orm::{ActiveValue, ConnectionTrait};
+use axa::sqlx::Db;
+use chrono::{DateTime, FixedOffset};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-pub use super::_entities::suggestion_runs::{self, ActiveModel, Entity, Model};
+use super::ModelResult;
 
-/// Default `SeaORM` active-model behaviour — no custom hooks.
-impl ActiveModelBehavior for ActiveModel {}
+/// One completed suggestion-job pass.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row id (UUID v4, generated at record time).
+    pub id: Uuid,
+    /// When this pass started (before the fetch).
+    pub started_at: DateTime<FixedOffset>,
+    /// When this pass finished (after the last POST attempt).
+    pub completed_at: DateTime<FixedOffset>,
+    /// Persons fetched this pass.
+    pub persons_fetched: i64,
+    /// Workers fetched this pass.
+    pub workers_fetched: i64,
+    /// Candidates `generate_candidates_bounded` returned.
+    pub candidates: i64,
+    /// Candidates successfully `POSTed`.
+    pub posted: i64,
+    /// Candidates whose POST failed.
+    pub failed: i64,
+    /// Candidates dropped by the `max_edges_per_run` cap.
+    pub dropped: i64,
+    /// The `LINK_GRAPH_SUGGEST_MAX_CANDIDATES` value this pass ran with.
+    pub max_candidates: i64,
+    /// The `LINK_GRAPH_SUGGEST_MAX_EDGES_PER_RUN` value this pass ran with.
+    pub max_edges_per_run: i64,
+}
 
 /// The counts to persist for one completed pass. A separate type from
 /// [`crate::suggest::job::SuggestionRunStats`] (rather than taking that
@@ -69,22 +95,48 @@ impl Model {
     /// # Errors
     ///
     /// When the insert fails.
-    pub async fn record<C: ConnectionTrait>(db: &C, rec: &SuggestionRunRecord) -> ModelResult<()> {
-        let am = suggestion_runs::ActiveModel {
-            id: ActiveValue::set(Uuid::new_v4()),
-            started_at: ActiveValue::set(rec.started_at),
-            completed_at: ActiveValue::set(chrono::Utc::now().fixed_offset()),
-            persons_fetched: ActiveValue::set(to_i64(rec.persons_fetched)),
-            workers_fetched: ActiveValue::set(to_i64(rec.workers_fetched)),
-            candidates: ActiveValue::set(to_i64(rec.candidates)),
-            posted: ActiveValue::set(to_i64(rec.posted)),
-            failed: ActiveValue::set(to_i64(rec.failed)),
-            dropped: ActiveValue::set(to_i64(rec.dropped)),
-            max_candidates: ActiveValue::set(to_i64(rec.max_candidates)),
-            max_edges_per_run: ActiveValue::set(to_i64(rec.max_edges_per_run)),
-        };
-        Entity::insert(am).exec(db).await?;
+    pub async fn record(db: impl Into<Db<'_>>, rec: &SuggestionRunRecord) -> ModelResult<()> {
+        let mut conn = db.into().acquire().await?;
+        let completed_at: DateTime<FixedOffset> = chrono::Utc::now().fixed_offset();
+        sqlx::query!(
+            "INSERT INTO suggestion_runs
+                 (id, started_at, completed_at, persons_fetched, workers_fetched,
+                  candidates, posted, failed, dropped, max_candidates, max_edges_per_run)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+            Uuid::new_v4(),
+            rec.started_at,
+            completed_at,
+            to_i64(rec.persons_fetched),
+            to_i64(rec.workers_fetched),
+            to_i64(rec.candidates),
+            to_i64(rec.posted),
+            to_i64(rec.failed),
+            to_i64(rec.dropped),
+            to_i64(rec.max_candidates),
+            to_i64(rec.max_edges_per_run),
+        )
+        .execute(&mut *conn)
+        .await?;
         Ok(())
+    }
+
+    /// Every recorded pass, in no particular order (the order the
+    /// `SeaORM` `find().all()` gave).
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn all(db: &PgPool) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT id, started_at AS "started_at: _", completed_at AS "completed_at: _",
+                      persons_fetched, workers_fetched, candidates, posted, failed,
+                      dropped, max_candidates, max_edges_per_run
+               FROM suggestion_runs"#,
+        )
+        .fetch_all(db)
+        .await?;
+        Ok(rows)
     }
 }
 

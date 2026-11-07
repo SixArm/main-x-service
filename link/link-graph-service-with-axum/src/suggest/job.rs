@@ -153,11 +153,10 @@
 //! `run_periodic`'s existing log-and-retry posture for that case.
 
 use async_trait::async_trait;
-use axa::prelude::*;
 use chrono::{NaiveDate, Utc};
 use entity_ref::{EntityRef, EntityType};
-use sea_orm::DatabaseConnection;
 use serde::Deserialize;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::{
@@ -165,6 +164,7 @@ use super::{
     generate_candidates_bounded,
 };
 use crate::models::suggestion_runs::SuggestionRunRecord;
+use crate::models::{ModelError, ModelResult};
 
 /// A source of one entity's identity data, for the suggestion pass.
 /// Injectable so the fetch→block→compare→post pipeline is testable without
@@ -683,7 +683,7 @@ fn max_edges_per_run_from_env() -> usize {
 /// doc's "Audit" section) — this job's actual work is HTTP client traffic
 /// between two peers, not a read-model repair, so `db` is otherwise
 /// untouched.
-pub async fn run_periodic<P, W, S>(persons: P, workers: W, sink: S, db: DatabaseConnection)
+pub async fn run_periodic<P, W, S>(persons: P, workers: W, sink: S, db: PgPool)
 where
     P: IdentitySource,
     W: IdentitySource,

@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT topic, offset_val, last_occurred_at AS \"last_occurred_at: _\"\n               FROM consumer_offsets",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "topic",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "consumer_offsets",
+            "name": "topic"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "offset_val",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "consumer_offsets",
+            "name": "offset_val"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "last_occurred_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "consumer_offsets",
+            "name": "last_occurred_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "35df9ecd73fdefbfce19cfe12dd44391fc14428e4d0efb62f06b05a5fbf6a127"
+}

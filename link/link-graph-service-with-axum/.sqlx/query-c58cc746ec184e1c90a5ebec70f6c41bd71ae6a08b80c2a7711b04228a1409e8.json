@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO suggestion_runs\n                 (id, started_at, completed_at, persons_fetched, workers_fetched,\n                  candidates, posted, failed, dropped, max_candidates, max_edges_per_run)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c58cc746ec184e1c90a5ebec70f6c41bd71ae6a08b80c2a7711b04228a1409e8"
+}

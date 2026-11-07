@@ -5,16 +5,22 @@
 //! read-model and calls [`Model::mark_processed`] after a successful
 //! apply.
 
-use axa::prelude::*;
-use chrono::Utc;
-use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveValue, ConnectionTrait, EntityTrait};
+use axa::sqlx::Db;
+use chrono::{DateTime, FixedOffset, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub use super::_entities::processed_events::{self, ActiveModel, Column, Entity, Model};
+use super::ModelResult;
 
-/// Default `SeaORM` active-model behaviour — no custom hooks.
-impl ActiveModelBehavior for ActiveModel {}
+/// A recorded envelope `event_id` that has already been applied to the
+/// read-model.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// The envelope `event_id` — the idempotency key.
+    pub event_id: Uuid,
+    /// When this event was recorded as processed.
+    pub processed_at: DateTime<FixedOffset>,
+}
 
 impl Model {
     /// Whether `event_id` has already been applied to the read-model.
@@ -22,8 +28,15 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn is_processed<C: ConnectionTrait>(db: &C, event_id: Uuid) -> ModelResult<bool> {
-        Ok(Entity::find_by_id(event_id).one(db).await?.is_some())
+    pub async fn is_processed(db: impl Into<Db<'_>>, event_id: Uuid) -> ModelResult<bool> {
+        let mut conn = db.into().acquire().await?;
+        let found = sqlx::query_scalar!(
+            "SELECT event_id FROM processed_events WHERE event_id = $1",
+            event_id,
+        )
+        .fetch_optional(&mut *conn)
+        .await?;
+        Ok(found.is_some())
     }
 
     /// Record `event_id` as processed. Idempotent on the primary key — a
@@ -35,15 +48,18 @@ impl Model {
     /// # Errors
     ///
     /// When the insert fails.
-    pub async fn mark_processed<C: ConnectionTrait>(db: &C, event_id: Uuid) -> ModelResult<()> {
-        let am = processed_events::ActiveModel {
-            event_id: ActiveValue::set(event_id),
-            processed_at: ActiveValue::set(Utc::now().fixed_offset()),
-        };
-        Entity::insert(am)
-            .on_conflict(OnConflict::column(Column::EventId).do_nothing().to_owned())
-            .exec(db)
-            .await?;
+    pub async fn mark_processed(db: impl Into<Db<'_>>, event_id: Uuid) -> ModelResult<()> {
+        let mut conn = db.into().acquire().await?;
+        let processed_at: DateTime<FixedOffset> = Utc::now().fixed_offset();
+        sqlx::query!(
+            "INSERT INTO processed_events (event_id, processed_at)
+             VALUES ($1, $2)
+             ON CONFLICT (event_id) DO NOTHING",
+            event_id,
+            processed_at,
+        )
+        .execute(&mut *conn)
+        .await?;
         Ok(())
     }
 
@@ -55,17 +71,17 @@ impl Model {
     /// # Errors
     ///
     /// When the delete query fails.
-    pub async fn purge_older_than<C: ConnectionTrait>(
-        db: &C,
-        retention_days: i64,
-    ) -> ModelResult<u64> {
-        use sea_orm::{ColumnTrait, QueryFilter};
+    pub async fn purge_older_than(db: impl Into<Db<'_>>, retention_days: i64) -> ModelResult<u64> {
+        let mut conn = db.into().acquire().await?;
         let cutoff =
             Utc::now() - chrono::Duration::try_days(retention_days.max(0)).unwrap_or_default();
-        let res = Entity::delete_many()
-            .filter(Column::ProcessedAt.lt(cutoff.fixed_offset()))
-            .exec(db)
-            .await?;
-        Ok(res.rows_affected)
+        let cutoff: DateTime<FixedOffset> = cutoff.fixed_offset();
+        let res = sqlx::query!(
+            "DELETE FROM processed_events WHERE processed_at < $1",
+            cutoff,
+        )
+        .execute(&mut *conn)
+        .await?;
+        Ok(res.rows_affected())
     }
 }

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT ref AS entity_ref, alive, last_seq\n               FROM entity_presence\n               WHERE ref = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_presence",
+            "name": "ref"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "alive",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "entity_presence",
+            "name": "alive"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "last_seq",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "entity_presence",
+            "name": "last_seq"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8f7ef0b178a623589dbe170631f6a61a0309663b1db6b605b56931667aedf275"
+}

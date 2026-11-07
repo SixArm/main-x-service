@@ -48,8 +48,8 @@
 //! ```
 
 use async_trait::async_trait;
-use axa::prelude::ModelResult;
 use entity_ref::{EntityRef, EntityType};
+use link_graph_service::models::ModelResult;
 use link_graph_service::suggest::job::{
     DEFAULT_MAX_EDGES_PER_RUN, HttpIdentitySource, HttpSuggestionSink, IdentitySource,
     run_suggestion_pass,

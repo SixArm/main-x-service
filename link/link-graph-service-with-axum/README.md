@@ -23,7 +23,7 @@ different services**: person *is the same human as* worker, person
 
 ## What it is
 
-- A **axa** backend service (Rust, Axum, SeaORM, PostgreSQL) on the
+- A **axa** backend service (Rust, Axum, sqlx, PostgreSQL) on the
   family [Rust + axa stack](../../agents/share/rust-axum-stack.md).
 - **Read-only to the world.** It exposes no write endpoints of its own;
   every change to *its own* state arrives as a consumed bus event
