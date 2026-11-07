@@ -983,6 +983,10 @@ async fn api_responses_carry_the_accepts_version_header() {
             )
             .await;
         assert_eq!(unsupported.status_code(), 406);
+        // The refusal is an RFC 9457 problem naming what is served.
+        let problem: serde_json::Value = unsupported.json();
+        assert_eq!(problem["code"], "unsupported_api_version");
+        assert_eq!(problem["supported"], serde_json::json!(["1.0"]));
 
         // A non-API path (the published key set) is exempt — no header.
         let keys = request.get("/.well-known/paseto-keys").await;

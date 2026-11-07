@@ -216,9 +216,10 @@ search `q`, invalid audit pid).
 selects the representation version with the `Accepts-version` request
 header (default `1.0` when omitted), per
 [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
-`src/version.rs` (`resolve_version`, pure/unit-tested) is layered as
-`require_version_mw` in `App::after_routes` alongside the auth guard: an
-explicit but unsupported version is `406 Not Acceptable`; a supported (or
+`axa::versioning::require_version_mw` (axa's `versioning` feature) is
+layered in `App::after_routes` alongside the auth guard: an explicit but
+unsupported version is a `406 Not Acceptable` problem with `code`
+`unsupported_api_version`; a supported (or
 omitted) one is stamped back onto the response as `Accepts-version`. A
 bare major (`1`) aliases its current minor (`1.0`). Copied from the
 event-service reference implementation (§13).

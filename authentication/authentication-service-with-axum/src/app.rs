@@ -61,7 +61,7 @@ impl App {
     /// Never returns an error today; the signature is axa's.
     pub fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
         Ok(router.layer(axum::middleware::from_fn(
-            crate::version::require_version_mw,
+            axa::versioning::require_version_mw,
         )))
     }
 

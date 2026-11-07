@@ -176,7 +176,7 @@ impl App {
             "Worker Service API",
         ));
         let router = auth::apply_enforcement(router, auth::require_auth_from_env()).layer(
-            axum::middleware::from_fn(crate::api::rest::version::require_version_mw),
+            axum::middleware::from_fn(axa::versioning::require_version_mw),
         );
         // Outermost of these, so the metric and `traceparent` cover
         // versioning and the auth guard too: a 401 or 403 is measured.

@@ -10,6 +10,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Changed
 
+- API version negotiation comes from `axa::versioning` (axa's `versioning`
+  feature). The crate's own version module is gone; it behaved the same,
+  serving only `1.0` on `/api` paths. **An unsupported `Accepts-version`
+  is now an RFC 9457 problem**, with `code` `unsupported_api_version` and
+  `requested` and `supported` as members, where it was a plain JSON
+  `{error, requested, supported}`.
+
+### Changed
+
 - **OTLP export comes from `axa::opentelemetry`** (axa's `opentelemetry`
   feature). `src/observability.rs` and its direct `opentelemetry*` and
   `tracing-opentelemetry` dependencies are gone, as is

@@ -22,8 +22,6 @@ pub mod links;
 pub mod routes;
 /// Shared [`AppState`] carried by every handler.
 pub mod state;
-/// Header-based API versioning (`Accepts-version`) middleware + helper.
-pub mod version;
 
 pub use state::AppState;
 

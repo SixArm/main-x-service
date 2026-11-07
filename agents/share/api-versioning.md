@@ -78,30 +78,31 @@ Accepts-version present & supported  → serve that version
 Accepts-version present & unsupported→ 406 Not Acceptable
 ```
 
-- `406` body names the requested and supported versions (JSON on the
-  native API; a FHIR `OperationOutcome` is **not** used here — this is the
-  native surface).
+- The `406` is an RFC 9457 problem, `application/problem+json`, with
+  `code` `unsupported_api_version` and `requested` and `supported` as
+  extension members (a FHIR `OperationOutcome` is **not** used here — this
+  is the native surface).
 - Safe and unsafe methods alike are negotiated; the header is orthogonal
   to auth (§5) and to the action/ABAC derivation.
 
 ## 4. Where it lives (implementation shape)
 
-A small, pure helper + a thin edge:
+In axa: `axa::versioning`, axa's `versioning` feature (the `axa-versioning`
+crate), since 2026-11-07. Each service layered its own copy of this until
+then, in `src/version.rs` or `src/api/rest/version.rs`; the eleven copies
+were identical in behaviour and are gone.
 
-- **Pure core** (unit-testable, no I/O): `resolve_version(header:
-  Option<&str>) -> Result<&'static str /*resolved*/, /*unsupported*/>`
-  over `SUPPORTED_API_VERSIONS` / `CURRENT_API_VERSION`. Trims, lowercases
-  the compare, applies the bare-major alias.
-- **Edge**: a middleware layered on the API router that runs
-  `resolve_version` on `Accepts-version`, returns `406` on the error, and
-  on success sets the `Accepts-version` response header. It is orthogonal
-  to the auth guard and may be composed in the same layer stack.
-- **Controller-style services** put the helper in `src/version.rs` and layer
-  the middleware in `app.rs` (next to the auth layer). **api/rest-layout
-  services** (event, worker, …) put it beside `src/api/rest/auth.rs` and
-  layer it in `after_routes`, exactly like the auth middleware.
-- The version middleware is **additive and near-noop**: with no header and
-  one supported version, it only stamps the response header.
+- **Pure core:** `axa::versioning::resolve_version(Option<&str>)` over
+  `SUPPORTED_API_VERSIONS` / `CURRENT_API_VERSION`. It trims, compares
+  without regard to case, and applies the bare-major alias.
+  `ApiVersions::new` serves a different set, with `negotiate_versions`.
+- **Edge:** `axa::versioning::require_version_mw`, layered in each
+  service's `after_routes` next to the auth guard and inside
+  `axa::middleware::apply`. It versions only `/api` paths, answers `406`
+  on an unsupported request, and otherwise stamps `Accepts-version` on the
+  response.
+- The middleware is **additive and near-noop**: with no header and one
+  supported version, it only stamps the response header.
 
 ## 5. Relationship to auth & FHIR
 

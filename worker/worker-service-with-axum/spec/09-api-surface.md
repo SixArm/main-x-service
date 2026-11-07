@@ -6,7 +6,8 @@ API URLs are version-free (`/api/workers`, not `/api/v1/workers`);
 clients select the representation version with the `Accepts-version`
 request header (default `1.0`) — see
 [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
-Implemented by `src/api/rest/version.rs` (`require_version_mw`).
+Implemented by `axa::versioning::require_version_mw` (axa's `versioning`
+feature); an unsupported version is a `406` problem.
 
 | Tier | Surface |
 |---|---|

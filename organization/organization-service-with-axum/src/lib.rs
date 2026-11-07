@@ -57,5 +57,3 @@ pub mod streaming;
 pub mod tasks;
 /// Field-level validation for incoming `Organization` payloads (→ `422`).
 pub mod validation;
-/// Header-based API versioning (`Accepts-version`) for the REST surface.
-pub mod version;

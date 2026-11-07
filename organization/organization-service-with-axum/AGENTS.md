@@ -169,8 +169,6 @@ changed. See
 src/
 ├── app.rs                 `App` functions (routes, truncate)
 ├── bin/main.rs            axa CLI entrypoint
-├── version.rs              header-based API versioning (`Accepts-version`,
-│                           `require_version_mw`, layered in `after_routes`)
 ├── auth.rs                 offline PASETO v4.public verify + ABAC; AU-2's
 │                           `ReloadableVerifier`/`ReloadablePolicy`,
 │                           `spawn_key_refresh`, `spawn_policy_watcher`

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- API version negotiation comes from `axa::versioning` (axa's `versioning`
+  feature). The crate's own version module is gone; it behaved the same,
+  serving only `1.0` on `/api` paths. **An unsupported `Accepts-version`
+  is now an RFC 9457 problem**, with `code` `unsupported_api_version` and
+  `requested` and `supported` as members, where it was a plain JSON
+  `{error, requested, supported}`.
+
+### Changed
+
 - axa 0.6.1. Every error axa answers is an RFC 9457 problem,
   `application/problem+json`, with `code` in place of `error` and `detail` in
   place of `description`. Axum's own refusals, such as an unknown route's `404`,

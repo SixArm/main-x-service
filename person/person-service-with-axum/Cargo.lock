@@ -968,6 +968,7 @@ dependencies = [
  "axa-opentelemetry",
  "axa-problem",
  "axa-seaorm",
+ "axa-versioning",
  "axum",
  "axum-test",
  "clap",
@@ -1043,6 +1044,17 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "validator",
+]
+
+[[package]]
+name = "axa-versioning"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a8563073e050b7a0045eec0e9b27103bbb4c69f5ae58889cb58bb6eaf12cca5"
+dependencies = [
+ "axa-problem",
+ "axum",
+ "serde_json",
 ]
 
 [[package]]

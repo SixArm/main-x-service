@@ -102,6 +102,4 @@ pub mod validation;
 /// coverage Pareto plus per-position duration quantiles (spec
 /// `13-tasks.md` T-14c). Pure, DB-free.
 pub mod variants;
-/// Header-based API versioning (`Accepts-version`) for the REST surface.
-pub mod version;
 pub mod workers;

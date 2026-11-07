@@ -12,8 +12,6 @@ pub mod auth;
 pub mod fhir;
 pub mod handlers;
 pub mod state;
-/// Header-based API versioning (`Accepts-version`) middleware + helper.
-pub mod version;
 
 pub use fhir::fhir_routes;
 pub use state::AppState;

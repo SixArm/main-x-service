@@ -39,5 +39,3 @@ pub mod openapi;
 pub mod streaming;
 pub mod tasks;
 pub mod validation;
-/// Header-based API versioning (`Accepts-version`) for the REST surface.
-pub mod version;

@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- API version negotiation comes from `axa::versioning` (axa's `versioning`
+  feature). The crate's own version module is gone; it behaved the same,
+  serving only `1.0` on `/api` paths. **An unsupported `Accepts-version`
+  is now an RFC 9457 problem**, with `code` `unsupported_api_version` and
+  `requested` and `supported` as members, where it was a plain JSON
+  `{error, requested, supported}`.
+
 - **Breaking: responses are bare JSON, and errors are RFC 9457 problems.**
   The `{success, data, error}` `ApiResponse` envelope is gone: a success is
   the payload itself, and an error is `application/problem+json` with

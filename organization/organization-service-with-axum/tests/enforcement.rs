@@ -159,6 +159,14 @@ async fn enforcement_on_gates_the_real_router() {
             "a version refusal has a request id"
         );
         assert_eq!(
+            unsupported.header("content-type"),
+            "application/problem+json"
+        );
+        let problem: Value = unsupported.json();
+        assert_eq!(problem["code"], "unsupported_api_version");
+        assert_eq!(problem["requested"], "99.0");
+        assert_eq!(problem["supported"], json!(["1.0"]));
+        assert_eq!(
             request
                 .post("/api/organizations")
                 .json(&organization_body())

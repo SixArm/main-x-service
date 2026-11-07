@@ -35,7 +35,6 @@ run it for the live count).
 | `api::rest::auth` (`src/api/rest/auth.rs`, T-15/AU-2) | 25 | Bearer parsing (missing / non-bearer / tampered / expired header → 401); the full ABAC matrix (empty attrs read-only, `access=write`, `access=admin`, `svc=true`, first-match deny, 401-vs-403 distinction); `derive_action` per-method + destructive-suffix routing; enforce on/off across public, FHIR, and out-of-prefix paths; boot-time verifier fetch success/fallback |
 | `api::rest::state` (`src/api/rest/state.rs`) | 2 | An empty verifier builds with zero keys; `env_or` falls back when unset |
 | `api::rest::fhir` (`src/api/rest/fhir.rs`, T-20) | 2 | The FHIR routes mount under `/fhir`; the `CapabilityStatement` matches the mounted routes and is labelled non-standard |
-| `api::rest::version` (`src/api/rest/version.rs`, T-25) | 5 | No header resolves to the current version; a bare major aliases its current minor; exact + case-insensitive matches; only `/api` paths are versioned; an unsupported version is an error |
 
 ### Bridge tests
 

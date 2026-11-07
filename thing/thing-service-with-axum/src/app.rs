@@ -149,7 +149,7 @@ impl App {
                 crate::api::rest::auth::require_auth_mw,
             ))
             .layer(axum::middleware::from_fn(
-                crate::api::rest::version::require_version_mw,
+                axa::versioning::require_version_mw,
             ));
         // Outermost of these, so the metric and `traceparent` cover
         // versioning and the auth guard too: a 401 or 403 is measured.

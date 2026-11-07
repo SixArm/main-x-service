@@ -15,7 +15,7 @@ src/
 ├── api/
 │   ├── mod.rs               # ok, ApiProblem
 │   └── rest/                # controllers: handlers + courses_routes() + ApiDoc + AppState
-│                             #   + auth.rs (T-15) + version.rs (T-25) + fhir.rs (T-20 controller)
+│                             #   + auth.rs (T-15) + fhir.rs (T-20 controller)
 ├── models/                  # Course, CourseInstance, Provider, identifier, …
 ├── db/                      # SeaORM entities + repository trait + audit + outbox (T-21)
 ├── matching/                # service-side adapter onto course_matcher::MatchingEngine

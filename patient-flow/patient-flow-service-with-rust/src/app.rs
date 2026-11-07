@@ -79,7 +79,7 @@ impl App {
         Ok(router
             .layer(axum::middleware::from_fn(require_auth_mw))
             .layer(axum::middleware::from_fn(
-                crate::version::require_version_mw,
+                axa::versioning::require_version_mw,
             )))
     }
 

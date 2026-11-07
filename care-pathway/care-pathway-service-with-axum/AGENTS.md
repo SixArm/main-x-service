@@ -460,7 +460,6 @@ src/
 │   └── journeys_seed.rs      T-14m: `journeys:seed` — persists what src/data/journeys.rs generates
 ├── metrics.rs             process-wide Prometheus registry (CRUD/merge counters + http_requests_total)
 ├── auth.rs                offline PASETO v4.public verification (AuthUser/MaybeAuthUser) + ABAC, both reloadable (ReloadableVerifier/ReloadablePolicy — AU-2 key/policy hot-reload)
-├── version.rs             `Accepts-version` header negotiation middleware (agents/share/api-versioning.md)
 ├── instances.rs            pure instance lifecycle state machine (active↔on_hold→terminal) + T-14j stalled-journey detection (ACTIVITY_SOURCES/LastActivity/last_activity()/is_stalled())
 ├── analytics.rs            T-14a event_log/journey_features codecs (anchors_delays column wired by T-14d, conformance column wired by T-14i) + T-14b directly-follows process map, pure, DB-free
 ├── data/

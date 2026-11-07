@@ -166,7 +166,6 @@ person records — see `examples/data/case-subject-links.md`.
 src/
 ├── app.rs                 `App` functions (routes, truncate, spawns the outbox relay)
 ├── bin/main.rs            axa CLI entrypoint
-├── version.rs             Accepts-version header negotiation (api-versioning.md)
 ├── controllers/cases.rs   CRUD + match + check-duplicates + deduplicate + review-queue + merge + audit/events/verify + erase + whoami
 ├── controllers/links.rs   cross-service `subject_of` edges (§8.6): create/list/delete + bulk pull
 ├── controllers/fhir.rs    FHIR R5 `Task` CRUD + search + CapabilityStatement

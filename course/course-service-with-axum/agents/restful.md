@@ -11,8 +11,9 @@ assumes this base path.
 API URLs are version-free; select the version with the `Accepts-version`
 header (default `1.0`), stamped back on the response — see
 [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
-Implemented by `version::require_version_mw` (`src/api/rest/version.rs`),
-layered in `App::after_routes`.
+Implemented by `axa::versioning::require_version_mw` (axa's `versioning`
+feature), layered in `App::after_routes`. An unsupported version is a
+`406` problem with `code` `unsupported_api_version`.
 
 ## Library API
 
