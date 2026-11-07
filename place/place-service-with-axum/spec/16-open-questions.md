@@ -8,7 +8,7 @@
   the "validation rejects on insert" claim was aspirational until now —
   `validate_place` rejects a direct self-reference
   (`contained_in_place == Some(place.id)`) and
-  `SeaOrmPlaceRepository::create`/`update` walk the ancestor chain
+  `PgPlaceRepository::create`/`update` walk the ancestor chain
   (`ancestor_chain_contains`) to reject a multi-hop cycle (A contains
   B, then B is made to contain A), returning `409 Conflict`. Since a
   place has at most **one** `contained_in_place`, the hierarchy is a

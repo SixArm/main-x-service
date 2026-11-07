@@ -1,0 +1,388 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, alternate_name, description, place_type, place_type_custom,\n                address_street_address, address_locality, address_region,\n                address_country, address_postal_code,\n                geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,\n                geo_elevation_as_decimal_metres,\n                telephone, fax_number, url, global_location_number, branch_code,\n                contained_in_place, is_accessible_for_free, public_access,\n                smoking_allowed, maximum_attendee_capacity, is_deleted,\n                content_hash, content_hash_sha3, content_mac,\n                deleted_at, created_at, updated_at\n         FROM places\n         ORDER BY updated_at DESC\n         LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "alternate_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "alternate_name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "place_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "place_type"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "place_type_custom",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "place_type_custom"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "address_street_address",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "address_street_address"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "address_locality",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "address_locality"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "address_region",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "address_region"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "address_country",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "address_country"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "address_postal_code",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "address_postal_code"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "geo_latitude_as_decimal_degrees",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "geo_latitude_as_decimal_degrees"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "geo_longitude_as_decimal_degrees",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "geo_longitude_as_decimal_degrees"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "geo_elevation_as_decimal_metres",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "geo_elevation_as_decimal_metres"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "telephone",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "telephone"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "fax_number",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "fax_number"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "global_location_number",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "global_location_number"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "branch_code",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "branch_code"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "contained_in_place",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "contained_in_place"
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "is_accessible_for_free",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "is_accessible_for_free"
+          }
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "public_access",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "public_access"
+          }
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "smoking_allowed",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "smoking_allowed"
+          }
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "maximum_attendee_capacity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "maximum_attendee_capacity"
+          }
+        }
+      },
+      {
+        "ordinal": 24,
+        "name": "is_deleted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "is_deleted"
+          }
+        }
+      },
+      {
+        "ordinal": 25,
+        "name": "content_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 26,
+        "name": "content_hash_sha3",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "content_hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 27,
+        "name": "content_mac",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "content_mac"
+          }
+        }
+      },
+      {
+        "ordinal": 28,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "deleted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 29,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 30,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "places",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "b8db8c5b02824ccf75e3cb7cae7bba897b1a6bc47cdd6f4dfb72147bd2c1eb6c"
+}

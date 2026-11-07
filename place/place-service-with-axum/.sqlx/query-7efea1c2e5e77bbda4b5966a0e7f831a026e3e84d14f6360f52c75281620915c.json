@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM place_keywords WHERE place_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7efea1c2e5e77bbda4b5966a0e7f831a026e3e84d14f6360f52c75281620915c"
+}

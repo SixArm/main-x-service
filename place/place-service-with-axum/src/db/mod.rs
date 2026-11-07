@@ -1,6 +1,9 @@
-//! Database access — connection pool + repository.
+//! Database access — the connection pool, the migrator, and the
+//! repository. **Every SQL statement this service runs is in this
+//! directory** (spec/tech-stack §5.2), written as a `sqlx::query!` /
+//! `query_as!` literal so the compiler checks it against the schema.
 //!
-//! [`SeaOrmPlaceRepository`] round-trips a domain [`Place`] against a fully
+//! [`PgPlaceRepository`] round-trips a domain [`Place`] against a fully
 //! normalized relational schema: scalar fields plus the flattened 0..1
 //! address/geo objects live on the `places` row; the keywords, identifiers,
 //! `amenity_features`, and `opening_hours` collections live in dedicated child
@@ -13,14 +16,9 @@ pub mod models;
 pub mod outbox;
 pub mod review_queue;
 
-use convert::{offset_to_ts, ts_to_offset};
-use sea_orm::{
-    ActiveModelTrait,
-    ActiveValue::{NotSet, Set},
-    ColumnTrait, ConnectionTrait, Database, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
-};
-use time::OffsetDateTime;
+use chrono::Utc;
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::Result;
@@ -35,12 +33,15 @@ use crate::models::opening_hours::{DayOfWeek, OpeningHoursSpecification};
 use crate::models::place::Place;
 use crate::models::place_type::PlaceType;
 use crate::streaming::envelope::{EventKind, EventTransport};
-use models::{
-    place_amenity_features, place_identifiers, place_keywords, place_merge_records,
-    place_opening_hours, places,
-};
+use models::PlaceRow;
 
-/// Open a `SeaORM` connection pool from a [`DatabaseConfig`].
+/// The schema migrations: the plain SQL files under `migrations/`, one
+/// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
+/// time. `place-service db migrate | down | reset | status` and the boot
+/// auto-migrate run these through `axa::sqlx`.
+pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
+
+/// Open a connection pool from a [`DatabaseConfig`].
 ///
 /// Applies the configured `max`/`min` pool bounds so the service caps its
 /// concurrent database connections (`PostgreSQL` has a finite backend slot
@@ -48,16 +49,14 @@ use models::{
 /// the first request after idle.
 ///
 /// # Errors
-/// Returns [`crate::Error::Pool`] if `SeaORM` cannot establish the pool
-/// (bad URL, unreachable server, auth failure, …).
-pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
-    // SeaORM's connect options carry the pool sizing knobs.
-    let mut opt = sea_orm::ConnectOptions::new(&config.url);
-    opt.max_connections(config.max_connections)
-        .min_connections(config.min_connections);
-    Database::connect(opt)
+/// Returns [`crate::Error::Pool`] if the pool cannot be established (bad
+/// URL, unreachable server, auth failure, …).
+pub async fn create_connection(config: &DatabaseConfig) -> Result<PgPool> {
+    PgPoolOptions::new()
+        .max_connections(config.max_connections)
+        .min_connections(config.min_connections)
+        .connect(&config.url)
         .await
-        // Normalise the SeaORM error into the crate's pool-error variant.
         .map_err(|e| crate::Error::Pool(e.to_string()))
 }
 
@@ -65,7 +64,7 @@ pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnec
 ///
 /// Abstracting persistence behind a trait lets `AppState` carry an
 /// `Arc<dyn PlaceRepository>` so handlers depend on the contract, not the
-/// `SeaORM` implementation — easing testing and any future storage swap.
+/// sqlx implementation — easing testing and any future storage swap.
 /// `Send + Sync` is required because the repository is shared across Axum's
 /// worker tasks.
 #[async_trait::async_trait]
@@ -140,10 +139,10 @@ pub trait PlaceRepository: Send + Sync {
     async fn merge(&self, survivor: &Place, duplicate_id: &Uuid) -> Result<Place>;
 }
 
-/// `SeaORM`-backed [`PlaceRepository`] over a `PostgreSQL` connection pool.
-pub struct SeaOrmPlaceRepository {
-    /// The shared `SeaORM` connection pool.
-    db: DatabaseConnection,
+/// sqlx-backed [`PlaceRepository`] over a `PostgreSQL` connection pool.
+pub struct PgPlaceRepository {
+    /// The shared connection pool.
+    db: PgPool,
     /// Which event transport is active (durable event bus, Phase 2).
     /// [`EventTransport::Memory`] (default) keeps the legacy post-commit
     /// in-memory publish only; [`EventTransport::Outbox`] additionally
@@ -151,13 +150,12 @@ pub struct SeaOrmPlaceRepository {
     transport: EventTransport,
 }
 
-impl SeaOrmPlaceRepository {
+impl PgPlaceRepository {
     /// Wrap an existing connection pool in a repository. Cheap: the pool
-    /// (a `DatabaseConnection`) is itself a clonable handle. Defaults to
-    /// [`EventTransport::Memory`] (behaviour unchanged from before the
-    /// outbox landed).
+    /// is itself a clonable handle. Defaults to [`EventTransport::Memory`]
+    /// (behaviour unchanged from before the outbox landed).
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self {
             db,
             transport: EventTransport::Memory,
@@ -175,20 +173,14 @@ impl SeaOrmPlaceRepository {
 
     /// When the outbox transport is active, enqueue one `event_outbox`
     /// row for `kind` applied to `place` **on `conn`** — pass the open
-    /// `&DatabaseTransaction` so the row commits with the entity write
-    /// (the outbox atomicity guarantee). A no-op under
-    /// [`EventTransport::Memory`].
-    ///
-    /// The `ConnectionTrait` generic lives here on a concrete method (not
-    /// on the object-safe [`PlaceRepository`] trait), which is how a
-    /// `dyn`-trait repository threads the outbox insert into its own
-    /// transaction.
+    /// transaction so the row commits with the entity write (the outbox
+    /// atomicity guarantee). A no-op under [`EventTransport::Memory`].
     ///
     /// # Errors
     /// Propagates the outbox insert error (envelope serialize / DB insert).
-    async fn enqueue_outbox<C: ConnectionTrait>(
+    async fn enqueue_outbox(
         &self,
-        conn: &C,
+        conn: &mut PgConnection,
         place: &Place,
         kind: EventKind,
     ) -> Result<()> {
@@ -222,15 +214,44 @@ impl SeaOrmPlaceRepository {
             if !visited.insert(current) {
                 return Ok(false);
             }
-            let row = places::Entity::find_by_id(current)
-                .one(&self.db)
-                .await
-                .map_err(|e| map_db(&e))?;
-            match row.and_then(|r| r.contained_in_place) {
+            // Outer `None`: no such row. Inner `None`: a root place.
+            let parent = sqlx::query_scalar!(
+                "SELECT contained_in_place FROM places WHERE id = $1",
+                current,
+            )
+            .fetch_optional(&self.db)
+            .await?;
+            match parent.flatten() {
                 Some(next) => current = next,
                 None => return Ok(false),
             }
         }
+    }
+
+    /// Read one `places` row by id, soft-deleted or not.
+    ///
+    /// # Errors
+    /// Propagates any database error from the lookup.
+    async fn find_row(&self, id: Uuid) -> Result<Option<PlaceRow>> {
+        let row = sqlx::query_as!(
+            PlaceRow,
+            "SELECT id, name, alternate_name, description, place_type, place_type_custom,
+                    address_street_address, address_locality, address_region,
+                    address_country, address_postal_code,
+                    geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,
+                    geo_elevation_as_decimal_metres,
+                    telephone, fax_number, url, global_location_number, branch_code,
+                    contained_in_place, is_accessible_for_free, public_access,
+                    smoking_allowed, maximum_attendee_capacity, is_deleted,
+                    content_hash, content_hash_sha3, content_mac,
+                    deleted_at, created_at, updated_at
+             FROM places
+             WHERE id = $1",
+            id,
+        )
+        .fetch_optional(&self.db)
+        .await?;
+        Ok(row)
     }
 
     /// Load child collections and assemble a domain [`Place`].
@@ -243,62 +264,56 @@ impl SeaOrmPlaceRepository {
     ///
     /// # Errors
     /// Propagates any database error from the four child-table queries.
-    async fn hydrate(&self, row: places::Model) -> Result<Place> {
+    async fn hydrate(&self, row: PlaceRow) -> Result<Place> {
         let id = row.id;
 
         // Keywords: ordered by stored position to keep list order stable.
-        let kw_rows = place_keywords::Entity::find()
-            .filter(place_keywords::Column::PlaceId.eq(id))
-            .order_by_asc(place_keywords::Column::Position)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let keywords = kw_rows.into_iter().map(|r| r.keyword).collect();
+        let keywords = sqlx::query_scalar!(
+            "SELECT keyword FROM place_keywords WHERE place_id = $1 ORDER BY position",
+            id,
+        )
+        .fetch_all(&self.db)
+        .await?;
 
         // Identifiers: the stored `(type tag, custom_label)` pair is decoded
         // back into the rich `IdentifierType` enum.
-        let id_rows = place_identifiers::Entity::find()
-            .filter(place_identifiers::Column::PlaceId.eq(id))
-            .order_by_asc(place_identifiers::Column::Position)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let identifiers = id_rows
-            .into_iter()
-            .map(|r| PlaceIdentifier {
-                identifier_type: parse_ident_type(&r.identifier_type, r.custom_label),
-                value: r.value,
-            })
-            .collect();
+        let identifiers = sqlx::query!(
+            "SELECT identifier_type, custom_label, value
+             FROM place_identifiers WHERE place_id = $1 ORDER BY position",
+            id,
+        )
+        .fetch_all(&self.db)
+        .await?
+        .into_iter()
+        .map(|r| PlaceIdentifier {
+            identifier_type: parse_ident_type(&r.identifier_type, r.custom_label),
+            value: r.value,
+        })
+        .collect();
 
-        let am_rows = place_amenity_features::Entity::find()
-            .filter(place_amenity_features::Column::PlaceId.eq(id))
-            .order_by_asc(place_amenity_features::Column::Position)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let amenity_features = am_rows
-            .into_iter()
-            .map(|r| AmenityFeature {
-                name: r.name,
-                value: r.value,
-            })
-            .collect();
+        let amenity_features = sqlx::query_as!(
+            AmenityFeature,
+            "SELECT name, value
+             FROM place_amenity_features WHERE place_id = $1 ORDER BY position",
+            id,
+        )
+        .fetch_all(&self.db)
+        .await?;
 
-        let oh_rows = place_opening_hours::Entity::find()
-            .filter(place_opening_hours::Column::PlaceId.eq(id))
-            .order_by_asc(place_opening_hours::Column::Position)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let opening_hours = oh_rows
-            .into_iter()
-            .map(|r| OpeningHoursSpecification {
-                day_of_week: parse_day_of_week(&r.day_of_week),
-                opens: r.opens,
-                closes: r.closes,
-            })
-            .collect();
+        let opening_hours = sqlx::query!(
+            "SELECT day_of_week, opens, closes
+             FROM place_opening_hours WHERE place_id = $1 ORDER BY position",
+            id,
+        )
+        .fetch_all(&self.db)
+        .await?
+        .into_iter()
+        .map(|r| OpeningHoursSpecification {
+            day_of_week: parse_day_of_week(&r.day_of_week),
+            opens: r.opens,
+            closes: r.closes,
+        })
+        .collect();
 
         let address = build_address(&row);
         let geo = match (
@@ -344,15 +359,27 @@ impl SeaOrmPlaceRepository {
                 .maximum_attendee_capacity
                 .map(|v| u32::try_from(v).unwrap_or_default()),
             is_deleted: row.is_deleted,
-            deleted_at: row.deleted_at.map(offset_to_ts),
-            created_at: offset_to_ts(row.created_at),
-            updated_at: offset_to_ts(row.updated_at),
+            deleted_at: row.deleted_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
         })
+    }
+
+    /// Hydrate each row in turn, keeping the query's order.
+    ///
+    /// # Errors
+    /// Propagates any database error from hydration.
+    async fn hydrate_all(&self, rows: Vec<PlaceRow>) -> Result<Vec<Place>> {
+        let mut out = Vec::with_capacity(rows.len());
+        for row in rows {
+            out.push(self.hydrate(row).await?);
+        }
+        Ok(out)
     }
 }
 
 #[async_trait::async_trait]
-impl PlaceRepository for SeaOrmPlaceRepository {
+impl PlaceRepository for PgPlaceRepository {
     async fn create(&self, place: &Place) -> Result<Place> {
         // T-16 multi-hop half: `validate_place` already rejects the
         // direct (0-hop) self-reference; this catches a cycle formed
@@ -364,34 +391,34 @@ impl PlaceRepository for SeaOrmPlaceRepository {
                 "contained_in_place would create a containment cycle".into(),
             ));
         }
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         // `created_at`/`updated_at` are server-managed (see `Place`'s
         // field docs): stamp both to "now" here, overriding whatever the
         // domain value carries, rather than trusting a client-supplied —
         // or `#[serde(default)]`-defaulted, i.e. Unix-epoch — timestamp.
-        let now = OffsetDateTime::now_utc();
-        let mut active = to_active(place);
-        active.created_at = Set(now);
-        active.updated_at = Set(now);
-        active.insert(&txn).await.map_err(|e| map_db(&e))?;
-        insert_collections(&txn, place).await?;
+        let now = Utc::now();
+        let mut row = place_row(place);
+        row.created_at = now;
+        row.updated_at = now;
+
+        let mut txn = self.db.begin().await?;
+        insert_place_row(&mut txn, &row).await?;
+        insert_collections(&mut txn, place).await?;
         // Durable event bus (Phase 2): under the outbox transport, write the
         // `event_outbox` row **inside this same transaction**, before commit,
         // so the entity rows and the event commit atomically (or roll back
         // together). A no-op under the memory transport.
-        self.enqueue_outbox(&txn, place, EventKind::Created).await?;
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        self.enqueue_outbox(&mut txn, place, EventKind::Created)
+            .await?;
+        txn.commit().await?;
         self.get_by_id(&place.id)
             .await?
             .ok_or_else(|| crate::Error::Database("place not found after insert".into()))
     }
 
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Place>> {
-        let row = places::Entity::find_by_id(*id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let Some(row) = row else { return Ok(None) };
+        let Some(row) = self.find_row(*id).await? else {
+            return Ok(None);
+        };
         if row.is_deleted {
             return Ok(None);
         }
@@ -399,11 +426,7 @@ impl PlaceRepository for SeaOrmPlaceRepository {
     }
 
     async fn update(&self, place: &Place) -> Result<Place> {
-        let exists = places::Entity::find_by_id(place.id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        if exists.is_none() {
+        if self.find_row(place.id).await?.is_none() {
             return Err(crate::Error::NotFound);
         }
         // T-16: reject an update that would close a containment cycle
@@ -418,65 +441,68 @@ impl PlaceRepository for SeaOrmPlaceRepository {
                 "contained_in_place would create a containment cycle".into(),
             ));
         }
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        // `created_at` is preserved (not overwritten by whatever the
-        // domain value carries — a stale read or a defaulted-empty one);
-        // `updated_at` is always refreshed to "now". Both are
-        // server-managed, matching `create`.
-        let mut active = to_active(place);
-        active.created_at = NotSet;
-        active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&txn).await.map_err(|e| map_db(&e))?;
-        delete_collections(&txn, place.id).await?;
-        insert_collections(&txn, place).await?;
+        // `created_at` is preserved (the UPDATE below does not name it,
+        // so whatever the domain value carries — a stale read or a
+        // defaulted-empty one — is ignored); `updated_at` is always
+        // refreshed to "now". Both are server-managed, matching `create`.
+        let mut row = place_row(place);
+        row.updated_at = Utc::now();
+
+        let mut txn = self.db.begin().await?;
+        update_place_row(&mut txn, &row).await?;
+        delete_collections(&mut txn, place.id).await?;
+        insert_collections(&mut txn, place).await?;
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, place, EventKind::Updated).await?;
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        self.enqueue_outbox(&mut txn, place, EventKind::Updated)
+            .await?;
+        txn.commit().await?;
         self.get_by_id(&place.id)
             .await?
             .ok_or(crate::Error::NotFound)
     }
 
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
-        let row = places::Entity::find_by_id(*id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?
-            .ok_or(crate::Error::NotFound)?;
-        let mut active: places::ActiveModel = row.clone().into();
-        active.is_deleted = Set(true);
-        active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
-        active.updated_at = Set(OffsetDateTime::now_utc());
+        let row = self.find_row(*id).await?.ok_or(crate::Error::NotFound)?;
         // Under the outbox transport, the tombstone update and the `deleted`
         // outbox row commit atomically in one transaction; the memory
         // transport keeps the plain, tx-free single-row update.
         if self.transport.is_outbox() {
             let place = self.hydrate(row).await?;
-            let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-            active.update(&txn).await.map_err(|e| map_db(&e))?;
-            self.enqueue_outbox(&txn, &place, EventKind::Deleted)
+            let mut txn = self.db.begin().await?;
+            mark_deleted(&mut txn, *id).await?;
+            self.enqueue_outbox(&mut txn, &place, EventKind::Deleted)
                 .await?;
-            txn.commit().await.map_err(|e| map_db(&e))?;
+            txn.commit().await?;
         } else {
-            active.update(&self.db).await.map_err(|e| map_db(&e))?;
+            let mut conn = self.db.acquire().await?;
+            mark_deleted(&mut conn, *id).await?;
         }
         Ok(())
     }
 
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Place>> {
-        let rows = places::Entity::find()
-            .filter(places::Column::IsDeleted.eq(false))
-            .order_by_desc(places::Column::CreatedAt)
-            .limit(limit)
-            .offset(offset)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let mut out = Vec::with_capacity(rows.len());
-        for row in rows {
-            out.push(self.hydrate(row).await?);
-        }
-        Ok(out)
+        let rows = sqlx::query_as!(
+            PlaceRow,
+            "SELECT id, name, alternate_name, description, place_type, place_type_custom,
+                    address_street_address, address_locality, address_region,
+                    address_country, address_postal_code,
+                    geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,
+                    geo_elevation_as_decimal_metres,
+                    telephone, fax_number, url, global_location_number, branch_code,
+                    contained_in_place, is_accessible_for_free, public_access,
+                    smoking_allowed, maximum_attendee_capacity, is_deleted,
+                    content_hash, content_hash_sha3, content_mac,
+                    deleted_at, created_at, updated_at
+             FROM places
+             WHERE is_deleted = false
+             ORDER BY created_at DESC
+             LIMIT $1 OFFSET $2",
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(&self.db)
+        .await?;
+        self.hydrate_all(rows).await
     }
 
     async fn list_in_bbox(
@@ -490,33 +516,50 @@ impl PlaceRepository for SeaOrmPlaceRepository {
         // A range comparison against a NULL geo column is never true in
         // SQL, so rows with no coordinates are excluded without a
         // separate `IS NOT NULL` filter.
-        let rows = places::Entity::find()
-            .filter(places::Column::IsDeleted.eq(false))
-            .filter(places::Column::GeoLatitudeAsDecimalDegrees.gte(bbox_decimal(lat_min)))
-            .filter(places::Column::GeoLatitudeAsDecimalDegrees.lte(bbox_decimal(lat_max)))
-            .filter(places::Column::GeoLongitudeAsDecimalDegrees.gte(bbox_decimal(lon_min)))
-            .filter(places::Column::GeoLongitudeAsDecimalDegrees.lte(bbox_decimal(lon_max)))
-            .limit(cap)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let mut out = Vec::with_capacity(rows.len());
-        for row in rows {
-            out.push(self.hydrate(row).await?);
-        }
-        Ok(out)
+        let rows = sqlx::query_as!(
+            PlaceRow,
+            "SELECT id, name, alternate_name, description, place_type, place_type_custom,
+                    address_street_address, address_locality, address_region,
+                    address_country, address_postal_code,
+                    geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,
+                    geo_elevation_as_decimal_metres,
+                    telephone, fax_number, url, global_location_number, branch_code,
+                    contained_in_place, is_accessible_for_free, public_access,
+                    smoking_allowed, maximum_attendee_capacity, is_deleted,
+                    content_hash, content_hash_sha3, content_mac,
+                    deleted_at, created_at, updated_at
+             FROM places
+             WHERE is_deleted = false
+               AND geo_latitude_as_decimal_degrees >= $1
+               AND geo_latitude_as_decimal_degrees <= $2
+               AND geo_longitude_as_decimal_degrees >= $3
+               AND geo_longitude_as_decimal_degrees <= $4
+             LIMIT $5",
+            bbox_decimal(lat_min),
+            bbox_decimal(lat_max),
+            bbox_decimal(lon_min),
+            bbox_decimal(lon_max),
+            to_i64(cap),
+        )
+        .fetch_all(&self.db)
+        .await?;
+        self.hydrate_all(rows).await
     }
 
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord> {
-        let active = place_merge_records::ActiveModel {
-            id: Set(rec.id),
-            main_place_id: Set(rec.main_place_id),
-            duplicate_place_id: Set(rec.duplicate_place_id),
-            merge_reason: Set(rec.merge_reason.clone()),
-            transferred_data: Set(rec.transferred_data.clone()),
-            merged_at: Set(ts_to_offset(rec.merged_at)),
-        };
-        active.insert(&self.db).await.map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO place_merge_records
+                 (id, main_place_id, duplicate_place_id, merge_reason, transferred_data, merged_at)
+             VALUES ($1, $2, $3, $4, $5, $6)",
+            rec.id,
+            rec.main_place_id,
+            rec.duplicate_place_id,
+            rec.merge_reason,
+            rec.transferred_data,
+            rec.merged_at,
+        )
+        .execute(&self.db)
+        .await?;
         Ok(rec.clone())
     }
 
@@ -524,27 +567,22 @@ impl PlaceRepository for SeaOrmPlaceRepository {
         // Fetch the duplicate row up front: it drives the soft-delete and,
         // under the outbox transport, the `Deleted` envelope's denormalised
         // name. Absent ⇒ NotFound (nothing to merge).
-        let dup_row = places::Entity::find_by_id(*duplicate_id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?
+        let dup_row = self
+            .find_row(*duplicate_id)
+            .await?
             .ok_or(crate::Error::NotFound)?;
         // Under the outbox transport, hydrate the duplicate before the
         // transaction opens so the `Deleted` envelope carries its name.
         let dup_place = if self.transport.is_outbox() {
-            Some(self.hydrate(dup_row.clone()).await?)
+            Some(self.hydrate(dup_row).await?)
         } else {
             None
         };
 
         // The whole merge — the duplicate soft-delete plus both outbox rows
         // — commits (or rolls back) under one transaction.
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-        let mut active: places::ActiveModel = dup_row.into();
-        active.is_deleted = Set(true);
-        active.deleted_at = Set(Some(OffsetDateTime::now_utc()));
-        active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&txn).await.map_err(|e| map_db(&e))?;
+        let mut txn = self.db.begin().await?;
+        mark_deleted(&mut txn, *duplicate_id).await?;
         // Durable event bus (Phase 2): a `Merged` outbox row for the survivor
         // (carrying the duplicate's pid via `merged_from`, so a merge-
         // repointing consumer can move edges off the duplicate) and a
@@ -552,13 +590,13 @@ impl PlaceRepository for SeaOrmPlaceRepository {
         // transaction. A no-op under the memory transport.
         if let Some(ref dup) = dup_place {
             OutboxInsert::for_merge(survivor, duplicate_id)?
-                .insert_on(&txn)
+                .insert_on(&mut txn)
                 .await?;
             OutboxInsert::for_place(dup, EventKind::Deleted)?
-                .insert_on(&txn)
+                .insert_on(&mut txn)
                 .await?;
         }
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        txn.commit().await?;
 
         self.get_by_id(&survivor.id)
             .await?
@@ -570,16 +608,44 @@ impl PlaceRepository for SeaOrmPlaceRepository {
 ///
 /// # Errors
 /// Propagates any database error from the count query.
-pub async fn count_active(db: &DatabaseConnection) -> Result<u64> {
-    places::Entity::find()
-        .filter(places::Column::IsDeleted.eq(false))
-        .count(db)
-        .await
-        .map_err(|e| map_db(&e))
+pub async fn count_active(db: &PgPool) -> Result<u64> {
+    let n = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM places WHERE is_deleted = false"#)
+        .fetch_one(db)
+        .await?;
+    Ok(u64::try_from(n).unwrap_or_default())
 }
 
-/// Build the `places` scalar+flattened active model from a domain [`Place`].
-fn to_active(place: &Place) -> places::ActiveModel {
+/// The rows `GET /api/records/verify` recomputes, most recently updated
+/// first, soft-deleted ones included (the handler skips those).
+///
+/// # Errors
+/// Propagates any database error from the query.
+pub async fn rows_for_verification(db: &PgPool, limit: u64) -> Result<Vec<PlaceRow>> {
+    let rows = sqlx::query_as!(
+        PlaceRow,
+        "SELECT id, name, alternate_name, description, place_type, place_type_custom,
+                address_street_address, address_locality, address_region,
+                address_country, address_postal_code,
+                geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,
+                geo_elevation_as_decimal_metres,
+                telephone, fax_number, url, global_location_number, branch_code,
+                contained_in_place, is_accessible_for_free, public_access,
+                smoking_allowed, maximum_attendee_capacity, is_deleted,
+                content_hash, content_hash_sha3, content_mac,
+                deleted_at, created_at, updated_at
+         FROM places
+         ORDER BY updated_at DESC
+         LIMIT $1",
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
+/// Build the full `places` row from a domain [`Place`], integrity digests
+/// included.
+fn place_row(place: &Place) -> PlaceRow {
     let (place_type, place_type_custom) = match &place.place_type {
         Some(t) => {
             let (tag, custom) = place_type_parts(t);
@@ -591,8 +657,8 @@ fn to_active(place: &Place) -> places::ActiveModel {
     // the child collections (addresses, coordinates, identifiers) are
     // covered too. Computed here rather than stamped afterwards, so one
     // statement writes the row and its integrity values together — and
-    // both `create` and `update` build their active model through this
-    // function, so it is the single place a write path could forget.
+    // both `create` and `update` build their row through this function,
+    // so it is the single place a write path could forget.
     let digests = crate::compliance::record_integrity::digests(
         &crate::compliance::record_integrity::RecordInput {
             id: place.id,
@@ -600,67 +666,178 @@ fn to_active(place: &Place) -> places::ActiveModel {
             is_deleted: place.is_deleted,
         },
     );
-    places::ActiveModel {
-        id: Set(place.id),
-        content_hash: Set(Some(digests.sha256)),
-        content_hash_sha3: Set(Some(digests.sha3)),
-        content_mac: Set(digests.mac),
-        name: Set(place.name.clone()),
-        alternate_name: Set(place.alternate_name.clone()),
-        description: Set(place.description.clone()),
-        place_type: Set(place_type),
-        place_type_custom: Set(place_type_custom),
-        address_street_address: Set(place
-            .address
-            .as_ref()
-            .and_then(|a| a.street_address.clone())),
-        address_locality: Set(place
-            .address
-            .as_ref()
-            .and_then(|a| a.address_locality.clone())),
-        address_region: Set(place
-            .address
-            .as_ref()
-            .and_then(|a| a.address_region.clone())),
-        address_country: Set(place
-            .address
-            .as_ref()
-            .and_then(|a| a.address_country.clone())),
-        address_postal_code: Set(place.address.as_ref().and_then(|a| a.postal_code.clone())),
-        geo_latitude_as_decimal_degrees: Set(place
-            .geo
-            .as_ref()
-            .map(|g| g.latitude_as_decimal_degrees.clone())),
-        geo_longitude_as_decimal_degrees: Set(place
-            .geo
-            .as_ref()
-            .map(|g| g.longitude_as_decimal_degrees.clone())),
-        geo_elevation_as_decimal_metres: Set(place
-            .geo
-            .as_ref()
-            .and_then(|g| g.elevation_as_decimal_metres.clone())),
-        telephone: Set(place.telephone.clone()),
-        fax_number: Set(place.fax_number.clone()),
-        url: Set(place.url.clone()),
-        global_location_number: Set(place.global_location_number.clone()),
-        branch_code: Set(place.branch_code.clone()),
-        contained_in_place: Set(place.contained_in_place),
-        is_accessible_for_free: Set(place.is_accessible_for_free),
-        public_access: Set(place.public_access),
-        smoking_allowed: Set(place.smoking_allowed),
-        maximum_attendee_capacity: Set(place
+    let address = place.address.as_ref();
+    let geo = place.geo.as_ref();
+    PlaceRow {
+        id: place.id,
+        content_hash: Some(digests.sha256),
+        content_hash_sha3: Some(digests.sha3),
+        content_mac: digests.mac,
+        name: place.name.clone(),
+        alternate_name: place.alternate_name.clone(),
+        description: place.description.clone(),
+        place_type,
+        place_type_custom,
+        address_street_address: address.and_then(|a| a.street_address.clone()),
+        address_locality: address.and_then(|a| a.address_locality.clone()),
+        address_region: address.and_then(|a| a.address_region.clone()),
+        address_country: address.and_then(|a| a.address_country.clone()),
+        address_postal_code: address.and_then(|a| a.postal_code.clone()),
+        geo_latitude_as_decimal_degrees: geo.map(|g| g.latitude_as_decimal_degrees.clone()),
+        geo_longitude_as_decimal_degrees: geo.map(|g| g.longitude_as_decimal_degrees.clone()),
+        geo_elevation_as_decimal_metres: geo.and_then(|g| g.elevation_as_decimal_metres.clone()),
+        telephone: place.telephone.clone(),
+        fax_number: place.fax_number.clone(),
+        url: place.url.clone(),
+        global_location_number: place.global_location_number.clone(),
+        branch_code: place.branch_code.clone(),
+        contained_in_place: place.contained_in_place,
+        is_accessible_for_free: place.is_accessible_for_free,
+        public_access: place.public_access,
+        smoking_allowed: place.smoking_allowed,
+        maximum_attendee_capacity: place
             .maximum_attendee_capacity
-            .map(|v| i32::try_from(v).unwrap_or(i32::MAX))),
-        is_deleted: Set(place.is_deleted),
-        deleted_at: Set(place.deleted_at.map(ts_to_offset)),
-        created_at: Set(ts_to_offset(place.created_at)),
-        updated_at: Set(ts_to_offset(place.updated_at)),
+            .map(|v| i32::try_from(v).unwrap_or(i32::MAX)),
+        is_deleted: place.is_deleted,
+        deleted_at: place.deleted_at,
+        created_at: place.created_at,
+        updated_at: place.updated_at,
     }
+}
+
+/// `INSERT` one whole `places` row.
+async fn insert_place_row(conn: &mut PgConnection, row: &PlaceRow) -> Result<()> {
+    sqlx::query!(
+        "INSERT INTO places (
+             id, name, alternate_name, description, place_type, place_type_custom,
+             address_street_address, address_locality, address_region,
+             address_country, address_postal_code,
+             geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,
+             geo_elevation_as_decimal_metres,
+             telephone, fax_number, url, global_location_number, branch_code,
+             contained_in_place, is_accessible_for_free, public_access,
+             smoking_allowed, maximum_attendee_capacity, is_deleted,
+             content_hash, content_hash_sha3, content_mac,
+             deleted_at, created_at, updated_at
+         ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+             $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+         )",
+        row.id,
+        row.name,
+        row.alternate_name,
+        row.description,
+        row.place_type,
+        row.place_type_custom,
+        row.address_street_address,
+        row.address_locality,
+        row.address_region,
+        row.address_country,
+        row.address_postal_code,
+        row.geo_latitude_as_decimal_degrees,
+        row.geo_longitude_as_decimal_degrees,
+        row.geo_elevation_as_decimal_metres,
+        row.telephone,
+        row.fax_number,
+        row.url,
+        row.global_location_number,
+        row.branch_code,
+        row.contained_in_place,
+        row.is_accessible_for_free,
+        row.public_access,
+        row.smoking_allowed,
+        row.maximum_attendee_capacity,
+        row.is_deleted,
+        row.content_hash,
+        row.content_hash_sha3,
+        row.content_mac,
+        row.deleted_at,
+        row.created_at,
+        row.updated_at,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// `UPDATE` every column of one `places` row except `id` and
+/// `created_at`, which never change after insert.
+async fn update_place_row(conn: &mut PgConnection, row: &PlaceRow) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE places SET
+             name = $2, alternate_name = $3, description = $4,
+             place_type = $5, place_type_custom = $6,
+             address_street_address = $7, address_locality = $8, address_region = $9,
+             address_country = $10, address_postal_code = $11,
+             geo_latitude_as_decimal_degrees = $12, geo_longitude_as_decimal_degrees = $13,
+             geo_elevation_as_decimal_metres = $14,
+             telephone = $15, fax_number = $16, url = $17,
+             global_location_number = $18, branch_code = $19,
+             contained_in_place = $20, is_accessible_for_free = $21, public_access = $22,
+             smoking_allowed = $23, maximum_attendee_capacity = $24, is_deleted = $25,
+             content_hash = $26, content_hash_sha3 = $27, content_mac = $28,
+             deleted_at = $29, updated_at = $30
+         WHERE id = $1",
+        row.id,
+        row.name,
+        row.alternate_name,
+        row.description,
+        row.place_type,
+        row.place_type_custom,
+        row.address_street_address,
+        row.address_locality,
+        row.address_region,
+        row.address_country,
+        row.address_postal_code,
+        row.geo_latitude_as_decimal_degrees,
+        row.geo_longitude_as_decimal_degrees,
+        row.geo_elevation_as_decimal_metres,
+        row.telephone,
+        row.fax_number,
+        row.url,
+        row.global_location_number,
+        row.branch_code,
+        row.contained_in_place,
+        row.is_accessible_for_free,
+        row.public_access,
+        row.smoking_allowed,
+        row.maximum_attendee_capacity,
+        row.is_deleted,
+        row.content_hash,
+        row.content_hash_sha3,
+        row.content_mac,
+        row.deleted_at,
+        row.updated_at,
+    )
+    .execute(conn)
+    .await?;
+    // The caller checked the row exists; one that vanished in between is
+    // an error, as it was when the ORM reported "no record updated".
+    if done.rows_affected() == 0 {
+        return Err(crate::Error::Database(
+            "place not updated: no such row".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Soft-delete one place: set the tombstone and its timestamp. Nothing
+/// else on the row changes, the stored digests included.
+async fn mark_deleted(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    let now = Utc::now();
+    sqlx::query!(
+        "UPDATE places SET is_deleted = true, deleted_at = $2, updated_at = $2 WHERE id = $1",
+        id,
+        now,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
 /// Reconstruct a [`PostalAddress`] from the flattened row, or `None` when
 /// every address column is empty.
-fn build_address(row: &places::Model) -> Option<PostalAddress> {
+fn build_address(row: &PlaceRow) -> Option<PostalAddress> {
     if row.address_street_address.is_none()
         && row.address_locality.is_none()
         && row.address_region.is_none()
@@ -679,83 +856,102 @@ fn build_address(row: &places::Model) -> Option<PostalAddress> {
 }
 
 /// Insert all child-collection rows for `place` on connection `conn`.
-async fn insert_collections<C: ConnectionTrait>(conn: &C, place: &Place) -> Result<()> {
+/// Each row's `position` is its index, so `hydrate` reads the lists back
+/// in the order they were written.
+async fn insert_collections(conn: &mut PgConnection, place: &Place) -> Result<()> {
     for (i, keyword) in place.keywords.iter().enumerate() {
-        place_keywords::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            place_id: Set(place.id),
-            keyword: Set(keyword.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO place_keywords (id, place_id, keyword, position)
+             VALUES ($1, $2, $3, $4)",
+            Uuid::new_v4(),
+            place.id,
+            keyword,
+            position(i),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     for (i, ident) in place.identifiers.iter().enumerate() {
         let (identifier_type, custom_label) = ident_type_parts(&ident.identifier_type);
-        place_identifiers::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            place_id: Set(place.id),
-            identifier_type: Set(identifier_type),
-            custom_label: Set(custom_label),
-            value: Set(ident.value.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO place_identifiers
+                 (id, place_id, identifier_type, custom_label, value, position)
+             VALUES ($1, $2, $3, $4, $5, $6)",
+            Uuid::new_v4(),
+            place.id,
+            identifier_type,
+            custom_label,
+            ident.value,
+            position(i),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     for (i, am) in place.amenity_features.iter().enumerate() {
-        place_amenity_features::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            place_id: Set(place.id),
-            name: Set(am.name.clone()),
-            value: Set(am.value.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO place_amenity_features (id, place_id, name, value, position)
+             VALUES ($1, $2, $3, $4, $5)",
+            Uuid::new_v4(),
+            place.id,
+            am.name,
+            am.value,
+            position(i),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     for (i, oh) in place.opening_hours.iter().enumerate() {
-        place_opening_hours::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            place_id: Set(place.id),
-            day_of_week: Set(day_of_week_str(&oh.day_of_week)),
-            opens: Set(oh.opens.clone()),
-            closes: Set(oh.closes.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO place_opening_hours (id, place_id, day_of_week, opens, closes, position)
+             VALUES ($1, $2, $3, $4, $5, $6)",
+            Uuid::new_v4(),
+            place.id,
+            day_of_week_str(&oh.day_of_week),
+            oh.opens,
+            oh.closes,
+            position(i),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     Ok(())
 }
 
 /// Delete all child-collection rows for `place_id` on connection `conn`.
-async fn delete_collections<C: ConnectionTrait>(conn: &C, place_id: Uuid) -> Result<()> {
-    place_keywords::Entity::delete_many()
-        .filter(place_keywords::Column::PlaceId.eq(place_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    place_identifiers::Entity::delete_many()
-        .filter(place_identifiers::Column::PlaceId.eq(place_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    place_amenity_features::Entity::delete_many()
-        .filter(place_amenity_features::Column::PlaceId.eq(place_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    place_opening_hours::Entity::delete_many()
-        .filter(place_opening_hours::Column::PlaceId.eq(place_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+async fn delete_collections(conn: &mut PgConnection, place_id: Uuid) -> Result<()> {
+    sqlx::query!("DELETE FROM place_keywords WHERE place_id = $1", place_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!(
+        "DELETE FROM place_identifiers WHERE place_id = $1",
+        place_id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM place_amenity_features WHERE place_id = $1",
+        place_id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM place_opening_hours WHERE place_id = $1",
+        place_id
+    )
+    .execute(&mut *conn)
+    .await?;
     Ok(())
+}
+
+/// A list index as the `INTEGER` `position` column.
+fn position(i: usize) -> i32 {
+    i32::try_from(i).unwrap_or(i32::MAX)
+}
+
+/// A `LIMIT` / `OFFSET` bound: Postgres takes `BIGINT`, the callers count
+/// in `u64`.
+fn to_i64(n: u64) -> i64 {
+    i64::try_from(n).unwrap_or(i64::MAX)
 }
 
 /// Map a [`PlaceType`] to its `(tag, custom_label)` columns.
@@ -847,11 +1043,6 @@ fn parse_day_of_week(tag: &str) -> DayOfWeek {
     }
 }
 
-/// Map a `SeaORM` [`DbErr`](sea_orm::DbErr) into the crate error type.
-fn map_db(e: &sea_orm::DbErr) -> crate::Error {
-    crate::Error::Database(e.to_string())
-}
-
 /// Convert a bounding-box bound (already-clamped, finite) into the
 /// decimal the `NUMERIC` geo columns compare against.
 ///
@@ -872,15 +1063,14 @@ pub use audit::AuditLogRepository;
 /// a bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
-    use super::{PlaceRepository, SeaOrmPlaceRepository};
-    use crate::db::models::event_outbox;
+    use super::{PgPlaceRepository, PlaceRepository};
+    use crate::db::outbox;
     use crate::models::place::Place;
     use crate::streaming::envelope::EventTransport;
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-    async fn connect() -> sea_orm::DatabaseConnection {
+    async fn connect() -> sqlx::PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        sqlx::PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
@@ -890,16 +1080,11 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
-        let repo = SeaOrmPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let place = repo.create(&Place::new("Central Park")).await.unwrap();
 
-        let created_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(place.id))
-            .filter(event_outbox::Column::Kind.eq("created"))
-            .all(&db)
-            .await
-            .unwrap();
+        let created_rows = outbox::rows_for(&db, place.id, "created").await.unwrap();
         assert_eq!(
             created_rows.len(),
             1,
@@ -914,7 +1099,7 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
-        let repo = SeaOrmPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let survivor = repo.create(&Place::new("Survivor")).await.unwrap();
         let duplicate = repo.create(&Place::new("Duplicate")).await.unwrap();
@@ -923,12 +1108,7 @@ mod tests {
         assert_eq!(merged.id, survivor.id);
 
         // Survivor: exactly one `merged` row, carrying the duplicate pid.
-        let merged_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(survivor.id))
-            .filter(event_outbox::Column::Kind.eq("merged"))
-            .all(&db)
-            .await
-            .unwrap();
+        let merged_rows = outbox::rows_for(&db, survivor.id, "merged").await.unwrap();
         assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
         assert_eq!(
             merged_rows[0].payload["merged_from"],
@@ -937,10 +1117,7 @@ mod tests {
         );
 
         // Duplicate: a `deleted` row.
-        let deleted_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(duplicate.id))
-            .filter(event_outbox::Column::Kind.eq("deleted"))
-            .all(&db)
+        let deleted_rows = outbox::rows_for(&db, duplicate.id, "deleted")
             .await
             .unwrap();
         assert_eq!(
@@ -958,7 +1135,7 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn update_rejects_a_cycle_through_an_existing_ancestor() {
         let db = connect().await;
-        let repo = SeaOrmPlaceRepository::new(db.clone());
+        let repo = PgPlaceRepository::new(db.clone());
 
         let mut a = Place::new("A");
         a = repo.create(&a).await.unwrap();

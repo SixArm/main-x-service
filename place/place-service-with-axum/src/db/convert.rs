@@ -1,9 +1,10 @@
 //! Date/time conversions across the persistence boundary.
 //!
-//! Domain models use `chrono` (`DateTime<Utc>`); the `SeaORM` entity models
-//! use the `time` crate (`OffsetDateTime`) because `SeaORM` 1.1 is configured
-//! with `time` support. These helpers translate between the two
-//! representations when reading/writing rows.
+//! Domain models and the row structs in [`super::models`] both use
+//! `chrono` (`DateTime<Utc>`), which is what sqlx maps `TIMESTAMPTZ` to, so
+//! most reads and writes need no conversion. The outbox's pure
+//! envelope→row mapping ([`super::outbox::OutboxInsert`]) is stamped with
+//! a `time::OffsetDateTime`; these helpers translate between the two.
 
 use chrono::{DateTime, Utc};
 use time::OffsetDateTime;

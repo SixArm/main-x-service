@@ -547,7 +547,7 @@ mod tests {
 
     /// A place cannot list itself as its own container (T-16 direct
     /// case; the multi-hop case is a repository-level check, since it
-    /// needs a DB round-trip — see `db::SeaOrmPlaceRepository::
+    /// needs a DB round-trip — see `db::PgPlaceRepository::
     /// ancestor_chain_contains`).
     #[test]
     fn test_self_referencing_contained_in_place_is_rejected() {

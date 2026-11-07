@@ -418,7 +418,7 @@ clearly described manual check confirms the acceptance criterion.
   when the scan response is built directly and by `review_row_to_item`
   (the `GET /api/places/review-queue` path). New DB-gated
   `tests/review_queue_score_breakdown.rs` (`#[ignore]`d): seeds two
-  identical-name places **directly through `SeaOrmPlaceRepository`**
+  identical-name places **directly through `SeaOrmPlaceRepository`** (now `PgPlaceRepository`)
   (bypassing `POST /api/places`'s own real-time duplicate check, which
   would otherwise reject the second seed with `409` before the batch
   scan ever runs), scans via `POST /api/places/deduplicate`, and asserts
@@ -496,7 +496,7 @@ clearly described manual check confirms the acceptance criterion.
   - **Resolved.** `validate_place` (`src/validation/mod.rs`) rejects
     `contained_in_place == Some(place.id)` with a `422`-shaped
     `ValidationError` on field `contained_in_place`. The multi-hop case
-    is a new `SeaOrmPlaceRepository::ancestor_chain_contains` helper
+    is a new `SeaOrmPlaceRepository::ancestor_chain_contains` helper (now `PgPlaceRepository::`)
     (`src/db/mod.rs`) — a bounded walk up the parent chain (a
     `visited` guard stops it looping on a pre-existing, unrelated
     cycle rather than assuming none exists) — called from both
@@ -550,3 +550,27 @@ clearly described manual check confirms the acceptance criterion.
   19/19 (one route stub widened from `/places/search` to `/places`
   since it never types a query term).
 
+- [x] **T-18 (M) — SeaORM → sqlx (the family pilot).** *(Done
+  2026-11-07; spec/tech-stack §5.)* Replaced SeaORM with direct sqlx
+  so a reviewer can read every statement the service runs (§10). All
+  SQL is in `src/db/` as 36 `query!` / `query_as!` / `query_scalar!`
+  literals, compile-checked against the committed `.sqlx/`; no
+  `QueryBuilder`, `raw_sql` or `AssertSqlSafe`, so no
+  `ci/sql-allowlist.txt` entry. `SeaOrmPlaceRepository` became
+  `PgPlaceRepository`; the SeaORM entities in `src/db/models.rs` became
+  plain row structs. Two handler queries (`GET /api/records/verify`,
+  `GET /api/audit/verify`) and the relay's retention delete moved into
+  `src/db/`. The `migration/` crate is gone: its seven migrations are
+  the same SQL in sqlx's flat `.up.sql` / `.down.sql` layout, run by
+  `sqlx::migrate!` through `axa::sqlx` (`db migrate | down | reset |
+  status`, boot auto-migrate). Proved: a `pg_dump --schema-only` of a
+  database migrated by the old code and one migrated by the new code
+  differ only in the migrations bookkeeping table. Compliance
+  behaviour unchanged and its tests not edited to pass: the only test
+  edits replace SeaORM connection and outbox-row lookups with
+  `sqlx::PgPool` and `db::outbox::rows_for`, keeping every assertion.
+  One test changed shape: the relay poll's `FOR UPDATE SKIP LOCKED`
+  pin read the SQL SeaORM generated, which a `query!` literal does not
+  expose, so it became a DB-gated test proving a second relay skips
+  rows the first holds. DB-gated suite 19 → 20, all passing.
+  Dependencies 419 → 386 unique normal crates.

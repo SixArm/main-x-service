@@ -106,6 +106,32 @@ declares `tonic = "0.12"` for the not-yet-built gRPC server (T-4), and two
 unrenamed `tonic` dependencies at different versions make rustc refuse the
 test binary (`E0464: multiple candidates for rlib dependency tonic`).
 
+## Database: sqlx, all SQL in `src/db/`
+
+Since 2026-11-07 this crate is the family's pilot of the move from
+SeaORM to sqlx (spec §10, §13 T-18; the repo's
+`spec/tech-stack/index.md` §5). The rules that keep it reviewable:
+
+- Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`
+  literal in `src/db/`. Handlers, the relay and tests call functions
+  there; they never hold SQL.
+- No `QueryBuilder`, `raw_sql` or `AssertSqlSafe`. The clippy stage
+  refuses them unless `ci/sql-allowlist.txt` names the file. Write an
+  optional filter as `($1::text IS NULL OR col = $1)` instead.
+- A helper running several statements takes `&mut PgConnection` (or
+  `axa::sqlx::Db`), so the outbox row and the child rows commit in the
+  caller's transaction.
+- Builds read `.sqlx/` with `SQLX_OFFLINE=true`. After changing a query
+  or a migration, migrate a database and run `SQLX_OFFLINE=false cargo
+  sqlx prepare -- --all-targets`, then commit `.sqlx/`. CI's `test-db`
+  stage runs `cargo sqlx prepare --check`.
+- Migrations are `migrations/<version>_<name>.up.sql` / `.down.sql`,
+  embedded by `sqlx::migrate!` as `db::MIGRATOR`. Never edit an applied
+  one: sqlx checks each file's checksum and refuses a changed one.
+- Timestamps are `chrono` in the row structs. Do not turn on sqlx's
+  `time` feature: axa enables `chrono`, and with both, sqlx 0.9.0's
+  macros warn on every timestamp column even when `sqlx.toml` names one.
+
 ## Doc hierarchy quick reference
 
 | File | Role |
@@ -138,11 +164,10 @@ Postgres, and `GET /api/health` returns `200`. This exercise found and
 fixed two real bugs: Cargo.toml's `[[bench]] bridge_bench` declaration
 requires `benches/bridge_bench.rs` to exist even for a `--bin`-only
 build (cargo refuses to parse the manifest otherwise), and the
-`migration/src/*.rs` wrappers `include_str!` the raw numbered SQL from
-a `migrations/` directory that is a **sibling** of `migration/` at the
-crate root (not nested inside it — this varies by crate; link-graph-
-service nests `migrations/` inside `migration/` instead). Both
-directories are now copied explicitly in the Dockerfile. See
+migration SQL directory had to be copied explicitly. Since the move to
+sqlx (2026-11-07) the Dockerfile copies `migrations/`, which
+`sqlx::migrate!` embeds, and `.sqlx/`, which the `query!` macros read
+under `SQLX_OFFLINE=true`; there is no `migration/` crate any more. See
 `.containerignore` at the repository root (excludes every crate's
 `target/`, or the build context would try to copy hundreds of GB of
 build artifacts). The wired multi-service `examples/compose/` stacks

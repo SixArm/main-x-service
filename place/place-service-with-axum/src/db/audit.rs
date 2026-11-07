@@ -1,16 +1,14 @@
 //! Audit-log repository — writes to the `audit_log` table and reads back
 //! per-entity / recent histories.
 
-use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect,
-};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::models::audit_log;
+use sqlx::PgPool;
+
+use super::models::AuditLogRow;
 use crate::Result;
 
 /// Public view of one audit-log row.
@@ -38,9 +36,9 @@ pub struct AuditEntry {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-impl From<audit_log::Model> for AuditEntry {
+impl From<AuditLogRow> for AuditEntry {
     /// Project a persisted `audit_log` row into the public view.
-    fn from(m: audit_log::Model) -> Self {
+    fn from(m: AuditLogRow) -> Self {
         Self {
             id: m.id,
             entity_type: m.entity_type,
@@ -51,7 +49,7 @@ impl From<audit_log::Model> for AuditEntry {
             user_agent: m.user_agent,
             old_values: m.old_values,
             new_values: m.new_values,
-            created_at: super::convert::offset_to_ts(m.created_at),
+            created_at: m.created_at,
         }
     }
 }
@@ -69,14 +67,14 @@ pub struct AuditContext {
 
 /// Repository for writing and querying the `audit_log` table.
 pub struct AuditLogRepository {
-    /// Shared `SeaORM` connection pool.
-    db: DatabaseConnection,
+    /// Shared connection pool.
+    db: PgPool,
 }
 
 impl AuditLogRepository {
     /// Wrap an existing connection pool.
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self { db }
     }
 
@@ -163,7 +161,7 @@ impl AuditLogRepository {
         // here rather than defaulted by the database: the alternative —
         // insert, then stamp — leaves a window in which the row exists
         // unprotected.
-        let created_at = time::OffsetDateTime::now_utc();
+        let created_at = chrono::Utc::now();
         // All three digests from one call, so none can be stamped
         // without the others. The two unkeyed ones are written
         // unconditionally; only the MAC depends on a configured key.
@@ -177,28 +175,30 @@ impl AuditLogRepository {
                 user_agent: ctx.user_agent.as_deref(),
                 old_values: old_values.as_ref(),
                 new_values: new_values.as_ref(),
-                created_at_micros: i64::try_from(created_at.unix_timestamp_nanos() / 1_000)
-                    .unwrap_or(0),
+                created_at_micros: created_at.timestamp_micros(),
             },
         );
-        let row = audit_log::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            entity_type: Set(entity_type),
-            entity_id: Set(entity_id),
-            action: Set(action),
-            user_id: Set(ctx.user_id.clone()),
-            user_ip_address: Set(ctx.ip_address.clone()),
-            user_agent: Set(ctx.user_agent.clone()),
-            old_values: Set(old_values),
-            new_values: Set(new_values),
-            created_at: Set(created_at),
-            hash: Set(Some(digests.sha256)),
-            hash_sha3: Set(Some(digests.sha3)),
-            mac: Set(digests.mac),
-        };
-        row.insert(&self.db)
-            .await
-            .map_err(|e| crate::Error::Database(e.to_string()))?;
+        sqlx::query!(
+            "INSERT INTO audit_log
+                 (id, entity_type, entity_id, action, user_id, user_ip_address, user_agent,
+                  old_values, new_values, created_at, hash, hash_sha3, mac)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+            Uuid::new_v4(),
+            entity_type,
+            entity_id,
+            action,
+            ctx.user_id,
+            ctx.ip_address,
+            ctx.user_agent,
+            old_values,
+            new_values,
+            created_at,
+            digests.sha256,
+            digests.sha3,
+            digests.mac,
+        )
+        .execute(&self.db)
+        .await?;
         Ok(())
     }
 
@@ -207,13 +207,19 @@ impl AuditLogRepository {
     /// # Errors
     /// Propagates any database error from the query.
     pub async fn list_for_entity(&self, entity_id: Uuid, limit: u64) -> Result<Vec<AuditEntry>> {
-        let rows = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityId.eq(entity_id))
-            .order_by_desc(audit_log::Column::CreatedAt)
-            .limit(limit)
-            .all(&self.db)
-            .await
-            .map_err(|e| crate::Error::Database(e.to_string()))?;
+        let rows = sqlx::query_as!(
+            AuditLogRow,
+            "SELECT id, entity_type, entity_id, action, user_id, user_ip_address, user_agent,
+                    old_values, new_values, created_at, hash, hash_sha3, mac
+             FROM audit_log
+             WHERE entity_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2",
+            entity_id,
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
         Ok(rows.into_iter().map(AuditEntry::from).collect())
     }
 
@@ -222,12 +228,42 @@ impl AuditLogRepository {
     /// # Errors
     /// Propagates any database error from the query.
     pub async fn list_recent(&self, limit: u64) -> Result<Vec<AuditEntry>> {
-        let rows = audit_log::Entity::find()
-            .order_by_desc(audit_log::Column::CreatedAt)
-            .limit(limit)
-            .all(&self.db)
-            .await
-            .map_err(|e| crate::Error::Database(e.to_string()))?;
+        let rows = sqlx::query_as!(
+            AuditLogRow,
+            "SELECT id, entity_type, entity_id, action, user_id, user_ip_address, user_agent,
+                    old_values, new_values, created_at, hash, hash_sha3, mac
+             FROM audit_log
+             ORDER BY created_at DESC
+             LIMIT $1",
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
         Ok(rows.into_iter().map(AuditEntry::from).collect())
     }
+
+    /// The rows `GET /api/audit/verify` recomputes, whole (digests
+    /// included), ordered by `id` descending as they always have been.
+    ///
+    /// # Errors
+    /// Propagates any database error from the query.
+    pub async fn rows_for_verification(&self, limit: u64) -> Result<Vec<AuditLogRow>> {
+        let rows = sqlx::query_as!(
+            AuditLogRow,
+            "SELECT id, entity_type, entity_id, action, user_id, user_ip_address, user_agent,
+                    old_values, new_values, created_at, hash, hash_sha3, mac
+             FROM audit_log
+             ORDER BY id DESC
+             LIMIT $1",
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
+        Ok(rows)
+    }
+}
+
+/// A `LIMIT` bound: Postgres takes `BIGINT`, the callers count in `u64`.
+fn to_i64(n: u64) -> i64 {
+    i64::try_from(n).unwrap_or(i64::MAX)
 }

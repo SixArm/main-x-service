@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE places SET\n             name = $2, alternate_name = $3, description = $4,\n             place_type = $5, place_type_custom = $6,\n             address_street_address = $7, address_locality = $8, address_region = $9,\n             address_country = $10, address_postal_code = $11,\n             geo_latitude_as_decimal_degrees = $12, geo_longitude_as_decimal_degrees = $13,\n             geo_elevation_as_decimal_metres = $14,\n             telephone = $15, fax_number = $16, url = $17,\n             global_location_number = $18, branch_code = $19,\n             contained_in_place = $20, is_accessible_for_free = $21, public_access = $22,\n             smoking_allowed = $23, maximum_attendee_capacity = $24, is_deleted = $25,\n             content_hash = $26, content_hash_sha3 = $27, content_mac = $28,\n             deleted_at = $29, updated_at = $30\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Uuid",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Int4",
+        "Bool",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5baa674a63e1f639a92fd8b4d5d8214f2b5671c0df4365a252663906e4145d0a"
+}

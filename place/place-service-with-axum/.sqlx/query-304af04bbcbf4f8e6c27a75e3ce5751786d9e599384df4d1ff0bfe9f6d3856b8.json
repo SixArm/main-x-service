@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT identifier_type, custom_label, value\n             FROM place_identifiers WHERE place_id = $1 ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "identifier_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "place_identifiers",
+            "name": "identifier_type"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "custom_label",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "place_identifiers",
+            "name": "custom_label"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "place_identifiers",
+            "name": "value"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "304af04bbcbf4f8e6c27a75e3ce5751786d9e599384df4d1ff0bfe9f6d3856b8"
+}

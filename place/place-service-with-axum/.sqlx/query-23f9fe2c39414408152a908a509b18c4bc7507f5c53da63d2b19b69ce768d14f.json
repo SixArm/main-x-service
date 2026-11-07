@@ -1,0 +1,44 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO places (\n             id, name, alternate_name, description, place_type, place_type_custom,\n             address_street_address, address_locality, address_region,\n             address_country, address_postal_code,\n             geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,\n             geo_elevation_as_decimal_metres,\n             telephone, fax_number, url, global_location_number, branch_code,\n             contained_in_place, is_accessible_for_free, public_access,\n             smoking_allowed, maximum_attendee_capacity, is_deleted,\n             content_hash, content_hash_sha3, content_mac,\n             deleted_at, created_at, updated_at\n         ) VALUES (\n             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,\n             $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31\n         )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Numeric",
+        "Numeric",
+        "Numeric",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Uuid",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Int4",
+        "Bool",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "23f9fe2c39414408152a908a509b18c4bc7507f5c53da63d2b19b69ce768d14f"
+}

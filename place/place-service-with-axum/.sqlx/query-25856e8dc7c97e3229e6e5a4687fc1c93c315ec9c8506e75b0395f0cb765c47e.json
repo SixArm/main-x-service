@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM place_amenity_features WHERE place_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "25856e8dc7c97e3229e6e5a4687fc1c93c315ec9c8506e75b0395f0cb765c47e"
+}

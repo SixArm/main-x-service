@@ -31,9 +31,8 @@ hand-maintained, fully-normalized reference schema (8 tables:
 `place_keywords`, `place_identifiers`, `place_amenity_features`,
 `place_opening_hours`, `place_consents`, `place_merge_records`,
 `audit_log`). It follows the same flattened design as the SQL the
-service actually applies — the SeaORM migration crate
-(`place-service-with-axum/migration/`) `include_str!`s the raw SQL
-in `place-service-with-axum/migrations/*/up.sql` — but it is **not
+service actually applies — `sqlx::migrate!` embeds the plain SQL in
+`place-service-with-axum/migrations/*.up.sql` — but it is **not
 generated from** the migrations and has drifted: the live migrations
 create 7 tables (no `place_consents`; consents are an in-memory
 model only), omit the artifact's lat/lon CHECK constraints, and

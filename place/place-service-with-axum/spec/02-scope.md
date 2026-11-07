@@ -21,7 +21,7 @@
 - Keyed integrity verification (SHA-256 + SHA3-256 digests + an
   HMAC-SHA256 MAC, default-off) over place records and the audit log —
   see §12, §13.
-- PostgreSQL persistence via SeaORM, with PostGIS for spatial.
+- PostgreSQL persistence via sqlx (compile-checked SQL, no ORM), with PostGIS for spatial.
 
 ### 2.2 Out of scope (today)
 

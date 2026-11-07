@@ -27,12 +27,10 @@
 //! (`person/person-service-with-axum/src/bulk/store.rs`, BLK-4).
 #![cfg(feature = "fluvio")]
 
-use place_service::db::models::event_outbox;
-use place_service::db::{PlaceRepository, SeaOrmPlaceRepository};
+use place_service::db::{PgPlaceRepository, PlaceRepository, outbox};
 use place_service::models::place::Place;
 use place_service::relay::{self, FluvioSink};
 use place_service::streaming::envelope::EventTransport;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 #[tokio::test]
 #[ignore = "requires PostgreSQL AND a live Fluvio broker; see this file's module docs"]
@@ -41,12 +39,12 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
     let endpoint = std::env::var("PLACE_FLUVIO_ENDPOINT")
         .expect("set PLACE_FLUVIO_ENDPOINT to the broker's SC address (e.g. 127.0.0.1:9103)");
 
-    let db = sea_orm::Database::connect(&db_url)
+    let db = sqlx::PgPool::connect(&db_url)
         .await
         .expect("connect to DATABASE_URL");
 
     // Durable transport, so `create` writes an outbox row.
-    let repo = SeaOrmPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+    let repo = PgPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);
     let place = repo
         .create(&Place::new("Fluvio Relay Round Trip"))
         .await
@@ -61,11 +59,11 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
         .expect("drain_once against the real sink");
     assert!(published >= 1, "at least this row's send should succeed");
 
-    let row = event_outbox::Entity::find()
-        .filter(event_outbox::Column::EntityPid.eq(place.id))
-        .one(&db)
+    let row = outbox::rows_for(&db, place.id, "created")
         .await
         .expect("load the outbox row")
+        .into_iter()
+        .next()
         .expect("the row exists");
     assert!(
         row.published_at.is_some(),

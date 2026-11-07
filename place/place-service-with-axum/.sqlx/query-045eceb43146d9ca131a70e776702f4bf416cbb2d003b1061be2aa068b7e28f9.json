@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT day_of_week, opens, closes\n             FROM place_opening_hours WHERE place_id = $1 ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day_of_week",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "place_opening_hours",
+            "name": "day_of_week"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "opens",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "place_opening_hours",
+            "name": "opens"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "closes",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "place_opening_hours",
+            "name": "closes"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "045eceb43146d9ca131a70e776702f4bf416cbb2d003b1061be2aa068b7e28f9"
+}
