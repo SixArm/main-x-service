@@ -114,8 +114,10 @@ regression even if it compiles and the feature "works".
    properties, SEC-M6). Pure functions over external input are fuzz targets.
 3. **Bound every input.** Per-field text length, array cardinality, and
    per-entry length are capped **before** persist/match (`MAX_TEXT_LEN` =
-   1024, `MAX_ARRAY_LEN` = 256, `MAX_ITEM_LEN` = 512; SEC-M1). Pagination
-   offsets are bounded (SEC-G7). Bulk uploads have byte + row caps (SEC-B2).
+   1024, `MAX_ARRAY_LEN` = 256, `MAX_ITEM_LEN` = 512; SEC-M1). A page
+   position comes only from a cursor the service signed, or, on the
+   services still paging by offset, is bounded (SEC-G7); a page size
+   above the maximum is refused. Bulk uploads have byte + row caps (SEC-B2).
    Unbounded fan-out into O(n·m) scoring is a DoS.
 4. **No spurious identity.** A deterministic short-circuit to `1.0` must
    require **both** sides to carry a non-empty, well-formed value — never

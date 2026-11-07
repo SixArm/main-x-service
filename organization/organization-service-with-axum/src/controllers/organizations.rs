@@ -5,10 +5,11 @@
 //! `organization-matcher` engine, so there is no separate model or
 //! adapter to drift.
 
+use axa::cursor_pagination::{CursorLimits, CursorPage};
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
-use axa::pagination::{Limits, OffsetTooLarge, PageParams};
 use axa::prelude::*;
+use axum::extract::OriginalUri;
 use axum::http::StatusCode;
 use organization_matcher::{MatchConfig, MatchingEngine, Organization};
 use serde::{Deserialize, Serialize};
@@ -320,22 +321,18 @@ async fn remove(
 
 /// List active organizations, one page at a time.
 ///
-/// `GET /api/organizations[?limit=&offset=]`. Returns `200` with an
-/// array of `OrgRef`, newest first, soft-deleted rows excluded, plus the
-/// `X-Total-Count` / `X-Limit` / `X-Offset` headers
-/// (`agents/share/restful.md`). Omitting both parameters returns the
-/// first [`LIST_DEFAULT_LIMIT`] rows — exactly what this endpoint
-/// returned before it was paginated, so no existing caller changes. An
-/// `offset` beyond [`MAX_OFFSET`] is a `400`.
+/// `GET /api/organizations[?limit=&cursor=]`. Returns `200` with an
+/// array of `OrgRef`, newest first, soft-deleted rows excluded, and a
+/// `Link: rel="next"` header while more rows follow
+/// (`agents/share/restful.md`). Omitting `limit` returns the first
+/// [`LIST_DEFAULT_LIMIT`] rows. A `limit` above [`MAX_LIMIT`], or a
+/// cursor this service did not sign for this query, is a `422`.
 #[debug_handler]
-async fn list(Query(params): Query<PageParams>, State(ctx): State<AppContext>) -> Result<Response> {
-    let page = params
-        .resolve(limits(LIST_DEFAULT_LIMIT))
-        .map_err(offset_too_large)?;
-    let rows = OrgModel::list_paged(&ctx.db, page.limit, page.offset).await?;
-    let total = OrgModel::count(&ctx.db).await?;
+async fn list(OriginalUri(uri): OriginalUri, State(ctx): State<AppContext>) -> Result<Response> {
+    let page = CursorPage::new(crate::cursor_key::key(), limits(LIST_DEFAULT_LIMIT), &uri)?;
+    let rows = OrgModel::list_paged(&ctx.db, page.limit() + 1, page.offset()).await?;
     let refs: Vec<OrgRef> = rows.iter().map(OrgRef::of).collect();
-    Ok(page.respond(i64::try_from(total).unwrap_or(i64::MAX), refs))
+    Ok(page.respond(refs))
 }
 
 // ─── Pagination (agents/share/restful.md) ───────────────────────────────
@@ -345,37 +342,20 @@ async fn list(Query(params): Query<PageParams>, State(ctx): State<AppContext>) -
 /// returns exactly what it always did.
 pub const LIST_DEFAULT_LIMIT: u64 = 100;
 
-/// Largest page any collection read will serve. A bigger `limit` is
-/// **clamped** to this rather than refused: a caller asking for 100 000
-/// rows wants "as many as you'll give me", and an `X-Limit` of 500
-/// answers that better than a `400` it has to learn to handle.
+/// Largest page any collection read will serve. A bigger `limit` is a
+/// `422`, never clamped, so a caller is not handed less than it asked
+/// for without being told.
 pub const MAX_LIMIT: u64 = 500;
 
-/// Largest accepted `offset`. Past this a request is a `400`: the
-/// database would have to materialise and discard arbitrarily many rows,
-/// which is a cheap denial of service (SEC-G7). Deep paging past this
-/// wants a cursor, not a bigger number.
-pub const MAX_OFFSET: u64 = 10_000;
-
-/// The bounds of a collection read whose default page is `default_limit`.
-const fn limits(default_limit: u64) -> Limits {
-    Limits {
+/// The page sizes of a collection read whose default page is
+/// `default_limit`. There is no offset bound: a position comes only from
+/// a cursor this service signed, so reaching a deep page means fetching
+/// every page before it.
+const fn limits(default_limit: u64) -> CursorLimits {
+    CursorLimits {
         default_limit,
         max_limit: MAX_LIMIT,
-        max_offset: MAX_OFFSET,
     }
-}
-
-/// An offset past [`MAX_OFFSET`] as a `400`, with the `offset_too_large`
-/// code the older services answer with too.
-fn offset_too_large(error: OffsetTooLarge) -> Error {
-    Error::CustomError(
-        StatusCode::BAD_REQUEST,
-        ErrorDetail::new(
-            "offset_too_large",
-            format!("{error}; narrow the query instead"),
-        ),
-    )
 }
 
 /// Score a query against an explicit candidate list (no persistence).
@@ -779,18 +759,10 @@ async fn review_decision(
 }
 
 /// Query string for the search endpoint: the `q` term, the optional
-/// retrieval-mode flags, and the page window.
+/// retrieval-mode flags. The page, `limit` and `cursor`, is read from the
+/// URI by [`CursorPage::new`], and ignored here.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
-    /// Page size; absent, zero or unparseable ⇒ [`SEARCH_DEFAULT_LIMIT`].
-    /// A string, as in [`PageParams`], so a bad value falls back rather
-    /// than refusing the query. Not `#[serde(flatten)]`ed, because the
-    /// `bool` flags below would then arrive as strings and fail.
-    #[serde(default)]
-    limit: Option<String>,
-    /// Rows to skip; absent ⇒ 0.
-    #[serde(default)]
-    offset: Option<String>,
     /// The full-text query.
     q: Option<String>,
     /// Typo-tolerant retrieval (Levenshtein distance ≤ 2) instead of
@@ -819,6 +791,7 @@ pub const SEARCH_DEFAULT_LIMIT: u64 = 50;
 /// an index entry for a deleted record cannot surface here.
 #[debug_handler]
 async fn search(
+    OriginalUri(uri): OriginalUri,
     Query(params): Query<SearchParams>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
@@ -827,12 +800,7 @@ async fn search(
     if q.is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let page = PageParams {
-        limit: params.limit.clone(),
-        offset: params.offset.clone(),
-    }
-    .resolve(limits(SEARCH_DEFAULT_LIMIT))
-    .map_err(offset_too_large)?;
+    let page = CursorPage::new(crate::cursor_key::key(), limits(SEARCH_DEFAULT_LIMIT), &uri)?;
     // An unavailable index is reported, never disguised as "no matches":
     // an operator must be able to tell a broken index from an empty one.
     let Some(engine) = crate::search::engine() else {
@@ -848,19 +816,31 @@ async fn search(
     } else {
         crate::search::SearchMode::Exact
     };
-    let (pids, total) = engine.search_page(
+    let (pids, _total) = engine.search_page(
         q,
         mode,
-        usize::try_from(page.limit).unwrap_or(usize::MAX),
-        usize::try_from(page.offset).unwrap_or(usize::MAX),
+        usize::try_from(page.limit() + 1).unwrap_or(usize::MAX),
+        usize::try_from(page.offset()).unwrap_or(usize::MAX),
     )?;
+    // Whether more follow is the index's answer, decided before the hits
+    // resolve: a hit whose row has since been deleted is dropped from the
+    // page (see `find_by_pids`), and a short page must not end the walk.
+    let (pids, more_follow) = page.split(pids);
     let rows = OrgModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
     let refs: Vec<OrgRef> = rows.iter().map(OrgRef::of).collect();
-    // The total is the index's match count, not the number of rows that
-    // resolved: a hit whose row has since been deleted is dropped from
-    // the page (see `find_by_pids`), and reporting the shrunken figure
-    // would make the count wobble for reasons a caller cannot see.
-    Ok(page.respond(i64::try_from(total).unwrap_or(i64::MAX), refs))
+    Ok(with_next(&page, more_follow, refs))
+}
+
+/// `rows` as a bare JSON array, with the page's `Link: rel="next"` when
+/// `more` says rows follow.
+fn with_next<T: Serialize>(page: &CursorPage, more: bool, rows: Vec<T>) -> Response {
+    let mut response = Json(rows).into_response();
+    if more && let Some(link) = page.next_link() {
+        response
+            .headers_mut()
+            .insert(axum::http::header::LINK, link);
+    }
+    response
 }
 
 /// Parse index hits into UUIDs, dropping any that will not parse.
@@ -1090,39 +1070,55 @@ mod tests {
         assert_eq!(LIST_DEFAULT_LIMIT, 100);
     }
 
-    /// This crate's bounds: `limit` is clamped rather than refused, a zero,
-    /// absent or unparseable `limit` falls back to the default, and the
-    /// offset bound is what refuses, as `offset_too_large`.
+    /// This crate's bounds: no `limit` is the default, a `limit` up to
+    /// [`MAX_LIMIT`] is taken, and anything else is refused, never clamped.
     #[test]
-    fn page_params_clamp_rather_than_reject() {
-        let params = |limit: Option<&str>, offset: Option<&str>| PageParams {
-            limit: limit.map(str::to_string),
-            offset: offset.map(str::to_string),
+    fn a_page_takes_its_limit_or_refuses_it() {
+        let page = |query: &str| {
+            let uri = format!("/api/organizations{query}").parse().unwrap();
+            CursorPage::new(crate::cursor_key::key(), limits(LIST_DEFAULT_LIMIT), &uri)
         };
-        let page = params(Some("100000"), Some("0"))
-            .resolve(limits(LIST_DEFAULT_LIMIT))
-            .unwrap();
-        assert_eq!((page.limit, page.offset), (MAX_LIMIT, 0));
-        for fallback in [Some("0"), Some("lots"), None] {
-            let page = params(fallback, None)
-                .resolve(limits(LIST_DEFAULT_LIMIT))
-                .unwrap();
-            assert_eq!(page.limit, LIST_DEFAULT_LIMIT, "{fallback:?}");
-        }
-        assert!(
-            params(None, Some(&MAX_OFFSET.to_string()))
-                .resolve(limits(SEARCH_DEFAULT_LIMIT))
-                .is_ok()
+        assert_eq!(page("").unwrap().limit(), LIST_DEFAULT_LIMIT);
+        assert_eq!(
+            page(&format!("?limit={MAX_LIMIT}")).unwrap().limit(),
+            MAX_LIMIT
         );
-        let refused = params(None, Some(&(MAX_OFFSET + 1).to_string()))
-            .resolve(limits(SEARCH_DEFAULT_LIMIT))
-            .map_err(offset_too_large)
-            .unwrap_err();
+        for refused in [
+            "?limit=0",
+            "?limit=lots",
+            &format!("?limit={}", MAX_LIMIT + 1),
+        ] {
+            assert!(page(refused).is_err(), "{refused}");
+        }
+    }
+
+    /// A cursor this service did not sign, such as a caller's own offset
+    /// in disguise, is refused rather than read.
+    #[test]
+    fn an_unsigned_cursor_is_refused() {
+        let uri = "/api/organizations?cursor=AQAAAAAAAAAK".parse().unwrap();
         assert!(
-            matches!(&refused, Error::CustomError(status, detail)
-                if *status == StatusCode::BAD_REQUEST
-                    && detail.code.as_deref() == Some("offset_too_large")),
-            "an unbounded offset is a DoS, not a deep page: {refused:?}"
+            CursorPage::new(crate::cursor_key::key(), limits(LIST_DEFAULT_LIMIT), &uri).is_err()
+        );
+    }
+
+    /// The next link is only sent while more rows follow.
+    #[test]
+    fn the_next_link_follows_more() {
+        let uri = "/api/organizations/search?q=acme&limit=2".parse().unwrap();
+        let page =
+            CursorPage::new(crate::cursor_key::key(), limits(SEARCH_DEFAULT_LIMIT), &uri).unwrap();
+        let more = with_next(&page, true, vec!["a", "b"]);
+        let link = more.headers()["link"].to_str().unwrap();
+        assert!(
+            link.starts_with("</api/organizations/search?q=acme&limit=2&cursor="),
+            "{link}"
+        );
+        assert!(
+            with_next(&page, false, vec!["a"])
+                .headers()
+                .get("link")
+                .is_none()
         );
     }
 

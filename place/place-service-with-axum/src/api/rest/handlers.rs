@@ -4,10 +4,10 @@
 //! ([`ApiProblem`]) with an HTTP status. Errors map: [`crate::Error::NotFound`] → 404,
 //! `Validation` → 422, `Conflict` → 409, everything else → 500.
 
+use axa::cursor_pagination::{CursorLimits, CursorPage, PageError};
 use axa::extract::{Json, Path, Query};
-use axa::pagination::{Limits, OffsetTooLarge, PageParams};
 use axum::{
-    extract::State,
+    extract::{OriginalUri, State},
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -27,54 +27,44 @@ use crate::privacy::{gdpr_export, mask_place};
 use crate::streaming::{EventKind, PlaceEvent};
 use crate::validation::{normalize_place, validate_place};
 
-/// Largest accepted `offset` on a paginated collection read
-/// (`agents/share/restful.md`, SEC-G7). Past this a request is a `400`:
-/// the database (or, for `nearby`, the in-process filter) would
-/// otherwise have to materialise and discard arbitrarily many rows,
-/// which is a cheap denial of service. Deep paging past this bound
-/// wants a cursor, not a bigger number.
-pub const MAX_OFFSET: u64 = 10_000;
-
 /// `400 Bad Request` problem for a rejected query parameter.
 fn bad_request(code: &str, message: impl Into<String>) -> Response {
     ApiProblem::new(code, message.into()).respond(StatusCode::BAD_REQUEST)
 }
 
-/// `400` for an `offset` beyond [`MAX_OFFSET`], with the
-/// `offset_too_large` code the rest of the family answers with too.
-fn offset_too_large(error: OffsetTooLarge) -> Response {
-    ApiProblem::new(
-        "offset_too_large",
-        format!("{error}; narrow the query instead"),
-    )
-    .respond(StatusCode::BAD_REQUEST)
+/// A refused page, a `limit` out of range or a cursor this service did
+/// not sign for this query, as this crate's own `422` problem with the
+/// `invalid_page` code.
+fn invalid_page(error: &PageError) -> Response {
+    ApiProblem::new("invalid_page", error.to_string()).respond(error.status())
 }
 
-/// The bounds of a collection read (`agents/share/restful.md`): a page
-/// of `default_limit` when none is asked for, clamped to `max_limit`,
-/// and an offset bounded by [`MAX_OFFSET`].
-const fn limits(default_limit: u64, max_limit: u64) -> Limits {
-    Limits {
+/// The page sizes of a collection read (`agents/share/restful.md`): a
+/// page of `default_limit` when none is asked for, and a `limit` above
+/// `max_limit` refused with a `422`, never clamped. There is no offset
+/// bound: a position comes only from a cursor this service signed, so
+/// reaching a deep page means fetching every page before it.
+const fn limits(default_limit: u64, max_limit: u64) -> CursorLimits {
+    CursorLimits {
         default_limit,
         max_limit,
-        max_offset: MAX_OFFSET,
     }
 }
 
-/// `?limit=` / `?offset=` resolved against `limits`. Both arrive as
-/// strings, so a zero or unparseable value falls back to the default
-/// rather than refusing the query; only an offset past [`MAX_OFFSET`]
-/// is refused, answered by [`offset_too_large`].
-fn resolve_page(
-    limit: Option<&String>,
-    offset: Option<&String>,
-    limits: Limits,
-) -> Result<axa::pagination::Page, OffsetTooLarge> {
-    PageParams {
-        limit: limit.cloned(),
-        offset: offset.cloned(),
+/// The page `?limit=` and `?cursor=` in `uri` name, under `limits`.
+fn page_of(uri: &axum::http::Uri, limits: CursorLimits) -> Result<CursorPage, PageError> {
+    CursorPage::new(crate::cursor_key::key(), limits, uri)
+}
+
+/// `response` with the page's `Link: rel="next"` when `more` says rows
+/// follow.
+fn with_next(page: &CursorPage, more: bool, mut response: Response) -> Response {
+    if more && let Some(link) = page.next_link() {
+        response
+            .headers_mut()
+            .insert(axum::http::header::LINK, link);
     }
-    .resolve(limits)
+    response
 }
 
 /// Map a crate error to the HTTP status the REST layer returns for it.
@@ -319,14 +309,14 @@ pub async fn delete_place(
 pub struct SearchQuery {
     /// Free-text query.
     pub q: Option<String>,
-    /// Max results (default 10, capped at 100). A zero or unparseable
-    /// value falls back to the default.
+    /// Page size (default 10, at most 100; anything else is a `422`).
+    /// Read from the URI by [`CursorPage::new`], declared here for the
+    /// `OpenAPI` document.
     #[param(value_type = Option<u64>)]
     pub limit: Option<String>,
-    /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
-    /// beyond that is a `400`, and an unparseable one is 0.
-    #[param(value_type = Option<u64>)]
-    pub offset: Option<String>,
+    /// The signed position from a previous page's `Link: rel="next"`.
+    /// Read from the URI by [`CursorPage::new`].
+    pub cursor: Option<String>,
     /// Use fuzzy matching.
     pub fuzzy: Option<bool>,
     /// Mask sensitive fields in the results.
@@ -334,7 +324,7 @@ pub struct SearchQuery {
 }
 
 /// Default page size for `GET /api/places/search` — the cap this
-/// endpoint applied before `offset` existed, so omitting `limit`
+/// endpoint applied before it was paginated, so omitting `limit`
 /// returns exactly what it always did.
 pub const SEARCH_DEFAULT_LIMIT: usize = 10;
 
@@ -344,48 +334,51 @@ pub const SEARCH_MAX_LIMIT: usize = 100;
 /// Search response payload.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct SearchResponse {
-    /// The matched places (hydrated from the DB).
+    /// The matched places (hydrated from the DB). No total: a count
+    /// would include rows the caller may not see, so whether more follow
+    /// is the `Link: rel="next"` header's answer instead.
     pub results: Vec<Place>,
-    /// Number of results returned.
-    pub total: usize,
 }
 
 /// Full-text / fuzzy place search.
 ///
-/// `GET /api/places/search?q=&limit=&offset=&fuzzy=&mask_sensitive=`.
-/// Returns `200` with a [`SearchResponse`] plus the `X-Total-Count` /
-/// `X-Limit` / `X-Offset` pagination headers
-/// (`agents/share/restful.md`) — the total is the true index match
-/// count, not the number of rows this page returned. An `offset`
-/// beyond [`MAX_OFFSET`] is a `400`.
+/// `GET /api/places/search?q=&limit=&cursor=&fuzzy=&mask_sensitive=`.
+/// Returns `200` with a [`SearchResponse`] and a `Link: rel="next"`
+/// header while more hits follow (`agents/share/restful.md`). A `limit`
+/// above [`SEARCH_MAX_LIMIT`], or a cursor this service did not sign for
+/// this query, is a `422`.
 #[utoipa::path(get, path = "/api/places/search", tag = "search",
     params(SearchQuery),
     responses(
         (status = 200, body = SearchResponse),
-        (status = 400, description = "offset too large")
+        (status = 422, description = "invalid limit or cursor")
     ))]
 pub async fn search_places(
     State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
     Query(q): Query<SearchQuery>,
 ) -> impl IntoResponse {
-    let page = match resolve_page(
-        q.limit.as_ref(),
-        q.offset.as_ref(),
+    let page = match page_of(
+        &uri,
         limits(SEARCH_DEFAULT_LIMIT as u64, SEARCH_MAX_LIMIT as u64),
     ) {
         Ok(page) => page,
-        Err(refused) => return offset_too_large(refused),
+        Err(refused) => return invalid_page(&refused),
     };
     let query = q.q.unwrap_or_default();
-    let (ids, total) = state
+    let (ids, _total) = state
         .search_engine
         .search_page(
             &query,
             q.fuzzy.unwrap_or(false),
-            usize::try_from(page.limit).unwrap_or(usize::MAX),
-            usize::try_from(page.offset).unwrap_or(usize::MAX),
+            usize::try_from(page.limit() + 1).unwrap_or(usize::MAX),
+            usize::try_from(page.offset()).unwrap_or(usize::MAX),
         )
         .unwrap_or_default();
+    // Whether more follow is the index's answer, decided before the hits
+    // resolve: a hit whose row has since been deleted is dropped from the
+    // page, and a short page must not end the walk.
+    let (ids, more_follow) = page.split(ids);
 
     let mut results = Vec::new();
     for id in ids {
@@ -399,32 +392,24 @@ pub async fn search_places(
             });
         }
     }
-    let count = results.len();
-    let response = ok(
-        StatusCode::OK,
-        SearchResponse {
-            results,
-            total: count,
-        },
-    );
-    (
-        page.headers(u64::try_from(total).unwrap_or(u64::MAX)),
-        response,
+    with_next(
+        &page,
+        more_follow,
+        ok(StatusCode::OK, SearchResponse { results }),
     )
-        .into_response()
 }
 
 /// Query parameters for `GET /api/places` (the plain collection list).
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 pub struct ListQuery {
-    /// Max results (default 10, capped at 100). A zero or unparseable
-    /// value falls back to the default.
+    /// Page size (default 10, at most 100; anything else is a `422`).
+    /// Read from the URI by [`CursorPage::new`], declared here for the
+    /// `OpenAPI` document.
     #[param(value_type = Option<u64>)]
     pub limit: Option<String>,
-    /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
-    /// beyond that is a `400`, and an unparseable one is 0.
-    #[param(value_type = Option<u64>)]
-    pub offset: Option<String>,
+    /// The signed position from a previous page's `Link: rel="next"`.
+    /// Read from the URI by [`CursorPage::new`].
+    pub cursor: Option<String>,
     /// Mask sensitive fields in the results.
     pub mask_sensitive: Option<bool>,
 }
@@ -443,16 +428,14 @@ pub const LIST_MAX_LIMIT: usize = SEARCH_MAX_LIMIT;
 /// caller that already handles one.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ListResponse {
-    /// The places on this page.
+    /// The places on this page. No total: whether more follow is the
+    /// `Link: rel="next"` header's answer (`agents/share/restful.md`).
     pub results: Vec<Place>,
-    /// Count of places on **this page** (not the global total — that
-    /// is the `X-Total-Count` header, `agents/share/restful.md`).
-    pub total: usize,
 }
 
 /// Enumerate every active place, database-backed and paginated.
 ///
-/// `GET /api/places[?limit=&offset=&mask_sensitive=]` — the genuine
+/// `GET /api/places[?limit=&cursor=&mask_sensitive=]` — the genuine
 /// "list the collection" endpoint, distinct from `/places/search`:
 /// there was previously no way to enumerate places at all (mirroring
 /// thing-service's own T-15) — `q="*"` tokenises to nothing
@@ -464,47 +447,44 @@ pub struct ListResponse {
 /// only ever as stale as the database itself, never as stale as a
 /// second, independently lifecycled search index.
 ///
-/// Returns `200` with the family pagination headers
-/// (`X-Total-Count`/`X-Limit`/`X-Offset`, `agents/share/restful.md`);
-/// an `offset` beyond [`MAX_OFFSET`] is a `400` (SEC-G7).
+/// Returns `200` with a `Link: rel="next"` header while more rows
+/// follow (`agents/share/restful.md`); a `limit` above
+/// [`LIST_MAX_LIMIT`], or a cursor this service did not sign for this
+/// query, is a `422`.
 #[utoipa::path(get, path = "/api/places", tag = "places",
     params(ListQuery),
     responses(
         (status = 200, body = ListResponse),
-        (status = 400, description = "offset too large")
+        (status = 422, description = "invalid limit or cursor")
     ))]
 pub async fn list_places(
     State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
     Query(q): Query<ListQuery>,
 ) -> impl IntoResponse {
-    let page = match resolve_page(
-        q.limit.as_ref(),
-        q.offset.as_ref(),
+    let page = match page_of(
+        &uri,
         limits(LIST_DEFAULT_LIMIT as u64, LIST_MAX_LIMIT as u64),
     ) {
         Ok(page) => page,
-        Err(refused) => return offset_too_large(refused),
+        Err(refused) => return invalid_page(&refused),
     };
     let mask_sensitive = q.mask_sensitive.unwrap_or(false);
     let places = state
         .place_repository
-        .list(page.limit, page.offset)
+        .list(page.limit() + 1, page.offset())
         .await
         .unwrap_or_default();
-    let total_count = crate::db::count_active(&state.db).await.unwrap_or(0);
+    let (places, more_follow) = page.split(places);
     let results: Vec<Place> = places
         .into_iter()
         .map(|p| if mask_sensitive { mask_place(&p) } else { p })
         .collect();
-    let count = results.len();
-    let response = ok(
-        StatusCode::OK,
-        ListResponse {
-            results,
-            total: count,
-        },
-    );
-    (page.headers(total_count), response).into_response()
+    with_next(
+        &page,
+        more_follow,
+        ok(StatusCode::OK, ListResponse { results }),
+    )
 }
 
 /// Query parameters for `GET /api/places/nearby`.
@@ -516,14 +496,14 @@ pub struct NearbyQuery {
     pub lon: f64,
     /// Search radius in kilometers (non-negative, finite).
     pub radius_km: f64,
-    /// Max results (default 10, capped at 100). A zero or unparseable
-    /// value falls back to the default.
+    /// Page size (default 10, at most 100; anything else is a `422`).
+    /// Read from the URI by [`CursorPage::new`], declared here for the
+    /// `OpenAPI` document.
     #[param(value_type = Option<u64>)]
     pub limit: Option<String>,
-    /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
-    /// beyond that is a `400`, and an unparseable one is 0.
-    #[param(value_type = Option<u64>)]
-    pub offset: Option<String>,
+    /// The signed position from a previous page's `Link: rel="next"`.
+    /// Read from the URI by [`CursorPage::new`].
+    pub cursor: Option<String>,
 }
 
 /// Default page size for `GET /api/places/nearby`.
@@ -540,25 +520,27 @@ pub const NEARBY_BBOX_SCAN_CAP: u64 = 5_000;
 
 /// Geo-radius search.
 ///
-/// `GET /api/places/nearby?lat=&lon=&radius_km=&limit=&offset=`. Filters
+/// `GET /api/places/nearby?lat=&lon=&radius_km=&limit=&cursor=`. Filters
 /// places within `radius_km` of `(lat, lon)`: a coarse SQL bounding-box
 /// pre-filter (`matching::geo::bounding_box`, over the `idx_places_geo`
 /// index) narrows the candidates, then the exact
 /// [`within_radius`](crate::matching::geo::within_radius) Haversine
 /// check keeps only those truly inside the circle. Results are ordered
-/// nearest-first. Returns `200` with a [`SearchResponse`] plus the
-/// `X-Total-Count` / `X-Limit` / `X-Offset` pagination headers
-/// (`agents/share/restful.md`) — the total is every in-radius match,
-/// ignoring the page window. `lat`/`lon`/`radius_km` out of range, or an
-/// `offset` beyond [`MAX_OFFSET`], is a `400`.
+/// nearest-first. Returns `200` with a [`SearchResponse`] and a
+/// `Link: rel="next"` header while more in-radius matches follow
+/// (`agents/share/restful.md`). `lat`/`lon`/`radius_km` out of range is
+/// a `400`; a `limit` above [`NEARBY_MAX_LIMIT`], or a cursor this
+/// service did not sign for this query, is a `422`.
 #[utoipa::path(get, path = "/api/places/nearby", tag = "search",
     params(NearbyQuery),
     responses(
         (status = 200, body = SearchResponse),
-        (status = 400, description = "invalid lat/lon/radius_km, or offset too large")
+        (status = 400, description = "invalid lat/lon/radius_km"),
+        (status = 422, description = "invalid limit or cursor")
     ))]
 pub async fn nearby_places(
     State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
     Query(q): Query<NearbyQuery>,
 ) -> impl IntoResponse {
     if !(-90.0..=90.0).contains(&q.lat) {
@@ -573,13 +555,9 @@ pub async fn nearby_places(
             "radius_km must be a non-negative finite number",
         );
     }
-    let page = match resolve_page(
-        q.limit.as_ref(),
-        q.offset.as_ref(),
-        limits(NEARBY_DEFAULT_LIMIT, NEARBY_MAX_LIMIT),
-    ) {
+    let page = match page_of(&uri, limits(NEARBY_DEFAULT_LIMIT, NEARBY_MAX_LIMIT)) {
         Ok(page) => page,
-        Err(refused) => return offset_too_large(refused),
+        Err(refused) => return invalid_page(&refused),
     };
 
     let center = GeoCoordinates::new(q.lat, q.lon);
@@ -606,29 +584,21 @@ pub async fn nearby_places(
     // rather than an arbitrary one.
     within.sort_by(|(da, _), (db, _)| da.partial_cmp(db).unwrap_or(std::cmp::Ordering::Equal));
 
-    let total = within.len();
-    let offset_usize = usize::try_from(page.offset).unwrap_or(usize::MAX);
-    let limit_usize = usize::try_from(page.limit).unwrap_or(usize::MAX);
-    let results: Vec<Place> = within
+    let offset_usize = usize::try_from(page.offset()).unwrap_or(usize::MAX);
+    let limit_usize = usize::try_from(page.limit() + 1).unwrap_or(usize::MAX);
+    let window: Vec<Place> = within
         .into_iter()
         .skip(offset_usize)
         .take(limit_usize)
         .map(|(_dist, p)| p)
         .collect();
-    let count = results.len();
+    let (results, more_follow) = page.split(window);
 
-    let response = ok(
-        StatusCode::OK,
-        SearchResponse {
-            results,
-            total: count,
-        },
-    );
-    (
-        page.headers(u64::try_from(total).unwrap_or(u64::MAX)),
-        response,
+    with_next(
+        &page,
+        more_follow,
+        ok(StatusCode::OK, SearchResponse { results }),
     )
-        .into_response()
 }
 
 /// A scored candidate place returned by match / duplicate endpoints.
@@ -1329,30 +1299,70 @@ pub async fn verify_audit_integrity(
 mod page_tests {
     use super::*;
 
-    /// This crate's bounds: `limit` is clamped rather than refused, a
-    /// zero, absent or unparseable `limit` falls back to the default, an
-    /// unparseable `offset` is 0, and the offset bound is what refuses,
-    /// as a `400` `offset_too_large`.
+    fn page(query: &str, limits: CursorLimits) -> Result<CursorPage, PageError> {
+        let uri = format!("/api/places{query}").parse().unwrap();
+        page_of(&uri, limits)
+    }
+
+    /// This crate's bounds: no `limit` is the default, a `limit` up to
+    /// the max is taken, and anything else is refused, never clamped, as
+    /// a `422` `invalid_page`.
     #[test]
-    fn page_params_clamp_rather_than_reject() {
-        let s = |v: &str| v.to_string();
+    fn a_page_takes_its_limit_or_refuses_it() {
         let list = limits(LIST_DEFAULT_LIMIT as u64, LIST_MAX_LIMIT as u64);
-        let page = resolve_page(Some(&s("100000")), Some(&s("0")), list).unwrap();
-        assert_eq!((page.limit, page.offset), (LIST_MAX_LIMIT as u64, 0));
-        for fallback in [Some(s("0")), Some(s("lots")), None] {
-            let page = resolve_page(fallback.as_ref(), Some(&s("x")), list).unwrap();
+        assert_eq!(page("", list).unwrap().limit(), LIST_DEFAULT_LIMIT as u64);
+        assert_eq!(
+            page(&format!("?limit={LIST_MAX_LIMIT}"), list)
+                .unwrap()
+                .limit(),
+            LIST_MAX_LIMIT as u64
+        );
+        let nearby = limits(NEARBY_DEFAULT_LIMIT, NEARBY_MAX_LIMIT);
+        assert_eq!(page("", nearby).unwrap().limit(), NEARBY_DEFAULT_LIMIT);
+        for refused in [
+            "?limit=0",
+            "?limit=lots",
+            &format!("?limit={}", LIST_MAX_LIMIT + 1),
+        ] {
+            let error = page(refused, list).expect_err(refused);
             assert_eq!(
-                (page.limit, page.offset),
-                (LIST_DEFAULT_LIMIT as u64, 0),
-                "{fallback:?}"
+                invalid_page(&error).status(),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "{refused}"
             );
         }
-        let nearby = limits(NEARBY_DEFAULT_LIMIT, NEARBY_MAX_LIMIT);
-        assert!(resolve_page(None, Some(&MAX_OFFSET.to_string()), nearby).is_ok());
-        let refused = resolve_page(None, Some(&(MAX_OFFSET + 1).to_string()), nearby)
-            .expect_err("an unbounded offset is a DoS, not a deep page");
-        assert_eq!(refused.requested, MAX_OFFSET + 1);
-        assert_eq!(offset_too_large(refused).status(), StatusCode::BAD_REQUEST);
+    }
+
+    /// A cursor this service did not sign, such as a caller's own offset
+    /// in disguise, is refused rather than read.
+    #[test]
+    fn an_unsigned_cursor_is_refused() {
+        let list = limits(LIST_DEFAULT_LIMIT as u64, LIST_MAX_LIMIT as u64);
+        assert!(page("?cursor=AQAAAAAAAAAK", list).is_err());
+    }
+
+    /// The next link is only sent while more rows follow.
+    #[test]
+    fn the_next_link_follows_more() {
+        let uri = "/api/places/search?q=park&limit=2".parse().unwrap();
+        let page = page_of(
+            &uri,
+            limits(SEARCH_DEFAULT_LIMIT as u64, SEARCH_MAX_LIMIT as u64),
+        )
+        .unwrap();
+        let body = || ok(StatusCode::OK, SearchResponse { results: vec![] });
+        let more = with_next(&page, true, body());
+        let link = more.headers()["link"].to_str().unwrap();
+        assert!(
+            link.starts_with("</api/places/search?q=park&limit=2&cursor="),
+            "{link}"
+        );
+        assert!(
+            with_next(&page, false, body())
+                .headers()
+                .get("link")
+                .is_none()
+        );
     }
 }
 

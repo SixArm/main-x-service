@@ -8506,3 +8506,17 @@ Suggested order: LCI-1 → LCI-2 → LCI-9 → LCI-3 → LCI-6 → LCI-5 → LCI
 LCI-8 → LCI-10 → LCI-7. The first three are what would have caught this
 session's red `main`; LCI-7 is last because it adds a machine to run and
 secure.
+
+## Phase 13 — Cursor paging (axa 0.7, 2026-11-07)
+
+organization, care-pathway, case, place and thing page by signed cursor
+through `axa::cursor_pagination` (`agents/share/restful.md`
+§Pagination). The rest still take `?offset=` through their own code.
+
+- [ ] **CUR-1 (M)** Move person, worker, event and course list and
+  search to cursor paging, with `CURSOR_KEY` and their front-ends, as
+  organization did. Their bounded `?offset=` goes, and so does the
+  offset cap, which a signed position no longer needs.
+- [ ] **CUR-2 (S)** `src/cursor_key.rs` is copied into each crate, like
+  `src/client_limits.rs`. Reading `CURSOR_KEY` with the production rule
+  belongs in axa, as one `CursorKey::from_env`.

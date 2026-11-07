@@ -598,6 +598,17 @@ clearly described manual check confirms the acceptance criterion.
   `ThingRepository.list` addition) is tracked there, not duplicated
   here.
 
+  (2026-11-07: offset paging replaced by **cursor paging**,
+  `axa::cursor_pagination`, §9. `?limit=&cursor=` with a signed cursor
+  and `Link: rel="next"`; no `X-Total-Count`/`X-Limit`/`X-Offset`, and
+  `ListResponse.total` removed; a bad `limit` (zero, unparseable, above
+  500) or cursor is a `422` coded `invalid_page`, not clamped; the
+  `LIST_MAX_OFFSET` bound and its `offset_too_large` `400` are gone,
+  since a position comes only from a cursor this service signed.
+  `CURSOR_KEY` signs them. The two request-level tests are now
+  `listing_with_no_query_term_enumerates_seeded_things`, walking the
+  `Link` chain, and `listing_with_a_bad_limit_or_cursor_is_refused`.)
+
 - [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
       (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
       features; `THING_KEYCLOAK_*` configuration; `request_claims` /

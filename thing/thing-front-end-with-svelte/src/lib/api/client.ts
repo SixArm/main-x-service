@@ -142,10 +142,10 @@ export class ApiClient {
   }
   /**
    * As {@link get}, but also returns the raw {@link Response} so a
-   * caller can read response headers — e.g. the family-wide
-   * `X-Total-Count`/`X-Limit`/`X-Offset` pagination headers
-   * (`agents/share/restful.md`), which the plain body a normal `get`
-   * returns has no room to carry (T-28).
+   * caller can read response headers — e.g. the `Link: <…>; rel="next"`
+   * that says where a collection's next page is
+   * (`agents/share/restful.md`, read with {@link nextLink}), which the
+   * plain body a normal `get` returns has no room to carry.
    * @throws {ApiError} On non-2xx response.
    */
   getWithHeaders<T>(
@@ -281,6 +281,21 @@ export class ApiClient {
     }
     return url.toString();
   }
+}
+
+/**
+ * The URL of `rel="next"` in a `Link` header, or `null` when there is
+ * none. Only a same-origin path is taken, so a header cannot send the
+ * client somewhere else.
+ */
+export function nextLink(header: string | null): string | null {
+  if (!header) return null;
+  for (const part of header.split(",")) {
+    const match = /^\s*<([^>]*)>\s*;\s*rel="?next"?\s*$/.exec(part);
+    const url = match?.[1];
+    if (url?.startsWith("/") && !url.startsWith("//")) return url;
+  }
+  return null;
 }
 
 /** `value` as a problem when it is an object, else `null`. */

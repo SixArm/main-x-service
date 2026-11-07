@@ -7,11 +7,12 @@
 
   $state:
     - query: bound search text.
-    - things / total: current result set and count (T-28: `total`
-      comes from the family-wide `X-Total-Count` header, ignoring
-      `limit`/`offset` — see `ThingRepository.search`).
-    - offset (T-28): the window's start, as actually applied by the
-      service (`X-Offset`, which may differ from what was asked for).
+    - things: every row loaded so far; "Load more" appends the next
+      page rather than replacing this one.
+    - next: the next page's URL from `Link: rel="next"`, or null on the
+      last page. The service sends no total (a count would describe
+      rows the caller's policy may hide), so the shown count is
+      `{count}+` while more follow — see `ThingRepository.list`.
     - loading / error: request status.
     - fuzzy / phonetic: search-mode toggles passed to the API.
     - maskSensitive (T-27): asks the server to mask sensitive fields in
@@ -24,10 +25,10 @@
 
   Reactive notes: an $effect runs the initial unfiltered list once on
   mount (T-15: `repo.list`, not a "*" wildcard search — see runSearch);
-  subsequent searches are user-triggered via runSearch (submit, the
-  mask-sensitive toggle's own onchange, or the previous/next page
-  controls). A new query/toggle-submit always starts back at offset 0
-  (runSearch's default); only the pagination controls advance it.
+  subsequent searches are user-triggered via runSearch (submit, or the
+  mask-sensitive toggle's own onchange). A new query or toggle always
+  starts back at the first page; only "Load more" follows `next`, and
+  the cursor it carries is signed for that query alone.
 -->
 <script lang="ts">
     import { page } from "$app/state";
@@ -43,8 +44,7 @@
 
     let query = $state("");
     let things = $state<Thing[]>([]);
-    let total = $state(0);
-    let offset = $state(0);
+    let next = $state<string | null>(null);
     let loading = $state(false);
     let error = $state<string | null>(null);
     let fuzzy = $state(true);
@@ -52,17 +52,18 @@
     let maskSensitive = $state(false);
 
     const repo = ThingRepository.withFetch();
-    const hasPreviousPage = $derived(offset > 0);
-    const hasNextPage = $derived(offset + things.length < total);
+    // While more rows follow, the count is a lower bound.
+    const countLabel = $derived(
+        next ? `${things.length}+` : String(things.length),
+    );
 
     // Execute a search, or — when the input is empty — enumerate the
     // collection directly via `repo.list` (T-15: `/things/search` has
     // no way to mean "everything"; a bare `q="*"` tokenises to nothing
     // server-side and always returns zero hits, regardless of how many
-    // records exist). `requestedOffset` defaults to 0 — a new query or
-    // toggle change starts back at the first page; only the pagination
-    // controls pass a non-zero value.
-    async function runSearch(q: string, requestedOffset = 0) {
+    // records exist). Always the first page: a new query or toggle
+    // change starts over.
+    async function runSearch(q: string) {
         loading = true;
         error = null;
         try {
@@ -71,36 +72,39 @@
                 ? await repo.search({
                       q: trimmed,
                       limit: PAGE_SIZE,
-                      offset: requestedOffset,
                       fuzzy,
                       phonetic,
                       mask_sensitive: maskSensitive,
                   })
                 : await repo.list({
                       limit: PAGE_SIZE,
-                      offset: requestedOffset,
                       mask_sensitive: maskSensitive,
                   });
             things = res.items;
-            total = res.total;
-            // The service's actually-applied offset (X-Offset), not just
-            // what was requested — it may clamp.
-            offset = res.offset;
+            next = res.next;
         } catch (err) {
             error = describeApiError(err);
             things = [];
-            total = 0;
-            offset = 0;
+            next = null;
         } finally {
             loading = false;
         }
     }
 
-    function previousPage() {
-        void runSearch(query, Math.max(0, offset - PAGE_SIZE));
-    }
-    function nextPage() {
-        void runSearch(query, offset + PAGE_SIZE);
+    // Append the page `next` names to the rows already shown.
+    async function loadMore() {
+        if (!next) return;
+        loading = true;
+        error = null;
+        try {
+            const res = await repo.list({ next });
+            things = [...things, ...res.items];
+            next = res.next;
+        } catch (err) {
+            error = describeApiError(err);
+        } finally {
+            loading = false;
+        }
     }
 
     // Navigate to the detail page for a grid-selected Thing.
@@ -144,7 +148,7 @@
             ><input
                 type="checkbox"
                 bind:checked={maskSensitive}
-                onchange={() => runSearch(query, offset)}
+                onchange={() => runSearch(query)}
             />
             {t("things.maskSensitive")}</label
         >
@@ -152,40 +156,26 @@
             {loading
                 ? t("things.loading")
                 : translate(
-                      total === 1
+                      things.length === 1 && !next
                           ? "things.recordCount"
                           : "things.recordCountPlural",
-                  ).replace("{count}", String(total))}
+                  ).replace("{count}", countLabel)}
         </span>
     </div>
     {#if error}
         <div class="banner error">{error}</div>
     {/if}
     <ThingGrid {things} onselect={openThing} />
-    {#if total > 0}
+    {#if next}
         <div class="row small">
             <button
                 type="button"
                 class="button"
-                disabled={!hasPreviousPage || loading}
-                onclick={previousPage}
+                disabled={loading}
+                onclick={loadMore}
             >
-                {t("things.previousPage")}
+                {t("list.more")}
             </button>
-            <button
-                type="button"
-                class="button"
-                disabled={!hasNextPage || loading}
-                onclick={nextPage}
-            >
-                {t("things.nextPage")}
-            </button>
-            <span class="muted" style="margin-left: auto">
-                {translate("things.pageRange")
-                    .replace("{from}", String(offset + 1))
-                    .replace("{to}", String(offset + things.length))
-                    .replace("{total}", String(total))}
-            </span>
         </div>
     {/if}
 </section>

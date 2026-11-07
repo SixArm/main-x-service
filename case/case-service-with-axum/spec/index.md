@@ -65,11 +65,29 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
    `subjects` / `keywords` entries non-blank; `422` on any problem, all
    reported together — also enforced on update. Rules in
    [`src/validation.rs`](../src/validation.rs).
-2. `GET /api/cases` — list active (cap 100), `{pid, title}`.
+2. `GET /api/cases` — list active, newest first, `{pid, title}`.
    `GET /api/cases/search?q=` — Tantivy full-text search over title,
    alternate titles, agency name, identifiers, keywords, and subjects
    (`?fuzzy=true` for typo tolerance, `?phonetic=true` for Soundex; blank
    `q` → `400`; an unavailable index → `503`).
+   **Paging (both, `axa::cursor_pagination`).** `?limit=` sets the page
+   size (default 100 for the list, 50 for search; at most 500) and
+   `?cursor=` names the next page. The body stays a bare JSON array;
+   while more rows follow, the response carries `Link: <…&cursor=…>;
+   rel="next"`, and the last page has none. There is **no total** — no
+   `X-Total-Count`, `X-Limit` or `X-Offset` — and no `?offset=`. A
+   `limit` that is `0`, not a number, or above 500 is a `422` (never
+   clamped), and so is a cursor this service did not sign for this
+   exact query. A cursor is signed with `CURSOR_KEY` (at least 32
+   bytes): required in production, where every replica must share it;
+   elsewhere an unset key is random per process, so cursors stop
+   working across a restart. Because a position comes only from a
+   signed cursor, deep paging means walking every page before it, which
+   replaces the old offset bound (SEC-G7). Whether more rows follow is
+   decided on the fetched batch — the table rows, or the index hits
+   before they resolve — **before** SEC-G3 concealment drops rows the
+   caller may not read, so a short page never ends the walk early and
+   the `Link` never depends on what the caller is allowed to see.
 3. `GET /api/cases/{pid}` — return the stored `Case`, unless the
    record-level ABAC decision carries the **`mask` obligation**
    (`mask_case`, §9), in which case the masked view (§6.13) is
@@ -1077,7 +1095,8 @@ the other v1 edge kinds even though it shares the same edge shape.
   (`SearchEngine`: `search`/`fuzzy_search`/`phonetic_search`/
   `search_page`/`candidates`). Replaces the Postgres `ILIKE` title search
   (`GET /search?q=`, now `?fuzzy=`/`?phonetic=` too, with the true
-  `X-Total-Count` from Tantivy's `Count` collector) and the capped
+  `X-Total-Count` from Tantivy's `Count` collector — since replaced by
+  cursor paging with no total, §3 item 2) and the capped
   1000-row `check-duplicates` scan (now blocked on up to 200
   fuzzy-title/phonetic/exact-identifier candidates from the index —
   subjects, the involved-party field, is the defining attribute made

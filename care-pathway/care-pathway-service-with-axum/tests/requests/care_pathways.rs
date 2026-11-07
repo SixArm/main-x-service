@@ -259,8 +259,9 @@ async fn can_list_care_pathways() {
     .await;
 }
 
-/// Pagination: `limit` / `offset` window both collection reads, and
-/// `X-Total-Count` reports the whole match set rather than the page.
+/// Pagination: `limit` sizes a page, `Link: rel="next"` carries the
+/// signed cursor to the next one until the last, there is no total, and
+/// a limit too large or a cursor this service did not sign is a `422`.
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -273,55 +274,80 @@ async fn list_and_search_are_paginated() {
                 .json(&json!({"name": format!("Paging Pathway {i}")}))
                 .await;
         }
-        macro_rules! header {
-            ($r:expr, $name:expr) => {
-                $r.headers()
-                    .get($name)
-                    .and_then(|v| v.to_str().ok())
-                    .unwrap_or_default()
-                    .to_string()
-            };
+        // Follow `Link: rel="next"` from `first` to the last page, and
+        // return each page's length and every pid seen.
+        macro_rules! walk {
+            ($first:expr) => {{
+                let mut url = $first.to_string();
+                let mut sizes = Vec::new();
+                let mut pids = std::collections::BTreeSet::new();
+                loop {
+                    let page = request.get(&url).await;
+                    assert_eq!(page.status_code(), 200, "{url}: {}", page.text());
+                    assert!(page.headers().get("x-total-count").is_none(), "no total");
+                    let body: Value = page.json();
+                    let rows = body.as_array().expect("array");
+                    sizes.push(rows.len());
+                    pids.extend(rows.iter().map(|row| row["pid"].to_string()));
+                    let Some(link) = page.headers().get("link") else {
+                        break;
+                    };
+                    let link = link.to_str().expect("ascii link");
+                    assert!(link.ends_with(r#">; rel="next""#), "{link}");
+                    url = link[1..link.find('>').expect("<url>")].to_string();
+                }
+                (sizes, pids)
+            }};
         }
 
-        let page = request.get("/api/care-pathways?limit=2&offset=1").await;
-        assert_eq!(page.status_code(), 200);
-        let body: Value = page.json();
-        assert_eq!(body.as_array().expect("array").len(), 2);
+        let (sizes, pids) = walk!("/api/care-pathways?limit=2");
         assert_eq!(
-            header!(page, "x-total-count"),
-            "5",
-            "the total ignores the window"
+            sizes,
+            [2, 2, 1],
+            "pages of two, and the last says so by having no link"
         );
-        assert_eq!(header!(page, "x-limit"), "2");
-        assert_eq!(header!(page, "x-offset"), "1");
+        assert_eq!(pids.len(), 5, "every row once");
 
-        // Omitting both parameters is the pre-pagination behaviour.
-        let all = request.get("/api/care-pathways").await;
-        let body: Value = all.json();
-        assert_eq!(body.as_array().expect("array").len(), 5);
-        assert_eq!(header!(all, "x-limit"), "100", "the default is the old cap");
+        // Omitting `limit` is the old cap, which holds all five.
+        let (sizes, _) = walk!("/api/care-pathways");
+        assert_eq!(sizes, [5]);
 
-        // Clamped, not refused.
-        let clamped = request.get("/api/care-pathways?limit=100000").await;
-        assert_eq!(header!(clamped, "x-limit"), "500");
-
-        // An out-of-bound offset is a 400 (SEC-G7).
+        // A limit past the maximum is refused, never clamped.
         assert_eq!(
             request
-                .get("/api/care-pathways?offset=10001")
+                .get("/api/care-pathways?limit=100000")
                 .await
                 .status_code(),
-            400
+            422
         );
 
-        // Search pages the same way, and its total is the match count.
-        let hits = request
-            .get("/api/care-pathways/search?q=Paging&limit=2")
-            .await;
-        assert_eq!(hits.status_code(), 200, "search page: {}", hits.text());
-        let body: Value = hits.json();
-        assert_eq!(body.as_array().expect("array").len(), 2);
-        assert_eq!(header!(hits, "x-total-count"), "5");
+        // A cursor is the service's own: a made-up one, or one carried to
+        // another query, is refused.
+        assert_eq!(
+            request
+                .get("/api/care-pathways?cursor=AQAAAAAAAAAK")
+                .await
+                .status_code(),
+            422
+        );
+        let first = request.get("/api/care-pathways?limit=2").await;
+        let link = first.headers()["link"].to_str().unwrap().to_string();
+        let cursor = &link[link.find("cursor=").unwrap() + 7..link.find('>').unwrap()];
+        assert_eq!(
+            request
+                .get(&format!(
+                    "/api/care-pathways/search?q=Paging&limit=2&cursor={cursor}"
+                ))
+                .await
+                .status_code(),
+            422,
+            "a list cursor is no good for a search"
+        );
+
+        // Search pages the same way, through the index.
+        let (sizes, pids) = walk!("/api/care-pathways/search?q=Paging&limit=2");
+        assert_eq!(sizes, [2, 2, 1]);
+        assert_eq!(pids.len(), 5, "all five match the query");
     })
     .await;
 }

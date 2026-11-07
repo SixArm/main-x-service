@@ -10,7 +10,7 @@
 //!    task §13 T-9, landed). The `GET /api/places/nearby` HTTP endpoint
 //!    now wires `matching::geo::within_radius` (behind a
 //!    `matching::geo::bounding_box` pre-filter) — see
-//!    `tests/api_nearby_and_search_offset.rs` for the DB-gated
+//!    `tests/api_nearby_and_search_cursor.rs` for the DB-gated
 //!    end-to-end HTTP coverage. This file keeps the primitive-level
 //!    pin over a small in-memory collection, independent of the
 //!    database.

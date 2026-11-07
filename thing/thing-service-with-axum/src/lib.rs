@@ -62,6 +62,8 @@ pub mod compliance;
 pub mod config;
 /// axa-idiomatic controllers (the mounted HL7 FHIR R5 surface).
 pub mod controllers;
+/// The secret that signs page cursors (`CURSOR_KEY`).
+pub mod cursor_key;
 pub mod db;
 /// Crate-level error type and result alias.
 pub mod error;

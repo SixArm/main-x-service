@@ -11,6 +11,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **`GET /api/care-pathways` and `GET /api/care-pathways/search` page by
+  cursor** (`axa::cursor_pagination`, spec §6.2). `?limit=` sizes a page
+  (default 100 / 50, at most 500) and a signed `?cursor=` names the next
+  one, carried in `Link: <…>; rel="next"` while more rows follow. The
+  body is still a bare JSON array. **Breaking:** `?offset=` is gone, and
+  so are `X-Total-Count`, `X-Limit` and `X-Offset`; a `limit` above 500,
+  zero or unparseable is a `422` rather than clamped or defaulted, and a
+  cursor this service did not sign, or one carried to another query, is
+  a `422`. The `400 offset_too_large` (SEC-G7) is gone with the offset
+  it bounded. The unused `Model::count` and `Model::search_count` count
+  queries are removed.
+
+### Added
+
+- `CURSOR_KEY` (at least 32 bytes) signs page cursors. Production
+  refuses to start without it, and every replica must share it; elsewhere
+  an unset key is random for the process, so cursors stop working when it
+  restarts.
+
+### Changed
+
 - Paging comes from `axa::pagination` (`Limits`, `PageParams`,
   `Page::respond`, `escape_like`) in place of this crate's own helpers,
   with the same defaults, maxima, headers and `offset_too_large` code. An

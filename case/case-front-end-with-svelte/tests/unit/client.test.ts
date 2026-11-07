@@ -4,7 +4,7 @@
 // normally handled by the BFF proxy, which injects the bearer server-side;
 // the client attaches one only when explicitly passed.
 import { describe, it, expect, vi } from "vitest";
-import { ApiClient, ApiError } from "$lib/api/client";
+import { ApiClient, ApiError, nextLink } from "$lib/api/client";
 
 /** A fake `fetch` that records the last call and returns a canned response. */
 function fakeFetch(
@@ -186,32 +186,54 @@ describe("getPage", () => {
       })) as unknown as typeof fetch;
   }
 
-  it("reads the pagination headers the service sends", async () => {
+  it("reads the next page from the Link header", async () => {
     const client = new ApiClient({
       baseUrl: "http://x",
       fetch: stub([{ pid: "a" }], {
-        "x-total-count": "431",
-        "x-limit": "25",
-        "x-offset": "50",
+        link: '</api/cases?limit=1&cursor=AbC_d-1>; rel="next"',
       }),
     });
-    const page = await client.getPage<{ pid: string }>("/api/things", {
-      limit: 25,
-      offset: 50,
+    const page = await client.getPage<{ pid: string }>("/api/cases", {
+      limit: 1,
     });
     expect(page.items).toHaveLength(1);
-    expect(page.total).toBe(431);
-    expect(page.limit).toBe(25);
-    expect(page.offset).toBe(50);
+    expect(page.next).toBe("/api/cases?limit=1&cursor=AbC_d-1");
   });
 
-  it("falls back to the page length when a service sends no headers", async () => {
+  it("says the last page is the last when there is no Link", async () => {
     const client = new ApiClient({
       baseUrl: "http://x",
       fetch: stub([{ pid: "a" }, { pid: "b" }], {}),
     });
-    const page = await client.getPage("/api/things");
-    expect(page.total).toBe(2);
-    expect(page.offset).toBe(0);
+    const page = await client.getPage("/api/cases");
+    expect(page.items).toHaveLength(2);
+    expect(page.next).toBeNull();
+  });
+
+  it("sends a first page's limit, and a next URL as it is", async () => {
+    const seen: string[] = [];
+    const client = new ApiClient({
+      baseUrl: "http://x",
+      fetch: (async (url: string) => {
+        seen.push(url);
+        return new Response("[]", { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    await client.getPage("/api/cases", { limit: 10 });
+    await client.getPage("/api/cases?limit=10&cursor=xyz");
+    expect(seen[0]).toContain("/api/cases?limit=10");
+    expect(seen[1]).toContain("/api/cases?limit=10&cursor=xyz");
+    expect(seen.join(" ")).not.toContain("offset");
+  });
+});
+
+describe("nextLink", () => {
+  it("takes only a same-origin path", () => {
+    expect(nextLink('<https://evil.example/x>; rel="next"')).toBeNull();
+    expect(nextLink('<//evil.example/x>; rel="next"')).toBeNull();
+    expect(
+      nextLink('</a?cursor=1>; rel="prev", </b?cursor=2>; rel="next"'),
+    ).toBe("/b?cursor=2");
+    expect(nextLink(null)).toBeNull();
   });
 });

@@ -99,3 +99,33 @@ with the deciding rule; see
 > `422` already decided); the reviewer identity is not recorded yet (no optional-claims extractor — accepted drift from person/worker).
 > Under ABAC the decision POST derives as a `write` action (not
 > destructive-classed).
+
+> **2026-11-07 — cursor paging on `GET /api/things`.** The collection
+> list pages by a signed cursor, through `axa::cursor_pagination`, in
+> place of `?limit=&offset=`:
+>
+> - `?limit=` sizes a page: default **10**, at most **500**. A limit
+>   that is zero, not a number, given twice, or above 500 is a `422`
+>   coded `invalid_page` — never clamped, never defaulted.
+> - `?cursor=` names the next page. It is opaque and signed with
+>   `CURSOR_KEY` for this path and these filters (`mask_sensitive`), so
+>   a caller cannot make one up, edit one, or carry one to another
+>   query; any such cursor is a `422` coded `invalid_page`. There is no
+>   `offset` parameter, and so no offset bound (the SEC-G7 `400` coded
+>   `offset_too_large` is gone): a deep page is reached only by
+>   fetching every page before it.
+> - While more rows follow, the response carries
+>   `Link: </api/things?…&cursor=…>; rel="next"`; the last page has no
+>   `Link`.
+> - **There is no total.** No `X-Total-Count`, `X-Limit` or `X-Offset`
+>   header, and the `ListResponse` body is `{ "results": [...] }`, its
+>   former page-count `total` field removed: a count describes rows the
+>   caller's policy may hide.
+> - `CURSOR_KEY` must be at least 32 bytes and the same on every
+>   replica. In production the service does not start without it;
+>   elsewhere an unset key is a random one for the process, so cursors
+>   stop working on restart.
+>
+> `/api/things/search` is not paged this way: it takes `?limit=`
+> (default 10, at most 100) for one top-N page, and its body keeps
+> `{ "results", "total" }`, where `total` is the length of `results`.

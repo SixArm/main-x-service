@@ -120,6 +120,27 @@ export class ApiClient {
   }
 
   /**
+   * `GET` one page of a collection, returning the body **and** the link
+   * to the next page the service sends (`agents/share/restful.md`).
+   *
+   * The plain {@link get} discards response headers, which is fine for a
+   * single record and useless for a collection: whether more rows follow
+   * is said by `Link: <…>; rel="next"`, whose URL carries a cursor the
+   * service signed. There is no total.
+   * @typeParam T - Expected response payload type.
+   * @param path - Collection path, or a page's `next` to fetch the page
+   *   after it (a `next` already carries its own query).
+   * @returns The payload plus the next page's path, or `null` on the last.
+   */
+  async getPage<T>(
+    path: string,
+    opts?: RequestOptions,
+  ): Promise<{ data: T; next: string | null }> {
+    const { data, response } = await this.send<T>("GET", path, opts);
+    return { data, next: nextLink(response.headers.get("link")) };
+  }
+
+  /**
    * Core request pipeline: build the URL, send, then classify the
    * outcome as either the parsed body or an {@link ApiError}.
    *
@@ -135,6 +156,15 @@ export class ApiClient {
     path: string,
     opts: RequestOptions = {},
   ): Promise<T> {
+    return (await this.send<T>(method, path, opts)).data;
+  }
+
+  /** {@link request}, keeping the response for its headers. */
+  private async send<T>(
+    method: string,
+    path: string,
+    opts: RequestOptions = {},
+  ): Promise<{ data: T; response: Response }> {
     const url = this.buildUrl(path, opts.query);
     const init: RequestInit = {
       method,
@@ -149,7 +179,7 @@ export class ApiClient {
 
     // 204 No Content: nothing to parse (e.g. soft-delete success).
     if (response.status === 204) {
-      return undefined as T;
+      return { data: undefined as T, response };
     }
 
     // Read the body once as text so we can guard against empty/non-JSON.
@@ -173,7 +203,7 @@ export class ApiClient {
       throw new ApiError(response.status, asProblem(parsed));
     }
     // Success: the body is the payload (undefined if none).
-    return (parsed ?? undefined) as T;
+    return { data: (parsed ?? undefined) as T, response };
   }
 
   /**
@@ -199,6 +229,21 @@ export class ApiClient {
     }
     return url.toString();
   }
+}
+
+/**
+ * The URL of `rel="next"` in a `Link` header, or `null` when there is
+ * none. Only a same-origin path is taken, so a header cannot send the
+ * client somewhere else.
+ */
+export function nextLink(header: string | null): string | null {
+  if (!header) return null;
+  for (const part of header.split(",")) {
+    const match = /^\s*<([^>]*)>\s*;\s*rel="?next"?\s*$/.exec(part);
+    const url = match?.[1];
+    if (url?.startsWith("/") && !url.startsWith("//")) return url;
+  }
+  return null;
 }
 
 /** `value` as a problem when it is an object, else `null`. */

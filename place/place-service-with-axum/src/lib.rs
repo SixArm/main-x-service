@@ -56,6 +56,8 @@ pub mod compliance;
 pub mod config;
 /// axa-idiomatic controllers (the mounted FHIR R5 surface).
 pub mod controllers;
+/// The secret that signs page cursors (`CURSOR_KEY`).
+pub mod cursor_key;
 pub mod db;
 pub mod error;
 /// HL7 FHIR R5 interop: the `Location` resource conversions, wire

@@ -118,10 +118,10 @@ impl SearchEngine {
 
     /// One page of hits **plus the true total**: `(ids, total)`.
     ///
-    /// A page can never tell a caller how much there is in total — which
-    /// is the whole point of `X-Total-Count`
-    /// (`agents/share/restful.md`) — so the total comes from Tantivy's
-    /// `Count` collector rather than the page length. `fuzzy` selects the
+    /// The total comes from Tantivy's `Count` collector rather than the
+    /// page length. The REST surface no longer reports it (a cursor page
+    /// sends `Link: rel="next"` instead, `agents/share/restful.md`), but
+    /// diagnostics and tests still read it. `fuzzy` selects the
     /// same two retrieval routes [`search`](Self::search) /
     /// [`fuzzy_search`](Self::fuzzy_search) expose.
     ///
@@ -145,8 +145,8 @@ impl SearchEngine {
             self.exact_query(query_str)?
         };
         // Ask for the whole prefix up to the page end, then skip: Tantivy
-        // has no "start at N" collector, and the offset is bounded by the
-        // caller precisely so this stays finite.
+        // has no "start at N" collector. The offset comes only from a signed
+        // cursor, so it is never past the hits a caller has already walked.
         let wanted = offset.saturating_add(limit).max(1);
         let s = self.index.schema();
         let (top, total) = searcher

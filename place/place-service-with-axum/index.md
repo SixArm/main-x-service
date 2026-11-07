@@ -77,15 +77,17 @@ curl -X POST http://localhost:5150/api/places \
   }'
 ```
 
-Full-text / fuzzy search (query params: `q`, `limit`, `offset`,
-`fuzzy`, `mask_sensitive`; response carries `X-Total-Count`/`X-Limit`/
-`X-Offset` pagination headers):
+Full-text / fuzzy search (query params: `q`, `limit`, `cursor`,
+`fuzzy`, `mask_sensitive`). Collection reads page by signed cursor:
+`?limit=` (default 10, at most 100), then follow the `Link: <…>;
+rel="next"` header, which is absent on the last page. No total is sent,
+and a bad `limit` or `cursor` is a `422` ([`spec/09-api-surface.md`](spec/09-api-surface.md)):
 
 ```bash
 curl "http://localhost:5150/api/places/search?q=Central+Park&fuzzy=true&limit=10"
 ```
 
-Geo-radius search (`lat` / `lon` / `radius_km`, same `limit`/`offset`
+Geo-radius search (`lat` / `lon` / `radius_km`, same `limit`/`cursor`
 pagination, nearest-first — [`spec/13-tasks.md`](spec/13-tasks.md) T-9):
 
 ```bash
@@ -111,6 +113,7 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 | `STREAMING_BROKER_URL` | Event-broker connection URL | `localhost:9003` |
 | `STREAMING_TOPIC` | Topic events publish to | `place-events` |
 | `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
+| `CURSOR_KEY` | Signs page cursors; at least 32 bytes, the same on every replica. Required in production | random per process (dev/test) |
 | `PLACE_EVENT_TRANSPORT` | Event transport: `memory` (default) or `outbox` (durable event bus, Phase 2 — writes an `event_outbox` row inside each write's transaction) | `memory` |
 | `PLACE_EVENT_RELAY` | Phase-3 outbox relay worker on/off (truthy `1`/`true`/`yes`/`on`); runs only when transport is also `outbox` | off |
 | `PLACE_EVENT_RELAY_INTERVAL_SECS` | Relay drain poll interval in seconds (floored at 1) | `5` |

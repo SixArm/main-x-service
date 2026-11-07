@@ -68,8 +68,9 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 
 Plus axa's default `/_health`, `/_ping`. Every CRUD action writes an
 `audit_logs` row and publishes a `created`/`updated`/`deleted` event.
-`GET /api/care-pathways` and `GET /api/care-pathways/search` take
-`?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/`X-Offset`.
+`GET /api/care-pathways` and `GET /api/care-pathways/search` are paged
+by `?limit=` and a signed `?cursor=`, with `Link: rel="next"` and no
+total; cursors are signed with `CURSOR_KEY`.
 
 This crate is also the family's **reference implementation** of the
 compliance controls in

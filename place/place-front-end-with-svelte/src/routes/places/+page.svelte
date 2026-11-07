@@ -3,7 +3,9 @@
 
   Local $state:
     - query           — current search text (bound to SearchBox).
-    - places / total  — current result page and its total count.
+    - places / next   — the rows loaded so far, and the next page's path
+      (`Link: rel="next"`), or null on the last. There is no total, so
+      the count reads "N+" while more follow, with a "Load more" button.
     - loading / error — request status surfaced in the UI.
     - fuzzy / phonetic — search toggles forwarded to the search endpoint;
       take effect on the next explicit search submit.
@@ -24,8 +26,9 @@
 
     let query = $state("");
     let places = $state<Place[]>([]);
-    let total = $state(0);
+    let next = $state<string | null>(null);
     let loading = $state(false);
+    let loadingMore = $state(false);
     let error = $state<string | null>(null);
     let fuzzy = $state(true);
     let phonetic = $state(false);
@@ -54,13 +57,28 @@
                   })
                 : await repo.list({ limit: 50, mask_sensitive: maskSensitive });
             places = res.items;
-            total = res.total;
+            next = res.next;
         } catch (err) {
             error = err instanceof Error ? err.message : String(err);
             places = [];
-            total = 0;
+            next = null;
         } finally {
             loading = false;
+        }
+    }
+
+    // Append the next page; its path carries the query and signed cursor.
+    async function loadMore() {
+        if (!next || loadingMore) return;
+        loadingMore = true;
+        try {
+            const res = await repo.nextPage(next);
+            places = [...places, ...res.items];
+            next = res.next;
+        } catch (err) {
+            error = err instanceof Error ? err.message : String(err);
+        } finally {
+            loadingMore = false;
         }
     }
 
@@ -123,11 +141,16 @@
         <span class="muted" style="margin-left: auto">
             {loading
                 ? t("places.loading")
-                : `${total} ${total === 1 ? t("places.countOne") : t("places.countMany")}`}
+                : `${places.length}${next ? "+" : ""} ${places.length === 1 && !next ? t("places.countOne") : t("places.countMany")}`}
         </span>
     </div>
     {#if error}
         <div class="banner error">{error}</div>
     {/if}
     <PlaceGrid {places} onselect={openPlace} />
+    {#if next}
+        <button type="button" onclick={loadMore} disabled={loadingMore}>
+            {t("list.more")}
+        </button>
+    {/if}
 </section>

@@ -19,6 +19,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Changed
 
+- **`GET /api/things` pages by signed cursor** (`axa::cursor_pagination`,
+  axa's `cursor-pagination` feature) instead of `?limit=&offset=`.
+  `?limit=` (default 10, at most 500) sizes a page and `?cursor=` names
+  the next one; while more rows follow the response carries
+  `Link: rel="next"`. **Breaking:** the `X-Total-Count`, `X-Limit` and
+  `X-Offset` headers are gone, and the `ListResponse` body drops its
+  `total` field, leaving `{ "results": [...] }`, because a count
+  describes rows the caller's policy may hide. A `limit` that is zero,
+  unparseable or above 500 is now a `422` coded `invalid_page` rather
+  than clamped or defaulted, as is a cursor this service did not sign
+  for this query. `offset` is no longer read, and the offset bound and
+  its `400` coded `offset_too_large` are removed. New `CURSOR_KEY`
+  signs cursors: at least 32 bytes, required in production, random per
+  process elsewhere.
 - Handlers take `Json`, `Path` and `Query` from `axa::extract` instead of
   axum. A request they cannot read is answered with a problem whose
   `detail` says what was wrong, without quoting what was sent, where

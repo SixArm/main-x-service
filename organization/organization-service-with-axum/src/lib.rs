@@ -31,6 +31,8 @@ pub mod client_limits;
 /// Compliance controls: row-level integrity and keyed MACs.
 pub mod compliance;
 pub mod controllers;
+/// The secret that signs page cursors (`CURSOR_KEY`).
+pub mod cursor_key;
 
 /// HL7 FHIR R5 interop (`Organization` resource) — conversions, wire
 /// types, and search-parameter parsing for the mounted `/fhir` endpoints.

@@ -43,8 +43,9 @@ and ABAC policy hot-reload are **done** (§9/§13, 2026-08-01) — a rotated
 key or an edited policy reaches a running process without a restart.
 Also done: keyed HMAC integrity MACs and external-witness chain
 checkpoints (§12.1, 2026-07-27) closing the tail-truncation gap the hash
-chain alone cannot see, and `?limit=`/`?offset=` pagination on list and
-search (§6.2, 2026-08-01). Token
+chain alone cannot see, and `?limit=` + signed `?cursor=` pagination on
+list and search (§6.2; offset paging 2026-08-01, cursor paging
+2026-11-07). Token
 issuance is out of scope — provided by the central authentication-service.
 The session / cross-service token model is fixed by
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md),
@@ -84,13 +85,22 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    name, alternate names, provider, identifiers, keywords, condition
    codes, and interventions (`?fuzzy=true` for typo tolerance,
    `?phonetic=true` for Soundex; blank `q` → `400`, an unavailable index
-   → `503`). Both take `?limit=`/`?offset=` and report
-   `X-Total-Count`/`X-Limit`/`X-Offset` response headers, per the family
-   convention in
-   [`agents/share/restful.md`](../../../agents/share/restful.md):
-   defaults reproduce the old hard caps (100 list / 50 search), `limit`
-   clamps to 500, and an `offset` past 10 000 is `400` (SEC-G7). The
-   search total is a `COUNT(*)` over the predicate, not the page length.
+   → `503`). Both are paged by cursor (`axa::cursor_pagination`):
+   `?limit=` sizes a page (default 100 list / 50 search, at most 500),
+   and while more rows follow the response carries
+   `Link: <…&cursor=…>; rel="next"`, whose `cursor` is signed by this
+   service for this query. The body stays a bare JSON array, and no
+   total is reported (no `X-Total-Count`, `X-Limit` or `X-Offset`). A
+   `limit` of zero, unparseable, or above 500 is a `422`, never clamped;
+   so is a cursor this service did not sign, or one carried to another
+   query. There is no offset parameter and so no offset bound: a deep
+   page is reached only by walking every page before it. For search,
+   whether more follow is decided on the index hits before they resolve
+   to rows, so a hit whose row was deleted does not end the walk early.
+   Cursors are signed with `CURSOR_KEY` (at least 32 bytes): required in
+   production and the same on every replica, so the service refuses to
+   start without it there; elsewhere an unset key is random per process,
+   so cursors stop working when the process restarts.
 3. `GET /api/care-pathways/{pid}` — return the stored `CarePathway`,
    unless the record-level ABAC decision carries the **`mask`
    obligation**, in which case the masked view (§6.16) is returned
@@ -1341,7 +1351,17 @@ the evidence bundle.
   including a record-level-decision proof that a non-sensitive-setting
   read is *not* masked by the same policy) + 1 enforcement + 1
   outbox-audit green vs Postgres 18; 246 lib tests; fmt + clippy clean.
-- [x] **2026-08-01 — Pagination on list and search.** `GET
+- [x] **2026-11-07 — Cursor pagination on list and search.** `GET
+  /api/care-pathways` and `GET /api/care-pathways/search` page by
+  `?limit=` and a signed `?cursor=` with `Link: rel="next"`
+  (`axa::cursor_pagination`, §6.2), replacing the 2026-08-01 offset
+  paging below: no total, no `?offset=`, and a bad `limit` (zero,
+  unparseable, above 500) or cursor is a `422` rather than clamped or
+  defaulted. `CURSOR_KEY` signs cursors. *Verified:* unit tests pin the
+  default limit, the refusals and the next link; a DB-gated request test
+  walks both reads page by page by following `Link`.
+- [x] **2026-08-01 — Pagination on list and search** (superseded by
+  cursor paging, 2026-11-07). `GET
   /api/care-pathways` and `GET /api/care-pathways/search` take
   `?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/`X-Offset`
   (§6.2), per the family convention in `agents/share/restful.md`
@@ -1944,7 +1964,7 @@ validation on create/update (blank `name`; ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks; UUID / DOI `identifiers` shapes; BCP-47
 `in_language` syntax — all problems reported together); paginated
 Tantivy full-text/fuzzy/phonetic search + paginated list
-(`?limit=`/`?offset=`, `X-Total-Count`/`X-Limit`/`X-Offset`); field
+(`?limit=` + signed `?cursor=`, `Link: rel="next"`, no total); field
 masking + audited GDPR export wired to the ABAC `mask` obligation;
 `/match`, `/check-duplicates`, and `/merge`
 (record merge + history)

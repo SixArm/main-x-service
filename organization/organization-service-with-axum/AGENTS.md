@@ -31,7 +31,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/organizations` | Create (body: `Organization`) → `{pid, name}`; real-time duplicate check (ORG-T3) — `409` with candidate matches on a likely duplicate |
-| GET | `/api/organizations?limit=&offset=` | List active, paginated (`X-Total-Count`/`X-Limit`/`X-Offset`; default first 100, `limit` clamps to 500, `offset` beyond 10 000 is `400`) |
+| GET | `/api/organizations?limit=&cursor=` | List active, paged by signed cursor (`Link: rel="next"` while more follow, no total; default first 100, a `limit` above 500 or a bad cursor is `422`) |
 | GET | `/api/organizations/search?q=[&fuzzy][&phonetic]` | Tantivy full-text search (name, legal name, alternate names, identifiers, keywords, address, url); `fuzzy` = typo-tolerant, `phonetic` = Soundex |
 | GET | `/api/organizations/{pid}` | Fetch the stored `Organization` (record-level ABAC; a `mask`-obligation allow returns the redacted view) |
 | GET | `/api/organizations/{pid}/masked` | The masked view: telephone / email / street line / fiscal identifiers redacted |
@@ -72,8 +72,8 @@ the other in-scope services.
 
 ## Scope
 
-CRUD (paginated list/search — `?limit=&offset=`, `X-Total-Count`/
-`X-Limit`/`X-Offset`) + matching + **name search** + **record merge** +
+CRUD (paged list/search — `?limit=&cursor=`, `Link: rel="next"`,
+no total) + matching + **name search** + **record merge** +
 a stored **review queue** + **audit log** + **event streaming**
 (in-memory + a durable transactional outbox, both default-off transport
 selectable) + **OpenAPI/Swagger** + **Prometheus metrics**

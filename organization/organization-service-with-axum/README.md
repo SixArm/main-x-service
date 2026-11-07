@@ -18,7 +18,7 @@ API URLs are version-free; select the version with the
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/organizations` | Create |
-| GET | `/api/organizations?limit=&offset=` | List (paginated: `X-Total-Count`/`X-Limit`/`X-Offset`) |
+| GET | `/api/organizations?limit=&cursor=` | List (paged: `Link: rel="next"` while more follow; no total) |
 | GET | `/api/organizations/{pid}` | Fetch (record-level ABAC; a `mask`-obligation allow returns the redacted view) |
 | GET | `/api/organizations/{pid}/masked` | The masked view (telephone/email/street line/fiscal identifiers redacted) |
 | GET | `/api/organizations/{pid}/export` | GDPR right-of-access export (audited every call) |

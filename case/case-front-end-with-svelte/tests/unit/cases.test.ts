@@ -163,8 +163,9 @@ describe("CaseRepository", () => {
   });
 
   // Full-text search (spec §13, PRO-P15). Pins the query string shape:
-  // `q` first, then `fuzzy`/`phonetic` only when set, then `limit`/`offset`
-  // appended by the shared `getPage()` pager.
+  // `q` first, then `fuzzy`/`phonetic` only when set, then `limit`
+  // appended by the shared `getPage()` pager; a later page is its `next`
+  // URL as the service sent it.
   it("search() GETs the search endpoint with just q", async () => {
     const { repo, calls } = spyClient();
     await repo.search({ q: "housing" });
@@ -186,12 +187,25 @@ describe("CaseRepository", () => {
     expect(calls[0]?.url).toBe("http://svc.test/api/cases/search?q=housing");
   });
 
-  it("search() appends limit/offset via the page window", async () => {
+  it("search() appends limit, and never an offset", async () => {
     const { repo, calls } = spyClient();
-    await repo.search({ q: "housing", limit: 10, offset: 20 });
+    await repo.search({ q: "housing", limit: 10 });
     expect(calls[0]?.url).toBe(
-      "http://svc.test/api/cases/search?q=housing&limit=10&offset=20",
+      "http://svc.test/api/cases/search?q=housing&limit=10",
     );
+  });
+
+  it("search() and listPage() follow a next URL as it is", async () => {
+    const { repo, calls } = spyClient();
+    await repo.search(
+      { q: "ignored" },
+      "/api/cases/search?q=housing&limit=2&cursor=c1",
+    );
+    await repo.listPage({ limit: 99 }, "/api/cases?limit=2&cursor=c2");
+    expect(calls[0]?.url).toBe(
+      "http://svc.test/api/cases/search?q=housing&limit=2&cursor=c1",
+    );
+    expect(calls[1]?.url).toBe("http://svc.test/api/cases?limit=2&cursor=c2");
   });
 
   it("search() URL-encodes the query", async () => {

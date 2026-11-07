@@ -11,6 +11,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **Breaking:** list and search page by signed cursor, through
+  `axa::cursor_pagination` (axa 0.7). A page is `?limit=&cursor=`, and
+  `Link: <…>; rel="next"` names the next one while more follow.
+  `X-Total-Count`, `X-Limit`, `X-Offset` and `?offset=` are gone. A
+  `limit` above 500 is `422` rather than clamped, and so is a cursor
+  this service did not sign. New setting `CURSOR_KEY`, at least 32
+  bytes, the same on every replica; production refuses to start without
+  it.
+
 - Paging comes from `axa::pagination` (`Limits`, `PageParams`,
   `Page::respond`) in place of this crate's own helpers, with the same
   defaults, maxima, headers and `offset_too_large` code. An unparseable

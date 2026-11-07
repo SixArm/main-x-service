@@ -114,12 +114,15 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
    copy-adapted from the course front-end's dependency-light pattern —
    the reference for a lightweight search box in this family) above the
    list, with **fuzzy** and **phonetic** checkboxes. A non-blank query
-   runs `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=&offset=`
+   runs `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=`
    (Tantivy, service spec T-6); a blank query falls back to the plain
    list (`GET /api/cases`) — the service rejects a blank `q` with `400`,
-   so the client never sends one. The result count reads `{shown} /
-   {total}` from the paginated response when the page is partial (same
-   convention as `/cases`' FilterBar count).
+   so the client never sends one. Both page by signed cursor: the
+   service sends no total, and `Link: rel="next"` (a same-origin path,
+   which `nextLink` alone accepts) names the next page. The result count
+   reads `{shown}+` while a next page exists and `{shown}` on the last,
+   and a **Load more** button (`list.more`) appends the next page by
+   following that URL as sent.
 13. Audit trail (`/[pid]/audit`, PRO-P15): one case's audit-log rows,
    newest first (`GET /api/cases/{pid}/audit`) — action, timestamp,
    actor (or none), and an expandable JSON snapshot where present.
@@ -171,7 +174,7 @@ calling the service; no token is read or attached in browser JS.
 | `/[pid]` links list | `GET /api/cases/{pid}/links` |
 | `/[pid]` link assert | `POST /api/cases/{pid}/links` |
 | `/[pid]` link withdraw | `DELETE /api/cases/{pid}/links/{id}` |
-| `/` search | `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=&offset=` |
+| `/` search | `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=` (then the `Link: rel="next"` URL) |
 | `/[pid]/audit` | `GET /api/cases/{pid}/audit` |
 | `/audit` recent audit | `GET /api/cases/audit/recent` |
 | `/audit` recent events | `GET /api/cases/events/recent` |
@@ -194,7 +197,8 @@ pagination-header parsing, error-classification/empty-body);
 `cases.test.ts` (`CaseRepository` — every method's path + verb, incl. a
 regression pinning `check-duplicates`, the merge/links methods, and
 (PRO-P15) `search()`'s query-string shape — `q` alone, `fuzzy`/`phonetic`
-included only when `true`, `limit`/`offset` via the shared pager, and
+included only when `true`, `limit` via the shared pager, a `next` URL
+followed as sent, and
 URL-encoding — plus `audit()`/`recentAudit()`/`recentEvents()`);
 `case-form.test.ts` (form-to-`Case` assembly); `i18n.test.ts` (13-locale
 parity — every locale covers every key with no extras, RTL detection,

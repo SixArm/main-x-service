@@ -11,6 +11,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- The things list follows the service's cursor paging. `ThingRepository`
+  `list` and `search` return `{ items, next }`, where `next` is the
+  same-origin path from `Link: rel="next"` (or `null` on the last page),
+  in place of `{ items, total, limit, offset }` read from
+  `X-Total-Count`/`X-Limit`/`X-Offset`, which the service no longer
+  sends. `/things` shows a "Load more" button (`list.more`, translated
+  in every locale) that appends the next page, and its count reads
+  `N+` while more follow; the Previous/Next buttons and the "N of M"
+  range are gone. Neither call sends `offset` any more.
 - The API client reads the service's new responses: a success is the bare
   body, and an error is an RFC 9457 problem, whose `detail` (else `title`)
   becomes `ApiError.message`, `code` becomes `ApiError.code`, and `errors`

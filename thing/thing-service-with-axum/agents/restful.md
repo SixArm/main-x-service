@@ -135,6 +135,7 @@ API URLs are version-free; select the representation version with the `Accepts-v
 |--------|---------------------------|-----------------------|
 | GET    | `/api/health`             | Health check          |
 | GET    | `/api/whoami`             | Echo the verified bearer-token claims (`401` without a valid token) |
+| GET    | `/api/things`             | List things, newest first (`?limit=` default 10, max 500; signed `?cursor=`; `Link: rel="next"` while more follow; no total; bad limit or cursor → `422`) |
 | POST   | `/api/things`             | Create thing          |
 | GET    | `/api/things/{id}`        | Get thing             |
 | PUT    | `/api/things/{id}`        | Update thing          |

@@ -1,4 +1,4 @@
-import { ApiClient } from "./client.js";
+import { ApiClient, nextLink } from "./client.js";
 import type {
   AuditEntry,
   BatchDeduplicationRequest,
@@ -32,29 +32,45 @@ export interface ReviewQueueOptions {
 /**
  * Parameters for {@link ThingRepository.list}.
  *
- * `limit`/`offset` paginate; `mask_sensitive` requests server-side
- * masking of sensitive fields, same as {@link SearchOptions}.
+ * `limit` sizes a first page and `mask_sensitive` requests server-side
+ * masking of sensitive fields, same as {@link SearchOptions}. `next` is
+ * a previous page's {@link Page.next}: when given, it is fetched as is,
+ * since the service signed it for exactly the query that produced it,
+ * and the other options are ignored.
  */
 export interface ListOptions {
   limit?: number;
-  offset?: number;
   mask_sensitive?: boolean;
+  next?: string;
 }
 
 /**
  * Parameters for a Thing search query.
  *
  * `q` is the search text; `fuzzy` enables edit-distance tolerance and
- * `phonetic` enables Soundex matching. `limit`/`offset` paginate, and
- * `mask_sensitive` requests server-side masking of sensitive fields.
+ * `phonetic` enables Soundex matching. `limit` caps the one page the
+ * service returns (default 10, at most 100), and `mask_sensitive`
+ * requests server-side masking of sensitive fields.
  */
 export interface SearchOptions {
   q: string;
   limit?: number;
-  offset?: number;
   fuzzy?: boolean;
   phonetic?: boolean;
   mask_sensitive?: boolean;
+}
+
+/**
+ * One page of things, and where the next one is. There is no total: the
+ * service sends none, because a count would describe rows the caller's
+ * policy may hide.
+ */
+export interface Page {
+  /** The things on this page. */
+  items: Thing[];
+  /** The next page's URL, from `Link: rel="next"`, to pass back as
+   *  {@link ListOptions.next}; `null` on the last page. */
+  next: string | null;
 }
 
 /**
@@ -88,39 +104,23 @@ export class ThingRepository {
   /**
    * Full-text search for Things, normalising the response shape.
    *
-   * WHY the normalisation: the service may return either a bare array or a
-   * `{ items, total }` object depending on version/endpoint; this method
-   * collapses both into a stable `{ items, total, limit, offset }` so
-   * callers never branch.
+   * WHY the normalisation: the service may return either a bare array or
+   * a `{ results }` object depending on version/endpoint; this method
+   * collapses both into a stable {@link Page} so callers never branch.
+   * Search answers one top-N page, so `next` is `null` unless the
+   * service starts sending `Link: rel="next"` here too.
    *
-   * `total`/`limit`/`offset` prefer the family-wide `X-Total-Count`/
-   * `X-Limit`/`X-Offset` response headers (`agents/share/restful.md`)
-   * over anything the body itself carries — the headers are the
-   * authoritative count of rows matching the query *ignoring*
-   * `limit`/`offset` (T-28), where the body's own `total` (when
-   * present at all) may just echo the page length. A service that
-   * predates the headers still works: the fallbacks below make that
-   * case behave exactly as it always did.
-   *
-   * @param opts - Query text and search/pagination flags.
-   * @returns Matching things, the total count, and the limit/offset the
-   *   service actually applied (which may differ from what was asked
-   *   for, e.g. a clamped `limit`).
+   * @param opts - Query text and search flags.
+   * @returns Matching things, and the next page's URL or `null`.
    * @throws {ApiError} On a failed request.
    */
-  async search(opts: SearchOptions): Promise<{
-    items: Thing[];
-    total: number;
-    limit: number;
-    offset: number;
-  }> {
+  async search(opts: SearchOptions): Promise<Page> {
     const { data, response } = await this.http.getWithHeaders<
-      Thing[] | { results: Thing[]; total?: number }
+      Thing[] | { results: Thing[] }
     >("/api/things/search", {
       query: {
         q: opts.q,
         limit: opts.limit,
-        offset: opts.offset,
         fuzzy: opts.fuzzy,
         phonetic: opts.phonetic,
         mask_sensitive: opts.mask_sensitive,
@@ -134,19 +134,7 @@ export class ThingRepository {
     // `ThingGrid` threw. Every stub in this crate's own tests encoded
     // the same wrong field name, so nothing here ever caught it.
     const items = Array.isArray(data) ? data : data.results;
-    const bodyTotal = Array.isArray(data) ? undefined : data.total;
-    const header = (name: string): number | undefined => {
-      const raw = response.headers.get(name);
-      if (raw === null) return undefined;
-      const value = Number(raw);
-      return Number.isFinite(value) ? value : undefined;
-    };
-    return {
-      items,
-      total: header("x-total-count") ?? bodyTotal ?? items.length,
-      limit: header("x-limit") ?? opts.limit ?? items.length,
-      offset: header("x-offset") ?? opts.offset ?? 0,
-    };
+    return { items, next: nextLink(response.headers.get("link")) };
   }
 
   /**
@@ -157,45 +145,32 @@ export class ThingRepository {
    * unfiltered list (e.g. on first load, before the visitor has typed
    * anything) must call this endpoint, not fake a wildcard search.
    *
-   * Same response-shape normalisation as {@link search}: `total`/
-   * `limit`/`offset` prefer the family-wide `X-Total-Count`/`X-Limit`/
-   * `X-Offset` response headers (`agents/share/restful.md`) over
-   * anything the body carries.
+   * The service pages by signed cursor (`agents/share/restful.md`):
+   * while more rows follow it sends `Link: <…>; rel="next"`, whose URL
+   * this returns as `next`. Pass it back as {@link ListOptions.next} for
+   * the page after.
    *
-   * @param opts - Pagination + masking flags.
-   * @returns The page of things, the total count, and the limit/offset
-   *   the service actually applied.
-   * @throws {ApiError} On a failed request.
+   * @param opts - A first page's size + masking flag, or a `next` URL.
+   * @returns The page of things, and the next page's URL or `null`.
+   * @throws {ApiError} On a failed request (`422` for a bad limit or
+   *   cursor).
    */
-  async list(opts: ListOptions = {}): Promise<{
-    items: Thing[];
-    total: number;
-    limit: number;
-    offset: number;
-  }> {
+  async list(opts: ListOptions = {}): Promise<Page> {
     const { data, response } = await this.http.getWithHeaders<
-      Thing[] | { results: Thing[]; total?: number }
-    >("/api/things", {
-      query: {
-        limit: opts.limit,
-        offset: opts.offset,
-        mask_sensitive: opts.mask_sensitive,
-      },
-    });
+      Thing[] | { results: Thing[] }
+    >(
+      opts.next ?? "/api/things",
+      opts.next
+        ? {}
+        : {
+            query: {
+              limit: opts.limit,
+              mask_sensitive: opts.mask_sensitive,
+            },
+          },
+    );
     const items = Array.isArray(data) ? data : data.results;
-    const bodyTotal = Array.isArray(data) ? undefined : data.total;
-    const header = (name: string): number | undefined => {
-      const raw = response.headers.get(name);
-      if (raw === null) return undefined;
-      const value = Number(raw);
-      return Number.isFinite(value) ? value : undefined;
-    };
-    return {
-      items,
-      total: header("x-total-count") ?? bodyTotal ?? items.length,
-      limit: header("x-limit") ?? opts.limit ?? items.length,
-      offset: header("x-offset") ?? opts.offset ?? 0,
-    };
+    return { items, next: nextLink(response.headers.get("link")) };
   }
 
   /**

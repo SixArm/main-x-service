@@ -77,14 +77,12 @@ canonical algorithm.
 
 Tantivy across `name`, `alternate_name`, `identifiers`, address
 components, `place_type`. Full-text + fuzzy + boolean. Search query
-parameters: `q`, `limit`, `offset`, `fuzzy`, `mask_sensitive`; the
-response carries `X-Total-Count`/`X-Limit`/`X-Offset` pagination
-headers (`agents/share/restful.md`).
+parameters: `q`, `limit`, `cursor`, `fuzzy`, `mask_sensitive`. Paging
+is by signed cursor (`agents/share/restful.md`, §9): `?limit=` and a signed `?cursor=`, a `Link: rel="next"` header while more rows follow, no total, and a `422` `invalid_page` on a bad limit or cursor.
 
 **Geo-radius search** (`GET /api/places/nearby?lat=&lon=&radius_km=
-&limit=&offset=`, §13 T-9, delivered) filters places within
-`radius_km` of `(lat, lon)`, nearest-first, and carries the same
-pagination headers. [`within_radius`](../src/matching/geo.rs)
+&limit=&cursor=`, §13 T-9, delivered) filters places within
+`radius_km` of `(lat, lon)`, nearest-first, and pages the same way. [`within_radius`](../src/matching/geo.rs)
 (Haversine) is the exact per-candidate check; a new
 [`bounding_box`](../src/matching/geo.rs) helper computes a coarse
 rectangular pre-filter (derived from the same mean Earth radius

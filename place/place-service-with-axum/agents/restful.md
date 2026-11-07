@@ -151,8 +151,8 @@ this up over HTTP (§13 T-9): `matching::geo::bounding_box` computes a
 coarse SQL pre-filter (a plain lat/lon range query over
 `idx_places_geo`, capped at 5,000 candidate rows), then
 `within_radius` narrows those candidates to the exact within-radius
-set, returned nearest-first with `X-Total-Count`/`X-Limit`/`X-Offset`
-pagination headers.
+set, returned nearest-first and paged by signed cursor (`Link:
+rel="next"`, no total; `spec/09-api-surface.md`).
 
 
 ### Prometheus metrics
@@ -181,8 +181,8 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET    | `/api/places/{id}`        | Get place             |
 | PUT    | `/api/places/{id}`        | Update place          |
 | DELETE | `/api/places/{id}`        | Soft delete place     |
-| GET    | `/api/places/search`      | Search places (`?q=&limit=&offset=&fuzzy=&mask_sensitive=`; `X-Total-Count`/`X-Limit`/`X-Offset` headers) |
-| GET    | `/api/places/nearby`      | Geo-radius search (`?lat=&lon=&radius_km=&limit=&offset=`; nearest-first; same pagination headers) |
+| GET    | `/api/places/search`      | Search places (`?q=&limit=&cursor=&fuzzy=&mask_sensitive=`; `Link: rel="next"` while more follow, no total) |
+| GET    | `/api/places/nearby`      | Geo-radius search (`?lat=&lon=&radius_km=&limit=&cursor=`; nearest-first; same paging) |
 | POST   | `/api/places/match`       | Match places          |
 | POST   | `/api/places/check-duplicates` | Check for duplicates |
 | POST   | `/api/places/merge`       | Merge places          |

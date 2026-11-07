@@ -2,7 +2,7 @@
 // error mapping, query-string building, and 204 handling using an injected
 // mock fetch.
 import { afterEach, describe, expect, it } from "vitest";
-import { ApiClient, ApiError } from "../../src/lib/api/client";
+import { ApiClient, ApiError, nextLink } from "../../src/lib/api/client";
 
 // Coerce a plain impl into the `fetch` type so it can be injected as the
 // client's fetch without pulling in DOM lib typings.
@@ -246,5 +246,27 @@ describe("ApiClient CSRF header", () => {
     });
     await client.post("/api/things", { body: {} });
     expect(capturedHeaders?.has("x-csrf-token")).toBe(false);
+  });
+});
+
+describe("nextLink", () => {
+  // Pins: the rel="next" URL is taken from a Link header, and its
+  // absence means the last page.
+  it("reads rel=next, and null when there is none", () => {
+    expect(nextLink('</api/things?cursor=abc>; rel="next"')).toBe(
+      "/api/things?cursor=abc",
+    );
+    expect(
+      nextLink('</a>; rel="prev", </api/things?cursor=x>; rel=next'),
+    ).toBe("/api/things?cursor=x");
+    expect(nextLink(null)).toBeNull();
+    expect(nextLink('</a>; rel="prev"')).toBeNull();
+  });
+
+  // Pins: only a same-origin path is followed, so a header cannot send
+  // the client to another host.
+  it("refuses a link to another origin", () => {
+    expect(nextLink('<https://evil.example/x>; rel="next"')).toBeNull();
+    expect(nextLink('<//evil.example/x>; rel="next"')).toBeNull();
   });
 });

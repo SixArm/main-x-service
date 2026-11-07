@@ -145,6 +145,7 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 | `THING_FLUVIO_ENDPOINT` | Fluvio broker SC address; selects the real-broker `FluvioSink` over the default `LoggingSink` (requires this crate's `fluvio` Cargo feature, off by default) | unset (`LoggingSink`) |
 | `THING_EVENT_TOPIC` | Topic the relay publishes to | `mxi.thing.events` |
 | `THING_REQUIRE_AUTH` | Blanket `/api/*` PASETO + ABAC enforcement (`1`/`true`/`yes`/`on`) | off |
+| `CURSOR_KEY` | Signs `GET /api/things` page cursors; at least 32 bytes, the same on every replica. Required in production | random per process (dev/test) |
 | `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
 | `OTLP_ENDPOINT` | OTLP collector endpoint; unset means export is off | (off) |
 | `OTLP_SERVICE_NAME` | service.name sent to the collector | `thing-service` |

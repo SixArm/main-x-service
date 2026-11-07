@@ -70,8 +70,8 @@ describe("ThingRepository", () => {
     expect(capturedMethod).toBe("POST");
   });
 
-  // Pins: a bare-array search response is normalised to {items, total}.
-  it("normalises bare-array search responses to {items, total}", async () => {
+  // Pins: a bare-array search response is normalised to {items, next}.
+  it("normalises bare-array search responses to {items, next}", async () => {
     const client = new ApiClient({
       baseUrl: "http://test",
       fetch: mockFetch(async () => jsonResponse([sampleThing])),
@@ -79,75 +79,30 @@ describe("ThingRepository", () => {
     const repo = new ThingRepository(client);
     const result = await repo.search({ q: "Pride" });
     expect(result.items).toHaveLength(1);
-    expect(result.total).toBe(1);
+    expect(result.next).toBeNull();
+    expect(result).not.toHaveProperty("total");
   });
 
-  // Pins: a { results, total } search response object is passed
-  // through, including an explicit total that differs from the page
-  // item count. `results` is the real service's field name
+  // Pins: a { results, total } search response object is read from
+  // `results`. `results` is the real service's field name
   // (src/api/rest/handlers.rs::SearchResponse) — this stub used to say
   // `items`, matching the client's own bug rather than the service, so
   // it never would have caught the mismatch a live walkthrough found.
   it("normalises {results,total} search response objects", async () => {
+    let capturedUrl = "";
     const client = new ApiClient({
       baseUrl: "http://test",
-      fetch: mockFetch(async () =>
-        jsonResponse({ results: [sampleThing], total: 42 }),
-      ),
+      fetch: mockFetch(async (input) => {
+        capturedUrl = String(input);
+        return jsonResponse({ results: [sampleThing], total: 1 });
+      }),
     });
     const repo = new ThingRepository(client);
-    const result = await repo.search({ q: "Pride" });
+    const result = await repo.search({ q: "Pride", limit: 25 });
     expect(result.items).toHaveLength(1);
-    expect(result.total).toBe(42);
-  });
-
-  // Pins: a response object with results but no total falls back to count.
-  it("falls back to item count when a response object omits total", async () => {
-    const client = new ApiClient({
-      baseUrl: "http://test",
-      fetch: mockFetch(async () => jsonResponse({ results: [sampleThing] })),
-    });
-    const repo = new ThingRepository(client);
-    const result = await repo.search({ q: "Pride" });
-    expect(result.total).toBe(1);
-  });
-
-  // Pins T-28: the family-wide X-Total-Count/X-Limit/X-Offset response
-  // headers (agents/share/restful.md) take priority over anything the
-  // body itself carries — the headers are the authoritative count
-  // ignoring limit/offset, where a bare-array body has no room for one
-  // at all.
-  it("prefers X-Total-Count/X-Limit/X-Offset headers over the body", async () => {
-    const client = new ApiClient({
-      baseUrl: "http://test",
-      fetch: mockFetch(async () =>
-        jsonResponse([sampleThing], 200, {
-          "X-Total-Count": "431",
-          "X-Limit": "25",
-          "X-Offset": "50",
-        }),
-      ),
-    });
-    const repo = new ThingRepository(client);
-    const result = await repo.search({ q: "Pride", limit: 25, offset: 50 });
-    expect(result.items).toHaveLength(1);
-    expect(result.total).toBe(431);
-    expect(result.limit).toBe(25);
-    expect(result.offset).toBe(50);
-  });
-
-  // Pins: a service with no pagination headers still works, falling
-  // back to the requested limit/offset (or item count / 0) exactly as
-  // it did before the headers existed.
-  it("falls back to the requested limit/offset when headers are absent", async () => {
-    const client = new ApiClient({
-      baseUrl: "http://test",
-      fetch: mockFetch(async () => jsonResponse([sampleThing])),
-    });
-    const repo = new ThingRepository(client);
-    const result = await repo.search({ q: "Pride", limit: 50 });
-    expect(result.limit).toBe(50);
-    expect(result.offset).toBe(0);
+    expect(result.next).toBeNull();
+    expect(capturedUrl).toContain("limit=25");
+    expect(capturedUrl).not.toContain("offset");
   });
 
   // Pins T-15: list() hits the plain collection endpoint, /api/things
@@ -159,48 +114,55 @@ describe("ThingRepository", () => {
       baseUrl: "http://test",
       fetch: mockFetch(async (input) => {
         capturedUrl = String(input);
-        return jsonResponse({ results: [sampleThing], total: 1 });
+        return jsonResponse({ results: [sampleThing] });
       }),
     });
     const repo = new ThingRepository(client);
-    const result = await repo.list();
-    expect(capturedUrl).toContain("/api/things");
+    const result = await repo.list({ limit: 10 });
+    expect(capturedUrl).toContain("/api/things?limit=10");
     expect(capturedUrl).not.toContain("/search");
+    expect(capturedUrl).not.toContain("offset");
     expect(result.items).toHaveLength(1);
+    expect(result.next).toBeNull();
   });
 
-  // Pins: list() prefers the X-Total-Count/X-Limit/X-Offset headers
-  // over the body's own total, same as search() (T-28's convention).
-  it("list() prefers pagination headers over the body", async () => {
+  // Pins: list() takes the next page's URL from `Link: rel="next"`, and
+  // ignores the old X-Total-Count family of headers entirely.
+  it("list() reads the next page from the Link header", async () => {
     const client = new ApiClient({
       baseUrl: "http://test",
       fetch: mockFetch(async () =>
-        jsonResponse({ results: [sampleThing], total: 1 }, 200, {
+        jsonResponse({ results: [sampleThing] }, 200, {
+          Link: '</api/things?limit=10&cursor=abc>; rel="next"',
           "X-Total-Count": "12",
-          "X-Limit": "10",
-          "X-Offset": "0",
         }),
       ),
     });
     const repo = new ThingRepository(client);
     const result = await repo.list({ limit: 10 });
-    expect(result.total).toBe(12);
-    expect(result.limit).toBe(10);
-    expect(result.offset).toBe(0);
+    expect(result).toEqual({
+      items: [sampleThing],
+      next: "/api/things?limit=10&cursor=abc",
+    });
   });
 
-  // Pins: list() with no pagination headers falls back to item count /
-  // the requested limit / 0, exactly like search()'s equivalent case.
-  it("list() falls back to item count and requested limit when headers are absent", async () => {
+  // Pins: list({ next }) fetches that URL as is, cursor and all, without
+  // re-adding the first page's options.
+  it("list({ next }) fetches the next URL unchanged", async () => {
+    let capturedUrl = "";
     const client = new ApiClient({
       baseUrl: "http://test",
-      fetch: mockFetch(async () => jsonResponse({ results: [sampleThing] })),
+      fetch: mockFetch(async (input) => {
+        capturedUrl = String(input);
+        return jsonResponse({ results: [] });
+      }),
     });
     const repo = new ThingRepository(client);
-    const result = await repo.list({ limit: 50 });
-    expect(result.total).toBe(1);
-    expect(result.limit).toBe(50);
-    expect(result.offset).toBe(0);
+    await repo.list({
+      next: "/api/things?limit=10&cursor=abc",
+      mask_sensitive: true,
+    });
+    expect(capturedUrl).toBe("http://test/api/things?limit=10&cursor=abc");
   });
 
   // Pins: get(id) issues GET /api/things/{id}.

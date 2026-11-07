@@ -156,6 +156,7 @@ impl App {
         // After the auth guard, so the lockout counts its 401s; inside the
         // telemetry layer, so a 429 is measured.
         let router = crate::client_limits::from_env(router)?;
+        crate::cursor_key::init_from_env()?;
         Ok(Self::with_telemetry(router, TELEMETRY.get()))
     }
 }

@@ -19,7 +19,24 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Changed
 
-- Paging on `GET /api/places`, `/api/places/search` and
+- **Paging is by signed cursor**, through `axa::cursor_pagination`
+  (axa's `cursor-pagination` feature), on `GET /api/places`,
+  `/api/places/search` and `/api/places/nearby`. A page is `?limit=`
+  (default 10, at most 100) and the next one is the `Link: <…>;
+  rel="next"` header, sent while more rows follow. Breaking for
+  callers: `?offset=` is gone (ignored); no `X-Total-Count`, `X-Limit`
+  or `X-Offset` is sent, and the `{results, total}` bodies are now
+  `{results}`, because a total counts rows the caller's policy may
+  hide; a `limit` above 100, `0`, or one that does not parse is a
+  `422` `invalid_page` where it was clamped or defaulted; a cursor
+  that was made up, edited, or carried to another query is a `422`;
+  the offset bound and its `400` `offset_too_large` are gone. New
+  `CURSOR_KEY` (at least 32 bytes) signs cursors and is required in
+  production; elsewhere an unset key is random per process.
+  `tests/api_nearby_and_search_offset.rs` is now
+  `tests/api_nearby_and_search_cursor.rs`.
+- (Superseded by the cursor paging above before release.) Paging on
+  `GET /api/places`, `/api/places/search` and
   `/api/places/nearby` comes from `axa::pagination` (axa's `pagination`
   feature), replacing the crate's own `with_page_headers`, offset check
   and limit clamping. Defaults, maximums, `MAX_OFFSET`, the

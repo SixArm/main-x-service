@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { version = "0.6", features = ["sea-orm", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "pagination"] }
+axa = { version = "0.7", features = ["sea-orm", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -22,6 +22,7 @@ tokio = { version = "1.54", default-features = false, features = [
 async-trait = { version = "0.1" }
 axum = { version = "0.8" }
 tracing = { version = "0.1" }
+getrandom = "0.3"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = { version = "1.13" }
 # Embedded full-text search index (see src/search/). Same version as the
@@ -149,7 +150,7 @@ authentication-verifier = { path = "../../authentication/authentication-verifier
 criterion = { version = "0.8", features = ["html_reports"] }
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).
 tempfile = "3"
-axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry", "versioning", "ratelimit", "pagination"] }
+axa = { version = "0.7", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 # `mock`: a `DatabaseConnection` that errors on any query, standing in
 # for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
 # prove a code path never touches the database (src/compliance/disclosure.rs).

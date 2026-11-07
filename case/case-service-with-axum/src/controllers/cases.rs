@@ -5,10 +5,11 @@
 //! engine, so there is no separate model or adapter to drift.
 
 use authentication_verifier::Action;
+use axa::cursor_pagination::{CursorLimits, CursorPage};
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
-use axa::pagination::{Limits, OffsetTooLarge, PageParams};
 use axa::prelude::*;
+use axum::extract::OriginalUri;
 use axum::http::StatusCode;
 use case_matcher::{Case, MatchConfig, MatchingEngine};
 
@@ -55,32 +56,36 @@ pub const LIST_DEFAULT_LIMIT: u64 = 100;
 /// Default page size for `GET /api/cases/search`.
 pub const SEARCH_DEFAULT_LIMIT: u64 = 50;
 
-/// Largest page any collection read will serve; a bigger `limit` is
-/// clamped rather than refused.
+/// Largest page any collection read will serve. A bigger `limit` is a
+/// `422`, never clamped, so a caller is not handed less than it asked
+/// for without being told.
 pub const MAX_LIMIT: u64 = 500;
 
-/// Largest accepted `offset`; past this a request is a `400` (SEC-G7).
-pub const MAX_OFFSET: u64 = 10_000;
-
-/// The bounds of a collection read whose default page is `default_limit`.
-const fn limits(default_limit: u64) -> Limits {
-    Limits {
+/// The page sizes of a collection read whose default page is
+/// `default_limit`. There is no offset bound: a position comes only from
+/// a cursor this service signed, so reaching a deep page means fetching
+/// every page before it.
+const fn limits(default_limit: u64) -> CursorLimits {
+    CursorLimits {
         default_limit,
         max_limit: MAX_LIMIT,
-        max_offset: MAX_OFFSET,
     }
 }
 
-/// An offset past [`MAX_OFFSET`] as a `400`, with the `offset_too_large`
-/// code the older services answer with too.
-fn offset_too_large(error: OffsetTooLarge) -> Error {
-    Error::CustomError(
-        StatusCode::BAD_REQUEST,
-        ErrorDetail::new(
-            "offset_too_large",
-            format!("{error}; narrow the query instead"),
-        ),
-    )
+/// `rows` as a bare JSON array, with the page's `Link: rel="next"` when
+/// `more` says rows follow.
+///
+/// `more` is decided by the caller from the batch it fetched, before any
+/// row is dropped by concealment or by resolving an index hit, so a page
+/// shortened by either never ends the walk early.
+fn with_next<T: Serialize>(page: &CursorPage, more: bool, rows: Vec<T>) -> Response {
+    let mut response = Json(rows).into_response();
+    if more && let Some(link) = page.next_link() {
+        response
+            .headers_mut()
+            .insert(axum::http::header::LINK, link);
+    }
+    response
 }
 
 /// Parse index hits into UUIDs, dropping any that will not parse.
@@ -161,7 +166,9 @@ struct MatchRequest {
     candidates: Vec<Case>,
 }
 
-/// Query string for `GET /api/cases/search`: the `q` title term.
+/// Query string for `GET /api/cases/search`: the `q` title term and the
+/// retrieval-mode flags. The page, `limit` and `cursor`, is read from the
+/// URI by [`CursorPage::new`], and ignored here.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
     /// The full-text query. Required in practice — a missing/blank `q`
@@ -173,15 +180,6 @@ struct SearchParams {
     /// Phonetic (Soundex) retrieval; takes precedence over `fuzzy`.
     #[serde(default)]
     phonetic: bool,
-    /// Page size; absent, zero or unparseable ⇒ [`SEARCH_DEFAULT_LIMIT`].
-    /// A string, as in [`PageParams`], so a bad value falls back rather
-    /// than refusing the query. Not `#[serde(flatten)]`ed, because the
-    /// `bool` flags above would then arrive as strings and fail.
-    #[serde(default)]
-    limit: Option<String>,
-    /// Rows to skip; absent ⇒ 0.
-    #[serde(default)]
-    offset: Option<String>,
 }
 
 /// Body of `POST /api/cases/merge`: which duplicate folds into which
@@ -498,28 +496,31 @@ async fn remove(
 
 /// List active cases, one page at a time. `GET /api/cases`.
 ///
-/// Responds `200` with an array of [`CaseRef`] (`{pid, title}`),
-/// most-recent first, and the `X-Total-Count` / `X-Limit` / `X-Offset`
-/// headers (`agents/share/restful.md`). Omitting `limit` serves
+/// `GET /api/cases[?limit=&cursor=]`. Responds `200` with an array of
+/// [`CaseRef`] (`{pid, title}`), most-recent first, and a
+/// `Link: rel="next"` header while more rows follow
+/// (`agents/share/restful.md`). Omitting `limit` serves
 /// [`LIST_DEFAULT_LIMIT`] rows, the cap this endpoint applied before it
-/// was paginated.
+/// was paginated. There is no total.
 ///
 /// # Errors
 ///
-/// `400` when `offset` exceeds [`MAX_OFFSET`]; a DB error when the query
-/// fails.
+/// `422` when `limit` exceeds [`MAX_LIMIT`] or the cursor is not one this
+/// service signed for this query; a DB error when the query fails.
 #[debug_handler]
 async fn list(
-    Query(params): Query<PageParams>,
+    OriginalUri(uri): OriginalUri,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> Result<Response> {
-    let page = params
-        .resolve(limits(LIST_DEFAULT_LIMIT))
-        .map_err(offset_too_large)?;
-    let rows = CaseModel::list_paged(&ctx.db, page.limit, page.offset).await?;
-    let total = CaseModel::count(&ctx.db).await?;
+    let page = CursorPage::new(crate::cursor_key::key(), limits(LIST_DEFAULT_LIMIT), &uri)?;
+    let rows = CaseModel::list_paged(&ctx.db, page.limit() + 1, page.offset()).await?;
+    // Whether more follow is the table's answer, decided on the fetched
+    // batch before concealment below drops any row: a page shortened by
+    // concealment must not end the walk, and a caller-specific answer
+    // would leak how many records they may not see.
+    let (rows, more_follow) = page.split(rows);
     // A collection read is recorded against the nil `pid`: it disclosed
     // many records, not one, so attributing it to any single case would
     // corrupt that case's §164.528 accounting.
@@ -542,10 +543,7 @@ async fn list(
         })
         .map(CaseRef::of)
         .collect();
-    // The total is the collection's match count, taken before the
-    // concealment above: a caller-specific total would leak exactly what
-    // concealment hides — how many records they are not allowed to see.
-    Ok(page.respond(i64::try_from(total).unwrap_or(i64::MAX), refs))
+    Ok(with_next(&page, more_follow, refs))
 }
 
 /// Full-text case search: `GET /api/cases/search?q=housing`.
@@ -564,6 +562,7 @@ async fn list(
 /// unavailable; a DB error when the query fails.
 #[debug_handler]
 async fn search(
+    OriginalUri(uri): OriginalUri,
     Query(params): Query<SearchParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
@@ -573,12 +572,7 @@ async fn search(
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let page = PageParams {
-        limit: params.limit.clone(),
-        offset: params.offset.clone(),
-    }
-    .resolve(limits(SEARCH_DEFAULT_LIMIT))
-    .map_err(offset_too_large)?;
+    let page = CursorPage::new(crate::cursor_key::key(), limits(SEARCH_DEFAULT_LIMIT), &uri)?;
     // An unavailable index is reported, never disguised as "no matches":
     // an operator must be able to tell a broken index from an empty one.
     let Some(engine) = crate::search::engine() else {
@@ -594,12 +588,17 @@ async fn search(
     } else {
         crate::search::SearchMode::Exact
     };
-    let (pids, index_total) = engine.search_page(
+    let (pids, _total) = engine.search_page(
         q.trim(),
         mode,
-        usize::try_from(page.limit).unwrap_or(usize::MAX),
-        usize::try_from(page.offset).unwrap_or(usize::MAX),
+        usize::try_from(page.limit() + 1).unwrap_or(usize::MAX),
+        usize::try_from(page.offset()).unwrap_or(usize::MAX),
     )?;
+    // Whether more follow is the index's answer, decided before the hits
+    // resolve and before concealment: a hit whose row has since been
+    // deleted drops out on resolve (see `find_by_pids`), a concealed row
+    // drops out below, and neither may end the walk.
+    let (pids, more_follow) = page.split(pids);
     let rows = CaseModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
     disclosure::record_access(
         &ctx.db,
@@ -619,7 +618,7 @@ async fn search(
         })
         .map(CaseRef::of)
         .collect();
-    Ok(page.respond(i64::try_from(index_total).unwrap_or(i64::MAX), refs))
+    Ok(with_next(&page, more_follow, refs))
 }
 
 /// Score a query against an explicit candidate list (no persistence).
@@ -1523,43 +1522,64 @@ pub fn routes() -> Routes {
 mod tests {
     use super::*;
 
-    /// This crate's bounds: `limit` is clamped rather than refused, a zero,
-    /// absent or unparseable `limit` falls back to the default, and the
-    /// offset bound is what refuses, as `offset_too_large`.
+    /// This crate's bounds: no `limit` is the default, a `limit` up to
+    /// [`MAX_LIMIT`] is taken, and anything else is refused, never clamped.
     #[test]
-    fn page_params_clamp_rather_than_reject() {
-        let params = |limit: Option<&str>, offset: Option<&str>| PageParams {
-            limit: limit.map(str::to_string),
-            offset: offset.map(str::to_string),
+    fn a_page_takes_its_limit_or_refuses_it() {
+        let page = |query: &str, default_limit: u64| {
+            let uri = format!("/api/cases{query}").parse().unwrap();
+            CursorPage::new(crate::cursor_key::key(), limits(default_limit), &uri)
         };
-        let page = params(Some("100000"), Some("0"))
-            .resolve(limits(LIST_DEFAULT_LIMIT))
-            .unwrap();
-        assert_eq!((page.limit, page.offset), (MAX_LIMIT, 0));
-        for fallback in [Some("0"), Some("lots"), None] {
-            let page = params(fallback, None)
-                .resolve(limits(LIST_DEFAULT_LIMIT))
-                .unwrap();
-            assert_eq!(page.limit, LIST_DEFAULT_LIMIT, "{fallback:?}");
-        }
-        let page = params(None, Some("lots"))
-            .resolve(limits(SEARCH_DEFAULT_LIMIT))
-            .unwrap();
-        assert_eq!((page.limit, page.offset), (SEARCH_DEFAULT_LIMIT, 0));
-        assert!(
-            params(None, Some(&MAX_OFFSET.to_string()))
-                .resolve(limits(SEARCH_DEFAULT_LIMIT))
-                .is_ok()
+        assert_eq!(
+            page("", LIST_DEFAULT_LIMIT).unwrap().limit(),
+            LIST_DEFAULT_LIMIT
         );
-        let refused = params(None, Some(&(MAX_OFFSET + 1).to_string()))
-            .resolve(limits(SEARCH_DEFAULT_LIMIT))
-            .map_err(offset_too_large)
-            .unwrap_err();
+        assert_eq!(
+            page("", SEARCH_DEFAULT_LIMIT).unwrap().limit(),
+            SEARCH_DEFAULT_LIMIT
+        );
+        assert_eq!(
+            page(&format!("?limit={MAX_LIMIT}"), LIST_DEFAULT_LIMIT)
+                .unwrap()
+                .limit(),
+            MAX_LIMIT
+        );
+        for refused in [
+            "?limit=0",
+            "?limit=lots",
+            &format!("?limit={}", MAX_LIMIT + 1),
+        ] {
+            assert!(page(refused, LIST_DEFAULT_LIMIT).is_err(), "{refused}");
+        }
+    }
+
+    /// A cursor this service did not sign, such as a caller's own offset
+    /// in disguise, is refused rather than read.
+    #[test]
+    fn an_unsigned_cursor_is_refused() {
+        let uri = "/api/cases?cursor=AQAAAAAAAAAK".parse().unwrap();
         assert!(
-            matches!(&refused, Error::CustomError(status, detail)
-                if *status == StatusCode::BAD_REQUEST
-                    && detail.code.as_deref() == Some("offset_too_large")),
-            "an unbounded offset is a DoS, not a deep page: {refused:?}"
+            CursorPage::new(crate::cursor_key::key(), limits(LIST_DEFAULT_LIMIT), &uri).is_err()
+        );
+    }
+
+    /// The next link is only sent while more rows follow.
+    #[test]
+    fn the_next_link_follows_more() {
+        let uri = "/api/cases/search?q=housing&limit=2".parse().unwrap();
+        let page =
+            CursorPage::new(crate::cursor_key::key(), limits(SEARCH_DEFAULT_LIMIT), &uri).unwrap();
+        let more = with_next(&page, true, vec!["a", "b"]);
+        let link = more.headers()["link"].to_str().unwrap();
+        assert!(
+            link.starts_with("</api/cases/search?q=housing&limit=2&cursor="),
+            "{link}"
+        );
+        assert!(
+            with_next(&page, false, vec!["a"])
+                .headers()
+                .get("link")
+                .is_none()
         );
     }
 

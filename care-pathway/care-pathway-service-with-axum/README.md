@@ -40,9 +40,13 @@ specific condition over a defined episode.
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (root path, public under auth enforcement) |
 
-`GET /api/care-pathways` and the search endpoint above both take
-`?limit=`/`?offset=` and report `X-Total-Count`/`X-Limit`/`X-Offset`
-response headers (defaults reproduce the old hard caps of 100/50).
+`GET /api/care-pathways` and the search endpoint above are paged by
+`?limit=` (default 100 list / 50 search, at most 500) and a signed
+`?cursor=`: while more rows follow, the response carries
+`Link: <…>; rel="next"`. There is no total. A bad `limit` or a cursor
+this service did not sign is a `422`. Cursors are signed with
+`CURSOR_KEY` (at least 32 bytes), which production requires, the same
+on every replica; elsewhere an unset key is random per process.
 
 ### Time-based analysis ([spec §6.18](./spec/index.md))
 
@@ -494,8 +498,8 @@ behind this crate's `fluvio` feature) +
 OpenAPI/Swagger + Prometheus metrics + offline PASETO v4.public
 verification + blanket `/api/*` auth enforcement and ABAC authorization
 (off by default, gated by `CARE_PATHWAY_REQUIRE_AUTH`) + rich payload
-validation (ICD/SNOMED/UUID/DOI/BCP-47) + `?limit=`/`?offset=`
-pagination on list and search + boot-time published-key fetch over HTTP
+validation (ICD/SNOMED/UUID/DOI/BCP-47) + `?limit=`/`?cursor=`
+cursor pagination on list and search + boot-time published-key fetch over HTTP
 plus a background refresh loop (`CARE_PATHWAY_PASETO_KEYS_URL` /
 `_REFRESH_SECS`) and ABAC-policy hot-reload
 (`CARE_PATHWAY_ABAC_POLICY_FILE`), all without a restart; **time-based

@@ -1,12 +1,12 @@
 //! REST API integration tests requiring a running `PostgreSQL`.
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test api_nearby_and_search_offset -- --ignored`.
+//! `DATABASE_URL=… cargo test --test api_nearby_and_search_cursor -- --ignored`.
 //!
 //! This file's reason to exist is **T-9**
 //! (`spec/13-tasks.md`): the geo-radius `GET /api/places/nearby` HTTP
-//! endpoint and `offset` support on `GET /api/places/search`, both
-//! exercised end-to-end against a real database and search index —
+//! endpoint and paging on `GET /api/places/search` (now signed cursors,
+//! followed through `Link: rel="next"`), both exercised end-to-end against a real database and search index —
 //! `tests/integration_geo_radius.rs` pins the `within_radius` primitive
 //! in isolation, this file pins the wired HTTP surface.
 
@@ -95,36 +95,47 @@ async fn post_places(app: &axum::Router, body: &Value) -> (StatusCode, Value) {
 }
 
 /// `GET` a path, returning the status, the parsed body, **and** the
-/// `X-Total-Count` / `X-Limit` / `X-Offset` pagination headers
-/// (`agents/share/restful.md`) as `(total, limit, offset)`, each `None`
-/// if the header was absent or unparseable.
-async fn get_json(
-    app: &axum::Router,
-    uri: &str,
-) -> (StatusCode, Value, (Option<u64>, Option<u64>, Option<u64>)) {
+/// path the `Link: rel="next"` header names, `None` on the last page
+/// (`agents/share/restful.md`). Asserts no total is sent.
+async fn get_json(app: &axum::Router, uri: &str) -> (StatusCode, Value, Option<String>) {
     let response = app
         .clone()
         .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
         .await
         .unwrap();
     let status = response.status();
-    let header = |name: &str| {
-        response
-            .headers()
-            .get(name)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.parse::<u64>().ok())
-    };
-    let headers = (
-        header("x-total-count"),
-        header("x-limit"),
-        header("x-offset"),
-    );
+    for name in ["x-total-count", "x-limit", "x-offset"] {
+        assert!(response.headers().get(name).is_none(), "no {name}");
+    }
+    let next = response.headers().get("link").map(|link| {
+        let link = link.to_str().expect("ascii link");
+        assert!(link.ends_with(r#">; rel="next""#), "{link}");
+        link[1..link.find('>').expect("<url>")].to_string()
+    });
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
     let parsed: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-    (status, parsed, headers)
+    (status, parsed, next)
+}
+
+/// Follow `Link: rel="next"` from `first` to the last page, returning
+/// each page's length and every name seen, in order.
+async fn walk(app: &axum::Router, first: &str) -> (Vec<usize>, Vec<String>) {
+    let mut url = first.to_string();
+    let mut sizes = Vec::new();
+    let mut names = Vec::new();
+    loop {
+        let (status, body, next) = get_json(app, &url).await;
+        assert_eq!(status, StatusCode::OK, "{url}: {body}");
+        let rows = body["results"].as_array().expect("results array");
+        assert!(body.get("total").is_none(), "no total in the body: {body}");
+        sizes.push(rows.len());
+        names.extend(rows.iter().map(|p| p["name"].as_str().unwrap().to_string()));
+        let Some(next) = next else { break };
+        url = next;
+    }
+    (sizes, names)
 }
 
 /// A place at a fixed name + coordinate, posted via the real create path
@@ -257,24 +268,23 @@ async fn nearby_rejects_out_of_range_coordinates() {
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
 }
 
-/// `GET /api/places/search?offset=` skips the requested number of
-/// results — the other T-9 acceptance test verbatim — and the
-/// `X-Total-Count` header reports the true total, unaffected by the
-/// page window.
+/// `GET /api/places/search` pages by following `Link: rel="next"` —
+/// the other T-9 acceptance test, rewritten for cursors — and sends no
+/// total; the last page says so by having no link.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
-async fn search_offset_skips_results_and_reports_true_total() {
+async fn search_pages_by_following_the_next_link() {
     let _guard = search_index_lock().lock().await;
     let (app, _index_dir) = test_router().await;
     let suffix = uuid::Uuid::new_v4().simple().to_string();
     // A **separator** before the uuid matters: Tantivy's default
     // tokenizer drops any single unbroken token over 40 characters
     // (`search::tests::overlong_single_token_is_not_indexed` pins this),
-    // and "Offsetville" directly against a 32-hex-char uuid with no
+    // and "Cursorville" directly against a 32-hex-char uuid with no
     // separator is 43 — a real single-word doc name could hit the same
     // cutoff, but this test's *fixture* just needs to not accidentally
     // pick that shape.
-    let token = format!("Offsetville-{suffix}");
+    let token = format!("Cursorville-{suffix}");
 
     // Three places sharing a unique, unindexed-elsewhere token so the
     // search is scoped to exactly this test's rows.
@@ -282,75 +292,75 @@ async fn search_offset_skips_results_and_reports_true_total() {
         create_place_at(&app, &format!("{token} Park {n}"), 10.0 + f64::from(n), 0.0).await;
     }
 
-    let (status0, body0, headers0) = get_json(
+    let (sizes, mut names) = walk(&app, &format!("/api/places/search?q={token}&limit=2")).await;
+    assert_eq!(sizes, [2, 1], "a page of two, then the last row");
+    names.sort();
+    names.dedup();
+    assert_eq!(names.len(), 3, "expected all three rows across both pages");
+
+    // Omitting `limit` is the old default (10), which holds all three.
+    let (sizes, _) = walk(&app, &format!("/api/places/search?q={token}")).await;
+    assert_eq!(sizes, [3]);
+
+    // A search cursor is no good for another query.
+    let (_, _, next) = get_json(&app, &format!("/api/places/search?q={token}&limit=2")).await;
+    let next = next.expect("more follow");
+    let cursor = &next[next.find("cursor=").unwrap() + 7..];
+    let (status, body, _) = get_json(
         &app,
-        &format!("/api/places/search?q={token}&limit=2&offset=0"),
+        &format!("/api/places/search?q=other{suffix}&limit=2&cursor={cursor}"),
     )
     .await;
-    assert_eq!(status0, StatusCode::OK, "{body0}");
-    let page0: Vec<String> = body0["results"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|p| p["name"].as_str().unwrap().to_string())
-        .collect();
-    assert_eq!(page0.len(), 2, "page0={page0:?} full_body={body0}");
-    assert_eq!(
-        headers0.0,
-        Some(3),
-        "X-Total-Count should be the true total"
-    );
-    assert_eq!(headers0.1, Some(2), "X-Limit should echo the applied limit");
-    assert_eq!(
-        headers0.2,
-        Some(0),
-        "X-Offset should echo the applied offset"
-    );
-
-    let (status2, body2, headers2) = get_json(
-        &app,
-        &format!("/api/places/search?q={token}&limit=2&offset=2"),
-    )
-    .await;
-    assert_eq!(status2, StatusCode::OK, "{body2}");
-    let page2: Vec<String> = body2["results"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|p| p["name"].as_str().unwrap().to_string())
-        .collect();
-    assert_eq!(
-        page2.len(),
-        1,
-        "the third row, skipping the first two: {page2:?}"
-    );
-    assert_eq!(headers2.0, Some(3));
-    assert_eq!(headers2.2, Some(2));
-
-    // The two pages together cover every row exactly once.
-    let mut all: Vec<String> = page0.into_iter().chain(page2).collect();
-    all.sort();
-    all.dedup();
-    assert_eq!(all.len(), 3, "expected all three rows across both pages");
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert_eq!(body["code"], "invalid_page");
 }
 
-/// An `offset` beyond the bound is a `400` (SEC-G7) on both endpoints —
-/// the database (or, for `nearby`, the in-process filter) is never asked
-/// to materialise and discard an unbounded number of rows.
+/// `GET /api/places/nearby` pages nearest-first by following the next
+/// link, every in-radius row once.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
-async fn offset_beyond_the_bound_is_rejected_on_both_endpoints() {
+async fn nearby_pages_by_following_the_next_link() {
+    let _guard = search_index_lock().lock().await;
+    let (app, _index_dir) = test_router().await;
+    // A centre no other test uses, so the radius holds only these rows.
+    let seed = uuid::Uuid::new_v4().as_u128();
+    let round6 = |v: f64| (v * 1_000_000.0).round() / 1_000_000.0;
+    #[allow(clippy::cast_precision_loss)]
+    let lat = round6(-50.0 + (seed % 100_000) as f64 / 1000.0);
+    #[allow(clippy::cast_precision_loss)]
+    let lon = round6(-170.0 + ((seed >> 64) % 340_000) as f64 / 1000.0);
+    let mut seeded = Vec::new();
+    for n in 0..3 {
+        let name = uuid::Uuid::new_v4().simple().to_string();
+        create_place_at(&app, &name, round6(lat + 0.01 * f64::from(n)), lon).await;
+        seeded.push(name);
+    }
+
+    let (sizes, names) = walk(
+        &app,
+        &format!("/api/places/nearby?lat={lat}&lon={lon}&radius_km=5&limit=2"),
+    )
+    .await;
+    assert_eq!(sizes, [2, 1], "{names:?}");
+    assert_eq!(names, seeded, "nearest-first, every row once");
+}
+
+/// A `limit` past the maximum, or a cursor this service did not sign, is
+/// a `422` on both endpoints — never clamped, never read as an offset.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn a_bad_limit_or_cursor_is_refused_on_both_endpoints() {
     let _guard = search_index_lock().lock().await;
     let (app, _index_dir) = test_router().await;
 
-    let (status, body, _headers) =
-        get_json(&app, "/api/places/search?q=anything&offset=1000000").await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
-
-    let (status, body, _headers) = get_json(
-        &app,
-        "/api/places/nearby?lat=0&lon=0&radius_km=1&offset=1000000",
-    )
-    .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    for uri in [
+        "/api/places/search?q=anything&limit=101",
+        "/api/places/search?q=anything&cursor=AQAAAAAAAAAK",
+        "/api/places/nearby?lat=0&lon=0&radius_km=1&limit=101",
+        "/api/places/nearby?lat=0&lon=0&radius_km=1&cursor=AQAAAAAAAAAK",
+    ] {
+        let (status, body, _) = get_json(&app, uri).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}: {body}");
+        assert_eq!(body["code"], "invalid_page", "{uri}");
+    }
 }

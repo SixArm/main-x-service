@@ -2,7 +2,7 @@
 // endpoint path and that response normalization works. Uses a stub fetch
 // that captures the request URL.
 import { describe, expect, it } from "vitest";
-import { ApiClient } from "../../src/lib/api/client";
+import { ApiClient, nextLink } from "../../src/lib/api/client";
 import { PlaceRepository } from "../../src/lib/api/places";
 import type {
   MatchResult,
@@ -18,10 +18,14 @@ function mockFetch(
 }
 
 /** Build a JSON `Response` with the given body/status for stub fetches. */
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(
+  body: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
   });
 }
 
@@ -76,8 +80,8 @@ describe("PlaceRepository", () => {
   });
 
   // Pins: a bare `Place[]` search payload is normalized to
-  // `{ items, total }`, with total derived from the array length.
-  it("normalises search responses to {items, total}", async () => {
+  // `{ items, next }`, and no `Link` header means the last page.
+  it("normalises search responses to {items, next}", async () => {
     const client = new ApiClient({
       baseUrl: "http://test",
       fetch: mockFetch(async () => jsonResponse([samplePlace])),
@@ -85,24 +89,49 @@ describe("PlaceRepository", () => {
     const repo = new PlaceRepository(client);
     const result = await repo.search({ q: "Central Park" });
     expect(result.items).toHaveLength(1);
-    expect(result.total).toBe(1);
+    expect(result.next).toBeNull();
   });
 
-  // Pins: a `{ results, total }` search payload trusts the
-  // service-supplied total rather than the page length. `results` is
-  // the real service's field name; this stub used to say `items`,
-  // matching the client's own bug rather than the service.
-  it("trusts the service total on object-form search responses", async () => {
+  // Pins: the next page comes from `Link: rel="next"`, not a total.
+  // `results` is the real service's field name; this stub used to say
+  // `items`, matching the client's own bug rather than the service.
+  it("reads the next page from the Link header", async () => {
     const client = new ApiClient({
       baseUrl: "http://test",
       fetch: mockFetch(async () =>
-        jsonResponse({ results: [samplePlace], total: 42 }),
+        jsonResponse({ results: [samplePlace] }, 200, {
+          link: '</api/places/search?q=Central+Park&limit=1&cursor=AbC_d-1>; rel="next"',
+        }),
       ),
     });
     const repo = new PlaceRepository(client);
-    const result = await repo.search({ q: "Central Park" });
+    const result = await repo.search({ q: "Central Park", limit: 1 });
     expect(result.items).toHaveLength(1);
-    expect(result.total).toBe(42);
+    expect(result.next).toBe(
+      "/api/places/search?q=Central+Park&limit=1&cursor=AbC_d-1",
+    );
+  });
+
+  // Pins: a next page is fetched by its path as it is, under the base
+  // URL, and no `offset` is ever sent.
+  it("fetches the next page by its path, without an offset", async () => {
+    const seen: string[] = [];
+    const client = new ApiClient({
+      baseUrl: "http://test/api/proxy",
+      fetch: mockFetch(async (input) => {
+        seen.push(String(input));
+        return jsonResponse({ results: [] });
+      }),
+    });
+    const repo = new PlaceRepository(client);
+    await repo.list({ limit: 10 });
+    const page = await repo.nextPage("/api/places?limit=10&cursor=xyz");
+    expect(seen[0]).toContain("/api/proxy/api/places?limit=10");
+    expect(seen[1]).toBe(
+      "http://test/api/proxy/api/places?limit=10&cursor=xyz",
+    );
+    expect(seen.join(" ")).not.toContain("offset");
+    expect(page.next).toBeNull();
   });
 
   // Pins T-27: `mask_sensitive` is forwarded on the search request when
@@ -145,7 +174,7 @@ describe("PlaceRepository", () => {
       baseUrl: "http://test",
       fetch: mockFetch(async (input) => {
         capturedUrl = String(input);
-        return jsonResponse({ results: [samplePlace], total: 1 });
+        return jsonResponse({ results: [samplePlace] });
       }),
     });
     const repo = new PlaceRepository(client);
@@ -156,7 +185,7 @@ describe("PlaceRepository", () => {
   });
 
   // Pins: list() normalises both response shapes, same as search().
-  it("normalises a bare-array list response to {items, total}", async () => {
+  it("normalises a bare-array list response to {items, next}", async () => {
     const client = new ApiClient({
       baseUrl: "http://test",
       fetch: mockFetch(async () => jsonResponse([samplePlace])),
@@ -164,7 +193,17 @@ describe("PlaceRepository", () => {
     const repo = new PlaceRepository(client);
     const result = await repo.list();
     expect(result.items).toHaveLength(1);
-    expect(result.total).toBe(1);
+    expect(result.next).toBeNull();
+  });
+
+  // Pins: only a same-origin path is taken from a `Link` header.
+  it("takes only a same-origin path from a Link header", () => {
+    expect(nextLink('<https://evil.example/x>; rel="next"')).toBeNull();
+    expect(nextLink('<//evil.example/x>; rel="next"')).toBeNull();
+    expect(
+      nextLink('</a?cursor=1>; rel="prev", </b?cursor=2>; rel="next"'),
+    ).toBe("/b?cursor=2");
+    expect(nextLink(null)).toBeNull();
   });
 
   // Pins: each remaining repository method targets its documented path

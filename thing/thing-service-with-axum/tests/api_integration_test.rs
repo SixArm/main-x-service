@@ -189,11 +189,12 @@ async fn get_things(app: &axum::Router, uri: &str) -> (StatusCode, axum::http::H
 /// records exist — the front-end's stated assumption that a bare `*`
 /// lists everything did not hold). Seeds three things carrying no
 /// shared literal prefix (so the fuzzy matcher's duplicate-check on
-/// create cannot flag any pair) and asserts a plain, term-free list
-/// call returns at least those three — "at least" because the suite's
-/// other tests share this database and may have created rows of their
-/// own; the pagination headers on this call name the true collection
-/// size regardless.
+/// create cannot flag any pair), then walks the collection page by page
+/// by following `Link: rel="next"` and asserts every seeded thing is
+/// seen. "Every seeded thing", not an exact count, because the suite's
+/// other tests share this database and may create rows of their own
+/// while the walk runs; a row inserted mid-walk can only push older rows
+/// later, never past the walk, so a seeded row is never skipped.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn listing_with_no_query_term_enumerates_seeded_things() {
@@ -208,39 +209,59 @@ async fn listing_with_no_query_term_enumerates_seeded_things() {
         seeded_ids.push(body["id"].as_str().unwrap().to_string());
     }
 
-    // A page large enough to cover this test's own seeded rows alongside
-    // whatever the rest of the suite has already created.
-    let (status, headers, body) = get_things(&app, "/api/things?limit=500").await;
-    assert_eq!(status, StatusCode::OK, "{body:?}");
-
-    let results = body["results"].as_array().expect("results array");
-    let returned_ids: Vec<&str> = results.iter().map(|r| r["id"].as_str().unwrap()).collect();
+    // Follow `Link: rel="next"` from the first page of two to the last.
+    let mut url = "/api/things?limit=2".to_string();
+    let mut returned_ids = std::collections::BTreeSet::new();
+    let mut pages = 0;
+    loop {
+        let (status, headers, body) = get_things(&app, &url).await;
+        assert_eq!(status, StatusCode::OK, "{url}: {body:?}");
+        for gone in ["x-total-count", "x-limit", "x-offset"] {
+            assert!(headers.get(gone).is_none(), "no {gone} header");
+        }
+        assert!(body.get("total").is_none(), "no total in the body");
+        let results = body["results"].as_array().expect("results array");
+        assert!(results.len() <= 2, "a page is at most the limit");
+        returned_ids.extend(
+            results
+                .iter()
+                .map(|r| r["id"].as_str().unwrap().to_string()),
+        );
+        pages += 1;
+        let Some(link) = headers.get("link") else {
+            break;
+        };
+        let link = link.to_str().expect("ascii link");
+        assert!(link.ends_with(r#">; rel="next""#), "{link}");
+        url = link[1..link.find('>').expect("<url>")].to_string();
+    }
+    assert!(
+        pages >= 2,
+        "three seeded rows need at least two pages of two"
+    );
     for id in &seeded_ids {
         assert!(
-            returned_ids.contains(&id.as_str()),
-            "seeded thing {id} missing from the unfiltered list; returned {returned_ids:?}"
+            returned_ids.contains(id),
+            "seeded thing {id} missing from the walk; returned {returned_ids:?}"
         );
     }
-
-    // The family pagination headers (`agents/share/restful.md`): the
-    // total is the true collection size (at least the 3 just seeded),
-    // never the empty answer `/things/search?q=*` gives today.
-    let total_count: u64 = headers["x-total-count"].to_str().unwrap().parse().unwrap();
-    assert!(
-        total_count >= 3,
-        "X-Total-Count should count the whole collection, got {total_count}"
-    );
-    assert_eq!(headers["x-limit"], "500");
-    assert_eq!(headers["x-offset"], "0");
 }
 
-/// An `offset` beyond the SEC-G7 bound is a `400`, not a database query
-/// that materialises and discards ten thousand-plus rows.
+/// A `limit` past the maximum is refused, never clamped, and a cursor
+/// this service did not sign is refused rather than read: both `422`,
+/// coded `invalid_page`. There is no offset to bound any more, because a
+/// position comes only from a signed cursor.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
-async fn listing_beyond_the_offset_bound_is_rejected() {
+async fn listing_with_a_bad_limit_or_cursor_is_refused() {
     let app = test_router().await;
-    let (status, _headers, body) = get_things(&app, "/api/things?offset=10001").await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{body:?}");
-    assert_eq!(body["code"], "offset_too_large");
+    for uri in [
+        "/api/things?limit=501",
+        "/api/things?limit=0",
+        "/api/things?cursor=AQAAAAAAAAAK",
+    ] {
+        let (status, _headers, body) = get_things(&app, uri).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}: {body:?}");
+        assert_eq!(body["code"], "invalid_page", "{uri}");
+    }
 }

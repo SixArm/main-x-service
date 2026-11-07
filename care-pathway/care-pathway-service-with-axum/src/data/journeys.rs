@@ -876,9 +876,8 @@ mod tests {
         }
     }
 
-    /// `open_share` is clamped, never rejected, matching the family's
-    /// pagination-style "clamp, don't error" convention for bounded
-    /// numeric knobs.
+    /// `open_share` is clamped, never rejected: "clamp, don't error"
+    /// for bounded numeric knobs.
     #[test]
     fn open_share_outside_zero_one_is_clamped_not_rejected() {
         let mut p = params(&[]);

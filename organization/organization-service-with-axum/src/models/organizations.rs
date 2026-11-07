@@ -3,7 +3,7 @@
 
 use axa::prelude::*;
 use organization_matcher::Organization as MatchOrg;
-use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, QuerySelect};
+use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 /// Re-export the generated entity types so callers use
@@ -142,9 +142,9 @@ impl Model {
     /// The ordering is by descending `id` — insertion order — which is
     /// stable enough to page through as long as rows are only appended.
     /// A row inserted *during* a page walk shifts everything after it by
-    /// one, which is the standard offset-pagination caveat and the reason
-    /// [`agents/share/restful.md`] says cursors are the right answer for
-    /// deep paging.
+    /// one. A signed cursor carries an offset underneath, so the list can
+    /// repeat or skip one row then, as [`agents/share/restful.md`] says;
+    /// `id` is unique, so it is never more than one.
     ///
     /// # Errors
     ///
@@ -162,20 +162,6 @@ impl Model {
             .all(db)
             .await?;
         Ok(rows)
-    }
-
-    /// How many active organizations exist, ignoring any page window —
-    /// the `X-Total-Count` a paged response reports.
-    ///
-    /// # Errors
-    ///
-    /// When the query fails.
-    pub async fn count(db: &DatabaseConnection) -> ModelResult<u64> {
-        let total = organizations::Entity::find()
-            .filter(organizations::Column::DeletedAt.is_null())
-            .count(db)
-            .await?;
-        Ok(total)
     }
 }
 

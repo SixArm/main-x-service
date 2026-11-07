@@ -151,8 +151,8 @@ test.describe("Place front-end smoke", () => {
   // sets `mask_sensitive` on the search request and re-fetches
   // immediately (unlike fuzzy/phonetic, which wait for the next
   // explicit submit) — mirroring the detail page's masked-view toggle
-  // above. The two stubbed responses carry different totals so the
-  // rendered count is the visible proof the toggle actually changed
+  // above. The two stubbed responses carry different row counts (the
+  // service sends no total) so the rendered count is the visible proof the toggle actually changed
   // which response was used, not just the outgoing request.
   test("places list toggles mask_sensitive on the search request", async ({
     page,
@@ -172,7 +172,11 @@ test.describe("Place front-end smoke", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ results: [place], total: masked ? 1 : 2 }),
+        body: JSON.stringify({
+          results: masked
+            ? [place]
+            : [place, { ...place, id: "0c4f1e2a-0000-4000-8000-00000000000c" }],
+        }),
       });
     });
 

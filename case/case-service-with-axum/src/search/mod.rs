@@ -463,10 +463,11 @@ impl SearchEngine {
     /// One page of hits **plus the true total**: `(pids, total)`.
     ///
     /// The total comes from Tantivy's `Count` collector rather than the
-    /// page length, because a page can never tell a caller how much
-    /// there is — which is the whole point of `X-Total-Count`
-    /// (`agents/share/restful.md`). `mode` picks the same three
-    /// retrieval routes the un-paged methods expose.
+    /// page length, because a page can never tell how much there is. The
+    /// REST search no longer reports it (it pages by cursor and sends no
+    /// total, `agents/share/restful.md`), but the figure stays available
+    /// to in-process callers. `mode` picks the same three retrieval routes
+    /// the un-paged methods expose.
     ///
     /// # Errors
     ///
@@ -483,8 +484,8 @@ impl SearchEngine {
             return Ok((Vec::new(), 0));
         };
         // Ask for the whole prefix up to the page end, then skip: Tantivy
-        // has no "start at N" collector, and the offset is bounded by the
-        // caller precisely so this stays finite.
+        // has no "start at N" collector. The offset comes only from a signed
+        // cursor, so it is never past the hits a caller has already walked.
         let wanted = offset.saturating_add(limit);
         let (top, total) = searcher
             .search(
@@ -829,8 +830,7 @@ mod tests {
         assert!(engine.search("Housing", 0).unwrap().is_empty());
     }
 
-    /// A page reports the **whole** match count, not the page length —
-    /// the number `X-Total-Count` carries.
+    /// A page reports the **whole** match count, not the page length.
     #[test]
     fn search_page_reports_the_total_not_the_page() {
         let (engine, _dir) = engine_in_temp();

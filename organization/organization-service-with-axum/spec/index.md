@@ -72,15 +72,18 @@ are never fed to the matcher. See §8 and
    `url`/`same_as[i]` must be `http(s)://`, `address.country`/
    `jurisdiction` must be a recognised ISO 3166-1 code (ORG-T4) — also
    enforced on update. Rules in [`src/validation.rs`](../src/validation.rs).
-2. `GET /api/organizations[?limit=&offset=]` — list active `{pid, name}`,
-   newest first, one page at a time. Reports `X-Total-Count` /
-   `X-Limit` / `X-Offset` per
-   [`agents/share/restful.md`](../../../agents/share/restful.md);
-   omitting both parameters returns the first 100, exactly as before
-   pagination. `limit` clamps to 500; `offset` beyond 10 000 is `400`
-   (an unbounded offset makes the database materialise and discard
-   arbitrarily many rows). Search (§6.11) paginates identically, and its
-   `X-Total-Count` is the **index's** match count, not the page length.
+2. `GET /api/organizations[?limit=&cursor=]` — list active `{pid, name}`,
+   newest first, one page at a time, through `axa::cursor_pagination`
+   per [`agents/share/restful.md`](../../../agents/share/restful.md).
+   While more rows follow, the response carries `Link: <…>; rel="next"`,
+   whose `cursor` this service signed with `CURSOR_KEY`; the last page
+   carries none, and there is **no total**, because a total would count
+   rows a caller's record policy hides. Omitting `limit` returns the
+   first 100. A `limit` of zero, not a number, or above 500 is `422`,
+   never clamped, and so is a cursor this service did not sign for this
+   path and these filters. Search (§6.11) pages identically; whether
+   more follow is the **index's** answer, decided before hits resolve to
+   rows, so a deleted row cannot end the walk early.
 3. `GET /api/organizations/{pid}` — return the stored `Organization`.
    Runs the **record-level** ABAC pass after loading (shared
    `authorization-attributes.md` §9): resource attributes are
@@ -923,8 +926,16 @@ organization is not a data subject.
   was purely additive (the negotiation header + `406`, not a URL
   migration). Details in §9.
 
+- [x] **Cursor paging on `GET /api/organizations` and `GET
+  /api/organizations/search`** *(2026-11-07)*. Replaces the offset
+  paging below with `axa::cursor_pagination`: `?limit=&cursor=`,
+  `Link: rel="next"`, no total, `422` on a bad limit or cursor, and
+  `CURSOR_KEY` (at least 32 bytes; required in production, random per
+  process elsewhere). The offset bound goes, because a position now
+  comes only from a signed cursor.
+
 - [x] **Pagination on `GET /api/organizations` and `GET
-  /api/organizations/search`** *(2026-08-01)*. `?limit=&offset=`, with
+  /api/organizations/search`** *(2026-08-01, superseded 2026-11-07)*. `?limit=&offset=`, with
   `X-Total-Count`/`X-Limit`/`X-Offset` response headers per
   [`agents/share/restful.md`](../../../agents/share/restful.md);
   omitting both parameters preserves the pre-pagination behaviour
@@ -1238,8 +1249,8 @@ organization is not a data subject.
 ## 14. Implementation status
 
 Done: axa boot; organizations table + migration; CRUD (blank name →
-`422`, unknown pid → `404`) with `?limit=&offset=` pagination
-(`X-Total-Count`/`X-Limit`/`X-Offset`, SEC-G7-bounded); `/match` and
+`422`, unknown pid → `404`) with cursor paging
+(`?limit=&cursor=`, `Link: rel="next"`, no total); `/match` and
 `/check-duplicates` embedding organization-matcher, blocked on the
 search index; audit log; in-memory event streaming (Phase 1: canonical
 `Envelope` + `EventPublisher` seam, `EventView` projection frozen for

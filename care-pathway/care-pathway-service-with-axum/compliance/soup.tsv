@@ -22,6 +22,7 @@ async-trait	Async methods in traits (loco Hooks, SeaORM migrations).	Not safety-
 axum	HTTP server, extractors, and response types underneath loco.	Safety-relevant. Header and path extraction feed the auth guard and the purpose-of-use audit context.
 tracing	Structured logging and spans.	Security-relevant. The no-secrets-in-logs invariant is enforced at call sites, not by this crate.
 tracing-subscriber	Log formatting, filtering, and the JSON layer.	Security-relevant. Misconfiguration could emit more detail than intended; log level is deployment-controlled.
+getrandom	The OS random source for the per-process cursor-signing key when CURSOR_KEY is unset outside production.	Security-relevant. A weak key would let a caller forge page cursors; production requires CURSOR_KEY instead.
 regex	Pattern matching in payload validation.	Safety-relevant. Used only on length-capped input (validation::MAX_TEXT_LEN), which bounds the catastrophic-backtracking risk.
 migration	This crate's own sea-orm-migration migrator (path dependency).	Safety-relevant. Owns the schema, including the audit_logs compliance columns. First-party code, not third-party SOUP.
 sea-orm	Async ORM and query builder over PostgreSQL.	Safety-relevant. All persistence, including the audit trail and the redaction sweep, goes through it. Query construction uses its typed builders, not string concatenation.

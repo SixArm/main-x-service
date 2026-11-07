@@ -46,6 +46,8 @@ pub mod compliance;
 /// template only, never a discovered model.
 pub mod conformance;
 pub mod controllers;
+/// The secret that signs page cursors (`CURSOR_KEY`).
+pub mod cursor_key;
 pub mod data;
 /// Journey data-quality and missingness report: eight closed-vocabulary
 /// defect codes (matching `data::journeys::DEFECT_CODES` name for

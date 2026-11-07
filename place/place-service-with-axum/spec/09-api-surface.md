@@ -25,12 +25,36 @@ The 17 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 (plus `GET /api/whoami` and the integrity-verify pair listed above as
 their own tiers). Full table: [`agents/restful.md`](../agents/restful.md).
 
-Search query parameters are `q`, `limit`, `offset`, `fuzzy`,
+Search query parameters are `q`, `limit`, `cursor`, `fuzzy`,
 `mask_sensitive`; `GET /api/places/nearby?lat=&lon=&radius_km=&limit=
-&offset=` is the geo-radius search. Both carry the family's
-`X-Total-Count`/`X-Limit`/`X-Offset` pagination headers
-(`agents/share/restful.md`) — delivered, §13 T-9. An `/api/audit/user`
-route remains **not yet delivered**.
+&cursor=` is the geo-radius search — delivered, §13 T-9. An
+`/api/audit/user` route remains **not yet delivered**.
+
+**Paging** (`GET /api/places`, `/api/places/search`,
+`/api/places/nearby`) is by signed cursor, through
+`axa::cursor_pagination`:
+
+- `?limit=` sets the page size: default 10 on all three, at most 100.
+  A `limit` of `0`, one that does not parse, or one above the maximum
+  is a `422` `invalid_page` — never clamped, so a caller is never
+  handed less than it asked for without being told.
+- `?cursor=` is the position, and only ever comes from a previous
+  page's `Link: <…>; rel="next"` header. It is signed for the exact
+  query it was issued for, so a cursor that was made up, edited, or
+  carried to another query (another `q`, centre or radius) is a `422`
+  `invalid_page`. There is no offset parameter, and so no offset
+  bound: reaching a deep page means fetching every page before it.
+- A response sends `Link: rel="next"` while more rows follow and none
+  on the last page. It sends **no total** — no `X-Total-Count`,
+  `X-Limit` or `X-Offset`, and the `{results}` body carries no
+  `total` — because a count includes rows the caller's policy may
+  hide. For search, whether more follow is the index's answer, decided
+  before hits resolve to rows, so a hit whose row was deleted since
+  cannot end a walk early.
+- `CURSOR_KEY` signs the cursors: at least 32 bytes, the same on every
+  replica, and required in production (the service refuses to start
+  without it). Elsewhere an unset key is a random one per process, so
+  a cursor stops working when the process restarts.
 
 This crate **does** expose an HL7 FHIR R5 surface mapping places to the
 FHIR `Location` resource (delivered 2026-07-07, T-11) — see the FHIR
@@ -40,7 +64,7 @@ section had not been updated to match.)
 
 Bare JSON on success, an RFC 9457 problem (`application/problem+json`)
 on failure (`spec/restful` §1.3): `code` is a lowercase token
-(`not_found`, `duplicate_detected`, `validation`, `offset_too_large`, …)
+(`not_found`, `duplicate_detected`, `validation`, `invalid_page`, …)
 and `errors` carries context (a duplicate `409`'s candidates, a `422`'s
 field errors). A `500` has no `detail`; its cause is logged. `409` on
 duplicate-detected create; `422` on validation failure.

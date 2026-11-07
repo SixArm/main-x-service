@@ -9,7 +9,9 @@
 
   State:
     - query / fuzzy / phonetic — the search inputs.
-    - cases / total — the last result set and its overall count.
+    - cases / next — the rows shown so far, and the next page's URL from
+      `Link: rel="next"` (`null` on the last page). There is no total, so
+      the count shows "+" while more follow, with a "Load more" button.
     - loading / error — request status, driving the loading / error /
       empty / list branches in the markup below.
 -->
@@ -26,8 +28,11 @@
   let fuzzy = $state(false);
   let phonetic = $state(false);
   let cases = $state<CaseRef[]>([]);
-  let total = $state(0);
+  let next = $state<string | null>(null);
+  // The trimmed query `next` belongs to: "" for the plain list.
+  let shown = $state("");
   let loading = $state(true);
+  let loadingMore = $state(false);
   let error = $state<string | null>(null);
 
   // Run a search (or, for a blank query, the plain list) and update state.
@@ -41,13 +46,36 @@
           ? await repo.listPage()
           : await repo.search({ q: trimmed, fuzzy, phonetic });
       cases = page.items;
-      total = page.total;
+      next = page.next;
+      shown = trimmed;
     } catch (err) {
       error = err instanceof Error ? err.message : t("search.failed");
       cases = [];
-      total = 0;
+      next = null;
     } finally {
       loading = false;
+    }
+  }
+
+  // Append the page after the last one shown, following its `next` URL,
+  // which already carries the query, the limit and the signed cursor.
+  async function loadMore() {
+    if (!next || loadingMore) return;
+    const from = next;
+    loadingMore = true;
+    try {
+      const page =
+        shown === ""
+          ? await repo.listPage({}, from)
+          : await repo.search({ q: shown }, from);
+      // A new search may have replaced the list while this was in flight.
+      if (next !== from) return;
+      cases = [...cases, ...page.items];
+      next = page.next;
+    } catch (err) {
+      error = err instanceof Error ? err.message : t("search.failed");
+    } finally {
+      loadingMore = false;
     }
   }
 
@@ -75,9 +103,7 @@
 {:else if cases.length === 0}
   <p class="surface">{t("list.empty")} <a href="/new">{t("list.createOne")}</a>.</p>
 {:else}
-  <p class="count">
-    {cases.length === total ? `${total}` : `${cases.length} / ${total}`}
-  </p>
+  <p class="count">{next ? `${cases.length}+` : `${cases.length}`}</p>
   <ul class="stack">
     {#each cases as record (record.pid)}
       <li class="surface row">
@@ -86,6 +112,11 @@
       </li>
     {/each}
   </ul>
+  {#if next}
+    <button type="button" onclick={loadMore} disabled={loadingMore}>
+      {t("list.more")}
+    </button>
+  {/if}
 {/if}
 
 <style>

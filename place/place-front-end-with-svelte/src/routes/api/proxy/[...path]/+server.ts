@@ -45,6 +45,10 @@ const proxy: RequestHandler = async ({
   const responseHeaders = new Headers();
   const contentType = upstream.headers.get("content-type");
   if (contentType) responseHeaders.set("content-type", contentType);
+  // The next page of a collection (`Link: rel="next"`); the client takes
+  // only a same-origin path from it, resolved under this proxy.
+  const link = upstream.headers.get("link");
+  if (link) responseHeaders.set("link", link);
   return new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,

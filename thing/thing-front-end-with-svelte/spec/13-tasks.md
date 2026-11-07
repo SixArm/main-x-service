@@ -173,6 +173,18 @@
     `npm test` (94 passed, up from 92), `npx playwright test` (15
     passed, up from 14), `npm run check` (0 errors), `npm run lint`
     clean.
+  - **Superseded 2026-11-07 by cursor paging.** `thing-service` now
+    pages `GET /api/things` by a signed cursor (`axa::cursor_pagination`)
+    and sends no `X-Total-Count`/`X-Limit`/`X-Offset`. `ThingRepository`
+    `list`/`search` return `{ items, next }`, `next` being the
+    same-origin path from `Link: rel="next"` (`nextLink` in
+    `src/lib/api/client.ts`, which refuses any other origin), and
+    `list({ next })` fetches it unchanged. `/things` replaced
+    Previous/Next and the "N of M" indicator with a "Load more" button
+    (`list.more`, every locale) that appends the next page, and a count
+    reading `N+` while more follow. The `things.previousPage`/
+    `things.nextPage`/`things.pageRange` keys are gone. Search sends no
+    `offset` any more (the service never read it).
 - [x] T-29: **401/403 handling in `ApiClient`.** *(resolved 2026-09-06.)*
   `ApiError` exposes `isNotFound()`/`isConflict()`/`isValidation()`
   helpers but nothing for `401`/`403`, and no route reacts to either

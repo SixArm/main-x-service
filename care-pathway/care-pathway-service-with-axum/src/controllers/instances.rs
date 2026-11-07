@@ -613,10 +613,10 @@ async fn overdue_reviews(State(ctx): State<AppContext>) -> Result<Response> {
 }
 
 /// `?idle_days=` (spec T-14j). Zero, negative, or unparseable falls
-/// back to the default — the same "a tuning knob never errors"
-/// convention pagination's `?limit=`/`?offset=` already uses, since
-/// an idle-day threshold is a lens setting, not a business promise
-/// like `target_days` on the standards endpoint.
+/// back to the default: "a tuning knob never errors", since an
+/// idle-day threshold is a lens setting, not a business promise like
+/// `target_days` on the standards endpoint. (Pagination's `?limit=` no
+/// longer works this way: a bad page size is a `422`.)
 #[derive(Debug, Default, serde::Deserialize)]
 struct StalledQuery {
     #[serde(default)]

@@ -75,7 +75,8 @@ canonical algorithm.
 
 Tantivy across `name`, `alternate_names`, `description`,
 `identifier.value`, `url`, `same_as`. Full-text + fuzzy + boolean.
-Pagination (`offset` + `limit`). Optional masking for Things subject
+One top-N page (`limit`, default 10, at most 100); the
+collection list `GET /api/things` pages by signed cursor (§9). Optional masking for Things subject
 to consent constraints.
 
 ### 6.4 Duplicate detection and merging

@@ -11,7 +11,7 @@
 //! into those audit rows.
 
 // SEC-G4: user text in a `LIKE` pattern is escaped so it matches literally.
-use axa::pagination::escape_like;
+use axa::cursor_pagination::escape_like;
 use chrono::Utc;
 use sea_orm::sea_query::Expr;
 use sea_orm::{

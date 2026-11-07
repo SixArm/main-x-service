@@ -189,11 +189,10 @@ async fn get_places(app: &axum::Router, uri: &str) -> (StatusCode, axum::http::H
 /// `q`, regardless of how many records exist — the same
 /// `tokenise` behaviour thing-service's search index has). Seeds three
 /// places carrying no shared literal prefix (so the fuzzy matcher's
-/// duplicate-check on create cannot flag any pair) and asserts a plain,
-/// term-free list call returns at least those three — "at least"
-/// because the suite's other tests share this database and may have
-/// created rows of their own; the pagination headers on this call name
-/// the true collection size regardless.
+/// duplicate-check on create cannot flag any pair) and walks the list by
+/// following `Link: rel="next"`. Places are listed newest-first, so the
+/// three just-seeded rows land on the first two pages of two regardless
+/// of how many other fixtures the rest of this suite has created.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn listing_with_no_query_term_enumerates_seeded_places() {
@@ -208,41 +207,50 @@ async fn listing_with_no_query_term_enumerates_seeded_places() {
         seeded_ids.push(body["id"].as_str().unwrap().to_string());
     }
 
-    // `limit=500` is deliberately above LIST_MAX_LIMIT (100, shared with
-    // /places/search) to also pin the clamp — see the header assertion
-    // below. Places are listed newest-first, so the 3 just-seeded rows
-    // land within the first 100 regardless of how many other fixtures
-    // the rest of this suite has created.
-    let (status, headers, body) = get_places(&app, "/api/places?limit=500").await;
-    assert_eq!(status, StatusCode::OK, "{body:?}");
-
-    let results = body["results"].as_array().expect("results array");
-    let returned_ids: Vec<&str> = results.iter().map(|r| r["id"].as_str().unwrap()).collect();
+    let mut url = "/api/places?limit=2".to_string();
+    let mut returned_ids = Vec::new();
+    for _ in 0..2 {
+        let (status, headers, body) = get_places(&app, &url).await;
+        assert_eq!(status, StatusCode::OK, "{body:?}");
+        assert!(headers.get("x-total-count").is_none(), "no total");
+        assert!(body.get("total").is_none(), "no total in the body");
+        let results = body["results"].as_array().expect("results array");
+        assert_eq!(results.len(), 2, "a full page while more follow");
+        returned_ids.extend(
+            results
+                .iter()
+                .map(|r| r["id"].as_str().unwrap().to_string()),
+        );
+        let link = headers["link"].to_str().unwrap();
+        assert!(link.ends_with(r#">; rel="next""#), "{link}");
+        url = link[1..link.find('>').unwrap()].to_string();
+    }
     for id in &seeded_ids {
         assert!(
-            returned_ids.contains(&id.as_str()),
-            "seeded place {id} missing from the unfiltered list; returned {returned_ids:?}"
+            returned_ids.contains(id),
+            "seeded place {id} missing from the first two pages; returned {returned_ids:?}"
         );
     }
+    let mut unique = returned_ids.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), returned_ids.len(), "no row twice");
 
-    let total_count: u64 = headers["x-total-count"].to_str().unwrap().parse().unwrap();
-    assert!(
-        total_count >= 3,
-        "X-Total-Count should count the whole collection, got {total_count}"
-    );
-    // Clamped to LIST_MAX_LIMIT (100), not the requested 500.
-    assert_eq!(headers["x-limit"], "100");
-    assert_eq!(headers["x-offset"], "0");
+    // Omitting `limit` is the old default page of 10.
+    let (status, _headers, body) = get_places(&app, "/api/places").await;
+    assert_eq!(status, StatusCode::OK, "{body:?}");
+    assert!(body["results"].as_array().unwrap().len() <= 10);
 }
 
-/// An `offset` beyond the SEC-G7 bound (`MAX_OFFSET`, 10 000) is a
-/// `400`, not a database query that materialises and discards
-/// ten-thousand-plus rows.
+/// A `limit` past `LIST_MAX_LIMIT` (100) is refused rather than clamped,
+/// and so is a cursor this service did not sign: both `422`.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
-async fn listing_beyond_the_offset_bound_is_rejected() {
+async fn listing_with_a_bad_limit_or_cursor_is_refused() {
     let app = test_router().await;
-    let (status, _headers, body) = get_places(&app, "/api/places?offset=10001").await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{body:?}");
-    assert_eq!(body["code"], "offset_too_large");
+    for uri in ["/api/places?limit=500", "/api/places?cursor=AQAAAAAAAAAK"] {
+        let (status, _headers, body) = get_places(&app, uri).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}: {body:?}");
+        assert_eq!(body["code"], "invalid_page");
+    }
 }

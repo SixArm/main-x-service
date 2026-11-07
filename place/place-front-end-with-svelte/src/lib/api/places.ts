@@ -31,14 +31,24 @@ export interface ReviewQueueOptions {
   limit?: number;
 }
 
+/**
+ * One page of places, and the path of the next page — the service's
+ * `Link: rel="next"` — or `null` when this is the last. There is no
+ * total: the service does not send one.
+ */
+export interface PlacePage {
+  /** The places on this page. */
+  items: Place[];
+  /** Pass to {@link PlaceRepository.nextPage} for the page after this. */
+  next: string | null;
+}
+
 /** Options for {@link PlaceRepository.search}. */
 export interface SearchOptions {
   /** Full-text query string. */
   q: string;
-  /** Max results per page. */
+  /** Max results per page (the service refuses more than 100). */
   limit?: number;
-  /** Result offset for pagination. */
-  offset?: number;
   /** Enable fuzzy (typo-tolerant) matching. */
   fuzzy?: boolean;
   /** Enable phonetic (Soundex) matching. */
@@ -74,38 +84,27 @@ export class PlaceRepository {
   }
 
   /**
-   * Full-text search for places.
+   * Full-text search for places — the first page.
    *
    * Normalizes the two response shapes the service may return — a bare
-   * `Place[]` or a `{ results, total }` object — into a single shape.
+   * `Place[]` or a `{ results }` object — into a single shape.
    * `results` is the real service's field name
    * (place-service-with-axum/src/api/rest/handlers.rs::SearchResponse);
    * this used to say `items`, a name the service never actually sends,
    * found only by running this client against a real place-service
    * (mirrors the identical thing-front-end T-30 finding — see its
    * spec §13).
-   * @param opts - Query string plus pagination/matching flags.
-   * @returns The matched places and a total count.
+   * @param opts - Query string plus page size/matching flags.
+   * @returns The matched places and the next page's path, if any.
    */
-  async search(
-    opts: SearchOptions,
-  ): Promise<{ items: Place[]; total: number }> {
-    const data = await this.http.get<
-      Place[] | { results: Place[]; total?: number }
-    >("/api/places/search", {
-      query: {
-        q: opts.q,
-        limit: opts.limit,
-        offset: opts.offset,
-        fuzzy: opts.fuzzy,
-        phonetic: opts.phonetic,
-        mask_sensitive: opts.mask_sensitive,
-      },
+  search(opts: SearchOptions): Promise<PlacePage> {
+    return this.page("/api/places/search", {
+      q: opts.q,
+      limit: opts.limit,
+      fuzzy: opts.fuzzy,
+      phonetic: opts.phonetic,
+      mask_sensitive: opts.mask_sensitive,
     });
-    // Bare array: total is just the array length.
-    if (Array.isArray(data)) return { items: data, total: data.length };
-    // Object form: trust `total`, falling back to the page length.
-    return { items: data.results, total: data.total ?? data.results.length };
   }
 
   /**
@@ -117,25 +116,39 @@ export class PlaceRepository {
    * unfiltered list (e.g. on first load, before the visitor has typed
    * anything) must call this endpoint, not fake a wildcard search.
    *
-   * Same response-shape normalisation as {@link search}: a bare
-   * `Place[]` or a `{ results, total }` object.
-   * @param opts - Pagination + masking flags.
-   * @returns The page of places and a total count.
+   * Same response-shape normalisation as {@link search}.
+   * @param opts - Page size + masking flag.
+   * @returns The first page of places and the next page's path, if any.
    */
-  async list(
-    opts: { limit?: number; offset?: number; mask_sensitive?: boolean } = {},
-  ): Promise<{ items: Place[]; total: number }> {
-    const data = await this.http.get<
-      Place[] | { results: Place[]; total?: number }
-    >("/api/places", {
-      query: {
-        limit: opts.limit,
-        offset: opts.offset,
-        mask_sensitive: opts.mask_sensitive,
-      },
+  list(
+    opts: { limit?: number; mask_sensitive?: boolean } = {},
+  ): Promise<PlacePage> {
+    return this.page("/api/places", {
+      limit: opts.limit,
+      mask_sensitive: opts.mask_sensitive,
     });
-    if (Array.isArray(data)) return { items: data, total: data.length };
-    return { items: data.results, total: data.total ?? data.results.length };
+  }
+
+  /**
+   * The page after one {@link search} or {@link list} returned: `next`
+   * already carries its query and the signed cursor, so it is sent as
+   * it is.
+   * @param next - A previous page's {@link PlacePage.next}.
+   */
+  nextPage(next: string): Promise<PlacePage> {
+    return this.page(next);
+  }
+
+  /** One page from `path`, normalising both response shapes. */
+  private async page(
+    path: string,
+    query?: Record<string, string | number | boolean | undefined>,
+  ): Promise<PlacePage> {
+    const { data, next } = await this.http.getPage<
+      Place[] | { results: Place[] }
+    >(path, query ? { query } : undefined);
+    const items = Array.isArray(data) ? data : (data?.results ?? []);
+    return { items, next };
   }
 
   /**

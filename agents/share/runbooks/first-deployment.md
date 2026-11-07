@@ -41,6 +41,7 @@ everywhere).
 | `<E>_PASETO_KEYS_URL` | unset | the peer falls back to a static `<E>_PASETO_KEYS` env value, or (if that's unset too) trusts no token at all — every request is then unauthenticated regardless of `REQUIRE_AUTH` |
 | `<E>_EVENT_TRANSPORT` | `memory` | events are lost on restart; no durable outbox |
 | integrity / audit MAC (4 services only) | off | see `integrity-activation.md` — not duplicated here |
+| `CURSOR_KEY` (organization, care-pathway, case, place, thing) | **none** | in production the service **does not start**; set it to at least 32 random bytes, the same on every replica, before the first boot (`restful.md` §Pagination) |
 
 ## Activation order, and why it is an order
 

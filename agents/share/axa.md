@@ -12,7 +12,7 @@ axa is a library, not a framework. Each service's `src/app.rs` holds ordinary
 functions, and its `main.rs` calls them. axa's own specification is
 [`spec/index.md`](https://github.com/publicprojects-io/axa/blob/main/spec/index.md).
 
-Services take it from crates.io, as `axa = "0.6"`.
+Services take it from crates.io, as `axa = "0.7"`.
 
 ## Errors
 
@@ -90,6 +90,15 @@ unless set: `RATE_LIMIT_PER_MINUTE` counts a client's requests, and
 client is the address axa resolved, so set `TRUSTED_PROXIES` behind a proxy,
 or every client shares one limit. Each process counts for itself, so this
 slows a noisy client and does not stop a distributed attack.
+
+## Paging
+
+List and search page by signed cursor through `axa::cursor_pagination`, the
+`cursor-pagination` feature: `?limit=&cursor=`, `Link: rel="next"`, no total, and
+a `422` for a bad limit or cursor. Each service signs with its `CURSOR_KEY`
+through `src/cursor_key.rs`. Its `escape_like` escapes user text for `LIKE`.
+Offset paging, `axa::offset_pagination`, is insecure and not used. See
+[restful.md](restful.md) §Pagination.
 
 ## Router order
 

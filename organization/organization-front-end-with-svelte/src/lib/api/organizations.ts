@@ -63,12 +63,17 @@ export class OrganizationRepository {
   }
 
   /**
-   * `GET /api/organizations?limit=&offset=` — one page, with the total.
-   * @param page The window; omitted values leave the service's defaults.
-   * @returns The refs plus `total` / `limit` / `offset` as applied.
+   * `GET /api/organizations?limit=` — the first page — or, given a
+   * page's `next`, the page after it.
+   * @param page The page size, for a first page.
+   * @param next A previous page's {@link Page.next}.
+   * @returns The refs plus the next page's URL, or `null` on the last.
    */
-  listPage(page: PageRequest = {}): Promise<Page<OrgRef>> {
-    return this.http.getPage<OrgRef>("/api/organizations", page);
+  listPage(page: PageRequest = {}, next?: string): Promise<Page<OrgRef>> {
+    return this.http.getPage<OrgRef>(
+      next ?? "/api/organizations",
+      next ? {} : page,
+    );
   }
 
   /**

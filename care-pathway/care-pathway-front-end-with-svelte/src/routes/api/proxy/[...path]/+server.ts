@@ -45,6 +45,9 @@ const proxy: RequestHandler = async ({
   const responseHeaders = new Headers();
   const contentType = upstream.headers.get("content-type");
   if (contentType) responseHeaders.set("content-type", contentType);
+  // The next page of a collection, which a list follows (restful.md).
+  const link = upstream.headers.get("link");
+  if (link) responseHeaders.set("link", link);
   return new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,

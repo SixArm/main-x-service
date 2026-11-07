@@ -19,7 +19,7 @@ create   ──>  POST   /api/care-pathways                {CarePathway}      ->
 read     ──>  GET    /api/care-pathways/{pid}                             -> CarePathway
 update   ──>  PUT    /api/care-pathways/{pid}          {CarePathway}      -> {pid, name}
 delete   ──>  DELETE /api/care-pathways/{pid}                             -> 204
-list     ──>  GET    /api/care-pathways   ?limit=&offset=                 -> [{pid, name}]  (X-Total-Count)
+list     ──>  GET    /api/care-pathways   ?limit=&cursor=                 -> [{pid, name}]  (Link: rel="next")
 search   ──>  GET    /api/care-pathways/search?q=stroke  ?fuzzy=&phonetic=  -> [{pid, name}]  (Tantivy; paginated)
 dedupe   ──>  POST   /api/care-pathways/check-duplicates  {query}         -> [{pid, score, ...}]
 match    ──>  POST   /api/care-pathways/match   {query, candidates}       -> ranked results

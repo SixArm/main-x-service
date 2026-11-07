@@ -5,10 +5,11 @@
 //! `care-pathway-matcher` engine, so there is no separate model or
 //! adapter to drift.
 
+use axa::cursor_pagination::{CursorLimits, CursorPage};
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
-use axa::pagination::{Limits, OffsetTooLarge, PageParams};
 use axa::prelude::*;
+use axum::extract::OriginalUri;
 use axum::http::StatusCode;
 use care_pathway_matcher::{CarePathway, MatchConfig, MatchingEngine};
 use serde::{Deserialize, Serialize};
@@ -46,46 +47,41 @@ pub const CHECK_DUPLICATES_SCAN_CAP: u64 = 1000;
 /// unreachable however obvious a duplicate it was.
 pub const CHECK_DUPLICATES_CANDIDATE_LIMIT: usize = 200;
 
-/// Maximum number of rows returned by `GET /api/care-pathways` (spec §6.2).
-///
-/// A pragmatic bound until pagination lands; the handler must pass this
-/// named const to `list` rather than a magic number.
+/// Default page size of `GET /api/care-pathways` (spec §6.2): what a
+/// request with no `?limit=` gets.
 pub const LIST_CAP: u64 = 100;
 
-/// Maximum number of rows returned by `GET /api/care-pathways/search`
-/// (spec §6.2). A pragmatic bound on the `ILIKE` scan.
+/// Default page size of `GET /api/care-pathways/search` (spec §6.2).
 pub const SEARCH_CAP: u64 = 50;
 
 // ─── Pagination (agents/share/restful.md) ───────────────────────────────
 
-/// Largest page any collection read will serve. A bigger `limit` is
-/// **clamped** to this rather than refused.
+/// Largest page any collection read will serve. A bigger `limit` is a
+/// `422`, never clamped, so a caller is not handed less than it asked
+/// for without being told.
 pub const MAX_LIMIT: u64 = 500;
 
-/// Largest accepted `offset`; past this a request is a `400`, because
-/// the database would otherwise materialise and discard arbitrarily many
-/// rows (SEC-G7). Deep paging past this wants a cursor.
-pub const MAX_OFFSET: u64 = 10_000;
-
-/// The bounds of a collection read whose default page is `default_limit`.
-const fn limits(default_limit: u64) -> Limits {
-    Limits {
+/// The page sizes of a collection read whose default page is
+/// `default_limit`. There is no offset bound: a position comes only from
+/// a cursor this service signed, so reaching a deep page means fetching
+/// every page before it.
+const fn limits(default_limit: u64) -> CursorLimits {
+    CursorLimits {
         default_limit,
         max_limit: MAX_LIMIT,
-        max_offset: MAX_OFFSET,
     }
 }
 
-/// An offset past [`MAX_OFFSET`] as a `400`, with the `offset_too_large`
-/// code the older services answer with too.
-fn offset_too_large(error: OffsetTooLarge) -> Error {
-    Error::CustomError(
-        StatusCode::BAD_REQUEST,
-        ErrorDetail::new(
-            "offset_too_large",
-            format!("{error}; narrow the query instead"),
-        ),
-    )
+/// `rows` as a bare JSON array, with the page's `Link: rel="next"` when
+/// `more` says rows follow.
+fn with_next<T: Serialize>(page: &CursorPage, more: bool, rows: Vec<T>) -> Response {
+    let mut response = Json(rows).into_response();
+    if more && let Some(link) = page.next_link() {
+        response
+            .headers_mut()
+            .insert(axum::http::header::LINK, link);
+    }
+    response
 }
 
 /// Parse index hits into UUIDs, dropping any that will not parse.
@@ -246,8 +242,10 @@ struct MatchRequest {
     candidates: Vec<CarePathway>,
 }
 
-/// Query string for `GET /search`: the (optional) `q` term. Absent or
-/// blank `q` is rejected by the handler as a `400`.
+/// Query string for `GET /search`: the (optional) `q` term and the
+/// retrieval-mode flags. Absent or blank `q` is rejected by the handler
+/// as a `400`. The page, `limit` and `cursor`, is read from the URI by
+/// [`CursorPage::new`], and ignored here.
 #[derive(Debug, Deserialize)]
 struct SearchParams {
     /// The full-text query.
@@ -258,15 +256,6 @@ struct SearchParams {
     /// Phonetic (Soundex) retrieval; takes precedence over `fuzzy`.
     #[serde(default)]
     phonetic: bool,
-    /// Page size; absent, zero or unparseable ⇒ [`SEARCH_CAP`].
-    /// A string, as in [`PageParams`], so a bad value falls back rather
-    /// than refusing the query. Not `#[serde(flatten)]`ed, because the
-    /// `bool` flags above would then arrive as strings and fail.
-    #[serde(default)]
-    limit: Option<String>,
-    /// Rows to skip; absent ⇒ 0.
-    #[serde(default)]
-    offset: Option<String>,
 }
 
 /// Request body for `POST /merge`: which duplicate folds into which
@@ -507,24 +496,30 @@ async fn remove(
     format::empty_json()
 }
 
-/// List active care pathways (capped at 100).
+/// List active care pathways, one page at a time.
 ///
-/// `GET /api/care-pathways` — response is a `[PathwayRef]` array, newest
-/// first. The 100 cap is a pragmatic bound until pagination lands.
+/// `GET /api/care-pathways[?limit=&cursor=]` — response is a
+/// `[PathwayRef]` array, newest first, with a `Link: rel="next"` header
+/// while more rows follow (`agents/share/restful.md`). Omitting `limit`
+/// returns the first [`LIST_CAP`] rows. A `limit` above [`MAX_LIMIT`],
+/// or a cursor this service did not sign for this query, is a `422`.
 ///
 /// # Errors
 ///
-/// Propagates DB query errors.
+/// `422` on a bad `limit` or `cursor`; otherwise DB query errors.
 #[debug_handler]
 async fn list(
-    Query(params): Query<PageParams>,
+    OriginalUri(uri): OriginalUri,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> Result<Response> {
-    let page = params.resolve(limits(LIST_CAP)).map_err(offset_too_large)?;
-    let rows = PathwayModel::list_paged(&ctx.db, page.limit, page.offset).await?;
-    let total = PathwayModel::count(&ctx.db).await?;
+    let page = CursorPage::new(crate::cursor_key::key(), limits(LIST_CAP), &uri)?;
+    let rows = PathwayModel::list_paged(&ctx.db, page.limit() + 1, page.offset()).await?;
+    // Whether more follow is decided on the stored rows, before the
+    // record-level filter below drops any the caller may not read: a
+    // page thinned by that filter must not end the walk.
+    let (rows, more_follow) = page.split(rows);
     // A collection read is recorded against the nil `pid`: it disclosed
     // many records, not one, so attributing it to any single record would
     // corrupt that record's §164.528 accounting.
@@ -538,7 +533,7 @@ async fn list(
     .await
     .map_err(audit_unavailable)?;
     let refs = readable_refs(&rows, &caller)?;
-    Ok(page.respond(i64::try_from(total).unwrap_or(i64::MAX), refs))
+    Ok(with_next(&page, more_follow, refs))
 }
 
 /// Full-text name search: `GET /api/care-pathways/search?q=stroke`.
@@ -546,15 +541,19 @@ async fn list(
 /// edit-distance tolerance, `?phonetic=true` for Soundex, which takes
 /// precedence over `fuzzy` when both are set) — spec §13 T-6's
 /// full-text/fuzzy rollout is done; the plain-`ILIKE` search this
-/// replaced is gone. Response is a `[PathwayRef]` array; a missing or
-/// blank `q` is a `400`; an unavailable index is `503`, never a
-/// disguised empty result.
+/// replaced is gone. Response is a `[PathwayRef]` array, paged by
+/// `?limit=` (default [`SEARCH_CAP`]) and a signed `?cursor=`, with a
+/// `Link: rel="next"` header while more hits follow; a missing or blank
+/// `q` is a `400`; a bad `limit` or `cursor` is a `422`; an unavailable
+/// index is `503`, never a disguised empty result.
 ///
 /// # Errors
 ///
-/// `400` when `q` is absent or whitespace-only; otherwise DB errors.
+/// `400` when `q` is absent or whitespace-only; `422` on a bad page;
+/// otherwise DB errors.
 #[debug_handler]
 async fn search(
+    OriginalUri(uri): OriginalUri,
     Query(params): Query<SearchParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
@@ -565,12 +564,7 @@ async fn search(
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let page = PageParams {
-        limit: params.limit,
-        offset: params.offset,
-    }
-    .resolve(limits(SEARCH_CAP))
-    .map_err(offset_too_large)?;
+    let page = CursorPage::new(crate::cursor_key::key(), limits(SEARCH_CAP), &uri)?;
     // An unavailable index is reported, never disguised as "no matches":
     // an operator must be able to tell a broken index from an empty one.
     let Some(engine) = crate::search::engine() else {
@@ -586,14 +580,17 @@ async fn search(
     } else {
         crate::search::SearchMode::Exact
     };
-    let (pids, index_total) = engine.search_page(
+    let (pids, _index_total) = engine.search_page(
         q.trim(),
         mode,
-        usize::try_from(page.limit).unwrap_or(usize::MAX),
-        usize::try_from(page.offset).unwrap_or(usize::MAX),
+        usize::try_from(page.limit() + 1).unwrap_or(usize::MAX),
+        usize::try_from(page.offset()).unwrap_or(usize::MAX),
     )?;
+    // Whether more follow is the index's answer, decided before the hits
+    // resolve: a hit whose row has since been deleted is dropped from the
+    // page (see `find_by_pids`), and a short page must not end the walk.
+    let (pids, more_follow) = page.split(pids);
     let rows = PathwayModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
-    let total = i64::try_from(index_total).unwrap_or(i64::MAX);
     disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
@@ -604,7 +601,7 @@ async fn search(
     .await
     .map_err(audit_unavailable)?;
     let refs = readable_refs(&rows, &caller)?;
-    Ok(page.respond(total, refs))
+    Ok(with_next(&page, more_follow, refs))
 }
 
 /// Score a query against an explicit candidate list (no persistence).
@@ -1044,37 +1041,54 @@ mod tests {
         assert_eq!(SEARCH_CAP, 50, "spec §6.2: search caps at 50");
     }
 
-    /// This crate's bounds: `limit` is clamped rather than refused, a zero,
-    /// absent or unparseable `limit` falls back to the default, and the
-    /// offset bound is what refuses, as `offset_too_large`.
+    /// This crate's bounds: no `limit` is the default, a `limit` up to
+    /// [`MAX_LIMIT`] is taken, and anything else is refused, never clamped.
     #[test]
-    fn page_params_clamp_rather_than_reject() {
-        let params = |limit: Option<&str>, offset: Option<&str>| PageParams {
-            limit: limit.map(str::to_string),
-            offset: offset.map(str::to_string),
+    fn a_page_takes_its_limit_or_refuses_it() {
+        let page = |query: &str| {
+            let uri = format!("/api/care-pathways{query}").parse().unwrap();
+            CursorPage::new(crate::cursor_key::key(), limits(LIST_CAP), &uri)
         };
-        let page = params(Some("100000"), Some("0"))
-            .resolve(limits(LIST_CAP))
-            .unwrap();
-        assert_eq!((page.limit, page.offset), (MAX_LIMIT, 0));
-        for fallback in [Some("0"), Some("lots"), None] {
-            let page = params(fallback, None).resolve(limits(LIST_CAP)).unwrap();
-            assert_eq!(page.limit, LIST_CAP, "{fallback:?}");
-        }
-        assert!(
-            params(None, Some(&MAX_OFFSET.to_string()))
-                .resolve(limits(SEARCH_CAP))
-                .is_ok()
+        assert_eq!(page("").unwrap().limit(), LIST_CAP);
+        assert_eq!(
+            page(&format!("?limit={MAX_LIMIT}")).unwrap().limit(),
+            MAX_LIMIT
         );
-        let refused = params(None, Some(&(MAX_OFFSET + 1).to_string()))
-            .resolve(limits(SEARCH_CAP))
-            .map_err(offset_too_large)
-            .unwrap_err();
+        for refused in [
+            "?limit=0",
+            "?limit=lots",
+            &format!("?limit={}", MAX_LIMIT + 1),
+        ] {
+            assert!(page(refused).is_err(), "{refused}");
+        }
+    }
+
+    /// A cursor this service did not sign, such as a caller's own offset
+    /// in disguise, is refused rather than read.
+    #[test]
+    fn an_unsigned_cursor_is_refused() {
+        let uri = "/api/care-pathways?cursor=AQAAAAAAAAAK".parse().unwrap();
+        assert!(CursorPage::new(crate::cursor_key::key(), limits(LIST_CAP), &uri).is_err());
+    }
+
+    /// The next link is only sent while more rows follow.
+    #[test]
+    fn the_next_link_follows_more() {
+        let uri = "/api/care-pathways/search?q=stroke&limit=2"
+            .parse()
+            .unwrap();
+        let page = CursorPage::new(crate::cursor_key::key(), limits(SEARCH_CAP), &uri).unwrap();
+        let more = with_next(&page, true, vec!["a", "b"]);
+        let link = more.headers()["link"].to_str().unwrap();
         assert!(
-            matches!(&refused, Error::CustomError(status, detail)
-                if *status == StatusCode::BAD_REQUEST
-                    && detail.code.as_deref() == Some("offset_too_large")),
-            "an unbounded offset is a DoS, not a deep page: {refused:?}"
+            link.starts_with("</api/care-pathways/search?q=stroke&limit=2&cursor="),
+            "{link}"
+        );
+        assert!(
+            with_next(&page, false, vec!["a"])
+                .headers()
+                .get("link")
+                .is_none()
         );
     }
 }

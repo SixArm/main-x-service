@@ -33,6 +33,8 @@ pub mod client_limits;
 /// implementation (`spec/compliance` §8.5 step 3).
 pub mod compliance;
 pub mod controllers;
+/// The secret that signs page cursors (`CURSOR_KEY`).
+pub mod cursor_key;
 pub mod data;
 /// HL7 FHIR R5 interop — the `Task` resource mapping (best-effort) over
 /// the stored `case_matcher::Case` DTO.

@@ -11,6 +11,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- The organizations list follows the service's cursor pages: `getPage`
+  returns `{ items, next }`, where `next` is the `Link: rel="next"` URL
+  (same-origin paths only), in place of `total`/`limit`/`offset`. The
+  list shows its count with "+" while more follow, and a "Load more"
+  button fetches the next page.
+
 - Read an error's reason from the RFC 9457 problem the service now answers
   (axa 0.6): `detail`, else `title`.
 

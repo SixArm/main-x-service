@@ -1,6 +1,6 @@
 //! `cases` model — CRUD over the stored `case_matcher::Case` payload.
 
-use axa::pagination::escape_like;
+use axa::cursor_pagination::escape_like;
 use axa::prelude::*;
 use case_matcher::Case as MatchCase;
 use chrono::SubsecRound as _;
@@ -8,7 +8,7 @@ use chrono::SubsecRound as _;
 use crate::compliance::record_integrity;
 use sea_orm::sea_query::Expr;
 use sea_orm::sea_query::extension::postgres::PgExpr;
-use sea_orm::{ConnectionTrait, PaginatorTrait, QueryOrder, QuerySelect};
+use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 pub use super::_entities::cases::{self, ActiveModel, Entity, Model};
@@ -183,26 +183,6 @@ impl Model {
         Ok(rows)
     }
 
-    /// How many active cases exist, ignoring any page window — the
-    /// `X-Total-Count` a paged response reports.
-    ///
-    /// This counts what the **collection** holds, before the per-record
-    /// concealment the handler applies (§10 governance): the header
-    /// therefore describes the query, not the caller's view of it.
-    /// Deriving it per caller would leak exactly what concealment
-    /// hides — the number of records they are not allowed to see.
-    ///
-    /// # Errors
-    ///
-    /// When the query fails.
-    pub async fn count(db: &DatabaseConnection) -> ModelResult<u64> {
-        let total = cases::Entity::find()
-            .filter(cases::Column::DeletedAt.is_null())
-            .count(db)
-            .await?;
-        Ok(total)
-    }
-
     /// Case-insensitive substring search on the denormalised `title`, over
     /// active rows (Postgres `ILIKE '%q%'`). This is the pragmatic title
     /// search; full-text / fuzzy search over the JSONB payload via Tantivy
@@ -237,22 +217,6 @@ impl Model {
             .all(db)
             .await?;
         Ok(rows)
-    }
-
-    /// How many active cases match `q`, ignoring any window. Same
-    /// collection-level semantics as [`count`](Self::count).
-    ///
-    /// # Errors
-    ///
-    /// When the query fails.
-    pub async fn search_count(db: &DatabaseConnection, q: &str) -> ModelResult<u64> {
-        let pattern = format!("%{}%", escape_like(q));
-        let total = cases::Entity::find()
-            .filter(cases::Column::DeletedAt.is_null())
-            .filter(Expr::col(cases::Column::Title).ilike(pattern))
-            .count(db)
-            .await?;
-        Ok(total)
     }
 
     /// The most recently updated `limit` cases, **including soft-deleted
@@ -363,7 +327,7 @@ mod tests {
     use super::escape_like;
 
     /// Pins the `LIKE` escaping this model's title search relies on
-    /// (`axa::pagination::escape_like`): literal text is unchanged, `%` and `_`
+    /// (`axa::cursor_pagination::escape_like`): literal text is unchanged, `%` and `_`
     /// are escaped so they match literally, and the backslash is escaped
     /// first so a user backslash cannot re-enable a wildcard.
     #[test]

@@ -1,8 +1,10 @@
 //! REST handlers for the Thing Service.
 
 use crate::api::{ApiProblem, ok};
+use axa::cursor_pagination::{CursorLimits, CursorPage, PageError};
 use axa::extract::{Json, Path, Query};
-use axa::pagination::{Limits, OffsetTooLarge, Page, PageParams};
+use axum::extract::OriginalUri;
+use axum::http::{Uri, header};
 use axum::response::Response;
 use axum::{extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
@@ -330,16 +332,11 @@ pub async fn search_things(
 }
 
 /// Query parameters for `GET /api/things` (the plain collection list).
+///
+/// The page, `limit` and `cursor`, is read from the URI by
+/// [`CursorPage::new`], and ignored here.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 pub struct ListQuery {
-    /// Page size; absent, zero, or unparseable falls back to
-    /// [`LIST_DEFAULT_LIMIT`]. A string, as in [`PageParams`], so a bad
-    /// value falls back rather than refusing the query. Not
-    /// `#[serde(flatten)]`ed, because `mask_sensitive` would then arrive
-    /// as a string and fail to parse as a `bool`.
-    pub limit: Option<String>,
-    /// Rows to skip; absent or unparseable means `0`.
-    pub offset: Option<String>,
     /// Mask sensitive fields in the results.
     pub mask_sensitive: Option<bool>,
 }
@@ -349,56 +346,55 @@ pub struct ListQuery {
 /// caller.
 const LIST_DEFAULT_LIMIT: u64 = 10;
 /// Largest page this endpoint will ever serve in one response. A bigger
-/// `limit` is **clamped**, not refused (`agents/share/restful.md`).
+/// `limit` is a `422`, never clamped, so a caller is not handed less than
+/// it asked for without being told (`agents/share/restful.md`).
 const LIST_MAX_LIMIT: u64 = 500;
-/// Largest accepted `offset` (SEC-G7 posture). Past this, a request is a
-/// `400` — the database would otherwise have to materialise and discard
-/// arbitrarily many rows, a cheap denial of service. Deep paging past
-/// this wants a cursor, not a bigger number.
-const LIST_MAX_OFFSET: u64 = 10_000;
 
-/// The bounds of `GET /api/things`.
-const LIST_LIMITS: Limits = Limits {
+/// The page sizes of `GET /api/things`. There is no offset bound: a
+/// position comes only from a cursor this service signed, so reaching a
+/// deep page means fetching every page before it.
+const LIST_LIMITS: CursorLimits = CursorLimits {
     default_limit: LIST_DEFAULT_LIMIT,
     max_limit: LIST_MAX_LIMIT,
-    max_offset: LIST_MAX_OFFSET,
 };
 
-/// The page a `ListQuery` asks for, under [`LIST_LIMITS`]. Pure and
-/// `State`/`Query`-free, so it is unit-testable without an extractor.
-fn resolve_list_page(q: &ListQuery) -> Result<Page, OffsetTooLarge> {
-    PageParams {
-        limit: q.limit.clone(),
-        offset: q.offset.clone(),
+/// The page `uri` asks for, under [`LIST_LIMITS`]. Pure and
+/// `State`-free, so it is unit-testable without an extractor.
+fn resolve_list_page(uri: &Uri) -> Result<CursorPage, PageError> {
+    CursorPage::new(crate::cursor_key::key(), LIST_LIMITS, uri)
+}
+
+/// A refused `limit` or `cursor` as a `422`, coded `invalid_page`. The
+/// detail is [`PageError`]'s own, which quotes nothing the caller sent.
+fn invalid_page(error: PageError) -> Response {
+    ApiProblem::new("invalid_page", error.to_string()).respond(error.status())
+}
+
+/// `body` as JSON, with the page's `Link: rel="next"` when `more` says
+/// rows follow.
+fn with_next<T: Serialize>(page: &CursorPage, more: bool, body: T) -> Response {
+    let mut response = (StatusCode::OK, Json(body)).into_response();
+    if more && let Some(link) = page.next_link() {
+        response.headers_mut().insert(header::LINK, link);
     }
-    .resolve(LIST_LIMITS)
+    response
 }
 
-/// An offset past [`LIST_MAX_OFFSET`] as a `400`, with the
-/// `offset_too_large` code the rest of the family answers with too.
-fn offset_too_large(error: OffsetTooLarge) -> Response {
-    ApiProblem::new(
-        "offset_too_large",
-        format!("{error}; narrow the query instead"),
-    )
-    .respond(StatusCode::BAD_REQUEST)
-}
-
-/// Collection-list response payload — the same shape as
-/// [`SearchResponse`], so the two surfaces are interchangeable for a
-/// caller that already handles one.
+/// Collection-list response payload — the same `results` array as
+/// [`SearchResponse`], so a caller that reads one reads the other.
+///
+/// There is no `total`: a count would describe rows the caller's policy
+/// may hide, and whether more rows follow is the `Link: rel="next"`
+/// header's to say (`agents/share/restful.md`).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ListResponse {
     /// The things on this page.
     pub results: Vec<Thing>,
-    /// Count of things on **this page** (not the global total — that is
-    /// the `X-Total-Count` header, `agents/share/restful.md`).
-    pub total: usize,
 }
 
 /// Enumerate every active thing, database-backed and paginated.
 ///
-/// `GET /api/things[?limit=&offset=]` — the genuine "list the
+/// `GET /api/things[?limit=&cursor=]` — the genuine "list the
 /// collection" endpoint, distinct from `/things/search`: there was
 /// previously no way to enumerate things at all (T-15) — `q="*"`
 /// tokenises to nothing and `/things/search` returns zero hits
@@ -408,37 +404,36 @@ pub struct ListResponse {
 /// internally by `/things/deduplicate`'s scan and the FHIR search
 /// scan), so its answer is only ever as stale as the database itself.
 ///
-/// Returns `200` with the family pagination headers
-/// (`X-Total-Count`/`X-Limit`/`X-Offset`, `agents/share/restful.md`,
-/// from [`axa::pagination`]); an `offset` beyond [`LIST_MAX_OFFSET`] is
-/// a `400` (SEC-G7). The body stays the [`ListResponse`] object, so only
-/// the headers come from [`Page::headers`].
+/// Returns `200` with a [`ListResponse`], newest first, and a
+/// `Link: rel="next"` header carrying a signed cursor while more rows
+/// follow (from [`axa::cursor_pagination`]). Omitting `limit` returns the
+/// first [`LIST_DEFAULT_LIMIT`] rows. A `limit` that is zero, not a
+/// number, or above [`LIST_MAX_LIMIT`], or a cursor this service did not
+/// sign for this query, is a `422` coded `invalid_page`.
 #[utoipa::path(get, path = "/api/things", tag = "things",
     params(ListQuery),
-    responses((status = 200, body = ListResponse), (status = 400)))]
-pub async fn list_things(State(state): State<AppState>, Query(q): Query<ListQuery>) -> Response {
-    let page = match resolve_list_page(&q) {
+    responses((status = 200, body = ListResponse), (status = 422)))]
+pub async fn list_things(
+    State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
+    Query(q): Query<ListQuery>,
+) -> Response {
+    let page = match resolve_list_page(&uri) {
         Ok(page) => page,
-        Err(error) => return offset_too_large(error),
+        Err(error) => return invalid_page(error),
     };
     let mask_sensitive = q.mask_sensitive.unwrap_or(false);
     let things = state
         .thing_repository
-        .list(page.limit, page.offset)
+        .list(page.limit() + 1, page.offset())
         .await
         .unwrap_or_default();
-    let total_count = crate::db::count_active(&state.db).await.unwrap_or(0);
+    let (things, more) = page.split(things);
     let results: Vec<Thing> = things
         .into_iter()
         .map(|t| if mask_sensitive { mask_thing(&t) } else { t })
         .collect();
-    let total = results.len();
-    (
-        StatusCode::OK,
-        page.headers(total_count),
-        Json(ListResponse { results, total }),
-    )
-        .into_response()
+    with_next(&page, more, ListResponse { results })
 }
 
 /// A scored candidate thing returned by match / duplicate endpoints.
@@ -1203,70 +1198,81 @@ mod review_report_tests {
 
 #[cfg(test)]
 mod list_things_tests {
-    //! Pure, DB-free pins for T-15's page-resolution rules
-    //! (`agents/share/restful.md`). The request-level "everything comes
-    //! back with no `q`" acceptance test lives in `tests/`, where a real
-    //! database is available.
+    //! Pure, DB-free pins for T-15's page rules
+    //! (`agents/share/restful.md`). The request-level walk over every
+    //! page lives in `tests/`, where a real database is available.
     use super::{
-        LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT, LIST_MAX_OFFSET, ListQuery, offset_too_large,
-        resolve_list_page,
+        LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT, ListResponse, invalid_page, resolve_list_page,
+        with_next,
     };
     use axum::http::StatusCode;
 
-    fn query(limit: Option<&str>, offset: Option<&str>) -> ListQuery {
-        ListQuery {
-            limit: limit.map(str::to_string),
-            offset: offset.map(str::to_string),
-            ..Default::default()
-        }
+    fn page(
+        query: &str,
+    ) -> Result<axa::cursor_pagination::CursorPage, axa::cursor_pagination::PageError> {
+        let uri = format!("/api/things{query}").parse().unwrap();
+        resolve_list_page(&uri)
     }
 
-    /// Omitting both parameters resolves to the default page from the
-    /// start — the common "just show me things" call.
+    /// Omitting `limit` resolves to the default page from the start —
+    /// the common "just show me things" call.
     #[test]
     fn absent_params_resolve_to_the_default_from_zero() {
-        let page = resolve_list_page(&ListQuery::default()).unwrap();
-        assert_eq!((page.limit, page.offset), (LIST_DEFAULT_LIMIT, 0));
+        let page = page("").unwrap();
+        assert_eq!((page.limit(), page.offset()), (LIST_DEFAULT_LIMIT, 0));
     }
 
-    /// A zero or unparseable limit is not an empty page or a `400` — it
-    /// falls back to the default, same as the family's other paginated
-    /// list endpoints. An unparseable offset falls back to `0`.
+    /// A limit up to the maximum is taken as asked.
     #[test]
-    fn a_zero_or_unparseable_limit_falls_back_to_the_default() {
-        for limit in ["0", "lots", "-5"] {
-            let page = resolve_list_page(&query(Some(limit), Some("many"))).unwrap();
+    fn a_limit_up_to_the_maximum_is_taken() {
+        assert_eq!(page("?limit=25").unwrap().limit(), 25);
+        assert_eq!(
+            page(&format!("?limit={LIST_MAX_LIMIT}")).unwrap().limit(),
+            LIST_MAX_LIMIT
+        );
+    }
+
+    /// A zero, unparseable, or oversized limit is refused as a `422`
+    /// coded `invalid_page`, never clamped or defaulted.
+    #[test]
+    fn a_bad_limit_is_refused() {
+        for refused in [
+            "?limit=0",
+            "?limit=lots",
+            &format!("?limit={}", LIST_MAX_LIMIT + 1),
+        ] {
+            let error = page(refused).unwrap_err();
             assert_eq!(
-                (page.limit, page.offset),
-                (LIST_DEFAULT_LIMIT, 0),
-                "{limit}"
+                invalid_page(error).status(),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "{refused}"
             );
         }
     }
 
-    /// A huge limit is clamped, not refused.
+    /// A cursor this service did not sign, such as a caller's own offset
+    /// in disguise, is refused rather than read.
     #[test]
-    fn an_oversized_limit_is_clamped_to_the_maximum() {
-        let page = resolve_list_page(&query(Some("1000000"), None)).unwrap();
-        assert_eq!(page.limit, LIST_MAX_LIMIT);
+    fn an_unsigned_cursor_is_refused() {
+        assert!(page("?cursor=AQAAAAAAAAAK").is_err());
     }
 
-    /// A within-range limit and a nonzero offset both pass through
-    /// unchanged.
+    /// The next link is only sent while more rows follow.
     #[test]
-    fn an_ordinary_page_request_passes_through() {
-        let page = resolve_list_page(&query(Some("25"), Some("50"))).unwrap();
-        assert_eq!((page.limit, page.offset), (25, 50));
-    }
-
-    /// The offset bound is inclusive, and one past it is a `400` coded
-    /// `offset_too_large` — an unbounded offset is a denial of service, not a deep page.
-    #[test]
-    fn an_offset_past_the_bound_is_refused() {
-        let at = LIST_MAX_OFFSET.to_string();
-        assert!(resolve_list_page(&query(None, Some(&at))).is_ok());
-        let past = (LIST_MAX_OFFSET + 1).to_string();
-        let error = resolve_list_page(&query(None, Some(&past))).unwrap_err();
-        assert_eq!(offset_too_large(error).status(), StatusCode::BAD_REQUEST);
+    fn the_next_link_follows_more() {
+        let page = page("?mask_sensitive=true&limit=2").unwrap();
+        let more = with_next(&page, true, ListResponse { results: vec![] });
+        let link = more.headers()["link"].to_str().unwrap();
+        assert!(
+            link.starts_with("</api/things?mask_sensitive=true&limit=2&cursor="),
+            "{link}"
+        );
+        assert!(link.ends_with(r#">; rel="next""#), "{link}");
+        assert!(
+            with_next(&page, false, ListResponse { results: vec![] })
+                .headers()
+                .get("link")
+                .is_none()
+        );
     }
 }

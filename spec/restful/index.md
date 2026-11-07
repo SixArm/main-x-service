@@ -292,7 +292,7 @@ and still a stub.
 
 ## 7. Pagination, search params, masking on reads
 
-### 7.1 Pagination — the family-wide header contract
+### 7.1 Pagination — signed cursors, with a `Link` to the next page
 
 This section previously described pagination as ad hoc and
 inconsistent per service (a fixed axa list cap of 100, a fixed axa
@@ -304,21 +304,22 @@ collection-read endpoint (`GET /<plural>`, `/search`, and any other
 paginated list), and this document defers to it rather than restating
 it in full:
 
-- `?limit=` and `?offset=` query params on every collection read;
-  totals/limit/offset are reported in **response headers**
-  (`X-Total-Count`, `X-Limit`, `X-Offset`), not a body envelope — so a
-  bare-JSON-array endpoint (every axa endpoint, §1.3) keeps returning a
-  bare array.
-- **Omitting both params preserves each endpoint's pre-existing
-  behaviour** — the old ad hoc numbers below are exactly what an
-  unparameterised request still gets today; they were never wrong, they
-  were just not the whole story.
-- **`limit` is clamped**, not rejected, to a per-endpoint `MAX_LIMIT`
-  (500 for list/search surfaces) — a caller asking for more gets the
-  max and an honest `X-Limit`.
-- **`offset` is bounded**; a request beyond the bound is `400` (SEC-G7)
-  rather than materialising an unbounded number of rows to discard.
-- Zero/unparseable values fall back to the default rather than erroring.
+- `?limit=` and a signed, opaque `?cursor=` on every collection read
+  (`axa::cursor_pagination`, since 2026-11-07). While more rows follow,
+  the response carries `Link: <…>; rel="next"`, and the body stays a
+  bare JSON array (§1.3). There is **no total**: it would count rows a
+  caller's record policy hides.
+- **Omitting `limit` gives each endpoint's pre-existing default page**;
+  the old ad hoc numbers below are what an unparameterised request
+  still gets.
+- **A bad `limit` is refused, not clamped**: zero, not a number, or
+  above `MAX_LIMIT` (500 for list/search surfaces) is `422`. So is a
+  cursor the service did not sign for this path and these filters.
+- **There is no offset bound.** A position comes only from a cursor the
+  service signed with `CURSOR_KEY`, so SEC-G7's cap has nothing left to
+  bound.
+- person, worker, event and course still take a bounded `?offset=`
+  through their own code, until repo `tasks.md` CUR-1.
 
 The pre-existing per-endpoint defaults this contract preserves:
 

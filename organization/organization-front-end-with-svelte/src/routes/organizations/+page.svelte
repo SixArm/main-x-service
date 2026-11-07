@@ -22,22 +22,37 @@
     let items = $state<OrgRef[]>([]);
     let loading = $state(true);
     let error = $state<string | null>(null);
-    // Rows matching overall, from `X-Total-Count` — not `items.length`,
-    // which is only this page. Shown so an operator can tell a short list
-    // from a first page of a long one.
-    let total = $state(0);
+    // The next page's URL, from `Link: rel="next"`, or `null` on the last.
+    // There is no total, so the count says "+" while more follow, and an
+    // operator can tell a short list from a first page of a long one.
+    let next = $state<string | null>(null);
+    let loadingMore = $state(false);
 
     onMount(async () => {
         try {
             const page = await repo.listPage();
             items = page.items;
-            total = page.total;
+            next = page.next;
         } catch (err) {
             error = err instanceof Error ? err.message : t("list.title");
         } finally {
             loading = false;
         }
     });
+
+    async function loadMore() {
+        if (!next || loadingMore) return;
+        loadingMore = true;
+        try {
+            const page = await repo.listPage({}, next);
+            items = [...items, ...page.items];
+            next = page.next;
+        } catch (err) {
+            error = err instanceof Error ? err.message : t("list.title");
+        } finally {
+            loadingMore = false;
+        }
+    }
 
     // The list endpoint returns lightweight refs, so the grid carries
     // those columns; `pid` stays a technical literal.
@@ -99,11 +114,7 @@
 {:else if items.length === 0}
     <p>{t("list.empty")}</p>
 {:else}
-    <p class="count">
-        {items.length === total
-            ? `${total}`
-            : `${items.length} / ${total}`}
-    </p>
+    <p class="count">{next ? `${items.length}+` : `${items.length}`}</p>
     <GridTheme>
       <FilterTheme>
         <div class="filter-wrap">
@@ -117,6 +128,11 @@
         </div>
       </FilterTheme>
     </GridTheme>
+    {#if next}
+        <button type="button" onclick={loadMore} disabled={loadingMore}>
+            {t("list.more")}
+        </button>
+    {/if}
 {/if}
 
 <style>
@@ -128,9 +144,8 @@
     overflow: hidden;
   }
 
-    /* The row count: just the total when the page holds everything, and
-       "shown / total" when it does not, so a first page of a long list
-       cannot be mistaken for a short list. */
+    /* The row count, with "+" while more pages follow, so a first page of
+       a long list cannot be mistaken for a short list. */
     .count {
         margin: 0 0 0.5rem;
         opacity: 0.75;

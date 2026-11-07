@@ -11,6 +11,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **`GET /api/cases` and `GET /api/cases/search` page by signed cursor**
+  (`axa::cursor_pagination`, axa's `cursor-pagination` feature), replacing
+  offset paging. `?limit=` keeps its defaults (100 list, 50 search) and
+  maximum (500); `?offset=` is gone, and the next page comes from the
+  `Link: rel="next"` header, which is absent on the last page. **No
+  `X-Total-Count`, `X-Limit` or `X-Offset` any more**, so `count` and
+  `search_count` are removed from the model. A `limit` of `0`, not a
+  number, or above 500 is now a `422` rather than clamped or defaulted,
+  and so is a cursor this service did not sign for the query; the
+  `offset_too_large` `400` is gone, since a position can only come from
+  a signed cursor. "More follow" is decided on the fetched batch (index
+  hits, for search, before they resolve) and before SEC-G3 concealment,
+  so neither a deleted hit nor a concealed row ends the walk.
+- New `CURSOR_KEY` (at least 32 bytes) signs cursors: required in
+  production, random per process elsewhere (`src/cursor_key.rs`). Adds
+  `getrandom` as a direct dependency (SOUP register updated).
+
 - Paging comes from `axa::pagination` (axa's `pagination` feature), and the
   title search's `LIKE` escaping from `axa::pagination::escape_like`. The
   crate's own page struct, offset check and header helper are gone. The

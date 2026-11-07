@@ -429,10 +429,10 @@ impl SearchEngine {
     /// One page of hits **plus the true total**: `(pids, total)`.
     ///
     /// The total comes from Tantivy's `Count` collector rather than the
-    /// page length, because a page can never tell a caller how much
-    /// there is — which is the whole point of `X-Total-Count`
-    /// (`agents/share/restful.md`). `mode` picks the same three
-    /// retrieval routes the un-paged methods expose.
+    /// page length. The HTTP search sends no total, because it would
+    /// count records a caller's policy hides; bulk export reads it.
+    /// `mode` picks the same three retrieval routes the un-paged methods
+    /// expose.
     ///
     /// # Errors
     ///
@@ -449,8 +449,8 @@ impl SearchEngine {
             return Ok((Vec::new(), 0));
         };
         // Ask for the whole prefix up to the page end, then skip: Tantivy
-        // has no "start at N" collector, and the offset is bounded by the
-        // caller precisely so this stays finite.
+        // has no "start at N" collector. The offset comes only from a signed
+        // cursor, so it is never past the hits a caller has already walked.
         let wanted = offset.saturating_add(limit);
         let (top, total) = searcher
             .search(

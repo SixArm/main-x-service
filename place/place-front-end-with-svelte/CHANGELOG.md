@@ -11,6 +11,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- The places list follows the service's cursor pages: `PlaceRepository`
+  `search` and `list` return `{ items, next }`, where `next` is the
+  `Link: rel="next"` path (same-origin paths only, `nextLink` in
+  `client.ts`), in place of `total`; `offset` is no longer sent, and
+  `nextPage(next)` fetches the page after. The BFF proxy now forwards
+  the `Link` header. The list shows its count with "+" while more
+  follow, and a "Load more" button (`list.more`, all eight locales)
+  fetches the next page.
+
 - The API client reads the service's new responses: a success is the bare
   body, and an error is an RFC 9457 problem, whose `detail` (else `title`)
   becomes `ApiError.message`, `code` becomes `ApiError.code`, and `errors`

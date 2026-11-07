@@ -49,11 +49,14 @@ export class CaseRepository {
   }
 
   /**
-   * `GET /api/cases?limit=&offset=` — one page, with the total.
-   * @param page The window; omitted values leave the service's defaults.
+   * `GET /api/cases?limit=` — the first page — or, given a page's
+   * `next`, the page after it.
+   * @param page The page size, for a first page.
+   * @param next A previous page's {@link Page.next}.
+   * @returns The refs plus the next page's URL, or `null` on the last.
    */
-  listPage(page: PageRequest = {}): Promise<Page<CaseRef>> {
-    return this.http.getPage<CaseRef>("/api/cases", page);
+  listPage(page: PageRequest = {}, next?: string): Promise<Page<CaseRef>> {
+    return this.http.getPage<CaseRef>(next ?? "/api/cases", next ? {} : page);
   }
 
   /**
@@ -181,19 +184,22 @@ export class CaseRepository {
   }
 
   /**
-   * Full-text case search. `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=&offset=`.
+   * Full-text case search. `GET /api/cases/search?q=&fuzzy=&phonetic=&limit=`.
    * A blank `q` is rejected by the service with `400` — callers wanting a
    * "show everything" view should call {@link listPage} instead.
    * @param params The query plus optional fuzzy/phonetic toggles and paging.
-   * @returns One page of {@link CaseRef} hits, with the service's total.
+   * @param next A previous search page's {@link Page.next}; when given,
+   *   it already carries the query and `params` is not re-sent.
+   * @returns One page of {@link CaseRef} hits, plus the next page's URL
+   *   or `null` on the last.
    */
-  search(params: SearchParams): Promise<Page<CaseRef>> {
+  search(params: SearchParams, next?: string): Promise<Page<CaseRef>> {
+    if (next) return this.http.getPage<CaseRef>(next);
     const query = new URLSearchParams({ q: params.q });
     if (params.fuzzy) query.set("fuzzy", "true");
     if (params.phonetic) query.set("phonetic", "true");
     return this.http.getPage<CaseRef>(`/api/cases/search?${query.toString()}`, {
       limit: params.limit,
-      offset: params.offset,
     });
   }
 

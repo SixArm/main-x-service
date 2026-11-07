@@ -72,20 +72,20 @@ test.describe("Thing front-end smoke", () => {
     await expect(page.getByText("[redacted]")).not.toBeVisible();
   });
 
-  // Pins T-28: the family-wide X-Total-Count/X-Offset headers drive the
-  // "N of M" indicator and the Next control, which re-fetches with the
-  // advanced offset (the client's fixed page size, 50) rather than
-  // stopping at the first 50 results with no way to see more.
-  test("things list next-page control advances the offset", async ({
+  // Pins T-28 (cursor paging, 2026-11-07): the service's
+  // `Link: rel="next"` drives a "Load more" control, which fetches that
+  // URL as is and appends its rows; the count reads `N+` while more
+  // follow, since the service sends no total.
+  test("things list load-more control follows the next link", async ({
     page,
   }) => {
-    let capturedOffset: string | null = null;
+    let capturedCursor: string | null = null;
     // No search term is ever typed, so every fetch goes through
     // `repo.list()` → `GET /api/things` (T-15), not `/search`.
     await page.route("**/api/things**", async (route) => {
       const url = new URL(route.request().url());
-      capturedOffset = url.searchParams.get("offset");
-      const onSecondPage = capturedOffset === "50";
+      capturedCursor = url.searchParams.get("cursor");
+      const onSecondPage = capturedCursor === "page2";
       const thing = {
         id: onSecondPage
           ? "0c4f1e2a-0000-4000-8000-00000000000d"
@@ -95,30 +95,25 @@ test.describe("Thing front-end smoke", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        headers: {
-          "X-Total-Count": "100",
-          "X-Limit": "50",
-          "X-Offset": onSecondPage ? "50" : "0",
-        },
-        body: JSON.stringify([thing]),
+        headers: onSecondPage
+          ? {}
+          : { Link: '</api/things?limit=50&cursor=page2>; rel="next"' },
+        body: JSON.stringify({ results: [thing] }),
       });
     });
 
     await page.goto("/things");
     await expect(page.getByText("First page item")).toBeVisible();
-    await expect(page.getByText("1–1 of 100")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Previous" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Next" })).toBeEnabled();
+    await expect(page.getByText("1+ records")).toBeVisible();
 
-    await page.getByRole("button", { name: "Next" }).click();
-    expect(capturedOffset).toBe("50");
+    await page.getByRole("button", { name: "Load more" }).click();
+    expect(capturedCursor).toBe("page2");
     await expect(page.getByText("Second page item")).toBeVisible();
-    await expect(page.getByText("51–51 of 100")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Previous" })).toBeEnabled();
-
-    await page.getByRole("button", { name: "Previous" }).click();
-    expect(capturedOffset).toBe("0");
     await expect(page.getByText("First page item")).toBeVisible();
+    await expect(page.getByText("2 records")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(
+      0,
+    );
   });
 
   // Pins: the new-thing form shows the required Name field and Create button.

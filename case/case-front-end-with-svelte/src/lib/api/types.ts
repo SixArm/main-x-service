@@ -284,10 +284,8 @@ export interface SearchParams {
   fuzzy?: boolean;
   /** Phonetic (Soundex) retrieval; takes precedence over `fuzzy` server-side. */
   phonetic?: boolean;
-  /** Page size; omitted ⇒ the service default. */
+  /** Page size, for a first page; omitted ⇒ the service default. */
   limit?: number;
-  /** Rows to skip; omitted ⇒ 0. */
-  offset?: number;
 }
 
 /**

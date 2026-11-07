@@ -3,6 +3,25 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **2026-11-07 — Cursor pagination (`axa::cursor_pagination`).**
+  `GET /api/places`, `/api/places/search` and `/api/places/nearby` page
+  by `?limit=` and a signed `?cursor=`, with `Link: rel="next"` while
+  more follow, replacing offset paging (§9). No `X-Total-Count` /
+  `X-Limit` / `X-Offset`, and the `total` field is gone from the
+  `SearchResponse` / `ListResponse` bodies: a total counts rows the
+  caller's policy may hide. A `limit` above 100 is a `422` (was
+  clamped); the offset bound (`MAX_OFFSET`, SEC-G7) and its `400`
+  `offset_too_large` are gone, since a position can only come from a
+  cursor this service signed. `CURSOR_KEY` (`src/cursor_key.rs`) is
+  required in production. Defaults unchanged (10 on all three).
+  Acceptance: `page_tests` (default, max taken, `0`/`lots`/max+1
+  refused, unsigned cursor refused, next link only while more follow);
+  DB-gated `tests/api_integration_test.rs` and
+  `tests/api_nearby_and_search_cursor.rs` (renamed from
+  `…_offset.rs`) walk list, search and nearby by following `Link`.
+  This supersedes the offset details recorded in T-9 and the list
+  endpoint entry below.
+
 - [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
       (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
       features; `PLACE_KEYCLOAK_*` configuration; `request_claims` /
@@ -196,6 +215,8 @@ clearly described manual check confirms the acceptance criterion.
     alongside the existing `q`/`limit`/`fuzzy`/`mask_sensitive`
     handling; `search()`/`fuzzy_search()` are unchanged call sites,
     refactored to share the same query-building as `search_page`.
+  - *(Paging since moved to signed cursors — see the 2026-11-07 entry
+    above; the offset details below are historical.)*
   - **Acceptance (met):** `tests/api_nearby_and_search_offset.rs`
     (DB-gated, `#[ignore]`) posts places then confirms
     `GET /api/places/nearby` returns only those within the radius (and
