@@ -1,6 +1,6 @@
 //! Configuration for the event-service runtime.
 //!
-//! [`Config`](crate::config::Config) is the root struct, composed of one
+//! [`Config`] is the root struct, composed of one
 //! struct per concern (server, database, search, matching,
 //! observability, streaming). It is `Serialize`/`Deserialize` so it can
 //! be loaded from a config file and implements [`Default`] with

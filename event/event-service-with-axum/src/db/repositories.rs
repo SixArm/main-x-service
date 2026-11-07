@@ -1,5 +1,5 @@
 //! Repository layer: converts between the domain
-//! [`Event`](crate::models::Event) and the row structs defined in
+//! [`Event`] and the row structs defined in
 //! [`crate::db::models`], and runs every statement against the event
 //! tables as a `sqlx::query!` / `query_as!` literal.
 
@@ -271,24 +271,14 @@ struct LoadedChildRows {
 /// Build the parent `events` [`EventRow`] for a fresh insert, stamping
 /// `created_at`/`updated_at` to `now`.
 fn event_row(event: &Event, now: DateTime<Utc>) -> EventRow {
-    // All three digests from one call over the **assembled** record, so
-    // the child collections (offers, participants, locations) are covered
-    // too. Computed here rather than stamped afterwards, so one statement
-    // writes the row and its integrity values together — and every write
-    // path builds its row through this function, so it is the
-    // single place one could forget to re-digest.
-    let digests = crate::compliance::record_integrity::digests(
-        &crate::compliance::record_integrity::RecordInput {
-            id: event.id,
-            event,
-            active: event.active,
-        },
-    );
+    // No digests here. They cover the record as stored, which only exists
+    // once the row and its children are written, so the write path stamps
+    // them afterwards in the same transaction (`stamp_digests`, EVT-V1).
     EventRow {
         id: event.id,
-        content_hash: Some(digests.sha256),
-        content_hash_sha3: Some(digests.sha3),
-        content_mac: digests.mac,
+        content_hash: None,
+        content_hash_sha3: None,
+        content_mac: None,
         active: event.active,
         name: event.name.clone(),
         description: event.description.clone(),
@@ -1119,7 +1109,10 @@ async fn apply_update_rows(conn: &mut PgConnection, event: &Event) -> Result<()>
     .execute(&mut *conn)
     .await?;
 
-    insert_children(conn, &rows).await
+    insert_children(conn, &rows).await?;
+    // Digests over the record as stored, in the caller's transaction
+    // (EVT-V1). `update` and `merge` both come through here.
+    PgEventRepository::stamp_digests(conn, &event.id).await
 }
 
 /// Soft-delete the event `id` on `conn` by stamping `deleted_at` /
@@ -1195,7 +1188,89 @@ impl PgEventRepository {
     ///
     /// Returns the database error if any of the per-child-table queries
     /// fails.
-    async fn load_children(&self, event_id: &Uuid) -> Result<LoadedChildRows> {
+    /// The assembled record for `id` as stored, read on `conn`, or `None`
+    /// when it is absent or soft-deleted. `get_by_id` and the digest stamp
+    /// both read through this, so the record a digest covers is exactly
+    /// the record `GET /api/records/verify` reassembles.
+    async fn read_event(conn: &mut PgConnection, id: &Uuid) -> Result<Option<Event>> {
+        // Soft-delete aware: a non-null `deleted_at` hides the row, so a
+        // tombstoned event reads back as `None`.
+        let event_row = sqlx::query_as!(
+            EventRow,
+            "SELECT id, active, name, content_hash, content_hash_sha3, content_mac,
+                    description, disambiguating_description, url, start_date, end_date,
+                    door_time, duration, previous_start_date, time_zone, all_day,
+                    event_status, event_attendance_mode, event_type, typical_age_range,
+                    is_accessible_for_free, maximum_attendee_capacity,
+                    maximum_physical_attendee_capacity, maximum_virtual_attendee_capacity,
+                    remaining_attendee_capacity, super_event_id, created_at, updated_at,
+                    created_by, updated_by, deleted_at, deleted_by
+             FROM events
+             WHERE id = $1 AND deleted_at IS NULL",
+            id,
+        )
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some(event_row) = event_row else {
+            return Ok(None);
+        };
+        let children = Self::load_children(conn, id).await?;
+        Ok(Some(from_rows(event_row, children)))
+    }
+
+    /// Stamp `id`'s three digests over the record **as stored**, on the
+    /// write's own connection, so they commit with the write.
+    ///
+    /// Digesting the domain value a caller passed in is what made every
+    /// fresh record fail verification (tasks.md EVT-V1): the stored row
+    /// takes the server's timestamps, and Postgres keeps microseconds, so
+    /// the value read back was never the value hashed. Reading the record
+    /// back inside the transaction makes the digest cover what
+    /// verification will recompute, whatever the database normalised.
+    ///
+    /// # Errors
+    /// When the record cannot be read back or the stamp fails.
+    async fn stamp_digests(conn: &mut PgConnection, id: &Uuid) -> Result<()> {
+        let mut stored = Self::read_event(conn, id).await?.ok_or_else(|| {
+            crate::Error::Validation("event not found while stamping digests".into())
+        })?;
+        // The stamp is itself an UPDATE, so the `update_events_updated_at`
+        // trigger sets `updated_at` to `CURRENT_TIMESTAMP` as it lands.
+        // That value is fixed for the transaction, so the digest covers it,
+        // read from the database rather than guessed from this clock.
+        let stamped_at = sqlx::query_scalar!(r#"SELECT CURRENT_TIMESTAMP AS "now!""#)
+            .fetch_one(&mut *conn)
+            .await?;
+        stored.updated_at = stamped_at;
+        let digests = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                id: stored.id,
+                event: &stored,
+                active: stored.active,
+            },
+        );
+        let written_at = sqlx::query_scalar!(
+            "UPDATE events SET content_hash = $2, content_hash_sha3 = $3, content_mac = $4
+             WHERE id = $1
+             RETURNING updated_at",
+            id,
+            digests.sha256,
+            digests.sha3,
+            digests.mac,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
+        // Refuse rather than store a digest that would never verify, should
+        // the trigger ever write something other than the transaction time.
+        if written_at != stamped_at {
+            return Err(crate::Error::Validation(format!(
+                "event {id}: updated_at became {written_at}, not {stamped_at}, so its digests would not verify"
+            )));
+        }
+        Ok(())
+    }
+
+    async fn load_children(conn: &mut PgConnection, event_id: &Uuid) -> Result<LoadedChildRows> {
         let identifiers = sqlx::query_as!(
             IdentifierRow,
             "SELECT id, event_id, use_type, identifier_type, system, value, assigner,
@@ -1204,7 +1279,7 @@ impl PgEventRepository {
              WHERE event_id = $1",
             event_id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
         let locations = sqlx::query_as!(
             LocationRow,
@@ -1215,7 +1290,7 @@ impl PgEventRepository {
              WHERE event_id = $1",
             event_id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
         let parties = sqlx::query_as!(
             PartyRow,
@@ -1225,7 +1300,7 @@ impl PgEventRepository {
              WHERE event_id = $1",
             event_id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
         let offers = sqlx::query_as!(
             OfferRow,
@@ -1235,7 +1310,7 @@ impl PgEventRepository {
              WHERE event_id = $1",
             event_id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
         let links = sqlx::query_as!(
             LinkRow,
@@ -1244,7 +1319,7 @@ impl PgEventRepository {
              WHERE event_id = $1",
             event_id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
         let sub_events = sqlx::query_as!(
             SubEventRow,
@@ -1253,7 +1328,7 @@ impl PgEventRepository {
              WHERE event_id = $1",
             event_id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
         let text_values = sqlx::query_as!(
             TextValueRow,
@@ -1263,7 +1338,7 @@ impl PgEventRepository {
              ORDER BY position ASC",
             event_id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
         Ok(LoadedChildRows {
             identifiers,
@@ -1289,6 +1364,8 @@ impl EventRepository for PgEventRepository {
         let rows = to_rows(event);
         let inserted = insert_event_row(&mut txn, &rows.event_row).await?;
         insert_children(&mut txn, &rows).await?;
+        // Digests over the record as stored, in this transaction (EVT-V1).
+        Self::stamp_digests(&mut txn, &inserted.id).await?;
 
         // Durable event bus (Phase 2): under the outbox transport, write
         // the `event_outbox` row **inside this same transaction**, before
@@ -1300,10 +1377,12 @@ impl EventRepository for PgEventRepository {
 
         txn.commit().await?;
 
-        // Reload children and reassemble the canonical domain `Event`
-        // (positions round-tripped) to return to the caller.
-        let children = self.load_children(&inserted.id).await?;
-        let result = from_rows(inserted, children);
+        // Reload and reassemble the canonical domain `Event` (positions
+        // round-tripped) to return to the caller.
+        let result = self
+            .get_by_id(&inserted.id)
+            .await?
+            .ok_or_else(|| crate::Error::Validation("Event not found after create".into()))?;
 
         // Fire-and-forget side effects: publish a `Created` stream event,
         // then record a CREATE audit row with only a `new_values` snapshot.
@@ -1325,29 +1404,8 @@ impl EventRepository for PgEventRepository {
     }
 
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Event>> {
-        // Soft-delete aware: a non-null `deleted_at` hides the row, so a
-        // tombstoned event reads back as `None`.
-        let event_row = sqlx::query_as!(
-            EventRow,
-            "SELECT id, active, name, content_hash, content_hash_sha3, content_mac,
-                    description, disambiguating_description, url, start_date, end_date,
-                    door_time, duration, previous_start_date, time_zone, all_day,
-                    event_status, event_attendance_mode, event_type, typical_age_range,
-                    is_accessible_for_free, maximum_attendee_capacity,
-                    maximum_physical_attendee_capacity, maximum_virtual_attendee_capacity,
-                    remaining_attendee_capacity, super_event_id, created_at, updated_at,
-                    created_by, updated_by, deleted_at, deleted_by
-             FROM events
-             WHERE id = $1 AND deleted_at IS NULL",
-            id,
-        )
-        .fetch_optional(&self.db)
-        .await?;
-        let Some(event_row) = event_row else {
-            return Ok(None);
-        };
-        let children = self.load_children(id).await?;
-        Ok(Some(from_rows(event_row, children)))
+        let mut conn = self.db.acquire().await?;
+        Self::read_event(&mut conn, id).await
     }
 
     async fn update(&self, event: &Event) -> Result<Event> {

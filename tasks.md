@@ -8523,19 +8523,27 @@ through `axa::cursor_pagination` (`agents/share/restful.md`
 
 ## Found 2026-11-07 (moving event to sqlx)
 
-Both were there before the move, on SeaORM, and the move keeps them as
-they were.
+All three were there before the move, on SeaORM. Fixed 2026-11-07.
 
-- [ ] **EVT-V1 (S)** event's `/api/records/verify` reports a freshly
+- [x] **EVT-V1 (S)** event's `/api/records/verify` reports a freshly
   created event as mismatched. The digest is most likely computed over
   in-memory timestamps rather than the stored, microsecond-truncated
   ones, so a record is flagged the moment it exists. An integrity check
   that flags every new row cannot be told apart from one that has been
   tampered with. Fix it, and add a DB test that a fresh record verifies.
-- [ ] **EVT-T1 (S)** event's `AppState::new` never calls
+- [x] **EVT-T1 (S)** event's `AppState::new` never calls
   `with_transport`, so the REST repository uses the memory transport
   whatever `EVENT_EVENT_TRANSPORT` says, and its outbox is never written
   from REST. Wire it, with a test that the outbox setting reaches REST.
-- [ ] **EVT-D1 (S)** `cargo doc -D warnings` fails on event's broken
+- [x] **EVT-D1 (S)** `cargo doc -D warnings` fails on event's broken
   intra-doc links (grpc, rest, `db/audit.rs`), so the crate-local
   `quality.yml` doc job is red.
+- [ ] **INT-V1 (M)** The EVT-V1 defect is family-wide: place's and
+  thing's `/api/records/verify` flag fresh records too (DB tests
+  `a_written_record_verifies`, 2026-11-07). Every crate with record
+  integrity (course, organization, care-pathway, case, person, worker as
+  well) gets that test, and its write path stamps digests over the record
+  as stored, inside the write's transaction, as event's
+  `stamp_digests` does. The crates already on sqlx are fixed now; for
+  the four still on SeaORM the test lands failing-free only with their
+  sqlx move, which must make it pass.

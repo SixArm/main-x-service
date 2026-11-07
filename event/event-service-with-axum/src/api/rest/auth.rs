@@ -3,7 +3,7 @@
 //! [`AuthUser`] is an Axum extractor that pulls `Authorization: Bearer
 //! <paseto>`, verifies the PASETO `v4.public` (Ed25519) signature and
 //! claims against the authentication-service published key set (carried
-//! in [`AppState::verifier`]), and yields the verified [`Claims`].
+//! in `AppState::verifier`), and yields the verified [`Claims`].
 //! Verification is stateless and offline — no database hit, no
 //! introspection call — so any handler can require authentication by
 //! taking an `AuthUser` argument. See
@@ -17,7 +17,7 @@
 //! case-insensitive), the [`enforce`] decision — wired as the
 //! [`require_auth_mw`] middleware in `App::after_routes` — requires a
 //! valid bearer token on **every** route except the public
-//! [`is_public_path`] allow-list (health/ping, OpenAPI/Swagger,
+//! `is_public_path` allow-list (health/ping, OpenAPI/Swagger,
 //! Prometheus metrics, `/api/health`, and the FHIR `/fhir/metadata`
 //! capability statement) — **deny-unless-public**, so a route mounted
 //! outside `/api` or `/fhir` is guarded too. It is **off by default**:
@@ -270,7 +270,7 @@ pub fn policy_from_env() -> Policy {
 /// # Errors
 ///
 /// `401` when enforcement is on, the path is not public
-/// ([`is_public_path`]), and the request carries no valid bearer
+/// (`is_public_path`), and the request carries no valid bearer
 /// token (missing / malformed / expired / tampered). `403` when the
 /// token is valid but the ABAC policy denies the derived action (the
 /// message names the deciding rule, per
@@ -380,7 +380,7 @@ async fn init_paseto() {
 static KEYCLOAK: OnceLock<authentication_verifier::keycloak::KeycloakVerifier> = OnceLock::new();
 
 /// The Keycloak verifier, or `None` when Keycloak is not configured (or was
-/// configured badly — see [`init_keycloak`]).
+/// configured badly — see `init_keycloak`).
 #[cfg(feature = "keycloak")]
 #[must_use]
 pub fn keycloak_verifier() -> Option<&'static authentication_verifier::keycloak::KeycloakVerifier> {
@@ -430,7 +430,7 @@ const KEY_REFRESH_DEFAULT_SECS: u64 = 3600;
 /// A failed fetch **keeps the current key set** — a transient
 /// auth-service outage must not lock every caller out. Interval from
 /// `EVENT_PASETO_KEYS_REFRESH_SECS` (default
-/// [`KEY_REFRESH_DEFAULT_SECS`]); `0` disables the loop. A no-op when
+/// `KEY_REFRESH_DEFAULT_SECS`); `0` disables the loop. A no-op when
 /// the URL is unset, since an env-supplied key set has nothing to
 /// re-fetch.
 pub fn spawn_key_refresh() {

@@ -1,6 +1,6 @@
 //! Domain models for the Event Service.
 //!
-//! The central model is [`Event`](crate::models::event::Event), aligned
+//! The central model is [`Event`], aligned
 //! with <https://schema.org/Event>. An event is a time-bounded
 //! occurrence (conference, performance, appointment, shift, encounter,
 //! delivery, sale, screening, …) with a location, parties, and
@@ -9,26 +9,26 @@
 //! This module is the crate's value-object library. It defines:
 //!
 //! - The supporting value types in this file
-//!   ([`Address`](crate::models::Address),
-//!   [`ContactPoint`](crate::models::ContactPoint),
-//!   [`Location`](crate::models::Location) and its members
-//!   [`Place`](crate::models::Place) /
-//!   [`VirtualLocation`](crate::models::VirtualLocation),
-//!   [`Party`](crate::models::Party),
-//!   [`Reference`](crate::models::Reference),
-//!   [`Offer`](crate::models::Offer), and the classification enums
-//!   [`EventStatus`](crate::models::EventStatus) /
-//!   [`EventAttendanceMode`](crate::models::EventAttendanceMode) /
-//!   [`EventType`](crate::models::EventType)).
-//! - The [`Event`](crate::models::event::Event) aggregate itself
-//!   (submodule [`event`](crate::models::event)).
-//! - External [`Identifier`](crate::models::identifier::Identifier)s
-//!   (submodule [`identifier`](crate::models::identifier)).
+//!   ([`Address`],
+//!   [`ContactPoint`],
+//!   [`Location`] and its members
+//!   [`Place`] /
+//!   [`VirtualLocation`],
+//!   [`Party`],
+//!   [`Reference`],
+//!   [`Offer`], and the classification enums
+//!   [`EventStatus`] /
+//!   [`EventAttendanceMode`] /
+//!   [`EventType`]).
+//! - The [`Event`] aggregate itself
+//!   (submodule [`event`]).
+//! - External [`Identifier`]s
+//!   (submodule [`identifier`]).
 //! - Operational records:
-//!   [`Consent`](crate::models::consent::Consent), merge
-//!   records ([`MergeRecord`](crate::models::merge::MergeRecord) et
+//!   [`Consent`], merge
+//!   records ([`MergeRecord`] et
 //!   al.), and the dedup review queue
-//!   ([`ReviewQueueItem`](crate::models::review_queue::ReviewQueueItem)
+//!   ([`ReviewQueueItem`]
 //!   et al.).
 //!
 //! These types carry no business logic beyond simple constructors; the
@@ -55,15 +55,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-/// Consent records (GDPR / media-release / data-sharing).
 pub mod consent;
-/// The [`Event`] aggregate root.
 pub mod event;
-/// External [`Identifier`]s and their classification.
 pub mod identifier;
-/// Merge request / response / history records.
 pub mod merge;
-/// Deduplication review-queue and batch-dedup request / response.
 pub mod review_queue;
 
 pub use consent::{Consent, ConsentStatus, ConsentType};
@@ -219,7 +214,7 @@ pub struct Place {
     #[schema(value_type = Option<f64>)]
     pub latitude_as_decimal_degrees: Option<BigDecimal>,
     /// Longitude in decimal degrees (`-180..=180`). Exact decimal; see
-    /// [`Place::latitude`].
+    /// `Place::latitude`.
     #[serde(default, with = "bigdecimal::impl_serde::arbitrary_precision_option")]
     #[schema(value_type = Option<f64>)]
     pub longitude_as_decimal_degrees: Option<BigDecimal>,

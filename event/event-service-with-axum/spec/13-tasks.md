@@ -662,6 +662,17 @@ clearly described manual check confirms the acceptance criterion.
       `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
       KC-1; reference: organization-service.
 
+- [x] **T-18 (S) — record digests cover the stored record; REST takes
+  the configured transport; docs build clean.** *(Done 2026-11-07; repo
+  `tasks.md` EVT-V1, EVT-T1, EVT-D1.)* Every new event failed
+  `/api/records/verify`, because its digests covered the caller's value
+  rather than the row as stored and rewritten by the `updated_at`
+  trigger. `stamp_digests` in `src/db/repositories.rs` reads the record
+  back in the write's transaction and digests it with the trigger's
+  `CURRENT_TIMESTAMP`; `tests/api_integration_test.rs`
+  `a_written_record_verifies` and `tests/rest_outbox_transport.rs` pin
+  both fixes.
+
 - [x] **T-17 (M) — SeaORM → sqlx.** *(Done 2026-11-07;
   spec/tech-stack §5, following place's pilot and thing.)* Replaced
   SeaORM with direct sqlx so a reviewer can read every statement the

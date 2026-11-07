@@ -10,7 +10,7 @@
 //!
 //! The default [`LoggingSink`] ships every event to the tracing log: it is
 //! the **no-broker** dev/CI sink and a useful observability aid — the drain
-//! + retention machinery runs and is fully exercised without Fluvio.
+//! and retention machinery runs and is fully exercised without Fluvio.
 //! `FluvioSink` (BUS-3, ported from case-service's BUS-1 reference; only
 //! compiled under this crate's `fluvio` cargo feature, off by default, so a
 //! default build's dependency tree and behaviour are unchanged) is the

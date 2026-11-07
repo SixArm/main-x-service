@@ -5,13 +5,11 @@
 //! here — the earlier `api::fhir` `501` stub was removed once the real
 //! `Appointment` surface landed.)
 //!
-//! A REST success is bare JSON, built with [`ok`](crate::api::ok). An error is an
-//! RFC 9457 problem, built with [`ApiProblem`](crate::api::ApiProblem), the same shape axa
+//! A REST success is bare JSON, built with [`ok`]. An error is an
+//! RFC 9457 problem, built with [`ApiProblem`], the same shape axa
 //! answers its own errors with (`spec/restful` §1.3).
 
-/// gRPC API (Tonic) — Create/Get/List/Delete Event.
 pub mod grpc;
-/// REST API (Axum): router, handlers, routes, shared state.
 pub mod rest;
 
 use axum::Json;

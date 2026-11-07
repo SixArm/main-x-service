@@ -10,7 +10,7 @@
 //! `EVENT_EVENT_TRANSPORT=outbox` is set.
 //!
 //! [`Envelope::for_event`] builds the envelope from a domain
-//! [`Event`](crate::models::Event); [`EventView`] is the flat operator
+//! [`Event`]; [`EventView`] is the flat operator
 //! projection; [`EventTransport`] / [`transport`] read the configured
 //! transport once from the environment.
 

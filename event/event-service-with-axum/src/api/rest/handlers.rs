@@ -5,11 +5,11 @@
 //! few private blocking/conversion helpers. Each public handler carries
 //! a `#[utoipa::path]` attribute that feeds
 //! [`ApiDoc`](crate::api::rest::ApiDoc). Handlers take
-//! [`AppState`](crate::api::rest::AppState) via Axum's `State` extractor
+//! [`AppState`] via Axum's `State` extractor
 //! and return `impl IntoResponse`: bare JSON on success
-//! ([`ok`](crate::api::ok)), and an RFC 9457 problem
-//! ([`ApiProblem`](crate::api::ApiProblem)) on error, with an
-//! appropriate [`StatusCode`](axum::http::StatusCode).
+//! ([`ok`]), and an RFC 9457 problem
+//! ([`ApiProblem`]) on error, with an
+//! appropriate [`StatusCode`].
 
 use crate::api::{ApiProblem, ok};
 use axa::extract::{Json, Path, Query};
@@ -105,7 +105,7 @@ pub struct CreateEventRequest {
 ///
 /// Serves HTTP `POST /api/events`. The flow is: validate the body,
 /// mint a `Uuid` when the payload's `id` is nil, run duplicate
-/// detection via [`check_duplicates_internal`], persist through the
+/// detection via `check_duplicates_internal`, persist through the
 /// repository (which also streams a `Created` event and writes an
 /// audit row), index the new event for search, and return `201`.
 ///
@@ -521,7 +521,7 @@ pub struct MatchResultsResponse {
 /// `POST /events/match` — find candidate matches for a probe event.
 ///
 /// Serves HTTP `POST /api/events/match`. Gathers blocking candidates
-/// via [`blocking_candidates`] (search index hits sharing a similar
+/// via `blocking_candidates` (search index hits sharing a similar
 /// name on the same `start_date` day), scores each against the probe
 /// with the configured matcher, drops anything below `threshold`
 /// (default `0.5`), and returns the top `limit` as a
@@ -664,7 +664,7 @@ fn to_match_response(m: crate::matching::MatchResult) -> MatchResponse {
 ///
 /// Serves HTTP `POST /api/events/check-duplicates`. Runs the same
 /// name + date blocking + scoring as `create_event` (via
-/// [`check_duplicates_internal`]) but *without* persisting anything,
+/// `check_duplicates_internal`) but *without* persisting anything,
 /// so a client can pre-flight a create. Always returns `200` with a
 /// [`DuplicateCheckResponse`]; an empty `potential_matches` with
 /// `has_duplicates = false` means the create would not conflict.
@@ -924,7 +924,7 @@ pub async fn merge_events(
 /// [`ReviewQueueItem`](crate::models::ReviewQueueItem)s: `AutoMerged`
 /// when the score also clears `auto_merge_threshold`, otherwise
 /// `Pending` for human review. Always returns `200` with a
-/// [`BatchDeduplicationResponse`] summary.
+/// `BatchDeduplicationResponse` summary.
 ///
 /// Unlike the real-time path this does not use name + date blocking —
 /// it is an explicit, bounded full scan, so the 1000-row cap and the

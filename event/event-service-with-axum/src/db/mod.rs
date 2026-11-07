@@ -4,12 +4,12 @@
 //! `sqlx::query!` / `query_as!` / `query_scalar!` literal so the compiler
 //! checks it against the schema.
 //!
-//! [`create_connection`](crate::db::create_connection) builds a pooled
-//! [`PgPool`] from [`DatabaseConfig`](crate::config::DatabaseConfig). The
-//! submodules cover the row structs ([`models`](crate::db::models)), the
-//! repository trait + impl ([`repositories`](crate::db::repositories)),
-//! the audit-log repository ([`audit`](crate::db::audit)), and the
-//! transactional outbox ([`outbox`](crate::db::outbox)).
+//! [`create_connection`] builds a pooled
+//! [`PgPool`] from [`DatabaseConfig`]. The
+//! submodules cover the row structs ([`models`]), the
+//! repository trait + impl ([`repositories`]),
+//! the audit-log repository ([`audit`]), and the
+//! transactional outbox ([`outbox`]).
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -17,16 +17,10 @@ use sqlx::postgres::PgPoolOptions;
 use crate::Result;
 use crate::config::DatabaseConfig;
 
-/// Audit-log repository.
 pub mod audit;
-/// chrono <-> time conversions at the persistence boundary.
 pub mod convert;
-/// Row structs, one per table read whole.
 pub mod models;
-/// Transactional-outbox write + relay helpers (durable event bus,
-/// Phase 2).
 pub mod outbox;
-/// Repository trait and sqlx implementation.
 pub mod repositories;
 
 pub use audit::AuditLogRepository;

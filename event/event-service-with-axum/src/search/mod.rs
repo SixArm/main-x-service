@@ -1,12 +1,12 @@
 //! Event full-text search over an embedded Tantivy index.
 //!
-//! [`SearchEngine`](crate::search::SearchEngine) is the high-level
+//! [`SearchEngine`] is the high-level
 //! facade used by the API and matching layers. It wraps an
-//! [`EventIndex`](crate::search::index::EventIndex) (the low-level
-//! schema + reader/writer in [`index`](crate::search::index)) and offers
+//! [`EventIndex`] (the low-level
+//! schema + reader/writer in [`index`]) and offers
 //! free-text, fuzzy, date-range, and combined name+date queries plus
 //! indexing and deletion. Documents are flattened from the rich
-//! [`Event`](crate::models::Event) aggregate by the private `build_doc`
+//! [`Event`] aggregate by the private `build_doc`
 //! helper; queries return matching event-id strings.
 //!
 //! Heavy I/O setup (a Tantivy index lives on disk) means the examples
@@ -24,9 +24,7 @@ use tantivy::{
 use crate::Result;
 use crate::models::{Event, Location, Party};
 
-/// Low-level Tantivy index: schema, reader, writer, stats.
 pub mod index;
-/// Query-building helpers layered on the index.
 pub mod query;
 
 pub use index::{EventIndex, EventIndexSchema, IndexStats};

@@ -7,5 +7,4 @@
 //! [`axa::routes::Routes`], added in
 //! [`crate::app::App::routes`]) — currently the FHIR R5 surface.
 
-/// HL7 FHIR R5 endpoints for the `Appointment` resource (`/fhir/*`).
 pub mod fhir;

@@ -1,22 +1,18 @@
-//! RESTful API implementation with Axum.
+//! The REST API, on Axum.
 //!
-//! [`ApiDoc`](crate::api::rest::ApiDoc) is the utoipa OpenAPI document,
-//! and [`events_routes`](crate::api::rest::events_routes) and
-//! [`metrics_routes`](crate::api::rest::metrics_routes) are the route
+//! [`ApiDoc`] is the utoipa `OpenAPI` document,
+//! and [`events_routes`] and
+//! [`metrics_routes`] are the route
 //! tables `App::routes` mounts. Handlers live in
-//! [`handlers`](crate::api::rest::handlers), shared services in
-//! [`state`](crate::api::rest::state)
-//! ([`AppState`](crate::api::rest::AppState)).
+//! [`handlers`], shared services in
+//! [`state`]
+//! ([`AppState`]).
 
 use utoipa::OpenApi;
 
-/// Bearer-token authentication extractor + `whoami` endpoint.
 pub mod auth;
-/// REST endpoint handlers and their request/response DTOs.
 pub mod handlers;
-/// Route-organization helpers.
 pub mod routes;
-/// Shared application state ([`AppState`]) passed to every handler.
 pub mod state;
 
 pub use state::AppState;

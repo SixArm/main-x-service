@@ -1,6 +1,6 @@
-//! [`EventProducer`](crate::streaming::EventProducer) implementations.
+//! [`EventProducer`] implementations.
 //!
-//! [`InMemoryEventPublisher`](crate::streaming::producer::InMemoryEventPublisher)
+//! [`InMemoryEventPublisher`]
 //! keeps published events in a `Mutex<Vec>` for development and tests.
 //! Production delivery to Fluvio is handled by the durable outbox +
 //! relay (`src/relay.rs`, `EventSink`/`FluvioSink`) instead of this

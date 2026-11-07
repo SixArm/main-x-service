@@ -49,40 +49,22 @@
 #![warn(clippy::pedantic)]
 
 // Module declarations.
-/// HTTP / RPC surface: REST (Axum), FHIR stubs, gRPC stub.
 pub mod api;
-/// axa application hooks (boot, routes, migrations).
 pub mod app;
-/// Request limits per client and a lockout after failed authentication.
 pub mod client_limits;
-/// Compliance controls: row-level integrity and keyed MACs.
 pub mod compliance;
-/// Runtime configuration (server, database, search, matching).
 pub mod config;
-/// axa-idiomatic controllers (the FHIR R5 `Appointment` surface).
 pub mod controllers;
-/// PostgreSQL persistence (SeaORM entities, repositories, audit log).
 pub mod db;
-/// Crate-wide error type and [`Result`] alias.
 pub mod error;
-/// FHIR R5 interop: `Appointment` resource structs, `Event` ⇄ resource
-/// conversions, and search-parameter parsing for the `/fhir` endpoints.
 pub mod fhir;
-/// Matching strategies, scoring, and the canonical-matcher bridge.
 pub mod matching;
-/// Prometheus metric registry and text exposition.
 pub mod metrics;
-/// Domain models (the [`Event`](models::Event) aggregate and friends).
 pub mod models;
-/// Privacy controls: masking, GDPR export, consent checks.
 pub mod privacy;
-/// Durable event bus Phase 3: the outbox relay loop + retention purge.
 pub mod relay;
-/// Tantivy full-text search index and query layer.
 pub mod search;
-/// Event-stream publishing and consumption.
 pub mod streaming;
-/// Data-quality validation, normalization, and standardization.
 pub mod validation;
 
 // Re-exports: surface the crate-wide error types at the root so callers

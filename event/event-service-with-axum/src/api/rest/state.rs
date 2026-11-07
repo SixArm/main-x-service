@@ -1,9 +1,9 @@
 //! Shared application state for the REST API.
 //!
-//! [`AppState`](crate::api::rest::AppState) bundles every service an
+//! [`AppState`] bundles every service an
 //! Axum handler needs — the DB connection, the event repository, the
 //! event publisher, the audit log, the search engine, the matcher, and
-//! the config — behind cheap [`Arc`](std::sync::Arc) clones (the struct
+//! the config — behind cheap [`Arc`] clones (the struct
 //! derives [`Clone`]). One instance is built at startup and shared
 //! across all requests via Axum's `with_state`.
 
@@ -72,9 +72,13 @@ impl AppState {
         // Create audit log repository
         let audit_log = Arc::new(AuditLogRepository::new(db.clone()));
 
-        // Create event repository with event publisher and audit log
+        // Create event repository with event publisher and audit log, on
+        // the transport `EVENT_EVENT_TRANSPORT` selects. Without it the
+        // repository stayed on the memory transport whatever the setting
+        // said, and REST writes never reached the outbox (tasks.md EVT-T1).
         let event_repository = Arc::new(
             PgEventRepository::new(db.clone())
+                .with_transport(crate::streaming::transport())
                 .with_event_publisher(event_publisher.clone())
                 .with_audit_log(audit_log.clone()),
         ) as Arc<dyn EventRepository>;
@@ -179,9 +183,9 @@ pub async fn boot_verifier() -> Verifier {
 /// `Verifier::from_paseto_keys_url`, the `authentication-verifier`
 /// `fetch` feature) and build a verifier expecting the
 /// `EVENT_TOKEN_ISSUER` / `EVENT_TOKEN_AUDIENCE` claims (same defaults
-/// as [`verifier_from_env`]). On success the fetched key set wins (an
+/// as `verifier_from_env`). On success the fetched key set wins (an
 /// info log records the source); on any transport / status / parse
-/// failure a warning is logged and the [`verifier_from_env`] path is
+/// failure a warning is logged and the `verifier_from_env` path is
 /// used instead — the service always boots.
 #[cfg(feature = "paseto")]
 pub async fn verifier_from_url_or_env(url: &str) -> Verifier {

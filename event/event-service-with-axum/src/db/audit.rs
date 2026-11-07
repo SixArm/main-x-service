@@ -53,11 +53,11 @@ impl AuditLogRepository {
     ///
     /// Records the post-create state only: `new_values` is the JSON
     /// snapshot of the freshly created entity, with no `old_values`.
-    /// Delegates to [`Self::log_action`] with action `"CREATE"`.
+    /// Delegates to `Self::log_action` with action `"CREATE"`.
     ///
     /// # Errors
     ///
-    /// Propagates any database insert error from [`Self::log_action`].
+    /// Propagates any database insert error from `Self::log_action`.
     pub async fn log_create(
         &self,
         entity_type: &str,
@@ -80,11 +80,11 @@ impl AuditLogRepository {
     ///
     /// Captures both before (`old_values`) and after (`new_values`)
     /// JSON snapshots so the diff is reconstructable from the trail.
-    /// Delegates to [`Self::log_action`] with action `"UPDATE"`.
+    /// Delegates to `Self::log_action` with action `"UPDATE"`.
     ///
     /// # Errors
     ///
-    /// Propagates any database insert error from [`Self::log_action`].
+    /// Propagates any database insert error from `Self::log_action`.
     pub async fn log_update(
         &self,
         entity_type: &str,
@@ -108,12 +108,12 @@ impl AuditLogRepository {
     ///
     /// Records the pre-delete state only: `old_values` is the JSON
     /// snapshot of the entity as it was before the (soft) delete, with
-    /// no `new_values`. Delegates to [`Self::log_action`] with action
+    /// no `new_values`. Delegates to `Self::log_action` with action
     /// `"DELETE"`.
     ///
     /// # Errors
     ///
-    /// Propagates any database insert error from [`Self::log_action`].
+    /// Propagates any database insert error from `Self::log_action`.
     pub async fn log_delete(
         &self,
         entity_type: &str,

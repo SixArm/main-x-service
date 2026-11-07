@@ -255,3 +255,111 @@ async fn create_event_from_a_minimal_hand_written_body_succeeds() {
     assert!(event.end_date.is_none());
     assert!(event.super_event.is_none());
 }
+
+/// Send `request` to `app` and return the status and JSON body.
+async fn send(app: &axum::Router, request: Request<Body>) -> (StatusCode, serde_json::Value) {
+    let response = app.clone().oneshot(request).await.unwrap();
+    let status = response.status();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    (
+        status,
+        serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+    )
+}
+
+/// Whether `/api/records/verify` names the record `id` as mismatched.
+async fn is_mismatched(app: &axum::Router, id: &str) -> bool {
+    let (status, report) = send(
+        app,
+        Request::builder()
+            .uri("/api/records/verify?limit=1000")
+            .body(Body::empty())
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "verify failed: {report}");
+    report["mismatched"]
+        .as_array()
+        .expect("a mismatched list")
+        .iter()
+        .any(|m| m["id"] == id)
+}
+
+/// A record verifies the moment it is written, and again after an update
+/// (tasks.md EVT-V1). Its digests used to cover the event the caller sent,
+/// whose timestamps the stored row replaces, so every fresh record failed
+/// verification and a real edit could not be told from a new row. Child
+/// rows and a numeric price are included, since the database normalises
+/// both.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn a_written_record_verifies() {
+    let app = common::create_test_router().await;
+    let title = common::unique_event_name("VerifiesWhenWritten");
+    let payload = json!({
+        "id": "00000000-0000-0000-0000-000000000000",
+        "active": true,
+        "name": title,
+        "start_date": "2026-06-01T18:00:00.123456789Z",
+        "end_date": "2026-06-01T20:00:00Z",
+        "event_status": "scheduled",
+        "event_attendance_mode": "offline",
+        "event_type": "conference",
+        "all_day": false,
+        "keywords": ["integrity", "audit"],
+        "offers": [{ "name": "Standard", "price": "12.50", "price_currency": "GBP" }],
+        "created_at": "2001-01-01T00:00:00.987654321Z",
+        "updated_at": "2001-01-01T00:00:00.987654321Z",
+    });
+    let (status, created) = send(
+        &app,
+        Request::builder()
+            .method("POST")
+            .uri("/api/events")
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "create failed: {created}");
+    let id = created["id"].as_str().expect("an id").to_string();
+    assert!(
+        !is_mismatched(&app, &id).await,
+        "a fresh record must verify"
+    );
+
+    let mut changed = created.clone();
+    changed["description"] = json!("Edited after creation");
+    let (status, updated) = send(
+        &app,
+        Request::builder()
+            .method("PUT")
+            .uri(format!("/api/events/{id}"))
+            .header("content-type", "application/json")
+            .body(Body::from(serde_json::to_vec(&changed).unwrap()))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "update failed: {updated}");
+    assert!(
+        !is_mismatched(&app, &id).await,
+        "an updated record must verify"
+    );
+
+    // And verification still catches a change made behind the service's
+    // back, so the two checks above cannot pass by verifying nothing.
+    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+        .await
+        .expect("connect for the tamper step");
+    sqlx::query("UPDATE events SET name = name || ' (edited in SQL)' WHERE id = $1")
+        .bind(uuid::Uuid::parse_str(&id).unwrap())
+        .execute(&pool)
+        .await
+        .expect("tamper with the row");
+    assert!(
+        is_mismatched(&app, &id).await,
+        "a row edited in SQL must be flagged"
+    );
+}

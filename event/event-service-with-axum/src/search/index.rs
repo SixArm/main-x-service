@@ -3,7 +3,7 @@
 //! Fields are tuned for the event domain: full-text on title /
 //! description / keywords; exact/string facets for status, type,
 //! attendance mode, language, location URL, and identifier values;
-//! a date_string for the event's start date (yyyy-mm-dd) so range
+//! a `date_string` for the event's start date (yyyy-mm-dd) so range
 //! filters degrade to lexicographic comparisons.
 
 use std::path::Path;

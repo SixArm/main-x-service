@@ -1,32 +1,28 @@
 //! Event matcher strategies and scoring.
 //!
-//! [`EventMatcher`](crate::matching::EventMatcher) is the trait that
+//! [`EventMatcher`] is the trait that
 //! callers use; concrete strategies are
-//! [`ProbabilisticMatcher`](crate::matching::ProbabilisticMatcher)
+//! [`ProbabilisticMatcher`]
 //! (weighted fuzzy) and
-//! [`DeterministicMatcher`](crate::matching::DeterministicMatcher)
+//! [`DeterministicMatcher`]
 //! (rule-based). Both delegate to the scorers in
-//! [`scoring`](crate::matching::scoring), which build on the component
-//! algorithms in [`algorithms`](crate::matching::algorithms).
+//! [`scoring`], which build on the component
+//! algorithms in [`algorithms`].
 //!
 //! For a second, independent opinion this module also re-exports the
 //! canonical `event-matcher` crate as
-//! [`matcher_lib`](crate::matching::matcher_lib); pair it with
-//! [`adapter::to_matcher_event`](crate::matching::adapter::to_matcher_event)
-//! to score two service [`Event`](crate::models::Event)s through the
+//! [`matcher_lib`]; pair it with
+//! [`adapter::to_matcher_event`]
+//! to score two service [`Event`]s through the
 //! reference implementation.
 
 use crate::Result;
 use crate::config::MatchingConfig;
 use crate::models::Event;
 
-/// Bridge to the canonical `event-matcher` crate ([`to_matcher_event`](adapter::to_matcher_event)).
 pub mod adapter;
-/// Per-component matching algorithms (name, time, location, …).
 pub mod algorithms;
-/// Soundex phonetic coding used as a name-similarity floor.
 pub mod phonetic;
-/// Probabilistic and deterministic scorers + quality classification.
 pub mod scoring;
 
 pub use scoring::{DeterministicScorer, MatchQuality, ProbabilisticScorer};

@@ -7,7 +7,7 @@
 //! `search_engine` / `matcher` — the same handles
 //! [`crate::api::rest::handlers`] calls — and to the shared validation
 //! ([`crate::validation::validate_event`]) and duplicate-detection
-//! ([`crate::api::rest::handlers::check_duplicates_internal`])
+//! (`crate::api::rest::handlers::check_duplicates_internal`)
 //! modules. Nothing here reimplements a REST business rule; this file
 //! is wire conversion (`proto::Event` ⇄ [`crate::models::Event`]) plus
 //! RPC-shaped error mapping (`tonic::Status` codes instead of HTTP
@@ -15,7 +15,7 @@
 //!
 //! ## Auth parity with REST
 //!
-//! [`grpc_enforce`] is the gRPC counterpart of
+//! `grpc_enforce` is the gRPC counterpart of
 //! [`crate::api::rest::auth::require_auth_mw`] (REST's blanket-guard
 //! middleware): `EVENT_REQUIRE_AUTH` off ⇒ every RPC is open, exactly
 //! today's REST default; on ⇒ a missing/invalid bearer (in the
@@ -213,7 +213,7 @@ fn event_from_proto(e: proto::Event) -> Result<Event, Status> {
 #[tonic::async_trait]
 impl proto::event_service_server::EventService for EventGrpcService {
     /// Validates ([`crate::validation::validate_event`]) and real-time
-    /// duplicate-checks ([`check_duplicates_internal`]) exactly as
+    /// duplicate-checks (`check_duplicates_internal`) exactly as
     /// `POST /api/events` does — the same functions, not
     /// reimplementations of them.
     async fn create_event(

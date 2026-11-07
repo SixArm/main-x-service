@@ -1,7 +1,7 @@
 //! HL7 FHIR R5 interop for the `Appointment` resource.
 //!
 //! A **best-effort, `low`-fidelity** representation of a
-//! schema.org/[`Event`](crate::models::Event) as a FHIR R5
+//! schema.org/[`Event`] as a FHIR R5
 //! **`Appointment`** ([`agents/share/fhir.md`](../../../../agents/share/fhir.md)
 //! §3): schema.org/Event and FHIR share no single canonical resource, so
 //! the mapping is a deliberate approximation, documented gap-by-gap here
@@ -9,7 +9,7 @@
 //! implemented.)
 //!
 //! It provides the bidirectional mapping between the stored
-//! [`Event`](crate::models::Event) and the wire-level
+//! [`Event`] and the wire-level
 //! [`resources::FhirAppointment`]: [`to_fhir_appointment`] for outbound
 //! responses and [`from_fhir_appointment`] for inbound requests.
 //! Resource shapes live in [`resources`], search-parameter parsing in
@@ -27,10 +27,7 @@
 //! | `location` | `participant` (`location`-coded, display only) |
 //! | `identifiers` | `identifier` (`system|value`; type↔system map) |
 
-/// FHIR resource + envelope wire types (`Appointment`,
-/// `OperationOutcome`, `Bundle`).
 pub mod resources;
-/// FHIR search-parameter parsing + the in-memory match predicate.
 pub mod search;
 
 use crate::models::{

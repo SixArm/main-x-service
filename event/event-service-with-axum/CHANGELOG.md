@@ -8,6 +8,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed
+
+- **A record now verifies the moment it is written** (repo `tasks.md`
+  EVT-V1). `GET /api/records/verify` reported every new event as
+  mismatched: the digests covered the event the caller sent, but the
+  stored row takes the server's timestamps, and the `updated_at` trigger
+  rewrites that column on any `UPDATE`. The write path now reads the
+  assembled record back inside its transaction, takes `updated_at` from
+  the transaction's `CURRENT_TIMESTAMP` the trigger will write, stamps all
+  three digests over that, and refuses the write if the trigger wrote
+  anything else. A DB test checks a fresh record and an updated one
+  verify, and a row edited in SQL is still flagged. Records written
+  before this fix keep their wrong digests and are still reported.
+- **REST writes honour `EVENT_EVENT_TRANSPORT`** (EVT-T1). `AppState`
+  built the repository without it, so REST stayed on the memory transport
+  and never wrote the outbox. A DB test runs a REST create under
+  `outbox` and finds its row.
+- **`cargo doc -D warnings` is clean** (EVT-D1). Outer `///` comments on
+  `pub mod` lines were merged with each module's own `//!` docs, so their
+  links resolved in the parent's scope; those outer comments are gone,
+  links to private items are plain code, and the explicit targets that
+  worked around it are removed.
+
 ### Changed — SeaORM replaced by sqlx
 
 - **Persistence is sqlx with no ORM** (spec §10, §13 T-17;

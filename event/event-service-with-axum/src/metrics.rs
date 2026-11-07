@@ -1,8 +1,8 @@
 //! Prometheus metrics for the event service.
 //!
-//! This module owns a process-wide [`Registry`](prometheus::Registry)
+//! This module owns a process-wide [`Registry`]
 //! populated with a fixed set of counters and histograms. Application
-//! code increments the global [`METRICS`](crate::metrics::METRICS) via
+//! code increments the global [`METRICS`] via
 //! `crate::metrics::METRICS` (e.g.
 //! `METRICS.event_created_total.inc()`). The REST API exposes the
 //! registry at `GET /metrics.prom` in Prometheus text-exposition format

@@ -10,15 +10,15 @@
 //! `Option<String> organizer`, and a `Vec<EventId>` keyed by
 //! `EventIdScheme`.
 //!
-//! [`to_matcher_event`](crate::matching::adapter::to_matcher_event)
+//! [`to_matcher_event`]
 //! performs the projection — including:
 //!
-//! - DateTime → RFC 3339 string
+//! - `DateTime` → RFC 3339 string
 //! - First `Location` → matcher's `Location` struct (variant-aware)
 //! - First organizer name → `organizer`
 //! - Each performer's name → `performers`
 //! - Each `Identifier` → `EventId` (via
-//!   [`map_identifier_scheme`](crate::matching::adapter::map_identifier_scheme))
+//!   [`map_identifier_scheme`])
 //! - `EventStatus` / `EventAttendanceMode` / `EventType` → matcher enums
 //!
 //! See `agents/share/match.md` and the matcher crate's `spec.md §5–§7` for

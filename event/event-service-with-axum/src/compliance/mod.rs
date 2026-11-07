@@ -28,12 +28,8 @@
 //! rather than as mismatches. Adopting the control on a populated table
 //! must not produce a wall of false accusations.
 
-/// Keyed integrity MACs — this crate's binding to the shared
-/// `integrity-mac` crate.
 pub mod mac;
 
-/// Keyed integrity over `audit_log` rows.
 pub mod audit_integrity;
 
-/// Row-level integrity hashing over the assembled `Event` record.
 pub mod record_integrity;

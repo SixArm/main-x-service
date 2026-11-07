@@ -1,6 +1,6 @@
 //! Error types for the event-service crate.
 //!
-//! [`Error`] is the single `thiserror`-derived error enum used across
+//! [`Error`](enum@Error) is the single `thiserror`-derived error enum used across
 //! every layer (DB, search, matching, API, …). [`Result`] is the crate
 //! local alias used by nearly every fallible function.
 //!
