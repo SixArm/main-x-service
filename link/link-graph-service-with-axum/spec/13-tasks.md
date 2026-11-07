@@ -714,6 +714,23 @@ auto-promote regardless of score. `DOC-6` (documentation harmonisation
 for this crate) was queued behind this chain finishing and is now
 unblocked.
 
+- [ ] T-37: Order presence by `seq`, once producers send what the contract
+  says. [event-bus.md](../../../agents/share/event-bus.md) defines `seq`
+  as per-`entity_pid` monotonic, from id ordering, and FR-8 records
+  `last_seq` for ordering. Producers send a per-process counter instead,
+  which restarts at 1, and `entity_presence::Model::mark` overwrites
+  `alive` and `last_seq` with no comparison. So an older event can mark a
+  deleted entity alive, which a redelivery, two relay replicas, or an
+  outbox that passes a failed row can all cause. Comparing on today's
+  `seq` would be worse: after a producer restart every event would look
+  old and presence would freeze. Once each producer sends its outbox row
+  id as `seq` (axa-outbox's `Claimed::id` rises per key and survives
+  restarts), make the upsert apply only when `excluded.last_seq >=
+  entity_presence.last_seq`, keep the lazy probe's `0` for a ref with no
+  row, and settle how `merged` marks the duplicate, as it carries the
+  survivor's `seq`. Migrating rows already holding a process counter
+  needs a one-off reset of `last_seq`. Found 2026-11-07.
+
 ### Reconciliation gauge hardening
 
 - [x] T-34 (M): *(resolved 2026-09-04.)* Label `link_graph_reconciliation_divergence` per entity,
