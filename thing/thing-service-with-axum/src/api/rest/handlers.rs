@@ -875,8 +875,8 @@ fn review_row_to_item(row: &crate::db::review_queue::ReviewQueueRow) -> ReviewQu
         score_breakdown: row.score_breakdown.clone(),
         status: parse_review_status(&row.status),
         reviewed_by: row.reviewed_by.clone(),
-        created_at: crate::db::convert::offset_to_ts(row.created_at),
-        reviewed_at: row.reviewed_at.map(crate::db::convert::offset_to_ts),
+        created_at: row.created_at,
+        reviewed_at: row.reviewed_at,
     }
 }
 
@@ -1057,18 +1057,11 @@ pub async fn verify_record_integrity(
     State(state): State<AppState>,
     Query(params): Query<AuditQuery>,
 ) -> impl IntoResponse {
-    use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
-
     let limit = params
         .limit
         .unwrap_or(VERIFY_DEFAULT_LIMIT)
         .clamp(1, VERIFY_MAX_LIMIT);
-    let rows = match crate::db::models::things::Entity::find()
-        .order_by_desc(crate::db::models::things::Column::UpdatedAt)
-        .limit(limit)
-        .all(&state.db)
-        .await
-    {
+    let rows = match crate::db::rows_for_verification(&state.db, limit).await {
         Ok(rows) => rows,
         Err(e) => {
             return ApiProblem::new(
@@ -1125,18 +1118,11 @@ pub async fn verify_audit_integrity(
     State(state): State<AppState>,
     Query(params): Query<AuditQuery>,
 ) -> impl IntoResponse {
-    use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
-
     let limit = params
         .limit
         .unwrap_or(VERIFY_DEFAULT_LIMIT)
         .clamp(1, VERIFY_MAX_LIMIT);
-    match crate::db::models::audit_log::Entity::find()
-        .order_by_desc(crate::db::models::audit_log::Column::Id)
-        .limit(limit)
-        .all(&state.db)
-        .await
-    {
+    match state.audit_log.rows_for_verification(limit).await {
         Ok(rows) => (
             StatusCode::OK,
             Json(crate::compliance::audit_integrity::verify(&rows)),

@@ -10,7 +10,7 @@ thing-front-end-with-svelte ──REST──> thing-service-with-axum ──Carg
 
 | Subproject | Role | Stack | Spec | Docs |
 |---|---|---|---|---|
-| [thing-service-with-axum](../thing-service-with-axum/) | System of record: REST CRUD, search, dedup, merge, audit, privacy, events | axa / Axum 0.8, SeaORM + PostgreSQL, Tantivy 0.22, Tonic stub, utoipa | [spec/](../thing-service-with-axum/spec/index.md) (§1–§18) | [agents/](../thing-service-with-axum/agents/index.md), [README](../thing-service-with-axum/README.md) |
+| [thing-service-with-axum](../thing-service-with-axum/) | System of record: REST CRUD, search, dedup, merge, audit, privacy, events | axa / Axum 0.8, sqlx + PostgreSQL, Tantivy 0.22, Tonic stub, utoipa | [spec/](../thing-service-with-axum/spec/index.md) (§1–§18) | [agents/](../thing-service-with-axum/agents/index.md), [README](../thing-service-with-axum/README.md) |
 | [thing-matcher-rust-crate](../thing-matcher-rust-crate/) | Canonical pairwise matcher: deterministic + probabilistic scoring with per-field breakdown | Pure Rust library — no IO, no async runtime, no `unsafe` | [spec/](../thing-matcher-rust-crate/spec/index.md) (§1–§13) | [AGENTS.md](../thing-matcher-rust-crate/AGENTS.md), [agents/](../thing-matcher-rust-crate/agents/), [README](../thing-matcher-rust-crate/README.md) |
 | [thing-front-end-with-svelte](../thing-front-end-with-svelte/) | Operator UI over the service REST API | SvelteKit 2, Svelte 5 runes, SVAR DataGrid, Lily Headless, TS strict | [spec/](../thing-front-end-with-svelte/spec/index.md) (§1–§18) | [AGENTS.md](../thing-front-end-with-svelte/AGENTS.md), [README](../thing-front-end-with-svelte/README.md) |
 

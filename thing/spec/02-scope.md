@@ -15,7 +15,7 @@ internals.
 - Per-field privacy masking, GDPR Article 15 export, consent records.
 - Event publishing on every CRUD / merge / link.
 - REST API (axa / Axum) + OpenAPI / Swagger; gRPC stub.
-- PostgreSQL persistence via SeaORM.
+- PostgreSQL persistence via sqlx (compile-checked SQL, no ORM).
 
 **thing-matcher-rust-crate** (canonical algorithm) owns:
 

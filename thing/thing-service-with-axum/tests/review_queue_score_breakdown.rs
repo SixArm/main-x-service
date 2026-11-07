@@ -104,7 +104,7 @@ async fn deduplicate_persists_and_review_queue_returns_the_score_breakdown() {
     let db = create_connection(&config.database)
         .await
         .expect("Postgres connection");
-    let repo = thing_service::db::SeaOrmThingRepository::new(db);
+    let repo = thing_service::db::PgThingRepository::new(db);
     let unique = uuid::Uuid::new_v4();
     let name = format!("Score Breakdown Fixture {unique}");
     let mut a = Thing::new(&name);

@@ -33,16 +33,14 @@
 //! elsewhere.
 #![cfg(feature = "fluvio")]
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use thing_service::db::models::event_outbox;
-use thing_service::db::{SeaOrmThingRepository, ThingRepository};
+use thing_service::db::{PgThingRepository, ThingRepository, outbox};
 use thing_service::models::thing::Thing;
 use thing_service::relay::{self, FluvioSink};
 use thing_service::streaming::EventTransport;
 
-async fn connect() -> sea_orm::DatabaseConnection {
+async fn connect() -> sqlx::PgPool {
     let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-    sea_orm::Database::connect(&url)
+    sqlx::PgPool::connect(&url)
         .await
         .expect("connect to DATABASE_URL")
 }
@@ -56,7 +54,7 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
     let db = connect().await;
     // Durable transport, so `create` writes an outbox row in the same
     // transaction as the thing row.
-    let repo = SeaOrmThingRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+    let repo = PgThingRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
     let thing = repo
         .create(&Thing::new("Fluvio Relay Round Trip"))
@@ -72,11 +70,11 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
         .expect("drain_once against the real sink");
     assert!(published >= 1, "at least this row's send should succeed");
 
-    let row = event_outbox::Entity::find()
-        .filter(event_outbox::Column::EntityPid.eq(thing.id))
-        .one(&db)
+    let row = outbox::rows_for(&db, thing.id, "created")
         .await
         .expect("load the outbox row")
+        .into_iter()
+        .next()
         .expect("the row exists");
     assert!(
         row.published_at.is_some(),

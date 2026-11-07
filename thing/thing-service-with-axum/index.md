@@ -52,6 +52,26 @@ cargo run -- start            # or: cargo run -- start
 curl http://localhost:5150/api/health
 ```
 
+### Database
+
+Persistence is sqlx with no ORM; every statement is a `query!` literal
+in `src/db/`, and spec §10 has the rules. The macros check queries
+against the committed `.sqlx/` data, so build with `SQLX_OFFLINE=true`
+(CI does) unless `DATABASE_URL` points at a **migrated** database: with
+it set and the schema missing, the build fails with "relation does not
+exist".
+
+```bash
+cargo run -- db migrate             # apply migrations/*.up.sql
+cargo run -- db status              # each migration, applied or pending
+AXA_DESTROY_DATA=true cargo run -- db down 1   # development / test only
+AXA_DESTROY_DATA=true cargo run -- db reset    # drop everything, migrate
+
+# After changing a query or a migration, regenerate .sqlx/ against a
+# migrated database, and commit it:
+SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets
+```
+
 ## API
 
 REST routes mount under `/api/things/*`. See

@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO thing_merge_records\n                 (id, main_thing_id, duplicate_thing_id, merge_reason, transferred_data, merged_at)\n             VALUES ($1, $2, $3, $4, $5, $6)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Jsonb",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "65b9a4ce4fd5c3c0f1cb9bcb0be637c4eb6e7d9b29672158e4c82cd0b25de2ee"
+}

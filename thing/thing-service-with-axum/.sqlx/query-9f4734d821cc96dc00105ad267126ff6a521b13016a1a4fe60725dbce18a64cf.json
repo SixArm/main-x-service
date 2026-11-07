@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT property_id, custom_label, value, name, url\n             FROM thing_identifiers WHERE thing_id = $1 ORDER BY position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "property_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "thing_identifiers",
+            "name": "property_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "custom_label",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "thing_identifiers",
+            "name": "custom_label"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "thing_identifiers",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "thing_identifiers",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "thing_identifiers",
+            "name": "url"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "9f4734d821cc96dc00105ad267126ff6a521b13016a1a4fe60725dbce18a64cf"
+}

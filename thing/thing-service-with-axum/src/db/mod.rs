@@ -1,6 +1,9 @@
-//! Database access — connection pool + repository.
+//! Database access — the connection pool, the migrator, and the
+//! repository. **Every SQL statement this service runs is in this
+//! directory** (spec/tech-stack §5.2), written as a `sqlx::query!` /
+//! `query_as!` literal so the compiler checks it against the schema.
 //!
-//! [`SeaOrmThingRepository`] round-trips a domain [`Thing`] against a fully
+//! [`PgThingRepository`] round-trips a domain [`Thing`] against a fully
 //! normalized relational schema: scalar fields live on the `things` row;
 //! the `alternate_names`, `identifiers`, `images`, and `same_as`
 //! collections live in dedicated child tables joined by `thing_id`. Writes
@@ -12,14 +15,9 @@ pub mod models;
 pub mod outbox;
 pub mod review_queue;
 
-use convert::{offset_to_ts, ts_to_offset};
-use sea_orm::{
-    ActiveModelTrait,
-    ActiveValue::{NotSet, Set},
-    ColumnTrait, ConnectionTrait, Database, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
-};
-use time::OffsetDateTime;
+use chrono::{DateTime, Utc};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::Result;
@@ -29,21 +27,24 @@ use crate::models::identifier::{IdentifierType, ThingIdentifier};
 use crate::models::merge::MergeRecord;
 use crate::models::thing::Thing;
 use crate::streaming::envelope::{EventKind, EventTransport};
-use models::{
-    thing_alternate_names, thing_identifiers, thing_images, thing_merge_records, thing_same_as,
-    things,
-};
+use models::ThingRow;
+
+/// The schema migrations: the plain SQL files under `migrations/`, one
+/// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
+/// time. `thing-service db migrate | down | reset | status` and the boot
+/// auto-migrate run these through `axa::sqlx`.
+pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// Open a connection pool from a [`DatabaseConfig`].
 ///
 /// # Errors
 ///
 /// Returns an error if the database connection cannot be established.
-pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
-    let mut opt = sea_orm::ConnectOptions::new(&config.url);
-    opt.max_connections(config.max_connections)
-        .min_connections(config.min_connections);
-    Database::connect(opt)
+pub async fn create_connection(config: &DatabaseConfig) -> Result<PgPool> {
+    PgPoolOptions::new()
+        .max_connections(config.max_connections)
+        .min_connections(config.min_connections)
+        .connect(&config.url)
         .await
         .map_err(|e| crate::Error::Pool(e.to_string()))
 }
@@ -74,10 +75,10 @@ pub trait ThingRepository: Send + Sync {
     async fn merge(&self, survivor: &Thing, duplicate_id: &Uuid) -> Result<Thing>;
 }
 
-/// SeaORM-backed [`ThingRepository`] over a `PostgreSQL` connection pool.
-pub struct SeaOrmThingRepository {
-    /// The shared `SeaORM` connection pool.
-    db: DatabaseConnection,
+/// sqlx-backed [`ThingRepository`] over a `PostgreSQL` connection pool.
+pub struct PgThingRepository {
+    /// The shared connection pool.
+    db: PgPool,
     /// Which event transport is active (durable event bus, Phase 2).
     /// [`EventTransport::Memory`] (default) keeps the handler's in-memory
     /// publish untouched; [`EventTransport::Outbox`] additionally writes
@@ -85,12 +86,12 @@ pub struct SeaOrmThingRepository {
     transport: EventTransport,
 }
 
-impl SeaOrmThingRepository {
+impl PgThingRepository {
     /// Wrap an existing connection pool in a repository, defaulting to the
     /// [`EventTransport::Memory`] transport (behaviour unchanged from
     /// before the outbox landed).
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self {
             db,
             transport: EventTransport::Memory,
@@ -108,17 +109,11 @@ impl SeaOrmThingRepository {
 
     /// When the outbox transport is active, enqueue one `event_outbox`
     /// row for `kind` applied to `thing` **on `conn`** — pass the open
-    /// `&DatabaseTransaction` so the row commits with the entity write
-    /// (the outbox atomicity guarantee). A no-op under
-    /// [`EventTransport::Memory`].
-    ///
-    /// The `ConnectionTrait` generic lives here on a concrete method (not
-    /// on the object-safe [`ThingRepository`] trait), which is how a
-    /// `dyn`-trait repository threads the outbox insert into its own
-    /// transaction.
-    async fn enqueue_outbox<C: ConnectionTrait>(
+    /// transaction so the row commits with the entity write (the outbox
+    /// atomicity guarantee). A no-op under [`EventTransport::Memory`].
+    async fn enqueue_outbox(
         &self,
-        conn: &C,
+        conn: &mut PgConnection,
         thing: &Thing,
         kind: EventKind,
     ) -> Result<()> {
@@ -130,49 +125,63 @@ impl SeaOrmThingRepository {
         Ok(())
     }
 
+    /// Read one `things` row by id, soft-deleted or not.
+    async fn find_row(&self, id: Uuid) -> Result<Option<ThingRow>> {
+        let row = sqlx::query_as!(
+            ThingRow,
+            "SELECT id, name, description, disambiguating_description, additional_type,
+                    url, main_entity_of_page, owner, subject_of, potential_action,
+                    is_deleted, content_hash, content_hash_sha3, content_mac,
+                    deleted_at, created_at, updated_at
+             FROM things
+             WHERE id = $1",
+            id,
+        )
+        .fetch_optional(&self.db)
+        .await?;
+        Ok(row)
+    }
+
     /// Load child collections and assemble a domain [`Thing`].
-    async fn hydrate(&self, row: things::Model) -> Result<Thing> {
+    async fn hydrate(&self, row: ThingRow) -> Result<Thing> {
         let id = row.id;
 
-        let alt_rows = thing_alternate_names::Entity::find()
-            .filter(thing_alternate_names::Column::ThingId.eq(id))
-            .order_by_asc(thing_alternate_names::Column::Position)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let alternate_names = alt_rows.into_iter().map(|r| r.name).collect();
+        let alternate_names = sqlx::query_scalar!(
+            "SELECT name FROM thing_alternate_names WHERE thing_id = $1 ORDER BY position",
+            id,
+        )
+        .fetch_all(&self.db)
+        .await?;
 
-        let id_rows = thing_identifiers::Entity::find()
-            .filter(thing_identifiers::Column::ThingId.eq(id))
-            .order_by_asc(thing_identifiers::Column::Position)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let identifiers = id_rows
-            .into_iter()
-            .map(|r| ThingIdentifier {
-                property_id: parse_ident_type(&r.property_id, r.custom_label),
-                value: r.value,
-                name: r.name,
-                url: r.url,
-            })
-            .collect();
+        let identifiers = sqlx::query!(
+            "SELECT property_id, custom_label, value, name, url
+             FROM thing_identifiers WHERE thing_id = $1 ORDER BY position",
+            id,
+        )
+        .fetch_all(&self.db)
+        .await?
+        .into_iter()
+        .map(|r| ThingIdentifier {
+            property_id: parse_ident_type(&r.property_id, r.custom_label),
+            value: r.value,
+            name: r.name,
+            url: r.url,
+        })
+        .collect();
 
-        let img_rows = thing_images::Entity::find()
-            .filter(thing_images::Column::ThingId.eq(id))
-            .order_by_asc(thing_images::Column::Position)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let images = img_rows.into_iter().map(|r| r.url).collect();
+        let images = sqlx::query_scalar!(
+            "SELECT url FROM thing_images WHERE thing_id = $1 ORDER BY position",
+            id,
+        )
+        .fetch_all(&self.db)
+        .await?;
 
-        let same_rows = thing_same_as::Entity::find()
-            .filter(thing_same_as::Column::ThingId.eq(id))
-            .order_by_asc(thing_same_as::Column::Position)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let same_as = same_rows.into_iter().map(|r| r.url).collect();
+        let same_as = sqlx::query_scalar!(
+            "SELECT url FROM thing_same_as WHERE thing_id = $1 ORDER BY position",
+            id,
+        )
+        .fetch_all(&self.db)
+        .await?;
 
         Ok(Thing {
             id: row.id,
@@ -190,15 +199,15 @@ impl SeaOrmThingRepository {
             subject_of: row.subject_of,
             potential_action: row.potential_action,
             is_deleted: row.is_deleted,
-            deleted_at: row.deleted_at.map(offset_to_ts),
-            created_at: offset_to_ts(row.created_at),
-            updated_at: offset_to_ts(row.updated_at),
+            deleted_at: row.deleted_at,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
         })
     }
 }
 
 #[async_trait::async_trait]
-impl ThingRepository for SeaOrmThingRepository {
+impl ThingRepository for PgThingRepository {
     /// Insert the scalar row plus all child-collection rows in one
     /// transaction, then re-hydrate so the caller gets the stored form
     /// (including any DB-side defaults). Rolls back on any failure.
@@ -208,24 +217,26 @@ impl ThingRepository for SeaOrmThingRepository {
     /// Returns [`crate::Error::Database`] on any DB failure, or if the row
     /// cannot be read back after insert.
     async fn create(&self, thing: &Thing) -> Result<Thing> {
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         // `created_at`/`updated_at` are server-managed (see `Thing`'s
         // field docs): stamp both to "now" here, overriding whatever the
         // domain value carries, rather than trusting a client-supplied —
         // or `#[serde(default)]`-defaulted, i.e. Unix-epoch — timestamp.
-        let now = OffsetDateTime::now_utc();
-        let mut active = to_active(thing);
-        active.created_at = Set(now);
-        active.updated_at = Set(now);
-        active.insert(&txn).await.map_err(|e| map_db(&e))?;
-        insert_collections(&txn, thing).await?;
+        let now = Utc::now();
+        let mut row = thing_row(thing);
+        row.created_at = now;
+        row.updated_at = now;
+
+        let mut txn = self.db.begin().await?;
+        insert_thing_row(&mut txn, &row).await?;
+        insert_collections(&mut txn, thing).await?;
         // Durable event bus (Phase 2): under the outbox transport, write
         // the `event_outbox` row **inside this same transaction**, before
         // the commit, so the entity rows and the event commit atomically
         // (or roll back together). A no-op under the memory transport,
         // which keeps the handler's in-memory publish.
-        self.enqueue_outbox(&txn, thing, EventKind::Created).await?;
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        self.enqueue_outbox(&mut txn, thing, EventKind::Created)
+            .await?;
+        txn.commit().await?;
         self.get_by_id(&thing.id)
             .await?
             .ok_or_else(|| crate::Error::Database("thing not found after insert".into()))
@@ -238,11 +249,9 @@ impl ThingRepository for SeaOrmThingRepository {
     ///
     /// Returns [`crate::Error::Database`] on any DB failure.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Thing>> {
-        let row = things::Entity::find_by_id(*id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        let Some(row) = row else { return Ok(None) };
+        let Some(row) = self.find_row(*id).await? else {
+            return Ok(None);
+        };
         if row.is_deleted {
             return Ok(None);
         }
@@ -258,27 +267,24 @@ impl ThingRepository for SeaOrmThingRepository {
     /// Returns [`crate::Error::NotFound`] if no row has this id, or
     /// [`crate::Error::Database`] on any DB failure.
     async fn update(&self, thing: &Thing) -> Result<Thing> {
-        let exists = things::Entity::find_by_id(thing.id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
-        if exists.is_none() {
+        if self.find_row(thing.id).await?.is_none() {
             return Err(crate::Error::NotFound);
         }
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
         // `created_at` is preserved (not overwritten by whatever the
         // domain value carries — a stale read or a defaulted-empty one);
         // `updated_at` is always refreshed to "now". Both are
         // server-managed, matching `create`.
-        let mut active = to_active(thing);
-        active.created_at = NotSet;
-        active.updated_at = Set(OffsetDateTime::now_utc());
-        active.update(&txn).await.map_err(|e| map_db(&e))?;
-        delete_collections(&txn, thing.id).await?;
-        insert_collections(&txn, thing).await?;
+        let mut row = thing_row(thing);
+        row.updated_at = Utc::now();
+
+        let mut txn = self.db.begin().await?;
+        update_thing_row(&mut txn, &row, None).await?;
+        delete_collections(&mut txn, thing.id).await?;
+        insert_collections(&mut txn, thing).await?;
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, thing, EventKind::Updated).await?;
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        self.enqueue_outbox(&mut txn, thing, EventKind::Updated)
+            .await?;
+        txn.commit().await?;
         self.get_by_id(&thing.id)
             .await?
             .ok_or(crate::Error::NotFound)
@@ -293,29 +299,21 @@ impl ThingRepository for SeaOrmThingRepository {
     /// Returns [`crate::Error::NotFound`] if no row has this id, or
     /// [`crate::Error::Database`] on any DB failure.
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
-        let row = things::Entity::find_by_id(*id)
-            .one(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?
-            .ok_or(crate::Error::NotFound)?;
-        let now = OffsetDateTime::now_utc();
-        let mut active: things::ActiveModel = row.clone().into();
-        active.is_deleted = Set(true);
-        active.deleted_at = Set(Some(now));
-        active.updated_at = Set(now);
+        let row = self.find_row(*id).await?.ok_or(crate::Error::NotFound)?;
         // Unlike create/update, the soft-delete had no existing
         // transaction. Under the outbox transport we open one here so the
         // tombstone write and the `deleted` outbox row commit atomically;
         // the memory transport keeps the plain, tx-free update.
         if self.transport.is_outbox() {
             let thing = self.hydrate(row).await?;
-            let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
-            active.update(&txn).await.map_err(|e| map_db(&e))?;
-            self.enqueue_outbox(&txn, &thing, EventKind::Deleted)
+            let mut txn = self.db.begin().await?;
+            mark_deleted(&mut txn, *id).await?;
+            self.enqueue_outbox(&mut txn, &thing, EventKind::Deleted)
                 .await?;
-            txn.commit().await.map_err(|e| map_db(&e))?;
+            txn.commit().await?;
         } else {
-            active.update(&self.db).await.map_err(|e| map_db(&e))?;
+            let mut conn = self.db.acquire().await?;
+            mark_deleted(&mut conn, *id).await?;
         }
         Ok(())
     }
@@ -328,14 +326,21 @@ impl ThingRepository for SeaOrmThingRepository {
     ///
     /// Returns [`crate::Error::Database`] on any DB failure.
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Thing>> {
-        let rows = things::Entity::find()
-            .filter(things::Column::IsDeleted.eq(false))
-            .order_by_desc(things::Column::CreatedAt)
-            .limit(limit)
-            .offset(offset)
-            .all(&self.db)
-            .await
-            .map_err(|e| map_db(&e))?;
+        let rows = sqlx::query_as!(
+            ThingRow,
+            "SELECT id, name, description, disambiguating_description, additional_type,
+                    url, main_entity_of_page, owner, subject_of, potential_action,
+                    is_deleted, content_hash, content_hash_sha3, content_mac,
+                    deleted_at, created_at, updated_at
+             FROM things
+             WHERE is_deleted = false
+             ORDER BY created_at DESC
+             LIMIT $1 OFFSET $2",
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(&self.db)
+        .await?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
             out.push(self.hydrate(row).await?);
@@ -351,15 +356,19 @@ impl ThingRepository for SeaOrmThingRepository {
     ///
     /// Returns [`crate::Error::Database`] on any DB failure.
     async fn record_merge(&self, rec: &MergeRecord) -> Result<MergeRecord> {
-        let active = thing_merge_records::ActiveModel {
-            id: Set(rec.id),
-            main_thing_id: Set(rec.main_thing_id),
-            duplicate_thing_id: Set(rec.duplicate_thing_id),
-            merge_reason: Set(rec.merge_reason.clone()),
-            transferred_data: Set(rec.transferred_data.clone()),
-            merged_at: Set(ts_to_offset(rec.merged_at)),
-        };
-        active.insert(&self.db).await.map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO thing_merge_records
+                 (id, main_thing_id, duplicate_thing_id, merge_reason, transferred_data, merged_at)
+             VALUES ($1, $2, $3, $4, $5, $6)",
+            rec.id,
+            rec.main_thing_id,
+            rec.duplicate_thing_id,
+            rec.merge_reason,
+            rec.transferred_data,
+            rec.merged_at,
+        )
+        .execute(&self.db)
+        .await?;
         Ok(rec.clone())
     }
 
@@ -381,34 +390,34 @@ impl ThingRepository for SeaOrmThingRepository {
         // envelope carries the record's name (needed under outbox).
         let duplicate = self.get_by_id(duplicate_id).await?;
 
-        let txn = self.db.begin().await.map_err(|e| map_db(&e))?;
+        let mut txn = self.db.begin().await?;
 
         // Apply the survivor's parent row + wholesale child replacement.
-        to_active(survivor)
-            .update(&txn)
-            .await
-            .map_err(|e| map_db(&e))?;
-        delete_collections(&txn, survivor.id).await?;
-        insert_collections(&txn, survivor).await?;
+        // Every column is written from the survivor, `created_at` and
+        // `updated_at` included, exactly as the merge always has.
+        let row = thing_row(survivor);
+        update_thing_row(&mut txn, &row, Some(row.created_at)).await?;
+        delete_collections(&mut txn, survivor.id).await?;
+        insert_collections(&mut txn, survivor).await?;
 
         // Soft-delete the duplicate on the same transaction.
-        apply_soft_delete_row(&txn, duplicate_id).await?;
+        mark_deleted(&mut txn, *duplicate_id).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the
         // survivor and a `Deleted` outbox row for the duplicate — both
         // inside this transaction. A no-op under the memory transport.
         if self.transport.is_outbox() {
             OutboxInsert::for_merge(survivor, duplicate_id)?
-                .insert_on(&txn)
+                .insert_on(&mut txn)
                 .await?;
             if let Some(dup) = duplicate.as_ref() {
                 OutboxInsert::for_event(dup, EventKind::Deleted)?
-                    .insert_on(&txn)
+                    .insert_on(&mut txn)
                     .await?;
             }
         }
 
-        txn.commit().await.map_err(|e| map_db(&e))?;
+        txn.commit().await?;
 
         self.get_by_id(&survivor.id)
             .await?
@@ -416,46 +425,51 @@ impl ThingRepository for SeaOrmThingRepository {
     }
 }
 
-/// Soft-delete the thing `id` on `conn` by stamping `is_deleted`/
-/// `deleted_at`/`updated_at` and leaving every other column (and the
-/// child rows) in place. A partial `UPDATE` (all other columns stay
-/// `NotSet`) so [`ThingRepository::merge`] can reuse it on its own
-/// transaction without loading the row first.
-async fn apply_soft_delete_row<C: ConnectionTrait>(conn: &C, id: &Uuid) -> Result<()> {
-    let now = OffsetDateTime::now_utc();
-    let active = things::ActiveModel {
-        id: Set(*id),
-        is_deleted: Set(true),
-        deleted_at: Set(Some(now)),
-        updated_at: Set(now),
-        ..Default::default()
-    };
-    active.update(conn).await.map_err(|e| map_db(&e))?;
-    Ok(())
-}
-
 /// Count non-deleted things (diagnostics / benches).
 ///
 /// # Errors
 ///
 /// Returns an error if the count query fails.
-pub async fn count_active(db: &DatabaseConnection) -> Result<u64> {
-    things::Entity::find()
-        .filter(things::Column::IsDeleted.eq(false))
-        .count(db)
-        .await
-        .map_err(|e| map_db(&e))
+pub async fn count_active(db: &PgPool) -> Result<u64> {
+    let n = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM things WHERE is_deleted = false"#)
+        .fetch_one(db)
+        .await?;
+    Ok(u64::try_from(n).unwrap_or_default())
 }
 
-/// Build the `things` scalar active model from a domain [`Thing`].
-fn to_active(thing: &Thing) -> things::ActiveModel {
+/// The rows `GET /api/records/verify` recomputes, most recently updated
+/// first, soft-deleted ones included (the handler skips those).
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
+pub async fn rows_for_verification(db: &PgPool, limit: u64) -> Result<Vec<ThingRow>> {
+    let rows = sqlx::query_as!(
+        ThingRow,
+        "SELECT id, name, description, disambiguating_description, additional_type,
+                url, main_entity_of_page, owner, subject_of, potential_action,
+                is_deleted, content_hash, content_hash_sha3, content_mac,
+                deleted_at, created_at, updated_at
+         FROM things
+         ORDER BY updated_at DESC
+         LIMIT $1",
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
+/// Build the full `things` row from a domain [`Thing`], integrity digests
+/// included.
+fn thing_row(thing: &Thing) -> ThingRow {
     // All three digests from one call over the **assembled** record, so
     // the child collections are covered too — an identifier is exactly
     // the kind of field worth editing quietly, and it does not live in
     // this row. Computed here rather than stamped afterwards, so one
     // statement writes the row and its integrity values together.
     //
-    // Both `create` and `update` build their active model here, so this
+    // `create`, `update` and `merge` all build their row here, so this
     // is the single place a write path could forget to re-digest.
     let digests = crate::compliance::record_integrity::digests(
         &crate::compliance::record_integrity::RecordInput {
@@ -464,104 +478,221 @@ fn to_active(thing: &Thing) -> things::ActiveModel {
             is_deleted: thing.is_deleted,
         },
     );
-    things::ActiveModel {
-        id: Set(thing.id),
-        content_hash: Set(Some(digests.sha256)),
-        content_hash_sha3: Set(Some(digests.sha3)),
-        content_mac: Set(digests.mac),
-        name: Set(thing.name.clone()),
-        description: Set(thing.description.clone()),
-        disambiguating_description: Set(thing.disambiguating_description.clone()),
-        additional_type: Set(thing.additional_type.clone()),
-        url: Set(thing.url.clone()),
-        main_entity_of_page: Set(thing.main_entity_of_page.clone()),
-        owner: Set(thing.owner.clone()),
-        subject_of: Set(thing.subject_of.clone()),
-        potential_action: Set(thing.potential_action.clone()),
-        is_deleted: Set(thing.is_deleted),
-        deleted_at: Set(thing.deleted_at.map(ts_to_offset)),
-        created_at: Set(ts_to_offset(thing.created_at)),
-        updated_at: Set(ts_to_offset(thing.updated_at)),
+    ThingRow {
+        id: thing.id,
+        content_hash: Some(digests.sha256),
+        content_hash_sha3: Some(digests.sha3),
+        content_mac: digests.mac,
+        name: thing.name.clone(),
+        description: thing.description.clone(),
+        disambiguating_description: thing.disambiguating_description.clone(),
+        additional_type: thing.additional_type.clone(),
+        url: thing.url.clone(),
+        main_entity_of_page: thing.main_entity_of_page.clone(),
+        owner: thing.owner.clone(),
+        subject_of: thing.subject_of.clone(),
+        potential_action: thing.potential_action.clone(),
+        is_deleted: thing.is_deleted,
+        deleted_at: thing.deleted_at,
+        created_at: thing.created_at,
+        updated_at: thing.updated_at,
     }
 }
 
+/// `INSERT` one whole `things` row.
+async fn insert_thing_row(conn: &mut PgConnection, row: &ThingRow) -> Result<()> {
+    sqlx::query!(
+        "INSERT INTO things (
+             id, name, description, disambiguating_description, additional_type,
+             url, main_entity_of_page, owner, subject_of, potential_action,
+             is_deleted, content_hash, content_hash_sha3, content_mac,
+             deleted_at, created_at, updated_at
+         ) VALUES (
+             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+         )",
+        row.id,
+        row.name,
+        row.description,
+        row.disambiguating_description,
+        row.additional_type,
+        row.url,
+        row.main_entity_of_page,
+        row.owner,
+        row.subject_of,
+        row.potential_action,
+        row.is_deleted,
+        row.content_hash,
+        row.content_hash_sha3,
+        row.content_mac,
+        row.deleted_at,
+        row.created_at,
+        row.updated_at,
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+/// `UPDATE` every column of one `things` row except `id`. `created_at` is
+/// written only when `created_at` is `Some` (the merge, which writes the
+/// survivor whole); `None` keeps the stored value (an ordinary update).
+async fn update_thing_row(
+    conn: &mut PgConnection,
+    row: &ThingRow,
+    created_at: Option<DateTime<Utc>>,
+) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE things SET
+             name = $2, description = $3, disambiguating_description = $4,
+             additional_type = $5, url = $6, main_entity_of_page = $7, owner = $8,
+             subject_of = $9, potential_action = $10, is_deleted = $11,
+             content_hash = $12, content_hash_sha3 = $13, content_mac = $14,
+             deleted_at = $15, updated_at = $16,
+             created_at = COALESCE($17, created_at)
+         WHERE id = $1",
+        row.id,
+        row.name,
+        row.description,
+        row.disambiguating_description,
+        row.additional_type,
+        row.url,
+        row.main_entity_of_page,
+        row.owner,
+        row.subject_of,
+        row.potential_action,
+        row.is_deleted,
+        row.content_hash,
+        row.content_hash_sha3,
+        row.content_mac,
+        row.deleted_at,
+        row.updated_at,
+        created_at,
+    )
+    .execute(conn)
+    .await?;
+    // A row that vanished is an error, as it was when the ORM reported
+    // "no record updated".
+    if done.rows_affected() == 0 {
+        return Err(crate::Error::Database(
+            "thing not updated: no such row".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Soft-delete one thing: set the tombstone and its timestamp, leaving
+/// every other column (the stored digests included) and the child rows in
+/// place. Takes the caller's connection so [`ThingRepository::merge`] can
+/// run it inside its own transaction.
+async fn mark_deleted(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    let now = Utc::now();
+    let done = sqlx::query!(
+        "UPDATE things SET is_deleted = true, deleted_at = $2, updated_at = $2 WHERE id = $1",
+        id,
+        now,
+    )
+    .execute(conn)
+    .await?;
+    // As under the ORM, an update that touches no row is an error.
+    if done.rows_affected() == 0 {
+        return Err(crate::Error::Database(
+            "thing not deleted: no such row".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Insert all child-collection rows for `thing` on connection `conn`.
-async fn insert_collections<C: ConnectionTrait>(conn: &C, thing: &Thing) -> Result<()> {
+/// Each row's `position` is its index, so `hydrate` reads the lists back
+/// in the order they were written.
+async fn insert_collections(conn: &mut PgConnection, thing: &Thing) -> Result<()> {
     for (i, name) in thing.alternate_names.iter().enumerate() {
-        thing_alternate_names::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            thing_id: Set(thing.id),
-            name: Set(name.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO thing_alternate_names (id, thing_id, name, position)
+             VALUES ($1, $2, $3, $4)",
+            Uuid::new_v4(),
+            thing.id,
+            name,
+            position(i),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     for (i, ident) in thing.identifiers.iter().enumerate() {
         let (property_id, custom_label) = ident_type_parts(&ident.property_id);
-        thing_identifiers::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            thing_id: Set(thing.id),
-            property_id: Set(property_id),
-            custom_label: Set(custom_label),
-            value: Set(ident.value.clone()),
-            name: Set(ident.name.clone()),
-            url: Set(ident.url.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO thing_identifiers
+                 (id, thing_id, property_id, custom_label, value, name, url, position)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            Uuid::new_v4(),
+            thing.id,
+            property_id,
+            custom_label,
+            ident.value,
+            ident.name,
+            ident.url,
+            position(i),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     for (i, url) in thing.images.iter().enumerate() {
-        thing_images::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            thing_id: Set(thing.id),
-            url: Set(url.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO thing_images (id, thing_id, url, position) VALUES ($1, $2, $3, $4)",
+            Uuid::new_v4(),
+            thing.id,
+            url,
+            position(i),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     for (i, url) in thing.same_as.iter().enumerate() {
-        thing_same_as::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            thing_id: Set(thing.id),
-            url: Set(url.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+        sqlx::query!(
+            "INSERT INTO thing_same_as (id, thing_id, url, position) VALUES ($1, $2, $3, $4)",
+            Uuid::new_v4(),
+            thing.id,
+            url,
+            position(i),
+        )
+        .execute(&mut *conn)
+        .await?;
     }
     Ok(())
 }
 
 /// Delete all child-collection rows for `thing_id` on connection `conn`.
-async fn delete_collections<C: ConnectionTrait>(conn: &C, thing_id: Uuid) -> Result<()> {
-    thing_alternate_names::Entity::delete_many()
-        .filter(thing_alternate_names::Column::ThingId.eq(thing_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    thing_identifiers::Entity::delete_many()
-        .filter(thing_identifiers::Column::ThingId.eq(thing_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    thing_images::Entity::delete_many()
-        .filter(thing_images::Column::ThingId.eq(thing_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
-    thing_same_as::Entity::delete_many()
-        .filter(thing_same_as::Column::ThingId.eq(thing_id))
-        .exec(conn)
-        .await
-        .map_err(|e| map_db(&e))?;
+async fn delete_collections(conn: &mut PgConnection, thing_id: Uuid) -> Result<()> {
+    sqlx::query!(
+        "DELETE FROM thing_alternate_names WHERE thing_id = $1",
+        thing_id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM thing_identifiers WHERE thing_id = $1",
+        thing_id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!("DELETE FROM thing_images WHERE thing_id = $1", thing_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM thing_same_as WHERE thing_id = $1", thing_id)
+        .execute(&mut *conn)
+        .await?;
     Ok(())
+}
+
+/// A list index as the `INTEGER` `position` column.
+fn position(i: usize) -> i32 {
+    i32::try_from(i).unwrap_or(i32::MAX)
+}
+
+/// A `LIMIT` / `OFFSET` bound: Postgres takes `BIGINT`, the callers count
+/// in `u64`.
+fn to_i64(n: u64) -> i64 {
+    i64::try_from(n).unwrap_or(i64::MAX)
 }
 
 /// Map an [`IdentifierType`] to its `(property_id, custom_label)` columns.
@@ -596,11 +727,6 @@ fn parse_ident_type(property_id: &str, custom_label: Option<String>) -> Identifi
     }
 }
 
-/// Map a `SeaORM` `DbErr` into the crate error type.
-fn map_db(e: &sea_orm::DbErr) -> crate::Error {
-    crate::Error::Database(e.to_string())
-}
-
 pub use audit::AuditLogRepository;
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path. They
@@ -610,15 +736,14 @@ pub use audit::AuditLogRepository;
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod outbox_tests {
-    use super::{SeaOrmThingRepository, ThingRepository};
-    use crate::db::models::event_outbox;
+    use super::{PgThingRepository, ThingRepository};
+    use crate::db::outbox;
     use crate::models::thing::Thing;
     use crate::streaming::EventTransport;
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-    async fn connect() -> sea_orm::DatabaseConnection {
+    async fn connect() -> sqlx::PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        sqlx::PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
@@ -629,16 +754,11 @@ mod outbox_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
-        let repo = SeaOrmThingRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgThingRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let thing = repo.create(&Thing::new("Widget")).await.unwrap();
 
-        let rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(thing.id))
-            .filter(event_outbox::Column::Kind.eq("created"))
-            .all(&db)
-            .await
-            .unwrap();
+        let rows = outbox::rows_for(&db, thing.id, "created").await.unwrap();
         assert_eq!(rows.len(), 1, "one created outbox row for the new thing");
         assert_eq!(rows[0].entity, "thing");
     }
@@ -650,7 +770,7 @@ mod outbox_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
-        let repo = SeaOrmThingRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgThingRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let survivor = repo.create(&Thing::new("Survivor")).await.unwrap();
         let duplicate = repo.create(&Thing::new("Duplicate")).await.unwrap();
@@ -659,12 +779,7 @@ mod outbox_tests {
         assert_eq!(merged.id, survivor.id);
 
         // Survivor: exactly one `merged` row, carrying the duplicate pid.
-        let merged_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(survivor.id))
-            .filter(event_outbox::Column::Kind.eq("merged"))
-            .all(&db)
-            .await
-            .unwrap();
+        let merged_rows = outbox::rows_for(&db, survivor.id, "merged").await.unwrap();
         assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
         assert_eq!(
             merged_rows[0].payload["merged_from"],
@@ -673,10 +788,7 @@ mod outbox_tests {
         );
 
         // Duplicate: a `deleted` row.
-        let deleted_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(duplicate.id))
-            .filter(event_outbox::Column::Kind.eq("deleted"))
-            .all(&db)
+        let deleted_rows = outbox::rows_for(&db, duplicate.id, "deleted")
             .await
             .unwrap();
         assert_eq!(

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO things (\n             id, name, description, disambiguating_description, additional_type,\n             url, main_entity_of_page, owner, subject_of, potential_action,\n             is_deleted, content_hash, content_hash_sha3, content_mac,\n             deleted_at, created_at, updated_at\n         ) VALUES (\n             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17\n         )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "678a4f31a0ed414df7cd851a2ae7871b1ae7a75f6ef6566b4b67d85a506cdad1"
+}

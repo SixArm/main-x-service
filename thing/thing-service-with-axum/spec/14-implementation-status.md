@@ -22,7 +22,8 @@
 | Stored review queue + decisions | `review_queue` table (normalized-pair UNIQUE upsert); `GET /api/things/review-queue` + `POST /api/things/review-queue/{id}/decision` (2026-07-19) |
 | Row-level integrity digests | SHA-256/SHA-3/optional-MAC over the assembled record (child tables included), stamped on every write; `GET /api/records/verify` + `GET /api/audit/verify` (2026-07-28) |
 | Server-owned wire fields optional | `POST /api/things` no longer demands `id`/`created_at`/`updated_at`/collection fields it owns and discards (QA-SERVER-FIELDS, 2026-08-04) |
-| Tests | 197 unit (`cargo test --lib`) + 6 DB-free/gated integration files + `duplicate_detection` bridge suite + `enforcement` activation proof + Criterion benchmarks |
+| Persistence | `PgThingRepository`: sqlx `query!` CRUD with transactions, soft delete; plain-SQL `sqlx::migrate!` migrations; all SQL in `src/db/` (§10, T-16) |
+| Tests | 218 unit (`cargo test --lib`, +3 DB-gated `#[ignore]`) + 111 integration (incl. the `duplicate_detection` bridge suite and `enforcement` activation proof; +9 DB-gated `#[ignore]`) + Criterion benchmarks — counted 2026-11-07 (T-16) |
 | `ThingMatcher` trait abstraction | The concrete facade is `ProbabilisticMatcher : ThingMatcher`; `AppState::matcher` holds `Arc<dyn ThingMatcher>`, so an alternative scorer can be substituted with no handler change (T-2, 2026-09-03) |
 
 ### 14.2 Open gaps → tasks

@@ -25,7 +25,7 @@
   wired to a live deployment target; see §2.2.
 - Row-level integrity digests (SHA-256/SHA-3/optional MAC) + verify
   endpoints (2026-07-28).
-- PostgreSQL persistence via SeaORM.
+- PostgreSQL persistence via sqlx (compile-checked SQL, no ORM).
 
 ### 2.2 Out of scope (today)
 

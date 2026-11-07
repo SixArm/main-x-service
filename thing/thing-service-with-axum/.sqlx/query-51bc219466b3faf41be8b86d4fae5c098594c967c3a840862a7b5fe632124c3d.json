@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE things SET\n             name = $2, description = $3, disambiguating_description = $4,\n             additional_type = $5, url = $6, main_entity_of_page = $7, owner = $8,\n             subject_of = $9, potential_action = $10, is_deleted = $11,\n             content_hash = $12, content_hash_sha3 = $13, content_mac = $14,\n             deleted_at = $15, updated_at = $16,\n             created_at = COALESCE($17, created_at)\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "51bc219466b3faf41be8b86d4fae5c098594c967c3a840862a7b5fe632124c3d"
+}

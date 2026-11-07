@@ -50,5 +50,17 @@ pub enum Error {
     Streaming(String),
 }
 
+/// Every sqlx failure is a [`Error::Database`], carrying sqlx's own
+/// message, so `?` on a query reads the same everywhere in `src/db/`.
+///
+/// A violated unique constraint is not singled out: it is a database
+/// error like any other, exactly as it was under `SeaORM`. A caller that
+/// wants it as a `409` checks it first with `axa::sqlx::is_unique_violation`.
+impl From<sqlx::Error> for Error {
+    fn from(e: sqlx::Error) -> Self {
+        Self::Database(e.to_string())
+    }
+}
+
 /// Crate-wide convenience alias for `std::result::Result<T, Error>`.
 pub type Result<T> = std::result::Result<T, Error>;

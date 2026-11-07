@@ -4,7 +4,7 @@ One subproject persists; the other two are deliberately stateless.
 
 | Subproject | Persistence |
 |---|---|
-| service | PostgreSQL via SeaORM (below) + local Tantivy search index |
+| service | PostgreSQL via sqlx (below) + local Tantivy search index |
 | matcher | None — pure library, no IO by specification |
 | front-end | None — browser state only; every page fetches fresh from the REST API |
 
@@ -35,9 +35,8 @@ hand-maintained — there is no generator script, build step, or
 `pg_dump` pipeline anywhere in the entity that produces or verifies
 it, so it can drift from the service's actual migrations silently.
 Current deltas against the service's two raw-SQL migrations
-([`migrations/`](../thing-service-with-axum/migrations/), executed
-verbatim by the SeaORM wrappers in
-[`migration/src/`](../thing-service-with-axum/migration/src/)):
+([`migrations/`](../thing-service-with-axum/migrations/), plain SQL
+embedded and run by `sqlx::migrate!`):
 
 - The migrations create 7 tables (`things`,
   `thing_alternate_names`, `thing_identifiers`, `thing_images`,

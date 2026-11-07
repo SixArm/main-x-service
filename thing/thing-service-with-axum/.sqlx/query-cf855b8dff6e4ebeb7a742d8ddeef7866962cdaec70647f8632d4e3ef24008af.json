@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE things SET is_deleted = true, deleted_at = $2, updated_at = $2 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cf855b8dff6e4ebeb7a742d8ddeef7866962cdaec70647f8632d4e3ef24008af"
+}

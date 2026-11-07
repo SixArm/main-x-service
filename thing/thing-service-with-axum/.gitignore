@@ -6,11 +6,6 @@
 # can reconstruct.
 !Cargo.lock
 
-# ...but not a sub-crate's lockfile. The service's own Cargo.lock is
-# the resolved graph for the binary; these are build artifacts of
-# path dependencies built standalone.
-migration/Cargo.lock
-
 # Tantivy index built by a local run or by the activation proof's test
 # router. Derived from Postgres, so it is never committed.
 /data/

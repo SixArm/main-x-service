@@ -21,7 +21,7 @@
 FROM rust:1.97-slim AS builder
 
 # Build dependencies — `libssl-dev` for openssl-sys, `libpq-dev` for
-# the PostgreSQL C client headers SeaORM links against via sqlx.
+# the PostgreSQL C client headers (sqlx itself is pure Rust).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         libssl-dev \
@@ -41,16 +41,12 @@ COPY integrity/integrity-mac-rust-crate integrity/integrity-mac-rust-crate
 COPY authentication/authentication-verifier-rust-crate authentication/authentication-verifier-rust-crate
 
 # This crate itself: manifests first (better layer caching), then the
-# nested `migration` sub-crate (loco's sea-orm-migration bridge — a
-# same-directory path dependency, so it travels with the COPY below
-# regardless), then sources.
+# plain-SQL migrations `sqlx::migrate!` embeds, then the `.sqlx/` query
+# data the `query!` macros check against (no database at build time),
+# then sources.
 COPY thing/thing-service-with-axum/Cargo.toml thing/thing-service-with-axum/Cargo.lock thing/thing-service-with-axum/
-COPY thing/thing-service-with-axum/migration thing/thing-service-with-axum/migration
-# The raw numbered SQL `migration/src/*.rs` embeds via `include_str!`
-# lives at the CRATE ROOT here (a sibling of `migration/`, not nested
-# inside it — this varies by crate; some nest `migrations/` inside
-# `migration/` instead, e.g. link-graph-service).
 COPY thing/thing-service-with-axum/migrations thing/thing-service-with-axum/migrations
+COPY thing/thing-service-with-axum/.sqlx thing/thing-service-with-axum/.sqlx
 COPY thing/thing-service-with-axum/src thing/thing-service-with-axum/src
 # `benches/` is included because Cargo.toml's `[[bench]]` declarations
 # require the files to exist even when we only build the `--bin` target.
@@ -59,15 +55,17 @@ COPY thing/thing-service-with-axum/benches thing/thing-service-with-axum/benches
 WORKDIR /app/thing/thing-service-with-axum
 
 # Build the binary target declared by src/bin/main.rs. Migration SQL
-# is embedded into the binary at compile time via `include_str!`
-# (agents/share/architecture.md), so the runtime stage below needs no
-# loose migration files.
+# is embedded into the binary at compile time by `sqlx::migrate!`, so
+# the runtime stage below needs no loose migration files.
+# `SQLX_OFFLINE=true` makes the `query!` macros read `.sqlx/` instead of
+# connecting to a database.
+ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin thing-service
 
 # Stage 2: runtime — minimal Debian 13 slim base.
 FROM debian:13-slim
 
-# Runtime libraries. libpq5 for the SeaORM PostgreSQL connector,
+# Runtime libraries. libpq5 for the PostgreSQL connector,
 # libssl3 for openssl, ca-certificates for HTTPS chains (PASETO
 # key-set fetch), curl for the HEALTHCHECK below.
 RUN apt-get update && apt-get install -y --no-install-recommends \

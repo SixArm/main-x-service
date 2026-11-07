@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, event_id, entity, entity_pid, kind, occurred_at, actor,\n                schema_version, payload, published_at\n         FROM event_outbox\n         WHERE published_at IS NULL\n         ORDER BY id ASC\n         LIMIT $1\n         FOR UPDATE SKIP LOCKED",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "entity",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "entity"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "entity_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "entity_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "occurred_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "occurred_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "actor",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "actor"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "schema_version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "schema_version"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "payload",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "payload"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "published_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "published_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "53998b5fc20ac8a11c253da657cfc2b1cfb144b85e93ae9fab2d467d83c9b595"
+}

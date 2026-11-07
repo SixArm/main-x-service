@@ -1,0 +1,155 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO review_queue\n                 (id, record_id_a, record_id_b, match_score, match_quality,\n                  detection_method, score_breakdown, status)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n             ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET\n                 match_score = EXCLUDED.match_score,\n                 match_quality = EXCLUDED.match_quality,\n                 detection_method = EXCLUDED.detection_method,\n                 score_breakdown = EXCLUDED.score_breakdown\n             RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                       detection_method, score_breakdown, status, reviewed_by,\n                       created_at, reviewed_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "record_id_a",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "record_id_a"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "record_id_b",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "record_id_b"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "match_score",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "match_score"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "match_quality",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "match_quality"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "detection_method",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "detection_method"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "score_breakdown",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "score_breakdown"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "reviewed_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "reviewed_by"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "reviewed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "reviewed_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Float8",
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "045d531bc902aef2aec026e217809ea3d9d2f64f6d92f132856ded35eb10f960"
+}

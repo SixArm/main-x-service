@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM thing_alternate_names WHERE thing_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "99fed0099f8af049a1209ebcd62be8c734991a20198b888ffca6b6f9cbad41ae"
+}

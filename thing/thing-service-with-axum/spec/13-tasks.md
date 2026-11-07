@@ -247,7 +247,8 @@ clearly described manual check confirms the acceptance criterion.
   - **Done (2026-07-08):** `event_outbox` migration
     (`migrations/2026070800000001_create_event_outbox/` +
     `m20260708_000001_create_event_outbox` registered in the migrator)
-    + SeaORM entity (`db::models::event_outbox`). New
+    + SeaORM entity (`db::models::event_outbox`; since T-16 a plain
+    `db::models::OutboxRow`). New
     `src/streaming/envelope.rs` — the canonical versioned `Envelope`
     (`entity` is `#[serde(skip_deserializing, default = default_entity)]`;
     `merged_from` on `Merged`), `EventKind`, `EventView`, and the
@@ -257,7 +258,7 @@ clearly described manual check confirms the acceptance criterion.
     New `src/db/outbox.rs` — the pure `OutboxInsert::from_envelope`
     (DB-free) + `for_event`/`for_merge` + `ConnectionTrait`-generic
     `insert_on` (so the repo passes its own transaction) + relay
-    `recent`/`unpublished`/`mark_published`. `SeaOrmThingRepository`
+    `recent`/`unpublished`/`mark_published`. `SeaOrmThingRepository` (now `PgThingRepository`)
     gains a `transport` field + `enqueue_outbox<C: ConnectionTrait>`;
     `create`/`update`/`soft_delete` write the outbox row **inside the
     entity write's transaction** (`soft_delete` grows a transaction
@@ -316,7 +317,7 @@ clearly described manual check confirms the acceptance criterion.
   `#[ignore]`d round-trip (create under outbox transport → `FluvioSink` →
   `drain_once` → assert `published_at`), following this crate's own
   DB-gated-test convention (direct `DATABASE_URL` connect +
-  `SeaOrmThingRepository`, not case's `loco_rs::testing::request`
+  `SeaOrmThingRepository` (now `PgThingRepository`), not case's `loco_rs::testing::request`
   harness, which this crate does not use elsewhere) — its run command is
   documented inline. It needs a live broker, which no automated run in
   this repo stands up, so it is verified by compiling under the feature,
@@ -419,7 +420,7 @@ clearly described manual check confirms the acceptance criterion.
   re-fetched stored one carry the identical breakdown. New DB-gated
   `tests/review_queue_score_breakdown.rs` (`#[ignore]`d): seeds two
   exact-name/description duplicates **directly through
-  `SeaOrmThingRepository`** (bypassing `POST /api/things`'s own
+  `SeaOrmThingRepository`** (now `PgThingRepository`) (bypassing `POST /api/things`'s own
   real-time duplicate check, which would otherwise reject the second
   seed with `409` before the batch scan ever runs), scans via
   `POST /api/things/deduplicate`, and asserts both the scan response's
@@ -615,3 +616,28 @@ clearly described manual check confirms the acceptance criterion.
       `enforce_request` used by the guard and the `AuthUser` extractor;
       `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
       KC-1; reference: organization-service / person-service.
+
+- [x] **T-16 (M) — SeaORM → sqlx.** *(Done 2026-11-07;
+  spec/tech-stack §5, following place's pilot.)* Replaced SeaORM with
+  direct sqlx so a reviewer can read every statement the service runs
+  (§10). All SQL is in `src/db/` as 35 `query!` / `query_as!` /
+  `query_scalar!` literals, compile-checked against the committed
+  `.sqlx/`; no `QueryBuilder`, `raw_sql` or `AssertSqlSafe`, so no
+  `ci/sql-allowlist.txt` entry. `SeaOrmThingRepository` became
+  `PgThingRepository`; the SeaORM entities in `src/db/models.rs` became
+  plain row structs. Two handler queries (`GET /api/records/verify`,
+  `GET /api/audit/verify`) and the relay's retention delete moved into
+  `src/db/`. The `migration/` crate is gone: its five migrations are
+  the same SQL in sqlx's flat `.up.sql` / `.down.sql` layout, run by
+  `sqlx::migrate!` through `axa::sqlx` (`db migrate | down | reset |
+  status`, boot auto-migrate). Proved: a `pg_dump --schema-only` of a
+  database migrated by the old code and one migrated by the new code is
+  identical once the bookkeeping tables are excluded. Compliance
+  behaviour unchanged and its tests not edited to pass: the only test
+  edits replace SeaORM connection and outbox-row lookups with
+  `sqlx::PgPool` and `db::outbox::rows_for`, keeping every assertion.
+  One test changed shape: the relay poll's `FOR UPDATE SKIP LOCKED`
+  pin read the SQL SeaORM generated, which a `query!` literal does not
+  expose, so it became a DB-gated test proving a second relay skips
+  rows the first holds. Unit tests 330 → 329, DB-gated suite 11 → 12,
+  all passing. Dependencies 400 → 367 unique normal crates.

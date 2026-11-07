@@ -1,0 +1,220 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, name, description, disambiguating_description, additional_type,\n                    url, main_entity_of_page, owner, subject_of, potential_action,\n                    is_deleted, content_hash, content_hash_sha3, content_mac,\n                    deleted_at, created_at, updated_at\n             FROM things\n             WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "disambiguating_description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "disambiguating_description"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "additional_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "additional_type"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "main_entity_of_page",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "main_entity_of_page"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "owner",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "owner"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "subject_of",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "subject_of"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "potential_action",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "potential_action"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "is_deleted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "is_deleted"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "content_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "content_hash_sha3",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "content_hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "content_mac",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "content_mac"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "deleted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "things",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "9aa18f7d4368d7ea1de0c00d178a3f2bc279190ec39687ee3811e68a0992e1a9"
+}
