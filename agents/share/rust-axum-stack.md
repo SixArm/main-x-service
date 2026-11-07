@@ -7,7 +7,7 @@
 | **HTTP**             | tower-http                                        | HTTP layer, CORS, compression               |
 | **Web Framework**    | Axum, axa                                         | HTTP server and routing (backend-only)      |
 | **Database**         | PostgreSQL 18+                                    | Data persistence                            |
-| **ORM**              | SeaORM, sea-orm-migration                         | Async database object-relational mapper     |
+| **Database access**  | sqlx (target); SeaORM, sea-orm-migration (being replaced, `spec/tech-stack` §5.4) | Literal, compile-checked SQL; migrations |
 | **Search Engine**    | Tantivy                                           | Embed full-text search indexing             |
 | **Data Streaming**   | Fluvio                                            | Event publishing and durable data streaming |
 | **API Docs**         | Utoipa                                            | OpenAPI 3.0 specification                   |
@@ -39,8 +39,8 @@ Constraints:
 - Tokio NOT async_std
 - MiMalloc NOT jemalloc
 - PostgreSQL NOT SQLite¹
-- chrono (sea-orm and axa require it; sea-orm has no `with-jiff` feature)
-- sea-orm feature "with-chrono" (controller-style services) or "with-time" (older services)
+- chrono (axa requires it); on sqlx, the `chrono` feature only, never `time`
+- sea-orm feature "with-chrono" (controller-style services) or "with-time" (older services), until each moves to sqlx
 
 ¹ `axa` hardcoded `sqlx-sqlite` into every crate that used it. Now that
 axa is gone, this rule can be enforced by the dependency graph as well as by

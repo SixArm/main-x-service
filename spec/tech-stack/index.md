@@ -220,6 +220,31 @@ One crate at a time, each proven against a real Postgres before the next, with
 the crates carrying the heaviest compliance load last. Audit digests, MACs, and
 the outbox must behave identically, and their tests are not edited to pass.
 
+### 5.4 Status
+
+This list is the one place that says which crates are on sqlx; other documents
+point here rather than repeat it.
+
+| Crate | On | Since |
+|---|---|---|
+| place | sqlx | `119a0497`, 2026-11-07 |
+| organization | sqlx | `7614a5a3`, 2026-11-07 |
+| thing, event, course, link-graph, patient-flow, authentication, case | SeaORM, next | |
+| care-pathway, person, worker | SeaORM, last | |
+
+Each crate on sqlx proves its schema unchanged with a `pg_dump --schema-only`
+diff against a database the old code migrated, which differs only in the
+bookkeeping table (`_sqlx_migrations` for `seaql_migrations`), so a database
+an old build migrated must be recreated. In the two pilots each crate lost
+about 34 normal dependencies (place 419 to 386, organization 382 to 348), and
+line counts stayed about even, because `query_as!` spells out the column lists
+that SeaORM's derives hid.
+
+Two things every crate on sqlx carries: timestamps map through sqlx's
+`chrono` feature, never `time` (with both on, sqlx 0.9.0's macros warn on
+every timestamp column), and `[profile.release.build-override] strip = false`,
+because macOS cannot load a stripped `sqlx-macros`.
+
 ---
 
 ## 6. Versioning, edition, and MSRV

@@ -118,7 +118,8 @@ case, and portfolio each provide:
   under repo `tasks.md` PRO-H9 and PRO-H12, was replaced by axa's on
   2026-11-07. Export is off unless `OTLP_ENDPOINT` is set; see
   [observability.md](observability.md).
-- **PostgreSQL** persistence via SeaORM + migrations
+- **PostgreSQL** persistence, moving from SeaORM to sqlx one crate at a time;
+  which crates are on which is in [`spec/tech-stack`](../../spec/tech-stack/index.md) §5.4
 
 ### Capabilities that vary by crate
 

@@ -46,8 +46,8 @@ capability matrix in [overview.md](overview.md)).
         |                         |                         |
 +-------v--------+   +------------v-----------+  +----------v---------+
 | PostgreSQL     |   | Tantivy full-text      |  | Event transport    |
-| (SeaORM +      |   | index (6 crates; the   |  | in-memory (default)|
-|  migrations)   |   | rest use ILIKE)        |  | or Postgres outbox |
+| (sqlx or       |   | index (6 crates; the   |  | in-memory (default)|
+|  SeaORM)       |   | rest use ILIKE)        |  | or Postgres outbox |
 | entity rows,   |   |                        |  | → relay → Fluvio   |
 | audit, outbox, |   +------------------------+  +----------+---------+
 | entity_links   |                                          |
@@ -106,8 +106,13 @@ src/
 └── openapi.rs             hand-written OpenAPI 3 doc
 ```
 
-Migrations live in a crate-root `migration/` directory (a `sea-orm-migration`
-migrator) in both shapes — `authentication-service` is the exception, with
+The family is moving from SeaORM to sqlx one crate at a time
+([`spec/tech-stack`](../../spec/tech-stack/index.md) §5.4 lists which). On sqlx,
+migrations are plain SQL in `migrations/<version>_<name>.up.sql` and
+`.down.sql`, run by `sqlx::migrate!`, and every statement is a `query!` literal
+in one directory: `src/db/` (person-style) or `src/models/` (controller-style).
+Still on SeaORM, migrations live in a crate-root `migration/` directory (a
+`sea-orm-migration` migrator), and `authentication-service` keeps its own in
 `src/migration/`.
 
 ## Cross-cutting subsystems
