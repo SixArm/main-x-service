@@ -279,12 +279,21 @@ run_stage() {
         'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
          CREATE EXTENSION IF NOT EXISTS citext;
          CREATE EXTENSION IF NOT EXISTS unaccent;' || true
-      # Crates that carry hand-written SQL migrations need them applied:
-      # unlike the controller-style services, they do not migrate on boot,
-      # so their suite would otherwise run against an empty schema and
-      # fail with `relation ... does not exist`. Directory names are
+      # Crates that carry hand-written SQL migrations need them applied
+      # before the suite, or it runs against an empty schema and fails
+      # with `relation ... does not exist`. Directory names are
       # timestamp-prefixed, so lexicographic order is apply order.
-      if ls "${crate}"/migrations/*/up.sql >/dev/null 2>&1; then
+      #
+      # A crate with a `migration/` migrator wraps that same SQL, so it runs
+      # the migrator instead. Its tests boot the app, which migrates, and
+      # SQL applied behind the migrator's back fails there with "relation
+      # already exists".
+      if [[ -d "${crate}/migration" ]] && ls "${crate}"/migrations/*/up.sql >/dev/null 2>&1; then
+        ( cd "${crate}" \
+          && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
+             cargo run --quiet $(locked_flag "${crate}") -- db migrate )
+        echo "  ran the migrator"
+      elif ls "${crate}"/migrations/*/up.sql >/dev/null 2>&1; then
         local up
         for up in $(ls "${crate}"/migrations/*/up.sql | sort); do
           PGPASSWORD="${PG_PASSWORD}" psql -h "${PG_HOST}" -p "${PG_PORT}" \
