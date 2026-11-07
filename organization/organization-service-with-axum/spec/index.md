@@ -1109,8 +1109,9 @@ organization is not a data subject.
   than propagating it). Blocking every organization from being created
   over an unrelated Tantivy hiccup would be a far larger availability
   regression than refusing one explicit check. A hit returns `409` with
-  `ErrorDetail { error: "duplicate_detected", description, errors:
-  <candidate ScoredRef array> }` (axa's `ErrorDetail.errors` field is
+  `ErrorDetail { code: "duplicate_detected", detail, errors:
+  <candidate ScoredRef array> }`, answered as an RFC 9457 problem with
+  `code` and `errors` as extension members (axa's `ErrorDetail.errors` field is
   built for exactly this — arbitrary structured detail alongside the
   message) and the record is never created.
   **A real, non-obvious side effect found only by running the DB-gated

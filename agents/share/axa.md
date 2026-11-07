@@ -12,7 +12,20 @@ axa is a library, not a framework. Each service's `src/app.rs` holds ordinary
 functions, and its `main.rs` calls them. axa's own specification is
 [`spec/index.md`](https://github.com/publicprojects-io/axa/blob/main/spec/index.md).
 
-Services take it from crates.io, as `axa = "0.5"`.
+Services take it from crates.io, as `axa = "0.6"`.
+
+## Errors
+
+Every error axa answers is an RFC 9457 problem, `application/problem+json`, with
+`type`, `title`, and `status`, plus `detail` where there is more to say and the `code`
+and `errors` extension members. Successes stay bare JSON. A service's own envelope,
+such as person's `ApiResponse`, is its own and does not change, and FHIR errors stay
+`OperationOutcome`. A client reads the reason from `detail`, and `title` when a `500`
+has none.
+
+An error with no `content-type`, or `text/plain`, becomes a problem with no `detail`,
+so a handler returning `(StatusCode, "why")` loses the text: return an `Error`. A
+violated unique or foreign key constraint answers `409`, not `500`.
 
 ## Stack
 

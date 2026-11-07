@@ -271,14 +271,15 @@ export class ApiClient {
 
 /**
  * Best-effort extraction of a human-readable message from a parsed error
- * body, trying the common loco.rs/JSON keys in order.
+ * body. axa answers errors as RFC 9457 problems, so `detail` (the reason)
+ * comes first and `title` last; `error` and `message` cover other bodies.
  * @param body Parsed response body (any shape).
- * @returns The first string found under `error`/`message`/`description`, else `undefined`.
+ * @returns The first string found under `detail`/`error`/`message`/`title`, else `undefined`.
  */
 function extractMessage(body: unknown): string | undefined {
   if (body && typeof body === "object") {
     const record = body as Record<string, unknown>;
-    for (const key of ["error", "message", "description"]) {
+    for (const key of ["detail", "error", "message", "title"]) {
       const value = record[key];
       if (typeof value === "string") return value;
     }

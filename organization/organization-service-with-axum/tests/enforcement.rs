@@ -134,10 +134,14 @@ async fn enforcement_on_gates_the_real_router() {
             "a protected read without a token is 401"
         );
 
-        // The refusal comes through axa's standard middleware, and tells the
-        // caller nothing about why.
+        // The refusal comes through axa's standard middleware as an RFC 9457
+        // problem, and tells the caller nothing about why: no `detail`.
         let refused = request.get("/api/organizations").await;
-        assert_eq!(refused.text(), "invalid token");
+        assert_eq!(refused.header("content-type"), "application/problem+json");
+        let problem: Value = refused.json();
+        assert_eq!(problem["status"], 401);
+        assert_eq!(problem["code"], "unauthorized");
+        assert!(problem.get("detail").is_none(), "{problem}");
         assert!(
             refused.maybe_header("x-request-id").is_some(),
             "a refusal has a request id"

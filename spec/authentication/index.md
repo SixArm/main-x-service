@@ -313,7 +313,7 @@ request *volume*, never on whether the account exists).
 |---|---|
 | `MAX_REQUESTS` | 5 |
 | `WINDOW` | 5 minutes (sliding) |
-| Over the cap | `429 Too Many Requests` (`{"error":"rate_limited",…}`), no token, no mail. |
+| Over the cap | `429 Too Many Requests` (a problem with `"code":"rate_limited"`), no token, no mail. |
 | Backing store | Postgres table `auth_rate_limits` (`email_key`, `requested_at TIMESTAMPTZ`). |
 | Concurrency | Per-key **advisory lock** `pg_advisory_xact_lock(hashtext(email_key))`, so concurrent same-email checks are exact; different emails never contend. |
 | Scale | Shared across horizontally-scaled instances (the previous in-memory map was single-process only). |

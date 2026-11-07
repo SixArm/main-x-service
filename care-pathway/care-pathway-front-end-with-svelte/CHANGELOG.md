@@ -9,6 +9,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Read an error's reason from the RFC 9457 problem the service now answers
+  (axa 0.6): `detail`, else `title`.
+
 ### Fixed — site-wide search is honoured
 
 The site-wide search (PickerBar) navigates to `/?<terms>`; the dashboard list now keeps rows whose name contains every term.

@@ -52,17 +52,14 @@
   let formError = $state<string | null>(null);
   let withdrawing = $state<string | null>(null);
 
-  // The service answers a rejected edge with loco's ErrorDetail —
-  // `{error: "validation", description: "<reason>"}` — and the shared
-  // client's generic message extractor prefers `error`, which is the
-  // machine code, not the reason. Reach for `description` first so the
-  // operator sees "edge kind ... does not permit ..." rather than the
-  // word "validation".
+  // The service answers a rejected edge as an RFC 9457 problem —
+  // `{code: "validation", detail: "<reason>", …}` — so show `detail`, the
+  // reason ("edge kind ... does not permit ..."), not the code.
   function describe(err: unknown): string {
     if (err instanceof ApiError) {
       const body = err.body;
       if (body && typeof body === "object") {
-        const detail = (body as Record<string, unknown>).description;
+        const detail = (body as Record<string, unknown>).detail;
         if (typeof detail === "string" && detail.length > 0) {
           return `${err.status}: ${detail}`;
         }

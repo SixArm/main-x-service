@@ -7,11 +7,19 @@ export class ApiError extends Error {
   status: number;
   body: unknown;
   constructor(status: number, body: unknown) {
-    const description =
-      typeof body === "object" && body !== null && "description" in body
-        ? String((body as { description: unknown }).description)
-        : `API error ${status}`;
-    super(description);
+    // The service answers errors as RFC 9457 problems: `detail` when there
+    // is more to say, and `title` always.
+    const problem =
+      typeof body === "object" && body !== null
+        ? (body as { detail?: unknown; title?: unknown })
+        : null;
+    const message =
+      problem?.detail != null
+        ? String(problem.detail)
+        : problem?.title != null
+          ? String(problem.title)
+          : `API error ${status}`;
+    super(message);
     this.status = status;
     this.body = body;
   }

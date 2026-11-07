@@ -122,6 +122,31 @@ describe("ApiClient", () => {
   });
 
   // Pins: the isUnauthorized / isBadRequest convenience getters.
+  // Pins: an RFC 9457 problem (axa 0.6) yields its detail, else its title.
+  it("reads a problem's detail, then its title", async () => {
+    const withDetail = fakeFetch(400, {
+      type: "about:blank",
+      title: "Bad Request",
+      status: 400,
+      detail: "name must not be blank",
+      code: "validation",
+    });
+    expect(
+      (await caughtError(client(withDetail).post("/api/cases", { body: {} })))
+        .message,
+    ).toBe("name must not be blank");
+    const titleOnly = fakeFetch(500, {
+      type: "about:blank",
+      title: "Internal Server Error",
+      status: 500,
+      code: "internal_server_error",
+    });
+    expect(
+      (await caughtError(client(titleOnly).post("/api/cases", { body: {} })))
+        .message,
+    ).toBe("Internal Server Error");
+  });
+
   it("classifies 401 and 400 via the error getters", async () => {
     const unauth = await caughtError(
       client(fakeFetch(401, { error: "nope" })).get("/x"),

@@ -106,8 +106,9 @@ reading its controller/handler source, not assumed from a sibling):
   (`#[serde(skip_serializing_if)]`).
 - **organization, care-pathway, case, portfolio, authentication** — bare
   axa JSON: a success response is the resource itself with no wrapper;
-  a non-2xx is axa's own `{"error":"...","description":"..."}`
-  (`ErrorDetail`).
+  a non-2xx is an RFC 9457 problem from axa,
+  `application/problem+json` with `type`, `title`, `status`, `code`, and
+  `detail` where there is more to say (`ErrorDetail`, axa 0.6).
 - **link-graph** — its own envelope, `{"success":bool,"data":...}` on
   `200` / `{"success":false,"error":"..."}` on `400`. Do not confuse this
   with the person-style envelope above — the field names coincide but

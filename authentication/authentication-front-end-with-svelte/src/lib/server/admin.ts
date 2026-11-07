@@ -14,17 +14,17 @@ const AUTH_API_URL = env.AUTH_API_URL || "http://localhost:5150";
 type FetchFn = typeof fetch;
 
 /** Success carries the payload; failure carries the HTTP status and a
- *  human-readable message (from the service's `{error, description}`). */
+ *  human-readable message (from the service's RFC 9457 problem). */
 export type AdminResult<T> =
   { ok: true; data: T } | { ok: false; status: number; message: string };
 
-/** Read the `{error, description}` body of a failed admin response into a
- *  message, falling back to the status text. */
-async function errorMessage(res: Response): Promise<string> {
+/** Read the problem body of a failed admin response into a message: its
+ *  `detail`, else its `title`, else the status text. */
+export async function errorMessage(res: Response): Promise<string> {
   try {
-    const body = (await res.json()) as { description?: string; error?: string };
+    const body = (await res.json()) as { detail?: string; title?: string };
 
-    return body.description ?? body.error ?? res.statusText;
+    return body.detail ?? body.title ?? res.statusText;
   } catch {
     return res.statusText;
   }

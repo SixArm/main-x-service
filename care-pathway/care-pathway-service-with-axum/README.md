@@ -439,8 +439,9 @@ identifier come back together:
 curl -s localhost:5150/api/care-pathways -H 'content-type: application/json' \
   -d '{"name":"  ","condition_codes":[{"system":"Icd10","code":"not-a-code"}],
        "identifiers":[{"scheme":"Uuid","value":"not-a-uuid"}]}'
-# → 422 {"error":"validation","description":"name must not be blank; \
-#        condition_codes[0] … ; identifiers[0] …"}
+# → 422 {"type":"about:blank","title":"Unprocessable Entity","status":422,
+#        "detail":"name must not be blank; condition_codes[0] … ; identifiers[0] …",
+#        "code":"validation"}
 ```
 
 ## Testing

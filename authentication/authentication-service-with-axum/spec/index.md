@@ -178,7 +178,7 @@ single-use (cleared on consumption).
    magic-link) are throttled per normalised (trimmed, lowercased) email:
    at most `MAX_REQUESTS` (5) requests per `WINDOW` (5 minutes). Over the
    limit the endpoint returns `429 Too Many Requests`
-   (`{"error":"rate_limited",…}`) and issues no token / sends no mail.
+   (a problem with `"code":"rate_limited"`) and issues no token / sends no mail.
    The limiter keys on request *volume*, not account existence, so the
    always-`200` anti-enumeration shape of the success path is preserved.
    The window log is stored in Postgres (the `auth_rate_limits` table) and

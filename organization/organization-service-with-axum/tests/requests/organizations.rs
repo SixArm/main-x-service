@@ -96,7 +96,7 @@ async fn create_conflicts_on_a_real_time_duplicate() {
             "a real-time duplicate must 409"
         );
         let body: serde_json::Value = conflict.json();
-        assert_eq!(body["error"], "duplicate_detected");
+        assert_eq!(body["code"], "duplicate_detected");
         let candidates = body["errors"].as_array().expect("candidate matches array");
         assert!(
             candidates.iter().any(|c| c["pid"] == existing_pid),

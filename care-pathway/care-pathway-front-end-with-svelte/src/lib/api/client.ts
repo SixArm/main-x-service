@@ -340,7 +340,9 @@ export class ApiClient {
 
 /**
  * Pull a human-readable message out of a JSON error body, checking the
- * common `error` / `message` / `description` keys in order.
+ * keys `detail` / `error` / `message` / `title` in order. axa answers
+ * errors as RFC 9457 problems, whose reason is `detail` and whose `title`
+ * is always present.
  *
  * @param body - The parsed response body.
  * @returns The first string-valued message found, or `undefined`.
@@ -348,7 +350,7 @@ export class ApiClient {
 function extractMessage(body: unknown): string | undefined {
   if (body && typeof body === "object") {
     const record = body as Record<string, unknown>;
-    for (const key of ["error", "message", "description"]) {
+    for (const key of ["detail", "error", "message", "title"]) {
       const value = record[key];
       if (typeof value === "string") return value;
     }

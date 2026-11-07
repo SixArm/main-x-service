@@ -10,6 +10,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Read an error's reason from the RFC 9457 problem the service now answers
+  (axa 0.6): `detail`, else `title`.
+
 ### Added — "Sign in with SSO" link (EV-2, T-13)
 
 A new `/signin/sso` server route and a conditional link on `/signin`

@@ -105,8 +105,8 @@ Cross-cutting UI rule for every `*-front-end-with-svelte` app:
    service's `validate_edge` (person `EntityRef` URN shape; confidence in
    `[0,1]`) so an obviously-doomed request states its reason locally, in
    the operator's own locale. Server rejections are surfaced inline from
-   axa's `ErrorDetail.description` (the `error` field carries the machine
-   code `validation`, not the reason).
+   the RFC 9457 problem's `detail` (its `code` carries the machine code
+   `validation`, not the reason).
 11. Layout shell: global navigation is a full-width **top bar** (header)
    with a **hamburger** toggle on narrow viewports — NOT a left sidebar —
    and the main content area is **full-width**.

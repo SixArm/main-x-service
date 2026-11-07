@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed
+
+- axa 0.6.1. Every error axa answers is an RFC 9457 problem,
+  `application/problem+json`, with `code` in place of `error` and `detail` in
+  place of `description`. Axum's own refusals, such as an unknown route's `404`,
+  are problems too, and a violated unique or foreign key constraint answers
+  `409`, not `500`. Successes, this service's own envelope, and FHIR errors do
+  not change.
+
 ### Changed — Loco replaced by axa
 
 - **Loco removed.** The service is now plain Axum plus shared helpers from

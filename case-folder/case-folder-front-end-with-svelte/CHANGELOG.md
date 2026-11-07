@@ -10,6 +10,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Read an error's reason from the RFC 9457 problem the service now answers
+  (axa 0.6): `detail`, else `title`.
+
 ### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
 
 `spec/lily-design-system-svelte-with-picker-bar/index.md` calls for

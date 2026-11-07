@@ -630,7 +630,7 @@ curl -s -i -X PUT http://localhost:5180/api/cases/4ef27633-8edc-4784-bd7d-736226
 
 ```
 HTTP/1.1 403 Forbidden
-{"error":"forbidden","description":"deny (rule 1)"}
+{"type":"about:blank","title":"Forbidden","status":403,"detail":"deny (rule 1)","code":"forbidden"}
 ```
 
 `deny (rule 1)` — the second rule (0-indexed), the closed-case deny,

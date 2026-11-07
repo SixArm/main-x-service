@@ -115,6 +115,10 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     if (!response.ok) {
         const message =
             (body as { error?: string } | null)?.error ??
+            // Errors axa answers itself, such as an unknown route, are
+            // RFC 9457 problems.
+            (body as { detail?: string } | null)?.detail ??
+            (body as { title?: string } | null)?.title ??
             `Request to ${path} failed with HTTP ${response.status}`;
         throw new ApiError(message, response.status, body);
     }

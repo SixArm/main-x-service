@@ -145,8 +145,8 @@ async fn create(
             return Err(Error::CustomError(
                 StatusCode::CONFLICT,
                 ErrorDetail {
-                    error: Some("duplicate_detected".to_string()),
-                    description: Some(
+                    code: Some("duplicate_detected".to_string()),
+                    detail: Some(
                         "potential duplicate organizations found; review matches before creating"
                             .to_string(),
                     ),

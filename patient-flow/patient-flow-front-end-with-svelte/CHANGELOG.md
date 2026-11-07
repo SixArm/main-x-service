@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Read an error's reason from the RFC 9457 problem the service now answers
+  (axa 0.6): `detail`, else `title`.
+
 ### Fixed — site-wide search is honoured
 
 The site-wide search (PickerBar) now targets `/locate` (it pointed at `/stays`, which has no index page and would 404) and prefills the input from `?<terms>` without submitting, since a locate is an audited read.

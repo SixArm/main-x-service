@@ -260,14 +260,15 @@ export interface Page<T> {
 
 /**
  * Pull a human-readable message out of a parsed error body, checking the
- * common loco.rs / generic keys (`error`, `message`, `description`) in
- * order. Returns `undefined` when none is present, so the caller can
+ * keys `detail`, `error`, `message`, `title` in order. axa answers errors
+ * as RFC 9457 problems, whose reason is `detail` and whose `title` is
+ * always present. Returns `undefined` when none is present, so the caller can
  * fall back to an `HTTP <status>` message.
  */
 function extractMessage(body: unknown): string | undefined {
   if (body && typeof body === "object") {
     const record = body as Record<string, unknown>;
-    for (const key of ["error", "message", "description"]) {
+    for (const key of ["detail", "error", "message", "title"]) {
       const value = record[key];
       if (typeof value === "string") return value;
     }

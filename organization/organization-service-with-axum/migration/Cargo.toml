@@ -12,7 +12,7 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-axa = { version = "0.5", features = ["sea-orm"] }
+axa = { version = "0.6", features = ["sea-orm"] }
 
 
 [dependencies.sea-orm-migration]
