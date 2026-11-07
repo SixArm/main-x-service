@@ -21,7 +21,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # an advance against one design family does not transfer.
 sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
-axa = { version = "0.6", features = ["sea-orm", "queue", "openapi", "opentelemetry", "versioning"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -94,7 +94,7 @@ required-features = []
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
-axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry", "versioning"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 # The `TestServer` axa's testing harness hands to a request test, and
 # `multipart::{MultipartForm, Part}` for the BLK-5 bulk-import request
 # tests (`tests/requests/bulk.rs`). Named explicitly so those tests can

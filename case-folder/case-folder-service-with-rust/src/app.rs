@@ -74,6 +74,8 @@ pub async fn router(ctx: &AppContext) -> Result<Router> {
     let router = initializers::main_worker_service_client::install(router);
     initializers::bootstrap_stubs::install().await?;
     let router = initializers::auth::install(router, auth);
+    // After the session guard, so the lockout counts its 401s.
+    let router = crate::client_limits::from_env(router)?;
     middleware::apply(router, &ctx.config.http)
 }
 

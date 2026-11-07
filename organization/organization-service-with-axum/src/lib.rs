@@ -25,6 +25,8 @@ pub mod auth;
 /// pipeline, artifact store, background worker, and REST handlers.
 /// See `agents/share/bulk-import-export.md`.
 pub mod bulk;
+/// Request limits per client and a lockout after failed authentication.
+pub mod client_limits;
 /// REST controllers: organization CRUD, matching, audit, and the docs endpoints.
 /// Compliance controls: row-level integrity and keyed MACs.
 pub mod compliance;

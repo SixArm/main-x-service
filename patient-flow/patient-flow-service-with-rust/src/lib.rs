@@ -30,6 +30,8 @@
 
 pub mod app;
 pub mod auth;
+/// Request limits per client and a lockout after failed authentication.
+pub mod client_limits;
 pub mod clients;
 pub mod controllers;
 pub mod flow;

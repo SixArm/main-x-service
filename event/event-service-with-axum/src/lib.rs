@@ -53,6 +53,8 @@
 pub mod api;
 /// axa application hooks (boot, routes, migrations).
 pub mod app;
+/// Request limits per client and a lockout after failed authentication.
+pub mod client_limits;
 /// Compliance controls: row-level integrity and keyed MACs.
 pub mod compliance;
 /// Runtime configuration (server, database, search, matching).

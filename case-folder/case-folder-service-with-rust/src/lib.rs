@@ -40,6 +40,8 @@
 /// axa application wiring: the `App` struct and its `Hooks`
 /// implementation (boot, initializer order, route mounting, tasks).
 pub mod app;
+/// Request limits per client and a lockout after failed authentication.
+pub mod client_limits;
 
 /// Passwordless magic-link authentication state: identity allowlist,
 /// magic + session token minting/verification, session cookie handling.

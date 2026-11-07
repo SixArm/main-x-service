@@ -76,11 +76,13 @@ impl App {
         auth::init().await;
         auth::spawn_key_refresh();
         auth::spawn_policy_watcher();
-        Ok(router
+        let router = router
             .layer(axum::middleware::from_fn(require_auth_mw))
             .layer(axum::middleware::from_fn(
                 axa::versioning::require_version_mw,
-            )))
+            ));
+        // After the auth guard, so the lockout counts its 401s.
+        crate::client_limits::from_env(router)
     }
 
     /// Register command-line tasks.

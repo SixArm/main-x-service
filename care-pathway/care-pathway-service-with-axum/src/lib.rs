@@ -35,6 +35,8 @@ pub mod auth;
 /// implementation — see `agents/share/compliance-for-healthcare.md` §2.
 /// Bulk operations: durable `bulk_jobs` state and artifact storage.
 pub mod bulk;
+/// Request limits per client and a lockout after failed authentication.
+pub mod client_limits;
 pub mod compliance;
 /// Conformance to the enrolled template: per instance, declared step
 /// order (`instance_steps.position`) against completion order

@@ -48,5 +48,5 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
-axa = { version = "0.6", features = ["testing"] }
+axa = { version = "0.6", features = ["testing", "ratelimit"] }
 serial_test = "4.0.1"

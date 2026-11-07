@@ -14,6 +14,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- Request limits per client through `axa::ratelimit`, in
+  `src/client_limits.rs`, both off unless set: `RATE_LIMIT_PER_MINUTE`
+  counts a client's requests, and `LOCKOUT_AFTER_FAILURES` the `401`s it
+  earns in fifteen minutes. A client past either gets a `429` problem with
+  `Retry-After`. Behind a proxy, `TRUSTED_PROXIES` must list it. A bad
+  value stops the service at boot.
+
 ### Changed
 
 - Handlers take `Json`, `Path` and `Query` from `axa::extract` instead of

@@ -200,6 +200,9 @@ impl App {
         let router = router.layer(axum::middleware::from_fn(require_auth_mw));
         // Outermost of these, so the metric and `traceparent` cover the
         // auth guard too: a 401 or 403 is measured.
+        // After the auth guard, so the lockout counts its 401s; inside the
+        // telemetry layer, so a 429 is measured.
+        let router = crate::client_limits::from_env(router)?;
         Ok(Self::with_telemetry(router, TELEMETRY.get()))
     }
 

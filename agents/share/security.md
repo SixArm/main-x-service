@@ -171,6 +171,20 @@ deployment's policy is written), but it means:
   (jwt-enforcement.md; the OPS-1 runbook): set the flag, mount the policy,
   publish/point at the PASETO keys, then verify a token is required.
 
+### Request limits
+
+Every service can limit each client's requests (`RATE_LIMIT_PER_MINUTE`)
+and lock a client out after repeated `401`s (`LOCKOUT_AFTER_FAILURES`),
+through `axa::ratelimit`. Both are **off by default**, like
+`<ENTITY>_REQUIRE_AUTH`, because a limit on behind a proxy that
+`TRUSTED_PROXIES` does not list puts every client under one limit, which
+is an outage. A deployment reachable by untrusted callers should set both,
+with `TRUSTED_PROXIES`. The limiter keys on the address axa resolved and
+never on a caller's `X-Forwarded-For`, holds an address only as a keyed
+hash, and counts in one process, so it slows a noisy client and does not
+stop a distributed attack. The authentication service's per-email limit on
+magic-link issuance is separate and stays on.
+
 ## 5. Secret handling
 
 - **Signing seed** (`TOKEN_PRIVATE_KEY_SEED`): required in production; the

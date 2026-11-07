@@ -37,6 +37,8 @@
 
 pub mod app;
 pub mod auth;
+/// Request limits per client and a lockout after failed authentication.
+pub mod client_limits;
 /// Compliance controls: keyed integrity over the audit trail.
 pub mod compliance;
 pub mod consumer;

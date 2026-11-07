@@ -81,6 +81,16 @@ own rejection reaches the caller with no `detail`. `axa::extract::Json`
 is a response type too. `axa::prelude` still exports axum's, so import
 these explicitly.
 
+## Request limits
+
+Each service layers `axa::ratelimit` through its `src/client_limits.rs`,
+after its auth guard and inside `axa::middleware::apply`. Both limits are off
+unless set: `RATE_LIMIT_PER_MINUTE` counts a client's requests, and
+`LOCKOUT_AFTER_FAILURES` counts the `401`s it earns in fifteen minutes. A
+client is the address axa resolved, so set `TRUSTED_PROXIES` behind a proxy,
+or every client shares one limit. Each process counts for itself, so this
+slows a noisy client and does not stop a distributed attack.
+
 ## Router order
 
 `App::router` builds the routes with `into_router`, adds the service's own layers in

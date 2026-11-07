@@ -26,6 +26,8 @@ pub mod auth;
 /// Postgres-backed background worker.
 /// See `agents/share/bulk-import-export.md`.
 pub mod bulk;
+/// Request limits per client and a lockout after failed authentication.
+pub mod client_limits;
 /// Regulatory-compliance controls: the tamper-evident audit chain and
 /// read/disclosure auditing, adopted from the care-pathway reference
 /// implementation (`spec/compliance` §8.5 step 3).

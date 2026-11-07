@@ -127,7 +127,7 @@ repo-accurate; behaviour noted per generation where it differs.
 | `404` | Not Found | Unknown `pid` on get/update/delete/merge; in the controller-style services a soft-deleted or malformed pid also maps to not-found (`http_err` remaps SeaORM `EntityNotFound`, which axa would otherwise surface as `500`) |
 | `409` | Conflict | Duplicate detected during create (real-time duplicate detection); body carries the candidate matches |
 | `422` | Unprocessable Entity | Validation failure — e.g. a blank `name`/`title`, or `main_pid == duplicate_pid` on merge. **All validation problems are reported together**, not just the first. `422` is reserved for semantic validation; `400` is for malformed requests (see [`../validation/index.md`](../validation/index.md)) |
-| `429` | Too Many Requests | Rate limit on the authentication-service magic-link endpoints (see [`../authentication/index.md`](../authentication/index.md)) |
+| `429` | Too Many Requests | Rate limit on the authentication-service magic-link endpoints (see [`../authentication/index.md`](../authentication/index.md)); and, in every service when configured, a client past `RATE_LIMIT_PER_MINUTE` or `LOCKOUT_AFTER_FAILURES` (`axa::ratelimit`), as a problem with `Retry-After` and `RateLimit-*` headers |
 | `500` | Internal Server Error | Unexpected server / database error |
 | `401` | Unauthorized | Missing or invalid bearer token on a protected route — see §4 |
 

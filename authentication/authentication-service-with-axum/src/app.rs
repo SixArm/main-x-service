@@ -60,9 +60,12 @@ impl App {
     ///
     /// Never returns an error today; the signature is axa's.
     pub fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
-        Ok(router.layer(axum::middleware::from_fn(
+        let router = router.layer(axum::middleware::from_fn(
             axa::versioning::require_version_mw,
-        )))
+        ));
+        // Outside the routes, so the lockout counts the 401s their
+        // session and token checks give.
+        crate::client_limits::from_env(router)
     }
 
     /// Register axa CLI tasks. `user_attributes` is the operator surface

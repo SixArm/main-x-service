@@ -19,7 +19,7 @@ include = ["src/**/*", "README.md"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { version = "0.6", features = ["sea-orm", "queue", "openapi", "opentelemetry", "versioning"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 # CSV codec for the bulk import/export operator/spreadsheet format
@@ -119,7 +119,7 @@ axum-test = "21"
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
-axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry", "versioning"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 # `mock`: a `DatabaseConnection` that errors on any query, standing in
 # for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
 # prove a code path never touches the database (src/compliance/disclosure.rs).
