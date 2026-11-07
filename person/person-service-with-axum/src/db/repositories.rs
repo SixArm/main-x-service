@@ -10,6 +10,8 @@
 //! for every mutation. [`AuditContext`] carries who/where provenance
 //! into those audit rows.
 
+// SEC-G4: user text in a `LIKE` pattern is escaped so it matches literally.
+use axa::pagination::escape_like;
 use chrono::Utc;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -1327,16 +1329,6 @@ impl PersonRepository for SeaOrmPersonRepository {
 /// by a bare `cargo test`; run with
 /// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
 /// under a bare `cargo test --lib`.
-/// Escape SQL `LIKE` wildcards (`\`, `%`, `_`) so a user query matches
-/// literally inside a `%…%` contains-pattern (SEC-G4). The backslash is
-/// escaped first so it cannot re-enable a following wildcard. Postgres
-/// `LIKE` uses `\` as the default escape character.
-fn escape_like(q: &str) -> String {
-    q.replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
-}
-
 #[cfg(test)]
 mod tests {
     use super::{AuditContext, PersonRepository, SeaOrmPersonRepository, escape_like};

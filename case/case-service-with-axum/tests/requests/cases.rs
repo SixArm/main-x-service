@@ -231,6 +231,13 @@ async fn list_and_search_are_paginated() {
             400
         );
 
+        // An unparseable value falls back to the default rather than
+        // refusing the query (agents/share/restful.md).
+        let unparseable = request.get("/api/cases?limit=lots&offset=nope").await;
+        assert_eq!(unparseable.status_code(), 200);
+        assert_eq!(header!(unparseable, "x-limit"), "100");
+        assert_eq!(header!(unparseable, "x-offset"), "0");
+
         let hits = request.get("/api/cases/search?q=Paging&limit=2").await;
         assert_eq!(hits.status_code(), 200, "search page: {}", hits.text());
         assert_eq!(hits.json::<Value>().as_array().expect("array").len(), 2);

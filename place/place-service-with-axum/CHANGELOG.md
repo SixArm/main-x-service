@@ -19,6 +19,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Changed
 
+- Paging on `GET /api/places`, `/api/places/search` and
+  `/api/places/nearby` comes from `axa::pagination` (axa's `pagination`
+  feature), replacing the crate's own `with_page_headers`, offset check
+  and limit clamping. Defaults, maximums, `MAX_OFFSET`, the
+  `{results, total}` bodies, the `X-Total-Count`/`X-Limit`/`X-Offset`
+  headers and the `400` `offset_too_large` are unchanged. One change: an
+  unparseable `limit` or `offset` now falls back to the default, where
+  it was a `400` (`agents/share/restful.md`).
 - Handlers take `Json`, `Path` and `Query` from `axa::extract` instead of
   axum. A request they cannot read is answered with a problem whose
   `detail` says what was wrong, without quoting what was sent, where

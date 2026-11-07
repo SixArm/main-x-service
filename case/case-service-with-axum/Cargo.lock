@@ -565,6 +565,7 @@ dependencies = [
  "axa-environment",
  "axa-openapi",
  "axa-opentelemetry",
+ "axa-pagination",
  "axa-problem",
  "axa-ratelimit",
  "axa-seaorm",
@@ -617,6 +618,16 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "axa-pagination"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a173061148a2344af7610a69926bf41a1867ba2a35374f478b9bec0762effb63"
+dependencies = [
+ "axum",
+ "serde",
 ]
 
 [[package]]

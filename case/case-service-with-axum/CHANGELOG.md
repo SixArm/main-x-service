@@ -11,6 +11,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Paging comes from `axa::pagination` (axa's `pagination` feature), and the
+  title search's `LIKE` escaping from `axa::pagination::escape_like`. The
+  crate's own page struct, offset check and header helper are gone. The
+  defaults, maxima, `X-Total-Count` / `X-Limit` / `X-Offset` headers and
+  the `offset_too_large` `400` are unchanged. **An unparseable `limit` or
+  `offset` now falls back to the default**, as `agents/share/restful.md`
+  says, where it was a `400`.
+
+### Changed
+
 - The seed task runs only in development or test
   (`Task::development_only`). axa refuses it anywhere else, so made-up
   records cannot reach a real database.

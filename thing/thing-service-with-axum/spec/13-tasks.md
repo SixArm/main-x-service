@@ -574,6 +574,12 @@ clearly described manual check confirms the acceptance criterion.
   SEC-G7 `LIST_MAX_OFFSET` bound. Registered on both of this crate's
   router-construction surfaces (`create_router` and `things_routes`)
   and the OpenAPI document.
+  (2026-11-07: the hand-written clamping, offset check and header
+  stamping were replaced by `axa::pagination`'s `Limits`/`PageParams`/
+  `Page::headers` — organization's `PageParams`/`with_page_headers`
+  went the same way — with limits, statuses, headers and body
+  unchanged; an unparseable `limit`/`offset` now falls back to the
+  default rather than a `400`.)
 
   **Verified live**, not just unit-tested: booted a real release
   binary against a real Postgres. `GET /api/things` — previously a

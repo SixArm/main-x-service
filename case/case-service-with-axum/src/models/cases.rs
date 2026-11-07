@@ -1,5 +1,6 @@
 //! `cases` model — CRUD over the stored `case_matcher::Case` payload.
 
+use axa::pagination::escape_like;
 use axa::prelude::*;
 use case_matcher::Case as MatchCase;
 use chrono::SubsecRound as _;
@@ -290,13 +291,6 @@ impl Model {
     }
 }
 
-/// Escape `LIKE`/`ILIKE` wildcards so a user query matches literally.
-fn escape_like(q: &str) -> String {
-    q.replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
-}
-
 impl ActiveModel {
     /// Replace the payload of an existing case.
     ///
@@ -368,7 +362,8 @@ impl ActiveModel {
 mod tests {
     use super::escape_like;
 
-    /// Pins the `LIKE` escaping: literal text is unchanged, `%` and `_`
+    /// Pins the `LIKE` escaping this model's title search relies on
+    /// (`axa::pagination::escape_like`): literal text is unchanged, `%` and `_`
     /// are escaped so they match literally, and the backslash is escaped
     /// first so a user backslash cannot re-enable a wildcard.
     #[test]

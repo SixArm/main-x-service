@@ -7,6 +7,7 @@
 use authentication_verifier::Action;
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
+use axa::pagination::{Limits, OffsetTooLarge, PageParams};
 use axa::prelude::*;
 use axum::http::StatusCode;
 use case_matcher::{Case, MatchConfig, MatchingEngine};
@@ -61,42 +62,25 @@ pub const MAX_LIMIT: u64 = 500;
 /// Largest accepted `offset`; past this a request is a `400` (SEC-G7).
 pub const MAX_OFFSET: u64 = 10_000;
 
-/// `?limit=` / `?offset=` on a collection read. Declared inline on each
-/// query struct rather than `#[serde(flatten)]`-ed: a flattened struct
-/// deserializes from a string-keyed map, so `limit=2` arrives as the
-/// string `"2"` and fails to parse as a `u64`.
-#[derive(Debug, Default, Clone, Copy)]
-struct Page {
-    /// Page size; `None`/zero ⇒ the endpoint default.
-    limit: Option<u64>,
-    /// Rows to skip; `None` ⇒ 0.
-    offset: Option<u64>,
+/// The bounds of a collection read whose default page is `default_limit`.
+const fn limits(default_limit: u64) -> Limits {
+    Limits {
+        default_limit,
+        max_limit: MAX_LIMIT,
+        max_offset: MAX_OFFSET,
+    }
 }
 
-impl Page {
-    /// The clamped `(limit, offset)` this request will use.
-    fn resolve(self, default_limit: u64) -> (u64, u64) {
-        let limit = self
-            .limit
-            .filter(|l| *l > 0)
-            .unwrap_or(default_limit)
-            .min(MAX_LIMIT);
-        (limit, self.offset.unwrap_or(0))
-    }
-
-    /// Reject an out-of-bound offset before it reaches the database.
-    fn check_offset(self) -> Result<()> {
-        if self.offset.unwrap_or(0) > MAX_OFFSET {
-            return Err(Error::CustomError(
-                StatusCode::BAD_REQUEST,
-                ErrorDetail::new(
-                    "offset_too_large",
-                    format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
-                ),
-            ));
-        }
-        Ok(())
-    }
+/// An offset past [`MAX_OFFSET`] as a `400`, with the `offset_too_large`
+/// code the older services answer with too.
+fn offset_too_large(error: OffsetTooLarge) -> Error {
+    Error::CustomError(
+        StatusCode::BAD_REQUEST,
+        ErrorDetail::new(
+            "offset_too_large",
+            format!("{error}; narrow the query instead"),
+        ),
+    )
 }
 
 /// Parse index hits into UUIDs, dropping any that will not parse.
@@ -114,37 +98,6 @@ fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
             }
         })
         .collect()
-}
-
-/// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response.
-///
-/// The total is the **collection's** match count, taken before the
-/// per-record concealment this controller applies: a caller-specific
-/// total would leak exactly what concealment hides — how many records
-/// they are not allowed to see.
-fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
-    let headers = response.headers_mut();
-    for (name, value) in [
-        ("x-total-count", total),
-        ("x-limit", limit),
-        ("x-offset", offset),
-    ] {
-        if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
-            headers.insert(name, value);
-        }
-    }
-    response
-}
-
-/// `?limit=` / `?offset=` for the list endpoint.
-#[derive(Debug, Default, Deserialize)]
-struct ListParams {
-    /// Page size; absent ⇒ [`LIST_DEFAULT_LIMIT`].
-    #[serde(default)]
-    limit: Option<u64>,
-    /// Rows to skip; absent ⇒ 0.
-    #[serde(default)]
-    offset: Option<u64>,
 }
 
 /// Validate an incoming `Case` payload.
@@ -220,12 +173,15 @@ struct SearchParams {
     /// Phonetic (Soundex) retrieval; takes precedence over `fuzzy`.
     #[serde(default)]
     phonetic: bool,
-    /// Page size; absent ⇒ [`SEARCH_DEFAULT_LIMIT`].
+    /// Page size; absent, zero or unparseable ⇒ [`SEARCH_DEFAULT_LIMIT`].
+    /// A string, as in [`PageParams`], so a bad value falls back rather
+    /// than refusing the query. Not `#[serde(flatten)]`ed, because the
+    /// `bool` flags above would then arrive as strings and fail.
     #[serde(default)]
-    limit: Option<u64>,
+    limit: Option<String>,
     /// Rows to skip; absent ⇒ 0.
     #[serde(default)]
-    offset: Option<u64>,
+    offset: Option<String>,
 }
 
 /// Body of `POST /api/cases/merge`: which duplicate folds into which
@@ -540,29 +496,29 @@ async fn remove(
     format::empty_json()
 }
 
-/// List active cases (capped at 100). `GET /api/cases`.
+/// List active cases, one page at a time. `GET /api/cases`.
 ///
 /// Responds `200` with an array of [`CaseRef`] (`{pid, title}`),
-/// most-recent first. The 100 cap is a pragmatic page size; pagination is
-/// not yet modelled.
+/// most-recent first, and the `X-Total-Count` / `X-Limit` / `X-Offset`
+/// headers (`agents/share/restful.md`). Omitting `limit` serves
+/// [`LIST_DEFAULT_LIMIT`] rows, the cap this endpoint applied before it
+/// was paginated.
 ///
 /// # Errors
 ///
-/// A DB error when the query fails.
+/// `400` when `offset` exceeds [`MAX_OFFSET`]; a DB error when the query
+/// fails.
 #[debug_handler]
 async fn list(
-    Query(params): Query<ListParams>,
+    Query(params): Query<PageParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> Result<Response> {
-    let page = Page {
-        limit: params.limit,
-        offset: params.offset,
-    };
-    page.check_offset()?;
-    let (limit, offset) = page.resolve(LIST_DEFAULT_LIMIT);
-    let rows = CaseModel::list_paged(&ctx.db, limit, offset).await?;
+    let page = params
+        .resolve(limits(LIST_DEFAULT_LIMIT))
+        .map_err(offset_too_large)?;
+    let rows = CaseModel::list_paged(&ctx.db, page.limit, page.offset).await?;
     let total = CaseModel::count(&ctx.db).await?;
     // A collection read is recorded against the nil `pid`: it disclosed
     // many records, not one, so attributing it to any single case would
@@ -586,7 +542,10 @@ async fn list(
         })
         .map(CaseRef::of)
         .collect();
-    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
+    // The total is the collection's match count, taken before the
+    // concealment above: a caller-specific total would leak exactly what
+    // concealment hides — how many records they are not allowed to see.
+    Ok(page.respond(i64::try_from(total).unwrap_or(i64::MAX), refs))
 }
 
 /// Full-text case search: `GET /api/cases/search?q=housing`.
@@ -614,12 +573,12 @@ async fn search(
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let page = Page {
-        limit: params.limit,
-        offset: params.offset,
-    };
-    page.check_offset()?;
-    let (limit, offset) = page.resolve(SEARCH_DEFAULT_LIMIT);
+    let page = PageParams {
+        limit: params.limit.clone(),
+        offset: params.offset.clone(),
+    }
+    .resolve(limits(SEARCH_DEFAULT_LIMIT))
+    .map_err(offset_too_large)?;
     // An unavailable index is reported, never disguised as "no matches":
     // an operator must be able to tell a broken index from an empty one.
     let Some(engine) = crate::search::engine() else {
@@ -638,11 +597,10 @@ async fn search(
     let (pids, index_total) = engine.search_page(
         q.trim(),
         mode,
-        usize::try_from(limit).unwrap_or(usize::MAX),
-        usize::try_from(offset).unwrap_or(usize::MAX),
+        usize::try_from(page.limit).unwrap_or(usize::MAX),
+        usize::try_from(page.offset).unwrap_or(usize::MAX),
     )?;
     let rows = CaseModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
-    let total = index_total as u64;
     disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
@@ -661,7 +619,7 @@ async fn search(
         })
         .map(CaseRef::of)
         .collect();
-    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
+    Ok(page.respond(i64::try_from(index_total).unwrap_or(i64::MAX), refs))
 }
 
 /// Score a query against an explicit candidate list (no persistence).
@@ -1564,6 +1522,46 @@ pub fn routes() -> Routes {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// This crate's bounds: `limit` is clamped rather than refused, a zero,
+    /// absent or unparseable `limit` falls back to the default, and the
+    /// offset bound is what refuses, as `offset_too_large`.
+    #[test]
+    fn page_params_clamp_rather_than_reject() {
+        let params = |limit: Option<&str>, offset: Option<&str>| PageParams {
+            limit: limit.map(str::to_string),
+            offset: offset.map(str::to_string),
+        };
+        let page = params(Some("100000"), Some("0"))
+            .resolve(limits(LIST_DEFAULT_LIMIT))
+            .unwrap();
+        assert_eq!((page.limit, page.offset), (MAX_LIMIT, 0));
+        for fallback in [Some("0"), Some("lots"), None] {
+            let page = params(fallback, None)
+                .resolve(limits(LIST_DEFAULT_LIMIT))
+                .unwrap();
+            assert_eq!(page.limit, LIST_DEFAULT_LIMIT, "{fallback:?}");
+        }
+        let page = params(None, Some("lots"))
+            .resolve(limits(SEARCH_DEFAULT_LIMIT))
+            .unwrap();
+        assert_eq!((page.limit, page.offset), (SEARCH_DEFAULT_LIMIT, 0));
+        assert!(
+            params(None, Some(&MAX_OFFSET.to_string()))
+                .resolve(limits(SEARCH_DEFAULT_LIMIT))
+                .is_ok()
+        );
+        let refused = params(None, Some(&(MAX_OFFSET + 1).to_string()))
+            .resolve(limits(SEARCH_DEFAULT_LIMIT))
+            .map_err(offset_too_large)
+            .unwrap_err();
+        assert!(
+            matches!(&refused, Error::CustomError(status, detail)
+                if *status == StatusCode::BAD_REQUEST
+                    && detail.code.as_deref() == Some("offset_too_large")),
+            "an unbounded offset is a DoS, not a deep page: {refused:?}"
+        );
+    }
 
     /// Pins the OQ-1 / T-2 decision: blank-title validation failure is
     /// `422 Unprocessable Entity` (family convention), not `400`.

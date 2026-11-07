@@ -7,6 +7,7 @@
 
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
+use axa::pagination::{Limits, OffsetTooLarge, PageParams};
 use axa::prelude::*;
 use axum::http::StatusCode;
 use care_pathway_matcher::{CarePathway, MatchConfig, MatchingEngine};
@@ -66,46 +67,25 @@ pub const MAX_LIMIT: u64 = 500;
 /// rows (SEC-G7). Deep paging past this wants a cursor.
 pub const MAX_OFFSET: u64 = 10_000;
 
-/// `?limit=` / `?offset=` on a collection read.
-///
-/// Declared inline on each query struct rather than `#[serde(flatten)]`-ed:
-/// a flattened struct deserializes from a string-keyed map, so `limit=2`
-/// arrives as the string `"2"` and fails to parse as a `u64` — a `400`
-/// on a valid request.
-#[derive(Debug, Default, Clone, Copy)]
-struct Page {
-    /// Page size; `None`, zero or unparseable ⇒ the endpoint default.
-    limit: Option<u64>,
-    /// Rows to skip; `None` ⇒ 0.
-    offset: Option<u64>,
+/// The bounds of a collection read whose default page is `default_limit`.
+const fn limits(default_limit: u64) -> Limits {
+    Limits {
+        default_limit,
+        max_limit: MAX_LIMIT,
+        max_offset: MAX_OFFSET,
+    }
 }
 
-impl Page {
-    /// The clamped `(limit, offset)` this request will actually use. A
-    /// zero `limit` falls back to the default: an empty page and an empty
-    /// collection look identical to a client, and only one is an answer.
-    fn resolve(self, default_limit: u64) -> (u64, u64) {
-        let limit = self
-            .limit
-            .filter(|l| *l > 0)
-            .unwrap_or(default_limit)
-            .min(MAX_LIMIT);
-        (limit, self.offset.unwrap_or(0))
-    }
-
-    /// Reject an out-of-bound offset before it reaches the database.
-    fn check_offset(self) -> Result<()> {
-        if self.offset.unwrap_or(0) > MAX_OFFSET {
-            return Err(Error::CustomError(
-                StatusCode::BAD_REQUEST,
-                ErrorDetail::new(
-                    "offset_too_large",
-                    format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
-                ),
-            ));
-        }
-        Ok(())
-    }
+/// An offset past [`MAX_OFFSET`] as a `400`, with the `offset_too_large`
+/// code the older services answer with too.
+fn offset_too_large(error: OffsetTooLarge) -> Error {
+    Error::CustomError(
+        StatusCode::BAD_REQUEST,
+        ErrorDetail::new(
+            "offset_too_large",
+            format!("{error}; narrow the query instead"),
+        ),
+    )
 }
 
 /// Parse index hits into UUIDs, dropping any that will not parse.
@@ -123,33 +103,6 @@ pub(crate) fn parse_pids(hits: &[String]) -> Vec<uuid::Uuid> {
             }
         })
         .collect()
-}
-
-/// Stamp `X-Total-Count` / `X-Limit` / `X-Offset` onto a response
-/// (`agents/share/restful.md`).
-fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
-    let headers = response.headers_mut();
-    for (name, value) in [
-        ("x-total-count", total),
-        ("x-limit", limit),
-        ("x-offset", offset),
-    ] {
-        if let Ok(value) = axum::http::HeaderValue::from_str(&value.to_string()) {
-            headers.insert(name, value);
-        }
-    }
-    response
-}
-
-/// `?limit=` / `?offset=` for the list endpoint.
-#[derive(Debug, Default, Deserialize)]
-struct ListParams {
-    /// Page size; absent ⇒ [`LIST_CAP`].
-    #[serde(default)]
-    limit: Option<u64>,
-    /// Rows to skip; absent ⇒ 0.
-    #[serde(default)]
-    offset: Option<u64>,
 }
 
 /// Validate an incoming `CarePathway` payload.
@@ -305,12 +258,15 @@ struct SearchParams {
     /// Phonetic (Soundex) retrieval; takes precedence over `fuzzy`.
     #[serde(default)]
     phonetic: bool,
-    /// Page size; absent ⇒ [`SEARCH_CAP`].
+    /// Page size; absent, zero or unparseable ⇒ [`SEARCH_CAP`].
+    /// A string, as in [`PageParams`], so a bad value falls back rather
+    /// than refusing the query. Not `#[serde(flatten)]`ed, because the
+    /// `bool` flags above would then arrive as strings and fail.
     #[serde(default)]
-    limit: Option<u64>,
+    limit: Option<String>,
     /// Rows to skip; absent ⇒ 0.
     #[serde(default)]
-    offset: Option<u64>,
+    offset: Option<String>,
 }
 
 /// Request body for `POST /merge`: which duplicate folds into which
@@ -561,18 +517,13 @@ async fn remove(
 /// Propagates DB query errors.
 #[debug_handler]
 async fn list(
-    Query(params): Query<ListParams>,
+    Query(params): Query<PageParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> Result<Response> {
-    let page = Page {
-        limit: params.limit,
-        offset: params.offset,
-    };
-    page.check_offset()?;
-    let (limit, offset) = page.resolve(LIST_CAP);
-    let rows = PathwayModel::list_paged(&ctx.db, limit, offset).await?;
+    let page = params.resolve(limits(LIST_CAP)).map_err(offset_too_large)?;
+    let rows = PathwayModel::list_paged(&ctx.db, page.limit, page.offset).await?;
     let total = PathwayModel::count(&ctx.db).await?;
     // A collection read is recorded against the nil `pid`: it disclosed
     // many records, not one, so attributing it to any single record would
@@ -587,7 +538,7 @@ async fn list(
     .await
     .map_err(audit_unavailable)?;
     let refs = readable_refs(&rows, &caller)?;
-    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
+    Ok(page.respond(i64::try_from(total).unwrap_or(i64::MAX), refs))
 }
 
 /// Full-text name search: `GET /api/care-pathways/search?q=stroke`.
@@ -614,12 +565,12 @@ async fn search(
     if q.trim().is_empty() {
         return bad_request("query parameter `q` is required");
     }
-    let page = Page {
+    let page = PageParams {
         limit: params.limit,
         offset: params.offset,
-    };
-    page.check_offset()?;
-    let (limit, offset) = page.resolve(SEARCH_CAP);
+    }
+    .resolve(limits(SEARCH_CAP))
+    .map_err(offset_too_large)?;
     // An unavailable index is reported, never disguised as "no matches":
     // an operator must be able to tell a broken index from an empty one.
     let Some(engine) = crate::search::engine() else {
@@ -638,11 +589,11 @@ async fn search(
     let (pids, index_total) = engine.search_page(
         q.trim(),
         mode,
-        usize::try_from(limit).unwrap_or(usize::MAX),
-        usize::try_from(offset).unwrap_or(usize::MAX),
+        usize::try_from(page.limit).unwrap_or(usize::MAX),
+        usize::try_from(page.offset).unwrap_or(usize::MAX),
     )?;
     let rows = PathwayModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
-    let total = index_total as u64;
+    let total = i64::try_from(index_total).unwrap_or(i64::MAX);
     disclosure::record_access(
         &ctx.db,
         uuid::Uuid::nil(),
@@ -653,7 +604,7 @@ async fn search(
     .await
     .map_err(audit_unavailable)?;
     let refs = readable_refs(&rows, &caller)?;
-    Ok(with_page_headers(format::json(refs)?, total, limit, offset))
+    Ok(page.respond(total, refs))
 }
 
 /// Score a query against an explicit candidate list (no persistence).
@@ -1091,5 +1042,39 @@ mod tests {
     fn list_and_search_caps_are_the_documented_values() {
         assert_eq!(LIST_CAP, 100, "spec §6.2: list caps at 100");
         assert_eq!(SEARCH_CAP, 50, "spec §6.2: search caps at 50");
+    }
+
+    /// This crate's bounds: `limit` is clamped rather than refused, a zero,
+    /// absent or unparseable `limit` falls back to the default, and the
+    /// offset bound is what refuses, as `offset_too_large`.
+    #[test]
+    fn page_params_clamp_rather_than_reject() {
+        let params = |limit: Option<&str>, offset: Option<&str>| PageParams {
+            limit: limit.map(str::to_string),
+            offset: offset.map(str::to_string),
+        };
+        let page = params(Some("100000"), Some("0"))
+            .resolve(limits(LIST_CAP))
+            .unwrap();
+        assert_eq!((page.limit, page.offset), (MAX_LIMIT, 0));
+        for fallback in [Some("0"), Some("lots"), None] {
+            let page = params(fallback, None).resolve(limits(LIST_CAP)).unwrap();
+            assert_eq!(page.limit, LIST_CAP, "{fallback:?}");
+        }
+        assert!(
+            params(None, Some(&MAX_OFFSET.to_string()))
+                .resolve(limits(SEARCH_CAP))
+                .is_ok()
+        );
+        let refused = params(None, Some(&(MAX_OFFSET + 1).to_string()))
+            .resolve(limits(SEARCH_CAP))
+            .map_err(offset_too_large)
+            .unwrap_err();
+        assert!(
+            matches!(&refused, Error::CustomError(status, detail)
+                if *status == StatusCode::BAD_REQUEST
+                    && detail.code.as_deref() == Some("offset_too_large")),
+            "an unbounded offset is a DoS, not a deep page: {refused:?}"
+        );
     }
 }

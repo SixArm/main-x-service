@@ -24,6 +24,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `detail` says what was wrong, without quoting what was sent, where
   axum's rejection reached the caller as a bare status. Statuses are
   unchanged. FHIR handlers keep axum's.
+- `GET /api/things` takes its paging from `axa::pagination` (axa's
+  `pagination` feature) instead of its own clamping, offset check and
+  header stamping. Limits, statuses, the `X-Total-Count`/`X-Limit`/
+  `X-Offset` headers and the `ListResponse` body are unchanged, and an
+  offset past 10 000 is still a `400` coded `offset_too_large`. An
+  unparseable `limit` or `offset` now falls back to the default, as
+  `agents/share/restful.md` says, where it was a `400`.
 
 ### Changed
 

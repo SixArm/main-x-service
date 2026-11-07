@@ -10,6 +10,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Changed
 
+- Search escapes `LIKE` wildcards with `axa::pagination::escape_like`, in
+  place of this crate's identical copy.
+
+### Changed
+
 - The seed task runs only in development or test
   (`Task::development_only`). axa refuses it anywhere else, so made-up
   records cannot reach a real database.

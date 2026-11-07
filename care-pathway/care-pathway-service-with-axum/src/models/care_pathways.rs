@@ -1,6 +1,7 @@
 //! `care_pathways` model — CRUD over the stored
 //! `care_pathway_matcher::CarePathway` payload.
 
+use axa::pagination::escape_like;
 use axa::prelude::*;
 use care_pathway_matcher::CarePathway as MatchPathway;
 use chrono::SubsecRound as _;
@@ -253,13 +254,6 @@ impl Model {
     }
 }
 
-/// Escape `LIKE`/`ILIKE` wildcards so a user query matches literally.
-fn escape_like(q: &str) -> String {
-    q.replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
-}
-
 impl ActiveModel {
     /// Replace the payload of an existing care pathway.
     ///
@@ -327,9 +321,10 @@ impl ActiveModel {
 /// Tests for the model's pure helpers (DB-free).
 #[cfg(test)]
 mod tests {
-    use super::escape_like;
+    use axa::pagination::escape_like;
 
-    /// `escape_like` neutralises `%`, `_`, and `\` so a user query matches
+    /// The `escape_like` this module binds into its `ILIKE` patterns
+    /// neutralises `%`, `_`, and `\` so a user query matches
     /// literally and cannot inject `ILIKE` wildcards.
     #[test]
     fn escape_like_neutralises_wildcards() {

@@ -11,6 +11,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Paging comes from `axa::pagination` (`Limits`, `PageParams`,
+  `Page::respond`, `escape_like`) in place of this crate's own helpers,
+  with the same defaults, maxima, headers and `offset_too_large` code. An
+  unparseable `limit` or `offset` now falls back to the default, as
+  `spec/restful` §7.1 says, where it was a `400`.
+
+### Changed
+
 - The seed task runs only in development or test
   (`Task::development_only`). axa refuses it anywhere else, so made-up
   records cannot reach a real database.

@@ -5,6 +5,7 @@
 //! `Validation` → 422, `Conflict` → 409, everything else → 500.
 
 use axa::extract::{Json, Path, Query};
+use axa::pagination::{Limits, OffsetTooLarge, PageParams};
 use axum::{
     extract::State,
     http::StatusCode,
@@ -39,30 +40,41 @@ fn bad_request(code: &str, message: impl Into<String>) -> Response {
     ApiProblem::new(code, message.into()).respond(StatusCode::BAD_REQUEST)
 }
 
-/// `400` for an `offset` beyond [`MAX_OFFSET`].
-fn offset_too_large() -> Response {
-    bad_request(
+/// `400` for an `offset` beyond [`MAX_OFFSET`], with the
+/// `offset_too_large` code the rest of the family answers with too.
+fn offset_too_large(error: OffsetTooLarge) -> Response {
+    ApiProblem::new(
         "offset_too_large",
-        format!("offset must not exceed {MAX_OFFSET}; narrow the query instead"),
+        format!("{error}; narrow the query instead"),
     )
+    .respond(StatusCode::BAD_REQUEST)
 }
 
-/// Stamp the pagination headers onto a response
-/// (`agents/share/restful.md`): `X-Total-Count` is the total ignoring
-/// the page window, `X-Limit`/`X-Offset` are the limit/offset actually
-/// applied — so a caller that sent neither still learns the defaults.
-fn with_page_headers(mut response: Response, total: u64, limit: u64, offset: u64) -> Response {
-    let headers = response.headers_mut();
-    for (name, value) in [
-        ("x-total-count", total),
-        ("x-limit", limit),
-        ("x-offset", offset),
-    ] {
-        if let Ok(v) = axum::http::HeaderValue::from_str(&value.to_string()) {
-            headers.insert(name, v);
-        }
+/// The bounds of a collection read (`agents/share/restful.md`): a page
+/// of `default_limit` when none is asked for, clamped to `max_limit`,
+/// and an offset bounded by [`MAX_OFFSET`].
+const fn limits(default_limit: u64, max_limit: u64) -> Limits {
+    Limits {
+        default_limit,
+        max_limit,
+        max_offset: MAX_OFFSET,
     }
-    response
+}
+
+/// `?limit=` / `?offset=` resolved against `limits`. Both arrive as
+/// strings, so a zero or unparseable value falls back to the default
+/// rather than refusing the query; only an offset past [`MAX_OFFSET`]
+/// is refused, answered by [`offset_too_large`].
+fn resolve_page(
+    limit: Option<&String>,
+    offset: Option<&String>,
+    limits: Limits,
+) -> Result<axa::pagination::Page, OffsetTooLarge> {
+    PageParams {
+        limit: limit.cloned(),
+        offset: offset.cloned(),
+    }
+    .resolve(limits)
 }
 
 /// Map a crate error to the HTTP status the REST layer returns for it.
@@ -307,11 +319,14 @@ pub async fn delete_place(
 pub struct SearchQuery {
     /// Free-text query.
     pub q: Option<String>,
-    /// Max results (default 10, capped at 100).
-    pub limit: Option<usize>,
+    /// Max results (default 10, capped at 100). A zero or unparseable
+    /// value falls back to the default.
+    #[param(value_type = Option<u64>)]
+    pub limit: Option<String>,
     /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
-    /// beyond that is a `400`.
-    pub offset: Option<u64>,
+    /// beyond that is a `400`, and an unparseable one is 0.
+    #[param(value_type = Option<u64>)]
+    pub offset: Option<String>,
     /// Use fuzzy matching.
     pub fuzzy: Option<bool>,
     /// Mask sensitive fields in the results.
@@ -353,20 +368,23 @@ pub async fn search_places(
     State(state): State<AppState>,
     Query(q): Query<SearchQuery>,
 ) -> impl IntoResponse {
-    let offset = q.offset.unwrap_or(0);
-    if offset > MAX_OFFSET {
-        return offset_too_large();
-    }
-    let limit = q
-        .limit
-        .filter(|l| *l > 0)
-        .unwrap_or(SEARCH_DEFAULT_LIMIT)
-        .min(SEARCH_MAX_LIMIT);
+    let page = match resolve_page(
+        q.limit.as_ref(),
+        q.offset.as_ref(),
+        limits(SEARCH_DEFAULT_LIMIT as u64, SEARCH_MAX_LIMIT as u64),
+    ) {
+        Ok(page) => page,
+        Err(refused) => return offset_too_large(refused),
+    };
     let query = q.q.unwrap_or_default();
-    let offset_usize = usize::try_from(offset).unwrap_or(usize::MAX);
     let (ids, total) = state
         .search_engine
-        .search_page(&query, q.fuzzy.unwrap_or(false), limit, offset_usize)
+        .search_page(
+            &query,
+            q.fuzzy.unwrap_or(false),
+            usize::try_from(page.limit).unwrap_or(usize::MAX),
+            usize::try_from(page.offset).unwrap_or(usize::MAX),
+        )
         .unwrap_or_default();
 
     let mut results = Vec::new();
@@ -389,22 +407,24 @@ pub async fn search_places(
             total: count,
         },
     );
-    with_page_headers(
+    (
+        page.headers(u64::try_from(total).unwrap_or(u64::MAX)),
         response,
-        u64::try_from(total).unwrap_or(u64::MAX),
-        u64::try_from(limit).unwrap_or(u64::MAX),
-        offset,
     )
+        .into_response()
 }
 
 /// Query parameters for `GET /api/places` (the plain collection list).
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 pub struct ListQuery {
-    /// Max results (default 10, capped at 100).
-    pub limit: Option<usize>,
+    /// Max results (default 10, capped at 100). A zero or unparseable
+    /// value falls back to the default.
+    #[param(value_type = Option<u64>)]
+    pub limit: Option<String>,
     /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
-    /// beyond that is a `400`.
-    pub offset: Option<u64>,
+    /// beyond that is a `400`, and an unparseable one is 0.
+    #[param(value_type = Option<u64>)]
+    pub offset: Option<String>,
     /// Mask sensitive fields in the results.
     pub mask_sensitive: Option<bool>,
 }
@@ -457,20 +477,18 @@ pub async fn list_places(
     State(state): State<AppState>,
     Query(q): Query<ListQuery>,
 ) -> impl IntoResponse {
-    let offset = q.offset.unwrap_or(0);
-    if offset > MAX_OFFSET {
-        return offset_too_large();
-    }
-    let limit = q
-        .limit
-        .filter(|l| *l > 0)
-        .unwrap_or(LIST_DEFAULT_LIMIT)
-        .min(LIST_MAX_LIMIT);
+    let page = match resolve_page(
+        q.limit.as_ref(),
+        q.offset.as_ref(),
+        limits(LIST_DEFAULT_LIMIT as u64, LIST_MAX_LIMIT as u64),
+    ) {
+        Ok(page) => page,
+        Err(refused) => return offset_too_large(refused),
+    };
     let mask_sensitive = q.mask_sensitive.unwrap_or(false);
-    let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
     let places = state
         .place_repository
-        .list(limit_u64, offset)
+        .list(page.limit, page.offset)
         .await
         .unwrap_or_default();
     let total_count = crate::db::count_active(&state.db).await.unwrap_or(0);
@@ -486,7 +504,7 @@ pub async fn list_places(
             total: count,
         },
     );
-    with_page_headers(response, total_count, limit_u64, offset)
+    (page.headers(total_count), response).into_response()
 }
 
 /// Query parameters for `GET /api/places/nearby`.
@@ -498,11 +516,14 @@ pub struct NearbyQuery {
     pub lon: f64,
     /// Search radius in kilometers (non-negative, finite).
     pub radius_km: f64,
-    /// Max results (default 10, capped at 100).
-    pub limit: Option<u64>,
+    /// Max results (default 10, capped at 100). A zero or unparseable
+    /// value falls back to the default.
+    #[param(value_type = Option<u64>)]
+    pub limit: Option<String>,
     /// Rows to skip (default 0). Bounded by [`MAX_OFFSET`]; an `offset`
-    /// beyond that is a `400`.
-    pub offset: Option<u64>,
+    /// beyond that is a `400`, and an unparseable one is 0.
+    #[param(value_type = Option<u64>)]
+    pub offset: Option<String>,
 }
 
 /// Default page size for `GET /api/places/nearby`.
@@ -552,15 +573,14 @@ pub async fn nearby_places(
             "radius_km must be a non-negative finite number",
         );
     }
-    let offset = q.offset.unwrap_or(0);
-    if offset > MAX_OFFSET {
-        return offset_too_large();
-    }
-    let limit = q
-        .limit
-        .filter(|l| *l > 0)
-        .unwrap_or(NEARBY_DEFAULT_LIMIT)
-        .min(NEARBY_MAX_LIMIT);
+    let page = match resolve_page(
+        q.limit.as_ref(),
+        q.offset.as_ref(),
+        limits(NEARBY_DEFAULT_LIMIT, NEARBY_MAX_LIMIT),
+    ) {
+        Ok(page) => page,
+        Err(refused) => return offset_too_large(refused),
+    };
 
     let center = GeoCoordinates::new(q.lat, q.lon);
     let (lat_min, lat_max, lon_min, lon_max) = bounding_box(&center, q.radius_km);
@@ -587,8 +607,8 @@ pub async fn nearby_places(
     within.sort_by(|(da, _), (db, _)| da.partial_cmp(db).unwrap_or(std::cmp::Ordering::Equal));
 
     let total = within.len();
-    let offset_usize = usize::try_from(offset).unwrap_or(usize::MAX);
-    let limit_usize = usize::try_from(limit).unwrap_or(usize::MAX);
+    let offset_usize = usize::try_from(page.offset).unwrap_or(usize::MAX);
+    let limit_usize = usize::try_from(page.limit).unwrap_or(usize::MAX);
     let results: Vec<Place> = within
         .into_iter()
         .skip(offset_usize)
@@ -604,12 +624,11 @@ pub async fn nearby_places(
             total: count,
         },
     );
-    with_page_headers(
+    (
+        page.headers(u64::try_from(total).unwrap_or(u64::MAX)),
         response,
-        u64::try_from(total).unwrap_or(u64::MAX),
-        limit,
-        offset,
     )
+        .into_response()
 }
 
 /// A scored candidate place returned by match / duplicate endpoints.
@@ -1303,6 +1322,37 @@ pub async fn verify_audit_integrity(
             format!("Failed to read audit rows for verification: {e}"),
         )
         .respond(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[cfg(test)]
+mod page_tests {
+    use super::*;
+
+    /// This crate's bounds: `limit` is clamped rather than refused, a
+    /// zero, absent or unparseable `limit` falls back to the default, an
+    /// unparseable `offset` is 0, and the offset bound is what refuses,
+    /// as a `400` `offset_too_large`.
+    #[test]
+    fn page_params_clamp_rather_than_reject() {
+        let s = |v: &str| v.to_string();
+        let list = limits(LIST_DEFAULT_LIMIT as u64, LIST_MAX_LIMIT as u64);
+        let page = resolve_page(Some(&s("100000")), Some(&s("0")), list).unwrap();
+        assert_eq!((page.limit, page.offset), (LIST_MAX_LIMIT as u64, 0));
+        for fallback in [Some(s("0")), Some(s("lots")), None] {
+            let page = resolve_page(fallback.as_ref(), Some(&s("x")), list).unwrap();
+            assert_eq!(
+                (page.limit, page.offset),
+                (LIST_DEFAULT_LIMIT as u64, 0),
+                "{fallback:?}"
+            );
+        }
+        let nearby = limits(NEARBY_DEFAULT_LIMIT, NEARBY_MAX_LIMIT);
+        assert!(resolve_page(None, Some(&MAX_OFFSET.to_string()), nearby).is_ok());
+        let refused = resolve_page(None, Some(&(MAX_OFFSET + 1).to_string()), nearby)
+            .expect_err("an unbounded offset is a DoS, not a deep page");
+        assert_eq!(refused.requested, MAX_OFFSET + 1);
+        assert_eq!(offset_too_large(refused).status(), StatusCode::BAD_REQUEST);
     }
 }
 

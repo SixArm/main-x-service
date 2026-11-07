@@ -2,12 +2,9 @@
 
 use crate::api::{ApiProblem, ok};
 use axa::extract::{Json, Path, Query};
+use axa::pagination::{Limits, OffsetTooLarge, Page, PageParams};
 use axum::response::Response;
-use axum::{
-    extract::State,
-    http::{HeaderMap, HeaderValue, StatusCode},
-    response::IntoResponse,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -336,10 +333,13 @@ pub async fn search_things(
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]
 pub struct ListQuery {
     /// Page size; absent, zero, or unparseable falls back to
-    /// [`LIST_DEFAULT_LIMIT`].
-    pub limit: Option<usize>,
-    /// Rows to skip; absent means `0`.
-    pub offset: Option<usize>,
+    /// [`LIST_DEFAULT_LIMIT`]. A string, as in [`PageParams`], so a bad
+    /// value falls back rather than refusing the query. Not
+    /// `#[serde(flatten)]`ed, because `mask_sensitive` would then arrive
+    /// as a string and fail to parse as a `bool`.
+    pub limit: Option<String>,
+    /// Rows to skip; absent or unparseable means `0`.
+    pub offset: Option<String>,
     /// Mask sensitive fields in the results.
     pub mask_sensitive: Option<bool>,
 }
@@ -347,29 +347,41 @@ pub struct ListQuery {
 /// Default page size for `GET /api/things` — matches `/things/search`'s
 /// own default so switching between the two surfaces doesn't surprise a
 /// caller.
-const LIST_DEFAULT_LIMIT: usize = 10;
+const LIST_DEFAULT_LIMIT: u64 = 10;
 /// Largest page this endpoint will ever serve in one response. A bigger
 /// `limit` is **clamped**, not refused (`agents/share/restful.md`).
-const LIST_MAX_LIMIT: usize = 500;
+const LIST_MAX_LIMIT: u64 = 500;
 /// Largest accepted `offset` (SEC-G7 posture). Past this, a request is a
 /// `400` — the database would otherwise have to materialise and discard
 /// arbitrarily many rows, a cheap denial of service. Deep paging past
 /// this wants a cursor, not a bigger number.
-const LIST_MAX_OFFSET: usize = 10_000;
+const LIST_MAX_OFFSET: u64 = 10_000;
 
-/// The clamped `(limit, offset)` a `ListQuery` resolves to. Pure and
+/// The bounds of `GET /api/things`.
+const LIST_LIMITS: Limits = Limits {
+    default_limit: LIST_DEFAULT_LIMIT,
+    max_limit: LIST_MAX_LIMIT,
+    max_offset: LIST_MAX_OFFSET,
+};
+
+/// The page a `ListQuery` asks for, under [`LIST_LIMITS`]. Pure and
 /// `State`/`Query`-free, so it is unit-testable without an extractor.
-///
-/// A zero `limit` falls back to the default rather than serving an
-/// empty page — an empty page and an empty collection look identical to
-/// a client, and only one of them is a real answer.
-fn resolve_list_page(q: &ListQuery) -> (usize, usize) {
-    let limit = q
-        .limit
-        .filter(|l| *l > 0)
-        .unwrap_or(LIST_DEFAULT_LIMIT)
-        .min(LIST_MAX_LIMIT);
-    (limit, q.offset.unwrap_or(0))
+fn resolve_list_page(q: &ListQuery) -> Result<Page, OffsetTooLarge> {
+    PageParams {
+        limit: q.limit.clone(),
+        offset: q.offset.clone(),
+    }
+    .resolve(LIST_LIMITS)
+}
+
+/// An offset past [`LIST_MAX_OFFSET`] as a `400`, with the
+/// `offset_too_large` code the rest of the family answers with too.
+fn offset_too_large(error: OffsetTooLarge) -> Response {
+    ApiProblem::new(
+        "offset_too_large",
+        format!("{error}; narrow the query instead"),
+    )
+    .respond(StatusCode::BAD_REQUEST)
 }
 
 /// Collection-list response payload — the same shape as
@@ -397,26 +409,22 @@ pub struct ListResponse {
 /// scan), so its answer is only ever as stale as the database itself.
 ///
 /// Returns `200` with the family pagination headers
-/// (`X-Total-Count`/`X-Limit`/`X-Offset`, `agents/share/restful.md`); an
-/// `offset` beyond [`LIST_MAX_OFFSET`] is a `400` (SEC-G7).
+/// (`X-Total-Count`/`X-Limit`/`X-Offset`, `agents/share/restful.md`,
+/// from [`axa::pagination`]); an `offset` beyond [`LIST_MAX_OFFSET`] is
+/// a `400` (SEC-G7). The body stays the [`ListResponse`] object, so only
+/// the headers come from [`Page::headers`].
 #[utoipa::path(get, path = "/api/things", tag = "things",
     params(ListQuery),
     responses((status = 200, body = ListResponse), (status = 400)))]
 pub async fn list_things(State(state): State<AppState>, Query(q): Query<ListQuery>) -> Response {
-    if q.offset.unwrap_or(0) > LIST_MAX_OFFSET {
-        return ApiProblem::new(
-            "offset_too_large",
-            format!("offset must not exceed {LIST_MAX_OFFSET}; narrow the query instead"),
-        )
-        .respond(StatusCode::BAD_REQUEST);
-    }
-    let (limit, offset) = resolve_list_page(&q);
+    let page = match resolve_list_page(&q) {
+        Ok(page) => page,
+        Err(error) => return offset_too_large(error),
+    };
     let mask_sensitive = q.mask_sensitive.unwrap_or(false);
-    let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
-    let offset_u64 = u64::try_from(offset).unwrap_or(u64::MAX);
     let things = state
         .thing_repository
-        .list(limit_u64, offset_u64)
+        .list(page.limit, page.offset)
         .await
         .unwrap_or_default();
     let total_count = crate::db::count_active(&state.db).await.unwrap_or(0);
@@ -425,20 +433,9 @@ pub async fn list_things(State(state): State<AppState>, Query(q): Query<ListQuer
         .map(|t| if mask_sensitive { mask_thing(&t) } else { t })
         .collect();
     let total = results.len();
-
-    let mut headers = HeaderMap::new();
-    for (name, value) in [
-        ("x-total-count", total_count),
-        ("x-limit", limit_u64),
-        ("x-offset", offset_u64),
-    ] {
-        if let Ok(value) = HeaderValue::from_str(&value.to_string()) {
-            headers.insert(name, value);
-        }
-    }
     (
         StatusCode::OK,
-        headers,
+        page.headers(total_count),
         Json(ListResponse { results, total }),
     )
         .into_response()
@@ -1210,51 +1207,66 @@ mod list_things_tests {
     //! (`agents/share/restful.md`). The request-level "everything comes
     //! back with no `q`" acceptance test lives in `tests/`, where a real
     //! database is available.
-    use super::{LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT, ListQuery, resolve_list_page};
+    use super::{
+        LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT, LIST_MAX_OFFSET, ListQuery, offset_too_large,
+        resolve_list_page,
+    };
+    use axum::http::StatusCode;
+
+    fn query(limit: Option<&str>, offset: Option<&str>) -> ListQuery {
+        ListQuery {
+            limit: limit.map(str::to_string),
+            offset: offset.map(str::to_string),
+            ..Default::default()
+        }
+    }
 
     /// Omitting both parameters resolves to the default page from the
     /// start — the common "just show me things" call.
     #[test]
     fn absent_params_resolve_to_the_default_from_zero() {
-        let (limit, offset) = resolve_list_page(&ListQuery::default());
-        assert_eq!(limit, LIST_DEFAULT_LIMIT);
-        assert_eq!(offset, 0);
+        let page = resolve_list_page(&ListQuery::default()).unwrap();
+        assert_eq!((page.limit, page.offset), (LIST_DEFAULT_LIMIT, 0));
     }
 
-    /// A zero limit is not an empty page — it falls back to the default,
-    /// same reasoning as the family's other paginated list endpoints.
+    /// A zero or unparseable limit is not an empty page or a `400` — it
+    /// falls back to the default, same as the family's other paginated
+    /// list endpoints. An unparseable offset falls back to `0`.
     #[test]
-    fn a_zero_limit_falls_back_to_the_default() {
-        let q = ListQuery {
-            limit: Some(0),
-            ..Default::default()
-        };
-        let (limit, _) = resolve_list_page(&q);
-        assert_eq!(limit, LIST_DEFAULT_LIMIT);
+    fn a_zero_or_unparseable_limit_falls_back_to_the_default() {
+        for limit in ["0", "lots", "-5"] {
+            let page = resolve_list_page(&query(Some(limit), Some("many"))).unwrap();
+            assert_eq!(
+                (page.limit, page.offset),
+                (LIST_DEFAULT_LIMIT, 0),
+                "{limit}"
+            );
+        }
     }
 
     /// A huge limit is clamped, not refused.
     #[test]
     fn an_oversized_limit_is_clamped_to_the_maximum() {
-        let q = ListQuery {
-            limit: Some(1_000_000),
-            ..Default::default()
-        };
-        let (limit, _) = resolve_list_page(&q);
-        assert_eq!(limit, LIST_MAX_LIMIT);
+        let page = resolve_list_page(&query(Some("1000000"), None)).unwrap();
+        assert_eq!(page.limit, LIST_MAX_LIMIT);
     }
 
     /// A within-range limit and a nonzero offset both pass through
     /// unchanged.
     #[test]
     fn an_ordinary_page_request_passes_through() {
-        let q = ListQuery {
-            limit: Some(25),
-            offset: Some(50),
-            ..Default::default()
-        };
-        let (limit, offset) = resolve_list_page(&q);
-        assert_eq!(limit, 25);
-        assert_eq!(offset, 50);
+        let page = resolve_list_page(&query(Some("25"), Some("50"))).unwrap();
+        assert_eq!((page.limit, page.offset), (25, 50));
+    }
+
+    /// The offset bound is inclusive, and one past it is a `400` coded
+    /// `offset_too_large` — an unbounded offset is a denial of service, not a deep page.
+    #[test]
+    fn an_offset_past_the_bound_is_refused() {
+        let at = LIST_MAX_OFFSET.to_string();
+        assert!(resolve_list_page(&query(None, Some(&at))).is_ok());
+        let past = (LIST_MAX_OFFSET + 1).to_string();
+        let error = resolve_list_page(&query(None, Some(&past))).unwrap_err();
+        assert_eq!(offset_too_large(error).status(), StatusCode::BAD_REQUEST);
     }
 }
