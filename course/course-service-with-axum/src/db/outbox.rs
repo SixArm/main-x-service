@@ -176,10 +176,6 @@ impl Model {
         let rows = course_outbox::Entity::find()
             .order_by_desc(course_outbox::Column::Id)
             .limit(limit)
-            .lock_with_behavior(
-                sea_orm::sea_query::LockType::Update,
-                sea_orm::sea_query::LockBehavior::SkipLocked,
-            )
             .all(db)
             .await
             .map_err(|e| map_db(&e))?;
@@ -192,9 +188,9 @@ impl Model {
     }
 
     /// The Phase-3 relay poll: the oldest unpublished rows in id order,
-    /// capped at `limit`. (The relay wraps this in a transaction with
-    /// `FOR UPDATE SKIP LOCKED` so parallel relays don't double-ship; the
-    /// ordering + `published_at IS NULL` filter is the shared shape.)
+    /// capped at `limit`. Rows held by another relay are skipped, and stay
+    /// locked until the caller's transaction ends, so run this in the
+    /// transaction that marks them published.
     /// Unused until the Fluvio relay lands (roadmap).
     ///
     /// # Errors
@@ -202,10 +198,7 @@ impl Model {
     /// Returns [`Error::Database`](crate::Error::Database) if the query
     /// fails.
     pub async fn unpublished<C: ConnectionTrait>(db: &C, limit: u64) -> Result<Vec<Self>> {
-        let rows = course_outbox::Entity::find()
-            .filter(course_outbox::Column::PublishedAt.is_null())
-            .order_by_asc(course_outbox::Column::Id)
-            .limit(limit)
+        let rows = unpublished_query(limit)
             .all(db)
             .await
             .map_err(|e| map_db(&e))?;
@@ -235,6 +228,19 @@ impl Model {
             .map_err(|e| map_db(&e))?;
         Ok(res.rows_affected)
     }
+}
+
+/// The relay's poll. `FOR UPDATE SKIP LOCKED` is what stops two relays
+/// shipping one row.
+fn unpublished_query(limit: u64) -> sea_orm::Select<course_outbox::Entity> {
+    course_outbox::Entity::find()
+        .filter(course_outbox::Column::PublishedAt.is_null())
+        .order_by_asc(course_outbox::Column::Id)
+        .limit(limit)
+        .lock_with_behavior(
+            sea_orm::sea_query::LockType::Update,
+            sea_orm::sea_query::LockBehavior::SkipLocked,
+        )
 }
 
 /// DB-free pins for the pure envelope→row mapping: every field maps, the
@@ -315,5 +321,18 @@ mod tests {
             )
             .is_err()
         );
+    }
+}
+
+#[cfg(test)]
+mod relay_poll {
+    use sea_orm::{DbBackend, QueryTrait};
+
+    #[test]
+    fn the_poll_skips_rows_another_relay_holds() {
+        let sql = super::unpublished_query(10)
+            .build(DbBackend::Postgres)
+            .to_string();
+        assert!(sql.ends_with("FOR UPDATE SKIP LOCKED"), "{sql}");
     }
 }
