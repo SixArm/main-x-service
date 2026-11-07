@@ -11,6 +11,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **OTLP export comes from `axa::opentelemetry`** (axa's `opentelemetry`
+  feature). `src/observability.rs`, `tests/otlp_middleware.rs`, and the
+  direct `opentelemetry*` and `tracing-opentelemetry` dependencies are gone,
+  along with their SOUP-register rows. `App::init_logger` starts export,
+  `App::with_telemetry` layers the request metric and `traceparent` header,
+  and `App::on_shutdown` sends what is queued.
+- **Breaking for deployments:** an unset `OTLP_ENDPOINT` now means export
+  is off, where it meant `http://localhost:4317`. Plain `http` to a host
+  other than this one stops the service at boot unless
+  `OTLP_ALLOW_INSECURE=true`. The exported request span is axa's
+  `http-request`, where it was `http.server.request`.
 - axa 0.6.1. Every error axa answers is an RFC 9457 problem,
   `application/problem+json`, with `code` in place of `error` and `detail` in
   place of `description`. Axum's own refusals, such as an unknown route's `404`,

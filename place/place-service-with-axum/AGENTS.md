@@ -75,61 +75,36 @@ commands.
 
 ## OpenTelemetry OTLP export
 
-`src/observability.rs` (repo `tasks.md` PRO-H12, landed 2026-08-30) is a
-close port of person-service's `src/observability.rs` — itself a port of
-link-graph-service's, the family's first working exporter. This crate
-carried no *working* observability module before this change:
-`opentelemetry`/`opentelemetry-otlp`/`opentelemetry_sdk`/
-`tracing-opentelemetry` were declared in `Cargo.toml` at stale 0.27/0.28
-pins with **zero consumers anywhere in `src/`** — dead scaffolding from
-an earlier, since-deleted stub — bumped to the family's settled 0.32/0.33
-pins in the same change that added the real module.
-`App::init_logger` installs it (axa's own `EnvFilter` + formatted
-layer, plus the `tracing-opentelemetry` bridge over an OTLP/gRPC
-exporter); `App::on_shutdown` flushes it. Export is **on by default** —
-set `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
-`http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
-(default `place-service`); both variables are **deliberately
-unprefixed**, matching every other crate that carries this pipeline,
-not the per-service `PLACE_*` convention `PLACE_REQUIRE_AUTH` and its
-siblings use.
+Export comes from `axa::opentelemetry`, axa's `opentelemetry` feature, since
+2026-11-07. The crate's own `src/observability.rs`, a port of
+person-service's, is gone. `App::init_logger` starts it and installs
+axa's logger with its layers, `App::with_telemetry` layers its middleware
+(the `http.server.request.duration` metric and a `traceparent` response
+header) inside axa's standard stack, outermost of the service's own layers
+so a `401` or `403` is measured, and `App::on_shutdown` sends what is
+queued. Spans are axa's per-request `http-request` span and whatever the
+code opens inside it. There is one router-construction surface,
+`App::after_routes`, so the middleware is layered once.
 
-**Where this crate's shape forced real adaptation** — confirmed rather
-than assumed:
+| Variable | Meaning |
+|---|---|
+| `OTLP_ENDPOINT` | Collector URL. **Unset or blank means export is off**, where the old module exported to `http://localhost:4317` by default |
+| `OTLP_SERVICE_NAME` | Replaces `place-service` |
+| `OTLP_ALLOW_INSECURE` | `true` allows plain `http` to a host other than this one. Without it such an endpoint stops the service at boot, because spans carry what the logs do |
 
-- **One router-construction surface**: `api::rest::places_routes()`,
-  mounted via `App::routes`/`App::after_routes`. Tests boot that same
-  router. `observability::trace_mw` is its outermost service layer.
-- **A renamed `tonic` dev-dependency was needed after all** — the one
-  place where this crate's port diverged from course's (PRO-H12 slice
-  1), which needed no rename. The capability matrix in
-  `agents/share/overview.md` marks this crate `–` on the gRPC-stub row
-  because there is no `src/api/grpc` **module** — but this crate
-  already declares `tonic = "0.12"` + `tonic-build` in `Cargo.toml`, in
-  anticipation of the still-open T-4 (gRPC implementation, not yet
-  started). A declared-but-unused Cargo dependency collides with an
-  unrenamed dev-dependency at a different version exactly the same way
-  a genuinely-used one does (`E0464: multiple candidates for rlib
-  dependency tonic`) — confirmed by trying the plain form first and
-  watching it fail. So the in-process OTLP collector tests' `tonic
-  0.14` dev-dependency is declared as
-  `otlp-test-tonic = { package = "tonic", version = "0.14" }`, same as
-  person/worker/event. This crate carries no SOUP register (unlike
-  person/worker), so no matching `soup.rs` rename-resolution fix was
-  needed.
+The variables are deliberately unprefixed, unlike `PLACE_*`.
 
-`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
-person-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
-collector) prove real export against a real gRPC listener in a normal
-`cargo test` run: a `tracing` span and a metric both reach the
-collector's decoded protobuf, and a served HTTP request returns a
-`traceparent` whose trace id matches the exported span's. None of this
-needs a database. Landing this raised `cargo test --lib` from 221 to
-229 (8 new `src/observability.rs` unit tests), plus 4 new tests across
-the two `tests/otlp_*.rs` binaries. Verified independently: `cargo fmt
---check` clean, `cargo clippy --all-targets -- -D warnings` clean,
-`cargo deny check` clean, MSRV check clean, `cargo bench --no-run`
-compiles clean.
+`tests/otlp_export.rs`, with the in-process collector in
+`tests/otlp_collector/`, proves the wiring in a normal `cargo test`: a
+request through `App::with_telemetry` and `axa::middleware::apply` reaches
+the collector as a span and a metric, and its `traceparent` names the
+exported trace. axa tests its own pipeline. None of this needs a database.
+
+The collector's `tonic` 0.14 dev-dependency is still renamed,
+`otlp-test-tonic = { package = "tonic", version = "0.14" }`: this crate
+declares `tonic = "0.12"` for the not-yet-built gRPC server (T-4), and two
+unrenamed `tonic` dependencies at different versions make rustc refuse the
+test binary (`E0464: multiple candidates for rlib dependency tonic`).
 
 ## Doc hierarchy quick reference
 

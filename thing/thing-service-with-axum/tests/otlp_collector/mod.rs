@@ -2,8 +2,7 @@
 //!
 //! Ported from person-service's `tests/otlp_collector/mod.rs` (PRO-H12,
 //! itself ported from link-graph-service's) — nothing here is
-//! service-specific. Shared by `tests/otlp_export.rs` (the pipeline) and
-//! `tests/otlp_middleware.rs` (the mounted middleware). It is the
+//! service-specific. Used by `tests/otlp_export.rs`. It is the
 //! generated `TraceServiceServer` / `MetricsServiceServer`, served by
 //! tonic on an ephemeral port, capturing every decoded request — so the
 //! assertions are made against the protobuf that actually crossed a
@@ -26,7 +25,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 use opentelemetry_proto::tonic::trace::v1::Span;
 // Renamed dev-dependency (`otlp-test-tonic = { package = "tonic" }`) — see
 // the Cargo.toml comment: this crate's main deps already carry
-// `tonic = "0.12"` (T-4's not-yet-built gRPC server), so an unrenamed
+// `tonic = "0.12"` (T-3's not-yet-built gRPC server), so an unrenamed
 // `tonic = "0.14"` dev-dependency collides in the test binary's extern
 // prelude (E0464).
 use otlp_test_tonic::{Request, Response, Status};

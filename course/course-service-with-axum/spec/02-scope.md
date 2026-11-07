@@ -26,7 +26,7 @@
   (`GET /api/records/verify`, `GET /api/audit/verify`) — see §2.1c.
 - PostgreSQL persistence via SeaORM, with migrations.
 - Structured tracing (`tracing`) **plus real OpenTelemetry OTLP
-  export** (`src/observability.rs`, T-26) — see §2.1d.
+  export** (`axa::opentelemetry`, T-26) — see §2.1d.
 
 ### 2.1a Authentication / authorisation (adopted, default-off)
 
@@ -59,13 +59,15 @@ this section used to carry, which predates T-20 shipping.
 
 ### 2.1d Observability — real OpenTelemetry OTLP export (adopted)
 
-`src/observability.rs` (T-26, PRO-H12 slice 1 of 7, landed 2026-08-30)
-is a real exporter — `tracing-opentelemetry` bridged over an OTLP/gRPC
-`SdkTracerProvider`/`SdkMeterProvider`, export-on-by-default at
-`OTLP_ENDPOINT` (default `http://localhost:4317`) with `service.name`
-from `OTLP_SERVICE_NAME` (default `course-service`). `trace_mw` is
-layered as the outermost middleware on both of this crate's
-router-construction surfaces. This reverses the MVP scope note §2.2
+Real OTLP/gRPC traces and metrics come from `axa::opentelemetry`
+(axa's `opentelemetry` feature) since 2026-11-07, replacing this
+crate's own `src/observability.rs` (T-26, PRO-H12 slice 1 of 7, landed
+2026-08-30). Export is on only when `OTLP_ENDPOINT` is set, with
+`service.name` from `OTLP_SERVICE_NAME` (default `course-service`);
+plain `http` to another host needs `OTLP_ALLOW_INSECURE=true`.
+`App::with_telemetry` layers the request metric and `traceparent`
+header as the outermost of this crate's own layers, inside axa's
+standard stack. This reverses the MVP scope note §2.2
 used to carry, which predates T-26 shipping — same shape as §2.1b's
 FHIR reversal note above. See T-26 and
 [`observability.md`](../../../agents/share/observability.md).

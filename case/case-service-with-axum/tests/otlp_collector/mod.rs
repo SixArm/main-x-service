@@ -3,9 +3,8 @@
 //! Ported from care-pathway-service's `tests/otlp_collector/mod.rs`
 //! (PRO-H12, itself ported from organization-service's, itself
 //! course-service's, itself link-graph-service's) — nothing here is
-//! service-specific. Shared by
-//! `tests/otlp_export.rs` (the pipeline) and `tests/otlp_middleware.rs`
-//! (the mounted middleware). It is the generated `TraceServiceServer` /
+//! service-specific. Used by
+//! `tests/otlp_export.rs`. It is the generated `TraceServiceServer` /
 //! `MetricsServiceServer`, served by tonic on an ephemeral port, capturing
 //! every decoded request — so the assertions are made against the
 //! protobuf that actually crossed a socket rather than against in-process

@@ -57,60 +57,32 @@ Shared reference docs live at the project root under
 
 ## OpenTelemetry OTLP export
 
-`src/observability.rs` (repo `tasks.md` PRO-H12, landed 2026-08-30) is a
-close port of person-service's `src/observability.rs` — itself a port of
-link-graph-service's, the family's first working exporter. Person, not
-link-graph-service, was the copy source here for the same reason worker
-and event's PRO-H9 ports were: person had already solved the
-two-router-construction-surfaces adaptation this crate's shape also
-needs. This module is genuinely new — this crate carried **no**
-`src/observability` module at all before this change, unlike
-person/worker/event, which each had a dead stub to replace (PRO-H9).
-`App::init_logger` installs it (axa's own `EnvFilter` + formatted
-layer, plus the `tracing-opentelemetry` bridge over an OTLP/gRPC
-exporter); `App::on_shutdown` flushes it. Export is **on by default** —
-set `OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
-`http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
-(default `course-service`); both variables are **deliberately
-unprefixed**, matching every other crate that carries this pipeline and
-`agents/share/rust-tracing-opentelemetry-stack.md`'s config table, not
-the per-service `COURSE_*` convention `COURSE_REQUIRE_AUTH` and its
-siblings use.
+Export comes from `axa::opentelemetry`, axa's `opentelemetry` feature, since
+2026-11-07. The crate's own `src/observability.rs`, a port of
+person-service's (PRO-H12), is gone. `App::init_logger` starts it and
+installs axa's logger with its layers, `App::with_telemetry` layers its
+middleware (the `http.server.request.duration` metric and a `traceparent`
+response header) inside axa's standard stack, outermost of the service's
+own layers so a `401` or `403` is measured, and `App::on_shutdown` sends
+what is queued. Spans are axa's per-request `http-request` span and
+whatever the code opens inside it. It sits beside, not in place of,
+`metrics::track_http_requests_mw` (T-18's Prometheus counter).
 
-**Where this crate's shape forced real adaptation** — confirmed rather
-than assumed:
+| Variable | Meaning |
+|---|---|
+| `OTLP_ENDPOINT` | Collector URL. **Unset or blank means export is off**, where the old module exported to `http://localhost:4317` by default |
+| `OTLP_SERVICE_NAME` | Replaces `course-service` |
+| `OTLP_ALLOW_INSECURE` | `true` allows plain `http` to a host other than this one. Without it such an endpoint stops the service at boot, because spans carry what the logs do |
 
-- **One router-construction surface**, `api::rest::courses_routes()`
-  mounted via `App::routes`/`App::after_routes`, as in link-graph-service.
-  Tests boot that same router. The `observability::trace_mw` tower
-  middleware (per-request span + `http.server.request.duration` histogram
-  + W3C `traceparent` response header) is its outermost service layer. It
-  is a **second**, complementary
-  middleware to the existing `metrics::track_http_requests_mw` (T-18's
-  Prometheus counter) — the two are independent sinks layered side by
-  side, not a replacement of one by the other.
-- **No `tonic` rename needed** — the one adaptation person/worker/event
-  all needed that this crate does **not**: this crate carries no gRPC
-  stub of its own (`agents/share/overview.md`'s capability matrix —
-  course is `–` on gRPC), so the in-process OTLP collector tests' `tonic
-  0.14` dev-dependency is declared as a plain `tonic = "0.14"` — no
-  `package = "…"` rename, and no matching SOUP-register fix (this crate
-  carries no SOUP register at all — see `agents/models.md`'s peers'
-  notes on that).
+The variables are deliberately unprefixed, unlike `COURSE_*`.
 
-`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
-person-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
-collector, unchanged from link-graph-service's original bar the
-un-renamed `tonic` import) prove real export against a real gRPC
-listener in a normal `cargo test` run: a `tracing` span and a metric
-both reach the collector's decoded protobuf, and a served HTTP request
-returns a `traceparent` whose trace id matches the exported span's. None
-of this needs a database. Landing this raised `cargo test --lib` from
-124 to 132 (8 new `src/observability.rs` unit tests), plus 4 new tests
-across the two `tests/otlp_*.rs` binaries. Verified independently:
-`cargo fmt --check` clean, `cargo clippy --all-targets -- -D warnings`
-clean, `cargo deny check` clean, MSRV check (`cargo +1.96 check
---all-targets`) clean.
+`tests/otlp_export.rs`, with the in-process collector in
+`tests/otlp_collector/`, proves the wiring in a normal `cargo test`: a
+request through `App::with_telemetry` and `axa::middleware::apply` reaches
+the collector as a span and a metric, and its `traceparent` names the
+exported trace. axa tests its own pipeline. None of this needs a database.
+The collector's `tonic = "0.14"` dev-dependency needs no rename, because
+this crate declares no other `tonic`.
 
 ## Container image
 

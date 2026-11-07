@@ -79,67 +79,32 @@ cargo clippy --all-targets --features fluvio -- -D warnings
 
 ## OpenTelemetry OTLP export
 
-`src/observability.rs` (repo `tasks.md` PRO-H9, landed 2026-08-28) is a
-close port of person-service's `src/observability.rs` — itself a port of
-link-graph-service's, the family's first working exporter. Person, not
-link-graph-service, was the copy source here because person had already
-solved the two adaptations this crate's shape needs (below); porting
-person's already-adapted file was less work and less risk than
-re-deriving the same two fixes independently. This module **replaces**
-the earlier `src/observability/` stub outright (a JSON `tracing`
-subscriber with the OTLP exporter commented out behind
-`// TODO: Initialize OTLP exporter`, never wired into `App`'s `Hooks`
-impl at all, plus a `custom_metrics::WorkerMetrics::new` that `todo!()`d)
-rather than filling the stub in place. `App::init_logger` installs it
-(axa's own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
-bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it. Export
-is **on by default** — set `OTLP_ENDPOINT=""` to disable it — at
-`OTLP_ENDPOINT` (default `http://localhost:4317`) with `service.name`
-from `OTLP_SERVICE_NAME` (default `worker-service`); both variables are
-**deliberately unprefixed**, matching link-graph-service, person-service,
-and `agents/share/rust-tracing-opentelemetry-stack.md`'s config table,
-not the per-service `WORKER_*` convention `WORKER_REQUIRE_AUTH` and its
-siblings use. This crate already carried a `Config.observability`
-substructure reading the same three variable names into
-`WORKER_*`-adjacent config — that struct predates this module, was never
-consulted by the (dead) exporter it was added for, and stays that way:
-the two are independent readers of the same three variables, not a
-layering (see `src/config/mod.rs`'s `ObservabilityConfig` doc comment).
+Export comes from `axa::opentelemetry`, axa's `opentelemetry` feature, since
+2026-11-07. The crate's own `src/observability.rs`, a port of
+person-service's, is gone. `App::init_logger` starts it and installs
+axa's logger with its layers, `App::with_telemetry` layers its middleware
+(the `http.server.request.duration` metric and a `traceparent` response
+header) inside axa's standard stack, outermost of the service's own layers
+so a `401` or `403` is measured, and `App::on_shutdown` sends what is
+queued. Spans are axa's per-request `http-request` span and whatever the
+code opens inside it.
 
-**Where this crate's shape forced real adaptation** — both exactly as
-person-service anticipated, confirmed rather than assumed:
+| Variable | Meaning |
+|---|---|
+| `OTLP_ENDPOINT` | Collector URL. **Unset or blank means export is off**, where the old module exported to `http://localhost:4317` by default |
+| `OTLP_SERVICE_NAME` | Replaces `worker-service` |
+| `OTLP_ALLOW_INSECURE` | `true` allows plain `http` to a host other than this one. Without it such an endpoint stops the service at boot, because spans carry what the logs do |
 
-- **One router-construction surface**: `api::rest::workers_routes()`,
-  mounted via `App::routes`/`App::after_routes`, as in link-graph-service.
-  Tests boot that same router. The `observability::trace_mw` tower
-  middleware (per-request span + `http.server.request.duration` histogram
-  + W3C `traceparent` response header) is its outermost service layer.
-- **A renamed `tonic` dev-dependency — gone as of the prost 0.14
-  migration (2026-09-07).** This crate originally depended on
-  `tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
-  in-process OTLP collector tests' `tonic = "0.14"` dev-dependency (used
-  to serve the fake collector) needed the same
-  `otlp-test-tonic = { package = "tonic", version = "0.14" }` rename
-  person-service's did, to dodge an unrenamed second `tonic` dependency
-  colliding in a test binary's extern prelude (`E0464: multiple
-  candidates for rlib dependency tonic`). Bumping the main gRPC stub to
-  `tonic = "0.14"` (forced by a Dependabot `prost` bump — tonic 0.12
-  cannot compile prost 0.14's generated code) put both dependencies on
-  the same line, so the rename is gone: one plain `tonic = "0.14"`
-  dev-dependency. `src/compliance/soup.rs`'s SOUP-register parser still
-  resolves a `package = "…"` inline-table rename to its target crate
-  name (needed while the rename existed, and for any future one).
+The variables are deliberately unprefixed, unlike `WORKER_*`. This crate's
+`Config.observability` substructure reads two of the same names and is
+not consulted by export (see `src/config/mod.rs`'s `ObservabilityConfig`
+doc comment).
 
-`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
-person-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
-collector, unchanged from link-graph-service's original) prove real
-export against a real gRPC listener in a normal `cargo test` run: a
-`tracing` span and a metric both reach the collector's decoded protobuf,
-and a served HTTP request returns a `traceparent` whose trace id matches
-the exported span's. None of this needs a database. Landing this raised
-`cargo test --lib` from 302 to 312 (8 new `src/observability.rs` unit
-tests + 2 new `soup.rs` rename-resolution tests), plus 4 new tests across
-the two `tests/otlp_*.rs` binaries.
+`tests/otlp_export.rs`, with the in-process collector in
+`tests/otlp_collector/`, proves the wiring in a normal `cargo test`: a
+request through `App::with_telemetry` and `axa::middleware::apply` reaches
+the collector as a span and a metric, and its `traceparent` names the
+exported trace. axa tests its own pipeline. None of this needs a database.
 
 ## gRPC server (T-6, repo `tasks.md` PRO-H11)
 
@@ -150,8 +115,7 @@ reference implementation for this repo's gRPC rollout.
 `CreateWorker` / `GetWorker` / `ListWorkers` / `DeleteWorker` —
 compiled by `build.rs` (`tonic-prost-build`, pinned to the same 0.14
 line as the main `tonic`/`tonic-prost` dependencies — tonic 0.14 split
-prost codegen out of `tonic-build` into this crate, 2026-09-07; see the
-OTLP export section above). `App::after_routes` spawns
+prost codegen out of `tonic-build` into this crate, 2026-09-07). `App::after_routes` spawns
 `crate::api::grpc::serve` as a
 background task on `GRPC_PORT` (config `server.grpc_port`, default
 `50051`) alongside the REST router, sharing one cloned `AppState` — a

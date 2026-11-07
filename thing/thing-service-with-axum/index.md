@@ -146,15 +146,19 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 | `THING_EVENT_TOPIC` | Topic the relay publishes to | `mxi.thing.events` |
 | `THING_REQUIRE_AUTH` | Blanket `/api/*` PASETO + ABAC enforcement (`1`/`true`/`yes`/`on`) | off |
 | `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
+| `OTLP_ENDPOINT` | OTLP collector endpoint; unset means export is off | (off) |
+| `OTLP_SERVICE_NAME` | service.name sent to the collector | `thing-service` |
+| `OTLP_ALLOW_INSECURE` | Allow plain `http` to a remote collector | off |
 
-> `GRPC_PORT`, `OTLP_SERVICE_NAME`, `OTLP_ENDPOINT`,
-> `STREAMING_BROKER_URL`, `STREAMING_TOPIC`, `DATABASE_MAX_CONNECTIONS`,
-> `DATABASE_MIN_CONNECTIONS`, `SERVER_HOST`, and `SERVER_PORT` also
-> parse into this crate's legacy `src/config/mod.rs::Config` struct but
-> are **not read anywhere else in `src/`** — a pre-loco holdover. There
-> is no gRPC server ([T-3](spec/13-tasks.md) is still open) and no OTLP
-> exporter; the real REST bind address/port and DB pool size come from
-> axa's own `config/*.yaml`.
+> `GRPC_PORT`, `STREAMING_BROKER_URL`, `STREAMING_TOPIC`,
+> `DATABASE_MAX_CONNECTIONS`, `DATABASE_MIN_CONNECTIONS`, `SERVER_HOST`,
+> and `SERVER_PORT` also parse into this crate's legacy
+> `src/config/mod.rs::Config` struct but are **not read anywhere else in
+> `src/`** — a pre-loco holdover. There is no gRPC server
+> ([T-3](spec/13-tasks.md) is still open); the real REST bind
+> address/port and DB pool size come from axa's own configuration. The
+> `OTLP_*` variables parse there too, but export reads them through
+> `axa::opentelemetry`, not that struct.
 
 ## Testing
 

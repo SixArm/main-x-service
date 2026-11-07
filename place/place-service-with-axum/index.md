@@ -106,11 +106,11 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 | `GRPC_PORT` | gRPC server port (Tonic stub) | `50051` |
 | `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | `512` |
 | `OTLP_SERVICE_NAME` | service.name sent to the collector | `place-service` |
-| `OTLP_ENDPOINT` | OTLP collector endpoint | `http://localhost:4317` |
+| `OTLP_ENDPOINT` | OTLP collector endpoint; unset means export is off | (off) |
+| `OTLP_ALLOW_INSECURE` | Allow plain `http` to a remote collector | off |
 | `STREAMING_BROKER_URL` | Event-broker connection URL | `localhost:9003` |
 | `STREAMING_TOPIC` | Topic events publish to | `place-events` |
 | `RUST_LOG`           | tracing-subscriber filter  | `info`                  |
-| `OTLP_ENDPOINT`      | OpenTelemetry collector    | `http://localhost:4317` |
 | `PLACE_EVENT_TRANSPORT` | Event transport: `memory` (default) or `outbox` (durable event bus, Phase 2 — writes an `event_outbox` row inside each write's transaction) | `memory` |
 | `PLACE_EVENT_RELAY` | Phase-3 outbox relay worker on/off (truthy `1`/`true`/`yes`/`on`); runs only when transport is also `outbox` | off |
 | `PLACE_EVENT_RELAY_INTERVAL_SECS` | Relay drain poll interval in seconds (floored at 1) | `5` |

@@ -31,57 +31,36 @@ crate (older Axum services vs. controller-style services — see §2).
 
 | Pillar | Crate / mechanism | Where | Status |
 |---|---|---|---|
-| **Logging / tracing** | `tracing` + `tracing-subscriber` (JSON or compact); axa `logger:` config block; SeaORM SQL query logging via `database.enable_logging` | every service | implemented |
+| **Logging / tracing** | `tracing` + `tracing-subscriber` (JSON or compact); axa's `LOG_*` settings; SeaORM SQL query logging via `DB_LOGGING` | every service | implemented |
 | **Metrics** | Prometheus text exposition at `GET /metrics.prom` (the `prometheus` crate registry in `src/metrics.rs`) | every service | implemented (all 10 services) |
-| **Distributed tracing** | OpenTelemetry OTLP export, `opentelemetry-semantic-conventions` | flat `src/observability.rs` module | **implemented in 8 services**: the cross-cutting link-graph-service (the original reference) plus **7 of the 10 entity registries** — person, worker, event (PRO-H9), course, place, thing (PRO-H12 slices 1–3), and organization (PRO-H12 slice 4). Real exporter code (`opentelemetry_otlp::{SpanExporter, MetricExporter}`, …), not a stub. **Still missing on 3 entity registries — care-pathway, case, and portfolio** — PRO-H12's remaining scope (§6). |
+| **Distributed tracing** | OpenTelemetry OTLP/gRPC export through `axa::opentelemetry` (axa's `opentelemetry` feature) | `App::init_logger` and `App::with_telemetry` in each service's `src/app.rs` | **implemented in 10 services**: link-graph and the nine registries in this repo (person, worker, event, course, place, thing, organization, care-pathway, case). Off unless `OTLP_ENDPOINT` is set (§3.4). |
 
 ### 1.1 Logging / tracing
 
 Process-wide logging is set up exactly once at startup.
 
-- **Older Axum services (and the controller-style services that have ported the
-  OTLP exporter — §1.3)** — `src/observability.rs::init_telemetry`
-  builds an OTel `Resource` tagging `service.name` / `service.version`,
-  then installs a JSON `tracing` subscriber. The level comes from the
-  `RUST_LOG` env filter (`EnvFilter::try_from_default_env`), falling
-  back to the configured `log_level`. `shutdown_telemetry` flushes the
-  tracer provider on graceful exit. Note the module is a **flat file**,
-  `src/observability.rs`, not a `src/observability/mod.rs` directory —
-  see §1.3 and §6.2.
-- **axa-native services without the exporter (care-pathway, case,
-  portfolio)** — logging is driven only by axa's `logger:` config
-  block (see §1.1.1), not a hand-rolled subscriber; there is no
-  `src/observability.rs` in these three at all yet.
+- **Every service** sets up logging through axa's logger. With OTLP export
+  on, `App::init_logger` installs it with `axa::opentelemetry`'s layers
+  and `DIAGNOSTIC_DIRECTIVES` (`axa::logger::init_with`); with export off
+  it returns `false` and axa installs its plain logger. `App::on_shutdown`
+  sends what export still holds.
 
-#### 1.1.1 axa `logger:` config block
+#### 1.1.1 axa logger settings
 
-The controller-style services configure logging declaratively in
-`config/<env>.yaml`:
+axa reads its settings from the environment; there are no config files.
 
-```yaml
-logger:
-  enable: true
-  pretty_backtrace: true       # sets RUST_BACKTRACE=1
-  level: debug                 # trace | debug | info | warn | error
-  format: compact              # compact | pretty | json
-  # override_filter: trace     # uncomment to include third-party crates
-```
-
-| Field | development / test | production |
-|---|---|---|
-| `level` | `debug` | axa default (`info`) |
-| `format` | `compact` | axa default |
-| `pretty_backtrace` | `true` | — |
-
-Production `config/production.yaml` omits the `logger:` block and
-inherits axa defaults; tune it there before going live (set
-`format: json` for machine ingestion, `level: info`).
+| Variable | Meaning |
+|---|---|
+| `LOG_ENABLE` | Logging on (default on, off under test) |
+| `LOG_LEVEL` | `trace`, `debug`, `info`, `warn`, or `error` |
+| `LOG_FORMAT` | `compact`, `pretty`, or `json`; use `json` for machine ingestion |
+| `LOG_FILTER` | A full `EnvFilter` directive, including third-party crates |
+| `RUST_LOG` | Overrides the filter outright when set |
 
 #### 1.1.2 SQL query logging
 
-SeaORM statement logging is gated by the axa `database.enable_logging`
-flag (default `false` in `config/development.yaml` and
-`config/test.yaml`). Enable it to surface every SQL statement on the
+SeaORM statement logging is gated by axa's `DB_LOGGING` setting
+(default off). Enable it to surface every SQL statement on the
 `tracing` stream during development; leave it **off** in production —
 query-level statistics belong to PostgreSQL `pg_stat_statements`
 instead (see [`../postgresql/index.md`](../postgresql/index.md) §13 and
@@ -98,23 +77,22 @@ Prometheus text-exposition format and served at `GET /metrics.prom`
 
 ### 1.3 Distributed tracing
 
-The OTLP pipeline is **active in 8 services** — the cross-cutting
-link-graph-service plus 7 of the 10 entity registries. This section
-used to describe every service as scaffolded; that description now
-applies only to the three still-missing entity registries
-(care-pathway, case, portfolio). In
-`src/observability.rs`, link-graph-service (the original reference,
-2026-08-05), person, worker, event (PRO-H9, 2026-08-28), course, place,
-thing (PRO-H12 slices 1–3, 2026-08-30), and organization (PRO-H12 slice
-4, 2026-08-30 — the first controller-style crate, `src/controllers/`
-rather than `src/api/rest/`, to carry it) each wire a real OTLP
-exporter (span + metric) bridged from `tracing` through axa's
-`App::init_logger` seam, with a per-request span, an
-`http.server.request.duration` histogram, and a W3C `traceparent`
-response header — proved against a real in-process collector, not a
-`todo!()` stub. **care-pathway, case, and portfolio carry no
-`src/observability.rs` module at all** — PRO-H12's remaining scope. See
-§3 and §6.
+OTLP export is **active in 10 services**, through `axa::opentelemetry`:
+link-graph and the nine registries in this repo. Each:
+
+- starts export in `App::init_logger` from `Config::from_env` (§3.4);
+- layers `axa::opentelemetry::middleware` with `App::with_telemetry`,
+  outermost of its own layers and inside `axa::middleware::apply`, so
+  each request's metric covers versioning and the auth guard, and its
+  response carries a W3C `traceparent`;
+- sends the last spans from `App::on_shutdown`;
+- proves that wiring in `tests/otlp_export.rs` against an in-process
+  OTLP/gRPC collector.
+
+The exported request span is axa's `http-request`. Until 2026-11-07 each
+service carried its own `src/observability.rs`, ported in turn from
+link-graph-service's (repo `tasks.md` PRO-H9, PRO-H12), which named the
+span `http.server.request`.
 
 ---
 
@@ -198,9 +176,7 @@ Per [`agents/share/rust-tracing-opentelemetry-stack.md`](../../agents/share/rust
 | Concern | Crate | Notes |
 |---|---|---|
 | Structured logging | `tracing`, `tracing-subscriber` | JSON in production, compact in dev |
-| Metrics + traces export | `opentelemetry`, `opentelemetry-otlp`, `opentelemetry_sdk` | OTLP gRPC or HTTP |
-| Bridge | `tracing-opentelemetry` | forwards `tracing` spans to OTel |
-| Semantic conventions | `opentelemetry-semantic-conventions` | HTTP / DB / RPC attributes |
+| Metrics + traces export | `axa::opentelemetry` | OTLP/gRPC, with the `tracing-opentelemetry` bridge; carries `opentelemetry`, `opentelemetry-otlp`, `opentelemetry_sdk` |
 
 ### 3.2 Spans and events
 
@@ -228,36 +204,29 @@ RUST_LOG=debug,sea_orm=warn cargo run    # quiet the ORM
 
 ### 3.4 OTLP exporter and `Resource`
 
-The exporter targets an OTLP collector. Environment variables (see the
-stack brief):
-
 | Variable | Default | Purpose |
 |---|---|---|
-| `RUST_LOG` | `info` | `EnvFilter` directive |
-| `OTLP_SERVICE_NAME` | crate name | `service.name` attribute |
-| `OTLP_ENDPOINT` | `http://localhost:4317` | OTLP collector endpoint |
+| `RUST_LOG` | unset | `EnvFilter` directive; with export on it also governs what is exported |
+| `OTLP_SERVICE_NAME` | the service's name | `service.name` attribute |
+| `OTLP_ENDPOINT` | unset, export off | OTLP/gRPC collector URL |
+| `OTLP_ALLOW_INSECURE` | off | allows plain `http` to a host other than this one |
 
-The OTel `Resource` is tagged with `service.name` (from config) and
-`service.version` (`CARGO_PKG_VERSION`) at bootstrap. **On the 8 landed
-services** (§1.3) the exporter wiring is real, not commented out, and
-each response carries a `traceparent` header for cross-service
-correlation. **On care-pathway, case, and portfolio** the exporter is
-absent (§6), so this section's env vars and behaviour don't yet apply
-to those three.
+The `Resource` carries `service.name` and `service.version`
+(`CARGO_PKG_VERSION`); `OTEL_RESOURCE_ATTRIBUTES` adds to it, for example
+`service.instance.id`. An endpoint must be `https` or loopback unless
+`OTLP_ALLOW_INSECURE` is set, and anything else stops the service at boot,
+because spans carry what the logs do. A collector that is down is not an
+error: spans wait in a bounded queue and are dropped when it fills.
 
 ### 3.5 Correlation across services
 
 The services form a federation (one per entity) plus the central
 [authentication-service](../../authentication/authentication-service-with-axum).
-Trace correlation relies on W3C `traceparent` propagation: an inbound
-request's context is extracted, attached to the request span, and
-propagated outbound on DB / RPC / HTTP calls. On the 8 landed services
-(§1.3) the extraction/propagation logic lives inline in the flat
-`src/observability.rs` — there is no separate `traces.rs` submodule;
-that was an earlier scaffolding plan this doc described before the
-shape settled. **On care-pathway, case, and portfolio**, which have no
-`src/observability.rs` at all yet, correlation is still best-effort via
-the shared `service.name` / request-path log fields.
+Each response carries the `traceparent` of its own trace, so an operator
+can go from a response to its trace. `axa::opentelemetry` does **not**
+continue a trace from an incoming `traceparent`, so each service's trace
+starts at its own edge; a request is followed across services by its
+request id (`axa_tracing::propagate`, not yet adopted here).
 
 ---
 
@@ -344,7 +313,7 @@ Enable the `pg_stat_statements` extension for execution-statistics and
 slow-query analysis, as specified in
 [`../postgresql/index.md`](../postgresql/index.md) §13 (Operations).
 This is the canonical source for per-statement latency — prefer it over
-SeaORM `enable_logging` in production (§1.1.2). Other relevant
+SeaORM `DB_LOGGING` in production (§1.1.2). Other relevant
 extensions (`pg_trgm` for the `ILIKE` name/title search, `postgis`
 where geo is modeled) are catalogued in the same postgresql spec.
 
@@ -362,38 +331,26 @@ where geo is modeled) are catalogued in the same postgresql spec.
 
 ### 6.1 Implemented today
 
-- JSON / compact structured `tracing` with `RUST_LOG` + axa
-  `logger:` config; per-call `service.name` / `service.version`.
+- JSON / compact structured `tracing` with `RUST_LOG` and axa's
+  `LOG_*` settings; per-call `service.name` / `service.version`.
 - Prometheus `/metrics.prom` text exposition on the **6 older Axum
   services** (person, worker, place, thing, event, **and course** —
   this list previously omitted course, contradicting §2.3, which has
   always listed all six correctly) plus organization, care-pathway,
   case, portfolio, and authentication (§2.3): CRUD counters,
   `http_requests_total`, latency + match-score histograms.
-- **Real OpenTelemetry OTLP export on 8 of 10 entity-registry-adjacent
-  services** (§1.3) — link-graph-service (the original reference),
-  person, worker, event, course, place, thing, and organization — each
-  via a working `src/observability.rs` proved against a real
-  in-process collector, not scaffolding.
-- SeaORM SQL query logging toggle (`database.enable_logging`).
+- **OpenTelemetry OTLP export on 10 services** (§1.3) through
+  `axa::opentelemetry`, each proved against an in-process collector.
+- SeaORM SQL query logging toggle (`DB_LOGGING`).
 - Health endpoints on every service; audit-log table + query API;
   event stream (in-memory by default, durable outbox + Fluvio relay
   shipped default-off on all ten registries — §4.5).
 
-### 6.2 Roadmap — scoped to the 3 remaining crates
-
-Everything below is **already done** on link-graph-service, person,
-worker, event, course, place, thing, and organization (§1.3, §3.4–3.5).
-What remains is porting the same shape to **care-pathway, case, and
-portfolio**, which today have no `src/observability.rs` module at all
-(PRO-H12's remaining scope) — not a family-wide gap.
+### 6.2 Roadmap
 
 | Item | Status | Detail |
 |---|---|---|
-| OTLP exporter (span + metric) | **done** on 8/10; **missing** on care-pathway/case/portfolio | Port organization's controller-style version (not a person-style crate's) — organization's `AGENTS.md` documents the adaptation these three, all `src/controllers/`-shaped, will need: exactly one router-construction surface, so the tower middleware layers once. |
-| `traceparent` propagation | **done** on 8/10, inline in the flat `src/observability.rs` (no separate `traces.rs` file — see §3.5) | Same porting task as above. |
-| OTLP metric counterpart (mirrors the Prometheus set) | **done** on 8/10 | Same porting task as above. |
-| `otlp-test-tonic` dev-dependency rename | needed only where a crate **declares** `tonic` at all (tracked by the Cargo.toml, not the gRPC-stub capability row) | Check each remaining crate's own `Cargo.toml` before porting — this tripped up place and thing despite showing `–` on gRPC. |
+| Continuing a caller's trace | not offered by `axa::opentelemetry` | each service's trace starts at its edge; follow a request by its request id |
 | DB connection-pool gauges | deferred, family-wide | surface pool saturation as a first-class metric |
 | Durable event bus | **shipped**, default-off, all ten registries | see [`spec/event-streaming/index.md`](../event-streaming/index.md) — not a roadmap item any more; only actually flipping a deployment's transport, and building the search-re-indexer/cache/analytics consumers, remain open |
 | Background-job metrics | deferred, family-wide | Postgres-backed queue is configured but idle |

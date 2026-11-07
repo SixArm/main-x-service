@@ -565,6 +565,7 @@ dependencies = [
  "async-trait",
  "axa-environment",
  "axa-openapi",
+ "axa-opentelemetry",
  "axa-problem",
  "axa-seaorm",
  "axum 0.8.9",
@@ -598,6 +599,22 @@ dependencies = [
  "axum 0.8.9",
  "serde_json",
  "utoipa",
+]
+
+[[package]]
+name = "axa-opentelemetry"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf39d529ddf1a159ab51648f6b1ea22cb2a82a2cdb7c146efe4cd12e00c5f9dc"
+dependencies = [
+ "axum 0.8.9",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "thiserror 2.0.21",
+ "tracing",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3866,12 +3883,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "opentelemetry-semantic-conventions"
-version = "0.33.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a3cf639fefd3e852869114f9925b578da6dd8e99281a2089bb0e773ead46962"
-
-[[package]]
 name = "opentelemetry_sdk"
 version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6074,11 +6085,7 @@ dependencies = [
  "migration",
  "mimalloc",
  "mockall",
- "opentelemetry",
- "opentelemetry-otlp",
  "opentelemetry-proto",
- "opentelemetry-semantic-conventions",
- "opentelemetry_sdk",
  "prometheus",
  "reqwest 0.13.5",
  "rusty_paseto",
@@ -6102,7 +6109,6 @@ dependencies = [
  "tonic-build",
  "tower 0.5.3",
  "tracing",
- "tracing-opentelemetry",
  "tracing-subscriber",
  "utoipa",
  "uuid",
@@ -6430,9 +6436,11 @@ dependencies = [
  "hyper-util",
  "percent-encoding",
  "pin-project",
+ "rustls-native-certs",
  "socket2 0.6.5",
  "sync_wrapper",
  "tokio",
+ "tokio-rustls",
  "tokio-stream",
  "tokio-util",
  "tower 0.5.3",

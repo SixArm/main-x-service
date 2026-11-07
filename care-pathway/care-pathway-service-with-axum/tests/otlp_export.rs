@@ -1,179 +1,160 @@
-//! End-to-end proof that spans and metrics actually leave this process
-//! over OTLP/gRPC (repo `tasks.md` PRO-H12).
+//! This service's OTLP wiring: a request through [`App::with_telemetry`] and
+//! axa's standard stack is exported to a real OTLP/gRPC collector, with its
+//! metric, and answers with a `traceparent` naming the exported trace.
 //!
-//! Ported from organization-service's `tests/otlp_export.rs` (itself from
-//! course-service's, itself link-graph-service's, the family's first
-//! working exporter). Each case stands up a **real OTLP/gRPC collector
-//! in-process** ([`otlp_collector`]), points the exporter at it, and
-//! asserts on the decoded protobuf that arrives over the socket.
-//!
-//! No external collector, nothing `#[ignore]`d, no database: these run in
-//! a normal `cargo test`.
+//! `axa::opentelemetry` tests its own export pipeline; this proves the
+//! service puts it where it belongs. The collector runs in this process, so
+//! nothing is `#[ignore]`d and no database is needed.
 
 mod otlp_collector;
 
-use std::time::{Duration, Instant};
+use std::net::SocketAddr;
+use std::time::Duration;
 
-use opentelemetry::metrics::MeterProvider as _;
-use opentelemetry::trace::TracerProvider as _;
+use axa::config::Http;
+use axa::opentelemetry::{Config, start};
+use axum::{Router, routing::get};
+use care_pathway_service::app::App;
 use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
-use care_pathway_service::observability::{
-    TelemetryConfig, build_meter_provider, build_tracer_provider,
-};
-
-/// **The headline assertion.** A `tracing` span emitted by ordinary
-/// application code reaches a real OTLP/gRPC endpoint, carrying the
-/// configured `service.name`, the span's own name, and its fields as `OTel`
-/// attributes.
-///
-/// The subscriber is installed with `with_default` rather than `init()`, so
-/// this leaves the process-global subscriber alone and can share a binary
-/// with the cases below.
-#[tokio::test(flavor = "multi_thread")]
-async fn a_tracing_span_reaches_a_real_otlp_collector() {
-    let (endpoint, captured) = otlp_collector::start().await;
-
-    let config = TelemetryConfig {
-        service_name: "care-pathway-service-otlp-test".to_string(),
-        endpoint: Some(endpoint),
-    };
-    let provider = build_tracer_provider(&config)
-        .expect("build tracer provider")
-        .expect("export enabled");
-
-    {
-        let layer =
-            tracing_opentelemetry::layer().with_tracer(provider.tracer("care-pathway-service"));
-        let subscriber = tracing_subscriber::registry().with(layer);
-        tracing::subscriber::with_default(subscriber, || {
-            let span = tracing::info_span!("instances.get", instance.id = "0c4f1e2a-test");
-            let _entered = span.enter();
-            tracing::info!("serving an instance read");
-        });
+/// axa's middleware settings with nothing a request here would notice.
+fn http() -> Http {
+    Http {
+        body_limit: 1024 * 1024,
+        compression: false,
+        timeout_seconds: 0,
+        timeout_overrides: vec![],
+        cors_origins: vec![],
+        hsts: false,
+        hsts_max_age: 0,
+        csp: None,
+        trusted_proxies: vec![],
     }
-
-    provider.force_flush().expect("force flush");
-
-    let seen = captured.clone();
-    assert!(
-        otlp_collector::wait_for(Duration::from_secs(10), || !seen.spans().is_empty()).await,
-        "no OTLP export request reached the collector"
-    );
-
-    // service.name survived the resource -> protobuf trip.
-    let service_names = captured.service_names();
-    assert!(
-        service_names.contains(&"care-pathway-service-otlp-test".to_string()),
-        "expected the configured service.name in the exported resource, got {service_names:?}"
-    );
-
-    // The span itself, by name, with its `tracing` field carried across as
-    // an OTel attribute — i.e. the bridge really bridged.
-    let spans = captured.spans();
-    let span = spans
-        .iter()
-        .find(|span| span.name == "instances.get")
-        .unwrap_or_else(|| {
-            panic!(
-                "exported spans did not include `instances.get`: {:?}",
-                spans.iter().map(|span| &span.name).collect::<Vec<_>>()
-            )
-        });
-    assert!(
-        span.attributes.iter().any(|kv| kv.key == "instance.id"),
-        "the span's `tracing` field did not survive as an OTel attribute"
-    );
-    assert!(
-        !span.trace_id.is_empty() && !span.span_id.is_empty(),
-        "exported span carried no trace/span id"
-    );
-
-    provider.shutdown().ok();
 }
 
-/// The metrics half of the same pipeline: an instrument recorded through the
-/// SDK meter provider is exported over OTLP/gRPC.
 #[tokio::test(flavor = "multi_thread")]
-async fn a_metric_reaches_a_real_otlp_collector() {
+async fn a_served_request_is_exported_with_its_metric_and_traceparent() {
     let (endpoint, captured) = otlp_collector::start().await;
-    let config = TelemetryConfig {
+    let config = Config {
         service_name: "care-pathway-service-otlp-test".to_string(),
+        service_version: env!("CARGO_PKG_VERSION").to_string(),
         endpoint: Some(endpoint),
+        allow_insecure: false,
     };
-    let provider = build_meter_provider(&config)
-        .expect("build meter provider")
-        .expect("export enabled");
+    let telemetry = start(&config).expect("start telemetry");
+    assert!(telemetry.exporting());
+    // The filter stands in for axa's: without one the bridge would export
+    // every `h2` and `hyper` span the exporter's own client makes.
+    tracing_subscriber::registry()
+        .with(telemetry.layers())
+        .with(tracing_subscriber::EnvFilter::new(
+            "axa=info,care_pathway_service=info",
+        ))
+        .init();
 
-    let meter = provider.meter("care-pathway-service");
-    let histogram = meter
-        .f64_histogram("http.server.request.duration")
-        .with_unit("s")
-        .build();
-    histogram.record(
-        0.0125,
-        &[opentelemetry::KeyValue::new("http.request.method", "GET")],
+    let router = Router::new().route("/api/health", get(|| async { "ok" }));
+    let router = App::with_telemetry(router, Some(&telemetry));
+    let router = axa::middleware::apply(router, &http()).expect("standard stack");
+    let listener = tokio::net::TcpListener::bind::<SocketAddr>("127.0.0.1:0".parse().unwrap())
+        .await
+        .expect("bind app");
+    let addr = listener.local_addr().expect("app addr");
+    tokio::spawn(async move {
+        axum::serve(listener, router).await.ok();
+    });
+
+    let response = reqwest::Client::new()
+        .get(format!("http://{addr}/api/health"))
+        .send()
+        .await
+        .expect("request the served app");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let traceparent = response
+        .headers()
+        .get("traceparent")
+        .expect("the response carried no traceparent")
+        .to_str()
+        .expect("traceparent is ASCII")
+        .to_string();
+    let parts: Vec<&str> = traceparent.split('-').collect();
+    assert_eq!(parts.len(), 4, "malformed traceparent: {traceparent}");
+    assert_eq!(
+        parts[1].len(),
+        32,
+        "trace id is not 16 bytes: {traceparent}"
     );
 
-    provider.force_flush().expect("force flush");
+    telemetry.flush();
+    let seen = captured.clone();
+    assert!(
+        otlp_collector::wait_for(Duration::from_secs(10), || {
+            seen.spans().iter().any(|span| span.name == "http-request")
+        })
+        .await,
+        "the request produced no exported span; got {:?}",
+        captured
+            .spans()
+            .iter()
+            .map(|span| span.name.clone())
+            .collect::<Vec<_>>()
+    );
+    let span = captured
+        .spans()
+        .into_iter()
+        .find(|span| span.name == "http-request")
+        .expect("request span");
+    let trace_id: String = span.trace_id.iter().map(|b| format!("{b:02x}")).collect();
+    assert_eq!(parts[1], trace_id, "traceparent names another trace");
+    assert!(
+        captured
+            .service_names()
+            .iter()
+            .any(|name| name == "care-pathway-service-otlp-test"),
+        "the export carried another service.name"
+    );
 
     let seen = captured.clone();
     assert!(
-        otlp_collector::wait_for(Duration::from_secs(10), || !seen.metric_names().is_empty()).await,
-        "no OTLP metric export reached the collector"
+        otlp_collector::wait_for(Duration::from_secs(10), || {
+            seen.metric_names()
+                .iter()
+                .any(|name| name == "http.server.request.duration")
+        })
+        .await,
+        "no request metric was exported; got {:?}",
+        captured.metric_names()
     );
-
-    let names = captured.metric_names();
-    assert!(
-        names.contains(&"http.server.request.duration".to_string()),
-        "expected the recorded instrument in the export, got {names:?}"
-    );
-
-    provider.shutdown().ok();
+    telemetry.shutdown();
 }
 
-/// Export must never be load-bearing for availability: with **no** collector
-/// listening, building the provider, emitting spans, flushing and shutting
-/// down all complete promptly. This is the property that lets export default
-/// to on, per the shared doc, without an activation flag.
-#[tokio::test(flavor = "multi_thread")]
-async fn no_collector_is_not_an_outage() {
-    let config = TelemetryConfig {
+/// With no endpoint, export is off and the router is left as it was.
+#[test]
+fn no_endpoint_means_no_export() {
+    let config = Config {
         service_name: "care-pathway-service".to_string(),
-        endpoint: Some(otlp_collector::dead_endpoint().await),
+        service_version: env!("CARGO_PKG_VERSION").to_string(),
+        endpoint: None,
+        allow_insecure: false,
     };
+    let telemetry = start(&config).expect("start telemetry");
+    assert!(!telemetry.exporting());
+    assert!(telemetry.layers().is_empty());
+}
 
-    let started = Instant::now();
-    let provider = build_tracer_provider(&config)
-        .expect("building an exporter must not fail without a collector")
-        .expect("export enabled");
-    assert!(
-        started.elapsed() < Duration::from_secs(1),
-        "building the exporter blocked on connecting to the collector"
-    );
-
-    {
-        let layer = tracing_opentelemetry::layer().with_tracer(provider.tracer("test"));
-        let subscriber = tracing_subscriber::registry().with(layer);
-        let emitted = Instant::now();
-        tracing::subscriber::with_default(subscriber, || {
-            for _ in 0..100 {
-                let span = tracing::info_span!("no-collector");
-                let _entered = span.enter();
-            }
-        });
-        assert!(
-            emitted.elapsed() < Duration::from_secs(1),
-            "emitting spans blocked while the collector was unreachable"
-        );
-    }
-
-    // A failing flush/shutdown is fine and expected; hanging is not.
-    let torn_down = Instant::now();
-    let _ = provider.force_flush();
-    let _ = provider.shutdown();
-    assert!(
-        torn_down.elapsed() < Duration::from_secs(60),
-        "shutdown hung with an unreachable collector"
-    );
+/// Plain `http` to another host is refused unless `OTLP_ALLOW_INSECURE` is
+/// set, because spans carry what the logs do.
+#[test]
+fn plain_http_to_another_host_is_refused() {
+    let mut config = Config {
+        service_name: "care-pathway-service".to_string(),
+        service_version: env!("CARGO_PKG_VERSION").to_string(),
+        endpoint: Some("http://otel-collector:4317".to_string()),
+        allow_insecure: false,
+    };
+    assert!(start(&config).is_err());
+    config.allow_insecure = true;
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    let telemetry = rt.block_on(async { start(&config).expect("allowed") });
+    assert!(telemetry.exporting());
 }

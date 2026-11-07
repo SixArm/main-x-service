@@ -17,10 +17,8 @@
   rotation (today the fetch happens once at boot), rate limiting,
   security headers.
 - **Observability** — Prometheus is done (`GET /metrics.prom`,
-  `src/metrics.rs`); remaining: the OTLP exporter is still a `TODO`
-  stub (`src/observability/mod.rs` builds an OTel `Resource` and
-  installs a plain JSON `tracing` subscriber, but exports no span or
-  metric over OTLP today), custom domain metrics (`event_created`,
+  `src/metrics.rs`), and so is OTLP export (`axa::opentelemetry`);
+  remaining: custom domain metrics (`event_created`,
   `event_duration_seconds`, `match_score`), Grafana dashboards +
   alerting.
 - **Performance** — time-range query caching, btree_gist exclusion

@@ -174,13 +174,15 @@ from the environment via `Config::from_env`:
 | `MATCHING_THRESHOLD`       | Probabilistic match cutoff | `0.85`                  |
 | `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | `512` |
 | `RUST_LOG`                 | tracing-subscriber filter  | `info`                  |
+| `OTLP_SERVICE_NAME` | service.name sent to the collector | `course-service` |
+| `OTLP_ENDPOINT` | OTLP collector endpoint; unset means export is off | (off) |
+| `OTLP_ALLOW_INSECURE` | Allow plain `http` to a remote collector | off |
 
 **Parsed but not read anywhere else** (legacy pre-loco `Config` fields
 that nothing in `src/` consults — the real bind address/port come from
-axa's own `config/<environment>.yaml`, and there is no OpenTelemetry
-exporter or streaming-broker client in this crate): `GRPC_PORT` (no
-gRPC surface exists at all — not even a stub), `OTLP_SERVICE_NAME` /
-`OTLP_ENDPOINT` (no `src/observability/` module), `STREAMING_BROKER_URL`
+axa's own `config/<environment>.yaml`, and there is no streaming-broker
+client in this crate): `GRPC_PORT` (no gRPC surface exists at all — not
+even a stub), `STREAMING_BROKER_URL`
 / `STREAMING_TOPIC` (superseded by the real durable-bus config below).
 Flagged rather than silently dropped in case a future pass wires or
 removes them.

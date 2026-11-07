@@ -110,48 +110,14 @@ case, and portfolio each provide:
 - **Offline PASETO v4.public verification** + the blanket **ABAC guard**
   (`<ENTITY>_REQUIRE_AUTH`, default-off), via the shared
   `authentication-verifier`
-- **Observability** — structured `tracing` and a Prometheus
-  `/metrics.prom` endpoint, plus **real OpenTelemetry OTLP export**,
-  now **family-wide** as of 2026-09-02 (repo `tasks.md` PRO-H9 +
-  PRO-H12, complete): **person, worker, event** (PRO-H9, 2026-08-28),
-  **course, place, thing** (PRO-H12 slices 1–3, 2026-08-30), and
-  **organization, care-pathway, case, portfolio** (PRO-H12 slices 4–7,
-  2026-08-30 through 2026-09-02) all carry a real exporter
-  (`src/observability.rs` — course's/place's/thing's ported from
-  person's, organization's ported from course's, care-pathway's ported
-  from organization's, case's ported from care-pathway's, and
-  portfolio's ported from case's, which ported from
-  link-graph-service's — see below). Every entity registry in the
-  family now exports real OTLP/gRPC traces and metrics. Organization
-  was the **first of the four controller-style registries**
-  (`src/controllers/`, not person-style `src/api/rest/`) to carry the
-  exporter, and it settled a question the earlier slices left open for
-  this group: it has exactly **one** router-construction surface
-  (`App::routes`/`App::after_routes`), unlike the person-style crates'
-  two, so `trace_mw` is layered once rather than twice. Care-pathway's,
-  case's, and portfolio's slices each **confirmed** rather than assumed
-  the same single-surface shape holds for them too (a fresh grep of
-  `src/`/`tests/` for a second `Router::new()`/`create_router` each
-  time, not carried over from an earlier finding) — all four
-  controller-style registries now share the identical single-surface
-  shape, four for four. Whether a port needs a renamed
-  `otlp-test-tonic` dev-dependency (to avoid an extern-prelude
-  collision) tracks whether the crate **declares** a `tonic` dependency
-  at all — not the gRPC-stub row below, which tracks only whether a
-  `src/api/grpc` module exists: person/worker/event need the rename
-  because they have both; place and thing need it too despite showing
-  `–` on gRPC, because each already declares `tonic` in `Cargo.toml` in
-  anticipation of a not-yet-built gRPC server (place's spec T-4,
-  thing's T-3); course, organization, care-pathway, case, and portfolio
-  needed no rename because none declares a `tonic` dependency at all.
-  Check each crate's actual `Cargo.toml`, not this table, before
-  assuming either way. The cross-cutting **link-graph-service** carries
-  the original reference (`src/observability.rs`: OTLP/gRPC traces +
-  metrics bridged from `tracing` through axa's `App::init_logger`
-  seam, with a per-request span, an `http.server.request.duration`
-  histogram, and a W3C `traceparent` response header, proved against a
-  real in-process collector) that every registry above ported from,
-  directly or by way of an earlier port.
+- **Observability** — structured `tracing`, a Prometheus
+  `/metrics.prom` endpoint, and **OpenTelemetry OTLP export** of traces
+  and the request-duration metric through `axa::opentelemetry` (axa's
+  `opentelemetry` feature), with a W3C `traceparent` on every response.
+  Each crate's own `src/observability.rs`, ported from link-graph-service's
+  under repo `tasks.md` PRO-H9 and PRO-H12, was replaced by axa's on
+  2026-11-07. Export is off unless `OTLP_ENDPOINT` is set; see
+  [observability.md](observability.md).
 - **PostgreSQL** persistence via SeaORM + migrations
 
 ### Capabilities that vary by crate
@@ -280,13 +246,9 @@ These are **not** entity registries and share little of the matrix above:
   world: it consumes every entity's event stream, serves the cross-service
   graph (`neighbors` / `single-view` / freshness), reconciles against each
   service's `entity_links`, audits, and sits behind the blanket guard. No
-  CRUD writes / matching / FHIR. Carries the family's original working
-  OpenTelemetry OTLP exporter (2026-08-05, `src/observability.rs`) — the
-  reference person's own exporter (2026-08-28, PRO-H9) was ported from,
-  and worker/event (PRO-H9) and course/place/thing/organization/
-  care-pathway/case/portfolio (PRO-H12) have since ported in turn —
-  every entity registry in the family now carries a real OTLP exporter
-  (PRO-H12 complete, 2026-09-02).
+  CRUD writes / matching / FHIR. Its `src/observability.rs` (2026-08-05) was the
+  family's first OTLP exporter and the one every registry ported; all of
+  them, link-graph included, now use `axa::opentelemetry` instead.
 
 See [rust-axum-stack.md](rust-axum-stack.md) for the dependency stack.
 

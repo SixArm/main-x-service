@@ -39,35 +39,30 @@ Tiered after the family convention: un-gated unit tests run DB-free in
   `compile_fail` doctest pins the §7 partition rule: `IdentityProbe`
   has no conversion to/from `person_matcher::Person` /
   `worker_matcher::Worker`.
-- **Telemetry config (T-22, `src/observability.rs`)** — the
-  `OTLP_SERVICE_NAME` / `OTLP_ENDPOINT` precedence (defaults, blank
-  service name, the `OTLP_ENDPOINT=""` off-switch), the resource's
-  `service.name` / `service.version`, that building an exporter against
-  an unreachable endpoint neither fails nor blocks, and that a failing
-  export is actually *visible* through the widened `EnvFilter`
-  (`with_exporter_diagnostics`).
+- **Telemetry config (T-22)** — owned and unit-tested by
+  `axa::opentelemetry` since 2026-11-07, not by this crate. This crate's
+  own checks of it live in `tests/otlp_export.rs` (§11.1a): no endpoint
+  means no export, and plain `http` to a remote host is refused without
+  `OTLP_ALLOW_INSECURE`.
 
 ### 11.1a OTLP export (DB-free, **not** `#[ignore]`d)
 
-The one tier that would be worthless as a compile-check, because no
-service in this family had ever exported a span before T-22. Both
-binaries stand up a **real in-process OTLP/gRPC collector** — the
-generated `TraceServiceServer` / `MetricsServiceServer` on an ephemeral
-port (`tests/otlp_collector/`) — and assert on the decoded protobuf that
-crossed the socket, not on in-process SDK state.
+The one tier that would be worthless as a compile-check. The export
+pipeline itself is `axa::opentelemetry`'s and is tested there; this tier
+proves the service wires it where it belongs. It stands up a **real
+in-process OTLP/gRPC collector** — the generated `TraceServiceServer` /
+`MetricsServiceServer` on an ephemeral port (`tests/otlp_collector/`) —
+and asserts on the decoded protobuf that crossed the socket, not on
+in-process SDK state.
 
-- **`tests/otlp_export.rs`** — a `tracing` span reaches the collector
-  carrying the configured `service.name`, the span name, its `tracing`
-  fields as OTel attributes, and non-empty trace/span ids; a recorded
-  instrument reaches it as a named metric; and with **no** collector
-  listening, building, emitting, flushing and shutting down all complete
-  promptly (the property that lets export default to on).
-- **`tests/otlp_middleware.rs`** — the mounted `trace_mw`, over a real
-  Axum server and a real HTTP request: the response's W3C `traceparent`
-  is well-formed **and its trace id equals the exported span's**, so the
-  header demonstrably points at the trace rather than merely looking
-  like one. Its own binary, because it installs a process-global
-  subscriber.
+- **`tests/otlp_export.rs`** — a real HTTP request through
+  `App::with_telemetry` and `axa::middleware::apply` on a served Axum
+  router is exported as axa's `http-request` span carrying the
+  configured `service.name`, with an `http.server.request.duration`
+  metric, and the response's W3C `traceparent` **names the exported
+  span's trace**. Two more cases pin the configuration contract: no
+  endpoint means no export, and plain `http` to a remote host is
+  refused unless `OTLP_ALLOW_INSECURE` is set.
 
 ### 11.2 DB-gated (`#[ignore]`)
 

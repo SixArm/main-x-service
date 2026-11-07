@@ -176,10 +176,9 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ Request/response logging
 - ✅ Error logging with context
 - ✅ Prometheus metrics endpoint — `GET /metrics.prom` (`src/metrics.rs`)
-- ⏳ OpenTelemetry: `src/observability/` builds an OTel `Resource` and
-  installs a JSON `tracing` subscriber, but the OTLP exporter is still
-  a `TODO` stub — no service in this family exports a span or metric
-  over OTLP today (see [`agents/share/overview.md`](../../agents/share/overview.md))
+- ✅ OpenTelemetry OTLP export of traces and the
+  `http.server.request.duration` metric, plus a `traceparent` response
+  header, through `axa::opentelemetry` — off unless `OTLP_ENDPOINT` is set
 
 ## Quick Start
 
@@ -532,7 +531,8 @@ Configuration via environment variables or `.env` file:
 | `GRPC_PORT` | gRPC server port (Tonic stub) | 50051 | No |
 | `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | 512 | No |
 | `OTLP_SERVICE_NAME` | service.name sent to the collector | event-service | No |
-| `OTLP_ENDPOINT` | OTLP collector endpoint | http://localhost:4317 | No |
+| `OTLP_ENDPOINT` | OTLP collector endpoint; unset means export is off | (off) | No |
+| `OTLP_ALLOW_INSECURE` | Allow plain `http` to a remote collector | off | No |
 | `STREAMING_BROKER_URL` | Event-broker connection URL | localhost:9003 | No |
 | `STREAMING_TOPIC` | Topic events publish to | event-events | No |
 | `RUST_LOG`                 | Logging level                | info           | No       |
@@ -712,7 +712,6 @@ event-service-with-axum/
 │   ├── relay.rs           # Durable-bus relay: EventSink, LoggingSink, FluvioSink
 │   ├── privacy/           # Masking, GDPR export, consent
 │   ├── validation/        # Boundary validators + normalisers
-│   ├── observability/     # OTel Resource + JSON tracing subscriber
 │   ├── models/
 │   │   ├── event.rs       # Event model
 │   │   └── mod.rs         # Shared models

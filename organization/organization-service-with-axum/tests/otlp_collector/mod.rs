@@ -2,8 +2,7 @@
 //!
 //! Ported from course-service's `tests/otlp_collector/mod.rs` (PRO-H12,
 //! itself ported from link-graph-service's) — nothing here is
-//! service-specific. Shared by `tests/otlp_export.rs` (the pipeline) and
-//! `tests/otlp_middleware.rs` (the mounted middleware). It is the
+//! service-specific. Used by `tests/otlp_export.rs`. It is the
 //! generated `TraceServiceServer` / `MetricsServiceServer`, served by
 //! tonic on an ephemeral port, capturing every decoded request — so the
 //! assertions are made against the protobuf that actually crossed a

@@ -19,7 +19,7 @@ include = ["src/**/*", "README.md"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { version = "0.6", features = ["sea-orm", "queue", "openapi"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "openapi", "opentelemetry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 # CSV codec for the bulk import/export operator/spreadsheet format
@@ -94,20 +94,6 @@ authentication-verifier = { path = "../../authentication/authentication-verifier
 # broker at all.
 fluvio = { version = "0.50", optional = true }
 
-# Real OpenTelemetry OTLP export (repo tasks.md PRO-H12, slice 6 of 7 —
-# see src/observability.rs's module docs). This crate declares no `tonic`
-# dependency of its own (no gRPC stub), so the span/metric exporters' own
-# `grpc-tonic` feature needs no rename.
-opentelemetry = { version = "0.33", features = ["trace", "metrics"] }
-opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
-opentelemetry-otlp = { version = "0.33", default-features = false, features = [
-  "grpc-tonic",
-  "trace",
-  "metrics",
-] }
-opentelemetry-semantic-conventions = { version = "0.33" }
-tracing-opentelemetry = { version = "0.34" }
-
 [features]
 # PASETO bearer verification (the family default): `Verifier`, the boot key
 # fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
@@ -133,7 +119,7 @@ axum-test = "21"
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
-axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry"] }
 # `mock`: a `DatabaseConnection` that errors on any query, standing in
 # for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
 # prove a code path never touches the database (src/compliance/disclosure.rs).
@@ -159,12 +145,11 @@ base64 = { version = "0.23" }
 # Temp key files for the MAC key-file sourcing tests.
 tempfile = { version = "3" }
 
-# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
-# `tests/otlp_middleware.rs` (PRO-H12, ported from care-pathway-service):
-# the generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
-# server transport, so the export pipeline is proved against a real gRPC
-# listener in a normal `cargo test` run — no external collector, nothing
-# `#[ignore]`d.
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs`: the
+# generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the service's OTLP wiring is proved against a real
+# gRPC listener in a normal `cargo test` run — no external collector,
+# nothing `#[ignore]`d.
 opentelemetry-proto = { version = "0.33", default-features = false, features = [
   "gen-tonic",
   "trace",
@@ -175,8 +160,8 @@ opentelemetry-proto = { version = "0.33", default-features = false, features = [
 # so there is no `E0464` extern-prelude collision to dodge.
 tonic = "0.14"
 tokio-stream = { version = "0.1", features = ["net"] }
-# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
-# HTTP request against a served router; this crate has no other `reqwest`
+# `tests/otlp_export.rs` makes a real HTTP request against a served
+# router; this crate has no other `reqwest`
 # dependency (unlike care-pathway, which has one as a main dependency for
 # its journey traversal).
 reqwest = { version = "0.13", default-features = false, features = [

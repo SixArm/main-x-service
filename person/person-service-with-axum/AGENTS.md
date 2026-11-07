@@ -101,62 +101,29 @@ published without reaching a real broker). `compose.fluvio.yaml` +
 
 ## OpenTelemetry OTLP export
 
-`src/observability.rs` (repo `tasks.md` PRO-H9, landed 2026-08-28) is a
-close port of link-graph-service's `src/observability.rs` — the
-family's first working exporter and this crate's reference. It
-**replaces** the earlier `src/observability/` stub outright (a JSON
-`tracing` subscriber with the OTLP exporter commented out behind
-`// TODO: Initialize OTLP exporter`, never wired into `App`'s `Hooks`
-impl at all) rather than filling the stub in place. `App::init_logger`
-installs it (axa's own `EnvFilter` + formatted layer, plus the
-`tracing-opentelemetry` bridge over an OTLP/gRPC exporter);
-`App::on_shutdown` flushes it. Export is **on by default** — set
-`OTLP_ENDPOINT=""` to disable it — at `OTLP_ENDPOINT` (default
-`http://localhost:4317`) with `service.name` from `OTLP_SERVICE_NAME`
-(default `person-service`); both variables are **deliberately
-unprefixed**, matching link-graph-service and
-`agents/share/rust-tracing-opentelemetry-stack.md`'s config table, not
-the per-service `PERSON_*` convention `PERSON_REQUIRE_AUTH` and its
-siblings use.
+Export comes from `axa::opentelemetry`, axa's `opentelemetry` feature, since
+2026-11-07. The crate's own `src/observability.rs`, a port of
+link-graph-service's, is gone. `App::init_logger` starts it and installs
+axa's logger with its layers, `App::with_telemetry` layers its middleware
+(the `http.server.request.duration` metric and a `traceparent` response
+header) inside axa's standard stack, outermost of the service's own layers
+so a `401` or `403` is measured, and `App::on_shutdown` sends what is
+queued. Spans are axa's per-request `http-request` span and whatever the
+code opens inside it.
 
-**Where this crate's shape forced real adaptation**, beyond the
-`App::init_logger`/`on_shutdown` seam (which ported close to
-verbatim): the router is `api::rest::persons_routes()`, mounted via
-`App::routes`/`App::after_routes`, and tests boot that same router. The
-`observability::trace_mw` tower middleware (per-request span +
-`http.server.request.duration` histogram + W3C `traceparent` response
-header) is its outermost service layer.
+| Variable | Meaning |
+|---|---|
+| `OTLP_ENDPOINT` | Collector URL. **Unset or blank means export is off**, where the old module exported to `http://localhost:4317` by default |
+| `OTLP_SERVICE_NAME` | Replaces `person-service` |
+| `OTLP_ALLOW_INSECURE` | `true` allows plain `http` to a host other than this one. Without it such an endpoint stops the service at boot, because spans carry what the logs do |
 
-A second, narrower adaptation applied at the time: this crate's own
-gRPC stub (`src/api/grpc/`) originally sat on `tonic = "0.12"` while
-the in-process OTLP collector tests needed `tonic = "0.14"`, so the
-dev-dependency was declared as
-`otlp-test-tonic = { package = "tonic", version = "0.14" }` to dodge an
-unrenamed second `tonic` dependency colliding in a test binary's
-extern prelude (`E0464: multiple candidates for rlib dependency
-tonic`). **That rename is gone as of the prost 0.14 migration**
-(2026-09-07): tonic 0.14 split prost codegen out of the core crate
-into `tonic-prost` (runtime) + `tonic-prost-build` (codegen, see
-`build.rs`), and bumping the main gRPC stub to `tonic = "0.14"` to
-pick that up means both dependencies now sit on the same line — no
-collision, no rename, one plain `tonic = "0.14"` dev-dependency. Worker
-and event still carry the collision (both still on `tonic = "0.12"` as
-of this writing) and will need this crate's original rename until they
-make the same prost 0.14 move, at which point they can drop it too.
-The `src/compliance/soup.rs` SOUP-register parser still resolves a
-`package = "…"` inline-table rename to its target crate name (needed
-while the rename existed, and for any future one); see
-`renamed_dependencies_report_their_resolved_package_name`'s doc comment
-for why that logic is unit-tested directly rather than via this
-crate's own manifest now.
+The variables are deliberately unprefixed, unlike `PERSON_*`.
 
-`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
-link-graph-service, with `tests/otlp_collector/` — an in-process
-OTLP/gRPC collector, unchanged) prove real export against a real gRPC
-listener in a normal `cargo test` run: a `tracing` span and a metric
-both reach the collector's decoded protobuf, and a served HTTP request
-returns a `traceparent` whose trace id matches the exported span's.
-None of this needs a database.
+`tests/otlp_export.rs`, with the in-process collector in
+`tests/otlp_collector/`, proves the wiring in a normal `cargo test`: a
+request through `App::with_telemetry` and `axa::middleware::apply` reaches
+the collector as a span and a metric, and its `traceparent` names the
+exported trace. axa tests its own pipeline. None of this needs a database.
 
 ## gRPC server (T-6, repo `tasks.md` PRO-H11 reference)
 

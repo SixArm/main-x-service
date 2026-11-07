@@ -35,8 +35,9 @@ the Main X Index aims at. Items the MVP does not yet meet are marked
   and event streaming on every CRUD *(roadmap)* per
   [`agents/share/auditability.md`](../../agents/share/auditability.md).
 - **NFR-7 — Observability.** Structured tracing (`tracing` +
-  `tracing-subscriber`, JSON logs in production) today; OTLP traces /
-  metrics / logs *(roadmap)* per
+  `tracing-subscriber`, JSON logs in production), plus OTLP traces and
+  request metrics through axa's `opentelemetry` feature when
+  `OTLP_ENDPOINT` is set (off when unset); OTLP logs *(roadmap)* per
   [`agents/share/observability.md`](../../agents/share/observability.md).
 - **NFR-8 — Determinism and explainability.** Matching is a pure,
   total, deterministic function — no clocks, RNGs, IO, or panics in

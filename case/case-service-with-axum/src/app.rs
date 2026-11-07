@@ -2,6 +2,7 @@
 //! registers routes, background workers, and the truncate/seed
 //! lifecycle for `case-service`.
 
+use axa::opentelemetry::Telemetry;
 use axa::{
     AppContext, Environment, Error, Result,
     boot::{BootResult, TestApp},
@@ -27,12 +28,12 @@ use std::sync::OnceLock;
 use crate::{
     auth, controllers,
     models::_entities::{audit_logs, cases, entity_links, merge_records},
-    observability::{self, Telemetry, TelemetryConfig},
     tasks,
 };
 
-/// The installed telemetry providers, so `on_shutdown` can flush what the
-/// batch processor is still holding. Set once by [`App::init_logger`].
+/// OTLP export, started by [`App::init_logger`] when `OTLP_ENDPOINT` is
+/// set, so that `after_routes` can measure requests and `on_shutdown` can
+/// send what is still queued.
 static TELEMETRY: OnceLock<Telemetry> = OnceLock::new();
 
 /// Blanket auth-enforcement middleware. Reads the `CASE_REQUIRE_AUTH`
@@ -72,58 +73,57 @@ async fn require_auth_mw(req: Request, next: Next) -> Response {
 /// axa CLI.
 pub struct App;
 impl App {
-    /// Install this crate's own logging + `OpenTelemetry` stack (repo
-    /// `tasks.md` PRO-H12), returning `true` so axa does **not** also
-    /// install its own. Ported from care-pathway-service's
-    /// `App::init_logger` (itself organization's, itself course's,
-    /// itself person's) — the `App::init_logger` seam is identical
-    /// across crates' shapes despite the differing router layout (see
-    /// `src/observability.rs`'s module docs and `after_routes` below for
-    /// where this crate's shape actually diverges).
+    /// Start OTLP export through `axa::opentelemetry`, and install axa's
+    /// logger with its layers. Returns `false`, so that axa installs its
+    /// plain logger, when `OTLP_ENDPOINT` is unset, which means export is
+    /// off.
+    ///
+    /// `OTLP_ENDPOINT` must be `https`, or loopback, or have
+    /// `OTLP_ALLOW_INSECURE` set, because spans carry what the logs do.
     ///
     /// # Errors
     ///
-    /// Returns an error only if an OTLP exporter cannot be **built** (a
-    /// malformed endpoint). A collector that is merely unreachable is not an
-    /// error: the gRPC channel connects lazily, so boot is unaffected.
+    /// When the endpoint is not a URL, or is plain `http` to another host
+    /// without `OTLP_ALLOW_INSECURE`. A collector that is down is not an
+    /// error: nothing connects until the first export.
     pub fn init_logger(ctx: &AppContext) -> Result<bool> {
-        let telemetry_config = TelemetryConfig::from_env();
-        if !telemetry_config.export_enabled() {
+        let config =
+            axa::opentelemetry::Config::from_env("case-service", env!("CARGO_PKG_VERSION"));
+        let telemetry = axa::opentelemetry::start(&config)
+            .map_err(|error| Error::Message(format!("OTLP: {error}")))?;
+        if !telemetry.exporting() {
             return Ok(false);
         }
-        let logger_config = &ctx.config.logger;
-        // An operator who set `RUST_LOG` or `logger.override_filter` owns
-        // the filter outright; otherwise axa's module whitelist applies,
-        // and the whitelist has no `opentelemetry*` entry — so a failing
-        // export would be silent unless widened.
-        let operator_supplied =
-            std::env::var("RUST_LOG").is_ok() || logger_config.override_filter.is_some();
-        let env_filter = observability::with_exporter_diagnostics(
-            axa::logger::init_env_filter(
-                env!("CARGO_CRATE_NAME"),
-                logger_config.override_filter.as_ref(),
-                &logger_config.level,
-            ),
-            operator_supplied,
+        axa::logger::init_with(
+            env!("CARGO_CRATE_NAME"),
+            &ctx.config.logger,
+            telemetry.layers(),
+            axa::opentelemetry::DIAGNOSTIC_DIRECTIVES,
         );
-        // `logger.enable: false` means "no stdout layer" — honour it rather
-        // than quietly turning logging on for anyone who enables export.
-        let fmt_layer = logger_config
-            .enable
-            .then(|| axa::logger::init_layer(std::io::stdout, &logger_config.format, true));
-        let telemetry = observability::init(&telemetry_config, env_filter, fmt_layer)
-            .map_err(|error| axa::Error::Message(format!("OTLP init failed: {error}")))?;
         tracing::info!(
-            service.name = %telemetry_config.service_name,
-            endpoint = %telemetry_config.endpoint.as_deref().unwrap_or_default(),
-            "OpenTelemetry OTLP export enabled"
+            service.name = %config.service_name,
+            endpoint = %config.endpoint.as_deref().unwrap_or_default(),
+            "otlp_export_started"
         );
         let _ = TELEMETRY.set(telemetry);
         Ok(true)
     }
 
-    /// Flush and tear down the OTLP providers on graceful shutdown, so the
-    /// last batch of spans is not lost with the process.
+    /// Measure each request and put `traceparent` on its response, when
+    /// export is on. It goes inside `axa::middleware::apply`, whose request
+    /// span it reports on.
+    pub fn with_telemetry(router: AxumRouter, telemetry: Option<&Telemetry>) -> AxumRouter {
+        match telemetry {
+            Some(telemetry) => router.layer(axum::middleware::from_fn_with_state(
+                telemetry.http_metrics(),
+                axa::opentelemetry::middleware,
+            )),
+            None => router,
+        }
+    }
+
+    /// Send what OTLP export still holds, on graceful shutdown, so the last
+    /// spans are not lost with the process.
     pub fn on_shutdown(_ctx: &AppContext) {
         if let Some(telemetry) = TELEMETRY.get() {
             telemetry.shutdown();
@@ -176,17 +176,14 @@ impl App {
         // unconditionally; the
         // `CASE_REQUIRE_AUTH` flag is read per request and the layer is a
         // near-noop when the flag is off (the default).
-        Ok(router
+        let router = router
             .layer(axum::middleware::from_fn(require_auth_mw))
             .layer(axum::middleware::from_fn(
                 crate::version::require_version_mw,
-            ))
-            // Outermost layer runs first, so the request span wraps
-            // versioning and the auth guard too — a 401/403 is part of the
-            // trace, not invisible to it. This is this crate's only
-            // router-construction surface — see `src/observability.rs`'s
-            // module docs.
-            .layer(axum::middleware::from_fn(observability::trace_mw)))
+            ));
+        // Outermost of these, so the metric and `traceparent` cover
+        // versioning and the auth guard too: a 401 or 403 is measured.
+        Ok(Self::with_telemetry(router, TELEMETRY.get()))
     }
 
     /// Register background workers.

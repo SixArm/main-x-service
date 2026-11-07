@@ -46,8 +46,9 @@ tracked in §15.
   raised in priority* relative to most sibling entities — see §12,
   §15, §13 T-10.
 - **NFR-8 — Observability.** Structured tracing (`tracing` +
-  `tracing-subscriber`, JSON logs in production) today; OTLP traces /
-  metrics / logs *(roadmap)* per
+  `tracing-subscriber`, JSON logs in production), plus OTLP traces and
+  request metrics through `axa::opentelemetry` when `OTLP_ENDPOINT` is
+  set (off when unset); OTLP logs *(roadmap)* per
   [`agents/share/observability.md`](../../agents/share/observability.md).
 - **NFR-9 — Determinism and explainability.** Matching is a pure,
   total, deterministic function — no clocks, RNGs, IO, or panics in the

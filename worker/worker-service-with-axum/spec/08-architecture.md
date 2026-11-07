@@ -18,7 +18,6 @@ src/
 ├── validation/              # boundary validators + normalisers
 ├── privacy/                 # masking + GDPR export + consent
 ├── config/                  # env loading + Config struct
-├── observability/           # OTLP setup
 ├── error.rs
 └── lib.rs
 ```

@@ -12,8 +12,9 @@ different services**: person *is the same human as* worker, person
 > The read-model core, the four read endpoints, the real Fluvio bus
 > consumer (BUS-2), reconciliation, offline-PASETO auth, the LNK-4
 > cross-service `same_identity` suggestion job, and real OpenTelemetry
-> OTLP export (T-22 — the family's first working exporter, including
-> its Podman `HEALTHCHECK` + non-root container hardening) are all live
+> OTLP export (T-22 — now through `axa::opentelemetry`, off unless
+> `OTLP_ENDPOINT` is set; plus its Podman `HEALTHCHECK` + non-root
+> container hardening) are all live
 > ([`spec/`](spec/index.md), §1–§18; `cargo test --lib`: 104 passed,
 > 2026-08-29); the remaining work (graph-read masking parity with the
 > case service, the durable-bus flip, the bus/governance/bench test

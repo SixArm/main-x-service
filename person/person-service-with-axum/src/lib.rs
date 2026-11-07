@@ -43,9 +43,6 @@ pub mod matching;
 pub mod metrics;
 /// Domain models (Person, Identifier, Organization, Consent, …).
 pub mod models;
-/// Structured logging + real OpenTelemetry OTLP export (traces + metrics),
-/// ported from link-graph-service (PRO-H9).
-pub mod observability;
 /// Data masking, GDPR export, and consent checking.
 pub mod privacy;
 /// Durable event bus **Phase 3**: the outbox relay loop + retention purge.

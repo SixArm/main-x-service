@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { version = "0.6", features = ["sea-orm", "queue", "openapi"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "openapi", "opentelemetry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -119,20 +119,6 @@ aws-credential-types = { version = "1", optional = true }
 # broker at all.
 fluvio = { version = "0.50", optional = true }
 
-# Real OpenTelemetry OTLP export (repo tasks.md PRO-H12, slice 5 of 7 —
-# see src/observability.rs's module docs). This crate declares no `tonic`
-# dependency of its own (no gRPC stub), so the span/metric exporters' own
-# `grpc-tonic` feature needs no rename.
-opentelemetry = { version = "0.33", features = ["trace", "metrics"] }
-opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
-opentelemetry-otlp = { version = "0.33", default-features = false, features = [
-  "grpc-tonic",
-  "trace",
-  "metrics",
-] }
-opentelemetry-semantic-conventions = { version = "0.33" }
-tracing-opentelemetry = { version = "0.34" }
-
 [[bin]]
 name = "care-pathway-service"
 path = "src/bin/main.rs"
@@ -163,7 +149,7 @@ authentication-verifier = { path = "../../authentication/authentication-verifier
 criterion = { version = "0.8", features = ["html_reports"] }
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).
 tempfile = "3"
-axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry"] }
 # `mock`: a `DatabaseConnection` that errors on any query, standing in
 # for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
 # prove a code path never touches the database (src/compliance/disclosure.rs).
@@ -199,12 +185,12 @@ tokio = { version = "1.54", default-features = false, features = [
   "time",
 ] }
 
-# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
-# `tests/otlp_middleware.rs` (PRO-H12, ported from organization-service):
-# the generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
-# server transport, so the export pipeline is proved against a real gRPC
-# listener in a normal `cargo test` run — no external collector, nothing
-# `#[ignore]`d.
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs`: the
+# generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
+# server transport, so the service's OTLP wiring is proved against a real
+# gRPC listener in a normal `cargo test` run — no external collector,
+# nothing `#[ignore]`d. The test's HTTP request uses the main `reqwest`
+# dependency.
 opentelemetry-proto = { version = "0.33", default-features = false, features = [
   "gen-tonic",
   "trace",

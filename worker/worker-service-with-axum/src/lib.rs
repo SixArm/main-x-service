@@ -21,8 +21,8 @@
 //!   log repository for `PostgreSQL`.
 //! - **API surface** ([`api`]) — REST (Axum), FHIR R5, and a gRPC stub.
 //! - **Cross-cutting concerns** — [`validation`], [`privacy`],
-//!   [`streaming`] (event publishing), [`observability`] (OpenTelemetry),
-//!   [`metrics`] (Prometheus), [`config`], and the crate-wide [`error`] types.
+//!   [`streaming`] (event publishing), [`metrics`] (Prometheus),
+//!   OTLP export through `axa::opentelemetry`, [`config`], and the crate-wide [`error`] types.
 //!
 //! # Crate layering
 //!
@@ -82,8 +82,6 @@ pub mod matching;
 pub mod metrics;
 /// Domain models: the [`Worker`](models::Worker) record and its sub-objects.
 pub mod models;
-/// Observability: OpenTelemetry tracing and metrics setup.
-pub mod observability;
 /// Privacy controls: field masking, consent checking, GDPR export.
 pub mod privacy;
 /// Durable event bus Phase 3: the outbox relay worker + retention purge.

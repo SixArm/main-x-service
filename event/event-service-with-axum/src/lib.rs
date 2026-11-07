@@ -26,7 +26,7 @@
 //!   HIPAA-style audit log.
 //! - **APIs** ([`api`]) — REST (Axum), FHIR stubs, gRPC stub.
 //! - **Event streaming** ([`streaming`]) and **observability**
-//!   ([`observability`], [`metrics`]).
+//!   ([`metrics`]; OTLP export comes from `axa::opentelemetry`).
 //!
 //! # Example
 //!
@@ -72,8 +72,6 @@ pub mod matching;
 pub mod metrics;
 /// Domain models (the [`Event`](models::Event) aggregate and friends).
 pub mod models;
-/// OpenTelemetry tracing and metrics setup.
-pub mod observability;
 /// Privacy controls: masking, GDPR export, consent checks.
 pub mod privacy;
 /// Durable event bus Phase 3: the outbox relay loop + retention purge.

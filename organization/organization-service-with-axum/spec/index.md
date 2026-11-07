@@ -168,8 +168,9 @@ embedded library; soft-delete with audit-friendly timestamps.
 | `ORGANIZATION_SEARCH_BOOT_REINDEX` | unset ⇒ **on** | Boot-time self-heal: when the index is empty **and** the table is not, rebuild in the background (`App::after_routes`). Falsy (`0`/`false`/`no`/`off`) ⇒ skip, for a deployment large enough to want the rebuild scheduled by hand. Anything else (including an unrecognised value) leaves it on, because the failure it prevents is silent. |
 | `ORGANIZATION_EVENT_RETENTION_DAYS` | `7` | Outbox row TTL. **Enforced** by the Phase-3 relay's periodic `purge_published` (deletes `published_at < now() - INTERVAL '<n> days'`) when the relay runs ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md) §3). |
 | `ORGANIZATION_BULK_ARTIFACT_DIR` | system temp dir + `organization-bulk-artifacts` | Base directory for BLK-5 bulk import/export artifacts (uploaded input, export output, error report) — `src/bulk/store.rs`, local-filesystem only this rollout step (§10.7). |
-| `OTLP_ENDPOINT` | `http://localhost:4317` | OTLP/gRPC collector endpoint (`src/observability.rs`). Set to the empty string to disable export. **Deliberately not `ORGANIZATION_`-prefixed** — one family-wide variable name, per [`agents/share/rust-tracing-opentelemetry-stack.md`](../../../agents/share/rust-tracing-opentelemetry-stack.md). |
-| `OTLP_SERVICE_NAME` | `organization-service` | `service.name` OTel resource attribute (`src/observability.rs`). Also deliberately unprefixed. |
+| `OTLP_ENDPOINT` | unset ⇒ **off** | OTLP collector endpoint (`axa::opentelemetry`, started in `App::init_logger`). Unset or blank means export is off. Plain `http` is allowed to loopback only, unless `OTLP_ALLOW_INSECURE` is set. **Deliberately not `ORGANIZATION_`-prefixed** — one family-wide variable name, per [`agents/share/rust-tracing-opentelemetry-stack.md`](../../../agents/share/rust-tracing-opentelemetry-stack.md). |
+| `OTLP_SERVICE_NAME` | `organization-service` | `service.name` OTel resource attribute. Also deliberately unprefixed. |
+| `OTLP_ALLOW_INSECURE` | off | `true` allows plain `http` to a collector on another host; without it such an endpoint stops the service at boot, because spans carry what the logs do. |
 
 ## 8. Architecture
 
@@ -1271,10 +1272,11 @@ queue with `provenance = "import"`); the `seed_examples` CLI task
 Postgres-gated test binaries (`enforcement`, `masking`, `outbox_audit`,
 `seed_examples_db`, `fluvio_relay`; §11); Loco scaffolding leftovers
 removed (no workers/tasks/data stubs); real **OpenTelemetry OTLP
-export** (`src/observability.rs`, PRO-H12 slice 4 of 7 — structured
-logging plus a `tracing-opentelemetry` bridge over an OTLP/gRPC
-exporter, `trace_mw` layered on this crate's one router-construction
-surface); green build + clippy.
+export** (`axa::opentelemetry`, axa's `opentelemetry` feature, since
+2026-11-07 — replacing the PRO-H12 slice 4 `src/observability.rs`; its
+middleware layered by `App::with_telemetry` on this crate's one
+router-construction surface; off unless `OTLP_ENDPOINT` is set); green
+build + clippy.
 
 Still open (§13): an `S3`
 `ArtifactStore` backend for BLK-5; a

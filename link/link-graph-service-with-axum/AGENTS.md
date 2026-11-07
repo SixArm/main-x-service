@@ -60,8 +60,8 @@ privacy-masking parity with the case service (T-18), the durable-bus
 flip (T-23), the bus/governance/bench test tiers (T-26..28), and (this
 pass) the documentation-harmonisation sweep LNK-4's completion
 unblocked (DOC-6). T-22 itself is fully done — both its **OTLP export**
-(landed 2026-08-05, `src/observability.rs`, the family's first working
-exporter) and its Podman `HEALTHCHECK` + non-root `USER` directives
+(landed 2026-08-05 as the family's first working exporter, and since
+2026-11-07 provided by `axa::opentelemetry`; see below) and its Podman `HEALTHCHECK` + non-root `USER` directives
 (present in the `Dockerfile` since it was added, 2026-08-03) — see the
 correction in `spec/13-tasks.md` T-22.
 
@@ -132,6 +132,32 @@ the shared design doc first, then the three above.
   every real consumer, this aggregator included, took the path
   dependency rather than the copy-per-project plan §2/§3 originally
   described). Do not fork a local copy without explicit approval.
+
+## OpenTelemetry OTLP export
+
+Export comes from `axa::opentelemetry`, axa's `opentelemetry` feature, since
+2026-11-07. The crate's own `src/observability.rs`, the family's original
+exporter that every other service ported, is gone. `App::init_logger` starts
+it and installs axa's logger with its layers, `App::with_telemetry` layers its
+middleware (the `http.server.request.duration` metric and a `traceparent`
+response header) inside axa's standard stack, outermost of the service's own
+layers so a `401` or `403` from the read guard is measured, and
+`App::on_shutdown` sends what is queued. Spans are axa's per-request
+`http-request` span and whatever the code opens inside it.
+
+| Variable | Meaning |
+|---|---|
+| `OTLP_ENDPOINT` | Collector URL. **Unset or blank means export is off**, where the old module exported to `http://localhost:4317` by default |
+| `OTLP_SERVICE_NAME` | Replaces `link-graph-service` |
+| `OTLP_ALLOW_INSECURE` | `true` allows plain `http` to a host other than this one. Without it such an endpoint stops the service at boot, because spans carry what the logs do |
+
+The variables are deliberately unprefixed, unlike `LINK_GRAPH_*`.
+
+`tests/otlp_export.rs`, with the in-process collector in
+`tests/otlp_collector/`, proves the wiring in a normal `cargo test`: a
+request through `App::with_telemetry` and `axa::middleware::apply` reaches
+the collector as a span and a metric, and its `traceparent` names the
+exported trace. axa tests its own pipeline. None of this needs a database.
 
 ## What does NOT live here
 

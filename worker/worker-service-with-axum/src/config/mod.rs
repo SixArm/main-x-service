@@ -98,9 +98,8 @@ pub struct MatchingConfig {
 
 /// Observability/telemetry configuration.
 ///
-/// Predates [`crate::observability`]'s real OTLP pipeline (PRO-H9) and is
-/// not read by it — that module reads `OTLP_SERVICE_NAME` /
-/// `OTLP_ENDPOINT` directly via [`crate::observability::TelemetryConfig::from_env`],
+/// Not read by OTLP export, which `axa::opentelemetry` configures from
+/// `OTLP_SERVICE_NAME` / `OTLP_ENDPOINT` / `OTLP_ALLOW_INSECURE` directly,
 /// deliberately unprefixed to match the family's shared config table
 /// rather than this crate's `WORKER_`-prefixed convention. This struct
 /// and that pipeline are two independent readers of related-looking

@@ -79,65 +79,34 @@ feature-gated, `#[ignore]`d live-broker round-trip.
 
 ## OpenTelemetry OTLP export
 
-`src/observability.rs` (repo `tasks.md` PRO-H9, landed 2026-08-28) is a
-close port of person-service's `src/observability.rs` (itself ported
-from link-graph-service, the family's first working exporter). It
-**replaces** the earlier `src/observability/` stub outright (a JSON
-`tracing` subscriber with the OTLP exporter commented out behind
-`// TODO: Initialize OTLP exporter`, spread across `mod.rs` +
-`metrics.rs` + `traces.rs`, and never wired into `App`'s `Hooks` impl
-at all — `init_telemetry`/`shutdown_telemetry` had no caller) rather
-than filling the stub in place. `App::init_logger` installs it (axa's
-own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
-bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it.
-Export is **on by default** — set `OTLP_ENDPOINT=""` to disable it —
-at `OTLP_ENDPOINT` (default `http://localhost:4317`) with
-`service.name` from `OTLP_SERVICE_NAME` (default `event-service`);
-both variables are **deliberately unprefixed**, matching
-link-graph-service/person-service and
-`agents/share/rust-tracing-opentelemetry-stack.md`'s config table, not
-the per-service `EVENT_*` convention `EVENT_REQUIRE_AUTH` and its
-siblings use.
+Export comes from `axa::opentelemetry`, axa's `opentelemetry` feature, since
+2026-11-07. The crate's own `src/observability.rs`, a port of
+person-service's, is gone. `App::init_logger` starts it and installs
+axa's logger with its layers, `App::with_telemetry` layers its middleware
+(the `http.server.request.duration` metric and a `traceparent` response
+header) inside axa's standard stack, outermost of the service's own layers
+so a `401` or `403` is measured, and `App::on_shutdown` sends what is
+queued. Spans are axa's per-request `http-request` span and whatever the
+code opens inside it.
 
-**This crate's shape matched person's almost exactly** (both are
-"person-style" crates per `agents/share/architecture.md`), so the port
-needed the same two adaptations, confirmed rather than assumed:
+| Variable | Meaning |
+|---|---|
+| `OTLP_ENDPOINT` | Collector URL. **Unset or blank means export is off**, where the old module exported to `http://localhost:4317` by default |
+| `OTLP_SERVICE_NAME` | Replaces `event-service` |
+| `OTLP_ALLOW_INSECURE` | `true` allows plain `http` to a host other than this one. Without it such an endpoint stops the service at boot, because spans carry what the logs do |
 
-- **One router-construction surface**, as in link-graph-service:
-  `api::rest::events_routes()` + `controllers::fhir::routes()`, mounted
-  via `App::routes`/`App::after_routes`. Tests boot that same router.
-  `observability::trace_mw` is its outermost service layer.
-- **A renamed `tonic` dev-dependency — gone as of the prost 0.14
-  migration (2026-09-07).** This crate originally depended on
-  `tonic = "0.12"` for its own gRPC stub (`src/api/grpc/`), so the
-  in-process OTLP collector tests' `tonic = "0.14"` dev-dependency (used
-  to serve the fake collector) needed the same
-  `otlp-test-tonic = { package = "tonic", version = "0.14" }` rename
-  person-service's did, to dodge an unrenamed second `tonic` dependency
-  colliding in a test binary's extern prelude (`E0464: multiple
-  candidates for rlib dependency tonic`). Bumping the main gRPC stub to
-  `tonic = "0.14"` (forced by Dependabot `prost`/`tonic-build` bumps —
-  tonic 0.12 cannot compile prost 0.14's generated code) put both
-  dependencies on the same line, so the rename is gone: one plain
-  `tonic = "0.14"` dev-dependency.
+The variables are deliberately unprefixed, unlike `EVENT_*`.
 
-**One difference from person's port**: this crate has **no
-`src/compliance/soup.rs`** — its `src/compliance/` module covers only
-row-level integrity (`mac.rs`, `audit_integrity.rs`,
-`record_integrity.rs`; see that module's doc comment), with no SOUP
-register or SBOM endpoint at all. Person's `renamed_package` parser fix
-for a `package = "…"` inline-table rename therefore has nothing to
-port here — checked directly rather than assumed absent.
+The in-process collector's dev-dependencies use plain `tonic = "0.14"`,
+the same line as the gRPC server's, so no `otlp-test-tonic` rename is
+needed. This crate has no SOUP register (`compliance/soup.tsv`), so the
+move needed no register rows.
 
-`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
-person-service, with `tests/otlp_collector/` — an in-process OTLP/gRPC
-collector, unchanged) prove real export against a real gRPC listener
-in a normal `cargo test` run: a `tracing` span and a metric both reach
-the collector's decoded protobuf, and a served HTTP request returns a
-`traceparent` whose trace id matches the exported span's. None of this
-needs a database. `cargo test --lib` grew from 159 to 167 (the eight
-new `observability::tests` unit tests); `cargo test --test otlp_export
---test otlp_middleware` is 4 further tests, all green.
+`tests/otlp_export.rs`, with the in-process collector in
+`tests/otlp_collector/`, proves the wiring in a normal `cargo test`: a
+request through `App::with_telemetry` and `axa::middleware::apply` reaches
+the collector as a span and a metric, and its `traceparent` names the
+exported trace. axa tests its own pipeline. None of this needs a database.
 
 ## gRPC server (T-6, repo `tasks.md` PRO-H11)
 
@@ -148,8 +117,7 @@ rollout. `proto/event.proto` (crate root) defines `EventService` —
 `CreateEvent` / `GetEvent` / `ListEvents` / `DeleteEvent` — compiled
 by `build.rs` (`tonic-prost-build`, pinned to the same 0.14 line as
 the main `tonic`/`tonic-prost` dependencies — tonic 0.14 split prost
-codegen out of `tonic-build` into this crate, 2026-09-07; see the OTLP
-export section above). `App::after_routes` spawns `crate::api::grpc::serve` as
+codegen out of `tonic-build` into this crate, 2026-09-07). `App::after_routes` spawns `crate::api::grpc::serve` as
 a background task on `GRPC_PORT` (config `server.grpc_port`, default
 `50051`) alongside the REST router, sharing one cloned `AppState` — a
 bind/serve failure is logged, not fatal, so REST still boots if the

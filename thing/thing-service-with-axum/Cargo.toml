@@ -38,7 +38,7 @@ serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precis
 sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 
-axa = { version = "0.6", features = ["sea-orm", "openapi"] }
+axa = { version = "0.6", features = ["sea-orm", "openapi", "opentelemetry"] }
 migration = { path = "migration" }
 
 # Search Engine
@@ -52,27 +52,8 @@ utoipa = { version = "6", features = ["axum_extras", "chrono", "uuid"] }
 
 # Data Streaming
 
-# OpenTelemetry (Observability) — real OTLP export (PRO-H12, ported from
-# person-service — see src/observability.rs's module docs). These were
-# previously stale 0.27/0.28 pins with zero consumers (no
-# src/observability module existed at all until this change). `grpc-tonic`
-# (not the crate's default `http-proto` + blocking reqwest): the shared
-# doc's `OTLP_ENDPOINT` default is `http://localhost:4317`, the gRPC
-# port. `internal-logs` is kept ON so a failing export is visible in the
-# log rather than silently dropped. No `logs` feature — this pipeline is
-# traces + metrics only.
-opentelemetry = { version = "0.33", features = ["trace", "metrics"] }
-opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
-opentelemetry-otlp = { version = "0.33", default-features = false, features = [
-  "grpc-tonic",
-  "trace",
-  "metrics",
-  "internal-logs",
-] }
-opentelemetry-semantic-conventions = { version = "0.33" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-opentelemetry = { version = "0.34" }
 
 # Utilities
 uuid = { version = "1.29", features = ["v4", "serde"] }
@@ -123,7 +104,7 @@ keycloak = ["authentication-verifier/keycloak"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa = { version = "0.6", features = ["sea-orm", "testing", "openapi"] }
+axa = { version = "0.6", features = ["sea-orm", "testing", "openapi", "opentelemetry"] }
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
@@ -148,16 +129,14 @@ tower = { version = "0.5", features = ["util"] }
 # Benchmarking
 criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 
-# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
-# `tests/otlp_middleware.rs` (PRO-H12, ported from person-service): the
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs`: the
 # generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
-# server transport, so the export pipeline is proved against a real gRPC
-# listener in a normal `cargo test` run — no external collector, nothing
-# `#[ignore]`d. This `tonic` (0.14, from opentelemetry-otlp's own
-# `grpc-tonic` line) is deliberately a different major version from this
+# server transport, so the service's OTLP wiring is proved against a real
+# gRPC listener in a normal `cargo test` run — no external collector,
+# nothing `#[ignore]`d. This `tonic` (0.14, the line `opentelemetry-proto`
+# generates against) is deliberately a different major version from this
 # crate's main `tonic = "0.12"` dependency — Cargo links both without
-# conflict since they are separate crates to the compiler; there is no
-# version to unify.
+# conflict since they are separate crates to the compiler.
 opentelemetry-proto = { version = "0.33", default-features = false, features = [
   "gen-tonic",
   "trace",
@@ -181,8 +160,8 @@ opentelemetry-proto = { version = "0.33", default-features = false, features = [
 # `use` path in the test files changes.
 otlp-test-tonic = { package = "tonic", version = "0.14" }
 tokio-stream = { version = "0.1", features = ["net"] }
-# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
-# HTTP request against a served router.
+# `tests/otlp_export.rs` makes a real HTTP request against a served
+# router.
 reqwest = { version = "0.13", default-features = false, features = [
   "rustls",
   "json",

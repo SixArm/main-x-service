@@ -76,19 +76,18 @@ disagree, §13 wins.**
 - **Prometheus `/metrics.prom`** (T-21, `src/metrics.rs`) — consumer
   lag, edge counts by status, processed counters, plus the LNK-4
   suggestion-run gauge (below).
-- **OpenTelemetry OTLP export** (T-22, `src/observability.rs`, landed
-  2026-08-05) — **the first working exporter anywhere in this family**;
-  the other services either carry a commented-out stub (person, worker,
-  event) or nothing. Traces and metrics over OTLP/**gRPC**, bridged from
-  `tracing` and installed through axa's `App::init_logger` seam so
-  axa's own `EnvFilter` policy and log format are reused rather than
-  re-derived; flushed from `on_shutdown`; `trace_mw` adds a per-request
-  span, an `http.server.request.duration` histogram, and the W3C
-  `traceparent` response header. On by default (`OTLP_ENDPOINT`,
-  `OTLP_SERVICE_NAME`); `OTLP_ENDPOINT=""` turns it off. Proved against a
-  real in-process OTLP/gRPC collector in `tests/otlp_export.rs` +
-  `tests/otlp_middleware.rs` (neither `#[ignore]`d, neither needing a
-  database).
+- **OpenTelemetry OTLP export** (T-22, landed 2026-08-05 as **the
+  first working exporter anywhere in this family**; since 2026-11-07
+  provided by `axa::opentelemetry`, axa's `opentelemetry` feature, with
+  the crate's own `src/observability.rs` removed). Traces and metrics
+  over OTLP/**gRPC**, started in `App::init_logger` and installed through
+  axa's logger; sent on `on_shutdown`; `App::with_telemetry` adds an
+  `http.server.request.duration` histogram and the W3C `traceparent`
+  response header over axa's per-request `http-request` span. Off unless
+  `OTLP_ENDPOINT` is set (`OTLP_SERVICE_NAME` names the service; plain
+  `http` to a remote host needs `OTLP_ALLOW_INSECURE=true`). Proved
+  against a real in-process OTLP/gRPC collector in `tests/otlp_export.rs`
+  (not `#[ignore]`d, no database).
 - **Cross-service `same_identity` suggestion (LNK-4, T-29..T-33,
   `src/suggest/`, complete 2026-08-04)** — the pure `IdentityProbe`
   comparator + candidate blocking (`mod.rs`), the periodic fetch→block→

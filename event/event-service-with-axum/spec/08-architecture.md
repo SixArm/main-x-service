@@ -22,7 +22,6 @@ src/
 ├── validation/              # boundary validators + normalisers
 ├── privacy/                 # masking + GDPR export + consent
 ├── config/                  # env loading + Config struct
-├── observability/           # OTel Resource + JSON tracing subscriber (OTLP export not yet wired)
 ├── metrics.rs               # Prometheus text-exposition (GET /metrics.prom)
 ├── error.rs
 └── lib.rs

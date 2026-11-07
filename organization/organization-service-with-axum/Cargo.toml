@@ -21,7 +21,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # an advance against one design family does not transfer.
 sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
-axa = { version = "0.6", features = ["sea-orm", "queue", "openapi"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "openapi", "opentelemetry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -70,20 +70,6 @@ authentication-verifier = { path = "../../authentication/authentication-verifier
 # the relay's `LoggingSink` covers dev/CI with no broker at all.
 fluvio = { version = "0.50", optional = true }
 
-# Real OpenTelemetry OTLP export (repo tasks.md PRO-H12, slice 4 of 7 —
-# see src/observability.rs's module docs). This crate declares no `tonic`
-# dependency of its own (no gRPC stub, unlike person/worker/event), so the
-# span/metric exporters' own `grpc-tonic` feature needs no rename.
-opentelemetry = { version = "0.33", features = ["trace", "metrics"] }
-opentelemetry_sdk = { version = "0.33", features = ["trace", "metrics"] }
-opentelemetry-otlp = { version = "0.33", default-features = false, features = [
-  "grpc-tonic",
-  "trace",
-  "metrics",
-] }
-opentelemetry-semantic-conventions = { version = "0.33" }
-tracing-opentelemetry = { version = "0.34" }
-
 [features]
 # PASETO bearer verification (the family default): `Verifier`, the boot key
 # fetch and the rotation refresh. Turn it off (`--no-default-features`) for a
@@ -108,7 +94,7 @@ required-features = []
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
-axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi"] }
+axa = { version = "0.6", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry"] }
 # The `TestServer` axa's testing harness hands to a request test, and
 # `multipart::{MultipartForm, Part}` for the BLK-5 bulk-import request
 # tests (`tests/requests/bulk.rs`). Named explicitly so those tests can
@@ -139,12 +125,11 @@ tokio = { version = "1.54", default-features = false, features = [
   "time",
 ] }
 
-# An in-process OTLP/gRPC collector for `tests/otlp_export.rs` /
-# `tests/otlp_middleware.rs` (PRO-H12, ported from course-service): the
+# An in-process OTLP/gRPC collector for `tests/otlp_export.rs`: the
 # generated `TraceServiceServer` / `MetricsServiceServer` plus tonic's
-# server transport, so the export pipeline is proved against a real gRPC
-# listener in a normal `cargo test` run — no external collector, nothing
-# `#[ignore]`d.
+# server transport, so the service's OTLP wiring is proved against a real
+# gRPC listener in a normal `cargo test` run — no external collector,
+# nothing `#[ignore]`d.
 opentelemetry-proto = { version = "0.33", default-features = false, features = [
   "gen-tonic",
   "trace",
@@ -155,9 +140,8 @@ opentelemetry-proto = { version = "0.33", default-features = false, features = [
 # so there is no `E0464` extern-prelude collision to dodge.
 tonic = "0.14"
 tokio-stream = { version = "0.1", features = ["net"] }
-# The mounted-middleware test (`tests/otlp_middleware.rs`) makes a real
-# HTTP request against a served router; this crate has no other direct
-# `reqwest` dependency.
+# `tests/otlp_export.rs` makes a real HTTP request against a served
+# router; this crate has no other direct `reqwest` dependency.
 reqwest = { version = "0.13", default-features = false, features = [
   "rustls",
   "json",

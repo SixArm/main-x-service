@@ -497,79 +497,46 @@ src/
 │   ├── bulk_jobs.rs        queued→running→terminal job lifecycle, shared by FHIR $export and native bulk import/export (submit/submit_with_ttl, set_input_url, finish_import, complete, fail)
 │   ├── review_queue.rs      T-10: the duplicate-review queue (raw SQL, no SeaORM entity) — upsert/list/decide
 │   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox,bulk_jobs,pathway_instances,instance_steps,instance_team,instance_events,instance_measures,instance_segments}.rs  SeaORM entities
-├── observability.rs       structured logging + real OpenTelemetry OTLP export (PRO-H12 slice 5 — see below)
 migration/src/            …care_pathways, …audit_logs, …merge_records, …event_outbox, …instances (m20260720_…), …outcomes, …compliance (m20260725_000007), …record_integrity, …bulk_jobs, …review_queue (m20260912_000016)
 config/                   development/production/test yaml
 compose.fluvio.yaml        opt-in local Fluvio broker (`fluvio` feature, BUS-3; not part of CI)
 Dockerfile.fluvio-cli       support image for compose.fluvio.yaml's sc-setup step
 tests/fluvio_relay.rs       `fluvio`-feature-gated, #[ignore]d live-broker round-trip test
 compliance/                crate-root IEC 62304 evidence: lifecycle.md, soup.tsv, traceability.tsv
-tests/otlp_export.rs       real OTLP/gRPC export proof, in-process collector, no database
-tests/otlp_middleware.rs   the mounted `trace_mw` layer proved end to end over a real HTTP request
-tests/otlp_collector/      the shared in-process OTLP/gRPC collector both otlp_* binaries use
+tests/otlp_export.rs       the service's OTLP wiring proved over a real HTTP request, in-process collector, no database
+tests/otlp_collector/      the in-process OTLP/gRPC collector tests/otlp_export.rs uses
 ```
 
 ## OpenTelemetry OTLP export
 
-`src/observability.rs` (repo `tasks.md` PRO-H12 slice 5 of 7, landed
-2026-09-01) is a close port of organization-service's
-`src/observability.rs` — itself a port of course's, itself person's,
-itself link-graph-service's, the family's first working exporter. This
-crate carried **no** `src/observability` module at all before this
-change, and is the **second of the four controller-style registries**
-(organization, care-pathway, case, portfolio — `src/controllers/`, not
-`src/api/rest/`) to carry it. `App::init_logger` installs it (axa's
-own `EnvFilter` + formatted layer, plus the `tracing-opentelemetry`
-bridge over an OTLP/gRPC exporter); `App::on_shutdown` flushes it.
-Export is **on by default** — set `OTLP_ENDPOINT=""` to disable it —
-at `OTLP_ENDPOINT` (default `http://localhost:4317`) with
-`service.name` from `OTLP_SERVICE_NAME` (default
-`care-pathway-service`); both variables are **deliberately
-unprefixed**, matching every other crate that carries this pipeline,
-not the per-service `CARE_PATHWAY_*` convention
-`CARE_PATHWAY_REQUIRE_AUTH` and its siblings use.
+Export comes from `axa::opentelemetry`, axa's `opentelemetry` feature, since
+2026-11-07. The crate's own `src/observability.rs`, a port of
+organization-service's, is gone. `App::init_logger` starts it and installs
+axa's logger with its layers, `App::with_telemetry` layers its middleware
+(the `http.server.request.duration` metric and a `traceparent` response
+header) inside axa's standard stack, outermost of the service's own layers
+so a `401` or `403` is measured, and `App::on_shutdown` sends what is
+queued. Spans are axa's per-request `http-request` span and whatever the
+code opens inside it. `App::after_routes` is this crate's only
+router-construction surface, so the middleware is layered once there.
 
-**Where this crate's shape forced real adaptation**, confirmed rather
-than assumed:
+| Variable | Meaning |
+|---|---|
+| `OTLP_ENDPOINT` | Collector URL. **Unset or blank means export is off**, where the old module exported to `http://localhost:4317` by default |
+| `OTLP_SERVICE_NAME` | Replaces `care-pathway-service` |
+| `OTLP_ALLOW_INSECURE` | `true` allows plain `http` to a host other than this one. Without it such an endpoint stops the service at boot, because spans carry what the logs do |
 
-- **Exactly one router-construction surface**, unlike the person-style
-  crates' two. This crate is genuinely controller-style: `App::routes` +
-  `App::after_routes` in `src/app.rs` is the only place a router gets
-  built — confirmed by grepping `src/` and `tests/` for a second
-  `Router::new()`/`create_router`: the one hit (`src/auth.rs`) is a
-  unit test for the auth middleware itself, not an app-level router,
-  and the request-level test suites (`tests/enforcement.rs`,
-  `tests/masking.rs`, …) boot the real `App` via axa's own testing
-  harness rather than a second hand-rolled router.
-  `observability::trace_mw` is therefore layered **once**, as the
-  outermost middleware in `after_routes` — the same precedent
-  `require_auth_mw` and `require_version_mw` already set by being
-  layered there.
-- **No `tonic` rename needed** — this crate declares no `tonic`
-  dependency of its own (no gRPC stub — `agents/share/overview.md`'s
-  capability matrix), so the in-process OTLP collector tests' `tonic
-  0.14` dev-dependency is a plain, un-renamed dependency, exactly as
-  course's and organization's are.
-- **A new SOUP-register bookkeeping step the other four ports had no
-  equivalent of.** This crate is the family's IEC 62304 SOUP-register
-  reference implementation (`compliance/soup.tsv`, verified live by
-  `every_direct_dependency_is_annotated`), so the eight new
-  dependencies (five main, three test-only) each needed a `name<TAB>
-  purpose<TAB>safety relevance` row before `cargo test --lib` was
-  green — found by running the test, not anticipated in advance.
+The variables are deliberately unprefixed, unlike `CARE_PATHWAY_*`.
 
-`tests/otlp_export.rs` and `tests/otlp_middleware.rs` (ported from
-organization-service, with `tests/otlp_collector/` — an in-process
-OTLP/gRPC collector, unchanged) prove real export against a real gRPC
-listener in a normal `cargo test` run: a `tracing` span and a metric
-both reach the collector's decoded protobuf, and a served HTTP request
-returns a `traceparent` whose trace id matches the exported span's.
-None of this needs a database. Landing this raised `cargo test --lib`
-from 308 to 316 (8 new `src/observability.rs` unit tests), plus 4 new
-tests across the two `tests/otlp_*.rs` binaries. Verified
-independently: `cargo fmt --check`, `cargo clippy --all-targets -- -D
-warnings`, `cargo deny check`, `cargo bench --no-run`, and the MSRV
-check (`cargo +1.96 check --all-targets`) all clean.
+`tests/otlp_export.rs`, with the in-process collector in
+`tests/otlp_collector/`, proves the wiring in a normal `cargo test`: a
+request through `App::with_telemetry` and `axa::middleware::apply` reaches
+the collector as a span and a metric, and its `traceparent` names the
+exported trace. axa tests its own pipeline. None of this needs a database.
+
+The SOUP register (`compliance/soup.tsv`) no longer lists the
+`opentelemetry*` and `tracing-opentelemetry` crates; the `axa` row covers
+export now.
 
 ## Container image
 
