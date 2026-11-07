@@ -54,13 +54,14 @@
 //! two documented leans: auto-provisioning would let the `IdP` control
 //! account creation, which a deployment should opt into, not inherit.
 
+use axa::extract::Query;
 use std::sync::OnceLock;
 use std::time::Duration;
 
 use axa::client::ClientAddr;
 use axa::error::ErrorDetail;
 use axa::prelude::*;
-use axum::extract::{Query, State};
+use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::Redirect;
 use base64::Engine;

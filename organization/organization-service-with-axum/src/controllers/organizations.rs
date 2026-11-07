@@ -6,6 +6,7 @@
 //! adapter to drift.
 
 use axa::error::ErrorDetail;
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::http::StatusCode;
 use organization_matcher::{MatchConfig, MatchingEngine, Organization};
@@ -326,10 +327,7 @@ async fn remove(
 /// returned before it was paginated, so no existing caller changes. An
 /// `offset` beyond [`MAX_OFFSET`] is a `400`.
 #[debug_handler]
-async fn list(
-    axum::extract::Query(page): axum::extract::Query<PageParams>,
-    State(ctx): State<AppContext>,
-) -> Result<Response> {
+async fn list(Query(page): Query<PageParams>, State(ctx): State<AppContext>) -> Result<Response> {
     page.check_offset()?;
     let (limit, offset) = page.resolve(LIST_DEFAULT_LIMIT);
     let rows = OrgModel::list_paged(&ctx.db, limit, offset).await?;
@@ -725,7 +723,7 @@ struct ReviewQueueListResponse {
 /// status token is `422`.
 #[debug_handler]
 async fn get_review_queue(
-    axum::extract::Query(query): axum::extract::Query<ReviewQueueListQuery>,
+    Query(query): Query<ReviewQueueListQuery>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     if let Some(status) = query.status.as_deref()
@@ -859,7 +857,7 @@ pub const SEARCH_DEFAULT_LIMIT: u64 = 50;
 /// an index entry for a deleted record cannot surface here.
 #[debug_handler]
 async fn search(
-    axum::extract::Query(params): axum::extract::Query<SearchParams>,
+    Query(params): Query<SearchParams>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let q = params.q.clone().unwrap_or_default();

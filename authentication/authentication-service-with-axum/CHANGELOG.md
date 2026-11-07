@@ -12,6 +12,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Handlers take `Json`, `Path` and `Query` from `axa::extract` instead of
+  axum. A request they cannot read is answered with a problem whose
+  `detail` says what was wrong, without quoting what was sent, where
+  axum's rejection reached the caller as a bare status. Statuses are
+  unchanged. FHIR handlers keep axum's.
+
+### Changed
+
 - API version negotiation comes from `axa::versioning` (axa's `versioning`
   feature). The crate's own version module is gone; it behaved the same,
   serving only `1.0` on `/api` paths. **An unsupported `Accepts-version`

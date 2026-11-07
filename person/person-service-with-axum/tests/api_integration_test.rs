@@ -543,6 +543,46 @@ async fn test_search_rejects_out_of_bound_offset() {
     );
 }
 
+/// A body that does not fit is a problem that says what was wrong, through
+/// `axa::extract::Json`, and quotes nothing the caller sent. Axum's own
+/// extractor answered with a bare status.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn test_a_malformed_body_is_a_problem_saying_what_was_wrong() {
+    let app = common::create_test_router().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/persons")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"name": "a-secret-value-42"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        response.headers()["content-type"],
+        "application/problem+json"
+    );
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let problem: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(problem["code"], "unprocessable_entity", "{problem}");
+    let detail = problem["detail"]
+        .as_str()
+        .expect("the problem says what was wrong");
+    assert!(!detail.is_empty());
+    assert!(
+        !detail.contains("a-secret-value-42"),
+        "the detail quotes the request: {detail}"
+    );
+}
+
 /// `GET /api/persons/{id}` for an unknown id returns 404.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]

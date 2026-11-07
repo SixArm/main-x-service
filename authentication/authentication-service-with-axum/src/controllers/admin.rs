@@ -29,12 +29,12 @@
 //! [`agents/share/authorization-attributes.md`]:
 //!     ../../../agents/share/authorization-attributes.md
 
+use axa::extract::{Json, Path};
 use std::collections::BTreeMap;
 
 use axa::client::ClientAddr;
 use axa::error::ErrorDetail;
 use axa::prelude::*;
-use axum::extract::Path;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 

@@ -2,6 +2,7 @@
 //! `bed-management.md`; PF-D7: the allocator advises, the operator
 //! decides).
 
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};

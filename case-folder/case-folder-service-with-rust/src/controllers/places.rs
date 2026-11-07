@@ -7,10 +7,10 @@
 //! `POST /api/places` writes back to the Main Place Service. The
 //! tracker keeps no local places table.
 
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::{
-    Extension, Json, debug_handler,
-    extract::{Path, Query},
+    Extension, debug_handler,
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };

@@ -8,9 +8,10 @@
 //! - `GET  /api/auth/me`      — the signed-in user, or `401`.
 //! - `POST /api/auth/logout`  — clear the session cookie.
 
+use axa::extract::Json;
 use axa::prelude::*;
 use axum::{
-    Extension, Json, debug_handler,
+    Extension, debug_handler,
     http::{HeaderMap, HeaderValue, StatusCode, header::SET_COOKIE},
     response::{IntoResponse, Response},
 };

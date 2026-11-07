@@ -14,6 +14,7 @@
 //! the same category of action the periodic worker already performs.
 
 use axa::error::ErrorDetail;
+use axa::extract::Path;
 use axa::prelude::*;
 use axum::http::StatusCode;
 

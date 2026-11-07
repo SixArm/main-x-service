@@ -29,6 +29,7 @@
 //! *unconditionally* in [`crate::analytics`] — never produced, not
 //! merely withheld by default — so there is no unmasked view to gate.
 
+use axa::extract::{Path, Query};
 use std::collections::{BTreeMap, HashMap};
 
 use axa::error::ErrorDetail;

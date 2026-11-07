@@ -3,11 +3,11 @@
 //! ([`crate::events`]). Every graph response carries an `as_of`
 //! watermark (spec §6 FR-17).
 
+use axa::extract::{Path, Query};
 use std::collections::{HashMap, HashSet};
 
 use axa::client::ClientAddr;
 use axa::prelude::*;
-use axum::extract::Query;
 use axum::http::HeaderMap;
 use axum::http::header::USER_AGENT;
 use chrono::{DateTime, FixedOffset, Utc};

@@ -14,8 +14,8 @@
 //! since the whole point is that an auditor can read the posture, and
 //! nothing here discloses pathway data.
 
+use axa::extract::{Json, Query};
 use axa::prelude::*;
-use axum::extract::Query;
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 

@@ -6,6 +6,7 @@
 //! adapter to drift.
 
 use axa::error::ErrorDetail;
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::http::StatusCode;
 use care_pathway_matcher::{CarePathway, MatchConfig, MatchingEngine};
@@ -560,7 +561,7 @@ async fn remove(
 /// Propagates DB query errors.
 #[debug_handler]
 async fn list(
-    axum::extract::Query(params): axum::extract::Query<ListParams>,
+    Query(params): Query<ListParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
@@ -603,7 +604,7 @@ async fn list(
 /// `400` when `q` is absent or whitespace-only; otherwise DB errors.
 #[debug_handler]
 async fn search(
-    axum::extract::Query(params): axum::extract::Query<SearchParams>,
+    Query(params): Query<SearchParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,

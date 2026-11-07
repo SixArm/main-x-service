@@ -6,10 +6,10 @@
 //! a patient that worker has handled. The tracker stores nothing about
 //! workers itself.
 
+use axa::extract::{Path, Query};
 use axa::prelude::*;
 use axum::{
     Extension, Json, debug_handler,
-    extract::{Path, Query},
     response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};

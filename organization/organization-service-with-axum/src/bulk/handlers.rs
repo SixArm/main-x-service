@@ -19,11 +19,12 @@
 //! ahead of the `/{pid}` capture, mirroring the convention already
 //! documented on `controllers::organizations::routes`.
 
+use axa::extract::{Json, Path, Query};
 use std::collections::BTreeMap;
 
 use axa::error::ErrorDetail;
 use axa::prelude::*;
-use axum::extract::{Multipart, Path, Query, State};
+use axum::extract::{Multipart, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use serde::{Deserialize, Serialize};
@@ -302,7 +303,7 @@ async fn export_organizations(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     headers: HeaderMap,
-    axum::Json(req): axum::Json<ExportRequest>,
+    Json(req): Json<ExportRequest>,
 ) -> Result<Response> {
     let idempotency_key = idempotency_key_of(&headers);
     let format = parse_format(req.format.as_deref())?;

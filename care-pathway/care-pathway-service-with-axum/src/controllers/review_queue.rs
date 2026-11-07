@@ -16,8 +16,9 @@
 //! without disturbing a pair a human already decided.
 
 use axa::error::ErrorDetail;
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
-use axum::extract::{Path, Query, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use care_pathway_matcher::{MatchConfig, MatchingEngine};
 use serde::{Deserialize, Serialize};
@@ -155,7 +156,7 @@ struct BatchDeduplicationResponse {
 /// Propagates DB query, payload-parse, and review-queue-write errors.
 async fn deduplicate(
     State(ctx): State<AppContext>,
-    axum::Json(req): axum::Json<BatchDeduplicationRequest>,
+    Json(req): Json<BatchDeduplicationRequest>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
     let rows = PathwayModel::list(&ctx.db, CHECK_DUPLICATES_SCAN_CAP).await?;
@@ -285,7 +286,7 @@ async fn review_decision(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     Path(id): Path<uuid::Uuid>,
-    axum::Json(req): axum::Json<ReviewDecisionRequest>,
+    Json(req): Json<ReviewDecisionRequest>,
 ) -> Result<Response> {
     let token = review_status_token(match req.status {
         ReviewDecision::Confirmed => ReviewStatus::Confirmed,

@@ -12,12 +12,8 @@
 //! appropriate [`StatusCode`](axum::http::StatusCode).
 
 use crate::api::{ApiProblem, ok};
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axa::extract::{Json, Path, Query};
+use axum::{extract::State, http::StatusCode, response::IntoResponse};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;

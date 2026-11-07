@@ -72,6 +72,15 @@ traffic, such as one host's private bridge in `examples/compose`.
 `AXA_DESTROY_DATA=true`. `axa::cli::parse` refuses them before the service does
 anything, and `--environment` cannot lift that.
 
+## Extractors
+
+Take `Json`, `Path`, and `Query` from `axa::extract`, not axum, in REST
+handlers. A request they cannot read is answered with a problem whose
+`detail` says what was wrong and quotes nothing the caller sent; axum's
+own rejection reaches the caller with no `detail`. `axa::extract::Json`
+is a response type too. `axa::prelude` still exports axum's, so import
+these explicitly.
+
 ## Router order
 
 `App::router` builds the routes with `into_router`, adds the service's own layers in

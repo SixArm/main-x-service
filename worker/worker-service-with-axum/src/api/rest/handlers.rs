@@ -15,13 +15,9 @@
 
 use crate::api::{ApiProblem, ok};
 use axa::client::ClientAddr;
+use axa::extract::{Json, Path, Query};
 use axum::response::Response;
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

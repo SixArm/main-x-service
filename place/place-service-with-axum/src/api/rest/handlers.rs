@@ -4,9 +4,9 @@
 //! ([`ApiProblem`]) with an HTTP status. Errors map: [`crate::Error::NotFound`] → 404,
 //! `Validation` → 422, `Conflict` → 409, everything else → 500.
 
+use axa::extract::{Json, Path, Query};
 use axum::{
-    Json,
-    extract::{Path, Query, State},
+    extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
 };

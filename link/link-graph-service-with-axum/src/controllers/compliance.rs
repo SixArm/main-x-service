@@ -20,8 +20,8 @@
 //! Behind the blanket auth + ABAC guard when `LINK_GRAPH_REQUIRE_AUTH` is on, and a
 //! read, so the default policy admits any authenticated caller.
 
+use axa::extract::Query;
 use axa::prelude::*;
-use axum::extract::Query;
 use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 

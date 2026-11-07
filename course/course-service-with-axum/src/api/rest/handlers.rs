@@ -14,12 +14,8 @@
 //! - `Error::Database` / `Error::Search` / `Error::Matching` / etc → 500
 
 use crate::api::{ApiProblem, ok};
-use axum::{
-    Json,
-    extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
-};
+use axa::extract::{Json, Path, Query};
+use axum::{extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};

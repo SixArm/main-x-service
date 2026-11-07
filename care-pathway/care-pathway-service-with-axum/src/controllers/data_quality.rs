@@ -10,6 +10,7 @@
 //! `<ENTITY>_REQUIRE_AUTH` guard rather than
 //! [`crate::controllers::exports`]'s elevated `Destructive` gate.
 
+use axa::extract::{Path, Query};
 use axa::prelude::*;
 use sea_orm::QueryOrder;
 use uuid::Uuid;

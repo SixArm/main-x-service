@@ -6,10 +6,10 @@
 //! a move event and updates the cabinet for every member folder, then
 //! updates the volume's own cabinet pointer.
 
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::{
-    Extension, Json, debug_handler,
-    extract::{Path, Query},
+    Extension, debug_handler,
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };

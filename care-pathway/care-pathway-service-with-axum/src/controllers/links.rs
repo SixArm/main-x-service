@@ -57,6 +57,7 @@
 //! is a document, not a person, and knowing one exists discloses
 //! nothing about anybody.
 
+use axa::extract::{Json, Path, Query};
 use std::collections::BTreeMap;
 
 use authentication_verifier::Action;

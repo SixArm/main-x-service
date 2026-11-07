@@ -1,10 +1,10 @@
 //! REST handlers for the Thing Service.
 
 use crate::api::{ApiProblem, ok};
+use axa::extract::{Json, Path, Query};
 use axum::response::Response;
 use axum::{
-    Json,
-    extract::{Path, Query, State},
+    extract::State,
     http::{HeaderMap, HeaderValue, StatusCode},
     response::IntoResponse,
 };

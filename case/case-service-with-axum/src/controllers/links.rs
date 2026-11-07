@@ -34,6 +34,7 @@
 //! `403`: a case is not disclosed merely by existing, but *this case has
 //! a subject* is the disclosure the link endpoints exist to protect.
 
+use axa::extract::{Json, Path, Query};
 use std::collections::BTreeMap;
 
 use authentication_verifier::Action;
@@ -377,7 +378,7 @@ fn authorize_bulk(caller: &MaybeAuthUser) -> Result<()> {
 /// read; `422` when `since` is not valid RFC3339; a DB error on the query.
 #[debug_handler]
 async fn bulk_links(
-    axum::extract::Query(params): axum::extract::Query<BulkParams>,
+    Query(params): Query<BulkParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
 ) -> Result<Response> {

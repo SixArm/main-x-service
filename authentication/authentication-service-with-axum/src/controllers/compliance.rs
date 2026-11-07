@@ -44,8 +44,8 @@
 //! limit beyond authentication). See `spec/index.md` §16 for the full
 //! reasoning and the rejected alternatives.
 
+use axa::extract::Query;
 use axa::prelude::*;
-use axum::extract::Query;
 use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 

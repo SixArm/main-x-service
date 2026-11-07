@@ -6,6 +6,7 @@
 
 use authentication_verifier::Action;
 use axa::error::ErrorDetail;
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::http::StatusCode;
 use case_matcher::{Case, MatchConfig, MatchingEngine};
@@ -550,7 +551,7 @@ async fn remove(
 /// A DB error when the query fails.
 #[debug_handler]
 async fn list(
-    axum::extract::Query(params): axum::extract::Query<ListParams>,
+    Query(params): Query<ListParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
@@ -604,7 +605,7 @@ async fn list(
 /// unavailable; a DB error when the query fails.
 #[debug_handler]
 async fn search(
-    axum::extract::Query(params): axum::extract::Query<SearchParams>,
+    Query(params): Query<SearchParams>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
     access: AccessContext,
@@ -1044,7 +1045,7 @@ async fn whoami(AuthUser(claims): AuthUser) -> Result<Response> {
 /// Propagates DB query errors.
 #[debug_handler]
 async fn verify_audit_chain(
-    axum::extract::Query(params): axum::extract::Query<VerifyParams>,
+    Query(params): Query<VerifyParams>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     let limit = params.limit();
@@ -1433,7 +1434,7 @@ struct ReviewQueueListResponse {
 /// token is `422`.
 #[debug_handler]
 async fn get_review_queue(
-    axum::extract::Query(query): axum::extract::Query<ReviewQueueListQuery>,
+    Query(query): Query<ReviewQueueListQuery>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
     if let Some(status) = query.status.as_deref()

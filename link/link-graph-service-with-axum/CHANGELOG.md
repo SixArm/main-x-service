@@ -16,6 +16,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Handlers take `Json`, `Path` and `Query` from `axa::extract` instead of
+  axum. A request they cannot read is answered with a problem whose
+  `detail` says what was wrong, without quoting what was sent, where
+  axum's rejection reached the caller as a bare status. Statuses are
+  unchanged. FHIR handlers keep axum's.
+
+### Changed
+
 - **OTLP export comes from `axa::opentelemetry`** (axa's `opentelemetry`
   feature). `src/observability.rs`, the family's original exporter, and
   its direct `opentelemetry*` and `tracing-opentelemetry` dependencies

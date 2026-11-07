@@ -6,10 +6,10 @@
 //! posted to the Main Event Service so the audit trail starts where
 //! the folder first landed.
 
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::{
-    Extension, Json, debug_handler,
-    extract::{Path, Query},
+    Extension, debug_handler,
     http::{StatusCode, header},
     response::{IntoResponse, Response},
 };

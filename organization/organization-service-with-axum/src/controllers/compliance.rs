@@ -21,8 +21,8 @@
 //! carries that caveat inline rather than leaving it to documentation,
 //! because a bare `verified: true` reads as more than it means.
 
+use axa::extract::Query;
 use axa::prelude::*;
-use axum::extract::Query;
 use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 

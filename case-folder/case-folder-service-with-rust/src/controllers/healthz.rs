@@ -2,8 +2,8 @@
 //! downstream service — so it remains green even when every external
 //! Main-X-Service is unreachable.
 
+use axa::extract::Json;
 use axa::prelude::*;
-use axum::Json;
 use axum::debug_handler;
 use serde_json::json;
 

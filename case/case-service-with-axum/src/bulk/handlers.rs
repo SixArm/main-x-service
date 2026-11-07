@@ -20,6 +20,7 @@
 
 use authentication_verifier::Action;
 use axa::error::ErrorDetail;
+use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::extract::Multipart;
 use axum::http::{HeaderMap, StatusCode};
@@ -494,7 +495,7 @@ struct ListQuery {
 #[debug_handler]
 async fn list_bulk_jobs(
     State(ctx): State<AppContext>,
-    axum::extract::Query(q): axum::extract::Query<ListQuery>,
+    Query(q): Query<ListQuery>,
 ) -> Result<Response> {
     let limit = q.limit.unwrap_or(50).min(500);
     let jobs = bulk_jobs::list_recent(&ctx.db, limit).await?;
