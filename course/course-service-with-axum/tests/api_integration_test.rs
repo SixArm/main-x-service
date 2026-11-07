@@ -511,3 +511,88 @@ async fn gdpr_export_envelopes_the_record() {
     assert!(env_obj["course"]["id"].is_string());
     assert!(env_obj["exported_at"].is_string());
 }
+
+/// Whether `GET /api/records/verify` names the record `id` as mismatched.
+async fn is_mismatched(app: &axum::Router, id: &str) -> bool {
+    let (status, report) = send(app, Method::GET, "/api/records/verify?limit=1000", None).await;
+    assert_eq!(status, StatusCode::OK, "verify failed: {report}");
+    report["mismatched"]
+        .as_array()
+        .expect("a mismatched list")
+        .iter()
+        .any(|m| m["id"] == id)
+}
+
+/// A record verifies the moment it is written, and again after an update,
+/// while a row edited in SQL is still caught (tasks.md INT-V1, the defect
+/// event's EVT-V1 found). The digests used to cover the course the caller
+/// sent, so a timestamp Postgres rounds to microseconds flagged every fresh
+/// record. Child rows (identifiers, links, text values) are included,
+/// since the pre-image covers them and the database decides their order
+/// on read-back.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn a_written_record_verifies() {
+    let app = common::create_test_router().await;
+
+    // A second course to link to, since `course_links` has a foreign key.
+    let (status, other) = send(
+        &app,
+        Method::POST,
+        "/api/courses",
+        Some(common::course_json("VerifyLinkTarget")),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "create failed: {other}");
+    let other_id = other["id"].as_str().expect("an id").to_string();
+
+    let mut body = common::course_json("VerifiesWhenWritten");
+    body["keywords"] = json!(["integrity", "audit"]);
+    body["identifiers"] = json!([
+        { "property_id": "Doi", "value": "10.1000/verify-when-written" },
+        { "property_id": "LmsCourseId", "value": "lms-verify-1" },
+    ]);
+    body["links"] = json!([
+        { "other_course_id": other_id, "link_type": "seealso" },
+        { "other_course_id": other_id, "link_type": "prerequisite" },
+    ]);
+    body["created_at"] = json!("2001-01-01T00:00:00.987654321Z");
+    body["updated_at"] = json!("2001-01-01T00:00:00.987654321Z");
+    let (status, created) = send(&app, Method::POST, "/api/courses", Some(body)).await;
+    assert_eq!(status, StatusCode::CREATED, "create failed: {created}");
+    let id = created["id"].as_str().expect("an id").to_string();
+    assert!(
+        !is_mismatched(&app, &id).await,
+        "a fresh record must verify"
+    );
+
+    let mut changed = created.clone();
+    changed["description"] = json!("Edited after creation");
+    let (status, updated) = send(
+        &app,
+        Method::PUT,
+        &format!("/api/courses/{id}"),
+        Some(changed),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "update failed: {updated}");
+    assert!(
+        !is_mismatched(&app, &id).await,
+        "an updated record must verify"
+    );
+
+    // And verification still catches a change made behind the service's
+    // back, so the two checks above cannot pass by verifying nothing.
+    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+        .await
+        .expect("connect for the tamper step");
+    sqlx::query("UPDATE courses SET name = name || ' (edited in SQL)' WHERE id = $1")
+        .bind(uuid::Uuid::parse_str(&id).unwrap())
+        .execute(&pool)
+        .await
+        .expect("tamper with the row");
+    assert!(
+        is_mismatched(&app, &id).await,
+        "a row edited in SQL must be flagged"
+    );
+}

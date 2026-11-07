@@ -185,32 +185,15 @@ impl PgCourseRepository {
 
     /// Read one `courses` row by id, soft-deleted or not.
     async fn find_row(&self, id: Uuid) -> Result<Option<CourseRow>> {
-        let row = sqlx::query_as!(
-            CourseRow,
-            "SELECT id, name, content_hash, content_hash_sha3, content_mac, description,
-                    disambiguating_description, url, additional_type, audience, license,
-                    typical_age_range, time_required, version, is_accessible_for_free,
-                    educational_level, educational_use, learning_resource_type,
-                    interactivity_type, course_code, number_of_credits,
-                    total_historical_enrollment, status, active, provider_id,
-                    created_at, updated_at, deleted_at
-             FROM courses
-             WHERE id = $1",
-            id,
-        )
-        .fetch_optional(&self.db)
-        .await?;
-        Ok(row)
+        let mut conn = self.db.acquire().await?;
+        find_course_row(&mut conn, id).await
     }
 
     /// Load a course's child collections and assemble the domain
     /// [`Course`].
     async fn hydrate(&self, row: CourseRow) -> Result<Course> {
-        let id = row.id;
-        let identifiers = load_identifiers(&self.db, id).await?;
-        let links = load_links(&self.db, id).await?;
-        let (text_values, credentials) = load_course_collections(&self.db, id).await?;
-        hydrate_course(row, identifiers, links, &text_values, &credentials)
+        let mut conn = self.db.acquire().await?;
+        hydrate_on(&mut conn, row).await
     }
 
     /// Read one `course_instances` row by id, scoped to its parent course,
@@ -237,6 +220,94 @@ impl PgCourseRepository {
     }
 }
 
+/// Read one `courses` row by id on `conn`, soft-deleted or not.
+async fn find_course_row(conn: &mut PgConnection, id: Uuid) -> Result<Option<CourseRow>> {
+    let row = sqlx::query_as!(
+        CourseRow,
+        "SELECT id, name, content_hash, content_hash_sha3, content_mac, description,
+                    disambiguating_description, url, additional_type, audience, license,
+                    typical_age_range, time_required, version, is_accessible_for_free,
+                    educational_level, educational_use, learning_resource_type,
+                    interactivity_type, course_code, number_of_credits,
+                    total_historical_enrollment, status, active, provider_id,
+                    created_at, updated_at, deleted_at
+             FROM courses
+             WHERE id = $1",
+        id,
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(row)
+}
+
+/// Load a course's child collections on `conn` and assemble the domain
+/// [`Course`].
+async fn hydrate_on(conn: &mut PgConnection, row: CourseRow) -> Result<Course> {
+    let id = row.id;
+    let identifiers = load_identifiers(conn, id).await?;
+    let links = load_links(conn, id).await?;
+    let (text_values, credentials) = load_course_collections(conn, id).await?;
+    hydrate_course(row, identifiers, links, &text_values, &credentials)
+}
+
+/// The assembled course `id` as stored, read on `conn`, or `None` when it
+/// is absent or soft-deleted. `get_by_id` and [`stamp_digests`] both read
+/// through this, so the record a digest covers is exactly the record
+/// `GET /api/records/verify` reassembles.
+async fn read_course(conn: &mut PgConnection, id: Uuid) -> Result<Option<Course>> {
+    let Some(row) = find_course_row(conn, id).await? else {
+        return Ok(None);
+    };
+    // Soft-deleted rows read as absent — callers never see them.
+    if row.deleted_at.is_some() {
+        return Ok(None);
+    }
+    Ok(Some(hydrate_on(conn, row).await?))
+}
+
+/// Stamp course `id`'s three digests over the record **as stored**, on
+/// the write's own connection, so they commit with the write (INT-V1).
+///
+/// Digesting the domain value a caller passed in is what made every fresh
+/// record fail verification: Postgres keeps microseconds, so a caller's
+/// nanosecond `created_at` / `updated_at` read back as a different value
+/// from the one hashed. Reading the record back inside the transaction
+/// makes the digest cover what verification will recompute, whatever the
+/// database normalised. `courses` has no `updated_at` trigger, and this
+/// `UPDATE` touches only the digest columns, so the stamp changes nothing
+/// it digests.
+///
+/// # Errors
+/// When the record cannot be read back or the stamp fails.
+async fn stamp_digests(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    let stored = read_course(conn, id)
+        .await?
+        .ok_or_else(|| crate::Error::Database("course not found while stamping digests".into()))?;
+    let digests = crate::compliance::record_integrity::digests(
+        &crate::compliance::record_integrity::RecordInput {
+            id: stored.id,
+            course: &stored,
+            active: stored.active,
+        },
+    );
+    let done = sqlx::query!(
+        "UPDATE courses SET content_hash = $2, content_hash_sha3 = $3, content_mac = $4
+         WHERE id = $1",
+        id,
+        digests.sha256,
+        digests.sha3,
+        digests.mac,
+    )
+    .execute(&mut *conn)
+    .await?;
+    if done.rows_affected() == 0 {
+        return Err(crate::Error::Database(
+            "course digests not stamped: no such row".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[async_trait::async_trait]
 impl CourseRepository for PgCourseRepository {
     async fn create(&self, course: &Course) -> Result<Course> {
@@ -247,6 +318,8 @@ impl CourseRepository for PgCourseRepository {
         insert_identifiers(&mut txn, course.id, &course.identifiers).await?;
         insert_links(&mut txn, course.id, &course.links).await?;
         insert_course_collections(&mut txn, course).await?;
+        // Digests over the record as stored, in this transaction (INT-V1).
+        stamp_digests(&mut txn, course.id).await?;
         // Durable event bus (Phase 2): under the outbox transport, write
         // the `course_outbox` row **inside this same transaction**, before
         // the commit, so the entity rows and the event commit atomically
@@ -263,14 +336,8 @@ impl CourseRepository for PgCourseRepository {
     }
 
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Course>> {
-        let Some(row) = self.find_row(*id).await? else {
-            return Ok(None);
-        };
-        // Soft-deleted rows read as absent — callers never see them.
-        if row.deleted_at.is_some() {
-            return Ok(None);
-        }
-        Ok(Some(self.hydrate(row).await?))
+        let mut conn = self.db.acquire().await?;
+        read_course(&mut conn, *id).await
     }
 
     async fn update(&self, course: &Course) -> Result<Course> {
@@ -684,7 +751,9 @@ async fn apply_course_update(conn: &mut PgConnection, course: &Course) -> Result
     insert_identifiers(conn, course.id, &course.identifiers).await?;
     insert_links(conn, course.id, &course.links).await?;
     insert_course_collections(conn, course).await?;
-    Ok(())
+    // Digests over the record as stored, in the caller's transaction
+    // (INT-V1). `update` and `merge` (the survivor) both come through here.
+    stamp_digests(conn, course.id).await
 }
 
 /// Soft-delete one course on `conn` (the plain soft delete): flip `active`
@@ -749,28 +818,19 @@ fn schedule_start(i: &CourseInstance) -> Option<chrono::DateTime<chrono::Utc>> {
 
 // ────────────────── Domain ↔ DB conversion ──────────────────
 
-/// Build the full `courses` row from a domain [`Course`], integrity
-/// digests included. On update, `updated_at` is stamped to now; on insert
-/// the course's own timestamp is kept.
+/// Build the full `courses` row from a domain [`Course`]. On update,
+/// `updated_at` is stamped to now; on insert the course's own timestamp is
+/// kept.
 fn course_row(course: &Course, is_update: bool) -> Result<CourseRow> {
     let now = Utc::now();
-    // All three digests from one call over the **assembled** record, so
-    // the child collections are covered too. Computed here rather than
-    // stamped afterwards, so one statement writes the row and its
-    // integrity values together — and every full write builds its row
-    // through this function.
-    let digests = crate::compliance::record_integrity::digests(
-        &crate::compliance::record_integrity::RecordInput {
-            id: course.id,
-            course,
-            active: course.active,
-        },
-    );
+    // No digests here. They cover the record as stored, which only exists
+    // once the row and its children are written, so the write path stamps
+    // them afterwards in the same transaction (`stamp_digests`, INT-V1).
     Ok(CourseRow {
         id: course.id,
-        content_hash: Some(digests.sha256),
-        content_hash_sha3: Some(digests.sha3),
-        content_mac: digests.mac,
+        content_hash: None,
+        content_hash_sha3: None,
+        content_mac: None,
         name: course.name.clone(),
         description: course.description.clone(),
         disambiguating_description: course.disambiguating_description.clone(),
@@ -1007,7 +1067,7 @@ async fn delete_course_collections(conn: &mut PgConnection, course_id: Uuid) -> 
 
 /// Load the `course_text_values` + `course_credentials` rows for a course.
 async fn load_course_collections(
-    db: &PgPool,
+    conn: &mut PgConnection,
     course_id: Uuid,
 ) -> Result<(Vec<CourseTextValueRow>, Vec<CourseCredentialRow>)> {
     let text_values = sqlx::query_as!(
@@ -1015,7 +1075,7 @@ async fn load_course_collections(
         "SELECT field, value FROM course_text_values WHERE course_id = $1 ORDER BY position",
         course_id,
     )
-    .fetch_all(db)
+    .fetch_all(&mut *conn)
     .await?;
     let credentials = sqlx::query_as!(
         CourseCredentialRow,
@@ -1024,7 +1084,7 @@ async fn load_course_collections(
          WHERE course_id = $1",
         course_id,
     )
-    .fetch_all(db)
+    .fetch_all(&mut *conn)
     .await?;
     Ok((text_values, credentials))
 }
@@ -1474,7 +1534,10 @@ async fn insert_links(
 }
 
 /// Load and deserialise all `course_identifiers` rows for `course_id`.
-async fn load_identifiers(db: &PgPool, course_id: Uuid) -> Result<Vec<CourseIdentifier>> {
+async fn load_identifiers(
+    conn: &mut PgConnection,
+    course_id: Uuid,
+) -> Result<Vec<CourseIdentifier>> {
     sqlx::query!(
         "SELECT property_id, custom_label, value, name, url
          FROM course_identifiers
@@ -1482,7 +1545,7 @@ async fn load_identifiers(db: &PgPool, course_id: Uuid) -> Result<Vec<CourseIden
          ORDER BY position",
         course_id,
     )
-    .fetch_all(db)
+    .fetch_all(&mut *conn)
     .await?
     .into_iter()
     .map(|r| {
@@ -1496,13 +1559,18 @@ async fn load_identifiers(db: &PgPool, course_id: Uuid) -> Result<Vec<CourseIden
     .collect()
 }
 
-/// Load and deserialise all `course_links` rows for `course_id`.
-async fn load_links(db: &PgPool, course_id: Uuid) -> Result<Vec<CourseLink>> {
+/// Load and deserialise all `course_links` rows for `course_id`, in the
+/// order they were written. The order is explicit because the record
+/// digest covers the assembled course, links included: an unordered read
+/// may return the rows in a different order later than it did when the
+/// digest was stamped, and the record would then fail verification.
+async fn load_links(conn: &mut PgConnection, course_id: Uuid) -> Result<Vec<CourseLink>> {
     sqlx::query!(
-        "SELECT other_course_id, link_type FROM course_links WHERE course_id = $1",
+        "SELECT other_course_id, link_type FROM course_links WHERE course_id = $1
+         ORDER BY created_at, id",
         course_id,
     )
-    .fetch_all(db)
+    .fetch_all(&mut *conn)
     .await?
     .into_iter()
     .map(|r| {

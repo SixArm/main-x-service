@@ -8538,12 +8538,16 @@ All three were there before the move, on SeaORM. Fixed 2026-11-07.
 - [x] **EVT-D1 (S)** `cargo doc -D warnings` fails on event's broken
   intra-doc links (grpc, rest, `db/audit.rs`), so the crate-local
   `quality.yml` doc job is red.
-- [ ] **INT-V1 (M)** The EVT-V1 defect is family-wide: place's and
-  thing's `/api/records/verify` flag fresh records too (DB tests
-  `a_written_record_verifies`, 2026-11-07). Every crate with record
-  integrity (course, organization, care-pathway, case, person, worker as
-  well) gets that test, and its write path stamps digests over the record
-  as stored, inside the write's transaction, as event's
-  `stamp_digests` does. The crates already on sqlx are fixed now; for
-  the four still on SeaORM the test lands failing-free only with their
-  sqlx move, which must make it pass.
+- [ ] **INT-V1 (M)** The EVT-V1 defect is family-wide: a fresh record
+  fails `/api/records/verify` because its digests cover the caller's value,
+  not the record as stored. Each crate with record integrity gets the DB
+  test `a_written_record_verifies` (a fresh and an updated record verify; a
+  row edited in SQL is flagged), and its write path stamps digests over the
+  record read back inside the write's transaction, as event's
+  `stamp_digests` does.
+  - [x] event, place, thing, course: had the defect, fixed 2026-11-07, the
+    test failing before and passing after.
+  - [x] organization: not affected (its pre-image leaves out server
+    timestamps and its payload has no numbers); the test guards it.
+  - [ ] care-pathway, case, person, worker: still on SeaORM; each lands
+    the test, passing, with its sqlx move.

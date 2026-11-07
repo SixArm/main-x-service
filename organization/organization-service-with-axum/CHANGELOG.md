@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — INT-V1: a written record verifies (test only, no defect)
+
+- **`a_written_record_verifies`** (`tests/requests/organizations.rs`,
+  DB-gated) creates an organization carrying every nested field
+  (identifiers, address, relationships, tags, non-ASCII keywords),
+  updates it, merges a duplicate into it, and checks that
+  `GET /api/compliance/records/verify?limit=1000` lists none of those
+  rows under `mismatched` — then edits the row in raw SQL and checks it
+  *is* listed. It passed before any change, with and without
+  `ORGANIZATION_INTEGRITY_MAC_KEY` set, so this crate does **not** have
+  event's EVT-V1 defect and its write path is unchanged. The digest's
+  pre-image (`o-r1`) binds only `pid`, `name`, `data`, `active` and
+  `deleted_at`: no server-set timestamp is bound, there is no
+  `updated_at` trigger, the soft-delete stamp is bound as epoch
+  microseconds (what Postgres keeps), and `data` holds only strings,
+  so a JSONB round-trip changes nothing `serde_json`'s sorted-key
+  serialization would see. No stored digest is wrong, so nothing
+  written earlier needs re-stamping.
+
 ### Changed — SeaORM replaced by sqlx
 
 - **Persistence is sqlx with no ORM** (spec §10, §13 ORG-SQLX; the

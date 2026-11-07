@@ -127,6 +127,13 @@ impl PgThingRepository {
 
     /// Read one `things` row by id, soft-deleted or not.
     async fn find_row(&self, id: Uuid) -> Result<Option<ThingRow>> {
+        let mut conn = self.db.acquire().await?;
+        Self::find_row_on(&mut conn, id).await
+    }
+
+    /// [`Self::find_row`] on `conn`, so a write can read inside its own
+    /// transaction.
+    async fn find_row_on(conn: &mut PgConnection, id: Uuid) -> Result<Option<ThingRow>> {
         let row = sqlx::query_as!(
             ThingRow,
             "SELECT id, name, description, disambiguating_description, additional_type,
@@ -137,20 +144,87 @@ impl PgThingRepository {
              WHERE id = $1",
             id,
         )
-        .fetch_optional(&self.db)
+        .fetch_optional(&mut *conn)
         .await?;
         Ok(row)
     }
 
-    /// Load child collections and assemble a domain [`Thing`].
-    async fn hydrate(&self, row: ThingRow) -> Result<Thing> {
+    /// The assembled record for `id` as stored, read on `conn`. `None`
+    /// when absent, and when soft-deleted unless `include_deleted`.
+    /// `get_by_id`, which `GET /api/records/verify` reassembles through,
+    /// and the digest stamp both read here, so a digest covers exactly
+    /// the record verification recomputes.
+    async fn read_thing(
+        conn: &mut PgConnection,
+        id: Uuid,
+        include_deleted: bool,
+    ) -> Result<Option<Thing>> {
+        let Some(row) = Self::find_row_on(conn, id).await? else {
+            return Ok(None);
+        };
+        if row.is_deleted && !include_deleted {
+            return Ok(None);
+        }
+        Ok(Some(Self::hydrate(conn, row).await?))
+    }
+
+    /// Stamp `id`'s three digests over the record **as stored**, on the
+    /// write's own connection, so they commit with the write (INT-V1).
+    ///
+    /// Digesting the domain value a caller passed in is what made every
+    /// fresh record fail verification: `create` and `update` replace its
+    /// timestamps with the server's after digesting it, and Postgres
+    /// keeps microseconds where the clock gives nanoseconds, so the
+    /// value read back was never the value hashed. Reading the record
+    /// back inside the transaction makes the digest cover what
+    /// verification recomputes, whatever the database normalised.
+    ///
+    /// `things` has no `updated_at` trigger, and this `UPDATE` writes only
+    /// the three digest columns, none of which is in the pre-image, so
+    /// the stamp cannot change what it covers. A soft-deleted record is
+    /// stamped too: `is_deleted` is in the pre-image so that resurrecting
+    /// a deleted record in SQL is caught.
+    ///
+    /// # Errors
+    /// When the record cannot be read back or the stamp fails.
+    async fn stamp_digests(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+        let stored = Self::read_thing(conn, id, true).await?.ok_or_else(|| {
+            crate::Error::Database("thing not found while stamping digests".into())
+        })?;
+        let digests = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                id: stored.id,
+                thing: &stored,
+                is_deleted: stored.is_deleted,
+            },
+        );
+        let done = sqlx::query!(
+            "UPDATE things SET content_hash = $2, content_hash_sha3 = $3, content_mac = $4
+             WHERE id = $1",
+            id,
+            digests.sha256,
+            digests.sha3,
+            digests.mac,
+        )
+        .execute(&mut *conn)
+        .await?;
+        if done.rows_affected() == 0 {
+            return Err(crate::Error::Database(
+                "thing not stamped: no such row".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Load child collections and assemble a domain [`Thing`], on `conn`.
+    async fn hydrate(conn: &mut PgConnection, row: ThingRow) -> Result<Thing> {
         let id = row.id;
 
         let alternate_names = sqlx::query_scalar!(
             "SELECT name FROM thing_alternate_names WHERE thing_id = $1 ORDER BY position",
             id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
 
         let identifiers = sqlx::query!(
@@ -158,7 +232,7 @@ impl PgThingRepository {
              FROM thing_identifiers WHERE thing_id = $1 ORDER BY position",
             id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?
         .into_iter()
         .map(|r| ThingIdentifier {
@@ -173,14 +247,14 @@ impl PgThingRepository {
             "SELECT url FROM thing_images WHERE thing_id = $1 ORDER BY position",
             id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
 
         let same_as = sqlx::query_scalar!(
             "SELECT url FROM thing_same_as WHERE thing_id = $1 ORDER BY position",
             id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
 
         Ok(Thing {
@@ -229,6 +303,8 @@ impl ThingRepository for PgThingRepository {
         let mut txn = self.db.begin().await?;
         insert_thing_row(&mut txn, &row).await?;
         insert_collections(&mut txn, thing).await?;
+        // Digests over the record as stored, in this transaction (INT-V1).
+        Self::stamp_digests(&mut txn, thing.id).await?;
         // Durable event bus (Phase 2): under the outbox transport, write
         // the `event_outbox` row **inside this same transaction**, before
         // the commit, so the entity rows and the event commit atomically
@@ -249,13 +325,8 @@ impl ThingRepository for PgThingRepository {
     ///
     /// Returns [`crate::Error::Database`] on any DB failure.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Thing>> {
-        let Some(row) = self.find_row(*id).await? else {
-            return Ok(None);
-        };
-        if row.is_deleted {
-            return Ok(None);
-        }
-        Ok(Some(self.hydrate(row).await?))
+        let mut conn = self.db.acquire().await?;
+        Self::read_thing(&mut conn, *id, false).await
     }
 
     /// Replace an existing thing. Child collections are deleted and
@@ -281,6 +352,7 @@ impl ThingRepository for PgThingRepository {
         update_thing_row(&mut txn, &row, None).await?;
         delete_collections(&mut txn, thing.id).await?;
         insert_collections(&mut txn, thing).await?;
+        Self::stamp_digests(&mut txn, thing.id).await?;
         // Outbox row shares the update transaction (see `create`).
         self.enqueue_outbox(&mut txn, thing, EventKind::Updated)
             .await?;
@@ -300,21 +372,22 @@ impl ThingRepository for PgThingRepository {
     /// [`crate::Error::Database`] on any DB failure.
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
         let row = self.find_row(*id).await?.ok_or(crate::Error::NotFound)?;
-        // Unlike create/update, the soft-delete had no existing
-        // transaction. Under the outbox transport we open one here so the
-        // tombstone write and the `deleted` outbox row commit atomically;
-        // the memory transport keeps the plain, tx-free update.
+        // One transaction, so the tombstone, its re-stamped digests
+        // (INT-V1) and, under the outbox transport, the `deleted` outbox
+        // row commit together: a deleted row is never left carrying the
+        // live record's digests.
+        let mut txn = self.db.begin().await?;
         if self.transport.is_outbox() {
-            let thing = self.hydrate(row).await?;
-            let mut txn = self.db.begin().await?;
+            let thing = Self::hydrate(&mut txn, row).await?;
             mark_deleted(&mut txn, *id).await?;
+            Self::stamp_digests(&mut txn, *id).await?;
             self.enqueue_outbox(&mut txn, &thing, EventKind::Deleted)
                 .await?;
-            txn.commit().await?;
         } else {
-            let mut conn = self.db.acquire().await?;
-            mark_deleted(&mut conn, *id).await?;
+            mark_deleted(&mut txn, *id).await?;
+            Self::stamp_digests(&mut txn, *id).await?;
         }
+        txn.commit().await?;
         Ok(())
     }
 
@@ -341,9 +414,10 @@ impl ThingRepository for PgThingRepository {
         )
         .fetch_all(&self.db)
         .await?;
+        let mut conn = self.db.acquire().await?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
-            out.push(self.hydrate(row).await?);
+            out.push(Self::hydrate(&mut conn, row).await?);
         }
         Ok(out)
     }
@@ -399,9 +473,13 @@ impl ThingRepository for PgThingRepository {
         update_thing_row(&mut txn, &row, Some(row.created_at)).await?;
         delete_collections(&mut txn, survivor.id).await?;
         insert_collections(&mut txn, survivor).await?;
+        // The survivor's digests over the survivor as stored (INT-V1).
+        Self::stamp_digests(&mut txn, survivor.id).await?;
 
-        // Soft-delete the duplicate on the same transaction.
+        // Soft-delete the duplicate on the same transaction, and re-stamp
+        // it so its digests cover the tombstone.
         mark_deleted(&mut txn, *duplicate_id).await?;
+        Self::stamp_digests(&mut txn, *duplicate_id).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the
         // survivor and a `Deleted` outbox row for the duplicate — both
@@ -460,29 +538,17 @@ pub async fn rows_for_verification(db: &PgPool, limit: u64) -> Result<Vec<ThingR
     Ok(rows)
 }
 
-/// Build the full `things` row from a domain [`Thing`], integrity digests
-/// included.
+/// Build the full `things` row from a domain [`Thing`], without digests.
 fn thing_row(thing: &Thing) -> ThingRow {
-    // All three digests from one call over the **assembled** record, so
-    // the child collections are covered too — an identifier is exactly
-    // the kind of field worth editing quietly, and it does not live in
-    // this row. Computed here rather than stamped afterwards, so one
-    // statement writes the row and its integrity values together.
-    //
-    // `create`, `update` and `merge` all build their row here, so this
-    // is the single place a write path could forget to re-digest.
-    let digests = crate::compliance::record_integrity::digests(
-        &crate::compliance::record_integrity::RecordInput {
-            id: thing.id,
-            thing,
-            is_deleted: thing.is_deleted,
-        },
-    );
+    // No digests here. They cover the record as stored, which only exists
+    // once the row and its children are written, so every write path
+    // stamps them afterwards in the same transaction (`stamp_digests`,
+    // INT-V1).
     ThingRow {
         id: thing.id,
-        content_hash: Some(digests.sha256),
-        content_hash_sha3: Some(digests.sha3),
-        content_mac: digests.mac,
+        content_hash: None,
+        content_hash_sha3: None,
+        content_mac: None,
         name: thing.name.clone(),
         description: thing.description.clone(),
         disambiguating_description: thing.disambiguating_description.clone(),

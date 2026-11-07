@@ -8,6 +8,30 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a freshly written record failed `GET /api/records/verify` (INT-V1)
+
+- **Record digests now cover the record as stored.** The write path
+  digested the `Thing` the caller sent, then `create` and `update`
+  replaced its `created_at`/`updated_at` with the server's clock, and
+  Postgres kept microseconds where that clock gives nanoseconds. The
+  record verification reassembles was never the record that was hashed,
+  so every new or updated thing was reported as tampered, and a real
+  edit could not be told from a fresh row. Create, update and merge (the
+  survivor) now read the assembled record back on the write's own
+  transaction, through the same read `get_by_id` and verification use,
+  and stamp all three digests over it with one `UPDATE` that touches
+  only the digest columns. Soft-delete (including merge's duplicate)
+  re-stamps too, so the tombstone is covered and resurrecting a deleted
+  row in SQL is caught; soft-delete now always runs in one transaction.
+  `things` has no `updated_at` trigger, so the stamp cannot change what
+  it covers. The pre-image format (`t-r1`) is unchanged, as are audit and
+  outbox behaviour.
+- **Records written before this fix keep their wrong digests** and are
+  still reported as mismatched until they are next written.
+- New DB test `a_written_record_verifies`: a fresh record with child rows
+  verifies, so does an updated one, and a row edited in SQL is flagged.
+  It failed before the fix.
+
 ### Changed — SeaORM replaced by sqlx
 
 - **Persistence is sqlx with no ORM** (spec §10, §13 T-16;

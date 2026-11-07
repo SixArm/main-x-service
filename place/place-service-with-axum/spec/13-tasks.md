@@ -574,3 +574,17 @@ clearly described manual check confirms the acceptance criterion.
   expose, so it became a DB-gated test proving a second relay skips
   rows the first holds. DB-gated suite 19 → 20, all passing.
   Dependencies 419 → 386 unique normal crates.
+- [x] **T-19 (S) — record digests cover the stored record.** *(Done
+  2026-11-07; repo `tasks.md` INT-V1.)* Every new or updated place
+  failed `/api/records/verify`, because `place_row` digested the
+  caller's value, not the row as stored with the server's timestamps,
+  microsecond precision and NUMERIC coordinates. `stamp_digests` in
+  `src/db/mod.rs` reads the record back in the write's transaction
+  (through `hydrate_on`, the same assembly `get_by_id` and the verify
+  handler use) and stamps the three digest columns; create and update
+  both call it. Merge does not write the survivor's row and soft-delete
+  is unchanged: verification skips deleted rows, and re-digesting a row
+  on delete would bless whatever it then held. Records written before
+  the fix keep their wrong digests and are still reported.
+  `tests/api_integration_test.rs` `a_written_record_verifies` pins it:
+  it failed with 0 of 5 records intact before the fix.

@@ -235,3 +235,22 @@
   Dependencies 377 → 342 unique normal crates. The crate-local
   `quality.yml` loses its `migration` clippy job, and `test.yml` builds
   with `SQLX_OFFLINE=true`.
+- [x] **T-32 (S) — record digests cover the record as stored
+  (repo `tasks.md` INT-V1).** *(Done 2026-11-07.)* A fresh course
+  failed `GET /api/records/verify`: its digests were computed from the
+  caller's course before it was stored, and Postgres truncates the
+  caller's nanosecond timestamps to microseconds, so the value read
+  back was never the value hashed. `course_row` no longer computes
+  digests; `create` and `apply_course_update` (so `update` and `merge`'s
+  survivor) call `stamp_digests`, which reads the assembled course back
+  on the write's transaction through `read_course` (the read `get_by_id`
+  and verification use), digests it, and writes the three columns with
+  one `UPDATE`. No `updated_at` trigger exists on `courses`, and the
+  stamp changes no digested column. `load_links` gained
+  `ORDER BY created_at, id`, since the digest covers link order. The
+  pre-image format (`c-r1`) is unchanged, and `CourseInstance` rows
+  carry no digests. Records written before the fix keep their wrong
+  digests and are still reported as mismatched. DB test
+  `a_written_record_verifies` (create with identifiers, links and
+  keywords, update, then a raw-SQL edit that must be flagged) failed
+  before the fix and passes after.

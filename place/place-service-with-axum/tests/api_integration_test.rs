@@ -254,3 +254,77 @@ async fn listing_with_a_bad_limit_or_cursor_is_refused() {
         assert_eq!(body["code"], "invalid_page");
     }
 }
+
+/// A record verifies the moment it is written, and a row edited in SQL is
+/// still caught (the check event's EVT-V1 failed). A digest computed from
+/// a value other than the one stored, for instance before Postgres rounds
+/// a timestamp to microseconds, flags every fresh record.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn a_written_record_verifies() {
+    let app = test_router().await;
+    let name = uuid::Uuid::new_v4().simple().to_string();
+    let (status, body) = post_places(
+        &app,
+        &json!({ "name": name, "keywords": ["integrity", "audit"] }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "create failed: {body}");
+    let id = body["id"].as_str().expect("an id").to_string();
+
+    let mismatched = |report: &Value| {
+        report["mismatched"]
+            .as_array()
+            .expect("a mismatched list")
+            .iter()
+            .any(|m| m["id"] == id.as_str())
+    };
+    let (status, _, report) = get_places(&app, "/api/records/verify?limit=1000").await;
+    assert_eq!(status, StatusCode::OK, "verify failed: {report}");
+    assert!(!mismatched(&report), "a fresh record must verify: {report}");
+
+    // An update rewrites the row and every child table, so it must stamp
+    // too. Coordinates and an identifier put a NUMERIC column and a
+    // second child table under the digest.
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/places/{id}"))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&json!({
+                        "name": format!("{name} updated"),
+                        "keywords": ["integrity"],
+                        "identifiers": [{ "identifier_type": "OpenStreetMap", "value": "n240109189" }],
+                        "geo": { "latitude_as_decimal_degrees": 51.5, "longitude_as_decimal_degrees": -0.12 }
+                    }))
+                    .unwrap(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK, "update failed");
+    let (status, _, report) = get_places(&app, "/api/records/verify?limit=1000").await;
+    assert_eq!(status, StatusCode::OK, "verify failed: {report}");
+    assert!(
+        !mismatched(&report),
+        "an updated record must verify: {report}"
+    );
+
+    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+        .await
+        .expect("connect for the tamper step");
+    sqlx::query("UPDATE places SET name = name || ' (edited in SQL)' WHERE id = $1")
+        .bind(uuid::Uuid::parse_str(&id).unwrap())
+        .execute(&pool)
+        .await
+        .expect("tamper with the row");
+    let (_, _, report) = get_places(&app, "/api/records/verify?limit=1000").await;
+    assert!(
+        mismatched(&report),
+        "a row edited in SQL must be flagged: {report}"
+    );
+}

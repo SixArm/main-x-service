@@ -9,6 +9,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **A freshly written course now passes `GET /api/records/verify`**
+  (spec §13 T-32, repo `tasks.md` INT-V1). The write path computed the
+  three record digests from the course the caller sent, before it was
+  stored; verification recomputes them over the course as read back.
+  Postgres keeps microseconds, so a caller's nanosecond `created_at` /
+  `updated_at` read back as a different value and every such record
+  was reported as tampered. Create, update and merge (the survivor)
+  now write the row and its children, read the assembled course back on
+  the same transaction through the read verification uses, and stamp
+  all three digests over that with one `UPDATE` of the digest columns
+  only (`courses` has no `updated_at` trigger). `course_links` are now
+  read `ORDER BY created_at, id`, since the digest covers their order
+  and the read had none. Audit and outbox behaviour is unchanged.
+  `CourseInstance` rows carry no digests, so they are unaffected.
+  **Records written before this fix keep their wrong digests and will
+  still be reported as mismatched**; nothing re-stamps them, since a
+  digest computed now would certify whatever the row now holds. A new
+  DB test, `a_written_record_verifies`, failed before the fix and
+  passes after.
+
 ### Changed — SeaORM replaced by sqlx
 
 - **Persistence is sqlx with no ORM** (spec §10, §13 T-31;

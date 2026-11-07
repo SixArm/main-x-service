@@ -265,3 +265,87 @@ async fn listing_with_a_bad_limit_or_cursor_is_refused() {
         assert_eq!(body["code"], "invalid_page", "{uri}");
     }
 }
+
+/// A record verifies the moment it is written, and again after an update,
+/// and a row edited in SQL is still caught (the check event's EVT-V1
+/// failed; INT-V1 here). A digest computed from a value other than the
+/// one stored, for instance before Postgres rounds a timestamp to
+/// microseconds, flags every fresh record. Child rows (alternate names,
+/// an identifier, `sameAs` links) are included, since they are in the
+/// digested record but not in the `things` row.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn a_written_record_verifies() {
+    let app = test_router().await;
+    let name = uuid::Uuid::new_v4().simple().to_string();
+    let (status, body) = post_things(
+        &app,
+        &json!({
+            "name": name,
+            "alternate_names": ["integrity", "audit"],
+            "identifiers": [{ "property_id": "Sku", "value": format!("SKU-{name}") }],
+            "same_as": ["https://example.org/integrity"],
+            "created_at": "2001-01-01T00:00:00.987654321Z",
+            "updated_at": "2001-01-01T00:00:00.987654321Z",
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "create failed: {body}");
+    let id = body["id"].as_str().expect("an id").to_string();
+
+    let mismatched = |report: &Value| {
+        report["mismatched"]
+            .as_array()
+            .expect("a mismatched list")
+            .iter()
+            .any(|m| m["id"] == id.as_str())
+    };
+    let (status, _, report) = get_things(&app, "/api/records/verify?limit=1000").await;
+    assert_eq!(status, StatusCode::OK, "verify failed: {report}");
+    assert!(!mismatched(&report), "a fresh record must verify: {report}");
+
+    let mut changed = body.clone();
+    changed["description"] = json!("Edited after creation");
+    changed["alternate_names"] = json!(["integrity", "audit", "edited"]);
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/things/{id}"))
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&changed).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "update failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let (_, _, report) = get_things(&app, "/api/records/verify?limit=1000").await;
+    assert!(
+        !mismatched(&report),
+        "an updated record must verify: {report}"
+    );
+
+    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+        .await
+        .expect("connect for the tamper step");
+    sqlx::query("UPDATE things SET name = name || ' (edited in SQL)' WHERE id = $1")
+        .bind(uuid::Uuid::parse_str(&id).unwrap())
+        .execute(&pool)
+        .await
+        .expect("tamper with the row");
+    let (_, _, report) = get_things(&app, "/api/records/verify?limit=1000").await;
+    assert!(
+        mismatched(&report),
+        "a row edited in SQL must be flagged: {report}"
+    );
+}

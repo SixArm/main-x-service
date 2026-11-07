@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT other_course_id, link_type FROM course_links WHERE course_id = $1",
+  "query": "SELECT other_course_id, link_type FROM course_links WHERE course_id = $1\n         ORDER BY created_at, id",
   "describe": {
     "columns": [
       {
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "6001c4c203745a4212aab5162fc0c25dff61cc64cb5c54fc22897249fc01e0ef"
+  "hash": "64fbc937d3d375262795fcb18f7fa9267c065f793c887260ad94fda5e2982b60"
 }

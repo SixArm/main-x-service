@@ -641,3 +641,18 @@ clearly described manual check confirms the acceptance criterion.
   expose, so it became a DB-gated test proving a second relay skips
   rows the first holds. Unit tests 330 → 329, DB-gated suite 11 → 12,
   all passing. Dependencies 400 → 367 unique normal crates.
+
+- [x] **INT-V1 (S) — a written record verifies.** *(Done 2026-11-07;
+  repo `tasks.md` INT-V1, after event's EVT-V1.)* Digests were computed
+  in `thing_row` over the caller's `Thing`, before `create`/`update`
+  replaced its timestamps with the server's and before Postgres rounded
+  them to microseconds, so `GET /api/records/verify` flagged every fresh
+  record. `PgThingRepository::stamp_digests` now reads the assembled
+  record back on the write's transaction (`read_thing`, the read
+  `get_by_id` uses) and writes the three digests with one `UPDATE` of
+  the digest columns only; create, update, merge (survivor and
+  duplicate) and soft-delete all stamp. No `updated_at` trigger exists
+  on `things`. Pre-image format unchanged. Records written before the
+  fix keep their wrong digests and are still reported until rewritten.
+  DB test `a_written_record_verifies` (create with child rows, update,
+  SQL tamper) failed before, passes after.

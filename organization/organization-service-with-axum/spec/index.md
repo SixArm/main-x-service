@@ -508,6 +508,21 @@ organization is not a data subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **INT-V1 — a written record verifies.** *(Done 2026-11-07; repo
+  `tasks.md` INT-V1, after event's EVT-V1.)* The DB test
+  `a_written_record_verifies` (`tests/requests/organizations.rs`)
+  checks that a created, updated, and merged record (survivor and
+  soft-deleted duplicate) are not reported by
+  `GET /api/compliance/records/verify`, and that a raw-SQL edit is. It
+  passed with no code change: this crate digests the record as it will
+  be read back, because the `o-r1` pre-image (§12,
+  `src/compliance/record_integrity.rs`) binds no server-set column
+  (`created_at`/`updated_at` are excluded), there is no `updated_at`
+  trigger, `deleted_at` is bound as epoch microseconds, and the JSONB
+  `data` holds only strings and is hashed with sorted keys. Not
+  affected, so no stored digest is wrong; the test stays as the guard
+  against a future write path (or a numeric field in the payload)
+  reintroducing the defect.
 - [x] **ORG-SQLX — SeaORM → sqlx (the second pilot, the first
   controller-style crate).** *(Done 2026-11-07;
   [`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5,

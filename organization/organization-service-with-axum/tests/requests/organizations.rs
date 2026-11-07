@@ -1065,3 +1065,141 @@ async fn deduplicate_review_queue_round_trip() {
     })
     .await;
 }
+
+/// `pid`s listed under `mismatched` by `GET /api/compliance/records/verify`.
+async fn mismatched_pids(request: &axa::testing::TestServer) -> Vec<String> {
+    let response = request
+        .get("/api/compliance/records/verify?limit=1000")
+        .await;
+    assert_eq!(response.status_code(), 200, "records verify should answer");
+    let report: serde_json::Value = response.json();
+    report["mismatched"]
+        .as_array()
+        .expect("mismatched array")
+        .iter()
+        .map(|m| m["pid"].as_str().expect("mismatch pid").to_string())
+        .collect()
+}
+
+/// INT-V1: a record the service wrote must verify. The digests are
+/// computed from the payload the caller sent, while verification
+/// recomputes them from the row as read back from Postgres, so any
+/// normalisation in between (JSONB key order or number form, a server-set
+/// column, timestamp precision) would flag every fresh record as tampered.
+/// Create, update, merge (survivor and soft-deleted duplicate) all have to
+/// verify, and a row edited in SQL must still be flagged.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn a_written_record_verifies() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        // Every nested collection the payload carries, so the digest is
+        // exercised over the whole stored record, not just `name`.
+        let created: serde_json::Value = request
+            .post("/api/organizations")
+            .json(&json!({
+                "name": "Verifiable Widgets Ltd",
+                "legal_name": "Verifiable Widgets Limited",
+                "alternate_names": ["VWL", "Verifiable"],
+                "identifiers": [
+                    {"scheme": "Wikidata", "value": "Q987654321"},
+                    {"scheme": "TaxId", "value": "GB987654321"}
+                ],
+                "url": "https://verifiable.example",
+                "same_as": ["https://www.wikidata.org/wiki/Q987654321"],
+                "address": {
+                    "street_address": "1 Ledger Lane",
+                    "locality": "Leeds",
+                    "region": "West Yorkshire",
+                    "postal_code": "LS1 1AA",
+                    "country": "GB"
+                },
+                "jurisdiction": "GB",
+                "founding_date": "2001-02-03",
+                "telephone": "+44 113 496 0000",
+                "email": "hello@verifiable.example",
+                "keywords": ["widgets", "ledgers", "Zürich", "日本"],
+                "relationships": [
+                    {"relation": "SubOrganizationOf", "organization_id": "org-parent-1"}
+                ],
+                "tags": ["tier-1", "vendor"]
+            }))
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid").to_string();
+        let uuid = uuid::Uuid::parse_str(&pid).expect("uuid");
+        // Not vacuous: an unhashed row is never a mismatch, so the record
+        // must actually carry both digests for the checks below to mean
+        // anything.
+        let (sha256, sha3): (Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT content_hash, content_hash_sha3 FROM organizations WHERE pid = $1",
+        )
+        .bind(uuid)
+        .fetch_one(&ctx.db)
+        .await
+        .expect("read digests");
+        assert!(
+            sha256.is_some() && sha3.is_some(),
+            "a new record carries its digests"
+        );
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            !mismatched.contains(&pid),
+            "a freshly created record must verify; mismatched: {mismatched:?}"
+        );
+
+        let response = request
+            .put(&format!("/api/organizations/{pid}"))
+            .json(&json!({
+                "name": "Verifiable Widgets Ltd",
+                "identifiers": [{"scheme": "Wikidata", "value": "Q987654321"}],
+                "address": {"locality": "York", "country": "GB"},
+                "keywords": ["widgets"],
+                "tags": ["tier-2"]
+            }))
+            .await;
+        assert_eq!(response.status_code(), 200, "update should succeed");
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            !mismatched.contains(&pid),
+            "an updated record must verify; mismatched: {mismatched:?}"
+        );
+
+        // Merge: the survivor is rewritten and the duplicate soft-deleted,
+        // and both rows are in the verified set.
+        let dup = seed_directly(
+            &ctx,
+            json!({
+                "name": "Verifiable Widgets Limited",
+                "keywords": ["gadgets"],
+                "identifiers": [{"scheme": "Duns", "value": "150483782"}]
+            }),
+        )
+        .await;
+        let dup_pid = dup["pid"].as_str().expect("dup pid").to_string();
+        let response = request
+            .post("/api/organizations/merge")
+            .json(&json!({"main_pid": pid, "duplicate_pid": dup_pid, "reason": "confirmed"}))
+            .await;
+        assert_eq!(response.status_code(), 200, "merge should succeed");
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            !mismatched.contains(&pid) && !mismatched.contains(&dup_pid),
+            "a merge survivor and its soft-deleted duplicate must verify; mismatched: {mismatched:?}"
+        );
+
+        // An edit made behind the service's back must still be caught.
+        sqlx::query("UPDATE organizations SET name = name || ' (edited in SQL)' WHERE pid = $1")
+            .bind(uuid)
+            .execute(&ctx.db)
+            .await
+            .expect("raw SQL edit");
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            mismatched.contains(&pid),
+            "a row edited in SQL must be reported; mismatched: {mismatched:?}"
+        );
+    })
+    .await;
+}

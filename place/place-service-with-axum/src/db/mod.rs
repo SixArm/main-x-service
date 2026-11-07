@@ -233,6 +233,16 @@ impl PgPlaceRepository {
     /// # Errors
     /// Propagates any database error from the lookup.
     async fn find_row(&self, id: Uuid) -> Result<Option<PlaceRow>> {
+        let mut conn = self.db.acquire().await?;
+        Self::read_row(&mut conn, id).await
+    }
+
+    /// Read one `places` row by id on `conn`, soft-deleted or not, so a
+    /// write can read its own uncommitted row back.
+    ///
+    /// # Errors
+    /// Propagates any database error from the lookup.
+    async fn read_row(conn: &mut PgConnection, id: Uuid) -> Result<Option<PlaceRow>> {
         let row = sqlx::query_as!(
             PlaceRow,
             "SELECT id, name, alternate_name, description, place_type, place_type_custom,
@@ -249,7 +259,7 @@ impl PgPlaceRepository {
              WHERE id = $1",
             id,
         )
-        .fetch_optional(&self.db)
+        .fetch_optional(&mut *conn)
         .await?;
         Ok(row)
     }
@@ -265,6 +275,17 @@ impl PgPlaceRepository {
     /// # Errors
     /// Propagates any database error from the four child-table queries.
     async fn hydrate(&self, row: PlaceRow) -> Result<Place> {
+        let mut conn = self.db.acquire().await?;
+        Self::hydrate_on(&mut conn, row).await
+    }
+
+    /// [`Self::hydrate`] on `conn`. `get_by_id`, which verification reads
+    /// through, and the digest stamp both assemble through here, so the
+    /// record a digest covers is exactly the one verification recomputes.
+    ///
+    /// # Errors
+    /// Propagates any database error from the four child-table queries.
+    async fn hydrate_on(conn: &mut PgConnection, row: PlaceRow) -> Result<Place> {
         let id = row.id;
 
         // Keywords: ordered by stored position to keep list order stable.
@@ -272,7 +293,7 @@ impl PgPlaceRepository {
             "SELECT keyword FROM place_keywords WHERE place_id = $1 ORDER BY position",
             id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
 
         // Identifiers: the stored `(type tag, custom_label)` pair is decoded
@@ -282,7 +303,7 @@ impl PgPlaceRepository {
              FROM place_identifiers WHERE place_id = $1 ORDER BY position",
             id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?
         .into_iter()
         .map(|r| PlaceIdentifier {
@@ -297,7 +318,7 @@ impl PgPlaceRepository {
              FROM place_amenity_features WHERE place_id = $1 ORDER BY position",
             id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?;
 
         let opening_hours = sqlx::query!(
@@ -305,7 +326,7 @@ impl PgPlaceRepository {
              FROM place_opening_hours WHERE place_id = $1 ORDER BY position",
             id,
         )
-        .fetch_all(&self.db)
+        .fetch_all(&mut *conn)
         .await?
         .into_iter()
         .map(|r| OpeningHoursSpecification {
@@ -370,11 +391,54 @@ impl PgPlaceRepository {
     /// # Errors
     /// Propagates any database error from hydration.
     async fn hydrate_all(&self, rows: Vec<PlaceRow>) -> Result<Vec<Place>> {
+        let mut conn = self.db.acquire().await?;
         let mut out = Vec::with_capacity(rows.len());
         for row in rows {
-            out.push(self.hydrate(row).await?);
+            out.push(Self::hydrate_on(&mut conn, row).await?);
         }
         Ok(out)
+    }
+
+    /// Stamp `id`'s three digests over the record **as stored**, on the
+    /// write's own connection, so they commit with the write.
+    ///
+    /// Digesting the domain value a caller passed in is what made every
+    /// fresh record fail verification (tasks.md INT-V1, event's EVT-V1):
+    /// the stored row takes the server's `created_at`/`updated_at`, which
+    /// the caller's value did not carry, and Postgres keeps microseconds
+    /// and stores NUMERIC coordinates in its own form, so the value read
+    /// back was never the value hashed. Reading the record back inside
+    /// the transaction makes the digest cover what verification will
+    /// recompute, whatever the database normalised.
+    ///
+    /// `places` has no `updated_at` trigger, and this `UPDATE` names only
+    /// the three digest columns, so stamping changes nothing it digests.
+    ///
+    /// # Errors
+    /// When the record cannot be read back or the stamp fails.
+    async fn stamp_digests(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+        let row = Self::read_row(conn, id).await?.ok_or_else(|| {
+            crate::Error::Database("place not found while stamping digests".into())
+        })?;
+        let stored = Self::hydrate_on(conn, row).await?;
+        let digests = crate::compliance::record_integrity::digests(
+            &crate::compliance::record_integrity::RecordInput {
+                id: stored.id,
+                place: &stored,
+                is_deleted: stored.is_deleted,
+            },
+        );
+        sqlx::query!(
+            "UPDATE places SET content_hash = $2, content_hash_sha3 = $3, content_mac = $4
+             WHERE id = $1",
+            id,
+            digests.sha256,
+            digests.sha3,
+            digests.mac,
+        )
+        .execute(&mut *conn)
+        .await?;
+        Ok(())
     }
 }
 
@@ -403,6 +467,8 @@ impl PlaceRepository for PgPlaceRepository {
         let mut txn = self.db.begin().await?;
         insert_place_row(&mut txn, &row).await?;
         insert_collections(&mut txn, place).await?;
+        // Digests over the record as stored, in this transaction (INT-V1).
+        Self::stamp_digests(&mut txn, place.id).await?;
         // Durable event bus (Phase 2): under the outbox transport, write the
         // `event_outbox` row **inside this same transaction**, before commit,
         // so the entity rows and the event commit atomically (or roll back
@@ -452,6 +518,8 @@ impl PlaceRepository for PgPlaceRepository {
         update_place_row(&mut txn, &row).await?;
         delete_collections(&mut txn, place.id).await?;
         insert_collections(&mut txn, place).await?;
+        // Digests over the record as stored, in this transaction (INT-V1).
+        Self::stamp_digests(&mut txn, place.id).await?;
         // Outbox row shares the update transaction (see `create`).
         self.enqueue_outbox(&mut txn, place, EventKind::Updated)
             .await?;
@@ -643,8 +711,10 @@ pub async fn rows_for_verification(db: &PgPool, limit: u64) -> Result<Vec<PlaceR
     Ok(rows)
 }
 
-/// Build the full `places` row from a domain [`Place`], integrity digests
-/// included.
+/// Build the full `places` row from a domain [`Place`], digests left
+/// empty: they cover the record as stored, which only exists once the row
+/// and its children are written, so the write path stamps them afterwards
+/// in the same transaction (`stamp_digests`, INT-V1).
 fn place_row(place: &Place) -> PlaceRow {
     let (place_type, place_type_custom) = match &place.place_type {
         Some(t) => {
@@ -653,26 +723,13 @@ fn place_row(place: &Place) -> PlaceRow {
         }
         None => (None, None),
     };
-    // All three digests from one call over the **assembled** record, so
-    // the child collections (addresses, coordinates, identifiers) are
-    // covered too. Computed here rather than stamped afterwards, so one
-    // statement writes the row and its integrity values together — and
-    // both `create` and `update` build their row through this function,
-    // so it is the single place a write path could forget.
-    let digests = crate::compliance::record_integrity::digests(
-        &crate::compliance::record_integrity::RecordInput {
-            id: place.id,
-            place,
-            is_deleted: place.is_deleted,
-        },
-    );
     let address = place.address.as_ref();
     let geo = place.geo.as_ref();
     PlaceRow {
         id: place.id,
-        content_hash: Some(digests.sha256),
-        content_hash_sha3: Some(digests.sha3),
-        content_mac: digests.mac,
+        content_hash: None,
+        content_hash_sha3: None,
+        content_mac: None,
         name: place.name.clone(),
         alternate_name: place.alternate_name.clone(),
         description: place.description.clone(),

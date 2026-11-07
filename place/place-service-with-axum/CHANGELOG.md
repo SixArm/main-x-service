@@ -8,6 +8,24 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed
+
+- **A record now verifies the moment it is written** (repo `tasks.md`
+  INT-V1, as event's EVT-V1). `GET /api/records/verify` reported every
+  new and every updated place as mismatched: the digests were computed
+  in `place_row` from the place the caller sent, but the stored row takes
+  the server's `created_at` / `updated_at` (which the caller's value did
+  not carry, or carried as the serde default), Postgres keeps
+  microseconds, and NUMERIC coordinates come back in their stored form.
+  Create and update now read the assembled record back inside their own
+  transaction and stamp all three digests over it with one `UPDATE` of
+  the digest columns; `place_row` no longer computes digests. `places`
+  has no `updated_at` trigger, so the stamp changes nothing it digests.
+  Audit and outbox behaviour are unchanged. A DB test checks that a fresh
+  record and an updated one verify, and that a row edited in SQL is
+  still flagged. Records written before this fix keep their wrong
+  digests and are still reported.
+
 ### Changed — SeaORM replaced by sqlx
 
 - **Persistence is sqlx with no ORM** (spec §10, §13 T-18; the family
