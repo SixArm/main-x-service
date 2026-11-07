@@ -16,6 +16,12 @@ pub struct Seed;
 
 #[async_trait]
 impl Task for Seed {
+    /// It loads made-up records, which must never reach a real database,
+    /// so axa refuses to run it outside development and test.
+    fn development_only(&self) -> bool {
+        true
+    }
+
     fn task(&self) -> TaskInfo {
         TaskInfo {
             name: "seed".to_string(),
@@ -211,5 +217,16 @@ impl Task for Seed {
         }
         tracing::info!("seeded the synthetic demo hospital");
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod development_only {
+    use axa::task::Task;
+
+    /// Made-up records must not reach a real database.
+    #[test]
+    fn it_runs_only_in_development_or_test() {
+        assert!(super::Seed.development_only());
     }
 }

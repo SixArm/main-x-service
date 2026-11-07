@@ -152,6 +152,12 @@ pub struct SeedExamples;
 
 #[async_trait]
 impl Task for SeedExamples {
+    /// It loads made-up records, which must never reach a real database,
+    /// so axa refuses to run it outside development and test.
+    fn development_only(&self) -> bool {
+        true
+    }
+
     /// Task metadata (name + one-line description) for the axa CLI.
     fn task(&self) -> TaskInfo {
         TaskInfo {
@@ -233,5 +239,16 @@ mod tests {
     fn task_is_named_seed_examples() {
         use axa::task::Task;
         assert_eq!(super::SeedExamples.task().name, "seed_examples");
+    }
+}
+
+#[cfg(test)]
+mod development_only {
+    use axa::task::Task;
+
+    /// Made-up records must not reach a real database.
+    #[test]
+    fn it_runs_only_in_development_or_test() {
+        assert!(super::SeedExamples.development_only());
     }
 }

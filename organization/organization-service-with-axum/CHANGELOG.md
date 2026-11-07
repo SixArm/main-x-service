@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- The seed task runs only in development or test
+  (`Task::development_only`). axa refuses it anywhere else, so made-up
+  records cannot reach a real database.
+
 ### Added
 
 - Request limits per client through `axa::ratelimit`, in

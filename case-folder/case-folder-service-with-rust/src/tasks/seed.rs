@@ -29,6 +29,12 @@ pub struct Seed;
 
 #[async_trait]
 impl Task for Seed {
+    /// It loads made-up records, which must never reach a real database,
+    /// so axa refuses to run it outside development and test.
+    fn development_only(&self) -> bool {
+        true
+    }
+
     /// Task metadata (name + one-line description) for the CLI listing.
     fn task(&self) -> TaskInfo {
         TaskInfo {
@@ -511,4 +517,15 @@ async fn seed_folders_and_moves(
 /// hard-coded literals, so this is a compile-time-known constant).
 fn date(y: i32, m: u32, d: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(y, m, d).expect("valid date")
+}
+
+#[cfg(test)]
+mod development_only {
+    use axa::task::Task;
+
+    /// Made-up records must not reach a real database.
+    #[test]
+    fn it_runs_only_in_development_or_test() {
+        assert!(super::Seed.development_only());
+    }
 }

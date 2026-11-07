@@ -67,10 +67,12 @@ by the seed itself; the tutorials that exercise duplicate detection,
 audit, and events do so against the seeded records afterward, not
 against the act of seeding. Each task refuses to insert into a
 non-empty table, so re-running it is a no-op rather than a duplicate
-load.
+load. It also runs only in development or test: axa refuses it anywhere
+else (`Task::development_only`), so made-up records cannot reach a real
+database, and a container built with `APP_ENV=production` will not run it.
 
 Run from each service crate's own directory, against its own database
-(`DATABASE_URL` / `config/development.yaml` as usual):
+(`DATABASE_URL` as usual):
 
 ```sh
 cd person/person-service-with-axum       && cargo run -- task seed_examples
