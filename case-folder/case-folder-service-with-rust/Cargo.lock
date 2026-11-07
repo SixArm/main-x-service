@@ -157,9 +157,9 @@ dependencies = [
 
 [[package]]
 name = "axa"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39530ce057e79a039c11ee1da47eafbcb1a3e97f7fbc36b714584c8eee4ab41d"
+checksum = "e7f321d0968f2ca45ddc6d0a6f2d48f2682f9d680ba2a50c3b7a69f28444a41f"
 dependencies = [
  "async-trait",
  "axa-environment",
@@ -199,13 +199,14 @@ dependencies = [
 
 [[package]]
 name = "axa-ratelimit"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be2c92a3894dfd967003ce5fb37cd9ec866ed524ea72239064fb00237b0c97f2"
+checksum = "491a6eb3b9e613d12da6df0eea115ded93cdddf42f16157e272663a75bfbfab6"
 dependencies = [
  "axa-problem",
  "axum",
  "serde_json",
+ "tracing",
 ]
 
 [[package]]

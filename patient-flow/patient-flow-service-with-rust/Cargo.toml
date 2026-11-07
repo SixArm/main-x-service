@@ -17,7 +17,7 @@ categories = ["development-tools", "rust-patterns"]
 include = ["src/**/*", "README.md"]
 
 [dependencies]
-axa = { version = "0.6", features = ["sea-orm", "openapi", "versioning", "ratelimit"] }
+axa = { version = "0.7", features = ["sea-orm", "openapi", "versioning", "ratelimit"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -70,7 +70,7 @@ required-features = []
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
-axa = { version = "0.6", features = ["sea-orm", "testing", "openapi", "versioning", "ratelimit"] }
+axa = { version = "0.7", features = ["sea-orm", "testing", "openapi", "versioning", "ratelimit"] }
 # Name the `TestServer` type in shared request-test helpers (same
 # version axa's testing feature uses internally).
 axum-test = { version = "21.1.0" }
