@@ -139,6 +139,8 @@ steps:
     commands:
       - apt-get update && apt-get install -y --no-install-recommends postgresql-client
       - until pg_isready -h postgres -U loco; do sleep 1; done
+      # `cargo sqlx prepare --check`, the drift check for crates on sqlx.
+      - cargo install sqlx-cli --version 0.9.0 --no-default-features --features rustls,postgres --locked
       - export CI_CHANGED_SINCE="${CI_COMMIT_PULL_REQUEST:+origin/${CI_COMMIT_TARGET_BRANCH}}"
       - scripts/ci-check.sh test-db
 

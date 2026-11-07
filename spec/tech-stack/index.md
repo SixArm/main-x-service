@@ -200,8 +200,13 @@ driver.
 - All SQL lives in one area per crate, so a reviewer has one place to read.
 - Use `query!` and `query_as!` by default. Commit `.sqlx/`, build with
   `SQLX_OFFLINE=true`, and check for drift against a real database in CI.
-- Dynamic SQL uses bound `QueryBuilder` calls only. `AssertSqlSafe` and a
-  non-literal `QueryBuilder::push` are refused by CI outside an allowlist.
+  `scripts/ci-check.sh` exports `SQLX_OFFLINE=true` for every stage, and its
+  `test-db` stage runs `cargo sqlx prepare --check` once the crate's own
+  `db migrate` has built the schema.
+- Dynamic SQL uses bound `QueryBuilder` calls only. `AssertSqlSafe`,
+  `QueryBuilder`, and `raw_sql` are refused by the `clippy` stage in any file
+  [`ci/sql-allowlist.txt`](../../ci/sql-allowlist.txt) does not name with a
+  reason, so that list is every place SQL is assembled from text.
 - Helpers that run several statements take `&mut PgConnection`, so the same code
   runs inside a transaction. Audit and outbox rows commit in the same
   transaction as the change they describe.

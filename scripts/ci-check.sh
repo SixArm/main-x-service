@@ -76,6 +76,35 @@ PG_PORT="${POSTGRES_PORT:-5432}"
 PG_USER="${POSTGRES_USER:-loco}"
 PG_PASSWORD="${POSTGRES_PASSWORD:-loco}"
 
+# sqlx checks `query!` against the committed `.sqlx/` data, never a live
+# database, so every stage builds the same way with or without Postgres.
+# Drift between that data and the schema is the `test-db` stage's to find
+# (`cargo sqlx prepare --check`, below). Set before any cargo runs.
+export SQLX_OFFLINE=true
+
+# A crate on sqlx keeps flat sqlx migrations: migrations/<version>_<name>.up.sql.
+uses_sqlx_migrations() {
+  ls "$1"/migrations/*.up.sql >/dev/null 2>&1
+}
+
+# SQL a service builds from text rather than writes as a literal: the ways
+# round sqlx 0.9's refusal of a non-literal `query()`. Each is allowed only
+# in a file `ci/sql-allowlist.txt` names, with its reason, so a reviewer has
+# a list of every place dynamic SQL is assembled (spec/tech-stack §5.2).
+check_sql_safety() {
+  local crate="$1" hits file bad=0
+  [[ -d "${crate}/src" ]] || return 0
+  hits="$(grep -rlE 'AssertSqlSafe|QueryBuilder|raw_sql' "${crate}/src" "${crate}/tests" 2>/dev/null || true)"
+  for file in ${hits}; do
+    if ! grep -v '^[[:space:]]*#' ci/sql-allowlist.txt | awk '{print $1}' | grep -Fxq "${file}"; then
+      echo "  ${file}: builds SQL from text (AssertSqlSafe, QueryBuilder or raw_sql)"
+      echo "    and is not listed in ci/sql-allowlist.txt"
+      bad=1
+    fi
+  done
+  return "${bad}"
+}
+
 # Is this crate enrolled for DB-gated tests? (see ci/db-suites.txt)
 enrolled_for_db() {
   local crate="$1"
@@ -247,6 +276,7 @@ run_stage() {
     clippy)
       # `-D warnings` turns the crate-root `#![warn(clippy::pedantic)]`
       # into a hard failure, which is the only way the lint stays at zero.
+      check_sql_safety "${crate}"
       ( cd "${crate}" && cargo clippy --all-targets $(locked_flag "${crate}") -- -D warnings )
       ;;
     test)
@@ -288,7 +318,22 @@ run_stage() {
       # the migrator instead. Its tests boot the app, which migrates, and
       # SQL applied behind the migrator's back fails there with "relation
       # already exists".
-      if [[ -d "${crate}/migration" ]] && ls "${crate}"/migrations/*/up.sql >/dev/null 2>&1; then
+      if uses_sqlx_migrations "${crate}"; then
+        # The service's own `db migrate`, i.e. `sqlx::migrate!`, so the
+        # `_sqlx_migrations` table its tests' boot checks is the real one.
+        ( cd "${crate}" \
+          && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
+             cargo run --quiet $(locked_flag "${crate}") -- db migrate )
+        echo "  ran sqlx migrations"
+        # The committed `.sqlx/` must describe this schema, or the offline
+        # build checks queries against a schema that no longer exists.
+        if [[ -d "${crate}/.sqlx" ]]; then
+          ( cd "${crate}" \
+            && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
+               SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets )
+          echo "  .sqlx/ matches the schema"
+        fi
+      elif [[ -d "${crate}/migration" ]] && ls "${crate}"/migrations/*/up.sql >/dev/null 2>&1; then
         ( cd "${crate}" \
           && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
              cargo run --quiet $(locked_flag "${crate}") -- db migrate )

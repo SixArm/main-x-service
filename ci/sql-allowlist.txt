@@ -1,0 +1,7 @@
+# Files allowed to build SQL from text: AssertSqlSafe, QueryBuilder or
+# raw_sql (scripts/ci-check.sh check_sql_safety, spec/tech-stack §5.2).
+#
+# One path per line, relative to the repo root, then the reason. Every
+# entry is a place a reviewer must read the assembled SQL by hand, so keep
+# the list short and each reason specific: which identifiers or clauses
+# are built, and why every value in them is still bound.

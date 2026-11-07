@@ -303,6 +303,9 @@ jobs:
         with:
           workspaces: ${{ matrix.crate }}
           key: db-${{ matrix.crate }}
+      # `cargo sqlx prepare --check`, the drift check for crates on sqlx.
+      - name: install sqlx-cli
+        run: cargo install sqlx-cli --version 0.9.0 --no-default-features --features rustls,postgres --locked
       - run: scripts/ci-check.sh test-db '${{ matrix.crate }}'
       # See the `check` job's identical step for why this runs last, once,
       # rather than between steps.
