@@ -24,10 +24,9 @@
 use axa::testing::prelude::*;
 use organization_matcher::Organization;
 use organization_service::app::App;
-use organization_service::models::_entities::event_outbox;
+use organization_service::models::event_outbox;
 use organization_service::models::organizations::Model as OrgModel;
 use organization_service::streaming;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serial_test::serial;
 
 #[tokio::test]
@@ -63,12 +62,12 @@ async fn outbox_transport_merged_event_carries_merged_from() {
                 .expect("merge_and_emit under outbox transport");
         assert_eq!(returned_dup_pid, dup_pid);
 
-        let rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(survivor.pid))
-            .filter(event_outbox::Column::Kind.eq("merged"))
-            .all(&ctx.db)
+        let rows: Vec<_> = event_outbox::Model::for_entity(&ctx.db, survivor.pid)
             .await
-            .expect("load outbox rows for the survivor");
+            .expect("load outbox rows for the survivor")
+            .into_iter()
+            .filter(|row| row.kind == "merged")
+            .collect();
         assert_eq!(
             rows.len(),
             1,

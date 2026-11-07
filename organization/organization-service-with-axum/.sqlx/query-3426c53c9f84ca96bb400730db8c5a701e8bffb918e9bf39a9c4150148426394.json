@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE axa_queue SET status = 'failed' WHERE args->>'job_id' = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3426c53c9f84ca96bb400730db8c5a701e8bffb918e9bf39a9c4150148426394"
+}

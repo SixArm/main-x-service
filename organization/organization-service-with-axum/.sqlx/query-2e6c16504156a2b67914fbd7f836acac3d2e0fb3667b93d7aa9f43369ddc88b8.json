@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "TRUNCATE organizations CASCADE",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "2e6c16504156a2b67914fbd7f836acac3d2e0fb3667b93d7aa9f43369ddc88b8"
+}

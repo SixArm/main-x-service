@@ -16,7 +16,7 @@
 
 | Capability | Notes |
 |---|---|
-| axa boot + chassis | axa, Axum 0.8, SeaORM 1.1 |
+| axa boot + chassis | axa, Axum 0.8, sqlx 0.9 (no ORM; since 2026-11-07) |
 | Schema + migrations | `organizations` (JSONB payload), `audit_logs` |
 | CRUD | Create / list / get / replace / soft-delete; blank-name guard (`422` on create + replace); unknown pid `404` |
 | Matching endpoints | `/match` (rank) and `/check-duplicates` (vs stored, ≤ 1 000 rows) embedding the matcher directly — no adapter |

@@ -299,20 +299,45 @@ the scraper with `metrics_path: /metrics.prom`.
 
 ## 10. Persistence
 
-PostgreSQL via SeaORM + `sea-orm-migration`. Migration
-`m20220101_000001_organizations`. `auto_migrate` on in development.
+PostgreSQL via **sqlx**, with no ORM (since 2026-11-07, §13 ORG-SQLX;
+[`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5).
+**Every statement the service runs is in `src/models/`**, one module
+per table, as a `sqlx::query!` / `query_as!` / `query_scalar!` literal
+compile-checked against the committed `.sqlx/` (`SQLX_OFFLINE=true` in
+CI and the image; `scripts/ci-check.sh test-db` runs `cargo sqlx
+prepare --check` against the migrated schema). There is no dynamic
+SQL: no `QueryBuilder`, `raw_sql` or `AssertSqlSafe`, so this crate has
+no `ci/sql-allowlist.txt` entry. The review queue's optional status
+filter is the static `($1::text IS NULL OR status = $1)`. `ctx.db` is
+axa's `sqlx::PgPool` (axa's `sqlx` feature). A helper that writes takes
+an `axa::sqlx::Db` (the pool, or the caller's open transaction), which
+is how an `organizations` row, its `event_outbox` row and its audit row
+commit in one transaction under the `outbox` transport.
+
+The schema is the plain SQL under `migrations/`, eight reversible
+`<version>_<name>.up.sql` / `.down.sql` pairs (organizations, audit
+logs, merge records, event outbox, review queue, integrity digests,
+review-queue provenance, bulk jobs), embedded by `sqlx::migrate!` and
+recorded in `_sqlx_migrations`. `db migrate | down [steps] | reset |
+status` run through `axa::sqlx`; `auto_migrate` is on in development.
+They replace the SeaORM `migration/` crate one for one, in the same
+order, and produce the same schema: a `pg_dump --schema-only` of a
+database migrated by each differs only in the bookkeeping table
+(`seaql_migrations` vs `_sqlx_migrations`). A database migrated by the
+old code has no `_sqlx_migrations`, so it must be recreated rather than
+migrated in place (there is no deployed data).
 
 ### 10.7 Bulk import/export (BLK-5) — per-entity adoption
 
 Per `agents/share/bulk-import-export.md` §10, this section is
 organization's declaration of what differs from the family-wide
-contract. `bulk_jobs` (migration `m20260803_000002_bulk_jobs`) is the
+contract. `bulk_jobs` (migration `2026080300000002_bulk_jobs`) is the
 uniform job table (`id UUID PRIMARY KEY`, `kind`, `entity`, `format`,
 `status`, `params JSONB`, the five `rows_*` counters, `actor`,
 `idempotency_key`, `input_url`/`result_url`/`error_report_url`,
 `created_at`/`updated_at`/`expires_at`), plus a `provenance` column
 added to the existing `review_queue` table
-(`m20260803_000001_review_queue_provenance`: `operator` | `import` |
+(`2026080300000001_review_queue_provenance`: `operator` | `import` |
 `matcher_suggested`, backfilled `operator`, set once on insert and never
 touched by a re-scan upsert).
 
@@ -385,17 +410,18 @@ individually audited via `streaming::create_and_emit`/`update_and_emit`).
 reference pattern (an advisory-lock guard transaction wrapping
 find-then-write), this crate's per-row upsert (`bulk::pipeline::import_upsert`)
 is a **plain** find-then-write with no lock. `streaming::create_and_emit`
-/ `update_and_emit` are hard-coded to `&DatabaseConnection` (they open
+/ `update_and_emit` take the pool (they open
 their own transaction internally under the `outbox` transport), so a
 lock held on a separate guard transaction would occupy one pooled
 connection while these need a second — under a small pool (this
 crate's own `config/test.yaml` runs `max_connections: 1`) that
 deadlocked every single import, not only a concurrent one, when first
 tried. Two importers racing the *same* stable key in the same instant
-can therefore both create a row. Closing this properly needs a
-`ConnectionTrait`-generic `streaming::create_and_emit`/`update_and_emit`
-— a `src/streaming.rs`-wide change, out of BLK-5's scope; tracked as a
-follow-up in §13.
+can therefore both create a row. Closing this properly needs
+`streaming::create_and_emit`/`update_and_emit` to run on the caller's
+transaction; since the sqlx move (§10) every model helper underneath
+already takes an `axa::sqlx::Db`, so that is now a change to those two
+functions only. Tracked as a follow-up in §13.
 
 **Artifact store** (`src/bulk/store.rs`) — **local-filesystem only**
 this rollout step (`ORGANIZATION_BULK_ARTIFACT_DIR`, default a system-temp
@@ -481,6 +507,50 @@ right-of-access export have landed (§13, §6.12–13) and honour the ABAC
 organization is not a data subject.
 
 ## 13. Tasks (live work queue)
+
+- [x] **ORG-SQLX — SeaORM → sqlx (the second pilot, the first
+  controller-style crate).** *(Done 2026-11-07;
+  [`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5,
+  following place's T-18.)* Replaced SeaORM with direct sqlx so a
+  reviewer can read every statement the service runs (§10). `src/models/`
+  is the one SQL area: the `_entities/` SeaORM entities became plain row
+  structs, and the SQL that lived elsewhere (the integrity-verification
+  handlers in `controllers/compliance.rs`, the relay's retention purge,
+  the bulk identifier lookup in `bulk/pipeline.rs`, the lost-job
+  `UPDATE` in `bulk/reconcile.rs`, the reindex and seed counts in
+  `tasks/`, and `App::truncate`) moved into it. 42 `query!` /
+  `query_as!` / `query_scalar!` literals in `src/models/`, plus 7 that
+  only tests run (the lost-job DB tests in `bulk/reconcile.rs` and two
+  integration tests), all compile-checked against the committed
+  `.sqlx/`; no
+  `QueryBuilder`, `raw_sql` or `AssertSqlSafe`, so no
+  `ci/sql-allowlist.txt` entry. `axa`'s `sea-orm` feature is now
+  `sqlx`; `sea-orm`, `sea-orm-migration` and the `migration/` crate are
+  gone (382 → 348 unique normal dependencies). The eight migrations,
+  which were SeaORM schema-builder Rust rather than SQL, were written
+  out as plain SQL in sqlx's flat reversible layout, one per old
+  migration in the same order, and proved identical: a `pg_dump
+  --schema-only` of a database migrated by the old code and one
+  migrated by the new differ only in `seaql_migrations` vs
+  `_sqlx_migrations`. `db migrate | down | reset | status` run through
+  `axa::sqlx` (and were each exercised against a real database).
+  Writes take an `axa::sqlx::Db`, so the `outbox` path still commits the
+  entity, outbox and audit rows in one transaction; the relay still
+  claims with `FOR UPDATE SKIP LOCKED` and acks in the same transaction.
+  A crate-local `models::ModelError` replaces axa's SeaORM-only one and
+  converts into the same `axa::Error` answers (missing row `404`, a
+  violated unique constraint `409`, other database errors `500`).
+  Timestamps stay `DateTime<FixedOffset>`, so the audit and merge
+  endpoints serialize them exactly as before (`+00:00`). Compliance
+  behaviour unchanged and no test edited to pass: test edits only
+  replace SeaORM queries and connections with model helpers or `query!`
+  literals, keeping every assertion. One test changed shape: the relay
+  poll's `SKIP LOCKED` pin read SeaORM's generated SQL, so it became a
+  DB-gated test proving a second relay skips rows the first holds.
+  DB-gated suite 48 → 49, all passing; unit tests 206 → 205 (that same
+  test moving). The SEC-B3 bulk-upsert lock is **not** added here (see
+  the SEC-B3 item below); the new connection shape makes it a change to
+  `streaming::create_and_emit` / `update_and_emit` only.
 
 - [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
       (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
@@ -1248,7 +1318,9 @@ organization is not a data subject.
 
 ## 14. Implementation status
 
-Done: axa boot; organizations table + migration; CRUD (blank name →
+Done: axa boot; persistence on sqlx with every statement a
+compile-checked `query!` literal in `src/models/` and plain-SQL
+`sqlx::migrate!` migrations (§10, ORG-SQLX); CRUD (blank name →
 `422`, unknown pid → `404`) with cursor paging
 (`?limit=&cursor=`, `Link: rel="next"`, no total); `/match` and
 `/check-duplicates` embedding organization-matcher, blocked on the
@@ -1291,10 +1363,10 @@ router-construction surface; off unless `OTLP_ENDPOINT` is set); green
 build + clippy.
 
 Still open (§13): an `S3`
-`ArtifactStore` backend for BLK-5; a
-`ConnectionTrait`-generic `streaming::create_and_emit`/`update_and_emit`
-so the BLK-5 per-row upsert can be advisory-lock-protected (SEC-B3)
-without a pool deadlock; moving the FHIR structured search onto the
+`ArtifactStore` backend for BLK-5; letting
+`streaming::create_and_emit`/`update_and_emit` run on a caller's
+transaction so the BLK-5 per-row upsert can be advisory-lock-protected
+(SEC-B3) without a pool deadlock; moving the FHIR structured search onto the
 Tantivy index; cross-service link **target** readiness confirmation
 (§8, §13). (Richer validation beyond identifier check-digits and the
 real-time duplicate check on create, both formerly listed here, are

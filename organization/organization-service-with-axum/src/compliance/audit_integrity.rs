@@ -150,7 +150,7 @@ pub fn tag(input: &AuditInput<'_>) -> Option<String> {
 
 /// Borrow a stored row as an [`AuditInput`].
 #[must_use]
-pub fn input_for(row: &crate::models::_entities::audit_logs::Model) -> AuditInput<'_> {
+pub fn input_for(row: &crate::models::audit_logs::Model) -> AuditInput<'_> {
     AuditInput {
         entity_pid: row.entity_pid,
         action: row.action.as_str(),
@@ -198,7 +198,7 @@ const CAVEAT: &str = "A verified result attests that no examined row's content w
 
 /// Verify a run of audit rows.
 #[must_use]
-pub fn verify(rows: &[crate::models::_entities::audit_logs::Model]) -> AuditIntegrityReport {
+pub fn verify(rows: &[crate::models::audit_logs::Model]) -> AuditIntegrityReport {
     let mut report = AuditIntegrityReport {
         rows: rows.len(),
         intact: 0,

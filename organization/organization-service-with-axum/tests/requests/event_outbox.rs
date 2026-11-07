@@ -14,11 +14,10 @@
 use axa::testing::prelude::*;
 use organization_matcher::Organization;
 use organization_service::app::App;
-use organization_service::models::_entities::{event_outbox, organizations};
+use organization_service::models::event_outbox::Model as OutboxRow;
 use organization_service::models::event_outbox::OutboxInsert;
 use organization_service::models::organizations::Model as OrgModel;
 use organization_service::streaming::{ENTITY, Envelope, EventKind, SCHEMA_VERSION};
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, TransactionTrait};
 use serial_test::serial;
 use uuid::Uuid;
 
@@ -49,27 +48,22 @@ async fn outbox_create_writes_org_and_one_event_atomically() {
         let org = Organization::new("Outbox Co.");
 
         // One transaction spanning the entity insert and the outbox insert.
-        let txn = ctx.db.begin().await.expect("begin tx");
-        let model = OrgModel::create(&txn, &org).await.expect("create org");
+        let mut txn = ctx.db.begin().await.expect("begin tx");
+        let model = OrgModel::create(&mut *txn, &org).await.expect("create org");
         let env = created_envelope(&model);
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
             .expect("map envelope")
-            .insert_on(&txn)
+            .insert_on(&mut *txn)
             .await
             .expect("enqueue outbox row");
         txn.commit().await.expect("commit tx");
 
         // The org row persisted...
-        let org_count = organizations::Entity::find()
-            .count(&ctx.db)
-            .await
-            .expect("count orgs");
+        let org_count = OrgModel::count_all(&ctx.db).await.expect("count orgs");
         assert_eq!(org_count, 1, "the organization row committed");
 
         // ...and exactly one outbox row for it, unpublished, correctly mapped.
-        let rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(model.pid))
-            .all(&ctx.db)
+        let rows = OutboxRow::for_entity(&ctx.db, model.pid)
             .await
             .expect("load outbox rows");
         assert_eq!(rows.len(), 1, "exactly one event_outbox row for the org");
@@ -96,12 +90,12 @@ async fn outbox_failure_rolls_back_both_writes() {
     request::<App, _, _>(|_request, ctx| async move {
         let org = Organization::new("Rollback Co.");
 
-        let txn = ctx.db.begin().await.expect("begin tx");
-        let model = OrgModel::create(&txn, &org).await.expect("create org");
+        let mut txn = ctx.db.begin().await.expect("begin tx");
+        let model = OrgModel::create(&mut *txn, &org).await.expect("create org");
         let env = created_envelope(&model);
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
             .expect("map envelope")
-            .insert_on(&txn)
+            .insert_on(&mut *txn)
             .await
             .expect("enqueue outbox row");
         // Simulate a handler error after both writes but before commit:
@@ -109,13 +103,9 @@ async fn outbox_failure_rolls_back_both_writes() {
         txn.rollback().await.expect("rollback tx");
 
         // Neither write survived — the two are all-or-nothing.
-        let org_count = organizations::Entity::find()
-            .count(&ctx.db)
-            .await
-            .expect("count orgs");
+        let org_count = OrgModel::count_all(&ctx.db).await.expect("count orgs");
         assert_eq!(org_count, 0, "the organization insert rolled back");
-        let event_count = event_outbox::Entity::find()
-            .count(&ctx.db)
+        let event_count = OutboxRow::count_all(&ctx.db)
             .await
             .expect("count outbox rows");
         assert_eq!(event_count, 0, "the event insert rolled back with it");

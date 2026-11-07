@@ -7,7 +7,7 @@
 //! separate model to drift.
 //!
 //! Re-exports the axa [`app::App`] hooks, the REST [`controllers`], the
-//! `SeaORM` [`models`], the hand-written [`openapi`] document, and the
+//! sqlx [`models`] (every SQL statement the service runs), the hand-written [`openapi`] document, and the
 //! in-memory [`streaming`] event buffer. For the canonical behaviour
 //! reference see [`../spec/index.md`](../spec/index.md); for per-area
 //! detail see the `agents/*` files.
@@ -43,7 +43,8 @@ pub mod initializers;
 pub mod merge;
 /// Process-wide Prometheus metrics, served at `/metrics.prom`.
 pub mod metrics;
-/// `SeaORM` entities plus the CRUD/audit helpers layered over them.
+/// Table rows and every SQL statement the service runs (sqlx `query!`
+/// literals), plus the migrator.
 pub mod models;
 /// Hand-written OpenAPI 3 document served at `/api-docs/openapi.json`.
 pub mod openapi;

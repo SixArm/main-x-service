@@ -31,7 +31,7 @@
 +-------------|-----------------------------------------------|-+
               |                                               |
 +-------------v---------------+   +---------------------------v--+
-|  PostgreSQL (SeaORM 1.1)    |   |  organization-matcher        |
+|  PostgreSQL (sqlx 0.9)      |   |  organization-matcher        |
 |  organizations  (JSONB data)|   |  pure library: MatchingEngine|
 |  audit_logs     (snapshots) |   |  no IO, no unsafe, no panics |
 +-----------------------------+   +------------------------------+
@@ -63,10 +63,10 @@ organization-service-with-axum/
 │   ├── models/
 │   │   ├── organizations.rs        CRUD helpers over the JSONB payload (create/find_by_pid/search/list/…)
 │   │   ├── audit_logs.rs           record / recent / for_entity
-│   │   └── _entities/              SeaORM entities
+│   │   └── …                       one module per table; every SQL statement (sqlx `query!`)
 │   ├── openapi.rs                  hand-written OpenAPI 3 document
 │   └── streaming.rs                in-memory OrgEvent ring buffer (OnceLock global)
-├── migration/src/                  m…_organizations, m…_audit_logs
+├── migrations/                     plain SQL `.up.sql` / `.down.sql`, run by `sqlx::migrate!`
 └── config/                         development / production / test yaml (auto_migrate in dev)
 ```
 

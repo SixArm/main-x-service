@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM merge_records",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "0bf805145eb3c97c47f438a20f93531cf1033414d99fdedeebf7c190b21d7775"
+}

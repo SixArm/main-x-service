@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::auth::{AuthUser, MaybeAuthUser};
 use crate::merge::merge_orgs;
 use crate::metrics::Metrics;
+use crate::models::ModelError;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::merge_records::Model as MergeRecordModel;
 use crate::models::organizations::Model as OrgModel;
@@ -112,7 +113,7 @@ fn validate(org: &Organization) -> Result<()> {
 fn http_err(err: ModelError) -> Error {
     match err {
         ModelError::EntityNotFound => Error::NotFound,
-        other => Error::Model(other),
+        other => other.into(),
     }
 }
 

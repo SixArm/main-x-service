@@ -1,0 +1,256 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, kind, entity, format, status, params, rows_total,\n                      rows_processed, rows_created, rows_upserted, rows_to_review,\n                      rows_errored, actor, idempotency_key, input_url, result_url,\n                      error_report_url, created_at AS \"created_at: _\",\n                      updated_at AS \"updated_at: _\", expires_at AS \"expires_at: _\"\n               FROM bulk_jobs\n               WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "entity",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "entity"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "format",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "format"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "params",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "params"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "rows_total",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "rows_total"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "rows_processed",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "rows_processed"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "rows_created",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "rows_created"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "rows_upserted",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "rows_upserted"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "rows_to_review",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "rows_to_review"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "rows_errored",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "rows_errored"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "actor",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "actor"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "idempotency_key",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "idempotency_key"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "input_url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "input_url"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "result_url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "result_url"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "error_report_url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "error_report_url"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "expires_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "expires_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "cdf9c46a35cb18b6c2e9157391c16ca5c6d9c86caad76e1ed96d057805571fd5"
+}

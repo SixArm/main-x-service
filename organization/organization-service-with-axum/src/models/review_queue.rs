@@ -12,19 +12,9 @@
 //! `automerged`); the controller owns the enum mapping.
 
 use axa::prelude::*;
+use axa::sqlx::Db;
 use chrono::{DateTime, Utc};
-use sea_orm::{ConnectionTrait, Statement, Value};
 use uuid::Uuid;
-
-/// The full column list every query returns, so `RETURNING` and
-/// `SELECT` stay in lockstep with [`ReviewQueueRow`].
-const COLS: &str = "id, record_id_a, record_id_b, match_score, match_quality, \
-     detection_method, score_breakdown, status, provenance, reviewed_by, created_at, reviewed_at";
-
-/// Map a `SeaORM` (or column-get) error onto the axa database error.
-fn db_err<E: Into<sea_orm::DbErr>>(e: E) -> Error {
-    Error::DB(e.into())
-}
 
 /// One stored review-queue row. `status` is the lowercase wire token.
 #[derive(Debug, Clone)]
@@ -97,47 +87,15 @@ pub enum DecideOutcome {
     AlreadyDecided(String),
 }
 
-/// Map one query result onto a [`ReviewQueueRow`].
-fn row_from(qr: &sea_orm::QueryResult) -> Result<ReviewQueueRow> {
-    Ok(ReviewQueueRow {
-        id: qr.try_get("", "id").map_err(db_err)?,
-        record_id_a: qr.try_get("", "record_id_a").map_err(db_err)?,
-        record_id_b: qr.try_get("", "record_id_b").map_err(db_err)?,
-        match_score: qr.try_get("", "match_score").map_err(db_err)?,
-        match_quality: qr.try_get("", "match_quality").map_err(db_err)?,
-        detection_method: qr.try_get("", "detection_method").map_err(db_err)?,
-        score_breakdown: qr.try_get("", "score_breakdown").map_err(db_err)?,
-        status: qr.try_get("", "status").map_err(db_err)?,
-        provenance: qr.try_get("", "provenance").map_err(db_err)?,
-        reviewed_by: qr.try_get("", "reviewed_by").map_err(db_err)?,
-        created_at: qr.try_get("", "created_at").map_err(db_err)?,
-        reviewed_at: qr.try_get("", "reviewed_at").map_err(db_err)?,
-    })
-}
-
 /// Insert-or-refresh a scan's candidate pairs and return the **stored**
 /// rows (stable ids; a previously decided pair returns its decided
 /// status untouched, with only the score columns refreshed).
 ///
 /// # Errors
 ///
-/// Returns [`Error::DB`] if an insert fails.
-pub async fn upsert<C: ConnectionTrait>(
-    conn: &C,
-    items: &[NewReviewItem],
-) -> Result<Vec<ReviewQueueRow>> {
-    let sql = format!(
-        "INSERT INTO review_queue \
-         (id, record_id_a, record_id_b, match_score, match_quality, \
-          detection_method, score_breakdown, status, provenance) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
-         ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET \
-             match_score = EXCLUDED.match_score, \
-             match_quality = EXCLUDED.match_quality, \
-             detection_method = EXCLUDED.detection_method, \
-             score_breakdown = EXCLUDED.score_breakdown \
-         RETURNING {COLS}"
-    );
+/// Returns [`Error::Sqlx`] if an insert fails.
+pub async fn upsert(db: impl Into<Db<'_>>, items: &[NewReviewItem]) -> Result<Vec<ReviewQueueRow>> {
+    let mut conn = db.into().acquire().await?;
     let mut rows = Vec::with_capacity(items.len());
     for item in items {
         // Normalize the pair order so (a, b) and (b, a) share one row.
@@ -146,24 +104,33 @@ pub async fn upsert<C: ConnectionTrait>(
         } else {
             (item.record_id_b, item.record_id_a)
         };
-        let stmt = Statement::from_sql_and_values(
-            conn.get_database_backend(),
-            &sql,
-            [
-                Uuid::new_v4().into(),
-                a.into(),
-                b.into(),
-                item.match_score.into(),
-                item.match_quality.clone().into(),
-                item.detection_method.clone().into(),
-                Value::Json(item.score_breakdown.clone().map(Box::new)),
-                item.status.clone().into(),
-                item.provenance.clone().into(),
-            ],
-        );
-        if let Some(qr) = conn.query_one_raw(stmt).await.map_err(db_err)? {
-            rows.push(row_from(&qr)?);
-        }
+        let row = sqlx::query_as!(
+            ReviewQueueRow,
+            "INSERT INTO review_queue
+                 (id, record_id_a, record_id_b, match_score, match_quality,
+                  detection_method, score_breakdown, status, provenance)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET
+                 match_score = EXCLUDED.match_score,
+                 match_quality = EXCLUDED.match_quality,
+                 detection_method = EXCLUDED.detection_method,
+                 score_breakdown = EXCLUDED.score_breakdown
+             RETURNING id, record_id_a, record_id_b, match_score, match_quality,
+                       detection_method, score_breakdown, status, provenance,
+                       reviewed_by, created_at, reviewed_at",
+            Uuid::new_v4(),
+            a,
+            b,
+            item.match_score,
+            item.match_quality,
+            item.detection_method,
+            item.score_breakdown,
+            item.status,
+            item.provenance,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
+        rows.push(row);
     }
     Ok(rows)
 }
@@ -173,34 +140,30 @@ pub async fn upsert<C: ConnectionTrait>(
 ///
 /// # Errors
 ///
-/// Returns [`Error::DB`] if the query fails.
-pub async fn list<C: ConnectionTrait>(
-    conn: &C,
+/// Returns [`Error::Sqlx`] if the query fails.
+pub async fn list(
+    db: impl Into<Db<'_>>,
     status: Option<&str>,
     limit: u64,
 ) -> Result<Vec<ReviewQueueRow>> {
     let limit = i64::try_from(limit.min(500)).unwrap_or(500);
-    let backend = conn.get_database_backend();
-    let stmt = if let Some(status) = status {
-        Statement::from_sql_and_values(
-            backend,
-            format!(
-                "SELECT {COLS} FROM review_queue WHERE status = $1 \
-                 ORDER BY created_at DESC, id LIMIT $2"
-            ),
-            [status.to_string().into(), limit.into()],
-        )
-    } else {
-        Statement::from_sql_and_values(
-            backend,
-            format!("SELECT {COLS} FROM review_queue ORDER BY created_at DESC, id LIMIT $1"),
-            [limit.into()],
-        )
-    };
-    let mut rows = Vec::new();
-    for qr in conn.query_all_raw(stmt).await.map_err(db_err)? {
-        rows.push(row_from(&qr)?);
-    }
+    let mut conn = db.into().acquire().await?;
+    // One static statement: an absent filter is a NULL `$1`, which
+    // matches every row.
+    let rows = sqlx::query_as!(
+        ReviewQueueRow,
+        "SELECT id, record_id_a, record_id_b, match_score, match_quality,
+                detection_method, score_breakdown, status, provenance,
+                reviewed_by, created_at, reviewed_at
+         FROM review_queue
+         WHERE ($1::text IS NULL OR status = $1)
+         ORDER BY created_at DESC, id
+         LIMIT $2",
+        status,
+        limit,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
     Ok(rows)
 }
 
@@ -212,40 +175,33 @@ pub async fn list<C: ConnectionTrait>(
 ///
 /// # Errors
 ///
-/// Returns [`Error::DB`] if a query fails.
-pub async fn decide<C: ConnectionTrait>(
-    conn: &C,
+/// Returns [`Error::Sqlx`] if a query fails.
+pub async fn decide(
+    db: impl Into<Db<'_>>,
     id: Uuid,
     status: &str,
     reviewed_by: Option<&str>,
 ) -> Result<DecideOutcome> {
-    let backend = conn.get_database_backend();
-    let update = Statement::from_sql_and_values(
-        backend,
-        format!(
-            "UPDATE review_queue \
-             SET status = $2, reviewed_by = $3, reviewed_at = now() \
-             WHERE id = $1 AND status = 'pending' \
-             RETURNING {COLS}"
-        ),
-        [
-            id.into(),
-            status.to_string().into(),
-            reviewed_by.map(ToString::to_string).into(),
-        ],
-    );
-    if let Some(qr) = conn.query_one_raw(update).await.map_err(db_err)? {
-        return Ok(DecideOutcome::Decided(Box::new(row_from(&qr)?)));
+    let mut conn = db.into().acquire().await?;
+    let decided = sqlx::query_as!(
+        ReviewQueueRow,
+        "UPDATE review_queue
+         SET status = $2, reviewed_by = $3, reviewed_at = now()
+         WHERE id = $1 AND status = 'pending'
+         RETURNING id, record_id_a, record_id_b, match_score, match_quality,
+                   detection_method, score_breakdown, status, provenance,
+                   reviewed_by, created_at, reviewed_at",
+        id,
+        status,
+        reviewed_by,
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(row) = decided {
+        return Ok(DecideOutcome::Decided(Box::new(row)));
     }
-    let probe = Statement::from_sql_and_values(
-        backend,
-        "SELECT status FROM review_queue WHERE id = $1",
-        [id.into()],
-    );
-    match conn.query_one_raw(probe).await.map_err(db_err)? {
-        Some(qr) => Ok(DecideOutcome::AlreadyDecided(
-            qr.try_get("", "status").map_err(db_err)?,
-        )),
-        None => Ok(DecideOutcome::NotFound),
-    }
+    let current = sqlx::query_scalar!("SELECT status FROM review_queue WHERE id = $1", id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    Ok(current.map_or(DecideOutcome::NotFound, DecideOutcome::AlreadyDecided))
 }

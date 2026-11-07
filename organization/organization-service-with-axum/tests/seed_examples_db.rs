@@ -14,9 +14,8 @@ use std::path::Path;
 
 use axa::testing::prelude::*;
 use organization_service::app::App;
-use organization_service::models::_entities::organizations;
+use organization_service::models::organizations;
 use organization_service::tasks::seed_examples::{FIXTURE_PATH, parse_fixture, seed};
-use sea_orm::{ConnectionTrait, EntityTrait, PaginatorTrait};
 use serial_test::serial;
 
 #[tokio::test]
@@ -27,8 +26,8 @@ async fn seed_examples_seeds_the_fixture_and_is_idempotent() {
         // Clean slate: this test asserts on the whole table's row
         // count, so it needs sole ownership of the starting state
         // regardless of what ran before it in the shared test database.
-        ctx.db
-            .execute_unprepared("TRUNCATE organizations CASCADE")
+        sqlx::query!("TRUNCATE organizations CASCADE")
+            .execute(&ctx.db)
             .await
             .expect("truncate organizations");
 
@@ -47,8 +46,7 @@ async fn seed_examples_seeds_the_fixture_and_is_idempotent() {
         assert_eq!(first.existing, 0);
         assert!(!first.skipped);
 
-        let count = organizations::Entity::find()
-            .count(&ctx.db)
+        let count = organizations::Model::count_all(&ctx.db)
             .await
             .expect("count organizations");
         assert_eq!(count, 20);
@@ -60,8 +58,7 @@ async fn seed_examples_seeds_the_fixture_and_is_idempotent() {
         assert_eq!(second.existing, 20);
         assert!(second.skipped);
 
-        let count_after = organizations::Entity::find()
-            .count(&ctx.db)
+        let count_after = organizations::Model::count_all(&ctx.db)
             .await
             .expect("count organizations after second run");
         assert_eq!(count_after, 20, "a re-run must not double the table");

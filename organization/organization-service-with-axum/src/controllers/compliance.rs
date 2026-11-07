@@ -23,11 +23,10 @@
 
 use axa::extract::Query;
 use axa::prelude::*;
-use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 
 use crate::compliance::{audit_integrity, record_integrity};
-use crate::models::_entities::{audit_logs, organizations};
+use crate::models::{audit_logs, organizations};
 
 /// Default rows examined in one call.
 pub const VERIFY_DEFAULT_LIMIT: u64 = 1000;
@@ -67,11 +66,7 @@ async fn verify_records(
     State(ctx): State<AppContext>,
     Query(params): Query<VerifyParams>,
 ) -> Result<Response> {
-    let rows = organizations::Entity::find()
-        .order_by_desc(organizations::Column::UpdatedAt)
-        .limit(params.limit())
-        .all(&ctx.db)
-        .await?;
+    let rows = organizations::Model::recently_updated(&ctx.db, params.limit()).await?;
     format::json(record_integrity::verify(&rows))
 }
 
@@ -87,11 +82,7 @@ async fn verify_audit(
     State(ctx): State<AppContext>,
     Query(params): Query<VerifyParams>,
 ) -> Result<Response> {
-    let rows = audit_logs::Entity::find()
-        .order_by_desc(audit_logs::Column::Id)
-        .limit(params.limit())
-        .all(&ctx.db)
-        .await?;
+    let rows = audit_logs::Model::recent(&ctx.db, params.limit()).await?;
     format::json(audit_integrity::verify(&rows))
 }
 

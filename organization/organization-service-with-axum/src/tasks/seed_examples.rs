@@ -35,9 +35,8 @@ use std::path::Path;
 
 use axa::prelude::*;
 use organization_matcher::Organization;
-use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait};
+use sqlx::PgPool;
 
-use crate::models::_entities::organizations;
 use crate::models::organizations::Model as OrgModel;
 
 /// The fixture's location, relative to this crate's manifest directory
@@ -99,8 +98,8 @@ pub struct SeedReport {
 /// # Errors
 ///
 /// When the row count query or an insert fails.
-pub async fn seed(db: &DatabaseConnection, fixture: &[Organization]) -> Result<SeedReport> {
-    let existing = organizations::Entity::find().count(db).await?;
+pub async fn seed(db: &PgPool, fixture: &[Organization]) -> Result<SeedReport> {
+    let existing = OrgModel::count_all(db).await?;
     if existing > 0 {
         println!(
             "organizations table is not empty ({existing} rows) — skipping seed; reset the database first if you want to reseed"

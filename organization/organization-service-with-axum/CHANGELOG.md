@@ -9,6 +9,55 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — SeaORM replaced by sqlx
+
+- **Persistence is sqlx with no ORM** (spec §10, §13 ORG-SQLX; the
+  second pilot of `spec/tech-stack/index.md` §5, and the first
+  controller-style crate). All SQL is in `src/models/`, as 42 `query!`
+  / `query_as!` / `query_scalar!` literals checked at compile time
+  against the committed `.sqlx/`; there is no dynamic SQL and no
+  `ci/sql-allowlist.txt` entry. The SeaORM `_entities/` are plain row
+  structs. SQL that lived outside `src/models/` (the integrity
+  verification handlers, the relay's retention purge, the bulk
+  identifier lookup, the lost-job reconcile `UPDATE`, the reindex and
+  seed counts, `App::truncate`) moved into it.
+- **The `migration/` crate is removed.** Its eight migrations were
+  SeaORM schema-builder Rust; they are now plain SQL in sqlx's flat
+  `migrations/<version>_<name>.up.sql` / `.down.sql` layout (versions
+  `2022010100000001` … `2026080300000002`, same order), embedded by
+  `sqlx::migrate!` and recorded in `_sqlx_migrations` instead of
+  `seaql_migrations`. The resulting schema is identical (`pg_dump
+  --schema-only` diff). A database migrated by the old code has no
+  `_sqlx_migrations`, so sqlx would try to re-create its tables; there
+  is no deployed data, so recreate it.
+- `axa` takes its `sqlx` feature instead of `sea-orm`, so `ctx.db` is a
+  `sqlx::PgPool`; `sea-orm` and `sea-orm-migration` are gone from the
+  tree (382 → 348 unique normal dependencies). `chrono` now names its
+  own `serde` feature, which SeaORM used to turn on.
+- Library API: `models::ModelError` / `ModelResult` replace axa's
+  SeaORM-only ones and convert into the same `axa::Error` (missing row
+  `404`, unique violation `409`, other database errors `500`).
+  Write helpers take an `axa::sqlx::Db` (pool or `&mut *txn`) instead of
+  a `ConnectionTrait`; `update_data` and `soft_delete` are methods on
+  `organizations::Model` rather than on a SeaORM `ActiveModel`. Row
+  timestamps stay `DateTime<FixedOffset>`, so the audit and merge
+  endpoints serialize them unchanged.
+- `db status` prints one tab-separated line per migration to stdout
+  (SeaORM logged it). `db reset` and the test boot recreate the schema
+  with `axa::sqlx::dangerously_recreate` in place of SeaORM's `fresh`.
+- `database.enable_logging` no longer reaches the driver: SeaORM passed
+  it to `sqlx_logging`, which defaulted it off, while a plain sqlx pool
+  logs each statement at `DEBUG` (target `sqlx::query`) and a slow one
+  at `WARN`.
+- A database error's text is sqlx's rather than SeaORM's wrapper (it
+  is logged, never sent).
+- The relay poll's `FOR UPDATE SKIP LOCKED` pin read the SQL SeaORM
+  generated; it is now a DB-gated test proving a second relay skips
+  rows the first holds (DB suite 48 → 49, unit tests 206 → 205).
+- `[profile.release.build-override] strip = false`: with stripping
+  reaching proc macros, macOS refuses to load the stripped
+  `sqlx-macros` dylib and a release build fails.
+
 ### Changed
 
 - **Breaking:** list and search page by signed cursor, through

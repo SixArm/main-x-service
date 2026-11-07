@@ -19,10 +19,10 @@ there is no separate model or adapter to drift.
 
 | Question | Answer |
 |---|---|
-| Framework | axa (`Hooks`/`AppContext`/CLI, axa config, `sea-orm-migration` 2.0). |
+| Framework | axa (`AppContext`/CLI, axa config, axa's `sqlx` feature: `ctx.db` is a `sqlx::PgPool`). |
 | Build / test | `cargo build` · `cargo test` (DB-free) · `cargo test -- --ignored` (request-level suite; needs Postgres). |
 | Run | `cargo run -- start` (needs Postgres). |
-| Persistence | One `organizations` table: `pid`, `name`, `data` (JSONB Organization), `active`, soft-delete. |
+| Persistence | sqlx, no ORM. One `organizations` table: `pid`, `name`, `data` (JSONB Organization), `active`, soft-delete. **All SQL is in `src/models/`** as `query!` literals checked against the committed `.sqlx/`. |
 
 ## API surface
 
@@ -120,14 +120,15 @@ backend needs no signature change). Stable key: LEI → DUNS → explicit
 search-blocking + matcher duplicate detection `check-duplicates` uses
 and is queued in the review queue with `provenance = "import"` (the
 `review_queue` table gained a `provenance` column,
-`m20260803_000001`). Every written row goes through
+`migrations/2026080300000001_review_queue_provenance`). Every written row goes through
 `streaming::create_and_emit`/`update_and_emit`, so a bulk-imported
 organization gets the same event/audit/search-index side effects as one
 created interactively. **Known limitation:** the per-row upsert is not
 SEC-B3 advisory-lock-protected (see spec §10.7 "Concurrency" for why —
 a locked guard transaction deadlocked under this crate's own
 `max_connections: 1` test config, since `streaming::create_and_emit`/
-`update_and_emit` are not generic over `ConnectionTrait`); two
+`update_and_emit` open their own transaction rather than joining the
+caller's); two
 importers racing the identical stable key can both create a row.
 
 **Durable event bus Phase 3** (`src/relay.rs`) is implemented: a
@@ -156,10 +157,20 @@ changed. See
 
 1. **Spec-first.** Update `spec/index.md` with behavioural changes.
 2. **Controller-style.** Endpoints are axa controllers in `app.rs`; new
-   tables are `sea-orm-migration` migrations.
-3. **Reuse the matcher type.** Do not fork an `Organization` DTO — the
+   tables are plain-SQL `migrations/<version>_<name>.up.sql` /
+   `.down.sql` pairs run by `sqlx::migrate!`.
+3. **All SQL in `src/models/`.** Every statement is a `sqlx::query!` /
+   `query_as!` / `query_scalar!` literal; never `QueryBuilder`,
+   `raw_sql` or `AssertSqlSafe` (the clippy stage refuses them outside
+   `ci/sql-allowlist.txt`). After changing a query or a migration, run
+   `cargo sqlx prepare -- --all-targets` against a migrated database and
+   commit `.sqlx/`; every build is `SQLX_OFFLINE=true`. A helper that
+   writes takes an `axa::sqlx::Db`, so it can join a caller's
+   transaction (pass `&mut *txn`); audit and outbox rows must commit in
+   the same transaction as the change they describe.
+4. **Reuse the matcher type.** Do not fork an `Organization` DTO — the
    service uses `organization_matcher::Organization` directly.
-4. **Auth** comes from the central
+5. **Auth** comes from the central
    [authentication-service](../../authentication/authentication-service-with-axum) (not
    embedded here): cookie sessions + offline PASETO v4.public verification.
 
@@ -199,17 +210,23 @@ src/
 │                           TSV — TSV shares the csv codec via a declared
 │                           delimiter; columns, csv, jsonl, stable_key,
 │                           error_report, pipeline, store, worker, handlers)
-├── models/
-│   ├── organizations.rs   CRUD helpers over the stored payload
-│   ├── bulk_jobs.rs       BLK-5 job CRUD/status helpers
-│   ├── review_queue.rs    batch-dedup review queue (now carries `provenance`)
-│   └── _entities/{organizations,bulk_jobs}.rs  SeaORM entities
-migration/src/            m20220101_000001_organizations, …_000002_audit_logs,
-                          …_000003_merge_records, …_000004_event_outbox,
-                          m20260719_000001_review_queue,
-                          m20260728_000001_integrity_digests,
-                          m20260803_000001_review_queue_provenance,
-                          m20260803_000002_bulk_jobs
+├── models/                every SQL statement the service runs (sqlx
+│   │                       `query!` literals) + `MIGRATOR` + `ModelError`
+│   ├── organizations.rs   row struct + CRUD over the stored payload
+│   ├── audit_logs.rs      audit trail (digests + MAC stamped on insert)
+│   ├── merge_records.rs   merge history
+│   ├── event_outbox.rs    outbox insert, relay poll/ack/purge
+│   ├── bulk_jobs.rs       BLK-5 job CRUD/status helpers + lost-job update
+│   └── review_queue.rs    batch-dedup review queue (now carries `provenance`)
+migrations/               plain SQL, `<version>_<name>.up.sql`/`.down.sql`:
+                          2022010100000001_organizations, …02_audit_logs,
+                          …03_merge_records, …04_event_outbox,
+                          2026071900000001_review_queue,
+                          2026072800000001_integrity_digests,
+                          2026080300000001_review_queue_provenance,
+                          2026080300000002_bulk_jobs
+.sqlx/                    offline query data for the `query!` macros
+                          (regenerate with `cargo sqlx prepare -- --all-targets`)
 tests/fluvio_relay.rs     `#![cfg(feature = "fluvio")]`-gated, `#[ignore]`d
                           live-broker relay round-trip (BUS-3)
 tests/enforcement.rs      AU-2 activation proof: blanket guard + ABAC over

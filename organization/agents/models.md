@@ -58,7 +58,7 @@ comparison contribute to the address score.
 ## Persistence row (service)
 
 **Files:** [`src/models/organizations.rs`](../organization-service-with-axum/src/models/organizations.rs),
-[`migration/src/m20220101_000001_organizations.rs`](../organization-service-with-axum/migration/src/m20220101_000001_organizations.rs)
+[`migrations/2022010100000001_organizations.up.sql`](../organization-service-with-axum/migrations/2022010100000001_organizations.up.sql)
 
 | Column | Type | Notes |
 |---|---|---|

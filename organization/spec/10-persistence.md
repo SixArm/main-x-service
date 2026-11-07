@@ -1,6 +1,7 @@
 ## 10. Persistence
 
-PostgreSQL via SeaORM 1.1 + `sea-orm-migration` (controller-style).
+PostgreSQL via sqlx 0.9 with no ORM (controller-style; SeaORM until
+2026-11-07).
 Family-wide database conventions:
 [`agents/share/postgresql.md`](../../agents/share/postgresql.md).
 
@@ -8,8 +9,8 @@ Family-wide database conventions:
 
 | Table | Migration | Columns |
 |---|---|---|
-| `organizations` | `m20220101_000001_organizations` | `id` (auto PK), `pid` (UUID unique), `name` (string, denormalised), `data` (JSONB — full `Organization` payload), `active` (bool default true), `deleted_at` (timestamptz null) |
-| `audit_logs` | `m20220101_000002_audit_logs` | `id` (auto PK), `entity_pid` (UUID), `action` (string: created / updated / deleted), `actor` (string null), `snapshot` (JSONB null) |
+| `organizations` | `2022010100000001_organizations` | `id` (auto PK), `pid` (UUID unique), `name` (string, denormalised), `data` (JSONB — full `Organization` payload), `active` (bool default true), `deleted_at` (timestamptz null) |
+| `audit_logs` | `2022010100000002_audit_logs` | `id` (auto PK), `entity_pid` (UUID), `action` (string: created / updated / deleted), `actor` (string null), `snapshot` (JSONB null) |
 
 ### 10.2 JSONB persistence model
 
@@ -37,8 +38,13 @@ removed — this is the entity's GDPR-balancing retention mechanism
 ### 10.4 Migrations and environments
 
 - Migrations live in
-  [`migration/src/`](../organization-service-with-axum/migration/);
-  new tables MUST be added as `sea-orm-migration` migrations.
+  [`migrations/`](../organization-service-with-axum/migrations/) as
+  plain SQL, one `<version>_<name>.up.sql` / `.down.sql` pair each, run
+  by `sqlx::migrate!` (`db migrate | down | reset | status`); new tables
+  MUST be added the same way. Every statement the service runs is a
+  `sqlx::query!` literal in `src/models/`, checked against the committed
+  `.sqlx/` (service spec §10). They replaced the SeaORM `migration/`
+  crate on 2026-11-07 with an identical schema.
 - `auto_migrate: true` in `config/development.yaml`; production
   applies migrations explicitly.
 - Extensions: none required by the current schema beyond stock

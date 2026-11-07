@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE axa_queue SET status = 'running', attempts = attempts + 1,\n                 started_at = now(), updated_at = now() - interval '2 hours'\n             WHERE args->>'job_id' = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b232c3ea73dc1442c7e620b3d6042b4e47ffa6f8fa5a9eca2c0bac141e801105"
+}
