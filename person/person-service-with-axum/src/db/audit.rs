@@ -863,9 +863,16 @@ mod chain_tests {
         }
 
         assert_eq!(scrub(&db, 7).await.expect("scrub"), 0, "nothing is old yet");
-        // A retention of no days takes every row before this moment.
-        assert_eq!(scrub(&db, 0).await.expect("scrub"), 2);
-        assert_eq!(scrub(&db, 0).await.expect("scrub"), 0, "nothing left to do");
+        // A retention of minus one day puts the cutoff a day ahead, so it
+        // takes every row. Zero would compare the app's clock, which stamps
+        // the rows, with the database's, which sets the cutoff, and fail
+        // whenever the database runs a few milliseconds behind.
+        assert_eq!(scrub(&db, -1).await.expect("scrub"), 2);
+        assert_eq!(
+            scrub(&db, -1).await.expect("scrub"),
+            0,
+            "nothing left to do"
+        );
 
         let rows = repo.chain_tail(10).await.expect("rows");
         assert!(
@@ -877,7 +884,7 @@ mod chain_tests {
         assert!(report.verified, "{:?}", report.breaks);
         assert_eq!(report.intact, 2, "content was checked, not skipped");
         assert_eq!(report.redacted, 0);
-        assert_eq!(unscrubbable(&db, 0).await.expect("count"), 0);
+        assert_eq!(unscrubbable(&db, -1).await.expect("count"), 0);
         clear(&db).await;
     }
 
