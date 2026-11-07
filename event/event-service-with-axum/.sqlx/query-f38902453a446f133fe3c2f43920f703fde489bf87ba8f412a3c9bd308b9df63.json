@@ -1,0 +1,143 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event_outbox\n                 (event_id, entity, entity_pid, kind, occurred_at, actor, schema_version, payload)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n             RETURNING id, event_id, entity, entity_pid, kind, occurred_at, actor,\n                       schema_version, payload, published_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "entity",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "entity"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "entity_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "entity_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "occurred_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "occurred_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "actor",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "actor"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "schema_version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "schema_version"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "payload",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "payload"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "published_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_outbox",
+            "name": "published_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Text",
+        "Int4",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "f38902453a446f133fe3c2f43920f703fde489bf87ba8f412a3c9bd308b9df63"
+}

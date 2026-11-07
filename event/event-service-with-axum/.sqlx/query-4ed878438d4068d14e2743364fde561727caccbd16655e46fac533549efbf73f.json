@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM event_outbox WHERE published_at IS NOT NULL AND published_at < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4ed878438d4068d14e2743364fde561727caccbd16655e46fac533549efbf73f"
+}

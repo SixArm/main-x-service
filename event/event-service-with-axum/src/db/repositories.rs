@@ -1,13 +1,10 @@
 //! Repository layer: converts between the domain
-//! [`Event`](crate::models::Event) and the SeaORM entities defined in
-//! [`crate::db::models`].
+//! [`Event`](crate::models::Event) and the row structs defined in
+//! [`crate::db::models`], and runs every statement against the event
+//! tables as a `sqlx::query!` / `query_as!` literal.
 
-use super::convert::{offset_to_ts, ts_to_offset};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, NotSet,
-    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
-};
-use time::OffsetDateTime;
+use chrono::{DateTime, Utc};
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::Result;
@@ -20,8 +17,7 @@ use crate::models::{
 use crate::streaming::{EventKind, EventTransport};
 
 use super::models::{
-    event_identifiers, event_links, event_locations, event_offers, event_parties, event_sub_events,
-    event_text_values, events,
+    EventRow, IdentifierRow, LinkRow, LocationRow, OfferRow, PartyRow, SubEventRow, TextValueRow,
 };
 
 pub use super::audit::AuditContext;
@@ -79,11 +75,11 @@ pub trait EventRepository: Send + Sync {
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Event>>;
 }
 
-/// SeaORM-backed [`EventRepository`] with optional event publishing and
+/// sqlx-backed [`EventRepository`] with optional event publishing and
 /// audit logging.
-pub struct SeaOrmEventRepository {
-    /// The database connection/pool.
-    db: DatabaseConnection,
+pub struct PgEventRepository {
+    /// The connection pool.
+    db: PgPool,
     /// Optional event-stream publisher for CRUD notifications.
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
     /// Optional audit-log repository for write trails.
@@ -95,12 +91,12 @@ pub struct SeaOrmEventRepository {
     transport: EventTransport,
 }
 
-impl SeaOrmEventRepository {
+impl PgEventRepository {
     /// Construct a repository over `db` with no publisher or audit log,
     /// and the default [`EventTransport::Memory`] transport (behaviour
     /// unchanged from before the outbox landed).
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self {
             db,
             event_publisher: None,
@@ -120,17 +116,16 @@ impl SeaOrmEventRepository {
 
     /// When the outbox transport is active, enqueue one `event_outbox`
     /// row for `kind` applied to `event` **on `conn`** — pass the open
-    /// `&DatabaseTransaction` so the row commits with the entity write
-    /// (the outbox atomicity guarantee). A no-op under
-    /// [`EventTransport::Memory`].
+    /// transaction so the row commits with the entity write (the outbox
+    /// atomicity guarantee). A no-op under [`EventTransport::Memory`].
     ///
-    /// The `ConnectionTrait` generic lives here on a concrete method (not
-    /// on the object-safe [`EventRepository`] trait), which is how a
+    /// The connection parameter lives here on a concrete method (not on
+    /// the object-safe [`EventRepository`] trait), which is how a
     /// `dyn`-trait repository threads the outbox insert into its own
     /// transaction.
-    async fn enqueue_outbox<C: ConnectionTrait>(
+    async fn enqueue_outbox(
         &self,
-        conn: &C,
+        conn: &mut PgConnection,
         event: &Event,
         kind: EventKind,
     ) -> Result<()> {
@@ -229,28 +224,28 @@ impl SeaOrmEventRepository {
 }
 
 // ---------------------------------------------------------------------------
-// Conversions: domain Event ↔ SeaORM rows
+// Conversions: domain Event ↔ rows
 // ---------------------------------------------------------------------------
 
 /// One [`Event`] flattened into its parent row plus all child-table
 /// rows, ready to insert under a single transaction.
 struct ChildRows {
     /// The parent `events` row.
-    event_row: events::ActiveModel,
+    event_row: EventRow,
     /// `event_identifiers` rows (one per external identifier).
-    identifiers: Vec<event_identifiers::ActiveModel>,
+    identifiers: Vec<IdentifierRow>,
     /// `event_locations` rows (one per [`Location`] in order).
-    locations: Vec<event_locations::ActiveModel>,
+    locations: Vec<LocationRow>,
     /// `event_parties` rows across all six role lists.
-    parties: Vec<event_parties::ActiveModel>,
+    parties: Vec<PartyRow>,
     /// `event_offers` rows (one per [`Offer`] in order).
-    offers: Vec<event_offers::ActiveModel>,
+    offers: Vec<OfferRow>,
     /// `event_links` rows (cross-event links).
-    links: Vec<event_links::ActiveModel>,
+    links: Vec<LinkRow>,
     /// `event_sub_events` rows (sub-event id references in order).
-    sub_events: Vec<event_sub_events::ActiveModel>,
+    sub_events: Vec<SubEventRow>,
     /// `event_text_values` rows (`alternate_name/image/same_as/keyword/in_language`).
-    text_values: Vec<event_text_values::ActiveModel>,
+    text_values: Vec<TextValueRow>,
 }
 
 /// All child-table rows loaded back for one event, in fixed order
@@ -258,33 +253,29 @@ struct ChildRows {
 /// text-values), ready to feed into [`from_rows`].
 struct LoadedChildRows {
     /// `event_identifiers` rows.
-    identifiers: Vec<event_identifiers::Model>,
+    identifiers: Vec<IdentifierRow>,
     /// `event_locations` rows.
-    locations: Vec<event_locations::Model>,
+    locations: Vec<LocationRow>,
     /// `event_parties` rows across all six role lists.
-    parties: Vec<event_parties::Model>,
+    parties: Vec<PartyRow>,
     /// `event_offers` rows.
-    offers: Vec<event_offers::Model>,
+    offers: Vec<OfferRow>,
     /// `event_links` rows.
-    links: Vec<event_links::Model>,
+    links: Vec<LinkRow>,
     /// `event_sub_events` rows.
-    sub_events: Vec<event_sub_events::Model>,
+    sub_events: Vec<SubEventRow>,
     /// `event_text_values` rows (ordered by `position`).
-    text_values: Vec<event_text_values::Model>,
+    text_values: Vec<TextValueRow>,
 }
 
-/// Flatten a domain [`Event`] into a [`ChildRows`] bundle of `SeaORM`
-/// `ActiveModel`s. Stamps `created_at`/`updated_at` to "now"; mints
-/// fresh `Uuid`s for child rows; serializes the JSONB array fields;
-/// and fans the six party role-lists out via [`push_party_rows`].
-/// Build the parent `events` [`ActiveModel`](events::ActiveModel) for a
-/// fresh insert, stamping `created_at`/`updated_at` to `now`.
-fn event_active_model(event: &Event, now: OffsetDateTime) -> events::ActiveModel {
+/// Build the parent `events` [`EventRow`] for a fresh insert, stamping
+/// `created_at`/`updated_at` to `now`.
+fn event_row(event: &Event, now: DateTime<Utc>) -> EventRow {
     // All three digests from one call over the **assembled** record, so
     // the child collections (offers, participants, locations) are covered
     // too. Computed here rather than stamped afterwards, so one statement
     // writes the row and its integrity values together — and every write
-    // path builds its active model through this function, so it is the
+    // path builds its row through this function, so it is the
     // single place one could forget to re-digest.
     let digests = crate::compliance::record_integrity::digests(
         &crate::compliance::record_integrity::RecordInput {
@@ -293,80 +284,80 @@ fn event_active_model(event: &Event, now: OffsetDateTime) -> events::ActiveModel
             active: event.active,
         },
     );
-    events::ActiveModel {
-        id: Set(event.id),
-        content_hash: Set(Some(digests.sha256)),
-        content_hash_sha3: Set(Some(digests.sha3)),
-        content_mac: Set(digests.mac),
-        active: Set(event.active),
-        name: Set(event.name.clone()),
-        description: Set(event.description.clone()),
-        disambiguating_description: Set(event.disambiguating_description.clone()),
-        url: Set(event.url.clone()),
-        start_date: Set(ts_to_offset(event.start_date)),
-        end_date: Set(event.end_date.map(ts_to_offset)),
-        door_time: Set(event.door_time.map(ts_to_offset)),
-        duration: Set(event.duration.clone()),
-        previous_start_date: Set(event.previous_start_date.map(ts_to_offset)),
-        time_zone: Set(event.time_zone.clone()),
-        all_day: Set(event.all_day),
-        event_status: Set(enum_to_str(&event.event_status)),
-        event_attendance_mode: Set(enum_to_str(&event.event_attendance_mode)),
-        event_type: Set(enum_to_str(&event.event_type)),
-        typical_age_range: Set(event.typical_age_range.clone()),
-        is_accessible_for_free: Set(event.is_accessible_for_free),
+    EventRow {
+        id: event.id,
+        content_hash: Some(digests.sha256),
+        content_hash_sha3: Some(digests.sha3),
+        content_mac: digests.mac,
+        active: event.active,
+        name: event.name.clone(),
+        description: event.description.clone(),
+        disambiguating_description: event.disambiguating_description.clone(),
+        url: event.url.clone(),
+        start_date: event.start_date,
+        end_date: event.end_date,
+        door_time: event.door_time,
+        duration: event.duration.clone(),
+        previous_start_date: event.previous_start_date,
+        time_zone: event.time_zone.clone(),
+        all_day: event.all_day,
+        event_status: enum_to_str(&event.event_status),
+        event_attendance_mode: enum_to_str(&event.event_attendance_mode),
+        event_type: enum_to_str(&event.event_type),
+        typical_age_range: event.typical_age_range.clone(),
+        is_accessible_for_free: event.is_accessible_for_free,
         // Capacities are `u32` in the domain but stored as Postgres
         // `i32`; values above `i32::MAX` would wrap (not expected for
         // real attendee counts). Read-back casts `i32` → `u32`.
-        maximum_attendee_capacity: Set(event.maximum_attendee_capacity.map(u32::cast_signed)),
-        maximum_physical_attendee_capacity: Set(event
+        maximum_attendee_capacity: event.maximum_attendee_capacity.map(u32::cast_signed),
+        maximum_physical_attendee_capacity: event
             .maximum_physical_attendee_capacity
-            .map(u32::cast_signed)),
-        maximum_virtual_attendee_capacity: Set(event
+            .map(u32::cast_signed),
+        maximum_virtual_attendee_capacity: event
             .maximum_virtual_attendee_capacity
-            .map(u32::cast_signed)),
-        remaining_attendee_capacity: Set(event.remaining_attendee_capacity.map(u32::cast_signed)),
-        super_event_id: Set(event.super_event),
-        created_at: Set(now),
-        updated_at: Set(now),
-        created_by: Set(None),
-        updated_by: Set(None),
-        deleted_at: Set(None),
-        deleted_by: Set(None),
+            .map(u32::cast_signed),
+        remaining_attendee_capacity: event.remaining_attendee_capacity.map(u32::cast_signed),
+        super_event_id: event.super_event,
+        created_at: now,
+        updated_at: now,
+        created_by: None,
+        updated_by: None,
+        deleted_at: None,
+        deleted_by: None,
     }
 }
 
 /// Build the `event_offers` rows (one per [`Offer`] in order). Price is
 /// parsed from its decimal-string form into `BigDecimal`; an
 /// unparseable string stores no price.
-fn offer_rows(event: &Event, now: OffsetDateTime) -> Vec<event_offers::ActiveModel> {
+fn offer_rows(event: &Event, now: DateTime<Utc>) -> Vec<OfferRow> {
     event
         .offers
         .iter()
         .enumerate()
-        .map(|(pos, o)| event_offers::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            event_id: Set(event.id),
-            position: Set(i32::try_from(pos).unwrap_or(i32::MAX)),
-            name: Set(o.name.clone()),
-            price: Set(o
+        .map(|(pos, o)| OfferRow {
+            id: Uuid::new_v4(),
+            event_id: event.id,
+            position: i32::try_from(pos).unwrap_or(i32::MAX),
+            name: o.name.clone(),
+            price: o
                 .price
                 .as_deref()
-                .and_then(|s| s.parse::<bigdecimal::BigDecimal>().ok())),
-            price_currency: Set(o.price_currency.clone()),
-            url: Set(o.url.clone()),
-            availability: Set(o.availability.as_ref().map(enum_to_str)),
-            valid_from: Set(o.valid_from.map(ts_to_offset)),
-            valid_through: Set(o.valid_through.map(ts_to_offset)),
-            created_at: Set(now),
-            updated_at: Set(now),
+                .and_then(|s| s.parse::<bigdecimal::BigDecimal>().ok()),
+            price_currency: o.price_currency.clone(),
+            url: o.url.clone(),
+            availability: o.availability.as_ref().map(enum_to_str),
+            valid_from: o.valid_from,
+            valid_through: o.valid_through,
+            created_at: now,
+            updated_at: now,
         })
         .collect()
 }
 
 /// Build the tagged `event_text_values` rows from the five string-list
 /// properties (`alternate_name`/`image`/`same_as`/`keyword`/`in_language`).
-fn text_value_rows(event: &Event) -> Vec<event_text_values::ActiveModel> {
+fn text_value_rows(event: &Event) -> Vec<TextValueRow> {
     let mut text_values = Vec::new();
     for (field, values) in [
         ("alternate_name", &event.alternate_names),
@@ -376,35 +367,39 @@ fn text_value_rows(event: &Event) -> Vec<event_text_values::ActiveModel> {
         ("in_language", &event.in_language),
     ] {
         for (pos, value) in values.iter().enumerate() {
-            text_values.push(event_text_values::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                event_id: Set(event.id),
-                field: Set(field.to_string()),
-                value: Set(value.clone()),
-                position: Set(i32::try_from(pos).unwrap_or(i32::MAX)),
+            text_values.push(TextValueRow {
+                id: Uuid::new_v4(),
+                event_id: event.id,
+                field: field.to_string(),
+                value: value.clone(),
+                position: i32::try_from(pos).unwrap_or(i32::MAX),
             });
         }
     }
     text_values
 }
 
+/// Flatten a domain [`Event`] into a [`ChildRows`] bundle of rows.
+/// Stamps `created_at`/`updated_at` to "now"; mints fresh `Uuid`s for
+/// child rows; and fans the six party role-lists out via
+/// [`push_party_rows`].
 fn to_rows(event: &Event) -> ChildRows {
-    let now = OffsetDateTime::now_utc();
-    let event_row = event_active_model(event, now);
+    let now = Utc::now();
+    let event_row = event_row(event, now);
 
     let identifiers = event
         .identifiers
         .iter()
-        .map(|id| event_identifiers::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            event_id: Set(event.id),
-            use_type: Set(id.use_type.as_ref().map(enum_to_str)),
-            identifier_type: Set(enum_to_str(&id.identifier_type)),
-            system: Set(id.system.clone()),
-            value: Set(id.value.clone()),
-            assigner: Set(id.assigner.clone()),
-            created_at: Set(now),
-            updated_at: Set(now),
+        .map(|id| IdentifierRow {
+            id: Uuid::new_v4(),
+            event_id: event.id,
+            use_type: id.use_type.as_ref().map(enum_to_str),
+            identifier_type: enum_to_str(&id.identifier_type),
+            system: id.system.clone(),
+            value: id.value.clone(),
+            assigner: id.assigner.clone(),
+            created_at: now,
+            updated_at: now,
         })
         .collect();
 
@@ -436,13 +431,13 @@ fn to_rows(event: &Event) -> ChildRows {
     let links = event
         .links
         .iter()
-        .map(|link| event_links::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            event_id: Set(event.id),
-            other_event_id: Set(link.other_event_id),
-            link_type: Set(enum_to_str(&link.link_type)),
-            created_at: Set(now),
-            created_by: Set(None),
+        .map(|link| LinkRow {
+            id: Uuid::new_v4(),
+            event_id: event.id,
+            other_event_id: link.other_event_id,
+            link_type: enum_to_str(&link.link_type),
+            created_at: now,
+            created_by: None,
         })
         .collect();
 
@@ -450,12 +445,12 @@ fn to_rows(event: &Event) -> ChildRows {
         .sub_events
         .iter()
         .enumerate()
-        .map(|(pos, sub_id)| event_sub_events::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            event_id: Set(event.id),
-            sub_event_id: Set(*sub_id),
-            position: Set(i32::try_from(pos).unwrap_or(i32::MAX)),
-            created_at: Set(now),
+        .map(|(pos, sub_id)| SubEventRow {
+            id: Uuid::new_v4(),
+            event_id: event.id,
+            sub_event_id: *sub_id,
+            position: i32::try_from(pos).unwrap_or(i32::MAX),
+            created_at: now,
         })
         .collect();
 
@@ -478,25 +473,25 @@ fn to_rows(event: &Event) -> ChildRows {
 /// each with `role` (e.g. `"organizer"`) and its 0-based `position`
 /// so insertion order can be restored on read.
 fn push_party_rows(
-    rows: &mut Vec<event_parties::ActiveModel>,
+    rows: &mut Vec<PartyRow>,
     event_id: Uuid,
     role: &str,
     parties: &[Party],
-    now: OffsetDateTime,
+    now: DateTime<Utc>,
 ) {
     for (pos, p) in parties.iter().enumerate() {
-        rows.push(event_parties::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            event_id: Set(event_id),
-            position: Set(i32::try_from(pos).unwrap_or(i32::MAX)),
-            role: Set(role.to_string()),
-            party_kind: Set(enum_to_str(&p.kind)),
-            party_id: Set(p.id),
-            name: Set(p.name.clone()),
-            email: Set(p.email.clone()),
-            url: Set(p.url.clone()),
-            created_at: Set(now),
-            updated_at: Set(now),
+        rows.push(PartyRow {
+            id: Uuid::new_v4(),
+            event_id,
+            position: i32::try_from(pos).unwrap_or(i32::MAX),
+            role: role.to_string(),
+            party_kind: enum_to_str(&p.kind),
+            party_id: p.id,
+            name: p.name.clone(),
+            email: p.email.clone(),
+            url: p.url.clone(),
+            created_at: now,
+            updated_at: now,
         });
     }
 }
@@ -506,65 +501,62 @@ fn push_party_rows(
 /// `"postal_address"` / `"virtual"` / `"text"`) records which variant
 /// was stored so [`row_to_location`] can reconstruct it; columns not
 /// relevant to the variant are left `None`.
-fn location_to_row(
-    event_id: Uuid,
-    pos: i32,
-    loc: &Location,
-    now: OffsetDateTime,
-) -> event_locations::ActiveModel {
-    let mut row = event_locations::ActiveModel {
-        id: Set(Uuid::new_v4()),
-        event_id: Set(event_id),
-        position: Set(pos),
-        kind: Set("text".into()),
-        place_id: Set(None),
-        name: Set(None),
-        line1: Set(None),
-        line2: Set(None),
-        city: Set(None),
-        state: Set(None),
-        postal_code: Set(None),
-        country: Set(None),
-        latitude_as_decimal_degrees: Set(None),
-        longitude_as_decimal_degrees: Set(None),
-        url: Set(None),
-        created_at: Set(now),
-        updated_at: Set(now),
+fn location_to_row(event_id: Uuid, pos: i32, loc: &Location, now: DateTime<Utc>) -> LocationRow {
+    let mut row = LocationRow {
+        id: Uuid::new_v4(),
+        event_id,
+        position: pos,
+        kind: "text".into(),
+        place_id: None,
+        name: None,
+        line1: None,
+        line2: None,
+        city: None,
+        state: None,
+        postal_code: None,
+        country: None,
+        latitude_as_decimal_degrees: None,
+        longitude_as_decimal_degrees: None,
+        url: None,
+        created_at: now,
+        updated_at: now,
     };
     match loc {
         Location::Place(p) => {
-            row.kind = Set("place".into());
-            row.place_id = Set(p.id);
-            row.name = Set(Some(p.name.clone()));
+            row.kind = "place".into();
+            row.place_id = p.id;
+            row.name = Some(p.name.clone());
             if let Some(addr) = &p.address {
-                row.line1 = Set(addr.line1.clone());
-                row.line2 = Set(addr.line2.clone());
-                row.city = Set(addr.city.clone());
-                row.state = Set(addr.state.clone());
-                row.postal_code = Set(addr.postal_code.clone());
-                row.country = Set(addr.country.clone());
+                row.line1.clone_from(&addr.line1);
+                row.line2.clone_from(&addr.line2);
+                row.city.clone_from(&addr.city);
+                row.state.clone_from(&addr.state);
+                row.postal_code.clone_from(&addr.postal_code);
+                row.country.clone_from(&addr.country);
             }
-            row.latitude_as_decimal_degrees = Set(p.latitude_as_decimal_degrees.clone());
-            row.longitude_as_decimal_degrees = Set(p.longitude_as_decimal_degrees.clone());
-            row.url = Set(p.url.clone());
+            row.latitude_as_decimal_degrees
+                .clone_from(&p.latitude_as_decimal_degrees);
+            row.longitude_as_decimal_degrees
+                .clone_from(&p.longitude_as_decimal_degrees);
+            row.url.clone_from(&p.url);
         }
         Location::PostalAddress(addr) => {
-            row.kind = Set("postal_address".into());
-            row.line1 = Set(addr.line1.clone());
-            row.line2 = Set(addr.line2.clone());
-            row.city = Set(addr.city.clone());
-            row.state = Set(addr.state.clone());
-            row.postal_code = Set(addr.postal_code.clone());
-            row.country = Set(addr.country.clone());
+            row.kind = "postal_address".into();
+            row.line1.clone_from(&addr.line1);
+            row.line2.clone_from(&addr.line2);
+            row.city.clone_from(&addr.city);
+            row.state.clone_from(&addr.state);
+            row.postal_code.clone_from(&addr.postal_code);
+            row.country.clone_from(&addr.country);
         }
         Location::Virtual(v) => {
-            row.kind = Set("virtual".into());
-            row.name = Set(v.name.clone());
-            row.url = Set(Some(v.url.clone()));
+            row.kind = "virtual".into();
+            row.name.clone_from(&v.name);
+            row.url = Some(v.url.clone());
         }
         Location::Text { value } => {
-            row.kind = Set("text".into());
-            row.name = Set(Some(value.clone()));
+            row.kind = "text".into();
+            row.name = Some(value.clone());
         }
     }
     row
@@ -577,7 +569,7 @@ fn location_to_row(
 /// `works` are reset to empty (not yet persisted as child tables).
 /// Project the `event_text_values` rows for `field` into an ordered
 /// `Vec<String>` (rows already arrive ordered by `position`).
-fn text_values_of(rows: &[event_text_values::Model], field: &str) -> Vec<String> {
+fn text_values_of(rows: &[TextValueRow], field: &str) -> Vec<String> {
     rows.iter()
         .filter(|r| r.field == field)
         .map(|r| r.value.clone())
@@ -586,9 +578,7 @@ fn text_values_of(rows: &[event_text_values::Model], field: &str) -> Vec<String>
 
 /// Reassemble the six party role-lists from the flat `event_parties`
 /// rows, keyed by `role` and ordered by `position`.
-fn parties_by_role(
-    mut parties: Vec<event_parties::Model>,
-) -> std::collections::HashMap<String, Vec<Party>> {
+fn parties_by_role(mut parties: Vec<PartyRow>) -> std::collections::HashMap<String, Vec<Party>> {
     parties.sort_by_key(|p| p.position);
     let mut by_role: std::collections::HashMap<String, Vec<Party>> =
         std::collections::HashMap::new();
@@ -610,7 +600,7 @@ fn parties_by_role(
 }
 
 /// Map `event_identifiers` rows back into domain [`Identifier`]s.
-fn identifiers_from_rows(rows: Vec<event_identifiers::Model>) -> Vec<Identifier> {
+fn identifiers_from_rows(rows: Vec<IdentifierRow>) -> Vec<Identifier> {
     rows.into_iter()
         .map(|id| Identifier {
             use_type: id.use_type.as_deref().and_then(parse_identifier_use),
@@ -624,14 +614,14 @@ fn identifiers_from_rows(rows: Vec<event_identifiers::Model>) -> Vec<Identifier>
 
 /// Sort `event_locations` rows by `position` and map them back into
 /// domain [`Location`] variants, dropping unrecognized rows.
-fn locations_from_rows(mut rows: Vec<event_locations::Model>) -> Vec<Location> {
+fn locations_from_rows(mut rows: Vec<LocationRow>) -> Vec<Location> {
     rows.sort_by_key(|l| l.position);
     rows.iter().filter_map(row_to_location).collect()
 }
 
 /// Sort `event_offers` rows by `position` and map them back into domain
 /// [`Offer`]s.
-fn offers_from_rows(mut rows: Vec<event_offers::Model>) -> Vec<Offer> {
+fn offers_from_rows(mut rows: Vec<OfferRow>) -> Vec<Offer> {
     rows.sort_by_key(|o| o.position);
     rows.into_iter()
         .map(|o| Offer {
@@ -640,14 +630,14 @@ fn offers_from_rows(mut rows: Vec<event_offers::Model>) -> Vec<Offer> {
             price_currency: o.price_currency,
             url: o.url,
             availability: o.availability.as_deref().and_then(parse_offer_availability),
-            valid_from: o.valid_from.map(offset_to_ts),
-            valid_through: o.valid_through.map(offset_to_ts),
+            valid_from: o.valid_from,
+            valid_through: o.valid_through,
         })
         .collect()
 }
 
 /// Map `event_links` rows back into domain [`EventLink`]s.
-fn links_from_rows(rows: Vec<event_links::Model>) -> Vec<EventLink> {
+fn links_from_rows(rows: Vec<LinkRow>) -> Vec<EventLink> {
     rows.into_iter()
         .map(|l| EventLink {
             other_event_id: l.other_event_id,
@@ -657,12 +647,12 @@ fn links_from_rows(rows: Vec<event_links::Model>) -> Vec<EventLink> {
 }
 
 /// Sort `event_sub_events` rows by `position` and project their ids.
-fn sub_event_ids_from_rows(mut rows: Vec<event_sub_events::Model>) -> Vec<Uuid> {
+fn sub_event_ids_from_rows(mut rows: Vec<SubEventRow>) -> Vec<Uuid> {
     rows.sort_by_key(|s| s.position);
     rows.into_iter().map(|s| s.sub_event_id).collect()
 }
 
-fn from_rows(event_row: events::Model, children: LoadedChildRows) -> Event {
+fn from_rows(event_row: EventRow, children: LoadedChildRows) -> Event {
     let LoadedChildRows {
         identifiers,
         locations,
@@ -705,11 +695,11 @@ fn from_rows(event_row: events::Model, children: LoadedChildRows) -> Event {
         image,
         same_as,
         keywords,
-        start_date: offset_to_ts(event_row.start_date),
-        end_date: event_row.end_date.map(offset_to_ts),
-        door_time: event_row.door_time.map(offset_to_ts),
+        start_date: event_row.start_date,
+        end_date: event_row.end_date,
+        door_time: event_row.door_time,
         duration: event_row.duration,
-        previous_start_date: event_row.previous_start_date.map(offset_to_ts),
+        previous_start_date: event_row.previous_start_date,
         time_zone: event_row.time_zone,
         all_day: event_row.all_day,
         event_status,
@@ -741,8 +731,8 @@ fn from_rows(event_row: events::Model, children: LoadedChildRows) -> Event {
         sub_events: sub_events_ids,
         offers,
         links,
-        created_at: offset_to_ts(event_row.created_at),
-        updated_at: offset_to_ts(event_row.updated_at),
+        created_at: event_row.created_at,
+        updated_at: event_row.updated_at,
     }
 }
 
@@ -750,7 +740,7 @@ fn from_rows(event_row: events::Model, children: LoadedChildRows) -> Event {
 /// row, dispatching on the `kind` column. Returns `None` for an
 /// unrecognized `kind` or a `text` row missing its value, so callers
 /// `filter_map` over the results.
-fn row_to_location(row: &event_locations::Model) -> Option<Location> {
+fn row_to_location(row: &LocationRow) -> Option<Location> {
     match row.kind.as_str() {
         "place" => Some(Location::Place(Place {
             id: row.place_id,
@@ -773,7 +763,7 @@ fn row_to_location(row: &event_locations::Model) -> Option<Location> {
 /// Assemble an [`Address`] from the address columns of an
 /// `event_locations` row, returning `None` when every address column
 /// is empty (so a bare place/virtual row doesn't yield a blank address).
-fn address_from_row(row: &event_locations::Model) -> Option<Address> {
+fn address_from_row(row: &LocationRow) -> Option<Address> {
     let any = row.line1.is_some()
         || row.line2.is_some()
         || row.city.is_some()
@@ -828,95 +818,373 @@ fn parse_offer_availability(s: &str) -> Option<OfferAvailability> {
     serde_json::from_value(serde_json::Value::String(s.to_string())).ok()
 }
 
+/// `INSERT` one `events` row, every column, and read it back as stored
+/// (`RETURNING`), so the caller rebuilds the domain event from the
+/// database's own values.
+async fn insert_event_row(conn: &mut PgConnection, row: &EventRow) -> Result<EventRow> {
+    let stored = sqlx::query_as!(
+        EventRow,
+        "INSERT INTO events
+             (id, active, name, content_hash, content_hash_sha3, content_mac, description,
+              disambiguating_description, url, start_date, end_date, door_time, duration,
+              previous_start_date, time_zone, all_day, event_status, event_attendance_mode,
+              event_type, typical_age_range, is_accessible_for_free, maximum_attendee_capacity,
+              maximum_physical_attendee_capacity, maximum_virtual_attendee_capacity,
+              remaining_attendee_capacity, super_event_id, created_at, updated_at, created_by,
+              updated_by, deleted_at, deleted_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+                 $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+         RETURNING id, active, name, content_hash, content_hash_sha3, content_mac, description,
+                   disambiguating_description, url, start_date, end_date, door_time, duration,
+                   previous_start_date, time_zone, all_day, event_status,
+                   event_attendance_mode, event_type, typical_age_range,
+                   is_accessible_for_free, maximum_attendee_capacity,
+                   maximum_physical_attendee_capacity, maximum_virtual_attendee_capacity,
+                   remaining_attendee_capacity, super_event_id, created_at, updated_at,
+                   created_by, updated_by, deleted_at, deleted_by",
+        row.id,
+        row.active,
+        row.name,
+        row.content_hash,
+        row.content_hash_sha3,
+        row.content_mac,
+        row.description,
+        row.disambiguating_description,
+        row.url,
+        row.start_date,
+        row.end_date,
+        row.door_time,
+        row.duration,
+        row.previous_start_date,
+        row.time_zone,
+        row.all_day,
+        row.event_status,
+        row.event_attendance_mode,
+        row.event_type,
+        row.typical_age_range,
+        row.is_accessible_for_free,
+        row.maximum_attendee_capacity,
+        row.maximum_physical_attendee_capacity,
+        row.maximum_virtual_attendee_capacity,
+        row.remaining_attendee_capacity,
+        row.super_event_id,
+        row.created_at,
+        row.updated_at,
+        row.created_by,
+        row.updated_by,
+        row.deleted_at,
+        row.deleted_by,
+    )
+    .fetch_one(conn)
+    .await?;
+    Ok(stored)
+}
+
+/// `INSERT` every child row of one event, table by table in the fixed
+/// order identifiers, locations, parties, offers, links, sub-events,
+/// text-values, on the caller's connection/transaction.
+async fn insert_children(conn: &mut PgConnection, rows: &ChildRows) -> Result<()> {
+    for r in &rows.identifiers {
+        sqlx::query!(
+            "INSERT INTO event_identifiers
+                 (id, event_id, use_type, identifier_type, system, value, assigner,
+                  created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            r.id,
+            r.event_id,
+            r.use_type,
+            r.identifier_type,
+            r.system,
+            r.value,
+            r.assigner,
+            r.created_at,
+            r.updated_at,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for r in &rows.locations {
+        sqlx::query!(
+            "INSERT INTO event_locations
+                 (id, event_id, position, kind, place_id, name, line1, line2, city, state,
+                  postal_code, country, latitude_as_decimal_degrees,
+                  longitude_as_decimal_degrees, url, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+                     $17)",
+            r.id,
+            r.event_id,
+            r.position,
+            r.kind,
+            r.place_id,
+            r.name,
+            r.line1,
+            r.line2,
+            r.city,
+            r.state,
+            r.postal_code,
+            r.country,
+            r.latitude_as_decimal_degrees,
+            r.longitude_as_decimal_degrees,
+            r.url,
+            r.created_at,
+            r.updated_at,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for r in &rows.parties {
+        sqlx::query!(
+            "INSERT INTO event_parties
+                 (id, event_id, position, role, party_kind, party_id, name, email, url,
+                  created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+            r.id,
+            r.event_id,
+            r.position,
+            r.role,
+            r.party_kind,
+            r.party_id,
+            r.name,
+            r.email,
+            r.url,
+            r.created_at,
+            r.updated_at,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    insert_remaining_children(conn, rows).await
+}
+
+/// The second half of [`insert_children`]: offers, links, sub-events and
+/// text-values, in that order.
+async fn insert_remaining_children(conn: &mut PgConnection, rows: &ChildRows) -> Result<()> {
+    for r in &rows.offers {
+        sqlx::query!(
+            "INSERT INTO event_offers
+                 (id, event_id, position, name, price, price_currency, url, availability,
+                  valid_from, valid_through, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+            r.id,
+            r.event_id,
+            r.position,
+            r.name,
+            r.price,
+            r.price_currency,
+            r.url,
+            r.availability,
+            r.valid_from,
+            r.valid_through,
+            r.created_at,
+            r.updated_at,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for r in &rows.links {
+        sqlx::query!(
+            "INSERT INTO event_links (id, event_id, other_event_id, link_type, created_at, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6)",
+            r.id,
+            r.event_id,
+            r.other_event_id,
+            r.link_type,
+            r.created_at,
+            r.created_by,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for r in &rows.sub_events {
+        sqlx::query!(
+            "INSERT INTO event_sub_events (id, event_id, sub_event_id, position, created_at)
+             VALUES ($1, $2, $3, $4, $5)",
+            r.id,
+            r.event_id,
+            r.sub_event_id,
+            r.position,
+            r.created_at,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for r in &rows.text_values {
+        sqlx::query!(
+            "INSERT INTO event_text_values (id, event_id, field, value, position)
+             VALUES ($1, $2, $3, $4, $5)",
+            r.id,
+            r.event_id,
+            r.field,
+            r.value,
+            r.position,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
 /// Apply an event's parent-row update and wholesale child-row
 /// replacement on `conn`. Shared by [`EventRepository::update`] and
 /// [`EventRepository::merge`]: preserves `created_*`, stamps
 /// `updated_at` to now, deletes every child row for the event, then
 /// re-inserts them from the domain model. Runs on the caller's
 /// connection/transaction so it shares that commit boundary.
-async fn apply_update_rows<C: ConnectionTrait>(conn: &C, event: &Event) -> Result<()> {
+///
+/// Every other column is written, `deleted_at`, `deleted_by` and
+/// `updated_by` included (all `NULL` from [`event_row`]), exactly as the
+/// whole-row update this replaced did.
+async fn apply_update_rows(conn: &mut PgConnection, event: &Event) -> Result<()> {
     // Update the events row (preserving created_*; updating updated_*).
     let rows = to_rows(event);
-    let mut row = rows.event_row;
-    row.created_at = NotSet;
-    row.created_by = NotSet;
-    row.updated_at = Set(OffsetDateTime::now_utc());
-    row.update(conn).await?;
+    let row = &rows.event_row;
+    let done = sqlx::query!(
+        "UPDATE events SET
+             active = $2, name = $3, content_hash = $4, content_hash_sha3 = $5,
+             content_mac = $6, description = $7, disambiguating_description = $8, url = $9,
+             start_date = $10, end_date = $11, door_time = $12, duration = $13,
+             previous_start_date = $14, time_zone = $15, all_day = $16, event_status = $17,
+             event_attendance_mode = $18, event_type = $19, typical_age_range = $20,
+             is_accessible_for_free = $21, maximum_attendee_capacity = $22,
+             maximum_physical_attendee_capacity = $23,
+             maximum_virtual_attendee_capacity = $24, remaining_attendee_capacity = $25,
+             super_event_id = $26, updated_at = $27, updated_by = $28, deleted_at = $29,
+             deleted_by = $30
+         WHERE id = $1",
+        row.id,
+        row.active,
+        row.name,
+        row.content_hash,
+        row.content_hash_sha3,
+        row.content_mac,
+        row.description,
+        row.disambiguating_description,
+        row.url,
+        row.start_date,
+        row.end_date,
+        row.door_time,
+        row.duration,
+        row.previous_start_date,
+        row.time_zone,
+        row.all_day,
+        row.event_status,
+        row.event_attendance_mode,
+        row.event_type,
+        row.typical_age_range,
+        row.is_accessible_for_free,
+        row.maximum_attendee_capacity,
+        row.maximum_physical_attendee_capacity,
+        row.maximum_virtual_attendee_capacity,
+        row.remaining_attendee_capacity,
+        row.super_event_id,
+        Utc::now(),
+        row.updated_by,
+        row.deleted_at,
+        row.deleted_by,
+    )
+    .execute(&mut *conn)
+    .await?;
+    // A row that does not exist is an error, worded as the ORM's
+    // "no record updated" was.
+    if done.rows_affected() == 0 {
+        return Err(not_updated());
+    }
 
     // Replace child rows wholesale.
-    event_identifiers::Entity::delete_many()
-        .filter(event_identifiers::Column::EventId.eq(event.id))
-        .exec(conn)
+    sqlx::query!(
+        "DELETE FROM event_identifiers WHERE event_id = $1",
+        event.id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!("DELETE FROM event_locations WHERE event_id = $1", event.id)
+        .execute(&mut *conn)
         .await?;
-    event_locations::Entity::delete_many()
-        .filter(event_locations::Column::EventId.eq(event.id))
-        .exec(conn)
+    sqlx::query!("DELETE FROM event_parties WHERE event_id = $1", event.id)
+        .execute(&mut *conn)
         .await?;
-    event_parties::Entity::delete_many()
-        .filter(event_parties::Column::EventId.eq(event.id))
-        .exec(conn)
+    sqlx::query!("DELETE FROM event_offers WHERE event_id = $1", event.id)
+        .execute(&mut *conn)
         .await?;
-    event_offers::Entity::delete_many()
-        .filter(event_offers::Column::EventId.eq(event.id))
-        .exec(conn)
+    sqlx::query!("DELETE FROM event_links WHERE event_id = $1", event.id)
+        .execute(&mut *conn)
         .await?;
-    event_links::Entity::delete_many()
-        .filter(event_links::Column::EventId.eq(event.id))
-        .exec(conn)
+    sqlx::query!("DELETE FROM event_sub_events WHERE event_id = $1", event.id)
+        .execute(&mut *conn)
         .await?;
-    event_sub_events::Entity::delete_many()
-        .filter(event_sub_events::Column::EventId.eq(event.id))
-        .exec(conn)
-        .await?;
-    event_text_values::Entity::delete_many()
-        .filter(event_text_values::Column::EventId.eq(event.id))
-        .exec(conn)
-        .await?;
+    sqlx::query!(
+        "DELETE FROM event_text_values WHERE event_id = $1",
+        event.id
+    )
+    .execute(&mut *conn)
+    .await?;
 
-    for r in rows.identifiers {
-        r.insert(conn).await?;
-    }
-    for r in rows.locations {
-        r.insert(conn).await?;
-    }
-    for r in rows.parties {
-        r.insert(conn).await?;
-    }
-    for r in rows.offers {
-        r.insert(conn).await?;
-    }
-    for r in rows.links {
-        r.insert(conn).await?;
-    }
-    for r in rows.sub_events {
-        r.insert(conn).await?;
-    }
-    for r in rows.text_values {
-        r.insert(conn).await?;
-    }
-    Ok(())
+    insert_children(conn, &rows).await
 }
 
 /// Soft-delete the event `id` on `conn` by stamping `deleted_at` /
 /// `deleted_by` and leaving every other column (and the child rows)
-/// in place. Factored from [`EventRepository::delete`]'s soft-delete
-/// so [`EventRepository::merge`] can reuse it on its own transaction.
-async fn apply_soft_delete_row<C: ConnectionTrait>(conn: &C, id: &Uuid) -> Result<()> {
-    let row = events::ActiveModel {
-        id: Set(*id),
-        deleted_at: Set(Some(OffsetDateTime::now_utc())),
-        deleted_by: Set(Some("system".into())),
-        ..Default::default()
-    };
-    row.update(conn).await?;
+/// in place. Shared by [`EventRepository::delete`] and
+/// [`EventRepository::merge`], which runs it on its own transaction.
+async fn apply_soft_delete_row(conn: &mut PgConnection, id: &Uuid) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE events SET deleted_at = $2, deleted_by = 'system' WHERE id = $1",
+        id,
+        Utc::now(),
+    )
+    .execute(conn)
+    .await?;
+    // As under the ORM, an update that touches no row is an error.
+    if done.rows_affected() == 0 {
+        return Err(not_updated());
+    }
     Ok(())
+}
+
+/// The error an update or soft delete that matched no row returns,
+/// with the message the ORM used for it.
+fn not_updated() -> crate::Error {
+    crate::Error::Database("None of the records are updated".into())
+}
+
+/// A `LIMIT` / `OFFSET` bound: Postgres takes `BIGINT`, the callers count
+/// in `u64`.
+fn to_i64(n: u64) -> i64 {
+    i64::try_from(n).unwrap_or(i64::MAX)
+}
+
+/// The `events` rows `GET /api/records/verify` reassembles and
+/// recomputes, newest update first, soft-deleted ones included.
+///
+/// # Errors
+///
+/// Returns the database error if the query fails.
+pub async fn rows_for_verification(db: &PgPool, limit: u64) -> Result<Vec<EventRow>> {
+    let rows = sqlx::query_as!(
+        EventRow,
+        "SELECT id, active, name, content_hash, content_hash_sha3, content_mac, description,
+                disambiguating_description, url, start_date, end_date, door_time, duration,
+                previous_start_date, time_zone, all_day, event_status, event_attendance_mode,
+                event_type, typical_age_range, is_accessible_for_free,
+                maximum_attendee_capacity, maximum_physical_attendee_capacity,
+                maximum_virtual_attendee_capacity, remaining_attendee_capacity,
+                super_event_id, created_at, updated_at, created_by, updated_by, deleted_at,
+                deleted_by
+         FROM events
+         ORDER BY updated_at DESC
+         LIMIT $1",
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
 }
 
 // ---------------------------------------------------------------------------
 // EventRepository impl
 // ---------------------------------------------------------------------------
 
-impl SeaOrmEventRepository {
+impl PgEventRepository {
     /// Load all child-row vectors for one event id in fixed order
     /// (identifiers, locations, parties, offers, links, sub-events,
     /// text-values), ready to feed into [`from_rows`]. The text-values
@@ -925,38 +1193,78 @@ impl SeaOrmEventRepository {
     ///
     /// # Errors
     ///
-    /// Returns the `SeaORM` error if any of the per-child-table queries
+    /// Returns the database error if any of the per-child-table queries
     /// fails.
     async fn load_children(&self, event_id: &Uuid) -> Result<LoadedChildRows> {
-        let identifiers = event_identifiers::Entity::find()
-            .filter(event_identifiers::Column::EventId.eq(*event_id))
-            .all(&self.db)
-            .await?;
-        let locations = event_locations::Entity::find()
-            .filter(event_locations::Column::EventId.eq(*event_id))
-            .all(&self.db)
-            .await?;
-        let parties = event_parties::Entity::find()
-            .filter(event_parties::Column::EventId.eq(*event_id))
-            .all(&self.db)
-            .await?;
-        let offers = event_offers::Entity::find()
-            .filter(event_offers::Column::EventId.eq(*event_id))
-            .all(&self.db)
-            .await?;
-        let links = event_links::Entity::find()
-            .filter(event_links::Column::EventId.eq(*event_id))
-            .all(&self.db)
-            .await?;
-        let sub_events = event_sub_events::Entity::find()
-            .filter(event_sub_events::Column::EventId.eq(*event_id))
-            .all(&self.db)
-            .await?;
-        let text_values = event_text_values::Entity::find()
-            .filter(event_text_values::Column::EventId.eq(*event_id))
-            .order_by_asc(event_text_values::Column::Position)
-            .all(&self.db)
-            .await?;
+        let identifiers = sqlx::query_as!(
+            IdentifierRow,
+            "SELECT id, event_id, use_type, identifier_type, system, value, assigner,
+                    created_at, updated_at
+             FROM event_identifiers
+             WHERE event_id = $1",
+            event_id,
+        )
+        .fetch_all(&self.db)
+        .await?;
+        let locations = sqlx::query_as!(
+            LocationRow,
+            "SELECT id, event_id, position, kind, place_id, name, line1, line2, city, state,
+                    postal_code, country, latitude_as_decimal_degrees,
+                    longitude_as_decimal_degrees, url, created_at, updated_at
+             FROM event_locations
+             WHERE event_id = $1",
+            event_id,
+        )
+        .fetch_all(&self.db)
+        .await?;
+        let parties = sqlx::query_as!(
+            PartyRow,
+            "SELECT id, event_id, position, role, party_kind, party_id, name, email, url,
+                    created_at, updated_at
+             FROM event_parties
+             WHERE event_id = $1",
+            event_id,
+        )
+        .fetch_all(&self.db)
+        .await?;
+        let offers = sqlx::query_as!(
+            OfferRow,
+            "SELECT id, event_id, position, name, price, price_currency, url, availability,
+                    valid_from, valid_through, created_at, updated_at
+             FROM event_offers
+             WHERE event_id = $1",
+            event_id,
+        )
+        .fetch_all(&self.db)
+        .await?;
+        let links = sqlx::query_as!(
+            LinkRow,
+            "SELECT id, event_id, other_event_id, link_type, created_at, created_by
+             FROM event_links
+             WHERE event_id = $1",
+            event_id,
+        )
+        .fetch_all(&self.db)
+        .await?;
+        let sub_events = sqlx::query_as!(
+            SubEventRow,
+            "SELECT id, event_id, sub_event_id, position, created_at
+             FROM event_sub_events
+             WHERE event_id = $1",
+            event_id,
+        )
+        .fetch_all(&self.db)
+        .await?;
+        let text_values = sqlx::query_as!(
+            TextValueRow,
+            "SELECT id, event_id, field, value, position
+             FROM event_text_values
+             WHERE event_id = $1
+             ORDER BY position ASC",
+            event_id,
+        )
+        .fetch_all(&self.db)
+        .await?;
         Ok(LoadedChildRows {
             identifiers,
             locations,
@@ -970,54 +1278,34 @@ impl SeaOrmEventRepository {
 }
 
 #[async_trait::async_trait]
-impl EventRepository for SeaOrmEventRepository {
+impl EventRepository for PgEventRepository {
     async fn create(&self, event: &Event) -> Result<Event> {
         // All parent + child inserts run under one transaction so a
         // partial failure leaves no orphan child rows.
-        let txn = self.db.begin().await?;
+        let mut txn = self.db.begin().await?;
 
-        // Flatten the domain event into parent + child `ActiveModel`s,
-        // then insert the parent first (children reference its id).
+        // Flatten the domain event into parent + child rows, then insert
+        // the parent first (children reference its id).
         let rows = to_rows(event);
-        let inserted = rows.event_row.insert(&txn).await?;
-        for r in rows.identifiers {
-            r.insert(&txn).await?;
-        }
-        for r in rows.locations {
-            r.insert(&txn).await?;
-        }
-        for r in rows.parties {
-            r.insert(&txn).await?;
-        }
-        for r in rows.offers {
-            r.insert(&txn).await?;
-        }
-        for r in rows.links {
-            r.insert(&txn).await?;
-        }
-        for r in rows.sub_events {
-            r.insert(&txn).await?;
-        }
-        for r in rows.text_values {
-            r.insert(&txn).await?;
-        }
+        let inserted = insert_event_row(&mut txn, &rows.event_row).await?;
+        insert_children(&mut txn, &rows).await?;
 
         // Durable event bus (Phase 2): under the outbox transport, write
         // the `event_outbox` row **inside this same transaction**, before
         // the commit, so the entity rows and the event commit atomically
         // (or roll back together). A no-op under the memory transport,
         // which keeps the post-commit ring-buffer publish below.
-        self.enqueue_outbox(&txn, event, EventKind::Created).await?;
+        self.enqueue_outbox(&mut txn, event, EventKind::Created)
+            .await?;
 
         txn.commit().await?;
 
         // Reload children and reassemble the canonical domain `Event`
-        // (positions/JSON round-tripped) to return to the caller.
+        // (positions round-tripped) to return to the caller.
         let children = self.load_children(&inserted.id).await?;
         let result = from_rows(inserted, children);
 
-        // Fire-and-forget side effects: publish a `Created` stream event
-        // (chrono `DateTime<Utc>` on the streaming side vs `time` on the row),
+        // Fire-and-forget side effects: publish a `Created` stream event,
         // then record a CREATE audit row with only a `new_values` snapshot.
         self.publish_event(crate::streaming::EventEvent::Created {
             event: result.clone(),
@@ -1039,10 +1327,22 @@ impl EventRepository for SeaOrmEventRepository {
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Event>> {
         // Soft-delete aware: a non-null `deleted_at` hides the row, so a
         // tombstoned event reads back as `None`.
-        let event_row = events::Entity::find_by_id(*id)
-            .filter(events::Column::DeletedAt.is_null())
-            .one(&self.db)
-            .await?;
+        let event_row = sqlx::query_as!(
+            EventRow,
+            "SELECT id, active, name, content_hash, content_hash_sha3, content_mac,
+                    description, disambiguating_description, url, start_date, end_date,
+                    door_time, duration, previous_start_date, time_zone, all_day,
+                    event_status, event_attendance_mode, event_type, typical_age_range,
+                    is_accessible_for_free, maximum_attendee_capacity,
+                    maximum_physical_attendee_capacity, maximum_virtual_attendee_capacity,
+                    remaining_attendee_capacity, super_event_id, created_at, updated_at,
+                    created_by, updated_by, deleted_at, deleted_by
+             FROM events
+             WHERE id = $1 AND deleted_at IS NULL",
+            id,
+        )
+        .fetch_optional(&self.db)
+        .await?;
         let Some(event_row) = event_row else {
             return Ok(None);
         };
@@ -1054,14 +1354,15 @@ impl EventRepository for SeaOrmEventRepository {
         // Snapshot the pre-update state first so the audit log can carry
         // an accurate `old_values` even though children are replaced.
         let old = self.get_by_id(&event.id).await?;
-        let txn = self.db.begin().await?;
+        let mut txn = self.db.begin().await?;
 
         // Parent-row update + wholesale child-row replacement, shared
         // with `merge` (see `apply_update_rows`).
-        apply_update_rows(&txn, event).await?;
+        apply_update_rows(&mut txn, event).await?;
 
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, event, EventKind::Updated).await?;
+        self.enqueue_outbox(&mut txn, event, EventKind::Updated)
+            .await?;
 
         txn.commit().await?;
 
@@ -1101,13 +1402,13 @@ impl EventRepository for SeaOrmEventRepository {
 
         // The whole merge — survivor row updates + duplicate soft-delete +
         // both outbox rows — commits (or rolls back) under one transaction.
-        let txn = self.db.begin().await?;
+        let mut txn = self.db.begin().await?;
 
         // Apply the survivor's parent + child rows (shared with `update`).
-        apply_update_rows(&txn, survivor).await?;
+        apply_update_rows(&mut txn, survivor).await?;
 
         // Soft-delete the duplicate (shared with `delete`).
-        apply_soft_delete_row(&txn, duplicate_id).await?;
+        apply_soft_delete_row(&mut txn, duplicate_id).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the
         // survivor (carrying the duplicate's pid via `merged_from`, so a
@@ -1116,11 +1417,11 @@ impl EventRepository for SeaOrmEventRepository {
         // transaction. A no-op under the memory transport.
         if self.transport.is_outbox() {
             OutboxInsert::for_merge(survivor, duplicate_id)?
-                .insert_on(&txn)
+                .insert_on(&mut txn)
                 .await?;
             if let Some(dup) = old_duplicate.as_ref() {
                 OutboxInsert::for_event(dup, EventKind::Deleted)?
-                    .insert_on(&txn)
+                    .insert_on(&mut txn)
                     .await?;
             }
         }
@@ -1176,30 +1477,25 @@ impl EventRepository for SeaOrmEventRepository {
     async fn delete(&self, id: &Uuid) -> Result<()> {
         // Capture the pre-image for the DELETE audit `old_values`.
         let old = self.get_by_id(id).await?;
-        // Soft delete: stamp `deleted_at`/`deleted_by` only. The other
-        // fields stay `NotSet` (via `..Default::default()`) so this is a
-        // partial UPDATE that leaves the rest of the row untouched and
-        // the child rows in place.
-        let row = events::ActiveModel {
-            id: Set(*id),
-            deleted_at: Set(Some(OffsetDateTime::now_utc())),
-            deleted_by: Set(Some("system".into())),
-            ..Default::default()
-        };
+        // Soft delete: stamp `deleted_at`/`deleted_by` only, a partial
+        // UPDATE that leaves the rest of the row untouched and the child
+        // rows in place.
         // Unlike create/update, the soft-delete is a single row update
         // with no existing transaction. Under the outbox transport we
         // open one here so the tombstone write and the `deleted` outbox
         // row commit atomically; the memory transport keeps the plain,
         // tx-free update.
         if self.transport.is_outbox() {
-            let txn = self.db.begin().await?;
-            row.update(&txn).await?;
+            let mut txn = self.db.begin().await?;
+            apply_soft_delete_row(&mut txn, id).await?;
             if let Some(old) = old.as_ref() {
-                self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
+                self.enqueue_outbox(&mut txn, old, EventKind::Deleted)
+                    .await?;
             }
             txn.commit().await?;
         } else {
-            row.update(&self.db).await?;
+            let mut conn = self.db.acquire().await?;
+            apply_soft_delete_row(&mut conn, id).await?;
         }
         self.publish_event(crate::streaming::EventEvent::Deleted {
             event_id: *id,
@@ -1221,16 +1517,18 @@ impl EventRepository for SeaOrmEventRepository {
     }
 
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Event>> {
-        let rows = events::Entity::find()
-            .filter(events::Column::DeletedAt.is_null())
-            .filter(events::Column::Active.eq(true))
-            .limit(limit)
-            .offset(offset)
-            .all(&self.db)
-            .await?;
+        let ids = sqlx::query_scalar!(
+            "SELECT id FROM events
+             WHERE deleted_at IS NULL AND active = true
+             LIMIT $1 OFFSET $2",
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(&self.db)
+        .await?;
         let mut events = Vec::new();
-        for row in rows {
-            if let Some(e) = self.get_by_id(&row.id).await? {
+        for id in ids {
+            if let Some(e) = self.get_by_id(&id).await? {
                 events.push(e);
             }
         }
@@ -1245,17 +1543,16 @@ impl EventRepository for SeaOrmEventRepository {
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
-    use super::{EventRepository, SeaOrmEventRepository};
+    use super::{EventRepository, PgEventRepository};
 
-    use crate::db::models::event_outbox;
+    use crate::db::outbox;
     use crate::models::Event;
     use crate::streaming::EventTransport;
     use chrono::{TimeZone, Utc};
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-    async fn connect() -> sea_orm::DatabaseConnection {
+    async fn connect() -> sqlx::PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        sqlx::PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
@@ -1267,7 +1564,7 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
-        let repo = SeaOrmEventRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgEventRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let start = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
         let survivor = repo.create(&Event::new("Survivor", start)).await.unwrap();
@@ -1277,12 +1574,7 @@ mod tests {
         assert_eq!(merged.id, survivor.id);
 
         // Survivor: exactly one `merged` row, carrying the duplicate pid.
-        let merged_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(survivor.id))
-            .filter(event_outbox::Column::Kind.eq("merged"))
-            .all(&db)
-            .await
-            .unwrap();
+        let merged_rows = outbox::rows_for(&db, survivor.id, "merged").await.unwrap();
         assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
         assert_eq!(
             merged_rows[0].payload["merged_from"],
@@ -1291,10 +1583,7 @@ mod tests {
         );
 
         // Duplicate: a `deleted` row.
-        let deleted_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(duplicate.id))
-            .filter(event_outbox::Column::Kind.eq("deleted"))
-            .all(&db)
+        let deleted_rows = outbox::rows_for(&db, duplicate.id, "deleted")
             .await
             .unwrap();
         assert_eq!(

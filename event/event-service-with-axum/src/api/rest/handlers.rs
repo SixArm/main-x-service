@@ -1247,17 +1247,10 @@ pub async fn verify_record_integrity(
     State(state): State<AppState>,
     Query(params): Query<AuditLogQuery>,
 ) -> impl IntoResponse {
-    use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
-
     let limit = u64::try_from(params.limit)
         .unwrap_or(VERIFY_DEFAULT_LIMIT)
         .clamp(1, VERIFY_MAX_LIMIT);
-    let rows = match crate::db::models::events::Entity::find()
-        .order_by_desc(crate::db::models::events::Column::UpdatedAt)
-        .limit(limit)
-        .all(&state.db)
-        .await
-    {
+    let rows = match crate::db::rows_for_verification(&state.db, limit).await {
         Ok(rows) => rows,
         Err(e) => {
             return ApiProblem::new(
@@ -1314,17 +1307,10 @@ pub async fn verify_audit_integrity(
     State(state): State<AppState>,
     Query(params): Query<AuditLogQuery>,
 ) -> impl IntoResponse {
-    use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
-
     let limit = u64::try_from(params.limit)
         .unwrap_or(VERIFY_DEFAULT_LIMIT)
         .clamp(1, VERIFY_MAX_LIMIT);
-    match crate::db::models::audit_log::Entity::find()
-        .order_by_desc(crate::db::models::audit_log::Column::Id)
-        .limit(limit)
-        .all(&state.db)
-        .await
-    {
+    match state.audit_log.rows_for_verification(limit).await {
         Ok(rows) => (
             StatusCode::OK,
             Json(crate::compliance::audit_integrity::verify(&rows)),

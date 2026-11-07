@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO event_parties\n                 (id, event_id, position, role, party_kind, party_id, name, email, url,\n                  created_at, updated_at)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9b71b39687624ed2e14bc1f1bac262fa58efb58cb2dc3c0bb0814fe2b16c7e29"
+}

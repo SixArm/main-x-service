@@ -178,7 +178,7 @@ pub const CAVEAT: &str = "A verified result attests that no examined row's conte
 
 /// Borrow a stored row as an [`AuditInput`].
 #[must_use]
-pub fn input_for(row: &crate::db::models::audit_log::Model) -> AuditInput<'_> {
+pub fn input_for(row: &crate::db::models::AuditLogRow) -> AuditInput<'_> {
     AuditInput {
         entity_type: row.entity_type.as_str(),
         entity_id: row.entity_id,
@@ -188,7 +188,7 @@ pub fn input_for(row: &crate::db::models::audit_log::Model) -> AuditInput<'_> {
         user_agent: row.user_agent.as_deref(),
         old_values: row.old_values.as_ref(),
         new_values: row.new_values.as_ref(),
-        created_at_micros: i64::try_from(row.timestamp.unix_timestamp_nanos() / 1_000).unwrap_or(0),
+        created_at_micros: row.timestamp.timestamp_micros(),
     }
 }
 
@@ -200,7 +200,7 @@ pub fn input_for(row: &crate::db::models::audit_log::Model) -> AuditInput<'_> {
 /// rows have, and checking only the MAC would report such a deployment as
 /// entirely unverified when it is not.
 #[must_use]
-pub fn verify(rows: &[crate::db::models::audit_log::Model]) -> AuditIntegrityReport {
+pub fn verify(rows: &[crate::db::models::AuditLogRow]) -> AuditIntegrityReport {
     let mut report = AuditIntegrityReport {
         rows: rows.len(),
         intact: 0,

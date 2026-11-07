@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, event_id, other_event_id, link_type, created_at, created_by\n             FROM event_links\n             WHERE event_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "other_event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "other_event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "link_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "link_type"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "created_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_links",
+            "name": "created_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "e0d051925603ac2ddbf3ea8ca5a758b0a4c2284d83d90bf0eced0b42a2cbb72a"
+}

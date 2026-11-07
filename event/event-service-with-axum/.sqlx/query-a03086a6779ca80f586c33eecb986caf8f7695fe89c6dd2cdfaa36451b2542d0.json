@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM event_locations WHERE event_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a03086a6779ca80f586c33eecb986caf8f7695fe89c6dd2cdfaa36451b2542d0"
+}

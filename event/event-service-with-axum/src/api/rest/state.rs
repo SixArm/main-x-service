@@ -9,11 +9,11 @@
 
 #[cfg(feature = "paseto")]
 use authentication_verifier::Verifier;
-use sea_orm::DatabaseConnection;
+use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::config::Config;
-use crate::db::{AuditLogRepository, EventRepository, SeaOrmEventRepository};
+use crate::db::{AuditLogRepository, EventRepository, PgEventRepository};
 use crate::matching::{EventMatcher, ProbabilisticMatcher};
 use crate::search::SearchEngine;
 use crate::streaming::{EventProducer, InMemoryEventPublisher};
@@ -22,7 +22,7 @@ use crate::streaming::{EventProducer, InMemoryEventPublisher};
 #[derive(Clone)]
 pub struct AppState {
     /// Database connection
-    pub db: DatabaseConnection,
+    pub db: PgPool,
 
     /// Event repository for database operations
     pub event_repository: Arc<dyn EventRepository>,
@@ -56,12 +56,12 @@ impl AppState {
     /// Assemble an [`AppState`] from the four externally-built pieces
     /// (DB connection, search engine, matcher, config). Internally
     /// wires an in-memory event publisher and an audit-log repository,
-    /// then constructs the [`SeaOrmEventRepository`] with both attached
+    /// then constructs the [`PgEventRepository`] with both attached
     /// so every CRUD write also streams an event and records an audit
     /// entry.
     #[must_use]
     pub fn new(
-        db: DatabaseConnection,
+        db: PgPool,
         search_engine: SearchEngine,
         matcher: ProbabilisticMatcher,
         config: Config,
@@ -74,7 +74,7 @@ impl AppState {
 
         // Create event repository with event publisher and audit log
         let event_repository = Arc::new(
-            SeaOrmEventRepository::new(db.clone())
+            PgEventRepository::new(db.clone())
                 .with_event_publisher(event_publisher.clone())
                 .with_audit_log(audit_log.clone()),
         ) as Arc<dyn EventRepository>;

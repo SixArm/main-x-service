@@ -8520,3 +8520,22 @@ through `axa::cursor_pagination` (`agents/share/restful.md`
 - [ ] **CUR-2 (S)** `src/cursor_key.rs` is copied into each crate, like
   `src/client_limits.rs`. Reading `CURSOR_KEY` with the production rule
   belongs in axa, as one `CursorKey::from_env`.
+
+## Found 2026-11-07 (moving event to sqlx)
+
+Both were there before the move, on SeaORM, and the move keeps them as
+they were.
+
+- [ ] **EVT-V1 (S)** event's `/api/records/verify` reports a freshly
+  created event as mismatched. The digest is most likely computed over
+  in-memory timestamps rather than the stored, microsecond-truncated
+  ones, so a record is flagged the moment it exists. An integrity check
+  that flags every new row cannot be told apart from one that has been
+  tampered with. Fix it, and add a DB test that a fresh record verifies.
+- [ ] **EVT-T1 (S)** event's `AppState::new` never calls
+  `with_transport`, so the REST repository uses the memory transport
+  whatever `EVENT_EVENT_TRANSPORT` says, and its outbox is never written
+  from REST. Wire it, with a test that the outbox setting reaches REST.
+- [ ] **EVT-D1 (S)** `cargo doc -D warnings` fails on event's broken
+  intra-doc links (grpc, rest, `db/audit.rs`), so the crate-local
+  `quality.yml` doc job is red.

@@ -19,7 +19,7 @@ attendees, sponsors, funders, contributors), `Vec<Offer>`,
 
 → Full reference:
 [`event-service-with-axum/agents/models.md`](../event-service-with-axum/agents/models.md)
-(includes invariants and the SeaORM table mapping).
+(includes invariants and the table mapping).
 
 ## 2. Matcher `Event` (comparison DTO)
 

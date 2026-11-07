@@ -1,0 +1,172 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,\n                    new_values, ip_address, user_agent, hash, hash_sha3, mac\n             FROM audit_log\n             ORDER BY id DESC\n             LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "timestamp",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "timestamp"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "action",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "action"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "entity_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "entity_type"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "entity_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "entity_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "old_values",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "old_values"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "new_values",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "new_values"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "ip_address",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "ip_address"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "user_agent",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "user_agent"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "hash"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "hash_sha3",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "mac",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "audit_log",
+            "name": "mac"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "a4414df3442f4201131077ad6b8f8413d5e9e2027c56e948342def8e9909bf5d"
+}

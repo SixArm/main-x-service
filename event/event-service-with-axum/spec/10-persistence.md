@@ -1,6 +1,51 @@
 ## 10. Persistence
 
-PostgreSQL 18+ via SeaORM.
+PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-07; SeaORM
+before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
+
+- **All SQL is in `src/db/`.** `repositories.rs` (the event repository
+  and the record-integrity read), `audit.rs` (the audit log, including
+  the audit-integrity read), `outbox.rs` (including the relay's poll,
+  ack and retention purge), and `mod.rs` (the pool and the migrator).
+  Nothing outside that directory runs a statement. `models.rs` holds
+  plain row structs (`EventRow`, one per child table, `AuditLogRow`,
+  `OutboxRow`), one field per column, with no behaviour.
+- **Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`
+  literal**, checked at compile time against the schema. The check data
+  is committed in `.sqlx/` and the build reads it offline
+  (`SQLX_OFFLINE=true`); `scripts/ci-check.sh test-db` runs `cargo sqlx
+  prepare --check` against a freshly migrated database, so a query that
+  no longer matches the schema fails CI. Regenerate after any query or
+  migration change with `cargo sqlx prepare -- --all-targets` against a
+  migrated database.
+- **No dynamic SQL.** There is no `QueryBuilder`, `raw_sql` or
+  `AssertSqlSafe` in this crate, and no `ci/sql-allowlist.txt` entry.
+- **Transactions.** A helper that runs several statements takes
+  `&mut PgConnection`, so it runs inside the caller's transaction. A
+  create's or update's child rows and its `event_outbox` row commit in
+  the same transaction as the `events` row; a merge's survivor update,
+  child replacement, duplicate soft delete and both outbox rows commit
+  together. An update or soft delete that matches no `events` row is an
+  error, as it was under SeaORM, with the same message.
+- **Timestamps** are `chrono::DateTime<Utc>` in the row structs, as in
+  the domain model. axa enables sqlx's `chrono`, and enabling `time` as
+  well makes sqlx 0.9.0's macros warn on every timestamp column. The
+  audit endpoints still serialize `audit_log.timestamp` in the `time`
+  crate's form, as they did when the row was a SeaORM model, so the wire
+  is unchanged. Every sqlx error is `Error::Database` carrying sqlx's
+  message; a unique violation is not singled out, as it was not before.
+- **Migrations** are plain SQL in sqlx's reversible flat layout,
+  `migrations/<version>_<name>.up.sql` / `.down.sql`, embedded by
+  `sqlx::migrate!` (`db::MIGRATOR`) and tracked in `_sqlx_migrations`.
+  `event-service db migrate | down [steps] | reset | status` and the
+  boot auto-migrate run them through `axa::sqlx`. The SQL is the same
+  SQL the SeaORM `migration/` wrapper crate ran, version prefixes and
+  names kept, including the legacy `create_organizations`; the last
+  migration, `drop_dead_organizations`, whose SQL used to live inline in
+  its Rust wrapper, is now its own pair of files. A `pg_dump
+  --schema-only` of a database migrated each way is identical apart
+  from the bookkeeping table (`seaql_migrations` → `_sqlx_migrations`),
+  so a database the old code migrated must be recreated.
 
 ### 10.1 Tables
 

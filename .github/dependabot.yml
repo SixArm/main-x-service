@@ -373,20 +373,6 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/event/event-service-with-axum/migration"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "rust"
-    groups:
-      routine:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "cargo"
     directory: "/integrity/integrity-mac-rust-crate"
     schedule:
       interval: "weekly"

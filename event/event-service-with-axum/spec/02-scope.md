@@ -26,7 +26,7 @@
 - REST API (Axum) + gRPC (Create/Get/List/Delete Event).
 - FHIR R5 `Appointment` surface (`/fhir/Appointment{,/{id}}` +
   `/fhir/metadata`) — best-effort schema.org/Event → FHIR mapping.
-- PostgreSQL persistence via SeaORM.
+- PostgreSQL persistence via sqlx (compile-checked SQL, no ORM).
 
 ### 2.2 Out of scope (today)
 

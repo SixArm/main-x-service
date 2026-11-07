@@ -1,0 +1,220 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, event_id, position, kind, place_id, name, line1, line2, city, state,\n                    postal_code, country, latitude_as_decimal_degrees,\n                    longitude_as_decimal_degrees, url, created_at, updated_at\n             FROM event_locations\n             WHERE event_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "position",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "kind",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "place_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "place_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "line1",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "line1"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "line2",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "line2"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "city",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "city"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "state",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "postal_code",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "postal_code"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "country",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "country"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "latitude_as_decimal_degrees",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "latitude_as_decimal_degrees"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "longitude_as_decimal_degrees",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "longitude_as_decimal_degrees"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_locations",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "7ab7e8ed2a6be0a1ff7b01f961aa65a172f8465db8cbf2158d31be012e658e7e"
+}

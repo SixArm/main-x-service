@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE events SET\n             active = $2, name = $3, content_hash = $4, content_hash_sha3 = $5,\n             content_mac = $6, description = $7, disambiguating_description = $8, url = $9,\n             start_date = $10, end_date = $11, door_time = $12, duration = $13,\n             previous_start_date = $14, time_zone = $15, all_day = $16, event_status = $17,\n             event_attendance_mode = $18, event_type = $19, typical_age_range = $20,\n             is_accessible_for_free = $21, maximum_attendee_capacity = $22,\n             maximum_physical_attendee_capacity = $23,\n             maximum_virtual_attendee_capacity = $24, remaining_attendee_capacity = $25,\n             super_event_id = $26, updated_at = $27, updated_by = $28, deleted_at = $29,\n             deleted_by = $30\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Varchar",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Varchar",
+        "Timestamptz",
+        "Varchar",
+        "Bool",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Uuid",
+        "Timestamptz",
+        "Varchar",
+        "Timestamptz",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "371caf70e93f7ea26af02e372bb3595b7dccb1a68785e62e872c72fe19abe1ac"
+}

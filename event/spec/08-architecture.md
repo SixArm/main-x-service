@@ -29,7 +29,7 @@
          |              |                 |  (library embed)
 +--------v-----+ +------v-------+ +-------v-------------------+
 | PostgreSQL   | | Tantivy      | | event-matcher-rust-crate  |
-| (SeaORM)     | | search index | | pure library: no IO,      |
+| (sqlx)       | | search index | | pure library: no IO,      |
 | events,      | | name+date    | | deterministic, per-field  |
 | audit_log, … | | blocking     | | MatchBreakdown            |
 +--------------+ +--------------+ +---------------------------+

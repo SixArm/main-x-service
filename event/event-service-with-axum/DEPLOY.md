@@ -67,7 +67,7 @@ podman compose logs -f event-server
 podman compose exec event-server bash
 
 # Inside the container, run migrations
-sea-orm-cli migrate up --database-url=$DATABASE_URL
+/app/event-service db migrate   # uses $DATABASE_URL
 
 # Exit the container
 exit
@@ -262,7 +262,7 @@ podman compose --profile tools up -d
 
 ```bash
 podman compose exec event-server bash
-sea-orm-cli migrate up
+/app/event-service db migrate
 exit
 ```
 
@@ -278,7 +278,7 @@ event-migrations:
       condition: service_healthy
   environment:
     DATABASE_URL: ${DATABASE_URL}
-  command: sea-orm-cli migrate up
+  command: ["/app/event-service", "db", "migrate"]
   networks:
     - event-network
 ```
@@ -292,13 +292,14 @@ podman compose up event-migrations
 ### Creating New Migrations
 
 ```bash
-# Inside development environment
-sea-orm-cli migrate generate add_new_feature
-
-# Edit up.sql and down.sql
+# Inside development environment: add a pair of plain SQL files,
+#   migrations/<version>_<name>.up.sql and .down.sql
 # Test migration
-sea-orm-cli migrate up
-sea-orm-cli migrate refresh
+cargo run -- db migrate
+AXA_DESTROY_DATA=true cargo run -- db down 1
+cargo run -- db migrate
+# Regenerate the compile-time query data, and commit .sqlx/
+SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets
 ```
 
 ## Monitoring
@@ -398,7 +399,7 @@ DROP SCHEMA public CASCADE;
 CREATE SCHEMA public;
 \q
 # Run migrations
-podman compose exec event-server sea-orm-cli migrate up
+podman compose exec event-server /app/event-service db migrate
 ```
 
 ### Search Index Issues

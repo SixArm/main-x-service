@@ -19,13 +19,12 @@ use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// The crate-wide error type. Each variant maps to a distinct failure
-/// domain and carries a human-readable message (or the underlying
-/// source error, for [`Error::Database`]).
+/// domain and carries a human-readable message.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// A `SeaORM` database operation failed (wraps the source error).
+    /// A database operation failed (carries the driver's message).
     #[error("Database error: {0}")]
-    Database(#[from] sea_orm::DbErr),
+    Database(String),
 
     /// A connection-pool acquisition or lifecycle failure.
     #[error("Connection pool error: {0}")]
@@ -68,11 +67,22 @@ pub enum Error {
     Internal(String),
 }
 
+/// Every sqlx failure is a [`Error::Database`], carrying sqlx's own
+/// message, so `?` on a query reads the same everywhere in `src/db/`.
+///
+/// A violated unique constraint is not singled out: it is a database
+/// error like any other, exactly as it was under `SeaORM`.
+impl From<sqlx::Error> for Error {
+    fn from(e: sqlx::Error) -> Self {
+        Self::Database(e.to_string())
+    }
+}
+
 impl Error {
-    /// Build a [`Error::Database`] from a free-text message (wraps it in
-    /// `DbErr::Custom`).
+    /// Build a [`Error::Database`] from a free-text message, worded as
+    /// it was under `SeaORM` (`Custom Error: …`).
     pub fn database(msg: impl Into<String>) -> Self {
-        Error::Database(sea_orm::DbErr::Custom(msg.into()))
+        Error::Database(format!("Custom Error: {}", msg.into()))
     }
 
     /// Build a [`Error::Validation`] from a free-text message.

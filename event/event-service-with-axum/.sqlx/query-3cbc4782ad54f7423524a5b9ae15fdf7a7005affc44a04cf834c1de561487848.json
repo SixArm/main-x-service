@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE events SET deleted_at = $2, deleted_by = 'system' WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3cbc4782ad54f7423524a5b9ae15fdf7a7005affc44a04cf834c1de561487848"
+}

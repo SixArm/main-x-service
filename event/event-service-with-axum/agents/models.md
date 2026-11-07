@@ -161,7 +161,7 @@ review-queue, and consent workflows.
 
 ## Database mapping
 
-SeaORM entity modules (`src/db/models.rs`) map to these tables:
+Row structs (`src/db/models.rs`, one per table, read by `sqlx::query_as!`) map to these tables:
 
 - `events` — scalar fields + JSONB arrays (`alternate_names`, `image`, `same_as`, `keywords`, `in_language`)
 - `event_identifiers`, `event_locations`, `event_parties`, `event_offers`, `event_links`, `event_sub_events`
@@ -174,7 +174,7 @@ SeaORM entity modules (`src/db/models.rs`) map to these tables:
 > but never written to by any code path. `PartyKind::Organization`
 > (the party-kind discriminator, above) is unrelated and unaffected.
 
-Migrations live in `migrations/` as numbered SQL `up.sql` / `down.sql` pairs.
+Migrations live in `migrations/` as plain SQL `<version>_<name>.up.sql` / `.down.sql` pairs, embedded and run by `sqlx::migrate!`.
 
 ## Invariants
 

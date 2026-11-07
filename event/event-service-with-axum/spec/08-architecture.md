@@ -13,7 +13,7 @@ src/
 │   └── fhir.rs              # mounted FHIR R5 Appointment routes + /fhir/metadata
 ├── fhir/                    # FHIR resources, conversions, OperationOutcome, Bundle, CapabilityStatement
 ├── models/                  # Event, Location, Party, Offer, …
-├── db/                      # SeaORM entities + repositories + audit + outbox
+├── db/                      # all SQL: row structs + repositories + audit + outbox
 ├── matching/                # algorithms + scoring + phonetic
 ├── search/                  # Tantivy index + query
 ├── streaming/               # legacy EventProducer trait + InMemoryEventPublisher (ring buffer) + the canonical Envelope/EventTransport
@@ -40,7 +40,7 @@ src/
 
 | Trait | Implementations |
 |---|---|
-| `EventRepository` | `SeaOrmEventRepository` |
+| `EventRepository` | `PgEventRepository` |
 | `EventMatcher` | `ProbabilisticMatcher`, `DeterministicMatcher` |
 | `EventProducer` (legacy in-process ring buffer) | `InMemoryEventPublisher` — production delivery went a different route, below (the dead `FluvioProducer` stub was removed, PRO-H4) |
 | `EventConsumer` | none — the dead `FluvioConsumer` stub was removed (PRO-H4) |

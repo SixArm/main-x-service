@@ -28,7 +28,7 @@ subproject's spec owns its internals (see the authority banner in
 - Per-field privacy masking, GDPR Article 15 export, consent records.
 - REST API (15 endpoints under `/api`), OpenAPI/Swagger, FHIR
   stub, gRPC stub.
-- PostgreSQL persistence via SeaORM; audit log; event streaming.
+- PostgreSQL persistence via sqlx (compile-checked SQL, no ORM); audit log; event streaming.
 
 **event-matcher-rust-crate** owns:
 

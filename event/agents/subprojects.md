@@ -8,7 +8,7 @@ event-front-end-with-svelte  →(HTTP /api)→  event-service-with-axum  →(Car
 
 | Subproject | Kind | Responsibility |
 |---|---|---|
-| [event-service-with-axum](../event-service-with-axum/) | Rust service (axa/Axum, PostgreSQL + SeaORM, Tantivy) | System of record: CRUD, validation, search, matching, dedup, merge, review queue, privacy, audit, event streaming, REST `/api` + OpenAPI; FHIR + gRPC stubs |
+| [event-service-with-axum](../event-service-with-axum/) | Rust service (axa/Axum, PostgreSQL + sqlx, Tantivy) | System of record: CRUD, validation, search, matching, dedup, merge, review queue, privacy, audit, event streaming, REST `/api` + OpenAPI; FHIR + gRPC stubs |
 | [event-matcher-rust-crate](../event-matcher-rust-crate/) | Rust library (pure, dependency-light) | Canonical pairwise Event comparison: deterministic rule + probabilistic weighted score with per-field breakdown; no IO, no unsafe, deterministic |
 | [event-front-end-with-svelte](../event-front-end-with-svelte/) | SvelteKit 2 SPA (Svelte 5 runes, SVAR DataGrid, Lily Headless) | Operator UI: list/search, create with 409 surfacing, detail/edit/delete, audit, match check, merge |
 
@@ -29,7 +29,7 @@ Rules of the road:
 ```bash
 cd event-service-with-axum
 cp .env.example .env            # set DATABASE_URL
-sea-orm-cli migrate up
+cargo run -- db migrate
 cargo run --release             # http://localhost:8080/api, /swagger-ui
 cargo test --lib                # unit tests
 cargo test --test duplicate_detection   # service↔matcher bridge tests

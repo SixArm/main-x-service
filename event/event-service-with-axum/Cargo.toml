@@ -32,12 +32,18 @@ tower = { version = "0.5", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precision"] }
 
-# Database (PostgreSQL ORM)
-sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json", "with-bigdecimal"] }
+# Database: sqlx directly, no ORM. Every statement is a `query!` /
+# `query_as!` literal in `src/db/`, checked at compile time against the
+# committed `.sqlx/` data (spec/tech-stack §5). The same driver axa's
+# `sqlx` feature already pulls in, so this adds no new database stack.
+# Timestamps map to `chrono`, which the domain models and axa already use:
+# with sqlx's `time` feature on as well, sqlx 0.9.0's macros warn on every
+# timestamp column. `bigdecimal` decodes the NUMERIC coordinate and price
+# columns.
+sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "macros", "migrate", "uuid", "chrono", "json", "bigdecimal"] }
 bigdecimal = { version = "0.4", features = ["serde", "serde-json"] }
 
-axa = { version = "0.7", features = ["sea-orm", "openapi", "opentelemetry", "versioning", "ratelimit"] }
-migration = { path = "migration" }
+axa = { version = "0.7", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 
 # Search Engine
 tantivy = "0.27"
@@ -64,7 +70,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # Utilities
 uuid = { version = "1.29", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
-time = "0.3"
+time = { version = "0.3", features = ["serde"] }
 thiserror = "2.0"
 dotenvy = "0.15"
 async-trait = "0.1"
@@ -117,7 +123,7 @@ keycloak = ["authentication-verifier/keycloak"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa = { version = "0.7", features = ["sea-orm", "testing", "openapi", "opentelemetry", "versioning", "ratelimit"] }
+axa = { version = "0.7", features = ["sqlx", "testing", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
@@ -213,6 +219,13 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+# Proc macros and build scripts are not stripped. With `strip = true`
+# reaching them, macOS refuses to load the stripped `sqlx-macros` dylib
+# ("mis-aligned LINKEDIT string pool") and a release build fails. The
+# shipped binary is still stripped; only host-side build tools are not.
+[profile.release.build-override]
+strip = false
 
 [profile.bench]
 inherits = "release"

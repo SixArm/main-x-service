@@ -1,0 +1,431 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO events\n             (id, active, name, content_hash, content_hash_sha3, content_mac, description,\n              disambiguating_description, url, start_date, end_date, door_time, duration,\n              previous_start_date, time_zone, all_day, event_status, event_attendance_mode,\n              event_type, typical_age_range, is_accessible_for_free, maximum_attendee_capacity,\n              maximum_physical_attendee_capacity, maximum_virtual_attendee_capacity,\n              remaining_attendee_capacity, super_event_id, created_at, updated_at, created_by,\n              updated_by, deleted_at, deleted_by)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,\n                 $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)\n         RETURNING id, active, name, content_hash, content_hash_sha3, content_mac, description,\n                   disambiguating_description, url, start_date, end_date, door_time, duration,\n                   previous_start_date, time_zone, all_day, event_status,\n                   event_attendance_mode, event_type, typical_age_range,\n                   is_accessible_for_free, maximum_attendee_capacity,\n                   maximum_physical_attendee_capacity, maximum_virtual_attendee_capacity,\n                   remaining_attendee_capacity, super_event_id, created_at, updated_at,\n                   created_by, updated_by, deleted_at, deleted_by",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "content_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "content_hash_sha3",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "content_hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "content_mac",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "content_mac"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "description"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "disambiguating_description",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "disambiguating_description"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "start_date",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "start_date"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "end_date",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "end_date"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "door_time",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "door_time"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "duration",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "duration"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "previous_start_date",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "previous_start_date"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "time_zone",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "time_zone"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "all_day",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "all_day"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "event_status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "event_status"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "event_attendance_mode",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "event_attendance_mode"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "event_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "event_type"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "typical_age_range",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "typical_age_range"
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "is_accessible_for_free",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "is_accessible_for_free"
+          }
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "maximum_attendee_capacity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "maximum_attendee_capacity"
+          }
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "maximum_physical_attendee_capacity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "maximum_physical_attendee_capacity"
+          }
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "maximum_virtual_attendee_capacity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "maximum_virtual_attendee_capacity"
+          }
+        }
+      },
+      {
+        "ordinal": 24,
+        "name": "remaining_attendee_capacity",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "remaining_attendee_capacity"
+          }
+        }
+      },
+      {
+        "ordinal": 25,
+        "name": "super_event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "super_event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 26,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 27,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 28,
+        "name": "created_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "created_by"
+          }
+        }
+      },
+      {
+        "ordinal": 29,
+        "name": "updated_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "updated_by"
+          }
+        }
+      },
+      {
+        "ordinal": 30,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "deleted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 31,
+        "name": "deleted_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "events",
+            "name": "deleted_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Varchar",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Varchar",
+        "Timestamptz",
+        "Varchar",
+        "Bool",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "99ddbe7e7fb30c4db5e8ca44822033c5f2494eb6b91aea4328f2f5bd86afe5cc"
+}

@@ -58,6 +58,33 @@ DATABASE_URL=… cargo test --test api_integration_test
 cargo bench
 ```
 
+## Database: sqlx, all SQL in `src/db/`
+
+Since 2026-11-07 this crate is on sqlx, not SeaORM (spec §10, §13 T-17;
+the repo's `spec/tech-stack/index.md` §5; place-service was the pilot,
+thing-service the closest template). The rules that keep it reviewable:
+
+- Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`
+  literal in `src/db/`. Handlers, the gRPC server, the relay and tests
+  call functions there; they never hold SQL.
+- No `QueryBuilder`, `raw_sql` or `AssertSqlSafe`. The clippy stage
+  refuses them unless `ci/sql-allowlist.txt` names the file. Write an
+  optional filter as `($1::text IS NULL OR col = $1)` instead.
+- A helper running several statements takes `&mut PgConnection`, so the
+  outbox row and the child rows commit in the caller's transaction.
+- Builds read `.sqlx/` with `SQLX_OFFLINE=true`. After changing a query
+  or a migration, migrate a database and run `SQLX_OFFLINE=false cargo
+  sqlx prepare -- --all-targets`, then commit `.sqlx/`. CI's `test-db`
+  stage runs `cargo sqlx prepare --check`.
+- Migrations are `migrations/<version>_<name>.up.sql` / `.down.sql`,
+  embedded by `sqlx::migrate!` as `db::MIGRATOR`. Never edit an applied
+  one: sqlx checks each file's checksum and refuses a changed one. Some
+  names are legacy (`create_organizations`); they stay as they are.
+- Timestamps are `chrono` in the row structs. Do not turn on sqlx's
+  `time` feature: with both, sqlx 0.9.0's macros warn on every timestamp
+  column. `time` remains for the outbox's `OutboxInsert` and for the
+  audit row's wire form of `timestamp` (`db::models::AuditLogRow`).
+
 ## Durable event bus — outbox relay + `FluvioSink`
 
 `src/relay.rs` is the Phase-3 outbox relay (spec §13 T-11): it drains

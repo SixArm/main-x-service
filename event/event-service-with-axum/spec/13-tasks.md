@@ -369,7 +369,8 @@ clearly described manual check confirms the acceptance criterion.
 - [x] **T-11 — Durable event bus (transactional outbox + relay).** Adopt
   the family contract ([`agents/share/event-bus.md`](../../../agents/share/event-bus.md)).
   - [x] **Phase 2 (transactional outbox).** `event_outbox` table + SeaORM
-    entity (`db::models::event_outbox`); the canonical `Envelope` /
+    entity (`db::models::event_outbox`; since T-17 a plain
+    `db::models::OutboxRow`); the canonical `Envelope` /
     `EventKind` / `EventView` + `EventTransport`/`transport()` selector
     (`src/streaming/envelope.rs`); `OutboxInsert` (pure envelope→row map +
     `insert_on` on a caller-supplied `ConnectionTrait`, so the entity write
@@ -445,7 +446,7 @@ clearly described manual check confirms the acceptance criterion.
     advisory, duplicate, or license warning. **Deviation from the BUS-1
     template:** the `tests/fluvio_relay.rs` round-trip drives
     `SeaOrmEventRepository::with_transport(EventTransport::Outbox)`
-    directly rather than case's `request::<App, _, _>` + process-wide
+    (now `PgEventRepository`) directly rather than case's `request::<App, _, _>` + process-wide
     `CASE_EVENT_TRANSPORT` env mutation — this crate keeps the
     person/worker-style hand-rolled `AppState`/repository layout (see
     `agents/share/architecture.md` "person-style"), which has no loco
@@ -660,3 +661,36 @@ clearly described manual check confirms the acceptance criterion.
       `claims_from_token` / `enforce_request` shared by REST and gRPC;
       `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
       KC-1; reference: organization-service.
+
+- [x] **T-17 (M) — SeaORM → sqlx.** *(Done 2026-11-07;
+  spec/tech-stack §5, following place's pilot and thing.)* Replaced
+  SeaORM with direct sqlx so a reviewer can read every statement the
+  service runs (§10). All SQL is in `src/db/` as 38 `query!` /
+  `query_as!` / `query_scalar!` literals, compile-checked against the
+  committed `.sqlx/`; no `QueryBuilder`, `raw_sql` or `AssertSqlSafe`,
+  so no `ci/sql-allowlist.txt` entry. `SeaOrmEventRepository` became
+  `PgEventRepository`; the SeaORM entities in `src/db/models.rs` became
+  plain row structs; the dead `src/db/schema.rs` and `diesel.toml` are
+  gone. Two handler queries (`GET /api/records/verify`, `GET
+  /api/audit/verify`) and the relay's retention delete moved into
+  `src/db/`. The gRPC server is unchanged: it calls the same
+  `EventRepository` methods. The `migration/` crate is gone: its eleven
+  migrations are the same SQL in sqlx's flat `.up.sql` / `.down.sql`
+  layout, version prefixes and names kept (the legacy
+  `create_organizations` included), run by `sqlx::migrate!` through
+  `axa::sqlx` (`db migrate | down | reset | status`, boot
+  auto-migrate). `drop_dead_organizations`, whose SQL was inline in its
+  Rust wrapper, became `2026090600000001_drop_dead_organizations`, its
+  down file the original `create_organizations` up SQL as before.
+  Proved: a `pg_dump --schema-only` of a database migrated by the old
+  code and one migrated by the new code is identical once the
+  bookkeeping tables are excluded. Compliance behaviour unchanged and
+  its tests not edited to pass: the only test edits replace SeaORM
+  connection and outbox-row lookups with `sqlx::PgPool` and
+  `db::outbox::rows_for`, keeping every assertion. One test changed
+  shape: the relay poll's `FOR UPDATE SKIP LOCKED` pin read the SQL
+  SeaORM generated, which a `query!` literal does not expose, so it
+  became a DB-gated test proving a second relay skips rows the first
+  holds. Unit tests 199 → 198, DB-gated suite 11 → 12 (gRPC 4/4
+  included), all passing. Dependencies 387 → 352 unique normal
+  crates.

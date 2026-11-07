@@ -6,14 +6,11 @@
 //! JSON snapshots. Read-side queries fetch the trail per entity, per
 //! user, or system-wide, always newest-first.
 
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set,
-};
 use serde_json::Value as JsonValue;
+use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::models::audit_log;
+use super::models::AuditLogRow;
 use crate::Result;
 
 /// Who/where/what context attached to each audited write.
@@ -41,14 +38,14 @@ impl Default for AuditContext {
 /// Audit log repository for recording changes
 pub struct AuditLogRepository {
     /// The database connection/pool used for audit inserts and queries.
-    db: DatabaseConnection,
+    db: PgPool,
 }
 
 impl AuditLogRepository {
-    /// Create a new audit log repository wrapping the given pooled
-    /// `SeaORM` [`DatabaseConnection`].
+    /// Create a new audit log repository wrapping the given connection
+    /// pool.
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self { db }
     }
 
@@ -145,7 +142,7 @@ impl AuditLogRepository {
     ///
     /// # Errors
     ///
-    /// Returns the `SeaORM` error if the row insert fails (converted
+    /// Returns the database error if the row insert fails (converted
     /// into the crate's `Result` via the `?` operator's `From` impl).
     async fn log_action(
         &self,
@@ -157,14 +154,13 @@ impl AuditLogRepository {
         context: &AuditContext,
     ) -> Result<()> {
         // Build the immutable audit row: a fresh UUID and a server-side
-        // UTC timestamp from the `time` crate (the column type is
-        // `OffsetDateTime`). `old_values`/`new_values` map straight to
-        // the JSONB columns.
+        // UTC timestamp. `old_values`/`new_values` map straight to the
+        // JSONB columns.
         // The timestamp is part of the MAC pre-image, so it is minted here
         // and reused, rather than being generated twice or defaulted by
         // the database — the alternative (insert, then stamp) leaves a
         // window in which the row exists unprotected.
-        let timestamp = time::OffsetDateTime::now_utc();
+        let timestamp = chrono::Utc::now();
         // All three digests from one call, so none can be stamped
         // without the others. The two unkeyed ones are written
         // unconditionally; only the MAC depends on a configured key.
@@ -178,27 +174,30 @@ impl AuditLogRepository {
                 user_agent: context.user_agent.as_deref(),
                 old_values: old_values.as_ref(),
                 new_values: new_values.as_ref(),
-                created_at_micros: i64::try_from(timestamp.unix_timestamp_nanos() / 1_000)
-                    .unwrap_or(0),
+                created_at_micros: timestamp.timestamp_micros(),
             },
         );
-        let new_audit = audit_log::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            timestamp: Set(timestamp),
-            user_id: Set(context.user_id.clone()),
-            action: Set(action.to_string()),
-            entity_type: Set(entity_type.to_string()),
-            entity_id: Set(entity_id),
-            old_values: Set(old_values),
-            new_values: Set(new_values),
-            ip_address: Set(context.ip_address.clone()),
-            user_agent: Set(context.user_agent.clone()),
-            hash: Set(Some(digests.sha256)),
-            hash_sha3: Set(Some(digests.sha3)),
-            mac: Set(digests.mac),
-        };
-
-        new_audit.insert(&self.db).await?;
+        sqlx::query!(
+            "INSERT INTO audit_log
+                 (id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                  new_values, ip_address, user_agent, hash, hash_sha3, mac)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+            Uuid::new_v4(),
+            timestamp,
+            context.user_id,
+            action,
+            entity_type,
+            entity_id,
+            old_values,
+            new_values,
+            context.ip_address,
+            context.user_agent,
+            digests.sha256,
+            digests.sha3,
+            digests.mac,
+        )
+        .execute(&self.db)
+        .await?;
 
         Ok(())
     }
@@ -209,20 +208,27 @@ impl AuditLogRepository {
     ///
     /// # Errors
     ///
-    /// Returns the `SeaORM` error if the query fails.
+    /// Returns the database error if the query fails.
     pub async fn get_logs_for_entity(
         &self,
         entity_type: &str,
         entity_id: Uuid,
         limit: u64,
-    ) -> Result<Vec<audit_log::Model>> {
-        let logs = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityType.eq(entity_type))
-            .filter(audit_log::Column::EntityId.eq(entity_id))
-            .order_by_desc(audit_log::Column::Timestamp)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
+    ) -> Result<Vec<AuditLogRow>> {
+        let logs = sqlx::query_as!(
+            AuditLogRow,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, hash, hash_sha3, mac
+             FROM audit_log
+             WHERE entity_type = $1 AND entity_id = $2
+             ORDER BY timestamp DESC
+             LIMIT $3",
+            entity_type,
+            entity_id,
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
         Ok(logs)
     }
@@ -232,13 +238,19 @@ impl AuditLogRepository {
     ///
     /// # Errors
     ///
-    /// Returns the `SeaORM` error if the query fails.
-    pub async fn get_recent_logs(&self, limit: u64) -> Result<Vec<audit_log::Model>> {
-        let logs = audit_log::Entity::find()
-            .order_by_desc(audit_log::Column::Timestamp)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
+    /// Returns the database error if the query fails.
+    pub async fn get_recent_logs(&self, limit: u64) -> Result<Vec<AuditLogRow>> {
+        let logs = sqlx::query_as!(
+            AuditLogRow,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, hash, hash_sha3, mac
+             FROM audit_log
+             ORDER BY timestamp DESC
+             LIMIT $1",
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
         Ok(logs)
     }
@@ -248,19 +260,48 @@ impl AuditLogRepository {
     ///
     /// # Errors
     ///
-    /// Returns the `SeaORM` error if the query fails.
-    pub async fn get_logs_by_user(
-        &self,
-        user_id: &str,
-        limit: u64,
-    ) -> Result<Vec<audit_log::Model>> {
-        let logs = audit_log::Entity::find()
-            .filter(audit_log::Column::UserId.eq(user_id))
-            .order_by_desc(audit_log::Column::Timestamp)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
+    /// Returns the database error if the query fails.
+    pub async fn get_logs_by_user(&self, user_id: &str, limit: u64) -> Result<Vec<AuditLogRow>> {
+        let logs = sqlx::query_as!(
+            AuditLogRow,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, hash, hash_sha3, mac
+             FROM audit_log
+             WHERE user_id = $1
+             ORDER BY timestamp DESC
+             LIMIT $2",
+            user_id,
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
         Ok(logs)
     }
+
+    /// The rows `GET /api/audit/verify` recomputes, whole (digests
+    /// included), ordered by `id` descending as they always have been.
+    ///
+    /// # Errors
+    ///
+    /// Returns the database error if the query fails.
+    pub async fn rows_for_verification(&self, limit: u64) -> Result<Vec<AuditLogRow>> {
+        let rows = sqlx::query_as!(
+            AuditLogRow,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, hash, hash_sha3, mac
+             FROM audit_log
+             ORDER BY id DESC
+             LIMIT $1",
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
+        Ok(rows)
+    }
+}
+
+/// A `LIMIT` bound: Postgres takes `BIGINT`, the callers count in `u64`.
+fn to_i64(n: u64) -> i64 {
+    i64::try_from(n).unwrap_or(i64::MAX)
 }

@@ -31,7 +31,7 @@
 //! event-service's own test harness has no axa request helper — this
 //! crate keeps the older hand-rolled `AppState`/repository layout (see
 //! `agents/share/architecture.md` "person-style"). So this test drives
-//! [`SeaOrmEventRepository`] directly with
+//! [`PgEventRepository`] directly with
 //! [`EventTransport::Outbox`](event_service::streaming::EventTransport)
 //! rather than mutating a process-wide `EVENT_EVENT_TRANSPORT` env var —
 //! functionally equivalent (an outbox row is enqueued in the same
@@ -41,12 +41,10 @@
 
 use chrono::{Duration as ChronoDuration, Utc};
 use event_service::config::Config;
-use event_service::db::models::event_outbox;
-use event_service::db::{self, EventRepository, SeaOrmEventRepository};
+use event_service::db::{self, EventRepository, PgEventRepository, outbox};
 use event_service::models::Event;
 use event_service::relay::{self, FluvioSink};
 use event_service::streaming::EventTransport;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 #[tokio::test]
 #[ignore = "requires PostgreSQL AND a live Fluvio broker; see this file's module docs"]
@@ -61,7 +59,7 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
 
     // Outbox transport on this repository instance only — no process-wide
     // env mutation needed (see the module docs' deviation note).
-    let repo = SeaOrmEventRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+    let repo = PgEventRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
     let start = Utc::now() + ChronoDuration::days(1);
     let event = Event::new("Fluvio Relay Round Trip", start);
@@ -79,11 +77,11 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
         .expect("drain_once against the real sink");
     assert!(published >= 1, "at least this row's send should succeed");
 
-    let row = event_outbox::Entity::find()
-        .filter(event_outbox::Column::EntityPid.eq(created.id))
-        .one(&db)
+    let row = outbox::rows_for(&db, created.id, "created")
         .await
         .expect("load the outbox row")
+        .into_iter()
+        .next()
         .expect("the row exists");
     assert!(
         row.published_at.is_some(),

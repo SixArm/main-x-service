@@ -5,11 +5,11 @@
 | Capability | Notes |
 |---|---|
 | Project chassis | Cargo, modular architecture |
-| Database schema | Tables + SeaORM entities + indexes + audit triggers |
+| Database schema | Tables + indexes + audit triggers; plain-SQL `sqlx::migrate!` migrations |
 | Matching | Probabilistic + deterministic; configurable weights |
 | Search | Tantivy index; fuzzy + bulk + name+date blocking |
 | REST API | Core endpoints + OpenAPI/Swagger + CORS + structured errors |
-| Repository | SeaORM CRUD with transactions, soft delete |
+| Repository | `PgEventRepository`: sqlx `query!` CRUD with transactions, soft delete; all SQL in `src/db/` (§10, T-17) |
 | Event streaming | InMemoryEventPublisher (index-level events) |
 | Durable event bus (outbox + relay) | Phase 2 transactional outbox (`event_outbox` table; `Envelope`/`EventTransport`; `OutboxInsert` shares the entity write's tx) + Phase 3 relay (`src/relay.rs`: `EventSink`/`LoggingSink`, `drain_once`, `purge_published`; `relay::spawn` in `after_routes`) + Phase 3 real-broker `FluvioSink` (BUS-3, done 2026-08-03; behind the `fluvio` Cargo feature, off by default; ported from case-service's BUS-1 reference). Gated by `EVENT_EVENT_TRANSPORT=outbox` + `EVENT_EVENT_RELAY` (both off by default); `EVENT_EVENT_RELAY_INTERVAL_SECS` (5) + `EVENT_EVENT_RETENTION_DAYS` (7, enforced by `purge_published`); `EVENT_FLUVIO_ENDPOINT` selects `FluvioSink` over `LoggingSink`, `EVENT_EVENT_TOPIC` (default `mxi.event.events`). BUS-2 (link-graph Fluvio consumer) remains |
 | Audit log | AuditLogRepository with old / new JSON |

@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, event_id, use_type, identifier_type, system, value, assigner,\n                    created_at, updated_at\n             FROM event_identifiers\n             WHERE event_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "use_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "use_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "identifier_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "identifier_type"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "system",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "system"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "value",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "assigner",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "assigner"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_identifiers",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "9520ad92cf25de9adfabf64d1bb6def28cdaf6f348281767959276d3b218f61f"
+}

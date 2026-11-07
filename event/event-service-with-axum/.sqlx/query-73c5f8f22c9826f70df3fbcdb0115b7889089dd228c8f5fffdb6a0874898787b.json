@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, event_id, position, name, price, price_currency, url, availability,\n                    valid_from, valid_through, created_at, updated_at\n             FROM event_offers\n             WHERE event_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "position",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "price",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "price"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "price_currency",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "price_currency"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "availability",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "availability"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "valid_from",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "valid_from"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "valid_through",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "valid_through"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_offers",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "73c5f8f22c9826f70df3fbcdb0115b7889089dd228c8f5fffdb6a0874898787b"
+}

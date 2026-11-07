@@ -8,6 +8,49 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — SeaORM replaced by sqlx
+
+- **Persistence is sqlx with no ORM** (spec §10, §13 T-17;
+  `spec/tech-stack/index.md` §5, after place's pilot and thing). All SQL
+  is in `src/db/`, as 38 `query!` / `query_as!` / `query_scalar!`
+  literals checked at compile time against the committed `.sqlx/`;
+  there is no dynamic SQL. `SeaOrmEventRepository` is now
+  `PgEventRepository`, over a `sqlx::PgPool`; `src/db/models.rs` holds
+  plain row structs instead of SeaORM entities. The SQL of the two
+  integrity-verification handlers and of the relay's retention purge
+  moved into `src/db/`. The outbox's `Model::recent` / `unpublished` /
+  `mark_published` are free functions in `db::outbox`, which also gains
+  `purge_published` and `rows_for`. The unused `src/db/schema.rs` and
+  `diesel.toml` are removed. The gRPC server is unchanged.
+- **The `migration/` crate is removed.** The same eleven migrations are
+  sqlx's flat `migrations/<version>_<name>.up.sql` / `.down.sql`, the
+  version prefixes and names kept, embedded by `sqlx::migrate!` and
+  recorded in `_sqlx_migrations` instead of `seaql_migrations`.
+  `drop_dead_organizations`, whose SQL was inline in its Rust wrapper,
+  is now `2026090600000001_drop_dead_organizations.{up,down}.sql`.
+  `db migrate | down | reset | status` and the boot auto-migrate run
+  through `axa::sqlx`. The resulting schema is identical (`pg_dump
+  --schema-only` diff). An existing database migrated by the old code
+  has no `_sqlx_migrations`, so sqlx would try to re-create its tables;
+  there is no deployed data, so recreate it. The crate-local
+  `quality.yml` loses its `migration` clippy job, and `test.yml`
+  migrates with `event-service db migrate` instead of `sea-orm-cli`.
+- `axa` takes its `sqlx` feature instead of `sea-orm`; `sea-orm` and
+  `sea-orm-migration` are gone from the tree (387 → 352 unique normal
+  dependencies). `time` now names its `serde` feature itself, which
+  SeaORM used to enable.
+- The audit endpoints' JSON is unchanged: `timestamp` is still the
+  `time` crate's serialization of the instant, as when the row was a
+  SeaORM model.
+- A database error's message is now sqlx's text rather than SeaORM's
+  (still `Error::Database`, still `500`). An update or soft delete that
+  finds no row is still an error with SeaORM's message, "None of the
+  records are updated". `db status` prints one line per migration to
+  stdout.
+- `[profile.release.build-override] strip = false`: with `strip = true`
+  reaching proc macros, macOS refuses to load the stripped `sqlx-macros`
+  dylib and a release build fails. The shipped binary is still stripped.
+
 ### Added
 
 - Request limits per client through `axa::ratelimit`, in

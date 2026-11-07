@@ -14,7 +14,7 @@ The Event Service is an identity-registry system that maintains a centralized re
 - ✅ **Full-Text Search**: Powered by Tantivy for fast, accurate event searches
 - ✅ **RESTful API**: Modern HTTP API with OpenAPI/Swagger documentation
 - ✅ **Event Streaming**: Real-time event event publishing with audit logging
-- ✅ **Database Integration**: PostgreSQL with SeaORM and migrations
+- ✅ **Database Integration**: PostgreSQL with sqlx (compile-checked SQL, no ORM) and plain-SQL migrations
 - ✅ **Podman Ready**: Multi-stage container builds, Podman Compose for dev/test/prod
 - ✅ **Integration Tests**: Comprehensive test coverage
 - ✅ **Production Hardened**: Security, monitoring, and compliance features
@@ -247,7 +247,7 @@ cargo run -- start            # or: cargo run -- start
 podman compose up -d
 
 # Run migrations (first time)
-podman compose exec event-server sea-orm-cli migrate up
+podman compose exec event-server /app/event-service db migrate
 
 # View logs
 podman compose logs -f
@@ -294,7 +294,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 | **Web Framework**    | Axum                                 | HTTP server and routing                  |
 | **Web Framework**    | axa                                 | HTTP server and routing                  |
 | **Database**         | PostgreSQL 18+                       | Data persistence                         |
-| **ORM**              | SeaORM                               | Async database object-relational mapper  |
+| **Database**         | sqlx                                 | Compile-checked SQL, no ORM              |
 | **Search Engine**    | Tantivy                              | Full-text search indexing                |
 | **Event Streaming**  | In-Memory (extendable to Kafka/NATS) | Event publishing                         |
 | **API Docs**         | Utoipa                               | OpenAPI 3.0 specification                |
@@ -337,7 +337,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
          │               │                       │
 ┌────────▼─────┐  ┌──────▼──────┐  ┌────────────▼──────┐
 │  PostgreSQL  │  │   Tantivy   │  │  Event Stream     │
-│  (SeaORM)    │  │   Search    │  │  (In-Memory)      │
+│  (sqlx)      │  │   Search    │  │  (In-Memory)      │
 │              │  │   Index     │  │                   │
 │  - events  │  │             │  │  - EventEvents  │
 │  - audit_log │  │             │  │  - Subscribers    │
@@ -416,20 +416,26 @@ cargo clippy -- -W clippy::all -W clippy::pedantic
 cargo fix --allow-dirty
 ```
 
-### Database Migrations
+### Database
+
+Persistence is sqlx with no ORM; every statement is a `query!` literal
+in `src/db/`, and spec §10 has the rules. The macros check queries
+against the committed `.sqlx/` data, so build with `SQLX_OFFLINE=true`
+(CI does) unless `DATABASE_URL` points at a **migrated** database: with
+it set and the schema missing, the build fails with "relation does not
+exist".
 
 ```bash
-# Create new migration
-sea-orm-cli migrate generate migration_name
+cargo run -- db migrate             # apply migrations/*.up.sql
+cargo run -- db status              # each migration, applied or pending
+AXA_DESTROY_DATA=true cargo run -- db down 1   # development / test only
+AXA_DESTROY_DATA=true cargo run -- db reset    # drop everything, migrate
 
-# Run pending migrations
-sea-orm-cli migrate up
-
-# Revert last migration
-sea-orm-cli migrate down
-
-# Check migration status
-sea-orm-cli migrate status
+# A new migration is a pair of files:
+#   migrations/<version>_<name>.up.sql and .down.sql
+# After changing a query or a migration, regenerate .sqlx/ against a
+# migrated database, and commit it:
+SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets
 ```
 
 ## API Documentation
@@ -618,7 +624,7 @@ podman build -t event-server:v1.0.0 .
 1. Build release binary: `cargo build --release`
 2. Copy binary: `cp target/release/event-service /opt/event-service/`
 3. Set up environment: `cp .env.production.example /opt/event-service/.env`
-4. Run migrations: `sea-orm-cli migrate up`
+4. Run migrations: `cargo run -- db migrate`
 5. Start service: `./event-service`
 
 ### Kubernetes (Future)
@@ -689,9 +695,8 @@ event-service-with-axum/
 │   ├── fhir/              # FHIR R5 resources + conversions (Appointment)
 │   ├── compliance/        # Keyed integrity: mac, record_integrity, audit_integrity
 │   ├── db/
-│   │   ├── models.rs      # Database models (incl. event_outbox)
-│   │   ├── schema.rs      # SeaORM schema
-│   │   ├── repositories.rs # Data access layer
+│   │   ├── models.rs      # Row structs, one per table (incl. event_outbox)
+│   │   ├── repositories.rs # Event repository: every event-table query
 │   │   ├── outbox.rs      # Transactional outbox insert/poll/ack seams
 │   │   ├── convert.rs     # DB ↔ domain conversions
 │   │   └── audit.rs       # Audit log repository
@@ -782,7 +787,7 @@ Built with excellent Rust crates:
 
 - [Tokio](https://tokio.rs/) - Async runtime
 - [Axum](https://github.com/tokio-rs/axum) - Web framework
-- [SeaORM](https://www.sea-ql.org/SeaORM/) - Async ORM and query builder
+- [sqlx](https://github.com/launchbadge/sqlx) - Async SQL with compile-time checked queries
 - [Loco](https://axa/) - Web framework conventions (backend-only)
 - [OpenTelemetry](https://opentelemetry.io/) - Observability framework
 - [Tantivy](https://github.com/tantivy-search/tantivy) - Search engine

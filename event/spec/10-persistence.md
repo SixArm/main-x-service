@@ -3,7 +3,7 @@
 One subproject persists; two do not. Detail:
 [service spec §10](../event-service-with-axum/spec/10-persistence.md).
 
-### 10.1 Service — PostgreSQL 18+ via SeaORM
+### 10.1 Service — PostgreSQL 18+ via sqlx (no ORM)
 
 | Table | Holds |
 |---|---|

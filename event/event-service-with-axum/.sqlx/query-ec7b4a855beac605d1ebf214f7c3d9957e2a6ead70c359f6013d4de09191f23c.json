@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, event_id, position, role, party_kind, party_id, name, email, url,\n                    created_at, updated_at\n             FROM event_parties\n             WHERE event_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "position",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "position"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "role",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "party_kind",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "party_kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "party_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "party_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "email",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "url",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "url"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "event_parties",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "ec7b4a855beac605d1ebf214f7c3d9957e2a6ead70c359f6013d4de09191f23c"
+}
