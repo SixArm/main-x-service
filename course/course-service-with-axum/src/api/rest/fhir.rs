@@ -10,7 +10,7 @@
 //!
 //! The mounted Axum surface backing `/fhir/Basic` (read / create / update /
 //! delete / search) plus `/fhir/metadata`. Handlers return an Axum
-//! [`Response`] directly (not the native `ApiResponse` envelope) so every
+//! [`Response`] directly (not the native bare JSON and RFC 9457 problems) so every
 //! response carries `application/fhir+json` and every non-2xx body is a FHIR
 //! `OperationOutcome` (§5). Conversions bridge the wire ⇄ stored
 //! [`Course`] DTO via [`crate::fhir`]; writes reuse the same repository,

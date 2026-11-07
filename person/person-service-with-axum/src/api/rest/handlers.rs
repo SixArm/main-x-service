@@ -1,13 +1,15 @@
 //! Axum handler functions and their request/response DTOs.
 //!
 //! Each handler takes [`AppState`] plus extracted path/query/JSON inputs
-//! and returns an [`ApiResponse`](crate::api::ApiResponse)-wrapped body with an appropriate HTTP
-//! status. The flow follows the create/match/merge/search pipelines:
+//! and returns bare JSON ([`ok`](crate::api::ok)) or an RFC 9457 problem
+//! ([`ApiProblem`](crate::api::ApiProblem)) with an appropriate HTTP status. The flow follows the create/match/merge/search pipelines:
 //! validation, real-time duplicate detection, persistence via the
 //! repository, and search-index synchronization. The `#[utoipa::path]`
 //! attributes feed [`ApiDoc`](crate::api::rest::ApiDoc) for OpenAPI/Swagger.
 
+use crate::api::{ApiProblem, ok};
 use axa::client::ClientAddr;
+use axum::response::Response;
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -27,7 +29,6 @@ use super::auth::{
 };
 use super::links;
 use super::state::AppState;
-use crate::api::ApiResponse;
 use crate::compliance::disclosure::{self, AccessContext};
 use crate::models::Person;
 
@@ -115,8 +116,8 @@ pub async fn create_person(
     // Validate person data
     let validation_errors = crate::validation::validate_person(&payload);
     if !validation_errors.is_empty() {
-        let error = ApiResponse::<Person>::error(
-            "VALIDATION_ERROR",
+        let error = ApiProblem::new(
+            "validation",
             format!(
                 "Validation failed: {}",
                 validation_errors
@@ -126,7 +127,7 @@ pub async fn create_person(
                     .join("; ")
             ),
         );
-        return (StatusCode::UNPROCESSABLE_ENTITY, Json(error));
+        return error.respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     // Ensure person has a UUID
@@ -142,14 +143,12 @@ pub async fn create_person(
             potential_matches: duplicates,
         };
         let details = serde_json::to_value(&dup_response).ok();
-        let mut error = ApiResponse::<Person>::error(
-            "DUPLICATE_DETECTED",
+        let mut error = ApiProblem::new(
+            "duplicate_detected",
             "Potential duplicate persons found. Review matches before proceeding.",
         );
-        if let Some(ref mut err) = error.error {
-            err.details = details;
-        }
-        return (StatusCode::CONFLICT, Json(error));
+        error.errors = details;
+        return error.respond(StatusCode::CONFLICT);
     }
 
     // Insert into database
@@ -161,14 +160,11 @@ pub async fn create_person(
                 tracing::warn!("Failed to index person in search engine: {}", e);
             }
 
-            (StatusCode::CREATED, Json(ApiResponse::success(person)))
+            ok(StatusCode::CREATED, person)
         }
         Err(e) => {
-            let error = ApiResponse::<Person>::error(
-                "DATABASE_ERROR",
-                format!("Failed to create person: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("database_error", format!("Failed to create person: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -242,11 +238,11 @@ pub async fn list_persons(
 
     // SEC-G7, same bound and reasoning as `search_persons`.
     if !search_offset_within_bound(params.offset) {
-        let error = ApiResponse::<ListResponse>::error(
-            "OFFSET_TOO_LARGE",
+        let error = ApiProblem::new(
+            "offset_too_large",
             format!("offset must not exceed {MAX_SEARCH_OFFSET}; narrow the query instead"),
         );
-        return (StatusCode::BAD_REQUEST, Json(error));
+        return error.respond(StatusCode::BAD_REQUEST);
     }
 
     // A list is a collection read, same disclosure posture as search
@@ -262,7 +258,7 @@ pub async fn list_persons(
     .await
     .is_err()
     {
-        return audit_unavailable::<ListResponse>();
+        return audit_unavailable();
     }
 
     let limit_u64 = u64::try_from(limit).unwrap_or(100);
@@ -293,14 +289,11 @@ pub async fn list_persons(
                 offset: params.offset,
                 limit,
             };
-            (StatusCode::OK, Json(ApiResponse::success(response)))
+            ok(StatusCode::OK, response)
         }
         Err(e) => {
-            let error = ApiResponse::<ListResponse>::error(
-                "DATABASE_ERROR",
-                format!("Failed to list persons: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("database_error", format!("Failed to list persons: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -346,34 +339,26 @@ pub async fn get_person(
                     .await
                     .is_err()
                     {
-                        return audit_unavailable::<Person>();
+                        return audit_unavailable();
                     }
                     let body = if obligations.iter().any(|o| o == "mask") {
                         crate::privacy::mask_person(&person)
                     } else {
                         person
                     };
-                    (StatusCode::OK, Json(ApiResponse::success(body)))
+                    ok(StatusCode::OK, body)
                 }
-                Err((status, reason)) => (
-                    status,
-                    Json(ApiResponse::<Person>::error("FORBIDDEN", reason)),
-                ),
+                Err((status, reason)) => ApiProblem::new("forbidden", reason).respond(status),
             }
         }
         Ok(None) => {
-            let error = ApiResponse::<Person>::error(
-                "NOT_FOUND",
-                format!("Person with id '{id}' not found"),
-            );
-            (StatusCode::NOT_FOUND, Json(error))
+            let error = ApiProblem::new("not_found", format!("Person with id '{id}' not found"));
+            error.respond(StatusCode::NOT_FOUND)
         }
         Err(e) => {
-            let error = ApiResponse::<Person>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve person: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve person: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -403,8 +388,8 @@ pub async fn update_person(
     // Validate
     let validation_errors = crate::validation::validate_person(&payload);
     if !validation_errors.is_empty() {
-        let error = ApiResponse::<Person>::error(
-            "VALIDATION_ERROR",
+        let error = ApiProblem::new(
+            "validation",
             format!(
                 "Validation failed: {}",
                 validation_errors
@@ -414,7 +399,7 @@ pub async fn update_person(
                     .join("; ")
             ),
         );
-        return (StatusCode::UNPROCESSABLE_ENTITY, Json(error));
+        return error.respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     // Ensure ID in path matches payload
@@ -427,25 +412,17 @@ pub async fn update_person(
             if let Err((status, reason)) =
                 authorize_record(&caller, Action::Write, &person_resource_attrs(&existing))
             {
-                return (
-                    status,
-                    Json(ApiResponse::<Person>::error("FORBIDDEN", reason)),
-                );
+                return ApiProblem::new("forbidden", reason).respond(status);
             }
         }
         Ok(None) => {
-            let error = ApiResponse::<Person>::error(
-                "NOT_FOUND",
-                format!("Person with id '{id}' not found"),
-            );
-            return (StatusCode::NOT_FOUND, Json(error));
+            let error = ApiProblem::new("not_found", format!("Person with id '{id}' not found"));
+            return error.respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            let error = ApiResponse::<Person>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve person: {e}"),
-            );
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve person: {e}"));
+            return error.respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -457,14 +434,11 @@ pub async fn update_person(
                 tracing::warn!("Failed to update person in search engine: {}", e);
             }
 
-            (StatusCode::OK, Json(ApiResponse::success(person)))
+            ok(StatusCode::OK, person)
         }
         Err(e) => {
-            let error = ApiResponse::<Person>::error(
-                "DATABASE_ERROR",
-                format!("Failed to update person: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("database_error", format!("Failed to update person: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -494,20 +468,17 @@ pub async fn delete_person(
             if let Err((status, reason)) =
                 authorize_record(&caller, Action::Delete, &person_resource_attrs(&person))
             {
-                return (status, Json(ApiResponse::<()>::error("FORBIDDEN", reason)));
+                return ApiProblem::new("forbidden", reason).respond(status);
             }
         }
         Ok(None) => {
-            let error =
-                ApiResponse::<()>::error("NOT_FOUND", format!("Person with id '{id}' not found"));
-            return (StatusCode::NOT_FOUND, Json(error));
+            let error = ApiProblem::new("not_found", format!("Person with id '{id}' not found"));
+            return error.respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            let error = ApiResponse::<()>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve person: {e}"),
-            );
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve person: {e}"));
+            return error.respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -519,12 +490,11 @@ pub async fn delete_person(
                 tracing::warn!("Failed to delete person from search engine: {}", e);
             }
 
-            (StatusCode::NO_CONTENT, Json(ApiResponse::<()>::success(())))
+            StatusCode::NO_CONTENT.into_response()
         }
         Err(e) => {
-            let error =
-                ApiResponse::<()>::error("DATABASE_ERROR", format!("Failed to delete person: {e}"));
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("database_error", format!("Failed to delete person: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -659,11 +629,11 @@ pub async fn search_persons(
     // force the index to materialise arbitrarily many results (CPU/memory
     // DoS), and the addition below could also overflow.
     if !search_offset_within_bound(params.offset) {
-        let error = ApiResponse::<SearchResponse>::error(
-            "OFFSET_TOO_LARGE",
+        let error = ApiProblem::new(
+            "offset_too_large",
             format!("offset must not exceed {MAX_SEARCH_OFFSET}; narrow the query instead"),
         );
-        return (StatusCode::BAD_REQUEST, Json(error));
+        return error.respond(StatusCode::BAD_REQUEST);
     }
 
     // A search is a collection read: recorded against the nil id, because
@@ -680,7 +650,7 @@ pub async fn search_persons(
     .await
     .is_err()
     {
-        return audit_unavailable::<SearchResponse>();
+        return audit_unavailable();
     }
 
     // Perform search using search engine
@@ -751,12 +721,11 @@ pub async fn search_persons(
                 offset: params.offset,
                 limit,
             };
-            (StatusCode::OK, Json(ApiResponse::success(response)))
+            ok(StatusCode::OK, response)
         }
         Err(e) => {
-            let error =
-                ApiResponse::<SearchResponse>::error("SEARCH_ERROR", format!("Search failed: {e}"));
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("search_error", format!("Search failed: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -860,11 +829,8 @@ pub async fn match_person(
             let match_results = match state.matcher.find_matches(&payload.person, &candidates) {
                 Ok(results) => results,
                 Err(e) => {
-                    let error = ApiResponse::<MatchResultsResponse>::error(
-                        "MATCH_ERROR",
-                        format!("Matching failed: {e}"),
-                    );
-                    return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+                    let error = ApiProblem::new("match_error", format!("Matching failed: {e}"));
+                    return error.respond(StatusCode::INTERNAL_SERVER_ERROR);
                 }
             };
 
@@ -893,14 +859,11 @@ pub async fn match_person(
                 total: matches.len(),
                 matches,
             };
-            (StatusCode::OK, Json(ApiResponse::success(response)))
+            ok(StatusCode::OK, response)
         }
         Err(e) => {
-            let error = ApiResponse::<MatchResultsResponse>::error(
-                "MATCH_ERROR",
-                format!("Matching failed: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("match_error", format!("Matching failed: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -995,7 +958,7 @@ pub async fn check_duplicates(
         has_duplicates: !matches.is_empty(),
         potential_matches: matches,
     };
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ─── Record Merging ─────────────────────────────────────────────────────────
@@ -1123,35 +1086,29 @@ pub async fn merge_persons(
     // *same* id, tombstoning the record and destroying its data. Reject
     // before any fetch (mirrors the case service's equal-pid `422`).
     if req.main_person_id == req.duplicate_person_id {
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "INVALID_MERGE",
-                "main_person_id and duplicate_person_id must differ".to_string(),
-            )),
-        );
+        return ApiProblem::new(
+            "invalid_merge",
+            "main_person_id and duplicate_person_id must differ".to_string(),
+        )
+        .respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     // Fetch both persons
     let main = match state.person_repository.get_by_id(&req.main_person_id).await {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "NOT_FOUND",
-                    format!("Main person {} not found", req.main_person_id),
-                )),
-            );
+            return ApiProblem::new(
+                "not_found",
+                format!("Main person {} not found", req.main_person_id),
+            )
+            .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to fetch main person: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to fetch main person: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1162,22 +1119,18 @@ pub async fn merge_persons(
     {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "NOT_FOUND",
-                    format!("Duplicate person {} not found", req.duplicate_person_id),
-                )),
-            );
+            return ApiProblem::new(
+                "not_found",
+                format!("Duplicate person {} not found", req.duplicate_person_id),
+            )
+            .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to fetch duplicate person: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to fetch duplicate person: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1195,13 +1148,8 @@ pub async fn merge_persons(
         .merge(&merged, &duplicate.id, &ctx)
         .await
     {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "DATABASE_ERROR",
-                format!("Failed to merge persons: {e}"),
-            )),
-        );
+        return ApiProblem::new("database_error", format!("Failed to merge persons: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     // Remove duplicate from search index
@@ -1232,7 +1180,7 @@ pub async fn merge_persons(
         main_person: merged,
     };
 
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ─── Batch Deduplication ────────────────────────────────────────────────────
@@ -1264,15 +1212,8 @@ pub async fn batch_deduplicate(
     let persons = match state.person_repository.list_active(1000, 0).await {
         Ok(p) => p,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(
-                    ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to list persons: {e}"),
-                    ),
-                ),
-            );
+            return ApiProblem::new("database_error", format!("Failed to list persons: {e}"))
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1358,15 +1299,11 @@ pub async fn batch_deduplicate(
     let rows = match crate::db::review_queue::upsert(&state.db, &new_items).await {
         Ok(rows) => rows,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(
-                    ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to persist review queue: {e}"),
-                    ),
-                ),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to persist review queue: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
     let review_items: Vec<crate::models::ReviewQueueItem> =
@@ -1388,7 +1325,7 @@ pub async fn batch_deduplicate(
         review_items,
     };
 
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ─── Review queue (stored) ──────────────────────────────────────────────────
@@ -1461,16 +1398,12 @@ pub async fn get_review_queue(
     if let Some(status) = query.status.as_deref()
         && !matches!(status, "pending" | "confirmed" | "rejected" | "automerged")
     {
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(
-                ApiResponse::<crate::models::ReviewQueueListResponse>::error(
-                    "INVALID_STATUS",
-                    format!("unknown review status `{status}`"),
-                ),
-            ),
+        return ApiProblem::new(
+            "invalid_status",
+            format!("unknown review status `{status}`"),
         )
-            .into_response();
+        .respond(StatusCode::UNPROCESSABLE_ENTITY)
+        .into_response();
     }
     match crate::db::review_queue::list(
         &state.db,
@@ -1483,24 +1416,18 @@ pub async fn get_review_queue(
             let items: Vec<crate::models::ReviewQueueItem> =
                 rows.iter().map(review_row_to_item).collect();
             let total = items.len();
-            (
+            ok(
                 StatusCode::OK,
-                Json(ApiResponse::success(
-                    crate::models::ReviewQueueListResponse { items, total },
-                )),
+                crate::models::ReviewQueueListResponse { items, total },
             )
-                .into_response()
+            .into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(
-                ApiResponse::<crate::models::ReviewQueueListResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to list review queue: {e}"),
-                ),
-            ),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to list review queue: {e}"),
         )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR)
+        .into_response(),
     }
 }
 
@@ -1608,36 +1535,25 @@ pub async fn review_decision(
                 }
             }
 
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success(review_row_to_item(&row))),
-            )
+            ok(StatusCode::OK, review_row_to_item(&row)).into_response()
+        }
+        Ok(crate::db::review_queue::DecideOutcome::NotFound) => {
+            ApiProblem::new("not_found", format!("no review item {id}"))
+                .respond(StatusCode::NOT_FOUND)
                 .into_response()
         }
-        Ok(crate::db::review_queue::DecideOutcome::NotFound) => (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::<crate::models::ReviewQueueItem>::error(
-                "NOT_FOUND",
-                format!("no review item {id}"),
-            )),
+        Ok(crate::db::review_queue::DecideOutcome::AlreadyDecided(current)) => ApiProblem::new(
+            "invalid_review_transition",
+            format!("item is `{current}`; only `pending` items can be decided"),
         )
-            .into_response(),
-        Ok(crate::db::review_queue::DecideOutcome::AlreadyDecided(current)) => (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(ApiResponse::<crate::models::ReviewQueueItem>::error(
-                "INVALID_REVIEW_TRANSITION",
-                format!("item is `{current}`; only `pending` items can be decided"),
-            )),
+        .respond(StatusCode::UNPROCESSABLE_ENTITY)
+        .into_response(),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to decide review item: {e}"),
         )
-            .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<crate::models::ReviewQueueItem>::error(
-                "DATABASE_ERROR",
-                format!("Failed to decide review item: {e}"),
-            )),
-        )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR)
+        .into_response(),
     }
 }
 
@@ -1679,24 +1595,19 @@ pub async fn export_person_data(
             .await
             .is_err()
             {
-                return audit_unavailable::<serde_json::Value>();
+                return audit_unavailable();
             }
             let export = crate::privacy::export_person_data(&person);
-            (StatusCode::OK, Json(ApiResponse::success(export)))
+            ok(StatusCode::OK, export)
         }
         Ok(None) => {
-            let error = ApiResponse::<serde_json::Value>::error(
-                "NOT_FOUND",
-                format!("Person with id '{id}' not found"),
-            );
-            (StatusCode::NOT_FOUND, Json(error))
+            let error = ApiProblem::new("not_found", format!("Person with id '{id}' not found"));
+            error.respond(StatusCode::NOT_FOUND)
         }
         Err(e) => {
-            let error = ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve person: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve person: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -1736,24 +1647,19 @@ pub async fn get_person_masked(
             .await
             .is_err()
             {
-                return audit_unavailable::<Person>();
+                return audit_unavailable();
             }
             let masked = crate::privacy::mask_person(&person);
-            (StatusCode::OK, Json(ApiResponse::success(masked)))
+            ok(StatusCode::OK, masked)
         }
         Ok(None) => {
-            let error = ApiResponse::<Person>::error(
-                "NOT_FOUND",
-                format!("Person with id '{id}' not found"),
-            );
-            (StatusCode::NOT_FOUND, Json(error))
+            let error = ApiProblem::new("not_found", format!("Person with id '{id}' not found"));
+            error.respond(StatusCode::NOT_FOUND)
         }
         Err(e) => {
-            let error = ApiResponse::<Person>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve person: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve person: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -1799,13 +1705,13 @@ pub async fn get_person_audit_logs(
         .get_logs_for_entity("Person", id, u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
+        Ok(logs) => ok(StatusCode::OK, logs),
         Err(e) => {
-            let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
+            let error = ApiProblem::new(
+                "database_error",
                 format!("Failed to retrieve audit logs: {e}"),
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -1859,36 +1765,27 @@ pub async fn erase_person(
     let txn = match state.db.begin().await {
         Ok(txn) => txn,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to start the erasure transaction: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to start the erasure transaction: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
     let outcome =
         match crate::compliance::erasure::erase(&txn, id, actor, &access, &state.audit_log).await {
             Ok(outcome) => outcome,
             Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::<serde_json::Value>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to erase: {e}"),
-                    )),
-                );
+                return ApiProblem::new("database_error", format!("Failed to erase: {e}"))
+                    .respond(StatusCode::INTERNAL_SERVER_ERROR);
             }
         };
     if let Err(e) = txn.commit().await {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to commit the erasure: {e}"),
-            )),
-        );
+        return ApiProblem::new(
+            "database_error",
+            format!("Failed to commit the erasure: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     // The search index holds a copy of the personal data, so an erasure
@@ -1901,7 +1798,7 @@ pub async fn erase_person(
     }
 
     let value = serde_json::to_value(&outcome).unwrap_or_else(|_| serde_json::json!({}));
-    (StatusCode::OK, Json(ApiResponse::success(value)))
+    ok(StatusCode::OK, value)
 }
 
 /// Accounting of disclosures for one person (HIPAA §164.528).
@@ -1948,31 +1845,18 @@ pub async fn get_person_disclosures(
     let record = match state.person_repository.get_by_id(&id).await {
         Ok(Some(record)) => record,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "NOT_FOUND",
-                    format!("Person with id '{id}' not found"),
-                )),
-            );
+            return ApiProblem::new("not_found", format!("Person with id '{id}' not found"))
+                .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to retrieve person: {e}"),
-                )),
-            );
+            return ApiProblem::new("database_error", format!("Failed to retrieve person: {e}"))
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
     if let Err((status, reason)) =
         authorize_record(&caller, Action::Read, &person_resource_attrs(&record))
     {
-        return (
-            status,
-            Json(ApiResponse::<serde_json::Value>::error("FORBIDDEN", reason)),
-        );
+        return ApiProblem::new("forbidden", reason).respond(status);
     }
 
     match state
@@ -1982,9 +1866,9 @@ pub async fn get_person_disclosures(
     {
         Ok(rows) => {
             let auditing = crate::compliance::audit_reads();
-            (
+            ok(
                 StatusCode::OK,
-                Json(ApiResponse::success(serde_json::json!({
+                serde_json::json!({
                     "id": id,
                     "read_auditing_enabled": auditing,
                     "count": rows.len(),
@@ -1995,16 +1879,14 @@ pub async fn get_person_disclosures(
                          being recorded; only disclosure-flagged mutations appear here"
                     },
                     "disclosures": rows,
-                }))),
+                }),
             )
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve the accounting of disclosures: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to retrieve the accounting of disclosures: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -2058,13 +1940,11 @@ pub async fn verify_record_integrity(
     {
         Ok(rows) => rows,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to read records for verification: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to read records for verification: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -2097,13 +1977,11 @@ pub async fn verify_record_integrity(
             // mismatch; skipping it is honest, and the count reflects it.
             Ok(None) => {}
             Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::<serde_json::Value>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to assemble record {id} for verification: {e}"),
-                    )),
-                );
+                return ApiProblem::new(
+                    "database_error",
+                    format!("Failed to assemble record {id} for verification: {e}"),
+                )
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
             }
         }
     }
@@ -2117,9 +1995,9 @@ pub async fn verify_record_integrity(
          either an out-of-band SQL edit, or a write path that forgot to rehash; investigate \
          the named ids against the audit trail"
     };
-    (
+    ok(
         StatusCode::OK,
-        Json(ApiResponse::success(serde_json::json!({
+        serde_json::json!({
             "limit": limit,
             "verified": report.verified,
             "records": report.records,
@@ -2127,7 +2005,7 @@ pub async fn verify_record_integrity(
             "unhashed": report.unhashed,
             "mismatched": report.mismatched,
             "interpretation": interpretation,
-        }))),
+        }),
     )
 }
 
@@ -2159,12 +2037,7 @@ pub async fn verify_record_integrity(
 pub async fn take_audit_checkpoint(State(state): State<AppState>) -> impl IntoResponse {
     let now = chrono::Utc::now().timestamp_micros();
     match crate::compliance::checkpoint::Checkpoint::take(&state.db, now).await {
-        Ok(None) => (
-            StatusCode::NO_CONTENT,
-            Json(ApiResponse::<serde_json::Value>::success(
-                serde_json::Value::Null,
-            )),
-        ),
+        Ok(None) => ok(StatusCode::NO_CONTENT, serde_json::Value::Null),
         Ok(Some(checkpoint)) => {
             tracing::info!(
                 target: "audit_checkpoint",
@@ -2177,15 +2050,13 @@ pub async fn take_audit_checkpoint(State(state): State<AppState>) -> impl IntoRe
                 "audit chain checkpoint"
             );
             let value = serde_json::to_value(&checkpoint).unwrap_or(serde_json::Value::Null);
-            (StatusCode::OK, Json(ApiResponse::success(value)))
+            ok(StatusCode::OK, value)
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::error(
-                "DATABASE_ERROR",
-                format!("Failed to take a checkpoint: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to take a checkpoint: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -2218,21 +2089,19 @@ pub async fn verify_audit_checkpoint(
                     "audit chain does not honour a recorded checkpoint"
                 );
             }
-            (
+            ok(
                 StatusCode::OK,
-                Json(ApiResponse::success(serde_json::json!({
+                serde_json::json!({
                     "honoured": honoured,
                     "verdict": verdict,
-                }))),
+                }),
             )
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::error(
-                "DATABASE_ERROR",
-                format!("Failed to verify the checkpoint: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to verify the checkpoint: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -2270,9 +2139,9 @@ pub async fn verify_audit_chain(
                  were written — investigate the named seq/id; a concurrent audit write on a \
                  pooled connection can also fork the chain, which reports as a linkage break"
             };
-            (
+            ok(
                 StatusCode::OK,
-                Json(ApiResponse::success(serde_json::json!({
+                serde_json::json!({
                     "limit": limit,
                     "verified": report.verified,
                     "rows": report.rows,
@@ -2282,15 +2151,15 @@ pub async fn verify_audit_chain(
                     "head": report.head,
                     "breaks": report.breaks,
                     "interpretation": interpretation,
-                }))),
+                }),
             )
         }
         Err(e) => {
-            let error = ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
+            let error = ApiProblem::new(
+                "database_error",
                 format!("Failed to verify the audit chain: {e}"),
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -2301,14 +2170,12 @@ pub async fn verify_audit_chain(
 /// was disclosed — the service is temporarily unable to account for a read
 /// of personal data, so it declines to serve one, and the status is
 /// retryable. Only reachable when `PERSON_AUDIT_FAIL_CLOSED` is on.
-fn audit_unavailable<T: serde::Serialize>() -> (StatusCode, Json<ApiResponse<T>>) {
-    (
-        StatusCode::SERVICE_UNAVAILABLE,
-        Json(ApiResponse::error(
-            "AUDIT_UNAVAILABLE",
-            "the access could not be recorded in the audit trail, so the read was refused",
-        )),
+fn audit_unavailable() -> Response {
+    ApiProblem::new(
+        "audit_unavailable",
+        "the access could not be recorded in the audit trail, so the read was refused",
     )
+    .respond(StatusCode::SERVICE_UNAVAILABLE)
 }
 
 /// Get recent audit logs
@@ -2333,13 +2200,13 @@ pub async fn get_recent_audit_logs(
         .get_recent_logs(u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
+        Ok(logs) => ok(StatusCode::OK, logs),
         Err(e) => {
-            let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
+            let error = ApiProblem::new(
+                "database_error",
                 format!("Failed to retrieve audit logs: {e}"),
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -2377,13 +2244,13 @@ pub async fn get_user_audit_logs(
         .get_logs_by_user(&params.user_id, u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
+        Ok(logs) => ok(StatusCode::OK, logs),
         Err(e) => {
-            let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
+            let error = ApiProblem::new(
+                "database_error",
                 format!("Failed to retrieve audit logs: {e}"),
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }

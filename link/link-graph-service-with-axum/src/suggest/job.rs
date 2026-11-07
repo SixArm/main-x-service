@@ -208,15 +208,7 @@ const PAGE_LIMIT: usize = 100;
 /// that changes its own bound later.
 const MAX_FETCH_OFFSET: usize = 10_000;
 
-/// The `{"success":…, "data": T}` envelope every native REST response on
-/// this family wraps its body in.
-#[derive(Debug, Deserialize)]
-struct ApiEnvelope<T> {
-    #[serde(default)]
-    data: Option<T>,
-}
-
-/// The `data` payload of `GET /<plural>`: person's field is `persons`,
+/// The body of `GET /<plural>`: person's field is `persons`,
 /// worker's is `workers` — both alias onto `records` here so one type
 /// parses both services' response shape.
 #[derive(Debug, Default, Deserialize)]
@@ -371,11 +363,11 @@ impl IdentitySource for HttpIdentitySource {
                 .map_err(|e| ModelError::Any(Box::new(e)))?
                 .error_for_status()
                 .map_err(|e| ModelError::Any(Box::new(e)))?;
-            let body: ApiEnvelope<ListData> = response
+            let body: ListData = response
                 .json()
                 .await
                 .map_err(|e| ModelError::Any(Box::new(e)))?;
-            let records = body.data.map(|d| d.records).unwrap_or_default();
+            let records = body.records;
             let page_len = records.len();
             for record in &records {
                 out.push((

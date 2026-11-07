@@ -17,12 +17,12 @@ use uuid::Uuid;
 use entity_ref::{EdgeKind, EntityRef};
 
 use crate::auth::{self, MaybeAuthUser};
-use crate::envelope;
 use crate::events::entity_from_topic;
 use crate::graph::{self, EdgeStatus};
 use crate::models::audit_log::{self, AuditContext};
 use crate::models::{consumer_offsets, edges};
 use crate::probe;
+use crate::responses;
 
 /// The distinct, parseable endpoint refs of a set of edge rows — the
 /// candidates for lazy verify-on-read.
@@ -223,21 +223,21 @@ async fn neighbors(
     ClientAddr(client): ClientAddr,
 ) -> Result<Response> {
     let Ok(start) = ref_urn.parse::<EntityRef>() else {
-        return envelope::bad_request(&format!("invalid entity ref: {ref_urn:?}"));
+        return responses::bad_request(&format!("invalid entity ref: {ref_urn:?}"));
     };
     let kind = match params.kind.as_deref() {
         None => None,
         Some(k) => match EdgeKind::from_token(k) {
             Some(x) => Some(x),
-            None => return envelope::bad_request(&format!("unknown edge kind: {k:?}")),
+            None => return responses::bad_request(&format!("unknown edge kind: {k:?}")),
         },
     };
     let Some(direction) = edges::Direction::parse(params.direction.as_deref()) else {
-        return envelope::bad_request("direction must be one of: out | in | both");
+        return responses::bad_request("direction must be one of: out | in | both");
     };
     let depth = params.depth.unwrap_or(1);
     if depth > MAX_DEPTH {
-        return envelope::bad_request(&format!("depth exceeds cap of {MAX_DEPTH}"));
+        return responses::bad_request(&format!("depth exceeds cap of {MAX_DEPTH}"));
     }
 
     let mut rows = collect_neighbors(&ctx.db, start, kind, direction, depth).await?;
@@ -257,7 +257,7 @@ async fn neighbors(
     let audit = audit_context(&caller, &headers, client.as_deref());
     audit_surfaced_edges(&ctx.db, &audit, "read_edge", &rows).await?;
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
-    envelope::ok(NeighborsData {
+    responses::ok(NeighborsData {
         r#ref: start.to_string(),
         edges: rows,
         as_of,
@@ -275,24 +275,24 @@ async fn edges_list(
 ) -> Result<Response> {
     let from = match parse_opt_ref(params.from.as_deref()) {
         Ok(v) => v,
-        Err(msg) => return envelope::bad_request(&msg),
+        Err(msg) => return responses::bad_request(&msg),
     };
     let to = match parse_opt_ref(params.to.as_deref()) {
         Ok(v) => v,
-        Err(msg) => return envelope::bad_request(&msg),
+        Err(msg) => return responses::bad_request(&msg),
     };
     let kind = match params.kind.as_deref() {
         None => None,
         Some(k) => match EdgeKind::from_token(k) {
             Some(x) => Some(x),
-            None => return envelope::bad_request(&format!("unknown edge kind: {k:?}")),
+            None => return responses::bad_request(&format!("unknown edge kind: {k:?}")),
         },
     };
     let status = match params.status.as_deref() {
         None => None,
         Some(s) => match EdgeStatus::from_token(s) {
             Some(x) => Some(x),
-            None => return envelope::bad_request(&format!("unknown status: {s:?}")),
+            None => return responses::bad_request(&format!("unknown status: {s:?}")),
         },
     };
 
@@ -314,7 +314,7 @@ async fn edges_list(
     let audit = audit_context(&caller, &headers, client.as_deref());
     audit_surfaced_edges(&ctx.db, &audit, "read_edge", &rows).await?;
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
-    envelope::ok(EdgesData { edges: rows, as_of })
+    responses::ok(EdgesData { edges: rows, as_of })
 }
 
 /// `GET /api/single-view/{ref}` — golden-record walk (spec §6 FR-15).
@@ -327,7 +327,7 @@ async fn single_view(
     ClientAddr(client): ClientAddr,
 ) -> Result<Response> {
     let Ok(start) = ref_urn.parse::<EntityRef>() else {
-        return envelope::bad_request(&format!("invalid entity ref: {ref_urn:?}"));
+        return responses::bad_request(&format!("invalid entity ref: {ref_urn:?}"));
     };
     let views = edges::Model::all_views(&ctx.db).await?;
     let view = graph::single_view(start, &views);
@@ -360,7 +360,7 @@ async fn single_view(
         })
         .collect();
     let as_of = consumer_offsets::Model::watermark(&ctx.db).await?;
-    envelope::ok(SingleViewData {
+    responses::ok(SingleViewData {
         identity_refs: view.identity_refs,
         affiliations,
         as_of,
@@ -381,7 +381,7 @@ async fn freshness(State(ctx): State<AppContext>) -> Result<Response> {
         })
         .collect();
     let as_of = rows.iter().map(|(_, t)| *t).max();
-    envelope::ok(FreshnessData { topics, as_of })
+    responses::ok(FreshnessData { topics, as_of })
 }
 
 /// Parse an optional `EntityRef` filter, returning a `400` message on a

@@ -2,35 +2,25 @@
 // (schema.org/Thing-based). Reference:
 // thing-service-with-axum/agents/models.md.
 
-// ─── HTTP envelope ───────────────────────────────────────────────────
+// ─── Errors ──────────────────────────────────────────────────────────
 
 /**
- * Standard response envelope returned by every Thing Service endpoint.
- *
- * The service always wraps payloads so that callers can distinguish a
- * successful empty result (`data: null`, `success: true`) from a failure
- * (`success: false` with a populated `error`). {@link ApiClient} unwraps
- * this so callers receive only the inner `data`.
- *
- * @typeParam T - The shape of the successful payload in `data`.
+ * An RFC 9457 problem, the body of every failed Thing Service response.
+ * A success is the bare payload, with no wrapper.
  */
-export interface ApiResponse<T> {
-  success: boolean;
-  data: T | null;
-  error: ApiErrorBody | null;
-}
-
-/**
- * Machine-readable error body carried inside a failed {@link ApiResponse}.
- *
- * `code` is a stable string (e.g. `NOT_FOUND`, `DUPLICATE`, `VALIDATION`)
- * used for branching; `message` is human-facing; `details` is an opaque,
- * endpoint-specific payload (e.g. duplicate `MatchResult[]` on a 409).
- */
-export interface ApiErrorBody {
-  code: string;
-  message: string;
-  details?: unknown;
+export interface Problem {
+  /** A URI naming the problem type; `"about:blank"` when there is none. */
+  type: string;
+  /** A short summary of the status, such as `"Not Found"`. */
+  title: string;
+  /** The HTTP status code. */
+  status: number;
+  /** What went wrong, for display. Absent on a `500`. */
+  detail?: string;
+  /** Stable lowercase code for branching, such as `"duplicate_detected"`. */
+  code?: string;
+  /** Structured context, such as duplicate candidates. */
+  errors?: unknown;
 }
 
 // ─── IdentifierType (schema.org/PropertyValue) ───────────────────────
@@ -335,7 +325,7 @@ export interface ReviewQueueItem {
 /** One operator verdict for a pending review item. */
 export type ReviewDecision = "confirmed" | "rejected";
 
-/** Response envelope for the stored review-queue list. */
+/** Response body for the stored review-queue list. */
 export interface ReviewQueueListResponse {
   /** The stored review-queue items (newest first). */
   items: ReviewQueueItem[];

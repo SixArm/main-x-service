@@ -5,7 +5,11 @@
 // `fetch` that fails the test if the CSRF gate lets a bad request through
 // to the "upstream".
 import { describe, expect, it, vi } from "vitest";
-import { DELETE, GET, POST } from "../../src/routes/api/proxy/[...path]/+server";
+import {
+  DELETE,
+  GET,
+  POST,
+} from "../../src/routes/api/proxy/[...path]/+server";
 
 const CSRF_COOKIE = "__Host-mxi_csrf";
 
@@ -18,10 +22,13 @@ function makeEvent(opts: {
   origin?: string;
 }) {
   const headers = new Headers(opts.headers ?? {});
-  const request = new Request(`${opts.origin ?? "http://localhost:5173"}/api/proxy/api/persons`, {
-    method: opts.method,
-    headers,
-  });
+  const request = new Request(
+    `${opts.origin ?? "http://localhost:5173"}/api/proxy/api/persons`,
+    {
+      method: opts.method,
+      headers,
+    },
+  );
   const fetchSpy = vi.fn(async () => new Response(null, { status: 200 }));
   return {
     event: {
@@ -31,7 +38,8 @@ function makeEvent(opts: {
       locals: { sessionId: null },
       fetch: fetchSpy,
       cookies: {
-        get: (name: string) => (name === CSRF_COOKIE ? opts.cookieValue : undefined),
+        get: (name: string) =>
+          name === CSRF_COOKIE ? opts.cookieValue : undefined,
       },
       // Fields unused by the handler but present on a real RequestEvent;
       // omitted here since the handler never touches them.

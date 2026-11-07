@@ -85,8 +85,7 @@ async fn create_thing_from_a_minimal_hand_written_body_succeeds() {
         serde_json::to_string(&body).unwrap()
     );
 
-    let created: Thing =
-        serde_json::from_value(body["data"].clone()).expect("Thing in response body");
+    let created: Thing = serde_json::from_value(body.clone()).expect("Thing in response body");
     assert_eq!(created.name, name);
 
     // The id is server-minted, not the nil sentinel the omitted field
@@ -138,8 +137,8 @@ async fn two_consecutive_hand_written_creates_do_not_collide() {
     let (status_b, body_b) = post_things(&app, &json!({ "name": b })).await;
     assert_eq!(status_b, StatusCode::CREATED, "{body_b:?}");
 
-    let id_a = body_a["data"]["id"].as_str().unwrap();
-    let id_b = body_b["data"]["id"].as_str().unwrap();
+    let id_a = body_a["id"].as_str().unwrap();
+    let id_b = body_b["id"].as_str().unwrap();
     assert_ne!(id_a, id_b, "each create must mint its own id");
     assert_ne!(id_a, "00000000-0000-0000-0000-000000000000");
     assert_ne!(id_b, "00000000-0000-0000-0000-000000000000");
@@ -147,7 +146,7 @@ async fn two_consecutive_hand_written_creates_do_not_collide() {
 
 /// Omitting `name` — a genuinely client-required field the server does
 /// NOT own — still fails, but now via the normal validation path
-/// (`422 validation_error`, field `name`), not via the JSON extractor's
+/// (`422 validation`, field `name`), not via the JSON extractor's
 /// generic "missing field" error before any handler code runs.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
@@ -157,7 +156,7 @@ async fn omitting_name_fails_validation_not_the_json_extractor() {
     let (status, body) = post_things(&app, &json!({})).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(
-        body["error"]["code"], "validation_error",
+        body["code"], "validation",
         "expected the validation-layer error code, got: {body}"
     );
 }
@@ -206,7 +205,7 @@ async fn listing_with_no_query_term_enumerates_seeded_things() {
     for name in &names {
         let (status, body) = post_things(&app, &json!({ "name": name })).await;
         assert_eq!(status, StatusCode::CREATED, "{body:?}");
-        seeded_ids.push(body["data"]["id"].as_str().unwrap().to_string());
+        seeded_ids.push(body["id"].as_str().unwrap().to_string());
     }
 
     // A page large enough to cover this test's own seeded rows alongside
@@ -214,7 +213,7 @@ async fn listing_with_no_query_term_enumerates_seeded_things() {
     let (status, headers, body) = get_things(&app, "/api/things?limit=500").await;
     assert_eq!(status, StatusCode::OK, "{body:?}");
 
-    let results = body["data"]["results"].as_array().expect("results array");
+    let results = body["results"].as_array().expect("results array");
     let returned_ids: Vec<&str> = results.iter().map(|r| r["id"].as_str().unwrap()).collect();
     for id in &seeded_ids {
         assert!(
@@ -243,5 +242,5 @@ async fn listing_beyond_the_offset_bound_is_rejected() {
     let app = test_router().await;
     let (status, _headers, body) = get_things(&app, "/api/things?offset=10001").await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body:?}");
-    assert_eq!(body["error"]["code"], "OFFSET_TOO_LARGE");
+    assert_eq!(body["code"], "offset_too_large");
 }

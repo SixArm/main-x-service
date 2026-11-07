@@ -10,8 +10,8 @@ Default base URL: `http://localhost:5150` (axa default port).
 
 ## Conventions
 
-- **Raw axa JSON — no `{success, data, error}` envelope** (this
-  differs from the older Axum-native entities like person).
+- **Bare JSON on success, an RFC 9457 problem on failure**, like every
+  service (`spec/restful` §1.3).
 - Wire field names are **snake_case** (`legal_name`,
   `founding_date`, …).
 - The organization request/response body **is** the

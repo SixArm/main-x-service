@@ -148,7 +148,7 @@ async fn near_ceiling_identifier_match_is_never_auto_promoted() {
         .json()
         .await
         .expect("parse links response");
-    let links = body["data"].as_array().expect("data is an array of links");
+    let links = body.as_array().expect("the body is an array of links");
     let edge = links
         .iter()
         .find(|l| l["kind"] == "same_identity" && l["to_ref"] == worker_ref.to_string())
@@ -187,7 +187,7 @@ async fn near_ceiling_identifier_match_is_never_auto_promoted() {
         .json()
         .await
         .expect("parse review-queue response");
-    let items = review_body["data"]["items"]
+    let items = review_body["items"]
         .as_array()
         .expect("data.items is an array");
     let row = items
@@ -241,7 +241,7 @@ async fn near_ceiling_identifier_match_is_never_auto_promoted() {
         .json()
         .await
         .expect("parse review-queue response");
-    let items_after = review_body_after["data"]["items"]
+    let items_after = review_body_after["items"]
         .as_array()
         .expect("data.items is an array");
     let row_after = items_after

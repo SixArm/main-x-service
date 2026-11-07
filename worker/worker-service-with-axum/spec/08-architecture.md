@@ -5,7 +5,7 @@
 ```
 src/
 ├── api/
-│   ├── mod.rs               # ApiResponse, ApiError
+│   ├── mod.rs               # ok, ApiProblem (responses)
 │   ├── rest/                # REST API (Axum) — 15 endpoints
 │   ├── fhir/                # FHIR R5 Worker resource
 │   └── grpc/                # real Tonic server (T-6): mod.rs (serve + generated

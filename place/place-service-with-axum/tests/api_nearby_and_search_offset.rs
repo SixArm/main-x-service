@@ -144,7 +144,7 @@ async fn create_place_at(app: &axum::Router, name: &str, lat: f64, lon: f64) -> 
         StatusCode::CREATED,
         "create failed for {name}: {body}"
     );
-    body["data"].clone()
+    body
 }
 
 /// `GET /api/places/nearby` returns only the places within `radius_km`
@@ -171,7 +171,7 @@ async fn nearby_returns_only_places_within_radius() {
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
 
-    let names: Vec<String> = body["data"]["results"]
+    let names: Vec<String> = body["results"]
         .as_array()
         .expect("results array")
         .iter()
@@ -229,7 +229,7 @@ async fn nearby_near_the_edge_of_the_radius() {
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
 
-    let names: Vec<String> = body["data"]["results"]
+    let names: Vec<String> = body["results"]
         .as_array()
         .expect("results array")
         .iter()
@@ -288,7 +288,7 @@ async fn search_offset_skips_results_and_reports_true_total() {
     )
     .await;
     assert_eq!(status0, StatusCode::OK, "{body0}");
-    let page0: Vec<String> = body0["data"]["results"]
+    let page0: Vec<String> = body0["results"]
         .as_array()
         .unwrap()
         .iter()
@@ -313,7 +313,7 @@ async fn search_offset_skips_results_and_reports_true_total() {
     )
     .await;
     assert_eq!(status2, StatusCode::OK, "{body2}");
-    let page2: Vec<String> = body2["data"]["results"]
+    let page2: Vec<String> = body2["results"]
         .as_array()
         .unwrap()
         .iter()

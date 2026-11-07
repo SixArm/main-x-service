@@ -25,7 +25,7 @@ Strategy rationale: entity spec
 | Seam | Test | Pins |
 |---|---|---|
 | Service ↔ matcher | [`tests/duplicate_detection.rs`](../event-service-with-axum/tests/duplicate_detection.rs) | Adapter field-routing **and** matcher scoring — both sides of the §5.3 DTO contract |
-| Front-end ↔ service | `tests/unit/client.test.ts`, `tests/unit/events.test.ts` (mocked fetch) | Envelope handling + endpoint wrapping against the documented wire format |
+| Front-end ↔ service | `tests/unit/client.test.ts`, `tests/unit/events.test.ts` (mocked fetch) | Response and problem handling + endpoint wrapping against the documented wire format |
 | Front-end resilience | `tests/e2e/events.spec.ts` (Playwright, no live service) | Page shells render with the API down |
 
 Rule: a PR that changes the integration contract (adapter, wire

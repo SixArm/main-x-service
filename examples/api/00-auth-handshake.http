@@ -4,7 +4,7 @@
 # See agents/share/authentication-sessions.md §5 for the full design, and
 # agents/share/authorization-attributes.md for the `attrs` claim / ABAC.
 #
-# Response envelope here is BARE loco JSON (no {"success":...} wrapper) —
+# Responses here are bare JSON, and errors RFC 9457 problems —
 # see src/controllers/auth.rs. Run these top to bottom: each later request
 # needs a cookie or token value a prior one produced.
 #

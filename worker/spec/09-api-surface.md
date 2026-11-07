@@ -1,6 +1,6 @@
 ## 9. API Surface
 
-Complete endpoint reference with parameters, envelopes, and status
+Complete endpoint reference with parameters, response shapes, and status
 codes: [service `agents/restful.md`](../worker-service-with-axum/agents/restful.md).
 This section is the entity-level summary.
 
@@ -48,7 +48,9 @@ Front-end detail:
 
 ### 9.3 Contract conventions
 
-- Envelope: `{ "success": bool, "data": …, "error": { code, message, details } }`.
+- Responses: bare JSON on success; an RFC 9457 problem on failure
+  (`type`, `title`, `status`, `detail`, a lowercase `code`, and
+  `errors` for context) — [`spec/restful`](../../spec/restful/index.md) §1.3.
 - Status codes: `200/201/204` success; `409` duplicate-on-create;
   `422` validation; `404`; `500`.
 - Base URL injected into the front-end via `PUBLIC_API_BASE_URL`

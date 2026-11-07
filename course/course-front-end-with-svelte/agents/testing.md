@@ -5,7 +5,7 @@ Two automated layers plus a manual integration pass, mapped to spec
 
 | Layer | Tool | Runs against | Purpose |
 |---|---|---|---|
-| Unit | Vitest + jsdom | Mocked `fetch` / in-memory | Pin `ApiClient` envelope handling, `ApiError` mapping, `CourseRepository` wiring, form-store behaviour, `CourseForm` validation |
+| Unit | Vitest + jsdom | Mocked `fetch` / in-memory | Pin `ApiClient` bare-JSON + problem handling, `ApiError` mapping, `CourseRepository` wiring, form-store behaviour, `CourseForm` validation |
 | Smoke (e2e) | Playwright | Built SvelteKit preview, no service | Pin route shells render, nav, basic form rendering (mocked) |
 | Live integration | (manual) | `pnpm dev` against a running `course-service-with-axum` | Click through CRUD / match / merge over real HTTP |
 
@@ -32,7 +32,7 @@ pnpm lint
 
 ## Unit tests (`tests/unit/`)
 
-Real files: `client.test.ts` (ApiClient envelope + error tests),
+Real files: `client.test.ts` (ApiClient success + problem error tests),
 `courses.test.ts` (CourseRepository wiring + search query-param
 forwarding), `form.test.ts` (the `createForm` rune controller:
 validate-blocks-submit, submit-error capture, reset, per-field
@@ -52,8 +52,9 @@ Conventions:
 - For repository tests: pin the exact route path. The Course Service
   duplicate-check endpoint is `POST /api/courses/check-duplicates`
   (not `/duplicates`).
-- For envelope tests: assert that `ApiClient` unwraps `{ success,
-  data, error }` correctly and that `ApiError` exposes the
+- For client tests: assert that `ApiClient` returns the bare body on
+  success, maps an RFC 9457 problem to `ApiError` (`detail` else `title`
+  → `message`, `code`, `errors` → `details`), and that `ApiError` exposes the
   `isConflict` / `isNotFound` / `isValidation` shortcuts.
 
 `ApiClient` takes an **options object**, not positional args:
@@ -63,9 +64,9 @@ import { describe, it, expect, vi } from "vitest";
 import { ApiClient } from "$lib/api/client";
 
 describe("ApiClient", () => {
-  it("unwraps the success envelope", async () => {
+  it("returns the bare body on success", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ success: true, data: { id: 1 }, error: null }), {
+      new Response(JSON.stringify({ id: 1 }), {
         headers: { "content-type": "application/json" },
       }),
     ) as unknown as typeof fetch;

@@ -19,14 +19,16 @@ failed on the primary key with a `500` — the same nil-sentinel handling
 the event service already had. A **non-nil** `id` is still honoured, so a
 caller may supply its own.
 
-All `/api` endpoints return `{ "success": bool, "data": …, "error": … }`.
+All `/api` endpoints return bare JSON on success and an RFC 9457 problem
+(`application/problem+json`) on failure (`spec/restful` §1.3). A `500`
+has no `detail`; its cause is logged.
 HTTP status codes follow REST conventions: `409` for duplicate
 detection on create, `422` for validation failure, `501` only for
 `GET /api/courses` (list-all-without-search, intentionally
 unimplemented — clients should call `/api/courses/search` with an
 empty `q` for the same effect).
 
-`GET /api/health` is the service's own envelope-wrapped health
+`GET /api/health` is the service's own health
 endpoint (kept for front-end and API-client parity); the axa
 `/_health` / `/_ping` pair serves container orchestration.
 

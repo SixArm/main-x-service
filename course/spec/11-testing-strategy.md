@@ -10,7 +10,7 @@ entity-level pin that the trio composes correctly.
 | **Bridge** | S (pins S↔M) | `cargo test --test duplicate_detection` | 14 tests pinning the adapter routing (§5.3) and the canonical matcher contract: identical / typo / deterministic short-circuits / negatives / enum routing / config presets |
 | Service integration | S | `cargo test --test api_integration_test -- --ignored` | 12 `#[ignore]`-tagged tests over the full router with real Postgres + Tantivy (lifecycle, 409/422, search, match, merge, dedup, instances, audit, masked, export) |
 | Service bench | S | `cargo bench` | 3 Criterion suites: matching, search, validation |
-| Front-end unit | F | `pnpm test` (Vitest) | 9 tests: `ApiClient` envelope + error handling, `CourseRepository` wrapping — pins the wire contract from the consumer side |
+| Front-end unit | F | `pnpm test` (Vitest) | 9 tests: `ApiClient` bare-JSON + problem error handling, `CourseRepository` wrapping — pins the wire contract from the consumer side |
 | Front-end e2e | F | `pnpm test:e2e` (Playwright) | 5 smoke tests: every MVP route shell renders even with the API down |
 | Type check | F | `pnpm check` | svelte-check, TypeScript strict |
 

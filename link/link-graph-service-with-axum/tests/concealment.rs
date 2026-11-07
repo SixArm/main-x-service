@@ -145,7 +145,7 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
         // The case-authorised caller sees BOTH edges.
         let (hk, hv) = bearer(&case_reader);
         let body: Value = request.get("/api/edges").add_header(hk, hv).await.json();
-        let edges = body["data"]["edges"].as_array().unwrap();
+        let edges = body["edges"].as_array().unwrap();
         assert_eq!(edges.len(), 2, "case-reader sees affiliation + subject_of");
         assert!(edges.iter().any(|e| e["kind"] == "subject_of"));
 
@@ -174,7 +174,7 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
         // edge is concealed — only the affiliation shows.
         let (hk, hv) = bearer(&other);
         let body: Value = request.get("/api/edges").add_header(hk, hv).await.json();
-        let edges = body["data"]["edges"].as_array().unwrap();
+        let edges = body["edges"].as_array().unwrap();
         assert_eq!(edges.len(), 1, "non-case caller sees only the affiliation");
         assert_eq!(edges[0]["kind"], "employed_by");
         assert!(!edges.iter().any(|e| e["kind"] == "subject_of"));
@@ -196,7 +196,7 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
             .add_header(hk, hv)
             .await
             .json();
-        let neighbor_edges = body["data"]["edges"].as_array().unwrap();
+        let neighbor_edges = body["edges"].as_array().unwrap();
         assert!(
             neighbor_edges.iter().any(|e| e["kind"] == "subject_of"),
             "case-reader's neighbors view sees the subject_of edge: {neighbor_edges:?}"
@@ -208,7 +208,7 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
             .add_header(hk, hv)
             .await
             .json();
-        let neighbor_edges = body["data"]["edges"].as_array().unwrap();
+        let neighbor_edges = body["edges"].as_array().unwrap();
         assert!(
             !neighbor_edges.iter().any(|e| e["kind"] == "subject_of"),
             "non-case caller's neighbors view must not reveal subject_of: {neighbor_edges:?}"
@@ -223,7 +223,7 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
             .add_header(hk, hv)
             .await
             .json();
-        let affiliations = body["data"]["affiliations"].as_array().unwrap();
+        let affiliations = body["affiliations"].as_array().unwrap();
         assert!(
             affiliations.iter().any(|a| a["kind"] == "subject_of"),
             "case-reader's single-view sees the subject_of affiliation: {affiliations:?}"
@@ -245,7 +245,7 @@ async fn case_read_sees_governed_edges_that_others_have_concealed() {
             .add_header(hk, hv)
             .await
             .json();
-        let affiliations = body["data"]["affiliations"].as_array().unwrap();
+        let affiliations = body["affiliations"].as_array().unwrap();
         assert!(
             !affiliations.iter().any(|a| a["kind"] == "subject_of"),
             "non-case caller's single-view must not reveal subject_of: {affiliations:?}"

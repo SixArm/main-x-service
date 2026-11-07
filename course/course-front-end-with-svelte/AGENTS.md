@@ -33,7 +33,7 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 | Concern | Location |
 | --- | --- |
 | Wire format types | `src/lib/api/types.ts` |
-| HTTP envelope handling | `src/lib/api/client.ts` |
+| HTTP response + problem handling | `src/lib/api/client.ts` |
 | Course endpoints | `src/lib/api/courses.ts` |
 | Reusable form pieces | `src/lib/forms/` |
 | Course-specific components | `src/lib/components/` |

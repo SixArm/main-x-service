@@ -2,7 +2,7 @@
 
 | Layer | Tool | Scope |
 | --- | --- | --- |
-| Unit | Vitest + jsdom | `ApiClient` envelope handling, `ApiError` mapping, `WorkerRepository` wiring. |
+| Unit | Vitest + jsdom | `ApiClient` bare-JSON and problem handling, `ApiError` mapping, `WorkerRepository` wiring. |
 | E2E smoke | Playwright | Page-shell rendering for every MVP route without requiring a live service. |
 | Live integration | (manual) | Run `pnpm dev` against a running `worker-service-with-axum`; click through CRUD/match/merge. |
 

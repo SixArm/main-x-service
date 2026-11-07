@@ -73,7 +73,7 @@ src/
     config.ts              - API_BASE_URL (same-origin /api/proxy BFF)
     api/
       types.ts             - Event, Location, Party, Offer, Identifier, MatchResult, … (mirrors the Rust models)
-      client.ts            - ApiClient + ApiError (envelope-aware fetch)
+      client.ts            - ApiClient + ApiError (bare JSON / RFC 9457 problems)
       events.ts           - EventRepository (CRUD + search + match + merge + audit)
     forms/
       form.svelte.ts       - createForm rune-based store
@@ -108,7 +108,7 @@ src/
     api/proxy/[...path]/+server.ts  - BFF reverse proxy (injects PASETO)
 tests/
   unit/
-    client.test.ts         - ApiClient envelope + error tests
+    client.test.ts         - ApiClient response + problem tests
     events.test.ts        - EventRepository wrapping tests
     form.test.ts           - createForm + validation rules
     i18n.test.ts            - 13-locale catalog + fallback

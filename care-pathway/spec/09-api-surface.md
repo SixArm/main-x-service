@@ -43,9 +43,8 @@ present (`MaybeAuthUser`). Blanket `/api/*` enforcement is wired but
 **default-off** (`CARE_PATHWAY_REQUIRE_AUTH`); paseto-keys-over-HTTP
 fetch at boot remains a follow-up (§13 T-7).
 
-Conventions: **raw axa JSON** (no `{success, data, error}` envelope
-— this is the loco-era convention, unlike the pre-loco person
-service). `404` for unknown / soft-deleted `pid`; `422` for a
+Conventions: bare JSON on success and an RFC 9457 problem on failure,
+like every service (`spec/restful` §1.3). `404` for unknown / soft-deleted `pid`; `422` for a
 validation failure (blank `name` on create/update — family
 convention, OQ-1 resolved via T-2); `400` for a malformed body. No
 authentication yet (roadmap §15).

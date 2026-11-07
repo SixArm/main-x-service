@@ -25,7 +25,8 @@ Front-end consumption map:
 | GET | `/api/audit/recent` | Recent system-wide audit activity |
 | GET | `/api/audit/user` | Per-user audit logs |
 
-Standard response envelope; `422` on validation failure; Swagger UI
+Bare JSON on success and RFC 9457 problems on failure
+(`spec/restful` §1.3); `422` on validation failure; Swagger UI
 at `/swagger-ui`. No FHIR surface — Things are not a FHIR-resource
 concern. gRPC is stubbed (service spec §13 T-3).
 

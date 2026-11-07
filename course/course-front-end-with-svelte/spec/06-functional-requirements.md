@@ -4,7 +4,7 @@
 | --- | --- |
 | FR-1 | List page MUST issue `GET /api/courses/search?q=…` on mount and on search submission. |
 | FR-2 | List page MUST expose a `fuzzy` toggle. (`phonetic` is intentionally omitted: the Course Service accepts a `phonetic` search param for API parity but documents it as a no-op, so the inert checkbox was removed in CHANGELOG v0.2.0. Re-add only when the service grows a real Soundex search path — tracked as §13 T-22.) |
-| FR-3 | Create page MUST capture HTTP 409 from `POST /api/courses` and render the match candidates from `error.details`. |
+| FR-3 | Create page MUST capture HTTP 409 from `POST /api/courses` and render the match candidates from the RFC 9457 problem's `errors`. |
 | FR-4 | Create page MUST surface inline field-level validation (name required, URL fields must start with http(s)://, course code max 100 chars, credits >= 0). |
 | FR-5 | Detail page MUST render identifiers, teaches, keywords, alternate names, same-as links, and instances when present. |
 | FR-6 | Edit page MUST PUT the full Course record. |

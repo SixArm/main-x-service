@@ -48,8 +48,8 @@ Plus axa's default routes (`AppRoutes::with_default_routes()` in
 [`src/app.rs`](../authentication-service-with-axum/src/app.rs)),
 including the framework health/ping endpoints.
 
-Responses are **raw axa JSON** — no `{success, data, error}` envelope
-(unlike the sibling entity services). Errors use axa's standard
+Responses are bare JSON on success and RFC 9457 problems on failure, like
+every service (`spec/restful` §1.3). Errors use axa's standard
 responses: `401` unauthorized, `400` bad request.
 
 ### 9.2 Verifier library API

@@ -101,10 +101,9 @@ Ports below are the `full-family.yml` ones from
 curl -F file=@examples/data/persons.jsonl -F format=jsonl -F dry_run=true \
   http://localhost:8081/api/persons/import
 
-# For real. Note person wraps its response (`.data.job_id`) while
-# organization and case return `{job_id}` bare.
+# For real. Every service returns `{job_id}` bare.
 JOB=$(curl -s -F file=@examples/data/persons.jsonl -F format=jsonl \
-  http://localhost:8081/api/persons/import | jq -r '.data.job_id')
+  http://localhost:8081/api/persons/import | jq -r '.job_id')
 curl -s "http://localhost:8081/api/persons/import/${JOB}" | jq
 
 curl -F file=@examples/data/organizations.jsonl -F format=jsonl \

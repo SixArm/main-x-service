@@ -125,7 +125,7 @@ async fn deduplicate_persists_and_review_queue_returns_the_score_breakdown() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    let review_items = body["data"]["review_items"].as_array().unwrap();
+    let review_items = body["review_items"].as_array().unwrap();
     let scanned = review_items
         .iter()
         .find(|i| is_pair(i, &id_a, &id_b))
@@ -143,7 +143,7 @@ async fn deduplicate_persists_and_review_queue_returns_the_score_breakdown() {
     // carries the same breakdown, proving it was actually persisted.
     let (status, body) = get(&app, "/api/things/review-queue?limit=500").await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    let items = body["data"]["items"].as_array().unwrap();
+    let items = body["items"].as_array().unwrap();
     let stored = items
         .iter()
         .find(|i| is_pair(i, &id_a, &id_b))

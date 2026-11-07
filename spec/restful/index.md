@@ -72,33 +72,44 @@ does not shadow them. This ordering is a hard convention — see the
 `routes()` function in
 [`organizations.rs`](../../organization/organization-service-with-axum/src/controllers/organizations.rs).
 
-### 1.3 Response envelope: raw axa JSON vs `ApiResponse`
+### 1.3 Responses: bare JSON, and RFC 9457 problems for errors
 
-This is the main wire difference between the two generations.
+Every service answers the same way:
 
-- **Controller-style services** (organization, care-pathway, case, portfolio) return **raw
-  axa JSON**: the handler's value is the body. Create/update/list/search
-  return a lightweight `{pid, name}` reference (`OrgRef`); `GET /{pid}`
-  returns the full stored payload; errors surface as axa's own JSON
-  error shape with the right status code.
-- **Older Axum services** (person, worker, place, thing, event, course)
-  wrap every response in an `ApiResponse` envelope:
-
-  ```json
-  { "success": true, "data": { /* ... */ }, "error": null }
-  ```
-
-  Errors invert it:
+- **A success is bare JSON**: the handler's value is the body, with no
+  wrapper. Controller-style services (organization, care-pathway, case,
+  portfolio) return a lightweight `{pid, name}` reference from
+  create/update/list/search and the full stored payload from `GET /{pid}`;
+  the older services (person, worker, place, thing, event, course) return
+  the domain record, or a list object such as `{ "persons": [...], "total": n }`.
+- **An error is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457)
+  problem**, `application/problem+json`:
 
   ```json
-  { "success": false, "data": null,
-    "error": { "code": "ERROR_CODE", "message": "…", "details": { } } }
+  { "type": "about:blank", "title": "Conflict", "status": 409,
+    "detail": "Potential duplicate persons found. Review matches before proceeding.",
+    "code": "duplicate_detected", "errors": { "potential_matches": [ ] } }
   ```
 
-  Defined in `src/api/mod.rs` (`ApiResponse`, `ApiError`).
+  `type`, `title`, and `status` are always present. `detail` is present
+  when there is more to say, and is written for the caller. `code` is a
+  stable lowercase snake_case token (`not_found`, `validation`,
+  `forbidden`, `duplicate_detected`, …) and `errors` carries structured
+  context such as duplicate candidates or per-field problems; both are
+  extension members.
+- **A `500` says nothing about why.** Its `code` is the status's own
+  (`internal_server_error`) and it has no `detail`: the internal code and
+  message go to the log, never to the caller. Any other status sends its
+  `detail`, so that text is written for the caller, such as a `503`'s
+  "the access could not be recorded in the audit trail".
+- **FHIR routes are the exception**: their errors stay `OperationOutcome`
+  ([`../../agents/share/fhir.md`](../../agents/share/fhir.md) §5).
 
-New work follows the axa convention (raw JSON). Clients that talk to
-both generations must handle both shapes.
+axa answers its own errors (an unknown route, a rejected body, a guard's
+refusal, a timeout) the same way, so a client parses one error shape across
+the whole family. The older services build theirs with `ApiProblem` and
+`ok` in `src/api/mod.rs`; the `{success, data, error}` `ApiResponse`
+envelope they used until 2026-11-07 is gone.
 
 ---
 
@@ -227,8 +238,8 @@ removed, not merely deprecated (see
   (`Error::CustomError(UNPROCESSABLE_ENTITY, …)`), `http_err()` remaps
   SeaORM `EntityNotFound` to `404` (axa's default would be `500`), and
   `bad_request()` returns `400`. The older services convert their
-  `Error` enum (11 variants, `thiserror`-derived) into the `ApiResponse`
-  error envelope with the appropriate status code.
+  `Error` enum (11 variants, `thiserror`-derived) into an RFC 9457
+  problem (`ApiProblem`) with the appropriate status code (§1.3).
 - Best-effort side effects (audit write, event publish) **never fail the
   request**: they log a `WARN` on error and the response still succeeds.
 
@@ -397,7 +408,7 @@ in `src/api/rest/handlers.rs` (older services) or
 | Capability | Controller-style services (org / care-pathway / case / portfolio) | Older Axum services (person / …) |
 |---|---|---|
 | CRUD + soft-delete | Implemented | Implemented |
-| `ApiResponse` envelope | No (raw axa JSON) | Yes |
+| Bare JSON successes, RFC 9457 problem errors (§1.3) | Yes | Yes (since 2026-11-07) |
 | Search | **Tantivy full-text** (`q`,`fuzzy`,`phonetic`,paging) — historical `ILIKE` superseded, see [`../search/index.md`](../search/index.md) | Tantivy full-text (`q`,`fuzzy`,`phonetic`,paging) |
 | Match / check-duplicates / merge | Implemented; `check-duplicates` search-blocked via Tantivy on all four | Implemented |
 | Batch `deduplicate` | Implemented in **organization** only; care-pathway/case/portfolio don't yet expose it | Implemented |

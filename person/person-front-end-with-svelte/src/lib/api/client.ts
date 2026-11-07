@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApiResponse } from "./types.js";
+import type { Problem } from "./types.js";
 
 /**
  * Name of the browser-readable CSRF double-submit cookie. Must match
@@ -59,37 +59,32 @@ export interface RequestOptions {
 }
 
 /**
- * Error thrown for any non-success API outcome — a non-2xx HTTP status or
- * an envelope with `success === false`.
+ * Error thrown for any non-2xx API outcome.
  *
- * Carries the parsed {@link ApiErrorBody} so callers can branch on the
+ * Carries the parsed RFC 9457 {@link Problem} so callers can branch on the
  * machine-readable `code` and HTTP `status` rather than parsing message
  * strings. The boolean getters cover the statuses the UI handles specially.
  */
 export class ApiError extends Error {
   /** HTTP status code of the failed response. */
   readonly status: number;
-  /** Machine-readable error code from the body, or `"UNKNOWN"`. */
+  /** Machine-readable error code from the problem, or `"unknown"`. */
   readonly code: string;
-  /** Free-form structured details from the body (e.g. field errors). */
+  /** The problem's structured `errors` (e.g. duplicate candidates). */
   readonly details: unknown;
 
   /**
    * @param status HTTP status code of the response.
-   * @param body Parsed error body, or `null` when the response had none.
+   * @param body Parsed problem, or `null` when the response had none.
    * @param fallbackMessage Message to use when the body carries none
    *   (e.g. a non-JSON response). Falls back further to `HTTP <status>`.
    */
-  constructor(
-    status: number,
-    body: ApiErrorBody | null,
-    fallbackMessage?: string,
-  ) {
-    super(body?.message ?? fallbackMessage ?? `HTTP ${status}`);
+  constructor(status: number, body: Problem | null, fallbackMessage?: string) {
+    super(body?.detail ?? body?.title ?? fallbackMessage ?? `HTTP ${status}`);
     this.name = "ApiError";
     this.status = status;
-    this.code = body?.code ?? "UNKNOWN";
-    this.details = body?.details;
+    this.code = body?.code ?? "unknown";
+    this.details = body?.errors;
   }
 
   /** True for `404 Not Found` (record missing / soft-deleted). */
@@ -122,8 +117,8 @@ export function isFormDataBody(body: unknown): body is FormData {
 }
 
 /**
- * Tiny `fetch` wrapper that understands the Person Service
- * {@link ApiResponse}`<T>` envelope and unwraps it to the bare `data`.
+ * Tiny `fetch` wrapper over the Person Service: a success is the bare JSON
+ * payload, and a failure is an RFC 9457 {@link Problem}.
  *
  * Stateless aside from base URL + default headers, so it is cheap to
  * construct per page/component (the project deliberately avoids global
@@ -169,9 +164,9 @@ export class ApiClient {
    * Core request pipeline shared by every verb: build the URL, send the
    * request, then classify the outcome.
    *
-   * @returns The unwrapped envelope `data` as `T`.
-   * @throws {ApiError} on a non-2xx status, a `success: false` envelope,
-   *   or a body that is present but not valid JSON.
+   * @returns The parsed body as `T`.
+   * @throws {ApiError} on a non-2xx status, or a body that is present but
+   *   not valid JSON.
    */
   private async request<T>(
     method: string,
@@ -223,11 +218,11 @@ export class ApiClient {
     // Read as text first so we can give a useful error on non-JSON
     // bodies (e.g. an HTML error page from a proxy) and tolerate an
     // empty body on otherwise-successful responses.
-    let parsed: ApiResponse<T> | null = null;
+    let parsed: unknown = null;
     const text = await response.text();
     if (text.length > 0) {
       try {
-        parsed = JSON.parse(text) as ApiResponse<T>;
+        parsed = JSON.parse(text) as unknown;
       } catch {
         throw new ApiError(
           response.status,
@@ -237,16 +232,11 @@ export class ApiClient {
       }
     }
 
-    // Failure classification, in precedence order: HTTP status first,
-    // then an application-level `success: false` envelope.
     if (!response.ok) {
-      throw new ApiError(response.status, parsed?.error ?? null);
+      throw new ApiError(response.status, asProblem(parsed));
     }
-    if (parsed && parsed.success === false) {
-      throw new ApiError(response.status, parsed.error);
-    }
-    // Success: hand back the unwrapped payload (undefined if none).
-    return (parsed?.data ?? undefined) as T;
+    // Success: the body is the payload (undefined if none).
+    return (parsed ?? undefined) as T;
   }
 
   /**
@@ -278,4 +268,11 @@ export class ApiClient {
     }
     return url.toString();
   }
+}
+
+/** `value` as a problem when it is an object, else `null`. */
+function asProblem(value: unknown): Problem | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Problem)
+    : null;
 }

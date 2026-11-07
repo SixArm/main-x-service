@@ -12,8 +12,9 @@ inventory: service [spec §9](../place-service-with-axum/spec/09-api-surface.md)
   `/api/health`: CRUD, search, geo-radius (`/api/places/nearby`),
   match, duplicate check, merge, batch deduplicate, GDPR export,
   masked view, audit queries.
-- **Envelope:** every response wraps in the shared success/error
-  envelope; the front-end unwraps it in `src/lib/api/client.ts`.
+- **Responses:** bare JSON on success, an RFC 9457 problem on failure
+  (`spec/restful` §1.3); the front-end reads both in
+  `src/lib/api/client.ts`.
 - **Status conventions:** `409` = duplicate candidates on create
   (payload carries the matches + breakdowns); `422` = validation
   failure (field-level details); REST-conventional otherwise.

@@ -82,7 +82,7 @@ src/
       auth.ts              - magic-link + session->PASETO calls to the auth service
     api/
       types.ts             - Worker, HumanName, MatchResult, EntityLink, … (mirrors the Rust models)
-      client.ts            - ApiClient + ApiError (envelope-aware fetch)
+      client.ts            - ApiClient + ApiError (fetch; RFC 9457 problems)
       workers.ts           - WorkerRepository (CRUD + search + match + merge + audit + links + review-queue)
       links.ts             - client-side mirror of the service's cross-service-link validation
     forms/
@@ -116,7 +116,7 @@ src/
         audit/+page.svelte
 tests/
   unit/
-    client.test.ts            - ApiClient envelope + error tests
+    client.test.ts            - ApiClient response + problem tests
     workers.test.ts           - WorkerRepository wrapping tests
     links-validation.test.ts  - client-side link validation vs the Rust `validate_edge` cases
     i18n.test.ts              - 13-locale key-parity + RTL tests

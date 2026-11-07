@@ -40,7 +40,6 @@ pub use state::AppState;
         handlers::audit_recent,
     ),
     components(schemas(
-        crate::api::ApiError,
         crate::models::thing::Thing,
         crate::models::identifier::ThingIdentifier,
         crate::models::identifier::IdentifierType,

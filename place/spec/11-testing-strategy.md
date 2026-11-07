@@ -23,7 +23,7 @@ scoring. A regression on either side fails here. Any new adapter
 routing rule MUST add a bridge test in the same PR (FR-19).
 
 **Front-end ↔ service — wire-type tests.** The front-end unit tests
-pin the envelope handling and repository wrapping against the wire
+pin the response and problem handling and repository wrapping against the wire
 format in `src/lib/api/types.ts`. They mock `fetch`; they do **not**
 verify against a live service.
 

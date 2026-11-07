@@ -50,7 +50,7 @@ Per [`agents/share/authentication-sessions.md`](../../agents/share/authenticatio
 | Concern | Location |
 | --- | --- |
 | Wire format types | `src/lib/api/types.ts` |
-| HTTP envelope handling | `src/lib/api/client.ts` |
+| HTTP response and problem handling | `src/lib/api/client.ts` |
 | Place endpoints | `src/lib/api/places.ts` |
 | Reusable form pieces | `src/lib/forms/` |
 | Place-specific components | `src/lib/components/` |

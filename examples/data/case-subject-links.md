@@ -107,16 +107,14 @@ CASE_PID=$(curl -s "${CASE_BASE}/api/cases/search?q=HB-2026-000101" \
 
 # Person line 5, by family name.
 PERSON_PID=$(curl -s "${PERSON_BASE}/api/persons/search?q=Brackenridge" \
-  | jq -r '.data[0].id')
+  | jq -r '.[0].id')
 
 curl -X POST "${CASE_BASE}/api/cases/${CASE_PID}/links" \
   -H 'content-type: application/json' \
   -d "{\"kind\":\"subject_of\",\"to_ref\":\"person:${PERSON_PID}\"}"
 ```
 
-The two response shapes differ (the case service returns a bare array,
-person wraps in `{success, data}`), which is why the `jq` paths are not
-the same. Ports are the `full-family.yml` ones from
+Both services return bare JSON, so the `jq` paths have the same shape. Ports are the `full-family.yml` ones from
 [`examples/compose/README.md`](../compose/README.md).
 
 > **Verified vs. not.** The link request body, its response, the

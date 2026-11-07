@@ -126,8 +126,8 @@ point for any field-name drift between the two crates.
 ### 5.4 Front-end TypeScript types
 
 The front-end mirrors the service's wire format in
-`src/lib/api/types.ts` (`Course`, `MatchResult`, …) and unwraps the
-shared envelope in `src/lib/api/client.ts`; `CourseRepository`
+`src/lib/api/types.ts` (`Course`, `MatchResult`, `Problem`, …) and maps
+RFC 9457 problems to `ApiError` in `src/lib/api/client.ts`; `CourseRepository`
 (`src/lib/api/courses.ts`) assumes the `/api` base path. The service
 model is upstream: if a field changes in the service, the front-end
 types MUST be fixed in the same change cycle (front-end

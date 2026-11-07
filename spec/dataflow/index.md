@@ -347,7 +347,7 @@ differs between the two service generations:
 | Search (§4) | Tantivy full-text / fuzzy / phonetic | Tantivy full-text / fuzzy / phonetic |
 | Create-time dedup (§1.2–§1.3) | deferred; explicit `check-duplicates` only | real-time on create → `409` |
 | Success status (§1.8) | `200` with `{pid, name}` | `201 Created` |
-| Validation error helper | `Error::CustomError(422, …)` | `ApiResponse::error` + `StatusCode::UNPROCESSABLE_ENTITY` |
+| Validation error helper | `Error::CustomError(422, …)` | `ApiProblem::new("validation", …).respond(StatusCode::UNPROCESSABLE_ENTITY)` |
 | Privacy (§5) | masked/export deferred in several crates | present (person/place/worker) |
 | check-duplicates candidates (§2) | Tantivy-index-blocked, same as older (batch `deduplicate` is the in-memory scan, cap 1000, WARN on cap) | search-blocked candidates |
 

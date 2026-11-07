@@ -132,7 +132,7 @@ the FHIR **RESTful interactions** below. `<ResourceType>` is the §3 type
 ## 5. Errors — `OperationOutcome`
 
 Every non-2xx FHIR response body is a FHIR **`OperationOutcome`** resource
-(never the native `{success,data,error}` envelope), so a FHIR client can
+(never the RFC 9457 problem the native API answers with), so a FHIR client can
 parse failures uniformly:
 
 ```jsonc

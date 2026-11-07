@@ -2,7 +2,7 @@
 
 | Layer | Tool | Scope |
 | --- | --- | --- |
-| Unit | Vitest + jsdom | `ApiClient` envelope handling, `ApiError` mapping, `ThingRepository` wiring. |
+| Unit | Vitest + jsdom | `ApiClient` response and problem handling, `ApiError` mapping, `ThingRepository` wiring. |
 | E2E smoke | Playwright | Page-shell rendering for every MVP route without requiring a live service. |
 | Live integration | (manual) | Run `pnpm dev` against a running `thing-service-with-axum`; click through CRUD/match/merge. |
 

@@ -13,10 +13,8 @@ Entity-level summary. Normative contract: entity spec
 
 ## Service REST API
 
-axa, dev port `5150`. Responses are **raw axa JSON — no
-`{success, data, error}` envelope** (deliberate divergence from the
-sibling entity services; the front-end client is correspondingly
-leaner).
+axa, dev port `5150`. Responses are bare JSON on success and an RFC 9457
+problem on failure, like every service (`spec/restful` §1.3).
 
 ### Authentication flow
 

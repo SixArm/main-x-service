@@ -4,7 +4,7 @@ Two layers, mapped to spec [§11 Testing Strategy](../spec/11-testing-strategy.m
 
 | Layer | Tool | Runs against | Purpose |
 |---|---|---|---|
-| Unit | Vitest | Mocked `fetch` / in-memory | Pin ApiClient envelope, repository wiring, form-store behaviour |
+| Unit | Vitest | Mocked `fetch` / in-memory | Pin ApiClient responses and problems, repository wiring, form-store behaviour |
 | Smoke | Playwright (`smoke` project) | Built SvelteKit preview, no service | Pin route shells render, nav, basic form submit (mocked) |
 
 ## Running
@@ -34,9 +34,10 @@ Conventions:
   `POST /api/things/check-duplicates` — the path the Thing Service
   serves; see [`spec §9`](../spec/09-api-consumption.md) and
   [`thing-service-with-axum/agents/restful.md`](../../thing-service-with-axum/agents/restful.md)).
-- For envelope tests: assert that `ApiClient` unwraps `{success,
-  data, error}` correctly and surfaces `ApiError` with `isConflict`
-  / `isNotFound` / `isValidation` shortcuts.
+- For client tests: assert that `ApiClient` returns a bare body on
+  success, and turns an RFC 9457 problem into an `ApiError` (message
+  from `detail`, else `title`; `code`; `details` from `errors`) with
+  `isConflict` / `isNotFound` / `isValidation` shortcuts.
 
 ## Smoke tests (`tests/e2e/`)
 
@@ -60,9 +61,9 @@ import { describe, it, expect, vi } from "vitest";
 import { ApiClient } from "$lib/api/client";
 
 describe("ApiClient", () => {
-  it("unwraps the success envelope", async () => {
+  it("returns the bare body on success", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ success: true, data: { id: 1 }, error: null }), {
+      new Response(JSON.stringify({ id: 1 }), {
         headers: { "content-type": "application/json" },
       }),
     );

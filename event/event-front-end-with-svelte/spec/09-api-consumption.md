@@ -19,5 +19,5 @@ The front-end binds 1:1 to the Event Service REST surface (see [`event-service-w
 | `GET /api/events/{id}/masked` | (available — not yet routed) |
 | `GET /api/events/{id}/export` | (available — not yet routed) |
 
-Envelope handling is centralised in `ApiClient`; per-endpoint methods on `EventRepository` return unwrapped `data`.
+Response and problem handling is centralised in `ApiClient`: a success is the bare body, and an RFC 9457 problem becomes an `ApiError`. Per-endpoint methods on `EventRepository` return the parsed body.
 

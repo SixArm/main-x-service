@@ -18,9 +18,9 @@ Services take it from crates.io, as `axa = "0.6"`.
 
 Every error axa answers is an RFC 9457 problem, `application/problem+json`, with
 `type`, `title`, and `status`, plus `detail` where there is more to say and the `code`
-and `errors` extension members. Successes stay bare JSON. A service's own envelope,
-such as person's `ApiResponse`, is its own and does not change, and FHIR errors stay
-`OperationOutcome`. A client reads the reason from `detail`, and `title` when a `500`
+and `errors` extension members. Successes stay bare JSON. The older services build
+their own errors the same way with `ApiProblem` (`spec/restful` §1.3), and FHIR errors
+stay `OperationOutcome`. A client reads the reason from `detail`, and `title` when a `500`
 has none.
 
 An error with no `content-type`, or `text/plain`, becomes a problem with no `detail`,

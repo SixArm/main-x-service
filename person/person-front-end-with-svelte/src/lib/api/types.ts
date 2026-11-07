@@ -3,30 +3,25 @@
 // Field names use snake_case to match the JSON wire format produced by
 // the Axum/SeaORM stack.
 
-// ─── HTTP envelope ───────────────────────────────────────────────────
+// ─── Errors ──────────────────────────────────────────────────────────
 
 /**
- * Standard response envelope wrapping every Person Service payload.
- * Exactly one of `data` (on success) / `error` (on failure) is populated,
- * keyed by `success`. {@link ApiClient} unwraps this to the bare `data`.
+ * An RFC 9457 problem, the body of every failed Person Service response.
+ * A success is the bare payload, with no wrapper.
  */
-export interface ApiResponse<T> {
-  /** Whether the request succeeded at the application level. */
-  success: boolean;
-  /** The payload on success; `null` on failure. */
-  data: T | null;
-  /** The error detail on failure; `null` on success. */
-  error: ApiErrorBody | null;
-}
-
-/** Machine-readable error detail carried in a failed {@link ApiResponse}. */
-export interface ApiErrorBody {
-  /** Stable error code for branching (e.g. `"VALIDATION"`). */
-  code: string;
-  /** Human-readable message suitable for display. */
-  message: string;
-  /** Optional structured details, e.g. per-field validation errors. */
-  details?: unknown;
+export interface Problem {
+  /** A URI naming the problem type; `"about:blank"` when there is none. */
+  type: string;
+  /** A short summary of the status, such as `"Not Found"`. */
+  title: string;
+  /** The HTTP status code. */
+  status: number;
+  /** What went wrong, for display. Absent on a `500`. */
+  detail?: string;
+  /** Stable lowercase code for branching, such as `"duplicate_detected"`. */
+  code?: string;
+  /** Structured context, such as duplicate candidates. */
+  errors?: unknown;
 }
 
 // ─── Shared primitives ───────────────────────────────────────────────

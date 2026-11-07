@@ -10,6 +10,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Changed
 
+- **Breaking: responses are bare JSON, and errors are RFC 9457 problems.**
+  The `{success, data, error}` `ApiResponse` envelope is gone: a success is
+  the payload itself (including `GET /api/health`), and an error is
+  `application/problem+json` with `type`, `title`, `status`, `detail`, a
+  lowercase `code` (`not_found`, `duplicate_detected`, `validation`,
+  `offset_too_large`, `database_error`, …) and, where there is context,
+  `errors` (a duplicate `409` carries its candidates there, a `422` its
+  field errors). `validation_error` is now `validation`. A `500` has no
+  `detail` and its cause is logged, where the old body sent the database
+  error text. Statuses are unchanged, and FHIR errors stay
+  `OperationOutcome`. `src/api/mod.rs` has `ok` and `ApiProblem` in place
+  of `ApiResponse` and `ApiError`. See `spec/restful` §1.3.
+
+### Changed
+
 - axa 0.6.1. Every error axa answers is an RFC 9457 problem,
   `application/problem+json`, with `code` in place of `error` and `detail` in
   place of `description`. Axum's own refusals, such as an unknown route's `404`,

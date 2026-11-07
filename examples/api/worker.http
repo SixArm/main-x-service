@@ -1,7 +1,8 @@
 ### worker-service — example requests
 # worker/worker-service-with-axum — "person-style" layout (src/api/rest/).
-# Envelope: {"success":bool,"data":...,"error":{"code","message","details"}}
-# — data/error ALWAYS both present, identical shape to person's (src/api/mod.rs).
+# Responses: bare JSON on success; an RFC 9457 problem
+# (application/problem+json: type, title, status, detail, code, errors)
+# on failure — spec/restful §1.3, src/api/mod.rs.
 # Gated by WORKER_REQUIRE_AUTH (default off).
 
 @baseUrl = http://localhost:8082
@@ -115,10 +116,8 @@ GET {{baseUrl}}/api/workers/{{workerId}}/links
 
 ### Record a workforce assessment (aptitude / personality / psychometric /
 # selection — worker-only capability, per-scale results + score bands).
-# GOTCHA (curl-verified): the assessment endpoints bypass the crate's
-# usual ApiResponse envelope entirely and return the created assessment
-# BARE with 201 Created (src/api/rest/assessments.rs — `Json(created)`,
-# not the ApiResponse wrapper every other worker.http request uses).
+# The created assessment comes back as bare JSON with 201 Created, like
+# every other worker response (src/api/rest/assessments.rs).
 # @name createAssessment
 POST {{baseUrl}}/api/workers/{{workerId}}/assessments
 Content-Type: application/json

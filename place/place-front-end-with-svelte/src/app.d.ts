@@ -4,7 +4,7 @@
 // alongside SvelteKit's default `message`.
 declare global {
   namespace App {
-    /** App-level error shape; mirrors the service's ApiErrorBody extras. */
+    /** App-level error shape; mirrors the client ApiError's extras. */
     interface Error {
       /** Machine-readable error code from the service. */
       code?: string;

@@ -8,7 +8,7 @@ Honest snapshot per subproject. Aspirational items live in
 | Capability | Status |
 |---|---|
 | Domain model (schema.org/Thing + PropertyValue identifiers) | ✅ |
-| REST API — 15 endpoints, OpenAPI / Swagger, CORS, envelopes | ✅ (axa / Axum 0.8) |
+| REST API — 15 endpoints, OpenAPI / Swagger, CORS, RFC 9457 problems | ✅ (axa / Axum 0.8) |
 | In-service matching (5 components) + deterministic short-circuits | ✅ |
 | Embedded thing-matcher 0.6.1 via `adapter.rs` + 15 bridge tests | ✅ |
 | Tantivy search | ✅ |

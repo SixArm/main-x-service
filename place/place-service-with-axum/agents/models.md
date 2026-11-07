@@ -19,7 +19,7 @@ client sends**: the handler mints a fresh `id` when the wire value is
 nil, and the repository stamps `created_at`/`updated_at` on
 insert/update. `name` is `#[serde(default)]` too, but for a different
 reason — it is the one field the server does *not* own, so an omitted
-value now reaches `validate_place` (`422 validation_error`) instead of
+value now reaches `validate_place` (`422 validation`) instead of
 being refused by the JSON extractor before any handler code runs. See
 [`spec/09-api-surface.md`](../spec/09-api-surface.md) for the full
 contract.

@@ -21,7 +21,7 @@
 #![warn(clippy::pedantic)]
 
 // Module declarations
-/// REST, FHIR R5, and gRPC API layers plus shared response envelopes.
+/// REST, FHIR R5, and gRPC API layers plus the shared response helpers.
 pub mod api;
 /// axa application hooks (boot, routes, migrations).
 pub mod app;

@@ -31,7 +31,7 @@ use tower::ServiceExt; // for `oneshot`
 use uuid::Uuid;
 
 use person_service::{
-    api::{ApiResponse, rest::links::LinkView},
+    api::rest::links::LinkView,
     db::models::audit_log,
     db::review_queue::{self, NewReviewItem},
     models::{Person, ReviewQueueItem, ReviewStatus},
@@ -60,10 +60,7 @@ async fn create_person(app: &axum::Router, family: &str, given: &str) -> Person 
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    serde_json::from_slice::<ApiResponse<Person>>(&body)
-        .unwrap()
-        .data
-        .unwrap()
+    serde_json::from_slice::<Person>(&body).unwrap()
 }
 
 async fn post_json(app: &axum::Router, uri: &str, body: Value) -> (StatusCode, Value) {
@@ -103,10 +100,7 @@ async fn get_json(app: &axum::Router, uri: &str) -> (StatusCode, Value) {
 async fn person_links(app: &axum::Router, person_id: Uuid) -> Vec<LinkView> {
     let (status, body) = get_json(app, &format!("/api/persons/{person_id}/links")).await;
     assert_eq!(status, StatusCode::OK);
-    serde_json::from_value::<ApiResponse<Vec<LinkView>>>(body)
-        .unwrap()
-        .data
-        .unwrap()
+    serde_json::from_value::<Vec<LinkView>>(body).unwrap()
 }
 
 /// Find the pending T-32 cross-service review row for a given
@@ -122,7 +116,7 @@ async fn find_cross_service_review_row(
     // type); pull its `items` array out of the raw envelope and
     // deserialize each element as a `ReviewQueueItem` directly.
     let items: Vec<ReviewQueueItem> =
-        serde_json::from_value(body["data"]["items"].clone()).expect("items array");
+        serde_json::from_value(body["items"].clone()).expect("items array");
     items
         .into_iter()
         .find(|item| {
@@ -165,10 +159,7 @@ async fn matcher_suggested_same_identity_link_creates_a_review_row() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "link create response: {body}");
-    let link = serde_json::from_value::<ApiResponse<LinkView>>(body)
-        .unwrap()
-        .data
-        .unwrap();
+    let link = serde_json::from_value::<LinkView>(body).unwrap();
     assert_eq!(link.provenance, "matcher_suggested");
     assert!((link.confidence.unwrap() - 0.87).abs() < 1e-9);
 
@@ -232,10 +223,7 @@ async fn confirming_promotes_the_edge_without_duplicating_it() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "decision response: {body}");
-    let decided = serde_json::from_value::<ApiResponse<ReviewQueueItem>>(body)
-        .unwrap()
-        .data
-        .unwrap();
+    let decided = serde_json::from_value::<ReviewQueueItem>(body).unwrap();
     assert_eq!(decided.status, ReviewStatus::Confirmed);
 
     let after = person_links(&app, person.id).await;
@@ -277,10 +265,7 @@ async fn rejecting_withdraws_the_edge() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "decision response: {body}");
-    let decided = serde_json::from_value::<ApiResponse<ReviewQueueItem>>(body)
-        .unwrap()
-        .data
-        .unwrap();
+    let decided = serde_json::from_value::<ReviewQueueItem>(body).unwrap();
     assert_eq!(decided.status, ReviewStatus::Rejected);
 
     assert!(
@@ -348,10 +333,7 @@ async fn ordinary_review_decision_is_unaffected_by_t32() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "decision response: {body}");
-    let decided = serde_json::from_value::<ApiResponse<ReviewQueueItem>>(body)
-        .unwrap()
-        .data
-        .unwrap();
+    let decided = serde_json::from_value::<ReviewQueueItem>(body).unwrap();
     assert_eq!(
         decided.status,
         ReviewStatus::Confirmed,
@@ -403,10 +385,7 @@ async fn matcher_suggested_link_creation_is_audited() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "link create response: {body}");
-    let link = serde_json::from_value::<ApiResponse<LinkView>>(body)
-        .unwrap()
-        .data
-        .unwrap();
+    let link = serde_json::from_value::<LinkView>(body).unwrap();
     let link_id: Uuid = link.id.parse().expect("link id is a UUID");
 
     let audit_rows = audit_log::Entity::find()

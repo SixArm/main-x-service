@@ -31,8 +31,8 @@ entity-level orientation: [`agents/restful.md`](../agents/restful.md).
 | GET | `/api/courses/{id}/audit` | Audit log for one course + children |
 | GET | `/api/audit/recent` | Recent audit activity |
 
-All responses use the shared envelope
-`{ "success": bool, "data": …, "error": … }`. OpenAPI: Swagger UI at
+All responses are bare JSON on success and an RFC 9457 problem on
+failure (`spec/restful` §1.3). OpenAPI: Swagger UI at
 `/swagger-ui`, raw JSON at `/api-docs/openapi.json`. `GET
 /api/courses` (list-all-without-search) is intentionally `501` — use
 `search` with an empty `q`.

@@ -83,7 +83,7 @@ export class EventRepository {
         event_type: opts.event_type,
       },
     });
-    // Service may return a bare array (no total) or an envelope object.
+    // Service may return a bare array (no total) or a `{ events, total }` object.
     if (Array.isArray(data)) return { items: data, total: data.length };
     return { items: data.events, total: data.total ?? data.events.length };
   }

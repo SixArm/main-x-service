@@ -12,7 +12,7 @@
 |  SvelteKit 2 SPA · Svelte 5 runes · SVAR DataGrid · Lily      |
 |  Own copy of types / ApiClient / ThingRepository              |
 +------------------------------+-------------------------------+
-                               |  REST (JSON envelope)
+                               |  REST (bare JSON / RFC 9457 problems)
 +------------------------------v-------------------------------+
 |  thing-service-with-axum            axa / Axum 0.8  |
 |  +----------------+ +----------------+ +-------------------+  |

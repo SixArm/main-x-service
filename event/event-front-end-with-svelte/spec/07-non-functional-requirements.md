@@ -5,5 +5,5 @@
 - **Accessibility**: WAI-ARIA conformance for forms, focus management on navigation.
 - **TypeScript**: strict + `noUncheckedIndexedAccess`.
 - **No SSR data fetch in MVP**: pages mount and `fetch()` from the browser; SSR fetch is a v0.2 follow-up (§13 T-13).
-- **Errors**: every `ApiError` rendered with its `code` and `message`; 422 `details` rendered field-by-field where possible.
+- **Errors**: every `ApiError` rendered with its `code` and `message` (the problem's `detail`, else its `title`); 422 `details` (the problem's `errors`) rendered field-by-field where possible.
 

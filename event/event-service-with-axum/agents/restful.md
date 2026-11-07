@@ -201,18 +201,29 @@ sits behind the blanket auth+ABAC guard (guarded when
 [`src/controllers/fhir.rs`](../src/controllers/fhir.rs),
 [`src/fhir/`](../src/fhir/).
 
-## Response envelope
+## Response format
+
+A success is the payload as bare JSON:
 
 ```json
-{ "success": true, "data": {…}, "error": null }
+{ "id": "…", "name": "Annual Conference", "start_date": "2026-06-01T09:00:00Z" }
 ```
 
-Error envelope:
+An error is an RFC 9457 problem, `application/problem+json`:
 
 ```json
-{ "success": false, "data": null,
-  "error": { "code": "…", "message": "…", "details": null } }
+{
+  "type": "about:blank",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Potential duplicate events found. Review matches before proceeding.",
+  "code": "duplicate_detected",
+  "errors": { "has_duplicates": true, "potential_matches": [ … ] }
+}
 ```
+
+`code` is a stable lowercase token. A `500` has no `detail`; its cause is
+logged. A `204` has no body. FHIR errors stay `OperationOutcome`.
 
 ## HTTP status codes
 
@@ -229,7 +240,7 @@ Error envelope:
 
 ## Source files
 
-- `src/api/mod.rs` — `ApiResponse`, `ApiError`
+- `src/api/mod.rs` — `ok` and `ApiProblem`, the response helpers
 - `src/api/rest/mod.rs` — router, OpenAPI doc, `serve`
 - `src/api/rest/handlers.rs` — all REST handlers
 - `src/api/rest/state.rs` — `AppState`

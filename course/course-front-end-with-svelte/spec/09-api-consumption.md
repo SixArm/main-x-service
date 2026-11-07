@@ -19,5 +19,5 @@ The front-end binds 1:1 to the Course Service REST surface (see [`course-service
 | `GET /api/courses/{id}/masked` | (available — not yet routed) |
 | `GET /api/courses/{id}/export` | (available — not yet routed) |
 
-Envelope handling is centralised in `ApiClient`; per-endpoint methods on `CourseRepository` return unwrapped `data`.
+Response handling is centralised in `ApiClient`: a success is the bare JSON body, and an RFC 9457 problem becomes an `ApiError` (`detail` → message, `code`, `errors` → `details`). Per-endpoint methods on `CourseRepository` return the body.
 

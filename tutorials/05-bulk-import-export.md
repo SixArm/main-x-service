@@ -101,7 +101,7 @@ curl -s -F file=@../../examples/data/persons.jsonl -F format=jsonl -F dry_run=tr
 ```
 
 ```json
-{"success":true,"data":{"job_id":"c5c69dfa-fb38-42bc-a276-522a90b26582"},"error":null}
+{"job_id":"c5c69dfa-fb38-42bc-a276-522a90b26582"}
 ```
 
 ```sh
@@ -109,7 +109,7 @@ curl -s "http://localhost:5150/api/persons/import/c5c69dfa-fb38-42bc-a276-522a90
 ```
 
 ```json
-{"success":true,"data":{"id":"c5c69dfa-fb38-42bc-a276-522a90b26582","kind":"import","entity":"person","format":"jsonl","status":"completed","rows_total":50,"rows_processed":50,"rows_created":50,"rows_upserted":0,"rows_to_review":0,"rows_errored":0,"download_url":null,"errors_url":null},"error":null}
+{"id":"c5c69dfa-fb38-42bc-a276-522a90b26582","kind":"import","entity":"person","format":"jsonl","status":"completed","rows_total":50,"rows_processed":50,"rows_created":50,"rows_upserted":0,"rows_to_review":0,"rows_errored":0,"download_url":null,"errors_url":null}
 ```
 
 Confirm nothing was actually persisted:
@@ -119,7 +119,7 @@ curl -s "http://localhost:5150/api/persons/search?q=&limit=1"
 ```
 
 ```json
-{"success":true,"data":{"persons":[],"total":0,"query":"","offset":0,"limit":1}}
+{"persons":[],"total":0,"query":"","offset":0,"limit":1}
 ```
 
 (A bare `q=` always returns `total: 0` regardless of what's in the
@@ -159,7 +159,7 @@ curl -s -F file=@../../examples/data/persons.jsonl -F format=jsonl \
 ```
 
 ```json
-{"success":true,"data":{"job_id":"58e05990-43b4-4513-ac21-a288cda65b60"},"error":null}
+{"job_id":"58e05990-43b4-4513-ac21-a288cda65b60"}
 ```
 
 Poll until terminal:
@@ -169,7 +169,7 @@ curl -s "http://localhost:5150/api/persons/import/58e05990-43b4-4513-ac21-a288cd
 ```
 
 ```json
-{"success":true,"data":{"id":"58e05990-43b4-4513-ac21-a288cda65b60","kind":"import","entity":"person","format":"jsonl","status":"completed","rows_total":50,"rows_processed":50,"rows_created":50,"rows_upserted":0,"rows_to_review":5,"rows_errored":0,"download_url":null,"errors_url":null},"error":null}
+{"id":"58e05990-43b4-4513-ac21-a288cda65b60","kind":"import","entity":"person","format":"jsonl","status":"completed","rows_total":50,"rows_processed":50,"rows_created":50,"rows_upserted":0,"rows_to_review":5,"rows_errored":0,"download_url":null,"errors_url":null}
 ```
 
 Real, observed timing: five successive polls (3 s apart) still read
@@ -230,7 +230,7 @@ curl -s -F file=@/tmp/persons-errors.jsonl -F format=jsonl \
 ```
 
 ```json
-{"success":true,"data":{"job_id":"07f7beba-5f5d-4387-8b91-0f50a1f4f234"},"error":null}
+{"job_id":"07f7beba-5f5d-4387-8b91-0f50a1f4f234"}
 ```
 
 Completed in well under two seconds (a four-row file, no duplicate
@@ -241,7 +241,7 @@ curl -s "http://localhost:5150/api/persons/import/07f7beba-5f5d-4387-8b91-0f50a1
 ```
 
 ```json
-{"success":true,"data":{"id":"07f7beba-5f5d-4387-8b91-0f50a1f4f234","kind":"import","entity":"person","format":"jsonl","status":"completed_with_errors","rows_total":4,"rows_processed":4,"rows_created":1,"rows_upserted":0,"rows_to_review":0,"rows_errored":3,"download_url":null,"errors_url":"file:///private/var/folders/.../person-bulk-artifacts/jobs/07f7beba.../errors.csv"},"error":null}
+{"id":"07f7beba-5f5d-4387-8b91-0f50a1f4f234","kind":"import","entity":"person","format":"jsonl","status":"completed_with_errors","rows_total":4,"rows_processed":4,"rows_created":1,"rows_upserted":0,"rows_to_review":0,"rows_errored":3,"download_url":null,"errors_url":"file:///private/var/folders/.../person-bulk-artifacts/jobs/07f7beba.../errors.csv"}
 ```
 
 `status: "completed_with_errors"` (not `failed`) — exactly the "one
@@ -280,7 +280,7 @@ curl -s -F file=@../../examples/data/persons.jsonl -F format=jsonl \
 ```
 
 ```json
-{"success":true,"data":{"job_id":"0bf11a2a-e492-4625-a5c2-049917b74565"},"error":null}
+{"job_id":"0bf11a2a-e492-4625-a5c2-049917b74565"}
 ```
 
 ```sh
@@ -288,7 +288,7 @@ curl -s "http://localhost:5150/api/persons/import/0bf11a2a-e492-4625-a5c2-049917
 ```
 
 ```json
-{"success":true,"data":{"id":"0bf11a2a-e492-4625-a5c2-049917b74565","kind":"import","entity":"person","format":"jsonl","status":"completed","rows_total":50,"rows_processed":50,"rows_created":43,"rows_upserted":7,"rows_to_review":43,"rows_errored":0,"download_url":null,"errors_url":null},"error":null}
+{"id":"0bf11a2a-e492-4625-a5c2-049917b74565","kind":"import","entity":"person","format":"jsonl","status":"completed","rows_total":50,"rows_processed":50,"rows_created":43,"rows_upserted":7,"rows_to_review":43,"rows_errored":0,"download_url":null,"errors_url":null}
 ```
 
 This is
@@ -329,7 +329,7 @@ curl -s -X POST http://localhost:5150/api/persons/export \
 ```
 
 ```json
-{"success":true,"data":{"job_id":"fe07cb6a-e825-43f4-a8a2-014a27fd1166"},"error":null}
+{"job_id":"fe07cb6a-e825-43f4-a8a2-014a27fd1166"}
 ```
 
 Poll to completion (`rows_total: 94` — the 50 from step 3, +1 from
@@ -504,7 +504,7 @@ curl -s -X POST http://localhost:5150/api/persons/export \
 ```
 
 ```json
-{"success":true,"data":{"job_id":"5bf83818-a22c-4266-81c3-65966ad9190d"},"error":null}
+{"job_id":"5bf83818-a22c-4266-81c3-65966ad9190d"}
 ```
 
 ```sh
@@ -512,7 +512,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:5150/api/persons/exp
 ```
 
 ```json
-{"success":true,"data":{"id":"5bf83818-a22c-4266-81c3-65966ad9190d","kind":"export","entity":"person","format":"jsonl","status":"completed","rows_total":94,"rows_processed":94,"...":"..."},"error":null}
+{"id":"5bf83818-a22c-4266-81c3-65966ad9190d","kind":"export","entity":"person","format":"jsonl","status":"completed","rows_total":94,"rows_processed":94,"...":"..."}
 ```
 
 `200`/`202` all the way through, `rows_total: 94` — the full,

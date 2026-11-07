@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApiResponse } from "./types.js";
+import type { Problem } from "./types.js";
 
 /**
  * Name of the browser-readable CSRF double-submit cookie. Must match
@@ -52,34 +52,33 @@ export interface RequestOptions {
 }
 
 /**
- * Error thrown for any non-success HTTP response or failed
- * {@link ApiResponse} envelope.
+ * Error thrown for any non-2xx API outcome.
  *
- * Carries the HTTP `status`, the service's stable error `code`, and the
- * opaque `details` payload, so callers can branch on the kind of failure
+ * Carries the HTTP `status`, the problem's stable error `code`, and its
+ * structured `errors` as `details`, so callers can branch on the kind of failure
  * (see the `isNotFound` / `isConflict` / `isValidation` accessors) without
  * string-matching messages.
  */
 export class ApiError extends Error {
+  /** HTTP status code of the failed response. */
   readonly status: number;
+  /** Machine-readable error code from the problem, or `"unknown"`. */
   readonly code: string;
+  /** The problem's structured `errors` (e.g. duplicate candidates). */
   readonly details: unknown;
 
   /**
    * @param status - HTTP status code of the failed response.
-   * @param body - Parsed error envelope, or `null` if none was available.
-   * @param fallbackMessage - Used as the message when `body.message` is absent.
+   * @param body - Parsed problem, or `null` if none was available.
+   * @param fallbackMessage - Used as the message when the problem carries
+   *   neither `detail` nor `title`.
    */
-  constructor(
-    status: number,
-    body: ApiErrorBody | null,
-    fallbackMessage?: string,
-  ) {
-    super(body?.message ?? fallbackMessage ?? `HTTP ${status}`);
+  constructor(status: number, body: Problem | null, fallbackMessage?: string) {
+    super(body?.detail ?? body?.title ?? fallbackMessage ?? `HTTP ${status}`);
     this.name = "ApiError";
     this.status = status;
-    this.code = body?.code ?? "UNKNOWN";
-    this.details = body?.details;
+    this.code = body?.code ?? "unknown";
+    this.details = body?.errors;
   }
 
   /** True for HTTP 401 — missing/expired/rejected session. */
@@ -105,17 +104,15 @@ export class ApiError extends Error {
 }
 
 /**
- * Thin `fetch` wrapper that speaks the Thing Service's
- * {@link ApiResponse} envelope: it sets JSON headers, builds URLs, and on
- * every call unwraps `data` or throws {@link ApiError}, so callers work
+ * Thin `fetch` wrapper over the Thing Service: it sets JSON headers,
+ * builds URLs, and on every call returns the bare JSON payload or throws
+ * {@link ApiError} carrying the RFC 9457 {@link Problem}, so callers work
  * with plain typed payloads.
  *
  * Stateless aside from base URL + headers, so one instance can be shared
- * or reconstructed per page freely.
+ * or reconstructed per page freely. Allows fetch injection for SSR load
+ * functions (use `event.fetch`) and tests.
  */
-// Tiny fetch wrapper that understands the Thing Service ApiResponse<T>
-// envelope. Allows fetch injection for SSR load functions (use
-// `event.fetch`) and tests.
 export class ApiClient {
   private readonly baseUrl: string;
   private readonly fetchFn: typeof fetch;
@@ -135,10 +132,10 @@ export class ApiClient {
   }
 
   /**
-   * Issue a `GET` and return the unwrapped `data`.
+   * Issue a `GET` and return the parsed body.
    * @typeParam T - Expected payload type.
-   * @returns The envelope's `data`.
-   * @throws {ApiError} On non-2xx response or `success: false` envelope.
+   * @returns The parsed body.
+   * @throws {ApiError} On non-2xx response.
    */
   get<T>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("GET", path, opts);
@@ -147,9 +144,9 @@ export class ApiClient {
    * As {@link get}, but also returns the raw {@link Response} so a
    * caller can read response headers — e.g. the family-wide
    * `X-Total-Count`/`X-Limit`/`X-Offset` pagination headers
-   * (`agents/share/restful.md`), which the plain `data` a normal `get`
+   * (`agents/share/restful.md`), which the plain body a normal `get`
    * returns has no room to carry (T-28).
-   * @throws {ApiError} On non-2xx response or `success: false` envelope.
+   * @throws {ApiError} On non-2xx response.
    */
   getWithHeaders<T>(
     path: string,
@@ -159,14 +156,14 @@ export class ApiClient {
   }
   /**
    * Issue a `POST` (typically with `opts.body`) and return the data.
-   * @throws {ApiError} On non-2xx response or `success: false` envelope.
+   * @throws {ApiError} On non-2xx response.
    */
   post<T>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("POST", path, opts);
   }
   /**
    * Issue a `PUT` (typically with `opts.body`) and return the data.
-   * @throws {ApiError} On non-2xx response or `success: false` envelope.
+   * @throws {ApiError} On non-2xx response.
    */
   put<T>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("PUT", path, opts);
@@ -174,7 +171,7 @@ export class ApiClient {
   /**
    * Issue a `DELETE`. Defaults `T` to `void` since deletes usually return
    * 204 No Content (resolves to `undefined`).
-   * @throws {ApiError} On non-2xx response or `success: false` envelope.
+   * @throws {ApiError} On non-2xx response.
    */
   delete<T = void>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("DELETE", path, opts);
@@ -184,7 +181,7 @@ export class ApiClient {
    * Core request pipeline shared by all verbs: delegates to
    * {@link requestWithResponse} and discards the raw `Response`, which
    * every verb but {@link getWithHeaders} has no use for.
-   * @throws {ApiError} On non-JSON body, non-2xx status, or failed envelope.
+   * @throws {ApiError} On non-JSON body or non-2xx status.
    */
   private async request<T>(
     method: string,
@@ -196,9 +193,9 @@ export class ApiClient {
   }
 
   /**
-   * As {@link request}, but resolves to both the envelope's `data` and
-   * the raw {@link Response} — the one place headers are reachable.
-   * @throws {ApiError} On non-JSON body, non-2xx status, or failed envelope.
+   * As {@link request}, but resolves to both the parsed body (as `data`)
+   * and the raw {@link Response} — the one place headers are reachable.
+   * @throws {ApiError} On non-JSON body or non-2xx status.
    */
   private async requestWithResponse<T>(
     method: string,
@@ -230,18 +227,18 @@ export class ApiClient {
 
     const response = await this.fetchFn(url, init);
 
-    // 204 No Content has no envelope to parse — resolve to undefined.
+    // 204 No Content has no body to parse — resolve to undefined.
     if (response.status === 204) {
       return { data: undefined as T, response };
     }
 
     // Read the body as text first so we can give a useful error on
     // non-JSON responses (e.g. an HTML error page from a proxy).
-    let parsed: ApiResponse<T> | null = null;
+    let parsed: unknown = null;
     const text = await response.text();
     if (text.length > 0) {
       try {
-        parsed = JSON.parse(text) as ApiResponse<T>;
+        parsed = JSON.parse(text) as unknown;
       } catch {
         throw new ApiError(
           response.status,
@@ -251,17 +248,12 @@ export class ApiClient {
       }
     }
 
-    // Transport-level failure: surface the envelope error if we have one.
     if (!response.ok) {
-      throw new ApiError(response.status, parsed?.error ?? null);
+      throw new ApiError(response.status, asProblem(parsed));
     }
-    // Application-level failure on a 2xx: the envelope still says failed.
-    if (parsed && parsed.success === false) {
-      throw new ApiError(response.status, parsed.error);
-    }
-    // Success: hand back the inner data (undefined if the body was empty)
+    // Success: the body is the payload (undefined if the body was empty),
     // plus the raw response, for callers that need its headers.
-    return { data: (parsed?.data ?? undefined) as T, response };
+    return { data: (parsed ?? undefined) as T, response };
   }
 
   /**
@@ -289,4 +281,11 @@ export class ApiClient {
     }
     return url.toString();
   }
+}
+
+/** `value` as a problem when it is an object, else `null`. */
+function asProblem(value: unknown): Problem | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Problem)
+    : null;
 }

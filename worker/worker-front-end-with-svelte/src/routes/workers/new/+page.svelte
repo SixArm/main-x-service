@@ -27,21 +27,33 @@
     };
 
     // WorkerForm submit handler: create, then navigate to the new record.
+    /** The duplicate candidates a `409` carries, or none. The service's
+     *  problem holds `{ has_duplicates, potential_matches }` in `errors`;
+     *  an older one sent the `MatchResult[]` alone. Accept both. */
+    function duplicateCandidates(err: unknown): MatchResult[] {
+        if (!(err instanceof ApiError) || !err.isConflict) return [];
+        const details = err.details as
+            | MatchResult[]
+            | { potential_matches?: MatchResult[] }
+            | null
+            | undefined;
+        return Array.isArray(details)
+            ? details
+            : (details?.potential_matches ?? []);
+    }
+
     async function handleSubmit(value: Worker) {
         duplicates = [];
         try {
             const created = await repo.create(value);
             if (created.id) goto(`/workers/${created.id}`);
         } catch (err) {
-            // 409 + array details = duplicate candidates. Show them and
-            // rethrow so WorkerForm displays the banner and stays put,
-            // letting the operator review before resubmitting.
-            if (
-                err instanceof ApiError &&
-                err.isConflict &&
-                Array.isArray(err.details)
-            ) {
-                duplicates = err.details as MatchResult[];
+            // A 409 carries duplicate candidates. Show them and rethrow so
+            // WorkerForm displays the banner and stays put, letting the
+            // operator review before resubmitting.
+            const candidates = duplicateCandidates(err);
+            if (candidates.length > 0) {
+                duplicates = candidates;
                 throw new Error(
                     tf("new.duplicatesDetected", { count: duplicates.length }),
                 );

@@ -11,17 +11,6 @@ use uuid::Uuid;
 
 use super::{Client, CreatePlace, Error, Place};
 
-/// The upstream `{success, data, error}` envelope. We consume `data` and,
-/// on search, `success`.
-#[derive(Debug, Deserialize)]
-struct ApiResponse<T> {
-    /// Payload, present on success.
-    data: Option<T>,
-    /// Service-reported success flag (checked on the search path).
-    #[serde(default)]
-    success: bool,
-}
-
 /// Wire shape of an upstream `Place`, trimmed to what the tracker reads.
 #[derive(Debug, Deserialize)]
 struct PlaceDto {
@@ -47,7 +36,7 @@ struct PlaceDto {
     capacity: Option<i32>,
 }
 
-/// The `data` shape returned by the place search endpoint.
+/// The body returned by the place search endpoint.
 #[derive(Debug, Deserialize, Default)]
 struct SearchEnvelope {
     /// Matching places.
@@ -141,20 +130,11 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<SearchEnvelope> = response
+        let body: SearchEnvelope = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        if !body.success {
-            return Err(Error::BadResponse("search returned success=false".into()));
-        }
-        Ok(body
-            .data
-            .unwrap_or_default()
-            .places
-            .into_iter()
-            .map(PlaceDto::into_place)
-            .collect())
+        Ok(body.places.into_iter().map(PlaceDto::into_place).collect())
     }
 
     /// `GET /api/places/{id}` — look up a place by UUID. A `404` maps
@@ -179,11 +159,11 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<PlaceDto> = response
+        let body: PlaceDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        Ok(body.data.map(PlaceDto::into_place))
+        Ok(Some(PlaceDto::into_place(body)))
     }
 
     /// `POST /api/places` — registers a new place. When `capacity` is
@@ -192,7 +172,7 @@ impl Client for HttpClient {
     ///
     /// # Errors
     /// Returns [`Error::Transport`] on a non-success status and
-    /// [`Error::BadResponse`] when the response has no usable `data`.
+    /// [`Error::BadResponse`] when the response body does not parse.
     async fn create(&self, input: CreatePlace) -> Result<Place, Error> {
         let mut payload = json!({
             "id": Uuid::new_v4(),
@@ -222,12 +202,10 @@ impl Client for HttpClient {
                 "create returned non-success: {body}"
             )));
         }
-        let body: ApiResponse<PlaceDto> = response
+        let body: PlaceDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        body.data
-            .map(PlaceDto::into_place)
-            .ok_or_else(|| Error::BadResponse("create returned empty data".into()))
+        Ok(PlaceDto::into_place(body))
     }
 }

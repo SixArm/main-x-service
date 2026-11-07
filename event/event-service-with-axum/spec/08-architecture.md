@@ -5,7 +5,7 @@
 ```
 src/
 ├── api/
-│   ├── mod.rs               # ApiResponse, ApiError
+│   ├── mod.rs               # ok, ApiProblem (responses)
 │   ├── rest/                # /api/* — 18 endpoints
 │   └── grpc/                # real Tonic server (T-6): mod.rs (serve + generated
 │                             # proto module) + service.rs (EventGrpcService)

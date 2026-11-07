@@ -76,7 +76,8 @@ cargo run -- db migrate
 
 REST routes mount under `/api/courses/*` and `/api/courses/{id}/instances/*`.
 See [`agents/restful.md`](agents/restful.md) for the full list. All
-endpoints return the standard `{success, data, error}` envelope.
+endpoints return bare JSON on success and an RFC 9457 problem
+(`application/problem+json`) on failure (`spec/restful` §1.3).
 URLs are version-free; negotiate the response shape with the
 `Accepts-version` header (default `1.0`) per
 [`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
@@ -105,7 +106,7 @@ The Event Service uses `/api/`; Course does NOT — direct `/api`.
 A deterministic short-circuit (e.g. a shared `provider_id` +
 `course_code`, or a matching DOI / Wikidata / `same_as` URL) pins the
 score and the create is rejected with `409 Conflict`; the ranked
-candidates ride under `error.details` as a `ScoredCandidate[]`:
+candidates ride under the problem's `errors` as a `ScoredCandidate[]`:
 
 ```bash
 curl -s -X POST http://localhost:8084/api/courses \
@@ -115,22 +116,22 @@ curl -s -X POST http://localhost:8084/api/courses \
 
 ```jsonc
 // HTTP/1.1 409 Conflict
+// Content-Type: application/problem+json
 {
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "DUPLICATE",
-    "message": "Potential duplicate course(s) detected",
-    "details": [
-      {
-        "course_id": "9c2b…",          // existing record this clashes with
-        "name": "Intro to Computer Science",
-        "course_code": "CS101",
-        "score": 1.0,                   // deterministic short-circuit
-        "quality": "certain"
-      }
-    ]
-  }
+  "type": "about:blank",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "A probable duplicate already exists; see `errors` for ranked candidates.",
+  "code": "duplicate_candidate",
+  "errors": [
+    {
+      "course_id": "9c2b…",          // existing record this clashes with
+      "name": "Intro to Computer Science",
+      "course_code": "CS101",
+      "score": 1.0,                   // deterministic short-circuit
+      "quality": "certain"
+    }
+  ]
 }
 ```
 

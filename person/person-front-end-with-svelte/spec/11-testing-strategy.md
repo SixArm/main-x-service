@@ -2,7 +2,7 @@
 
 | Layer | Tool | Scope | Run |
 | --- | --- | --- | --- |
-| Unit | Vitest + jsdom | `ApiClient` envelope handling, `ApiError` mapping, `PersonRepository` wiring. | `pnpm test` |
+| Unit | Vitest + jsdom | `ApiClient` response and problem handling, `ApiError` mapping, `PersonRepository` wiring. | `pnpm test` |
 | E2E smoke | Playwright (project `smoke`) | Page-shell rendering for every MVP route. Does not need a live service — the page renders an error banner if the API call fails. | `pnpm test:e2e` |
 | Live integration | Playwright (project `integration`) | Golden-path flows that drive the live SvelteKit preview against a running `person-service-with-axum`. 9 tests = 8 FR-mapped (FR-1, FR-3 ×2, FR-5, FR-6, FR-7, FR-8, FR-9) + 1 per-record audit-presence test that maps to no FR. Self-cleanup via REST `DELETE` in `afterAll`. | `bin/e2e` (health-checks then runs) or `pnpm test:integration` |
 

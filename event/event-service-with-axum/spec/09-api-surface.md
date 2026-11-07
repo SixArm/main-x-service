@@ -11,8 +11,10 @@ Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 | Web UI | None in this crate (backend-only axa service, no view tier). The operator UI is the sibling [`event-front-end-with-svelte`](../../event-front-end-with-svelte/spec/index.md). |
 | Docs | Swagger UI at `/swagger-ui` |
 
-Standard response envelope. `409` on duplicate-detected create; `422`
-on validation failure.
+All REST endpoints return bare JSON on success and an RFC 9457 problem
+(`application/problem+json`) on failure (`spec/restful` §1.3). A `500`
+has no `detail`; its cause is logged. `409` on duplicate-detected
+create; `422` on validation failure.
 
 Authentication is opt-in per handler: taking an `AuthUser` argument
 requires a valid `Authorization: Bearer <paseto>` token, verified

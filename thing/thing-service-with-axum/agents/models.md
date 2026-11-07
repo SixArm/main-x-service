@@ -52,7 +52,7 @@ with `422 missing field …` before the handler ever runs. The create
 handler mints a fresh `id` when the wire value is nil and the
 repository stamps `created_at`/`updated_at` to "now" on insert
 (preserving `created_at`, refreshing `updated_at` on update); an
-omitted `name` now reaches `validate_thing` (`422 validation_error`)
+omitted `name` now reaches `validate_thing` (`422 validation`)
 rather than the extractor. `description`, `disambiguating_description`,
 `additional_type`, `url`, `main_entity_of_page`, `owner`, `subject_of`,
 `potential_action`, and `deleted_at` are plain `Option<T>` with no

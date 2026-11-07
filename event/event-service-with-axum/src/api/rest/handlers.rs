@@ -6,10 +6,12 @@
 //! a `#[utoipa::path]` attribute that feeds
 //! [`ApiDoc`](crate::api::rest::ApiDoc). Handlers take
 //! [`AppState`](crate::api::rest::AppState) via Axum's `State` extractor
-//! and return `impl IntoResponse`; errors are returned as
-//! [`ApiResponse`](crate::api::ApiResponse) error envelopes with an
+//! and return `impl IntoResponse`: bare JSON on success
+//! ([`ok`](crate::api::ok)), and an RFC 9457 problem
+//! ([`ApiProblem`](crate::api::ApiProblem)) on error, with an
 //! appropriate [`StatusCode`](axum::http::StatusCode).
 
+use crate::api::{ApiProblem, ok};
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -20,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::api::ApiResponse;
 use crate::models::{Event, EventLink, EventStatus, EventType, LinkType};
 
 use super::state::AppState;
@@ -120,7 +121,7 @@ pub struct CreateEventRequest {
 ///
 /// # Errors
 ///
-/// This handler returns an [`ApiResponse`] error envelope (never a
+/// This handler returns an RFC 9457 problem ([`ApiProblem`]) (never a
 /// `Result`) with one of these statuses:
 ///
 /// - `422 Unprocessable Entity` — the body failed
@@ -129,7 +130,7 @@ pub struct CreateEventRequest {
 ///   JSON parsed fine but its *contents* are semantically invalid.
 /// - `409 Conflict` — duplicate detection found at least one candidate
 ///   at/above the configured threshold; the
-///   [`DuplicateCheckResponse`] is attached in `error.details` so the
+///   [`DuplicateCheckResponse`] is attached in `errors` so the
 ///   caller can review before retrying. `409` (not `422`) signals a
 ///   conflict with existing state rather than a malformed request.
 /// - `500 Internal Server Error` — the repository `create` failed.
@@ -144,9 +145,8 @@ pub async fn create_event(
             .map(|e| format!("{}: {}", e.field, e.message))
             .collect::<Vec<_>>()
             .join("; ");
-        let err =
-            ApiResponse::<Event>::error("VALIDATION_ERROR", format!("Validation failed: {msg}"));
-        return (StatusCode::UNPROCESSABLE_ENTITY, Json(err));
+        let err = ApiProblem::new("validation", format!("Validation failed: {msg}"));
+        return err.respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     if payload.id == Uuid::nil() {
@@ -163,18 +163,16 @@ pub async fn create_event(
             has_duplicates: true,
             potential_matches: duplicates,
         };
-        // Attach the scored candidates as structured `error.details`
+        // Attach the scored candidates as structured `errors`
         // so the client can show them and decide whether to proceed.
         let details = serde_json::to_value(&dup_response).ok();
-        let mut err = ApiResponse::<Event>::error(
-            "DUPLICATE_DETECTED",
+        let mut err = ApiProblem::new(
+            "duplicate_detected",
             "Potential duplicate events found. Review matches before proceeding.",
         );
-        if let Some(ref mut e) = err.error {
-            e.details = details;
-        }
+        err.errors = details;
         // 409 Conflict: the request conflicts with existing records.
-        return (StatusCode::CONFLICT, Json(err));
+        return err.respond(StatusCode::CONFLICT);
     }
 
     match state.event_repository.create(&payload).await {
@@ -185,15 +183,10 @@ pub async fn create_event(
             if let Err(e) = state.search_engine.index_event(&event) {
                 tracing::warn!("Failed to index event: {}", e);
             }
-            (StatusCode::CREATED, Json(ApiResponse::success(event)))
+            ok(StatusCode::CREATED, event)
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<Event>::error(
-                "DATABASE_ERROR",
-                format!("Failed to create event: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new("database_error", format!("Failed to create event: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -209,8 +202,8 @@ pub async fn create_event(
 )]
 /// `GET /events/{id}` — fetch one non-deleted event by `id`.
 ///
-/// Serves HTTP `GET /api/events/{id}`. Returns the event in a
-/// success envelope on a hit.
+/// Serves HTTP `GET /api/events/{id}`. Returns the event as bare JSON
+/// on a hit.
 ///
 /// # Errors
 ///
@@ -219,21 +212,11 @@ pub async fn create_event(
 /// - `500 Internal Server Error` — the repository lookup failed.
 pub async fn get_event(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match state.event_repository.get_by_id(&id).await {
-        Ok(Some(event)) => (StatusCode::OK, Json(ApiResponse::success(event))),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::<Event>::error(
-                "NOT_FOUND",
-                format!("Event with id '{id}' not found"),
-            )),
-        ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<Event>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve event: {e}"),
-            )),
-        ),
+        Ok(Some(event)) => ok(StatusCode::OK, event),
+        Ok(None) => ApiProblem::new("not_found", format!("Event with id '{id}' not found"))
+            .respond(StatusCode::NOT_FOUND),
+        Err(e) => ApiProblem::new("database_error", format!("Failed to retrieve event: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -277,9 +260,8 @@ pub async fn update_event(
             .map(|e| format!("{}: {}", e.field, e.message))
             .collect::<Vec<_>>()
             .join("; ");
-        let err =
-            ApiResponse::<Event>::error("VALIDATION_ERROR", format!("Validation failed: {msg}"));
-        return (StatusCode::UNPROCESSABLE_ENTITY, Json(err));
+        let err = ApiProblem::new("validation", format!("Validation failed: {msg}"));
+        return err.respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
     payload.id = id;
     match state.event_repository.update(&payload).await {
@@ -287,15 +269,10 @@ pub async fn update_event(
             if let Err(e) = state.search_engine.index_event(&event) {
                 tracing::warn!("Failed to update event in search index: {}", e);
             }
-            (StatusCode::OK, Json(ApiResponse::success(event)))
+            ok(StatusCode::OK, event)
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<Event>::error(
-                "DATABASE_ERROR",
-                format!("Failed to update event: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new("database_error", format!("Failed to update event: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -330,15 +307,10 @@ pub async fn delete_event(
             if let Err(e) = state.search_engine.delete_event(&id.to_string()) {
                 tracing::warn!("Failed to delete event from search index: {}", e);
             }
-            (StatusCode::NO_CONTENT, Json(ApiResponse::<()>::success(())))
+            StatusCode::NO_CONTENT.into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<()>::error(
-                "DATABASE_ERROR",
-                format!("Failed to delete event: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new("database_error", format!("Failed to delete event: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -440,9 +412,8 @@ pub async fn search_events(
     let ids = match event_ids {
         Ok(ids) => ids,
         Err(e) => {
-            let err =
-                ApiResponse::<SearchResponse>::error("SEARCH_ERROR", format!("Search failed: {e}"));
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(err));
+            let err = ApiProblem::new("search_error", format!("Search failed: {e}"));
+            return err.respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -493,7 +464,7 @@ pub async fn search_events(
         offset: params.offset,
         limit,
     };
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ---------------------------------------------------------------------------
@@ -578,11 +549,8 @@ pub async fn match_event(
     let match_results = match state.matcher.find_matches(&payload.event, &candidates) {
         Ok(r) => r,
         Err(e) => {
-            let err = ApiResponse::<MatchResultsResponse>::error(
-                "MATCH_ERROR",
-                format!("Matching failed: {e}"),
-            );
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(err));
+            let err = ApiProblem::new("match_error", format!("Matching failed: {e}"));
+            return err.respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -598,7 +566,7 @@ pub async fn match_event(
         total: matches.len(),
         matches,
     };
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ---------------------------------------------------------------------------
@@ -713,7 +681,7 @@ pub async fn check_duplicates(
         has_duplicates: !matches.is_empty(),
         potential_matches: matches,
     };
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ---------------------------------------------------------------------------
@@ -864,22 +832,15 @@ pub async fn merge_events(
     let main = match state.event_repository.get_by_id(&req.main_event_id).await {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "NOT_FOUND",
-                    format!("Main event {} not found", req.main_event_id),
-                )),
-            );
+            return ApiProblem::new(
+                "not_found",
+                format!("Main event {} not found", req.main_event_id),
+            )
+            .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to fetch main event: {e}"),
-                )),
-            );
+            return ApiProblem::new("database_error", format!("Failed to fetch main event: {e}"))
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -890,22 +851,18 @@ pub async fn merge_events(
     {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "NOT_FOUND",
-                    format!("Duplicate event {} not found", req.duplicate_event_id),
-                )),
-            );
+            return ApiProblem::new(
+                "not_found",
+                format!("Duplicate event {} not found", req.duplicate_event_id),
+            )
+            .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to fetch duplicate event: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to fetch duplicate event: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -916,13 +873,8 @@ pub async fn merge_events(
     // (+`merged_from`) and `Deleted` outbox rows and publishes the
     // in-memory `Merged`/`Deleted` stream events.
     if let Err(e) = state.event_repository.merge(&merged, &duplicate.id).await {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "DATABASE_ERROR",
-                format!("Failed to merge events: {e}"),
-            )),
-        );
+        return ApiProblem::new("database_error", format!("Failed to merge events: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     // Post-merge search-index updates are best-effort: the merge is
@@ -951,7 +903,7 @@ pub async fn merge_events(
         merge_record,
         main_event: merged,
     };
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ---------------------------------------------------------------------------
@@ -988,15 +940,8 @@ pub async fn batch_deduplicate(
     let events = match state.event_repository.list_active(1000, 0).await {
         Ok(p) => p,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(
-                    ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to list events: {e}"),
-                    ),
-                ),
-            );
+            return ApiProblem::new("database_error", format!("Failed to list events: {e}"))
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1072,7 +1017,7 @@ pub async fn batch_deduplicate(
         queued_for_review: queued,
         review_items,
     };
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ---------------------------------------------------------------------------
@@ -1108,22 +1053,12 @@ pub async fn export_event_data(
     match state.event_repository.get_by_id(&id).await {
         Ok(Some(event)) => {
             let export = crate::privacy::export_event_data(&event);
-            (StatusCode::OK, Json(ApiResponse::success(export)))
+            ok(StatusCode::OK, export)
         }
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "NOT_FOUND",
-                format!("Event with id '{id}' not found"),
-            )),
-        ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve event: {e}"),
-            )),
-        ),
+        Ok(None) => ApiProblem::new("not_found", format!("Event with id '{id}' not found"))
+            .respond(StatusCode::NOT_FOUND),
+        Err(e) => ApiProblem::new("database_error", format!("Failed to retrieve event: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -1157,22 +1092,12 @@ pub async fn get_event_masked(
     match state.event_repository.get_by_id(&id).await {
         Ok(Some(event)) => {
             let masked = crate::privacy::mask_event(&event);
-            (StatusCode::OK, Json(ApiResponse::success(masked)))
+            ok(StatusCode::OK, masked)
         }
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::<Event>::error(
-                "NOT_FOUND",
-                format!("Event with id '{id}' not found"),
-            )),
-        ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<Event>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve event: {e}"),
-            )),
-        ),
+        Ok(None) => ApiProblem::new("not_found", format!("Event with id '{id}' not found"))
+            .respond(StatusCode::NOT_FOUND),
+        Err(e) => ApiProblem::new("database_error", format!("Failed to retrieve event: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -1221,16 +1146,12 @@ pub async fn get_event_audit_logs(
         .get_logs_for_entity("Event", id, u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(
-                ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to retrieve audit logs: {e}"),
-                ),
-            ),
-        ),
+        Ok(logs) => ok(StatusCode::OK, logs),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to retrieve audit logs: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -1259,16 +1180,12 @@ pub async fn get_recent_audit_logs(
         .get_recent_logs(u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(
-                ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to retrieve audit logs: {e}"),
-                ),
-            ),
-        ),
+        Ok(logs) => ok(StatusCode::OK, logs),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to retrieve audit logs: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -1308,16 +1225,12 @@ pub async fn get_user_audit_logs(
         .get_logs_by_user(&params.user_id, u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(
-                ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to retrieve audit logs: {e}"),
-                ),
-            ),
-        ),
+        Ok(logs) => ok(StatusCode::OK, logs),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to retrieve audit logs: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 /// Default rows examined by the integrity endpoints.
@@ -1351,14 +1264,11 @@ pub async fn verify_record_integrity(
     {
         Ok(rows) => rows,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to read records for verification: {e}"),
-                )),
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to read records for verification: {e}"),
             )
-                .into_response();
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1381,14 +1291,11 @@ pub async fn verify_record_integrity(
             // finding.
             Ok(None) => {}
             Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::<serde_json::Value>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to assemble a record for verification: {e}"),
-                    )),
+                return ApiProblem::new(
+                    "database_error",
+                    format!("Failed to assemble a record for verification: {e}"),
                 )
-                    .into_response();
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
             }
         }
     }
@@ -1427,13 +1334,10 @@ pub async fn verify_audit_integrity(
             Json(crate::compliance::audit_integrity::verify(&rows)),
         )
             .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to read audit rows for verification: {e}"),
-            )),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to read audit rows for verification: {e}"),
         )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }

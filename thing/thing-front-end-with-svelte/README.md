@@ -82,7 +82,7 @@ src/
       auth.ts                 - magic-link + session->PASETO exchange calls
     api/
       types.ts             - Thing, ThingIdentifier, MatchResult, … (mirrors the Rust models)
-      client.ts            - ApiClient + ApiError (envelope-aware fetch)
+      client.ts            - ApiClient + ApiError (bare JSON / RFC 9457 problems)
       things.ts           - ThingRepository (CRUD + search + match + merge + audit + review-queue)
     forms/
       form.svelte.ts       - createForm rune-based store
@@ -114,7 +114,7 @@ src/
     api/proxy/[...path]/+server.ts - BFF reverse proxy (session -> PASETO -> Thing Service)
 tests/
   unit/
-    client.test.ts          - ApiClient envelope + error tests
+    client.test.ts          - ApiClient response + problem tests
     things.test.ts          - ThingRepository wrapping tests
     thing-form.test.ts       - FR-4 create/edit form validation
     merge-validation.test.ts - FR-9 merge guard

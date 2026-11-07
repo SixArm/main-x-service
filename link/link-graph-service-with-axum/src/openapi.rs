@@ -46,7 +46,7 @@ fn paths() -> Value {
             ],
             "responses": {
                 "200": { "description": "Incident edges", "content": { "application/json": {
-                    "schema": { "$ref": "#/components/schemas/NeighborsEnvelope" } } } },
+                    "schema": { "$ref": "#/components/schemas/NeighborsResponse" } } } },
                 "400": { "description": "Malformed ref, unknown kind, or depth over the cap" },
                 "401": { "description": "Missing/invalid token (enforcement on)" }
             }
@@ -64,7 +64,7 @@ fn paths() -> Value {
             ],
             "responses": {
                 "200": { "description": "Filtered edges", "content": { "application/json": {
-                    "schema": { "$ref": "#/components/schemas/EdgesEnvelope" } } } },
+                    "schema": { "$ref": "#/components/schemas/EdgesResponse" } } } },
                 "400": { "description": "Malformed filter value" },
                 "401": { "description": "Missing/invalid token (enforcement on)" }
             }
@@ -75,7 +75,7 @@ fn paths() -> Value {
             "parameters": [ ref_param ],
             "responses": {
                 "200": { "description": "Unified identity + affiliations", "content": { "application/json": {
-                    "schema": { "$ref": "#/components/schemas/SingleViewEnvelope" } } } },
+                    "schema": { "$ref": "#/components/schemas/SingleViewResponse" } } } },
                 "400": { "description": "Malformed ref" },
                 "401": { "description": "Missing/invalid token (enforcement on)" }
             }
@@ -85,7 +85,7 @@ fn paths() -> Value {
             "description": "The last consumed occurred_at + lag-versus-now per entity topic (the eventual-consistency window, made queryable).",
             "responses": {
                 "200": { "description": "Per-topic freshness", "content": { "application/json": {
-                    "schema": { "$ref": "#/components/schemas/FreshnessEnvelope" } } } }
+                    "schema": { "$ref": "#/components/schemas/FreshnessResponse" } } } }
             }
         } }
     })
@@ -135,27 +135,27 @@ fn components() -> Value {
                 "lag_seconds": { "type": "integer", "format": "int64" }
             }
         },
-        "NeighborsEnvelope": envelope(&json!({
+        "NeighborsResponse": body_schema(&json!({
             "type": "object", "properties": {
                 "ref": { "type": "string" },
                 "edges": { "type": "array", "items": { "$ref": "#/components/schemas/Edge" } },
                 "as_of": { "type": "string", "format": "date-time", "nullable": true }
             }
         })),
-        "EdgesEnvelope": envelope(&json!({
+        "EdgesResponse": body_schema(&json!({
             "type": "object", "properties": {
                 "edges": { "type": "array", "items": { "$ref": "#/components/schemas/Edge" } },
                 "as_of": { "type": "string", "format": "date-time", "nullable": true }
             }
         })),
-        "SingleViewEnvelope": envelope(&json!({
+        "SingleViewResponse": body_schema(&json!({
             "type": "object", "properties": {
                 "identity_refs": { "type": "array", "items": { "type": "string" } },
                 "affiliations": { "type": "array", "items": { "$ref": "#/components/schemas/Affiliation" } },
                 "as_of": { "type": "string", "format": "date-time", "nullable": true }
             }
         })),
-        "FreshnessEnvelope": envelope(&json!({
+        "FreshnessResponse": body_schema(&json!({
             "type": "object", "properties": {
                 "topics": { "type": "array", "items": { "$ref": "#/components/schemas/TopicFreshness" } },
                 "as_of": { "type": "string", "format": "date-time", "nullable": true }
@@ -164,18 +164,11 @@ fn components() -> Value {
     } })
 }
 
-/// Wrap a `data` schema in the family's `{ success, data, error }`
-/// response envelope.
-fn envelope(data: &Value) -> Value {
-    json!({
-        "type": "object",
-        "required": ["success"],
-        "properties": {
-            "success": { "type": "boolean" },
-            "data": data,
-            "error": { "type": "string", "nullable": true }
-        }
-    })
+/// A response body schema. Bodies are bare JSON (`spec/restful` §1.3), so
+/// this is the schema itself; it stays a function so every response keeps
+/// one place to change.
+fn body_schema(data: &Value) -> Value {
+    data.clone()
 }
 
 #[cfg(test)]
@@ -201,19 +194,22 @@ mod tests {
     }
 
     #[test]
-    fn every_edge_returning_response_is_enveloped_with_as_of() {
+    fn every_edge_returning_response_is_bare_json_with_as_of() {
         let s = spec();
         for env in [
-            "NeighborsEnvelope",
-            "EdgesEnvelope",
-            "SingleViewEnvelope",
-            "FreshnessEnvelope",
+            "NeighborsResponse",
+            "EdgesResponse",
+            "SingleViewResponse",
+            "FreshnessResponse",
         ] {
             let schema = &s["components"]["schemas"][env];
-            assert_eq!(schema["properties"]["success"]["type"], "boolean");
             assert!(
-                schema["properties"]["data"]["properties"]["as_of"].is_object(),
-                "{env} data carries as_of"
+                schema["properties"].get("success").is_none(),
+                "{env} is bare JSON, not enveloped"
+            );
+            assert!(
+                schema["properties"]["as_of"].is_object(),
+                "{env} carries as_of"
             );
         }
     }

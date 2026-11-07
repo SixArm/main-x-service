@@ -3,32 +3,25 @@
 // event-service-with-axum/agents/models.md.
 // NOTE: Event Service mounts REST under `/api/`.
 
-// ─── HTTP envelope ───────────────────────────────────────────────────
+// ─── Errors ──────────────────────────────────────────────────────────
 
 /**
- * Standard JSON envelope returned by every Event Service endpoint.
- *
- * The service always wraps payloads so callers can distinguish transport
- * success from application success: on success `data` is populated and
- * `error` is null; on failure `error` carries the structured cause and
- * `data` is null. {@link ApiClient} unwraps this so callers see `T`.
- *
- * @typeParam T - The shape of the successful payload.
+ * An RFC 9457 problem, the body of every failed Event Service response.
+ * A success is the bare payload, with no wrapper.
  */
-export interface ApiResponse<T> {
-  success: boolean;
-  data: T | null;
-  error: ApiErrorBody | null;
-}
-
-/** Structured error body inside a failed {@link ApiResponse}. */
-export interface ApiErrorBody {
-  /** Stable machine-readable error code (e.g. for branching in the UI). */
-  code: string;
-  /** Human-readable message safe to surface to operators. */
-  message: string;
-  /** Optional extra context (validation field errors, conflict candidates, …). */
-  details?: unknown;
+export interface Problem {
+  /** A URI naming the problem type; `"about:blank"` when there is none. */
+  type: string;
+  /** A short summary of the status, such as `"Not Found"`. */
+  title: string;
+  /** The HTTP status code. */
+  status: number;
+  /** What went wrong, for display. Absent on a `500`. */
+  detail?: string;
+  /** Stable lowercase code for branching, such as `"duplicate_detected"`. */
+  code?: string;
+  /** Structured context, such as duplicate candidates. */
+  errors?: unknown;
 }
 
 // ─── Status / mode / type enums ──────────────────────────────────────

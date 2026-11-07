@@ -1,7 +1,8 @@
 ### thing-service — example requests
 # thing/thing-service-with-axum — "person-style" layout (src/api/rest/).
-# Envelope: same as place — {"success","data","error"} with data/error
-# OMITTED (not null) on the unused side (#[serde(skip_serializing_if)]).
+# Responses: bare JSON on success; an RFC 9457 problem
+# (application/problem+json: type, title, status, detail, code, errors)
+# on failure — spec/restful §1.3, src/api/mod.rs.
 # Gated by THING_REQUIRE_AUTH (default off).
 #
 # GOTCHA (curl-verified, same as place): Thing has NO #[serde(default)],

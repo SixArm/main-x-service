@@ -17,8 +17,10 @@ Implemented by `src/api/rest/version.rs` (`require_version_mw`).
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` (OpenAPI 3.0 via utoipa) |
 
-Standard response envelope. `409` on duplicate-detected create; `422`
-on validation failure.
+Bare JSON on success and an RFC 9457 problem on failure
+([`spec/restful`](../../../spec/restful/index.md) §1.3). `409` on
+duplicate-detected create, with the candidates in the problem's
+`errors`; `422` on validation failure.
 
 Authentication is opt-in per handler by default: taking an `AuthUser`
 argument requires a valid `Authorization: Bearer <paseto>` token,
@@ -70,12 +72,9 @@ returned here. Graph traversal (`neighbors` / `single-view`) lives in the
 separate `link-graph-service-with-axum` aggregator, not this service. See
 [cross-service linking §4.1](../../../agents/share/cross-service-linking.md).
 
-These three per-record endpoints return the crate's uniform
-`{success,data,error}` envelope (`ApiResponse<T>`), matching every other
-worker REST endpoint — fixed 2026-08-03; they previously returned bare
-JSON, which a front-end client that unwraps `.data` would have silently
-read as `undefined` rather than erroring. The bulk aggregator endpoint
-(`GET /api/workers/links`) is deliberately **not** wrapped: it stays bare
+These three per-record endpoints answer bare JSON on success and an
+RFC 9457 problem on failure, like every other worker REST endpoint. The
+bulk aggregator endpoint (`GET /api/workers/links`) returns
 `{"edges": [...]}` for the link-graph aggregator's HTTP client, which
 deserializes that shape directly.
 

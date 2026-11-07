@@ -3,36 +3,25 @@
 // Field names use snake_case to match the JSON wire format produced by
 // the Axum/SeaORM stack.
 
-// ─── HTTP envelope ───────────────────────────────────────────────────
+// ─── Errors ──────────────────────────────────────────────────────────
 
 /**
- * Uniform success/error envelope wrapping every Worker Service response
- * body. The service always sets exactly one of `data` / `error` per
- * `success`. {@link ApiClient} unwraps this so callers see only `T`.
- *
- * @typeParam T - The payload type carried in `data` on success.
+ * An RFC 9457 problem, the body of every failed Worker Service response.
+ * A success is the bare payload, with no wrapper.
  */
-export interface ApiResponse<T> {
-  /** True when the request succeeded; `data` is populated, `error` null. */
-  success: boolean;
-  /** The success payload, or null on error. */
-  data: T | null;
-  /** The error detail, or null on success. */
-  error: ApiErrorBody | null;
-}
-
-/**
- * Machine-readable error detail inside an {@link ApiResponse}. `details` is
- * untyped because its shape is endpoint-specific (e.g. an array of
- * {@link MatchResult} for duplicate-detection `409`s).
- */
-export interface ApiErrorBody {
-  /** Stable error code (e.g. `NOT_FOUND`, `DUPLICATE`, `VALIDATION`). */
-  code: string;
-  /** Human-readable error message. */
-  message: string;
-  /** Optional endpoint-specific extra context (shape varies). */
-  details?: unknown;
+export interface Problem {
+  /** A URI naming the problem type; `"about:blank"` when there is none. */
+  type: string;
+  /** A short summary of the status, such as `"Not Found"`. */
+  title: string;
+  /** The HTTP status code. */
+  status: number;
+  /** What went wrong, for display. Absent on a `500`. */
+  detail?: string;
+  /** Stable lowercase code for branching, such as `"duplicate_detected"`. */
+  code?: string;
+  /** Structured context, such as duplicate candidates. */
+  errors?: unknown;
 }
 
 // ─── Shared primitives ───────────────────────────────────────────────

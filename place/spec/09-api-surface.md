@@ -5,7 +5,7 @@
 Complete reference:
 [`place-service-with-axum/agents/restful.md`](../place-service-with-axum/agents/restful.md)
 and service [spec §9](../place-service-with-axum/spec/09-api-surface.md).
-15 endpoints; standard response envelope; `409` on duplicate-detected
+15 endpoints; bare JSON on success, an RFC 9457 problem on failure; `409` on duplicate-detected
 create; `422` on validation failure.
 
 | Method | Path | Purpose |

@@ -10,7 +10,9 @@ Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 | gRPC (Tonic) | Real server (T-6, 2026-09-02): `CreatePerson` / `GetPerson` / `ListPersons` / `DeletePerson` on `PersonService`, generated from `proto/person.proto`, spawned on `grpc_port` alongside the REST router. No `UpdatePerson` RPC yet, and the proto `Person` message is a partial projection (identification + demographics only) — see spec §13 T-6 |
 | Docs | Swagger UI at `/swagger-ui` (OpenAPI 3.0 via utoipa) |
 
-All REST endpoints return `{ "success": bool, "data": …, "error": … }`.
+All REST endpoints return bare JSON on success and an RFC 9457 problem
+(`application/problem+json`) on failure (`spec/restful` §1.3). A `500`
+has no `detail`; its cause is logged.
 HTTP status codes follow REST conventions: `409` for duplicate
 detection on create, `422` for validation failure.
 
@@ -61,16 +63,10 @@ Creating a link is **optimistic** — it stores the assertion and emits a
 `linked` event without calling the target service. Verification status is
 not returned here; it is the aggregator's read-model concern.
 
-These three per-record endpoints return the crate's uniform
-`{success,data,error}` envelope (`ApiResponse<T>`), matching every other
-person REST endpoint — fixed 2026-08-03; they previously returned bare
-JSON, which a front-end client that unwraps `.data` would have silently
-read as `undefined` rather than erroring. The bulk aggregator endpoint
-(`GET /api/persons/links`, §9.3-adjacent — see
+These three per-record endpoints return bare JSON, like every other person
+REST endpoint, and the bulk aggregator endpoint (`GET /api/persons/links`,
 [cross-service linking §4.2](../../../agents/share/cross-service-linking.md))
-is deliberately **not** wrapped: it stays bare `{"edges": [...]}` for the
-link-graph aggregator's HTTP client, which deserializes that shape
-directly.
+returns `{"edges": [...]}` for the link-graph aggregator.
 
 ### 9.2 Bulk import / export
 

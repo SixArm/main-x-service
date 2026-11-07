@@ -113,7 +113,7 @@ async fn reconcile_adds_missing_and_removes_extra() {
 
         // The read-model now matches the authoritative set: only edge B.
         let body: Value = request.get("/api/edges").await.json();
-        let edges = body["data"]["edges"].as_array().unwrap();
+        let edges = body["edges"].as_array().unwrap();
         assert_eq!(edges.len(), 1, "repaired to the authoritative set");
         assert_eq!(edges[0]["edge_id"], u(20).to_string());
         assert_eq!(edges[0]["to_ref"], format!("person:{}", u(4)));
@@ -165,7 +165,7 @@ async fn reconcile_is_scoped_to_the_source_entity() {
 
         // Both edges are still present.
         let body: Value = request.get("/api/edges").await.json();
-        let edges = body["data"]["edges"].as_array().unwrap();
+        let edges = body["edges"].as_array().unwrap();
         assert_eq!(edges.len(), 2, "the person edge survived the case pass");
         let ids: Vec<&str> = edges
             .iter()

@@ -102,7 +102,7 @@ master-patient-index-style layout with explicit layered modules. From
 
 ```
 src/
-├── api/        REST (Axum) + FHIR R5 + gRPC (stub) + ApiResponse/ApiError envelopes
+├── api/        REST (Axum) + FHIR R5 + gRPC (stub) + ok/ApiProblem responses
 ├── db/         SeaORM entities, repositories, audit log
 ├── matching/   probabilistic + deterministic matchers, algorithms, scoring, phonetic
 ├── search/     Tantivy index + query builder

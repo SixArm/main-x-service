@@ -20,7 +20,7 @@ front-end [spec §4](../course-front-end-with-svelte/spec/04-glossary.md).
 | **Adapter** | `src/matching/adapter.rs` in the service — the lossy projection service model → matcher model (§5.3) |
 | **Canonical algorithm** | The matcher crate's scoring — the reference the service embeds via `course_matcher::MatchingEngine` |
 | **Deterministic short-circuit** | An identifier-scheme match (DOI / Wikidata / LOM / OER / URI / UUID), same-provider course code, or `same_as` URL overlap that pins the score to 1.0 |
-| **Envelope** | The REST response wrapper `{ "success": bool, "data": …, "error": … }` shared by service and front-end |
+| **Problem** | The RFC 9457 error body (`application/problem+json`) the service answers every REST failure with; a success is bare JSON. Shared contract of service and front-end |
 | **Match** | A comparison between two courses yielding a 0.00–1.00 score plus per-component breakdown |
 | **Merge** | Transfers a duplicate's identifiers / instances / syllabus / links onto a surviving record, soft-deletes the duplicate, snapshots the transfer |
 | **Review queue** | Persisted candidate duplicate pairs: `Pending` / `Confirmed` / `Rejected` / `AutoMerged` |

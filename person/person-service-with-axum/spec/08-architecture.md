@@ -7,7 +7,7 @@ src/
 ├── bin/main.rs              # binary entry: cli::main::<App, Migrator>()
 ├── app.rs                   # axa App Hooks (routes, after_routes, queue)
 ├── api/
-│   ├── mod.rs               # ApiResponse, ApiError
+│   ├── mod.rs               # ok, ApiProblem (responses)
 │   ├── rest/                # REST API (Axum) — 15 endpoints, mounted at /api
 │   ├── fhir/                # FHIR R5 Person + bundle stubs
 │   └── grpc/                # real Tonic server (T-6): mod.rs (serve + generated

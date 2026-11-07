@@ -41,19 +41,7 @@ const CASE_FILE_TYPE: &str = "CaseFile";
 /// Marks the Thing as a volume (a bundle of folders).
 const VOLUME_TYPE: &str = "Volume";
 
-/// The upstream `{success, data, error}` envelope. We only consume `data`.
-#[derive(Debug, Deserialize)]
-struct ApiResponse<T> {
-    /// Payload, present on success.
-    data: Option<T>,
-    /// Service-reported success flag. Unused (status is authoritative),
-    /// hence `#[allow(dead_code)]`.
-    #[serde(default)]
-    #[allow(dead_code)]
-    success: bool,
-}
-
-/// The `data` shape returned by the search endpoint: a list of things.
+/// The body returned by the search endpoint: a list of things.
 #[derive(Debug, Deserialize, Default)]
 struct SearchEnvelope {
     /// Raw thing DTOs; filtered by `thing_type` downstream.
@@ -374,13 +362,11 @@ impl HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<SearchEnvelope> = response
+        let body: SearchEnvelope = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
         Ok(body
-            .data
-            .unwrap_or_default()
             .things
             .into_iter()
             .filter_map(ThingDto::into_folder)
@@ -393,7 +379,7 @@ impl HttpClient {
     ///
     /// # Errors
     /// Returns [`Error::Transport`] on a non-success status and
-    /// [`Error::BadResponse`] when the response has no usable volume `data`.
+    /// [`Error::BadResponse`] when the response has no usable volume record.
     async fn patch_volume(&self, id: Uuid, patch: serde_json::Value) -> Result<Volume, Error> {
         let response = self
             .http
@@ -408,13 +394,12 @@ impl HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<ThingDto> = response
+        let body: ThingDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        body.data
-            .and_then(ThingDto::into_volume)
-            .ok_or_else(|| Error::BadResponse("update returned empty data".into()))
+        ThingDto::into_volume(body)
+            .ok_or_else(|| Error::BadResponse("update returned a record it cannot use".into()))
     }
 }
 
@@ -456,11 +441,11 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<ThingDto> = response
+        let body: ThingDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        Ok(body.data.and_then(ThingDto::into_folder))
+        Ok(ThingDto::into_folder(body))
     }
 
     /// `GET /api/things/search` filtered by the `patient_id=` keyword —
@@ -497,7 +482,7 @@ impl Client for HttpClient {
     ///
     /// # Errors
     /// Returns [`Error::DuplicateTitle`] on a `409`, [`Error::Transport`]
-    /// on other non-success statuses, [`Error::BadResponse`] on bad `data`.
+    /// on other non-success statuses, [`Error::BadResponse`] on a record it cannot use.
     async fn create(&self, input: NewFolder) -> Result<Folder, Error> {
         let id = Uuid::new_v4();
         let payload = build_payload(id, &input);
@@ -517,13 +502,12 @@ impl Client for HttpClient {
                 "create returned non-success: {body}"
             )));
         }
-        let body: ApiResponse<ThingDto> = response
+        let body: ThingDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        body.data
-            .and_then(ThingDto::into_folder)
-            .ok_or_else(|| Error::BadResponse("create returned empty data".into()))
+        ThingDto::into_folder(body)
+            .ok_or_else(|| Error::BadResponse("create returned a record it cannot use".into()))
     }
 
     /// `PATCH /api/things/{id}` — moves a folder by updating its cabinet
@@ -531,7 +515,7 @@ impl Client for HttpClient {
     ///
     /// # Errors
     /// Returns [`Error::Transport`] on a non-success status and
-    /// [`Error::BadResponse`] on bad `data`.
+    /// [`Error::BadResponse`] on a record it cannot use.
     async fn update_cabinet(
         &self,
         id: Uuid,
@@ -559,13 +543,12 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<ThingDto> = response
+        let body: ThingDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        body.data
-            .and_then(ThingDto::into_folder)
-            .ok_or_else(|| Error::BadResponse("update returned empty data".into()))
+        ThingDto::into_folder(body)
+            .ok_or_else(|| Error::BadResponse("update returned a record it cannot use".into()))
     }
 
     /// `POST /api/things` — creates a volume Thing. An upstream
@@ -573,7 +556,7 @@ impl Client for HttpClient {
     ///
     /// # Errors
     /// Returns [`Error::DuplicateTitle`] on a `409`, [`Error::Transport`]
-    /// on other non-success statuses, [`Error::BadResponse`] on bad `data`.
+    /// on other non-success statuses, [`Error::BadResponse`] on a record it cannot use.
     async fn create_volume(&self, input: NewVolume) -> Result<Volume, Error> {
         let id = Uuid::new_v4();
         let payload = build_volume_payload(id, &input);
@@ -593,13 +576,13 @@ impl Client for HttpClient {
                 "create volume returned non-success: {body}"
             )));
         }
-        let body: ApiResponse<ThingDto> = response
+        let body: ThingDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        body.data
-            .and_then(ThingDto::into_volume)
-            .ok_or_else(|| Error::BadResponse("create volume returned empty data".into()))
+        ThingDto::into_volume(body).ok_or_else(|| {
+            Error::BadResponse("create volume returned a record it cannot use".into())
+        })
     }
 
     /// `GET /api/things/{id}` — look up a volume by UUID. A `404` maps to
@@ -624,11 +607,11 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<ThingDto> = response
+        let body: ThingDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        Ok(body.data.and_then(ThingDto::into_volume))
+        Ok(ThingDto::into_volume(body))
     }
 
     /// `GET /api/things/search?thing_type=Volume&limit=200` — all volumes.
@@ -651,13 +634,11 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<SearchEnvelope> = response
+        let body: SearchEnvelope = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
         Ok(body
-            .data
-            .unwrap_or_default()
             .things
             .into_iter()
             .filter_map(ThingDto::into_volume)
@@ -698,7 +679,7 @@ impl Client for HttpClient {
     ///
     /// # Errors
     /// Returns [`Error::Transport`] on a non-success status and
-    /// [`Error::BadResponse`] on bad `data`.
+    /// [`Error::BadResponse`] on a record it cannot use.
     async fn set_folder_volume(
         &self,
         folder_id: Uuid,
@@ -726,12 +707,11 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<ThingDto> = response
+        let body: ThingDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        body.data
-            .and_then(ThingDto::into_folder)
-            .ok_or_else(|| Error::BadResponse("update returned empty data".into()))
+        ThingDto::into_folder(body)
+            .ok_or_else(|| Error::BadResponse("update returned a record it cannot use".into()))
     }
 }

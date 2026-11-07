@@ -28,6 +28,7 @@
 //! **bulk endpoint** ([`bulk_links`]) remains the aggregator's sync
 //! reconciliation path (design §8).
 
+use crate::api::{ApiProblem, ok};
 use axa::client::ClientAddr;
 use std::collections::BTreeMap;
 
@@ -242,43 +243,28 @@ fn actor(ctx: &AuditContext) -> AuditActor<'_> {
     }
 }
 
-/// `404` — unknown worker id. Wrapped in the crate's uniform
-/// `{success,data,error}` envelope ([`ApiResponse`]) like every other
-/// worker REST endpoint — these link endpoints previously returned bare
-/// `{"error": ...}` bodies, which the front-end's `ApiClient` (which
-/// unwraps `.data`) would have silently read as `undefined`.
+/// `404` — unknown worker id, as an RFC 9457 problem like every other
+/// worker REST error.
 fn not_found(id: Uuid) -> Response {
-    (
-        StatusCode::NOT_FOUND,
-        Json(crate::api::ApiResponse::<()>::error(
-            "NOT_FOUND",
-            format!("Worker with id '{id}' not found"),
-        )),
-    )
+    ApiProblem::new("not_found", format!("Worker with id '{id}' not found"))
+        .respond(StatusCode::NOT_FOUND)
         .into_response()
 }
 
 /// `500` — database failure.
 fn db_error(e: &crate::Error) -> Response {
-    (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(crate::api::ApiResponse::<()>::error(
-            "DATABASE_ERROR",
-            format!("{e}"),
-        )),
-    )
+    ApiProblem::new("database_error", format!("{e}"))
+        .respond(StatusCode::INTERNAL_SERVER_ERROR)
         .into_response()
 }
 
 /// Map a record-level authorization rejection `(status, reason)` to a
 /// JSON error response (`403` policy-denied / `401` fail-safe), matching
-/// the rest of the crate's `"FORBIDDEN"` code convention regardless of
+/// the rest of the crate's `forbidden` code convention regardless of
 /// the actual status.
 fn rejection((status, reason): (StatusCode, String)) -> Response {
-    (
-        status,
-        Json(crate::api::ApiResponse::<()>::error("FORBIDDEN", reason)),
-    )
+    ApiProblem::new("forbidden", reason)
+        .respond(status)
         .into_response()
 }
 
@@ -414,13 +400,8 @@ pub async fn create_link(
     let (edge_kind, to) = match validate_edge(&req.kind, &req.to_ref) {
         Ok(pair) => pair,
         Err(reason) => {
-            return (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                Json(crate::api::ApiResponse::<()>::error(
-                    "VALIDATION_ERROR",
-                    reason,
-                )),
-            )
+            return ApiProblem::new("validation", reason)
+                .respond(StatusCode::UNPROCESSABLE_ENTITY)
                 .into_response();
         }
     };
@@ -458,7 +439,7 @@ pub async fn create_link(
     {
         tracing::warn!("failed to audit worker link create: {e}");
     }
-    (StatusCode::OK, Json(crate::api::ApiResponse::success(view))).into_response()
+    ok(StatusCode::OK, view).into_response()
 }
 
 /// List a worker's active outbound edges. `GET /api/workers/{id}/links`.
@@ -482,11 +463,7 @@ pub async fn list_links(
     match entity_links::list_active(&state.db, worker.id).await {
         Ok(rows) => {
             let views: Vec<LinkView> = rows.iter().map(LinkView::of).collect();
-            (
-                StatusCode::OK,
-                Json(crate::api::ApiResponse::success(views)),
-            )
-                .into_response()
+            ok(StatusCode::OK, views).into_response()
         }
         Err(e) => db_error(&e),
     }
@@ -517,13 +494,8 @@ pub async fn delete_link(
     let row = match entity_links::find_active(&state.db, worker.id, link_id).await {
         Ok(Some(row)) => row,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(crate::api::ApiResponse::<()>::error(
-                    "NOT_FOUND",
-                    format!("link '{link_id}' not found"),
-                )),
-            )
+            return ApiProblem::new("not_found", format!("link '{link_id}' not found"))
+                .respond(StatusCode::NOT_FOUND)
                 .into_response();
         }
         Err(e) => return db_error(&e),
@@ -543,11 +515,7 @@ pub async fn delete_link(
             {
                 tracing::warn!("failed to audit worker link delete: {e}");
             }
-            (
-                StatusCode::OK,
-                Json(crate::api::ApiResponse::success(json!({}))),
-            )
-                .into_response()
+            ok(StatusCode::OK, json!({})).into_response()
         }
         Err(e) => db_error(&e),
     }

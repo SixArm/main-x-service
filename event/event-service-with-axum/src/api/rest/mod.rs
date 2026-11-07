@@ -91,8 +91,6 @@ pub use state::AppState;
             crate::models::ConsentType,
             crate::models::ConsentStatus,
             crate::matching::MatchScoreBreakdown,
-            crate::api::ApiResponse::<crate::models::Event>,
-            crate::api::ApiError,
             handlers::HealthResponse,
             handlers::CreateEventRequest,
             handlers::SearchQuery,

@@ -20,7 +20,7 @@
 //! - [`events`] — event decode + the `apply_event` seam.
 //! - [`models`] — `SeaORM` entities + query/projection helpers.
 //! - [`controllers`] — the read-only Axum controllers.
-//! - [`envelope`] — the `{ success, data, error }` API wrapper.
+//! - [`responses`] — bare JSON successes and RFC 9457 problem errors.
 //! - [`suggest`] — the cross-service `same_identity` suggestion
 //!   comparator (LNK-4 / T-29; pure, DB-free, never consumes edges).
 //! - [`observability`] — structured logging + real `OpenTelemetry` OTLP
@@ -43,7 +43,6 @@ pub mod auth;
 pub mod compliance;
 pub mod consumer;
 pub mod controllers;
-pub mod envelope;
 pub mod events;
 pub mod graph;
 pub mod metrics;
@@ -52,4 +51,5 @@ pub mod observability;
 pub mod openapi;
 pub mod probe;
 pub mod reconcile;
+pub mod responses;
 pub mod suggest;

@@ -4,7 +4,7 @@
 //! converts with [`to_fhir_worker`] / [`from_fhir_worker`], reuses the same
 //! repository and search engine as the REST API via the shared [`AppState`],
 //! and reports errors as a FHIR [`FhirOperationOutcome`] (rather than the REST
-//! [`crate::api::ApiResponse`] envelope) so responses stay FHIR-conformant.
+//! RFC 9457 problem, [`crate::api::ApiProblem`]) so responses stay FHIR-conformant.
 //! Every response carries `application/fhir+json`; search returns a FHIR
 //! `Bundle` of type `searchset`, and `GET /fhir/metadata` returns the
 //! `CapabilityStatement`. No doctests — these require a live [`AppState`].

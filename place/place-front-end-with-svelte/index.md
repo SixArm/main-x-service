@@ -51,7 +51,7 @@ The SPA mounts at `/`. All operator workflows live under `/places`.
 2. Grid renders SVAR DataGrid with matching rows.
 3. Operator clicks **New place** → `/places/new`.
 4. Form submits to `POST /api/places`. Service returns 409 with a
-   `MatchResult[]` under `error.details` when the matcher flags
+   `MatchResult[]` under the problem's `errors` when the matcher flags
    probable duplicates.
 5. Inline `MatchResultsList` renders each candidate with name,
    GLN / identifier, per-component breakdown, deterministic flag.

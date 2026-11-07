@@ -1,96 +1,159 @@
 //! API layer: REST (Axum) and gRPC (Tonic — a real server,
-//! Create/Get/List/Delete Event).
+//! Create/Get/List/Delete Event), plus the shared response helpers.
 //!
 //! (FHIR R5 lives in [`crate::fhir`] + [`crate::controllers::fhir`], not
 //! here — the earlier `api::fhir` `501` stub was removed once the real
 //! `Appointment` surface landed.)
 //!
-//! This module defines the uniform JSON response envelope used by the
-//! REST handlers — [`ApiResponse`](crate::api::ApiResponse) (success or
-//! error) wrapping an [`ApiError`](crate::api::ApiError) payload — and a
-//! `From<Error>` bridge so any crate error can be returned as a
-//! `500`-style envelope.
-//!
-//! # Examples
-//!
-//! ```
-//! use event_service::api::ApiResponse;
-//!
-//! let ok = ApiResponse::success(42);
-//! assert!(ok.success);
-//! assert_eq!(ok.data, Some(42));
-//!
-//! let err: ApiResponse<i32> = ApiResponse::error("NOT_FOUND", "missing");
-//! assert!(!err.success);
-//! assert_eq!(err.error.unwrap().code, "NOT_FOUND");
-//! ```
+//! A REST success is bare JSON, built with [`ok`](crate::api::ok). An error is an
+//! RFC 9457 problem, built with [`ApiProblem`](crate::api::ApiProblem), the same shape axa
+//! answers its own errors with (`spec/restful` §1.3).
 
-/// gRPC API (Tonic) — currently a stub.
+/// gRPC API (Tonic) — Create/Get/List/Delete Event.
 pub mod grpc;
 /// REST API (Axum): router, handlers, routes, shared state.
 pub mod rest;
 
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use axum::Json;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use serde::Serialize;
 
-/// Uniform success/error envelope returned by REST handlers.
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct ApiResponse<T> {
-    /// `true` for a success response, `false` for an error.
-    pub success: bool,
-    /// The payload on success; `None` on error.
-    pub data: Option<T>,
-    /// The error detail on failure; `None` on success.
-    pub error: Option<ApiError>,
+/// A successful response: `body` as bare JSON with `status`.
+pub fn ok<T: Serialize>(status: StatusCode, body: T) -> Response {
+    (status, Json(body)).into_response()
 }
 
-/// Machine-readable error detail carried inside an [`ApiResponse`].
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct ApiError {
-    /// Stable error code (e.g. `NOT_FOUND`, `VALIDATION_ERROR`).
+/// An error, answered as an RFC 9457 problem by [`ApiProblem::respond`].
+///
+/// `code` is a stable lowercase `snake_case` token, sent as the `code`
+/// extension member. `detail` is for the caller, and `errors` carries
+/// structured context such as duplicate candidates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApiProblem {
+    /// Stable machine-readable code, such as `not_found`.
     pub code: String,
-    /// Human-readable error message.
-    pub message: String,
-    /// Optional structured details (field errors, etc.).
-    pub details: Option<serde_json::Value>,
+    /// What went wrong, for the caller.
+    pub detail: String,
+    /// Structured context, sent as the `errors` extension member.
+    pub errors: Option<serde_json::Value>,
 }
 
-impl<T> ApiResponse<T> {
-    /// Wrap `data` in a successful response (`success = true`).
-    pub fn success(data: T) -> Self {
+impl ApiProblem {
+    /// A problem with `code` and `detail`, and no `errors`.
+    pub fn new(code: impl Into<String>, detail: impl Into<String>) -> Self {
         Self {
-            success: true,
-            data: Some(data),
-            error: None,
+            code: code.into(),
+            detail: detail.into(),
+            errors: None,
         }
     }
 
-    /// Build an error response from a code + message (no `data`).
-    pub fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
-        ApiResponse {
-            success: false,
-            data: None,
-            error: Some(ApiError {
-                code: code.into(),
-                message: message.into(),
-                details: None,
-            }),
+    /// Attach structured context, sent as `errors`.
+    #[must_use]
+    pub fn with_errors(mut self, errors: Option<serde_json::Value>) -> Self {
+        self.errors = errors;
+        self
+    }
+
+    /// The problem as it goes on the wire for `status`.
+    ///
+    /// A `500` says nothing about why: its code is the status's own and it
+    /// has no `detail`, and the real code and detail are logged instead.
+    /// Any other status sends `detail`, so it must be written for the caller.
+    #[must_use]
+    pub fn to_problem(&self, status: StatusCode) -> axa::problem::Problem {
+        let problem = axa::problem::Problem::new(status);
+        if status == StatusCode::INTERNAL_SERVER_ERROR {
+            tracing::error!(code = %self.code, detail = %self.detail, "request failed");
+            let code = status_code_token(status);
+            return problem.with_extension("code", serde_json::Value::String(code));
         }
+        let mut problem = problem
+            .with_detail(self.detail.clone())
+            .with_extension("code", serde_json::Value::String(self.code.clone()));
+        if let Some(errors) = &self.errors {
+            problem = problem.with_extension("errors", errors.clone());
+        }
+        problem
+    }
+
+    /// Answer with this problem and `status`.
+    #[must_use]
+    pub fn respond(&self, status: StatusCode) -> Response {
+        self.to_problem(status).into_response()
     }
 }
 
-impl<T> From<crate::Error> for ApiResponse<T> {
-    /// Convert any crate [`Error`](crate::Error) into an error envelope
-    /// with code `INTERNAL_ERROR` and the error's `Display` as message.
+impl From<crate::Error> for ApiProblem {
+    /// Any [`crate::Error`] as an internal error. Answered with a `500`,
+    /// its text is logged and never sent.
     fn from(err: crate::Error) -> Self {
-        ApiResponse {
-            success: false,
-            data: None,
-            error: Some(ApiError {
-                code: "INTERNAL_ERROR".to_string(),
-                message: err.to_string(),
-                details: None,
-            }),
-        }
+        Self::new("internal_error", err.to_string())
+    }
+}
+
+/// A status's reason as a `snake_case` token, as axa writes it:
+/// `500` is `internal_server_error`.
+fn status_code_token(status: StatusCode) -> String {
+    status
+        .canonical_reason()
+        .unwrap_or("error")
+        .to_ascii_lowercase()
+        .replace([' ', '-'], "_")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn body(response: Response) -> (Option<String>, serde_json::Value) {
+        let content_type = response
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .map(|v| v.to_str().unwrap().to_string());
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (content_type, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn a_success_is_bare_json() {
+        let (content_type, value) = body(ok(StatusCode::OK, serde_json::json!({"id": 1}))).await;
+        assert_eq!(content_type.as_deref(), Some("application/json"));
+        assert_eq!(value, serde_json::json!({"id": 1}));
+    }
+
+    #[tokio::test]
+    async fn a_client_error_is_a_problem_with_its_detail() {
+        let response = ApiProblem::new("duplicate_detected", "review matches")
+            .with_errors(Some(serde_json::json!({"potential_matches": []})))
+            .respond(StatusCode::CONFLICT);
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+        let (content_type, value) = body(response).await;
+        assert_eq!(content_type.as_deref(), Some("application/problem+json"));
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "type": "about:blank", "title": "Conflict", "status": 409,
+                "detail": "review matches", "code": "duplicate_detected",
+                "errors": {"potential_matches": []}
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_server_error_says_nothing_about_why() {
+        let response = ApiProblem::new("database_error", "connection refused to 10.0.0.5")
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
+        let (_, value) = body(response).await;
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "type": "about:blank", "title": "Internal Server Error", "status": 500,
+                "code": "internal_server_error"
+            })
+        );
     }
 }

@@ -61,7 +61,7 @@ for the file-by-file breakdown.
 2. Grid renders SVAR DataGrid with matching rows.
 3. Operator clicks **New worker** → `/workers/new`.
 4. Form submits to `POST /api/workers`. Service returns 409 with a
-   `MatchResult[]` under `error.details` when the matcher flags
+   problem carrying the candidates under `errors` when the matcher flags
    probable duplicates.
 5. Inline `MatchResultsList` renders each candidate with name,
    identifier, per-component breakdown, deterministic flag.

@@ -55,16 +55,15 @@ async fn send(
     (status, json)
 }
 
-/// Health probe returns `200` with the `healthy` envelope.
+/// Health probe returns `200` with the `healthy` body.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn health_returns_ok() {
     let app = common::create_test_router().await;
     let (status, body) = send(&app, Method::GET, "/api/health", None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(body["success"], json!(true));
-    assert_eq!(body["data"]["status"], "healthy");
-    assert_eq!(body["data"]["service"], "course-service");
+    assert_eq!(body["status"], "healthy");
+    assert_eq!(body["service"], "course-service");
 }
 
 /// Full CRUD lifecycle: create → get → update → soft-delete → 404.
@@ -77,7 +76,7 @@ async fn create_get_update_softdelete_lifecycle() {
     // Create
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(body.clone())).await;
     assert_eq!(status, StatusCode::CREATED, "body: {env}");
-    let created: Course = serde_json::from_value(env["data"].clone()).unwrap();
+    let created: Course = serde_json::from_value(env.clone()).unwrap();
     assert_ne!(
         created.id.to_string(),
         "00000000-0000-0000-0000-000000000000"
@@ -87,7 +86,7 @@ async fn create_get_update_softdelete_lifecycle() {
     // Get
     let (status, env) = send(&app, Method::GET, &format!("/api/courses/{id}"), None).await;
     assert_eq!(status, StatusCode::OK);
-    let fetched: Course = serde_json::from_value(env["data"].clone()).unwrap();
+    let fetched: Course = serde_json::from_value(env.clone()).unwrap();
     assert_eq!(fetched.id, id);
     assert_eq!(fetched.name, created.name);
 
@@ -102,7 +101,7 @@ async fn create_get_update_softdelete_lifecycle() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(env["data"]["course_code"], "EDIT202");
+    assert_eq!(env["course_code"], "EDIT202");
 
     // Soft delete
     let (status, _) = send(&app, Method::DELETE, &format!("/api/courses/{id}"), None).await;
@@ -113,7 +112,7 @@ async fn create_get_update_softdelete_lifecycle() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
-/// Invalid create body yields `422` with a field-scoped `details` array.
+/// Invalid create body yields a `422` problem with a field-scoped `errors` array.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn validation_failure_returns_422_with_details() {
@@ -125,8 +124,8 @@ async fn validation_failure_returns_422_with_details() {
     });
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(bad)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(env["success"], json!(false));
-    let details = &env["error"]["details"];
+    assert_eq!(env["code"], "validation");
+    let details = &env["errors"];
     assert!(
         details.is_array(),
         "details should be an array, got {details}"
@@ -158,7 +157,7 @@ async fn search_finds_created_record() {
     let uri = format!("/api/courses/search?q={token}");
     let (status, env) = send(&app, Method::GET, &uri, None).await;
     assert_eq!(status, StatusCode::OK);
-    let items = env["data"]["items"].as_array().expect("items array");
+    let items = env["items"].as_array().expect("items array");
     assert!(!items.is_empty(), "expected at least one hit for {token}");
 }
 
@@ -170,7 +169,7 @@ async fn check_duplicates_flags_a_clone() {
     let body = common::course_json("DupCheck");
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(body.clone())).await;
     assert_eq!(status, StatusCode::CREATED);
-    let created: Course = serde_json::from_value(env["data"].clone()).unwrap();
+    let created: Course = serde_json::from_value(env.clone()).unwrap();
 
     // Probe with an identical-shape body but a fresh id.
     let mut probe: Value = serde_json::to_value(&created).unwrap();
@@ -183,7 +182,7 @@ async fn check_duplicates_flags_a_clone() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let hits = env["data"].as_array().expect("array of ScoredCandidate");
+    let hits = env.as_array().expect("array of ScoredCandidate");
     assert!(!hits.is_empty(), "expected duplicate detection to fire");
     assert_eq!(hits[0]["course_id"], json!(created.id));
 }
@@ -196,7 +195,7 @@ async fn match_endpoint_returns_ranked_candidates() {
     let body = common::course_json("Match");
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(body.clone())).await;
     assert_eq!(status, StatusCode::CREATED);
-    let created: Course = serde_json::from_value(env["data"].clone()).unwrap();
+    let created: Course = serde_json::from_value(env.clone()).unwrap();
 
     let probe = json!({
         "id": "00000000-0000-0000-0000-000000000000",
@@ -204,7 +203,7 @@ async fn match_endpoint_returns_ranked_candidates() {
     });
     let (status, env) = send(&app, Method::POST, "/api/courses/match", Some(probe)).await;
     assert_eq!(status, StatusCode::OK);
-    let arr = env["data"].as_array().expect("array");
+    let arr = env.as_array().expect("array");
     assert!(arr.iter().any(|c| c["course_id"] == json!(created.id)));
 }
 
@@ -219,8 +218,8 @@ async fn merge_folds_duplicate_into_main() {
     let (sb, eb) = send(&app, Method::POST, "/api/courses", Some(body_b)).await;
     assert_eq!(sa, StatusCode::CREATED);
     assert_eq!(sb, StatusCode::CREATED);
-    let main_id = ea["data"]["id"].as_str().unwrap().to_string();
-    let dup_id = eb["data"]["id"].as_str().unwrap().to_string();
+    let main_id = ea["id"].as_str().unwrap().to_string();
+    let dup_id = eb["id"].as_str().unwrap().to_string();
 
     let req = json!({
         "main_course_id": main_id,
@@ -230,15 +229,9 @@ async fn merge_folds_duplicate_into_main() {
     });
     let (status, env) = send(&app, Method::POST, "/api/courses/merge", Some(req)).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(
-        env["data"]["merge_record"]["main_course_id"],
-        json!(main_id)
-    );
-    assert_eq!(
-        env["data"]["merge_record"]["duplicate_course_id"],
-        json!(dup_id)
-    );
-    assert_eq!(env["data"]["merge_record"]["status"], "Completed");
+    assert_eq!(env["merge_record"]["main_course_id"], json!(main_id));
+    assert_eq!(env["merge_record"]["duplicate_course_id"], json!(dup_id));
+    assert_eq!(env["merge_record"]["status"], "Completed");
 
     // Duplicate is soft-deleted → 404.
     let (status, _) = send(&app, Method::GET, &format!("/api/courses/{dup_id}"), None).await;
@@ -257,7 +250,7 @@ async fn batch_dedup_returns_response_shape() {
     });
     let (status, env) = send(&app, Method::POST, "/api/courses/deduplicate", Some(req)).await;
     assert_eq!(status, StatusCode::OK);
-    let data = &env["data"];
+    let data = &env;
     assert!(data["courses_scanned"].is_number());
     assert!(data["duplicates_found"].is_number());
     assert!(data["auto_merged"].is_number());
@@ -304,9 +297,7 @@ async fn review_queue_persists_across_a_rescan_and_decides_once() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "body: {env}");
-    let review_items = env["data"]["review_items"]
-        .as_array()
-        .expect("review_items array");
+    let review_items = env["review_items"].as_array().expect("review_items array");
     let seeded_pair = review_items
         .iter()
         .find(|i| {
@@ -324,7 +315,7 @@ async fn review_queue_persists_across_a_rescan_and_decides_once() {
     // this run's own response body.
     let (status, env) = send(&app, Method::GET, "/api/courses/review-queue", None).await;
     assert_eq!(status, StatusCode::OK);
-    let items = env["data"]["items"].as_array().expect("items array");
+    let items = env["items"].as_array().expect("items array");
     assert!(
         items.iter().any(|i| i["id"] == json!(item_id)),
         "persisted item missing from GET /review-queue: {items:?}"
@@ -339,8 +330,8 @@ async fn review_queue_persists_across_a_rescan_and_decides_once() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "body: {env}");
-    assert_eq!(env["data"]["status"], "Confirmed");
-    assert_eq!(env["data"]["reviewed_by"], "test-suite");
+    assert_eq!(env["status"], "Confirmed");
+    assert_eq!(env["reviewed_by"], "test-suite");
 
     // Deciding an already-decided item is a 422 (first-writer-wins).
     let (status, _) = send(
@@ -380,7 +371,7 @@ async fn review_queue_persists_across_a_rescan_and_decides_once() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let items = env["data"]["items"].as_array().expect("items array");
+    let items = env["items"].as_array().expect("items array");
     assert!(
         items.iter().any(|i| i["id"] == json!(item_id)),
         "decided row must keep its Confirmed status across a re-scan: {items:?}"
@@ -395,7 +386,7 @@ async fn instance_subresource_round_trips() {
     let course_body = common::course_json("InstanceParent");
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(course_body)).await;
     assert_eq!(status, StatusCode::CREATED);
-    let course_id = env["data"]["id"].as_str().unwrap().to_string();
+    let course_id = env["id"].as_str().unwrap().to_string();
 
     // Create instance
     let inst_body = json!({
@@ -412,7 +403,7 @@ async fn instance_subresource_round_trips() {
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "body: {env}");
-    let inst_id = env["data"]["id"].as_str().unwrap().to_string();
+    let inst_id = env["id"].as_str().unwrap().to_string();
 
     // List
     let (status, env) = send(
@@ -423,7 +414,7 @@ async fn instance_subresource_round_trips() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let arr = env["data"].as_array().unwrap();
+    let arr = env.as_array().unwrap();
     assert!(arr.iter().any(|i| i["id"] == json!(inst_id)));
 
     // Soft-delete
@@ -445,10 +436,10 @@ async fn audit_log_records_create_then_update() {
     let body = common::course_json("Audit");
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(body)).await;
     assert_eq!(status, StatusCode::CREATED);
-    let course_id = env["data"]["id"].as_str().unwrap().to_string();
+    let course_id = env["id"].as_str().unwrap().to_string();
 
     // Update so we have two entries
-    let mut update_body = env["data"].clone();
+    let mut update_body = env.clone();
     update_body["course_code"] = json!("AUDIT99");
     let (_, _) = send(
         &app,
@@ -466,7 +457,7 @@ async fn audit_log_records_create_then_update() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let entries = env["data"].as_array().unwrap();
+    let entries = env.as_array().unwrap();
     let actions: Vec<&str> = entries
         .iter()
         .filter_map(|e| e["action"].as_str())
@@ -483,7 +474,7 @@ async fn masked_view_clears_provider_and_instructors() {
     let body = common::course_json("Masked");
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(body)).await;
     assert_eq!(status, StatusCode::CREATED);
-    let course_id = env["data"]["id"].as_str().unwrap().to_string();
+    let course_id = env["id"].as_str().unwrap().to_string();
 
     let (status, env) = send(
         &app,
@@ -493,7 +484,7 @@ async fn masked_view_clears_provider_and_instructors() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert!(env["data"]["provider_id"].is_null());
+    assert!(env["provider_id"].is_null());
 }
 
 /// The GDPR export wraps the record in the source/schema envelope.
@@ -504,7 +495,7 @@ async fn gdpr_export_envelopes_the_record() {
     let body = common::course_json("Export");
     let (status, env) = send(&app, Method::POST, "/api/courses", Some(body)).await;
     assert_eq!(status, StatusCode::CREATED);
-    let course_id = env["data"]["id"].as_str().unwrap().to_string();
+    let course_id = env["id"].as_str().unwrap().to_string();
 
     let (status, env) = send(
         &app,
@@ -514,7 +505,7 @@ async fn gdpr_export_envelopes_the_record() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let env_obj = &env["data"];
+    let env_obj = &env;
     assert_eq!(env_obj["source"], "course-service");
     assert_eq!(env_obj["schema"], "https://schema.org/Course");
     assert!(env_obj["course"]["id"].is_string());

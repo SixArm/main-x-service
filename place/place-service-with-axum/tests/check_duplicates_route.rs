@@ -62,12 +62,11 @@ async fn check_duplicates_is_served_at_the_documented_path() {
         .await
         .unwrap();
     let body: Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(body["success"], true, "{body}");
     assert!(
-        body["data"]["duplicates_found"].is_boolean(),
-        "response should carry the DuplicateCheckResponse envelope, got {body}"
+        body["duplicates_found"].is_boolean(),
+        "response should carry the DuplicateCheckResponse body, got {body}"
     );
-    assert!(body["data"]["candidates"].is_array(), "{body}");
+    assert!(body["candidates"].is_array(), "{body}");
 
     // The doc-drifted path from before the fix must NOT serve
     // check-duplicates — pinning that the old name is gone, not merely

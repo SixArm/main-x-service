@@ -42,7 +42,7 @@ Aspirational items live in §15, not here.
 
 | Contract | Status |
 |---|---|
-| Front-end ↔ service wire contract (`/api`, envelope, `{ items, total }`) | ✅ pinned by front-end unit tests |
+| Front-end ↔ service wire contract (`/api`, bare JSON + RFC 9457 problems, `{ items, total }`) | ✅ pinned by front-end unit tests |
 | Service ↔ matcher adapter contract (§5.3) | ✅ pinned by 14 bridge tests |
 | SSO across the trio | ❌ roadmap |
 | Entity spec ↔ crate specs consistency | ✅ service spec aligned with the Loco conversion and post-nesting links repaired 2026-06-13 (§13 T-2, T-3, T-4) |

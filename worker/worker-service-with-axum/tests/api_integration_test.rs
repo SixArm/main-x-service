@@ -18,10 +18,7 @@ use axum::{
 use serde_json::json;
 use tower::ServiceExt; // for `oneshot` and `ready`
 
-use worker_service::{
-    api::{ApiResponse, rest::links::LinkView},
-    models::Worker,
-};
+use worker_service::{api::rest::links::LinkView, models::Worker};
 
 /// `GET /api/health` returns 200 with the service name and "healthy".
 #[tokio::test]
@@ -92,10 +89,9 @@ async fn test_create_worker() {
         String::from_utf8_lossy(&body)
     );
 
-    let api_response: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
-    assert!(api_response.success);
+    let api_response: Worker = serde_json::from_slice(&body).unwrap();
 
-    let worker = api_response.data.unwrap();
+    let worker = api_response;
     assert_eq!(worker.name.family, family_name);
     assert_eq!(worker.name.given, vec!["Integration", "Test"]);
     assert!(worker.id.to_string() != "00000000-0000-0000-0000-000000000000");
@@ -140,8 +136,8 @@ async fn test_create_and_get_worker() {
         .await
         .unwrap();
 
-    let create_api_response: ApiResponse<Worker> = serde_json::from_slice(&create_body).unwrap();
-    let created_worker = create_api_response.data.unwrap();
+    let create_api_response: Worker = serde_json::from_slice(&create_body).unwrap();
+    let created_worker = create_api_response;
     let worker_id = created_worker.id;
 
     // Get worker by ID
@@ -161,10 +157,9 @@ async fn test_create_and_get_worker() {
         .await
         .unwrap();
 
-    let get_api_response: ApiResponse<Worker> = serde_json::from_slice(&get_body).unwrap();
-    assert!(get_api_response.success);
+    let get_api_response: Worker = serde_json::from_slice(&get_body).unwrap();
 
-    let retrieved_worker = get_api_response.data.unwrap();
+    let retrieved_worker = get_api_response;
     assert_eq!(retrieved_worker.id, worker_id);
     assert_eq!(retrieved_worker.name.family, family_name);
 }
@@ -206,8 +201,8 @@ async fn test_update_worker() {
         .await
         .unwrap();
 
-    let create_api_response: ApiResponse<Worker> = serde_json::from_slice(&create_body).unwrap();
-    let mut worker = create_api_response.data.unwrap();
+    let create_api_response: Worker = serde_json::from_slice(&create_body).unwrap();
+    let mut worker = create_api_response;
 
     // Update worker
     worker.name.given = vec!["Update".to_string(), "Modified".to_string()];
@@ -230,8 +225,8 @@ async fn test_update_worker() {
         .await
         .unwrap();
 
-    let update_api_response: ApiResponse<Worker> = serde_json::from_slice(&update_body).unwrap();
-    let updated_worker = update_api_response.data.unwrap();
+    let update_api_response: Worker = serde_json::from_slice(&update_body).unwrap();
+    let updated_worker = update_api_response;
 
     assert_eq!(updated_worker.name.given, vec!["Update", "Modified"]);
 }
@@ -273,8 +268,8 @@ async fn test_delete_worker() {
         .await
         .unwrap();
 
-    let create_api_response: ApiResponse<Worker> = serde_json::from_slice(&create_body).unwrap();
-    let worker = create_api_response.data.unwrap();
+    let create_api_response: Worker = serde_json::from_slice(&create_body).unwrap();
+    let worker = create_api_response;
 
     // Delete worker
     let delete_response = app
@@ -419,8 +414,8 @@ async fn test_list_workers_paginates_every_created_record_exactly_once() {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        let created: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
-        created_ids.insert(created.data.unwrap().id);
+        let created: Worker = serde_json::from_slice(&body).unwrap();
+        created_ids.insert(created.id);
     }
     assert_eq!(created_ids.len(), created_count, "each POST made a new id");
 
@@ -446,9 +441,9 @@ async fn test_list_workers_paginates_every_created_record_exactly_once() {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        let page: ApiResponse<worker_service::api::rest::handlers::ListResponse> =
+        let page: worker_service::api::rest::handlers::ListResponse =
             serde_json::from_slice(&body).unwrap();
-        let data = page.data.unwrap();
+        let data = page;
         let page_len = data.workers.len();
         for w in data.workers {
             seen_ids.push(w.id);
@@ -625,9 +620,8 @@ async fn test_audit_verify_reports_an_intact_chain() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert!(parsed.success);
-    let report = parsed.data.expect("a verification report");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let report = parsed;
 
     assert!(
         report["verified"].as_bool().unwrap(),
@@ -700,8 +694,8 @@ async fn test_disclosure_accounting_states_whether_it_is_complete() {
     let body = axum::body::to_bytes(created.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
-    let id = created.data.expect("created record").id;
+    let created: Worker = serde_json::from_slice(&body).unwrap();
+    let id = created.id;
 
     // Perform an actual disclosing read: naming a recipient is what makes
     // an access a §164.528 *disclosure* rather than an internal access, so
@@ -735,8 +729,8 @@ async fn test_disclosure_accounting_states_whether_it_is_complete() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let report = parsed.data.expect("an accounting");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let report = parsed;
 
     assert_eq!(report["id"].as_str().unwrap(), id.to_string());
     assert!(report["disclosures"].is_array());
@@ -851,8 +845,8 @@ async fn test_erasure_destroys_personal_data_and_the_chain_still_verifies() {
     let body = axum::body::to_bytes(created.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
-    let worker = created.data.expect("created worker");
+    let created: Worker = serde_json::from_slice(&body).unwrap();
+    let worker = created;
     let id = worker.id;
     assert!(
         !worker.identifiers.is_empty(),
@@ -890,8 +884,8 @@ async fn assert_chain_verifies_with_redactions(app: axum::Router) {
     let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let report = parsed.data.expect("a verification report");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let report = parsed;
     assert!(
         report["verified"].as_bool().unwrap(),
         "redaction must preserve linkage: {report}"
@@ -926,8 +920,8 @@ async fn test_erasure_of_an_unknown_id_is_answered_not_refused() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let outcome = parsed.data.expect("an erasure outcome");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let outcome = parsed;
     assert!(!outcome["payload_erased"].as_bool().unwrap());
     assert!(outcome["irreversible"].as_bool().unwrap());
 }
@@ -1065,11 +1059,11 @@ async fn attach_and_verify_assessment(app: &axum::Router, id: uuid::Uuid) {
         .await
         .unwrap();
     let listed: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    // The assessments endpoint returns a bare JSON array, not the
-    // `{data: …}` envelope the other worker endpoints use. Reading
-    // `["data"]` yields `null`, which counts as zero — which is exactly
-    // how the post-erasure assertion below passed vacuously until this
-    // pre-check was added.
+    // The assessments endpoint returns a bare JSON array. When the other
+    // worker endpoints still wrapped theirs in a `{data: …}` envelope,
+    // reading `["data"]` here yielded `null`, which counts as zero — which
+    // is exactly how the post-erasure assertion below passed vacuously
+    // until this pre-check was added.
     assert_eq!(
         listed
             .as_array()
@@ -1097,8 +1091,8 @@ async fn erase_and_read_outcome(app: &axum::Router, id: uuid::Uuid) -> serde_jso
     let body = axum::body::to_bytes(erased.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    parsed.data.expect("an erasure outcome")
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    parsed
 }
 
 /// What the service *claims* it did. Checked separately from
@@ -1162,8 +1156,8 @@ async fn test_no_writer_produces_unchained_audit_rows() {
     let body = axum::body::to_bytes(created.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
-    let id = created.data.expect("created record").id;
+    let created: Worker = serde_json::from_slice(&body).unwrap();
+    let id = created.id;
 
     // A delete exercises the third trigger branch (`TG_OP = 'DELETE'`,
     // which a soft delete reached as an UPDATE).
@@ -1241,8 +1235,8 @@ async fn test_entity_audit_covers_every_entity_type_spelling() {
     let body = axum::body::to_bytes(created.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
-    let id = created.data.expect("created record").id;
+    let created: Worker = serde_json::from_slice(&body).unwrap();
+    let id = created.id;
 
     let response = app
         .oneshot(
@@ -1257,8 +1251,8 @@ async fn test_entity_audit_covers_every_entity_type_spelling() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<Vec<serde_json::Value>> = serde_json::from_slice(&body).unwrap();
-    let rows = parsed.data.expect("audit rows");
+    let parsed: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let rows = parsed;
     assert!(
         !rows.is_empty(),
         "the create must appear in this record's audit history"
@@ -1419,11 +1413,9 @@ async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
     let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(
-        parsed.data.expect("chain report")["verified"]
-            .as_bool()
-            .unwrap(),
+        parsed["verified"].as_bool().unwrap(),
         "the audit chain cannot see a record edit — that is why this control exists"
     );
 
@@ -1467,8 +1459,8 @@ async fn create_worker(app: &axum::Router, payload: &serde_json::Value) -> uuid:
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
-    parsed.data.expect("created worker").id
+    let parsed: Worker = serde_json::from_slice(&body).unwrap();
+    parsed.id
 }
 
 /// Fetch the record-integrity report.
@@ -1487,8 +1479,8 @@ async fn record_integrity_report(app: &axum::Router) -> serde_json::Value {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    parsed.data.expect("an integrity report")
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    parsed
 }
 
 /// Assert no record reports as tampered.
@@ -1564,11 +1556,9 @@ async fn test_out_of_band_edit_to_an_assessment_score_is_detected() {
     let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(
-        parsed.data.expect("chain report")["verified"]
-            .as_bool()
-            .unwrap(),
+        parsed["verified"].as_bool().unwrap(),
         "an assessment edit writes no audit row, so the chain still verifies"
     );
 
@@ -1637,18 +1627,12 @@ async fn test_compliance_sbom_needs_a_caller_with_enforcement_off() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
-/// Regression pin: the cross-service link endpoints (`api/rest/links.rs`)
-/// previously returned bare JSON — `Json(view)` — while every other
-/// worker REST endpoint wraps in the uniform `{success,data,error}`
-/// envelope. The front-end `ApiClient` unwraps `.data`, so a bare body
-/// would have silently decoded as `undefined` rather than erroring.
-/// `POST`/`GET`/`DELETE .../links` must decode as `ApiResponse<T>` like
-/// everything else. (The bulk aggregator endpoint, `GET /api/workers/links`,
-/// is deliberately excluded — it stays bare for the link-graph consumer,
-/// which deserializes `{"edges": [...]}` directly.)
+/// The cross-service link endpoints (`api/rest/links.rs`) answer bare JSON,
+/// like every other worker REST endpoint (`spec/restful` §1.3): a created
+/// link is the `LinkView`, a list is the array, and a withdrawal is `{}`.
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL database"]
-async fn test_links_endpoints_use_the_api_response_envelope() {
+async fn test_links_endpoints_answer_bare_json() {
     let app = common::create_test_router().await;
 
     let family_name = common::unique_worker_name("Links");
@@ -1673,10 +1657,10 @@ async fn test_links_endpoints_use_the_api_response_envelope() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Worker> = serde_json::from_slice(&body).unwrap();
-    let worker_id = created.data.unwrap().id;
+    let created: Worker = serde_json::from_slice(&body).unwrap();
+    let worker_id = created.id;
 
-    // Create a same_identity link — the response must be envelope-wrapped.
+    // Create a same_identity link — the response is the link itself.
     let to_ref = format!("person:{}", uuid::Uuid::new_v4());
     let link_json = json!({ "kind": "same_identity", "to_ref": to_ref });
     let response = app
@@ -1695,12 +1679,10 @@ async fn test_links_endpoints_use_the_api_response_envelope() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created_link: ApiResponse<LinkView> = serde_json::from_slice(&body).unwrap();
-    assert!(created_link.success);
-    let link = created_link.data.expect("wrapped link view");
+    let link: LinkView = serde_json::from_slice(&body).unwrap();
     assert_eq!(link.to_ref, to_ref);
 
-    // List — also envelope-wrapped, carrying the array in `data`.
+    // List — the bare array.
     let response = app
         .clone()
         .oneshot(
@@ -1715,11 +1697,10 @@ async fn test_links_endpoints_use_the_api_response_envelope() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let listed: ApiResponse<Vec<LinkView>> = serde_json::from_slice(&body).unwrap();
-    assert!(listed.success);
-    assert_eq!(listed.data.expect("wrapped link list").len(), 1);
+    let listed: Vec<LinkView> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(listed.len(), 1);
 
-    // Withdraw — also envelope-wrapped (an empty object in `data`).
+    // Withdraw — an empty object.
     let response = app
         .oneshot(
             Request::builder()
@@ -1734,6 +1715,6 @@ async fn test_links_endpoints_use_the_api_response_envelope() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let deleted: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert!(deleted.success);
+    let deleted: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(deleted, json!({}));
 }

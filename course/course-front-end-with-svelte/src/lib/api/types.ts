@@ -2,31 +2,25 @@
 // (schema.org/Course-aligned). Reference:
 // course-service-with-axum/agents/models.md.
 
-// ─── HTTP envelope ───────────────────────────────────────────────────
+// ─── Errors ──────────────────────────────────────────────────────────
 
 /**
- * Uniform success/error envelope wrapping every Course Service JSON
- * response. The service always returns this shape, so the client
- * can branch on `success` rather than HTTP status alone.
- *
- * @typeParam T - The payload type carried in `data` on success.
+ * An RFC 9457 problem, the body of every failed Course Service response.
+ * A success is the bare payload, with no wrapper.
  */
-export interface ApiResponse<T> {
-  success: boolean;
-  data: T | null;
-  error: ApiErrorBody | null;
-}
-
-/**
- * Structured error body nested under {@link ApiResponse.error}. `code`
- * is a stable machine token (e.g. `NOT_FOUND`, `DUPLICATE`); `details`
- * is endpoint-specific (e.g. a `MatchResult[]` on a 409 duplicate
- * conflict).
- */
-export interface ApiErrorBody {
-  code: string;
-  message: string;
-  details?: unknown;
+export interface Problem {
+  /** A URI naming the problem type; `"about:blank"` when there is none. */
+  type: string;
+  /** A short summary of the status, such as `"Not Found"`. */
+  title: string;
+  /** The HTTP status code. */
+  status: number;
+  /** What went wrong, for display. Absent on a `500`. */
+  detail?: string;
+  /** Stable lowercase code for branching, such as `"duplicate_candidate"`. */
+  code?: string;
+  /** Structured context, such as duplicate candidates. */
+  errors?: unknown;
 }
 
 // ─── Identifier types ────────────────────────────────────────────────

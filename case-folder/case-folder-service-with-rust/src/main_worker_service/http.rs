@@ -11,17 +11,6 @@ use uuid::Uuid;
 
 use super::{Client, Error, Worker};
 
-/// The upstream `{success, data, error}` envelope. We consume `data` and,
-/// on search, `success`.
-#[derive(Debug, Deserialize)]
-struct ApiResponse<T> {
-    /// Payload, present on success.
-    data: Option<T>,
-    /// Service-reported success flag (checked on the search path).
-    #[serde(default)]
-    success: bool,
-}
-
 /// Wire shape of an upstream FHIR-style `Worker`, trimmed to what the
 /// tracker reads.
 #[derive(Debug, Deserialize)]
@@ -46,7 +35,7 @@ struct NameDto {
     given: Vec<String>,
 }
 
-/// The `data` shape returned by the worker search endpoint.
+/// The body returned by the worker search endpoint.
 #[derive(Debug, Deserialize, Default)]
 struct SearchEnvelope {
     /// Matching workers.
@@ -125,16 +114,11 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<SearchEnvelope> = response
+        let body: SearchEnvelope = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        if !body.success {
-            return Err(Error::BadResponse("search returned success=false".into()));
-        }
         Ok(body
-            .data
-            .unwrap_or_default()
             .workers
             .into_iter()
             .map(WorkerDto::into_worker)
@@ -163,10 +147,10 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<WorkerDto> = response
+        let body: WorkerDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        Ok(body.data.map(WorkerDto::into_worker))
+        Ok(Some(WorkerDto::into_worker(body)))
     }
 }

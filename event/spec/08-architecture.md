@@ -10,7 +10,7 @@
 +------------------------------v-------------------------------+
 |  event-front-end-with-svelte                                 |
 |  SvelteKit 2 + Svelte 5 runes + SVAR DataGrid + Lily         |
-|  SPA; ApiClient + EventRepository (envelope-aware fetch)     |
+|  SPA; ApiClient + EventRepository (bare JSON / RFC 9457)     |
 +------------------------------+-------------------------------+
                                |  HTTP JSON, /api/*
 +------------------------------v-------------------------------+

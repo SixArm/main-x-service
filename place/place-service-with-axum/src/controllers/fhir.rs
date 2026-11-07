@@ -4,8 +4,8 @@
 //! update / delete / search) plus `/fhir/metadata` (the
 //! `CapabilityStatement`), per the family contract
 //! ([`agents/share/fhir.md`](../../../../agents/share/fhir.md)). Handlers
-//! return an Axum [`Response`] directly (not the native `ApiResponse`
-//! envelope) so every response carries `application/fhir+json` and every
+//! return an Axum [`Response`] directly (not the native REST problem
+//! shape) so every response carries `application/fhir+json` and every
 //! non-2xx body is a FHIR `OperationOutcome` (§5). Conversions bridge the
 //! wire ⇄ stored [`crate::models::place::Place`] DTO via [`crate::fhir`];
 //! writes reuse the same repository, validation, audit trail, event stream,

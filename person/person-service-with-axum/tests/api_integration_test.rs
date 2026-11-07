@@ -6,7 +6,7 @@
 //! [`common::create_test_router`] (which opens a database connection and
 //! search index from the environment config) and drive it with
 //! `tower::ServiceExt::oneshot` requests, asserting on status codes and
-//! decoded [`ApiResponse`] bodies. They require a reachable `PostgreSQL`
+//! decoded bare JSON bodies. They require a reachable `PostgreSQL`
 //! instance (see `docker-compose.test.yml`) and exercise the full
 //! create / get / update / delete / search lifecycle plus the
 //! not-found path.
@@ -20,10 +20,7 @@ use axum::{
 use serde_json::json;
 use tower::ServiceExt; // for `oneshot` and `ready`
 
-use person_service::{
-    api::{ApiResponse, rest::links::LinkView},
-    models::Person,
-};
+use person_service::{api::rest::links::LinkView, models::Person};
 
 /// `GET /api/health` returns 200 and identifies the service.
 #[tokio::test]
@@ -90,10 +87,9 @@ async fn test_create_person() {
         .await
         .unwrap();
 
-    let api_response: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
-    assert!(api_response.success);
+    let api_response: Person = serde_json::from_slice(&body).unwrap();
 
-    let person = api_response.data.unwrap();
+    let person = api_response;
     assert_eq!(person.name.family, family_name);
     assert_eq!(person.name.given, vec!["Integration", "Test"]);
     assert!(person.id.to_string() != "00000000-0000-0000-0000-000000000000");
@@ -139,8 +135,8 @@ async fn test_create_and_get_person() {
         .await
         .unwrap();
 
-    let create_api_response: ApiResponse<Person> = serde_json::from_slice(&create_body).unwrap();
-    let created_person = create_api_response.data.unwrap();
+    let create_api_response: Person = serde_json::from_slice(&create_body).unwrap();
+    let created_person = create_api_response;
     let person_id = created_person.id;
 
     // Get person by ID
@@ -160,10 +156,9 @@ async fn test_create_and_get_person() {
         .await
         .unwrap();
 
-    let get_api_response: ApiResponse<Person> = serde_json::from_slice(&get_body).unwrap();
-    assert!(get_api_response.success);
+    let get_api_response: Person = serde_json::from_slice(&get_body).unwrap();
 
-    let retrieved_person = get_api_response.data.unwrap();
+    let retrieved_person = get_api_response;
     assert_eq!(retrieved_person.id, person_id);
     assert_eq!(retrieved_person.name.family, family_name);
 }
@@ -206,8 +201,8 @@ async fn test_update_person() {
         .await
         .unwrap();
 
-    let create_api_response: ApiResponse<Person> = serde_json::from_slice(&create_body).unwrap();
-    let mut person = create_api_response.data.unwrap();
+    let create_api_response: Person = serde_json::from_slice(&create_body).unwrap();
+    let mut person = create_api_response;
 
     // Update person
     person.name.given = vec!["Update".to_string(), "Modified".to_string()];
@@ -230,8 +225,8 @@ async fn test_update_person() {
         .await
         .unwrap();
 
-    let update_api_response: ApiResponse<Person> = serde_json::from_slice(&update_body).unwrap();
-    let updated_person = update_api_response.data.unwrap();
+    let update_api_response: Person = serde_json::from_slice(&update_body).unwrap();
+    let updated_person = update_api_response;
 
     assert_eq!(updated_person.name.given, vec!["Update", "Modified"]);
 }
@@ -274,8 +269,8 @@ async fn test_delete_person() {
         .await
         .unwrap();
 
-    let create_api_response: ApiResponse<Person> = serde_json::from_slice(&create_body).unwrap();
-    let person = create_api_response.data.unwrap();
+    let create_api_response: Person = serde_json::from_slice(&create_body).unwrap();
+    let person = create_api_response;
 
     // Delete person
     let delete_response = app
@@ -432,8 +427,8 @@ async fn test_list_persons_paginates_every_created_record_exactly_once() {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
-        created_ids.insert(created.data.unwrap().id);
+        let created: Person = serde_json::from_slice(&body).unwrap();
+        created_ids.insert(created.id);
     }
     assert_eq!(created_ids.len(), created_count, "each POST made a new id");
 
@@ -459,9 +454,9 @@ async fn test_list_persons_paginates_every_created_record_exactly_once() {
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
-        let page: ApiResponse<person_service::api::rest::handlers::ListResponse> =
+        let page: person_service::api::rest::handlers::ListResponse =
             serde_json::from_slice(&body).unwrap();
-        let data = page.data.unwrap();
+        let data = page;
         let page_len = data.persons.len();
         for p in data.persons {
             seen_ids.push(p.id);
@@ -541,10 +536,10 @@ async fn test_search_rejects_out_of_bound_offset() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let body_str = String::from_utf8(body.to_vec()).unwrap();
-    assert!(
-        body_str.contains("OFFSET_TOO_LARGE"),
-        "expected the OFFSET_TOO_LARGE error code, got: {body_str}"
+    let problem: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(
+        problem["code"], "offset_too_large",
+        "expected the offset_too_large problem, got: {problem}"
     );
 }
 
@@ -602,7 +597,7 @@ async fn test_merge_into_self_is_rejected() {
         .unwrap();
     let body_str = String::from_utf8(body.to_vec()).unwrap();
     assert!(
-        body_str.contains("INVALID_MERGE") || body_str.contains("must differ"),
+        body_str.contains("invalid_merge") || body_str.contains("must differ"),
         "expected the self-merge rejection reason, got: {body_str}"
     );
 }
@@ -637,8 +632,8 @@ async fn create_minimal_person(
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let api: ApiResponse<Person> = serde_json::from_slice(&bytes).unwrap();
-    api.data.unwrap()
+    let api: Person = serde_json::from_slice(&bytes).unwrap();
+    api
 }
 
 /// Merging two *different* real persons round-trips the `"old"`-aliased
@@ -692,10 +687,10 @@ async fn test_merge_two_persons_round_trips_alias_name_and_replaces_link() {
     let merge_body = axum::body::to_bytes(merge_response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let merge_body_str = String::from_utf8(merge_body.to_vec()).unwrap();
-    assert!(
-        merge_body_str.contains("\"success\":true"),
-        "expected a successful merge, got: {merge_body_str}"
+    let merged: serde_json::Value = serde_json::from_slice(&merge_body).unwrap();
+    assert_eq!(
+        merged["merge_record"]["status"], "completed",
+        "expected a successful merge, got: {merged}"
     );
 
     // Re-fetch the survivor: proves the alias name and link were not only
@@ -714,8 +709,8 @@ async fn test_merge_two_persons_round_trips_alias_name_and_replaces_link() {
     let get_body = axum::body::to_bytes(get_response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let get_api_response: ApiResponse<Person> = serde_json::from_slice(&get_body).unwrap();
-    let survivor = get_api_response.data.unwrap();
+    let get_api_response: Person = serde_json::from_slice(&get_body).unwrap();
+    let survivor = get_api_response;
 
     let alias = survivor
         .additional_names
@@ -816,8 +811,8 @@ async fn test_replaced_by_link_round_trips() {
     let get_body = axum::body::to_bytes(get_response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let get_api_response: ApiResponse<Person> = serde_json::from_slice(&get_body).unwrap();
-    let survivor = get_api_response.data.unwrap();
+    let get_api_response: Person = serde_json::from_slice(&get_body).unwrap();
+    let survivor = get_api_response;
 
     let link = survivor
         .links
@@ -886,8 +881,8 @@ async fn test_create_person_with_telecom_and_identifier_use_type_round_trips() {
         "expected 201, got {status}: {}",
         String::from_utf8_lossy(&create_body)
     );
-    let created: ApiResponse<Person> = serde_json::from_slice(&create_body).unwrap();
-    let person_id = created.data.unwrap().id;
+    let created: Person = serde_json::from_slice(&create_body).unwrap();
+    let person_id = created.id;
 
     let get_response = app
         .oneshot(
@@ -902,10 +897,7 @@ async fn test_create_person_with_telecom_and_identifier_use_type_round_trips() {
     let get_body = axum::body::to_bytes(get_response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let retrieved = serde_json::from_slice::<ApiResponse<Person>>(&get_body)
-        .unwrap()
-        .data
-        .unwrap();
+    let retrieved = serde_json::from_slice::<Person>(&get_body).unwrap();
 
     let phone = retrieved
         .telecom
@@ -969,8 +961,8 @@ async fn test_disclosure_accounting_states_whether_it_is_complete() {
     let body = axum::body::to_bytes(created.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
-    let id = created.data.expect("created record").id;
+    let created: Person = serde_json::from_slice(&body).unwrap();
+    let id = created.id;
 
     // Perform an actual disclosing read: naming a recipient is what makes
     // an access a §164.528 *disclosure* rather than an internal access, so
@@ -1004,8 +996,8 @@ async fn test_disclosure_accounting_states_whether_it_is_complete() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let report = parsed.data.expect("an accounting");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let report = parsed;
 
     assert_eq!(report["id"].as_str().unwrap(), id.to_string());
     assert!(report["disclosures"].is_array());
@@ -1120,8 +1112,8 @@ async fn test_erasure_destroys_personal_data_and_the_chain_still_verifies() {
     let body = axum::body::to_bytes(created.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
-    let person = created.data.expect("created person");
+    let created: Person = serde_json::from_slice(&body).unwrap();
+    let person = created;
     let id = person.id;
     assert!(
         !person.identifiers.is_empty(),
@@ -1144,8 +1136,8 @@ async fn test_erasure_destroys_personal_data_and_the_chain_still_verifies() {
     let body = axum::body::to_bytes(erased.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let outcome = parsed.data.expect("an erasure outcome");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let outcome = parsed;
     assert!(outcome["irreversible"].as_bool().unwrap());
     assert!(outcome["payload_erased"].as_bool().unwrap());
     assert!(
@@ -1182,8 +1174,8 @@ async fn assert_chain_verifies_with_redactions(app: axum::Router) {
     let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let report = parsed.data.expect("a verification report");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let report = parsed;
     assert!(
         report["verified"].as_bool().unwrap(),
         "redaction must preserve linkage: {report}"
@@ -1218,8 +1210,8 @@ async fn test_erasure_of_an_unknown_id_is_answered_not_refused() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let outcome = parsed.data.expect("an erasure outcome");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let outcome = parsed;
     assert!(!outcome["payload_erased"].as_bool().unwrap());
     assert!(outcome["irreversible"].as_bool().unwrap());
 }
@@ -1333,8 +1325,8 @@ async fn test_no_writer_produces_unchained_audit_rows() {
     let body = axum::body::to_bytes(created.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
-    let id = created.data.expect("created record").id;
+    let created: Person = serde_json::from_slice(&body).unwrap();
+    let id = created.id;
 
     // A delete exercises the third trigger branch (`TG_OP = 'DELETE'`,
     // which a soft delete reached as an UPDATE).
@@ -1412,8 +1404,8 @@ async fn test_entity_audit_covers_every_entity_type_spelling() {
     let body = axum::body::to_bytes(created.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
-    let id = created.data.expect("created record").id;
+    let created: Person = serde_json::from_slice(&body).unwrap();
+    let id = created.id;
 
     let response = app
         .oneshot(
@@ -1428,8 +1420,8 @@ async fn test_entity_audit_covers_every_entity_type_spelling() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<Vec<serde_json::Value>> = serde_json::from_slice(&body).unwrap();
-    let rows = parsed.data.expect("audit rows");
+    let parsed: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let rows = parsed;
     assert!(
         !rows.is_empty(),
         "the create must appear in this record's audit history"
@@ -1590,11 +1582,9 @@ async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
     let body = axum::body::to_bytes(verify.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(
-        parsed.data.expect("chain report")["verified"]
-            .as_bool()
-            .unwrap(),
+        parsed["verified"].as_bool().unwrap(),
         "the audit chain cannot see a record edit — that is why this control exists"
     );
 
@@ -1638,8 +1628,8 @@ async fn create_person(app: &axum::Router, payload: &serde_json::Value) -> uuid:
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
-    parsed.data.expect("created person").id
+    let parsed: Person = serde_json::from_slice(&body).unwrap();
+    parsed.id
 }
 
 /// Fetch the record-integrity report.
@@ -1658,8 +1648,8 @@ async fn record_integrity_report(app: &axum::Router) -> serde_json::Value {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    parsed.data.expect("an integrity report")
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    parsed
 }
 
 /// Assert no record reports as tampered.
@@ -1715,8 +1705,8 @@ async fn test_a_recorded_checkpoint_detects_wholesale_deletion() {
     let body = axum::body::to_bytes(taken.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let checkpoint = parsed.data.expect("a checkpoint");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let checkpoint = parsed;
 
     // Delete the trail as an attacker with SQL access would. No audit row
     // is written; nothing in-band records it.
@@ -1742,9 +1732,9 @@ async fn test_a_recorded_checkpoint_detects_wholesale_deletion() {
     let body = axum::body::to_bytes(chain.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(
-        parsed.data.expect("report")["verified"].as_bool().unwrap(),
+        parsed["verified"].as_bool().unwrap(),
         "an emptied chain verifies vacuously — which is why the witness exists"
     );
 
@@ -1764,8 +1754,8 @@ async fn test_a_recorded_checkpoint_detects_wholesale_deletion() {
     let body = axum::body::to_bytes(checked.into_body(), usize::MAX)
         .await
         .unwrap();
-    let parsed: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    let report = parsed.data.expect("a verdict");
+    let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let report = parsed;
     assert_eq!(
         report["honoured"], false,
         "wholesale deletion must be detected: {report}"
@@ -1829,18 +1819,12 @@ async fn test_compliance_sbom_needs_a_caller_with_enforcement_off() {
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
-/// Regression pin: the cross-service link endpoints (`api/rest/links.rs`)
-/// previously returned bare JSON — `Json(view)` — while every other
-/// person REST endpoint wraps in the uniform `{success,data,error}`
-/// envelope. The front-end `ApiClient` unwraps `.data`, so a bare body
-/// would have silently decoded as `undefined` rather than erroring.
-/// `POST`/`GET`/`DELETE .../links` must decode as `ApiResponse<T>` like
-/// everything else. (The bulk aggregator endpoint, `GET /api/persons/links`,
-/// is deliberately excluded — it stays bare for the link-graph consumer,
-/// which deserializes `{"edges": [...]}` directly.)
+/// The cross-service link endpoints (`api/rest/links.rs`) answer bare JSON,
+/// like every other person REST endpoint (`spec/restful` §1.3): a created
+/// link is the `LinkView`, a list is the array, and a withdrawal is `{}`.
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
-async fn test_links_endpoints_use_the_api_response_envelope() {
+async fn test_links_endpoints_answer_bare_json() {
     let app = common::create_test_router().await;
 
     let family_name = common::unique_person_name("Links");
@@ -1865,10 +1849,10 @@ async fn test_links_endpoints_use_the_api_response_envelope() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created: ApiResponse<Person> = serde_json::from_slice(&body).unwrap();
-    let person_id = created.data.unwrap().id;
+    let created: Person = serde_json::from_slice(&body).unwrap();
+    let person_id = created.id;
 
-    // Create a same_identity link — the response must be envelope-wrapped.
+    // Create a same_identity link — the response is the link itself.
     let to_ref = format!("worker:{}", uuid::Uuid::new_v4());
     let link_json = json!({ "kind": "same_identity", "to_ref": to_ref });
     let response = app
@@ -1887,12 +1871,10 @@ async fn test_links_endpoints_use_the_api_response_envelope() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let created_link: ApiResponse<LinkView> = serde_json::from_slice(&body).unwrap();
-    assert!(created_link.success);
-    let link = created_link.data.expect("wrapped link view");
+    let link: LinkView = serde_json::from_slice(&body).unwrap();
     assert_eq!(link.to_ref, to_ref);
 
-    // List — also envelope-wrapped, carrying the array in `data`.
+    // List — the bare array.
     let response = app
         .clone()
         .oneshot(
@@ -1907,11 +1889,10 @@ async fn test_links_endpoints_use_the_api_response_envelope() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let listed: ApiResponse<Vec<LinkView>> = serde_json::from_slice(&body).unwrap();
-    assert!(listed.success);
-    assert_eq!(listed.data.expect("wrapped link list").len(), 1);
+    let listed: Vec<LinkView> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(listed.len(), 1);
 
-    // Withdraw — also envelope-wrapped (an empty object in `data`).
+    // Withdraw — an empty object.
     let response = app
         .oneshot(
             Request::builder()
@@ -1926,6 +1907,6 @@ async fn test_links_endpoints_use_the_api_response_envelope() {
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
         .unwrap();
-    let deleted: ApiResponse<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert!(deleted.success);
+    let deleted: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(deleted, json!({}));
 }

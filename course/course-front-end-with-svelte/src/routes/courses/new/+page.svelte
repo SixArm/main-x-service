@@ -31,8 +31,8 @@
             if (created.id) goto(`/courses/${created.id}`);
         } catch (err) {
             if (err instanceof ApiError && err.isConflict) {
-                // The Course Service ships `details` as a flat
-                // MatchResult[]. A sibling family service was rumoured
+                // The Course Service ships the problem's `errors`
+                // (here `details`) as a flat MatchResult[]. A sibling family service was rumoured
                 // to wrap it in `{ has_duplicates, potential_matches }`;
                 // keep the wrapper-aware branch so this page survives a
                 // future service-side shape change without redeploy.

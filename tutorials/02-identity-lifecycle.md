@@ -173,7 +173,7 @@ curl -s -X POST http://localhost:5150/api/persons/check-duplicates \
 ```
 
 ```json
-{"success":true,"data":{"has_duplicates":false,"potential_matches":[]},"error":null}
+{"has_duplicates":false,"potential_matches":[]}
 ```
 
 That's an exact copy of seeded person #1's own name and birth date, and
@@ -221,7 +221,7 @@ HTTP/1.1 409 Conflict
 content-type: application/json
 accepts-version: 1.0
 
-{"success":false,"data":null,"error":{"code":"DUPLICATE_DETECTED","message":"Potential duplicate persons found. Review matches before proceeding.","details":{"has_duplicates":true,"potential_matches":[{"detection_method":"duplicate_detection","person":{"...":"...","id":"26578248-52f2-45a0-8a4f-ebae2ba81b32","name":{"family":"Okonkwo","given":["Adaeze"]},"...":"..."},"quality":"certain","score":0.9749999999999999,"score_breakdown":{"address_score":0.0,"birth_date_score":0.95,"document_score":0.0,"gender_score":1.0,"identifier_score":0.0,"name_score":0.9874999999999999,"tax_id_score":0.0}}]}}}
+{"type":"about:blank","title":"Conflict","status":409,"detail":"Potential duplicate persons found. Review matches before proceeding.","code":"duplicate_detected","errors":{"has_duplicates":true,"potential_matches":[{"detection_method":"duplicate_detection","person":{"...":"...","id":"26578248-52f2-45a0-8a4f-ebae2ba81b32","name":{"family":"Okonkwo","given":["Adaeze"]}},"quality":"certain","score":0.9749999999999999,"score_breakdown":{"address_score":0.0,"birth_date_score":0.95,"document_score":0.0,"gender_score":1.0,"identifier_score":0.0,"name_score":0.9874999999999999,"tax_id_score":0.0}}]}}
 ```
 
 (The candidate's full record is trimmed above for readability — the
@@ -235,7 +235,7 @@ curl -s "http://localhost:5150/api/persons/search?q=Okonkwoh&limit=10"
 ```
 
 ```json
-{"success":true,"data":{"persons":[],"total":0,"query":"Okonkwoh","offset":0,"limit":10}}
+{"persons":[],"total":0,"query":"Okonkwoh","offset":0,"limit":10}
 ```
 
 ## 4. `check-duplicates` — same detection, no side effect
@@ -250,7 +250,7 @@ curl -s -X POST http://localhost:5150/api/persons/check-duplicates \
 ```
 
 ```json
-{"success":true,"data":{"has_duplicates":true,"potential_matches":[{"person":{"id":"26578248-52f2-45a0-8a4f-ebae2ba81b32","name":{"family":"Okonkwo","given":["Adaeze"]},"birth_date":"1984-03-11","...":"..."},"score":0.9749999999999999,"quality":"certain","detection_method":"duplicate_detection","score_breakdown":{"address_score":0.0,"birth_date_score":0.95,"document_score":0.0,"gender_score":1.0,"identifier_score":0.0,"name_score":0.9874999999999999,"tax_id_score":0.0}}]}}
+{"has_duplicates":true,"potential_matches":[{"person":{"id":"26578248-52f2-45a0-8a4f-ebae2ba81b32","name":{"family":"Okonkwo","given":["Adaeze"]},"birth_date":"1984-03-11","...":"..."},"score":0.9749999999999999,"quality":"certain","detection_method":"duplicate_detection","score_breakdown":{"address_score":0.0,"birth_date_score":0.95,"document_score":0.0,"gender_score":1.0,"identifier_score":0.0,"name_score":0.9874999999999999,"tax_id_score":0.0}}]}
 ```
 
 Identical score and breakdown to the `409` — same
@@ -273,10 +273,10 @@ curl -s -X POST http://localhost:5150/api/persons/match \
 ```
 
 ```json
-{"success":true,"data":{"matches":[
+{"matches":[
   {"person":{"id":"195503f4-d4d6-4912-a40b-35300a7a48f0","name":{"family":"Nakamura","given":["Ren"]},"...":"..."},"score":1.0,"quality":"certain","detection_method":"probabilistic","score_breakdown":{"birth_date_score":1.0,"gender_score":1.0,"name_score":1.0,"...":"0.0 elsewhere"}},
   {"person":{"id":"1e8ebf4f-059c-4341-b2d3-008602952d7e","name":{"family":"Nakamura","given":["Kenji"]},"...":"..."},"score":0.9425641025641024,"quality":"probable","detection_method":"probabilistic","score_breakdown":{"birth_date_score":1.0,"gender_score":1.0,"name_score":0.8755555555555555,"...":"0.0 elsewhere"}}
-],"total":2},"error":null}
+],"total":2}
 ```
 
 Two things worth noticing in this real response. First, `match` doesn't
@@ -320,13 +320,13 @@ Pushing the threshold above 1.0 keeps every real duplicate in the
 decidable `pending` state instead.
 
 ```json
-{"success":true,"data":{"persons_scanned":50,"duplicates_found":5,"auto_merged":0,"queued_for_review":5,"review_items":[
+{"persons_scanned":50,"duplicates_found":5,"auto_merged":0,"queued_for_review":5,"review_items":[
   {"id":"42843791-bd11-4fce-9fdc-c55729d42fbe","person_id_a":"26578248-...","person_id_b":"921c48ac-...","match_score":0.9934065934065933,"match_quality":"certain","status":"pending","provenance":"operator","...":"..."},
   {"id":"0678f250-7ce4-44c4-8a9e-8a61a92fadfa","person_id_a":"a0ea036d-...","person_id_b":"aabda370-...","match_score":0.9907692307692307,"match_quality":"certain","status":"pending","...":"..."},
   {"id":"e788888b-93cc-4235-9e58-0691dd5622a7","person_id_a":"64121a81-...","person_id_b":"9c5b66fb-...","match_score":0.9705128205128204,"match_quality":"certain","status":"pending","...":"..."},
   {"id":"8c3d796f-449d-4d90-bbc9-2fcc7a9c8dc5","person_id_a":"03669b2f-...","person_id_b":"1d887df7-...","match_score":0.9994999999999999,"match_quality":"certain","status":"pending","...":"..."},
   {"id":"03513dd5-e821-4f26-870a-6364f2fad9e9","person_id_a":"195503f4-...","person_id_b":"1e8ebf4f-...","match_score":0.9425641025641024,"match_quality":"probable","status":"pending","...":"..."}
-]},"error":null}
+]}
 ```
 
 All five documented pairs, all five documented scores
@@ -353,7 +353,7 @@ curl -s -X POST http://localhost:5150/api/persons/review-queue/03513dd5-e821-4f2
 ```
 
 ```json
-{"success":true,"data":{"id":"03513dd5-e821-4f26-870a-6364f2fad9e9","status":"rejected","match_score":0.9425641025641024,"match_quality":"probable","reviewed_at":"2026-08-04T07:18:31.632254Z","...":"..."}}
+{"id":"03513dd5-e821-4f26-870a-6364f2fad9e9","status":"rejected","match_score":0.9425641025641024,"match_quality":"probable","reviewed_at":"2026-08-04T07:18:31.632254Z","...":"..."}
 ```
 
 And confirm the clear-cut Okonkwo pair (id `42843791-...`), which we'll
@@ -366,7 +366,7 @@ curl -s -X POST http://localhost:5150/api/persons/review-queue/42843791-bd11-4fc
 ```
 
 ```json
-{"success":true,"data":{"id":"42843791-bd11-4fce-9fdc-c55729d42fbe","status":"confirmed","match_score":0.9934065934065933,"match_quality":"certain","reviewed_at":"2026-08-04T07:18:48.515332Z","...":"..."}}
+{"id":"42843791-bd11-4fce-9fdc-c55729d42fbe","status":"confirmed","match_score":0.9934065934065933,"match_quality":"certain","reviewed_at":"2026-08-04T07:18:48.515332Z","...":"..."}
 ```
 
 ## 8. Merge
@@ -378,7 +378,7 @@ curl -s -X POST http://localhost:5150/api/persons/merge \
 ```
 
 ```json
-{"success":true,"data":{
+{
   "merge_record":{"id":"db716847-0853-460d-be1a-90de08e11524","main_person_id":"26578248-...","duplicate_person_id":"921c48ac-...","status":"completed","merge_reason":"Confirmed duplicate — family-name transposition, same DOB (review-queue item 42843791)","transferred_data":{},"merged_at":"2026-08-04T08:04:41.282681Z"},
   "main_person":{
     "id":"26578248-52f2-45a0-8a4f-ebae2ba81b32",
@@ -387,7 +387,7 @@ curl -s -X POST http://localhost:5150/api/persons/merge \
     "links":[{"other_person_id":"921c48ac-d073-49db-b235-4ad82f8278c3","link_type":"replaces"}],
     "...":"..."
   }
-},"error":null}
+}
 ```
 
 Exactly what [`merge.md`](../agents/share/merge.md) documents: the
@@ -407,6 +407,10 @@ The first time this merge was attempted, it failed:
 ```json
 {"success":false,"data":null,"error":{"code":"DATABASE_ERROR","message":"Failed to merge persons: Database error: Query Error: error returned from database: new row for relation \"person_names\" violates check constraint \"patient_names_use_type_check\" at line 2076","details":null}}
 ```
+
+That capture predates 2026-11-07. A `500` now answers only
+`{"type":"about:blank","title":"Internal Server Error","status":500,"code":"internal_server_error"}`,
+and its cause, the database error above, goes to the service's log.
 
 `src/db/repositories.rs` wrote `NameUse`/`IdentifierUse`/
 `ContactPointSystem`/`ContactPointUse`/`LinkType` via `format!("{:?}")`
@@ -443,7 +447,7 @@ curl -s -i http://localhost:5150/api/persons/921c48ac-d073-49db-b235-4ad82f8278c
 ```
 HTTP/1.1 404 Not Found
 
-{"success":false,"data":null,"error":{"code":"NOT_FOUND","message":"Person with id '921c48ac-d073-49db-b235-4ad82f8278c3' not found","details":null}}
+{"type":"about:blank","title":"Not Found","status":404,"detail":"Person with id '921c48ac-d073-49db-b235-4ad82f8278c3' not found","code":"not_found"}
 ```
 
 Not `200` with `"active":false` in the body — `get_by_id` (and every
@@ -460,7 +464,7 @@ curl -s "http://localhost:5150/api/persons/26578248-52f2-45a0-8a4f-ebae2ba81b32/
 ```
 
 ```json
-{"success":true,"data":[
+[
   {"seq":6,"action":"UPDATE","entity_type":"Person","entity_id":"26578248-...",
    "old_values":{"additional_names":[],"links":[],"...":"..."},
    "new_values":{"additional_names":[{"family":"Okonkow","use_type":"old","...":"..."}],"links":[{"link_type":"replaces","other_person_id":"921c48ac-..."}],"...":"..."},
@@ -471,7 +475,7 @@ curl -s "http://localhost:5150/api/persons/26578248-52f2-45a0-8a4f-ebae2ba81b32/
    "new_values":{"updated_at":"2026-08-04T07:17:43.650089Z","...":"..."},
    "hash":"87789dee4ec98bde0a39e1888c5490709a97e148a4a4c1ae3651cd54f066b285",
    "prev_hash":null,"...":"..."}
-]}
+]
 ```
 
 Two rows, not the "create + merge" pair you might expect — a genuine,
@@ -583,7 +587,7 @@ curl -s -X POST http://localhost:5173/api/proxy/api/persons/review-queue/0678f25
 ```
 
 ```json
-{"success":true,"data":{"id":"0678f250-...","status":"confirmed","...":"..."}}
+{"id":"0678f250-...","status":"confirmed","...":"..."}
 ```
 
 ```sh
@@ -593,10 +597,10 @@ curl -s -X POST http://localhost:5173/api/proxy/api/persons/merge \
 ```
 
 ```json
-{"success":true,"data":{
+{
   "merge_record":{"main_person_id":"a0ea036d-...","duplicate_person_id":"aabda370-...","status":"completed","...":"..."},
   "main_person":{"name":{"family":"Halloran","given":["Bill"]},"additional_names":[{"family":"Halloran","given":["William"],"use_type":"old"}],"links":[{"link_type":"replaces","other_person_id":"aabda370-..."}],"...":"..."}
-},"error":null}
+}
 ```
 
 Bill Halloran survives with William's name folded in as an `"old"`

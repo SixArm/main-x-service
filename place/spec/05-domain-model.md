@@ -111,7 +111,7 @@ service [spec §6.2](../place-service-with-axum/spec/06-functional-requirements.
 ### 5.4 Front-end TypeScript types
 
 The front-end mirrors the service's wire format in
-`src/lib/api/types.ts` and unwraps the shared envelope in
+`src/lib/api/types.ts` and reads its bare JSON and RFC 9457 problems in
 `src/lib/api/client.ts`. The service model is upstream: if a field
 changes in the service, the front-end types MUST be fixed in the same
 change cycle (front-end

@@ -49,7 +49,7 @@
 #![deny(missing_docs)]
 #![warn(clippy::pedantic)]
 
-/// REST API surface and shared response envelope.
+/// REST API surface and the shared response helpers.
 pub mod api;
 /// axa application hooks (boot, routes, migrations).
 pub mod app;

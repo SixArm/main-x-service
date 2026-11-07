@@ -26,8 +26,8 @@ Front-end consumption map:
 | GET | `/audit/user` | Audit logs for one user |
 
 Also: Swagger UI at `/swagger-ui`; Prometheus at `/metrics.prom`;
-`/fhir/Event/*` returns `501` (stub); gRPC stubbed. Standard
-envelope `{ "success", "data", "error" }`.
+`/fhir/Event/*` returns `501` (stub); gRPC stubbed. Bare JSON on
+success, an RFC 9457 problem on failure (`spec/restful` §1.3).
 
 ### 9.2 Front-end routes
 

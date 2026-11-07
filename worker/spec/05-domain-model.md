@@ -125,8 +125,8 @@ Invariants:
 
 ### 5.4 Front-end↔service contract
 
-The front-end consumes the service's JSON envelope
-(`{ success, data, error }`) over the REST surface in §9, via
+The front-end consumes the service's responses over the REST surface
+in §9 (bare JSON on success, an RFC 9457 problem on failure), via
 `ApiClient` + `WorkerRepository`
 (`src/lib/api/client.ts`, `src/lib/api/workers.ts`). It never talks
 to the matcher; matching is reachable only through the service's

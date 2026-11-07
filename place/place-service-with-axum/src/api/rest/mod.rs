@@ -67,7 +67,6 @@ impl utoipa::Modify for SecurityAddon {
         handlers::audit_recent,
     ),
     components(schemas(
-        crate::api::ApiError,
         crate::models::place::Place,
         crate::models::address::PostalAddress,
         crate::models::geo::GeoCoordinates,

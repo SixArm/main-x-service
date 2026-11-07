@@ -133,7 +133,7 @@ src/
     review.ts               - review-queue status vocabulary + score-breakdown helpers
     api/
       types.ts             - Person, HumanName, MatchResult, EntityLink, BulkJobView, … (mirrors the Rust models)
-      client.ts            - ApiClient + ApiError (envelope-aware fetch; FormData pass-through)
+      client.ts            - ApiClient + ApiError (bare JSON / RFC 9457 problems; FormData pass-through)
       persons.ts           - PersonRepository (CRUD + search + match + merge + audit + links + bulk + review-queue)
     server/                 - BFF-only, never bundled to the browser
       config.ts             - PERSON_API_URL / AUTH_API_URL

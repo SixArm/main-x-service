@@ -1,8 +1,7 @@
 # RESTful API Reference — Care Pathway Entity
 
-The service is axa and returns **raw JSON** — no
-`{success, data, error}` envelope (unlike the pre-loco person
-service). Source:
+The service is axa and returns bare JSON on success and an RFC 9457
+problem on failure, like every service (`spec/restful` §1.3). Source:
 [`src/controllers/care_pathways.rs`](../care-pathway-service-with-axum/src/controllers/care_pathways.rs).
 Base URL in development: `http://localhost:5150`.
 

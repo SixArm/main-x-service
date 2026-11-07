@@ -22,7 +22,7 @@ This spec owns the **cross-subproject contract**:
 | Tantivy full-text / fuzzy / boolean search; geo-radius search | place-service |
 | Duplicate detection (real-time / explicit / batch), review queue, merge | place-service |
 | Validation, normalisation, privacy masking, GDPR export, consent | place-service |
-| REST API surface, OpenAPI / Swagger, response envelope | place-service |
+| REST API surface, OpenAPI / Swagger, response and problem shapes | place-service |
 | Canonical pairwise matching algorithm (deterministic + probabilistic) | [place-matcher](../place-matcher-rust-crate/spec/index.md) |
 | Normalisation primitives (names, postcodes, phones, addresses, phonetics) | place-matcher |
 | Match configuration presets (`strict` / `default` / `lenient`) | place-matcher |

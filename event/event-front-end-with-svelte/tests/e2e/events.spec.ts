@@ -10,243 +10,307 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 test.describe("Event front-end smoke", () => {
-    // Pins: the dashboard heading and the primary nav links are present.
-    test("dashboard renders nav and heading", async ({ page }) => {
-        await page.goto("/");
-        await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-        // The nav is a hamburger dropdown at every viewport width
-        // (deliberate layout design) — open it before asserting links.
-        await page.getByRole("button", { name: "Toggle navigation" }).click();
-        await expect(page.getByRole("link", { name: "Events" })).toBeVisible();
-        await expect(page.getByRole("link", { name: "Match check" })).toBeVisible();
-        await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
-    });
+  // Pins: the dashboard heading and the primary nav links are present.
+  test("dashboard renders nav and heading", async ({ page }) => {
+    await page.goto("/");
+    await expect(
+      page.getByRole("heading", { name: "Dashboard" }),
+    ).toBeVisible();
+    // The nav is a hamburger dropdown at every viewport width
+    // (deliberate layout design) — open it before asserting links.
+    await page.getByRole("button", { name: "Toggle navigation" }).click();
+    await expect(page.getByRole("link", { name: "Events" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Match check" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
+  });
 
-    // Pins: the events list shows its heading, the search box, and the
-    // "New event" action (scoped to <main> to avoid the sidebar link).
-    test("events list renders search box and new event link", async ({ page }) => {
-        await page.goto("/events");
-        await expect(page.getByRole("heading", { name: "Events" })).toBeVisible();
-        await expect(page.getByRole("searchbox")).toBeVisible();
-        await expect(page.getByRole("main").getByRole("link", { name: "New event" })).toBeVisible();
-    });
+  // Pins: the events list shows its heading, the search box, and the
+  // "New event" action (scoped to <main> to avoid the sidebar link).
+  test("events list renders search box and new event link", async ({
+    page,
+  }) => {
+    await page.goto("/events");
+    await expect(page.getByRole("heading", { name: "Events" })).toBeVisible();
+    await expect(page.getByRole("searchbox")).toBeVisible();
+    await expect(
+      page.getByRole("main").getByRole("link", { name: "New event" }),
+    ).toBeVisible();
+  });
 
-    // Pins: the new-event form exposes the required Name/Start fields and
-    // the Create button.
-    test("new event form renders required name and start fields", async ({ page }) => {
-        await page.goto("/events/new");
-        await expect(page.getByRole("heading", { name: "New event" })).toBeVisible();
-        await expect(page.getByLabel(/^Name/)).toBeVisible();
-        await expect(page.getByLabel(/^Start/)).toBeVisible();
-        await expect(page.getByRole("button", { name: "Create" })).toBeVisible();
-    });
+  // Pins: the new-event form exposes the required Name/Start fields and
+  // the Create button.
+  test("new event form renders required name and start fields", async ({
+    page,
+  }) => {
+    await page.goto("/events/new");
+    await expect(
+      page.getByRole("heading", { name: "New event" }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/^Name/)).toBeVisible();
+    await expect(page.getByLabel(/^Start/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create" })).toBeVisible();
+  });
 
-    // Pins: the match-check page renders with its "Find matches" button.
-    test("match check form renders", async ({ page }) => {
-        await page.goto("/events/match");
-        await expect(page.getByRole("heading", { name: "Match check" })).toBeVisible();
-        await expect(page.getByRole("button", { name: /Find matches/ })).toBeVisible();
-    });
-
-    // Pins: the merge page renders both the main and duplicate ID inputs.
-    test("merge form renders both ID inputs", async ({ page }) => {
-        await page.goto("/events/merge");
-        await expect(page.getByRole("heading", { name: "Merge events" })).toBeVisible();
-        await expect(page.getByLabel(/Main event ID/)).toBeVisible();
-        await expect(page.getByLabel(/Duplicate event ID/)).toBeVisible();
-    });
-
-    // Pins T-27: the calendar renders both a timed event and an all-day
-    // event, and selecting one navigates to its detail page. The all-day
-    // case is not incidental — `end_date` equal to `start_date` (the
-    // common shape for a same-day all-day event) previously made the
-    // event silently invisible: `@svar-ui/calendar-store` requires an
-    // all-day event's `end` to be strictly after `start`, and the page
-    // was passing `end_date` straight through with no exclusive-end
-    // adjustment. See the fix in `src/routes/calendar/+page.svelte`.
-    test("calendar renders a timed and an all-day event, and navigates on select", async ({
-        page,
-    }) => {
-        const timedId = "0c4f1e2a-0000-4000-8000-00000000000f";
-        const allDayId = "0c4f1e2a-0000-4000-8000-000000000010";
-        const today = new Date();
-        const dayInThisMonth = new Date(today.getFullYear(), today.getMonth(), 12)
-            .toISOString()
-            .slice(0, 10);
-        await page.route("**/api/events/search**", async (route) => {
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                    data: [
-                        {
-                            id: timedId,
-                            name: "Board Meeting",
-                            start_date: `${dayInThisMonth}T09:00:00Z`,
-                            end_date: `${dayInThisMonth}T10:00:00Z`,
-                            event_status: "scheduled",
-                            event_type: "meeting",
-                        },
-                        {
-                            id: allDayId,
-                            name: "Site Closure",
-                            // start == end is the shape that used to be
-                            // filtered out entirely (a same-day all-day
-                            // event, the common case).
-                            start_date: `${dayInThisMonth}T00:00:00Z`,
-                            end_date: `${dayInThisMonth}T00:00:00Z`,
-                            all_day: true,
-                            event_status: "scheduled",
-                            event_type: "holiday",
-                        },
-                    ],
-                    error: null,
-                }),
-            });
-        });
-        await page.route(`**/api/events/${allDayId}`, async (route) => {
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                    data: {
-                        id: allDayId,
-                        name: "Site Closure",
-                        start_date: `${dayInThisMonth}T00:00:00Z`,
-                        all_day: true,
-                        event_status: "scheduled",
-                        event_type: "holiday",
+  // Pins: a 409 problem's duplicate candidates are listed under the form.
+  // The service sends them in `errors` as `{ has_duplicates,
+  // potential_matches }`; the page once read only a bare array and so
+  // never showed them.
+  test("a duplicate 409 lists its candidates", async ({ page }) => {
+    await page.route("**/api/events", (route) =>
+      route.request().method() === "POST"
+        ? route.fulfill({
+            status: 409,
+            contentType: "application/problem+json",
+            body: JSON.stringify({
+              type: "about:blank",
+              title: "Conflict",
+              status: 409,
+              detail: "Potential duplicate events found.",
+              code: "duplicate_detected",
+              errors: {
+                has_duplicates: true,
+                potential_matches: [
+                  {
+                    event: {
+                      id: "evt-dup",
+                      name: "Annual Conference 2026",
+                      start_date: "2026-06-01T09:00:00Z",
                     },
-                    error: null,
-                }),
-            });
-        });
-
-        await page.goto("/calendar");
-        const calendar = page.getByTestId("event-calendar");
-        await expect(calendar).toBeVisible();
-        await expect(calendar.getByText("Board Meeting", { exact: false })).toBeVisible();
-        await expect(calendar.getByText("Site Closure", { exact: false })).toBeVisible();
-
-        await calendar.getByText("Site Closure", { exact: false }).click();
-        await expect(page).toHaveURL(`/events/${allDayId}`);
-    });
-
-    // Pins FR-5: the detail page renders the event identity once loaded.
-    // The Event Service GET is stubbed at the browser boundary so the smoke
-    // suite needs no backing service.
-    test("detail page renders the loaded event identity", async ({ page }) => {
-        await page.route("**/api/events/evt-1", (route) =>
-            route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({
-                    success: true,
-                    data: {
-                        id: "evt-1",
-                        name: "Annual Conference",
-                        start_date: "2026-06-01T09:00:00Z",
-                        event_status: "scheduled",
-                        event_type: "conference",
-                    },
-                    error: null,
-                }),
+                    score: 0.97,
+                    quality: "certain",
+                  },
+                ],
+              },
             }),
-        );
-        await page.goto("/events/evt-1");
-        await expect(page.getByRole("heading", { name: "Annual Conference" })).toBeVisible();
-        await expect(page.getByRole("link", { name: "Edit" })).toBeVisible();
-        await expect(page.getByRole("link", { name: "Audit" })).toBeVisible();
+          })
+        : route.fallback(),
+    );
+    await page.goto("/events/new");
+    await page.getByLabel(/^Name/).fill("Annual Conference");
+    await page.getByLabel(/^Start/).fill("2026-06-01T09:00");
+    await page.getByRole("button", { name: "Create" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Possible duplicates" }),
+    ).toBeVisible();
+    await expect(page.getByText("Annual Conference 2026")).toBeVisible();
+  });
+
+  // Pins: the match-check page renders with its "Find matches" button.
+  test("match check form renders", async ({ page }) => {
+    await page.goto("/events/match");
+    await expect(
+      page.getByRole("heading", { name: "Match check" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Find matches/ }),
+    ).toBeVisible();
+  });
+
+  // Pins: the merge page renders both the main and duplicate ID inputs.
+  test("merge form renders both ID inputs", async ({ page }) => {
+    await page.goto("/events/merge");
+    await expect(
+      page.getByRole("heading", { name: "Merge events" }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/Main event ID/)).toBeVisible();
+    await expect(page.getByLabel(/Duplicate event ID/)).toBeVisible();
+  });
+
+  // Pins T-27: the calendar renders both a timed event and an all-day
+  // event, and selecting one navigates to its detail page. The all-day
+  // case is not incidental — `end_date` equal to `start_date` (the
+  // common shape for a same-day all-day event) previously made the
+  // event silently invisible: `@svar-ui/calendar-store` requires an
+  // all-day event's `end` to be strictly after `start`, and the page
+  // was passing `end_date` straight through with no exclusive-end
+  // adjustment. See the fix in `src/routes/calendar/+page.svelte`.
+  test("calendar renders a timed and an all-day event, and navigates on select", async ({
+    page,
+  }) => {
+    const timedId = "0c4f1e2a-0000-4000-8000-00000000000f";
+    const allDayId = "0c4f1e2a-0000-4000-8000-000000000010";
+    const today = new Date();
+    const dayInThisMonth = new Date(today.getFullYear(), today.getMonth(), 12)
+      .toISOString()
+      .slice(0, 10);
+    await page.route("**/api/events/search**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: timedId,
+            name: "Board Meeting",
+            start_date: `${dayInThisMonth}T09:00:00Z`,
+            end_date: `${dayInThisMonth}T10:00:00Z`,
+            event_status: "scheduled",
+            event_type: "meeting",
+          },
+          {
+            id: allDayId,
+            name: "Site Closure",
+            // start == end is the shape that used to be
+            // filtered out entirely (a same-day all-day
+            // event, the common case).
+            start_date: `${dayInThisMonth}T00:00:00Z`,
+            end_date: `${dayInThisMonth}T00:00:00Z`,
+            all_day: true,
+            event_status: "scheduled",
+            event_type: "holiday",
+          },
+        ]),
+      });
+    });
+    await page.route(`**/api/events/${allDayId}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: allDayId,
+          name: "Site Closure",
+          start_date: `${dayInThisMonth}T00:00:00Z`,
+          all_day: true,
+          event_status: "scheduled",
+          event_type: "holiday",
+        }),
+      });
     });
 
-    // Pins T-19: the masked-view toggle re-fetches through
-    // GET /api/events/{id}/masked and back, rather than redacting
-    // client-side — the two stubs return visibly different descriptions
-    // so the test can tell which endpoint actually answered.
-    test("event detail toggles between the plain and masked view", async ({
-        page,
-    }) => {
-        const id = "0c4f1e2a-0000-4000-8000-00000000000a";
-        const base = {
-            id,
-            name: "Annual Conference",
-            start_date: "2026-06-01T09:00:00Z",
-        };
-        await page.route("**/api/events/**", async (route) => {
-            const url = route.request().url();
-            const envelope = url.includes("/masked")
-                ? { success: true, data: { ...base, description: "***REDACTED***" }, error: null }
-                : { success: true, data: { ...base, description: "Full conference details" }, error: null };
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify(envelope),
-            });
-        });
+    await page.goto("/calendar");
+    const calendar = page.getByTestId("event-calendar");
+    await expect(calendar).toBeVisible();
+    await expect(
+      calendar.getByText("Board Meeting", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      calendar.getByText("Site Closure", { exact: false }),
+    ).toBeVisible();
 
-        await page.goto(`/events/${id}`);
-        await expect(page.getByText("Full conference details")).toBeVisible();
-        await expect(
-            page.getByText("Showing the masked view"),
-        ).not.toBeVisible();
+    await calendar.getByText("Site Closure", { exact: false }).click();
+    await expect(page).toHaveURL(`/events/${allDayId}`);
+  });
 
-        await page.getByRole("button", { name: "Show masked" }).click();
-        await expect(page.getByText("***REDACTED***")).toBeVisible();
-        await expect(page.getByText("Showing the masked view")).toBeVisible();
+  // Pins FR-5: the detail page renders the event identity once loaded.
+  // The Event Service GET is stubbed at the browser boundary so the smoke
+  // suite needs no backing service.
+  test("detail page renders the loaded event identity", async ({ page }) => {
+    await page.route("**/api/events/evt-1", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "evt-1",
+          name: "Annual Conference",
+          start_date: "2026-06-01T09:00:00Z",
+          event_status: "scheduled",
+          event_type: "conference",
+        }),
+      }),
+    );
+    await page.goto("/events/evt-1");
+    await expect(
+      page.getByRole("heading", { name: "Annual Conference" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Edit" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Audit" })).toBeVisible();
+  });
 
-        await page.getByRole("button", { name: "Show full" }).click();
-        await expect(page.getByText("Full conference details")).toBeVisible();
-        await expect(
-            page.getByText("Showing the masked view"),
-        ).not.toBeVisible();
+  // Pins T-19: the masked-view toggle re-fetches through
+  // GET /api/events/{id}/masked and back, rather than redacting
+  // client-side — the two stubs return visibly different descriptions
+  // so the test can tell which endpoint actually answered.
+  test("event detail toggles between the plain and masked view", async ({
+    page,
+  }) => {
+    const id = "0c4f1e2a-0000-4000-8000-00000000000a";
+    const base = {
+      id,
+      name: "Annual Conference",
+      start_date: "2026-06-01T09:00:00Z",
+    };
+    await page.route("**/api/events/**", async (route) => {
+      const url = route.request().url();
+      const body = url.includes("/masked")
+        ? { ...base, description: "***REDACTED***" }
+        : { ...base, description: "Full conference details" };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      });
     });
 
-    // Pins FR-6: the edit page renders its shell heading even before the
-    // record loads (the EventForm fills in once the GET resolves).
-    test("edit page renders its heading", async ({ page }) => {
-        await page.goto("/events/evt-1/edit");
-        await expect(page.getByRole("heading", { name: "Edit event" })).toBeVisible();
+    await page.goto(`/events/${id}`);
+    await expect(page.getByText("Full conference details")).toBeVisible();
+    await expect(page.getByText("Showing the masked view")).not.toBeVisible();
+
+    await page.getByRole("button", { name: "Show masked" }).click();
+    await expect(page.getByText("***REDACTED***")).toBeVisible();
+    await expect(page.getByText("Showing the masked view")).toBeVisible();
+
+    await page.getByRole("button", { name: "Show full" }).click();
+    await expect(page.getByText("Full conference details")).toBeVisible();
+    await expect(page.getByText("Showing the masked view")).not.toBeVisible();
+  });
+
+  // Pins FR-6: the edit page renders its shell heading even before the
+  // record loads (the EventForm fills in once the GET resolves).
+  test("edit page renders its heading", async ({ page }) => {
+    await page.goto("/events/evt-1/edit");
+    await expect(
+      page.getByRole("heading", { name: "Edit event" }),
+    ).toBeVisible();
+  });
+
+  // Pins: the per-record audit route renders its heading shell.
+  test("audit page renders its heading", async ({ page }) => {
+    await page.goto("/events/evt-1/audit");
+    await expect(
+      page.getByRole("heading", { name: "Audit log" }),
+    ).toBeVisible();
+  });
+
+  // Pins: the GDPR export button (T-20) fetches GET /api/events/{id}/export
+  // and saves what came back as `event-<id>-export.json` — a real browser
+  // download (Blob object URL + synthetic anchor), asserted through
+  // Playwright's download event, with the saved bytes compared to the
+  // stubbed payload so a silently-empty file cannot pass.
+  test("event detail downloads the GDPR export as JSON", async ({ page }) => {
+    const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
+    const payload = {
+      subject: id,
+      exported_at: "2026-09-03T00:00:00Z",
+      records: [],
+    };
+    const record = {
+      id,
+      name: "Annual Conference",
+      start_date: "2026-06-01T09:00:00Z",
+      event_type: "conference",
+      event_status: "scheduled",
+    };
+    await page.route("**/api/events/**", async (route) => {
+      const url = route.request().url();
+      const body = url.includes("/export") ? payload : record;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      });
     });
 
-    // Pins: the per-record audit route renders its heading shell.
-    test("audit page renders its heading", async ({ page }) => {
-        await page.goto("/events/evt-1/audit");
-        await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
-    });
-
-    // Pins: the GDPR export button (T-20) fetches GET /api/events/{id}/export
-    // and saves what came back as `event-<id>-export.json` — a real browser
-    // download (Blob object URL + synthetic anchor), asserted through
-    // Playwright's download event, with the saved bytes compared to the
-    // stubbed payload so a silently-empty file cannot pass.
-    test("event detail downloads the GDPR export as JSON", async ({ page }) => {
-        const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
-        const payload = { subject: id, exported_at: "2026-09-03T00:00:00Z", records: [] };
-        const record = { id, name: "Annual Conference", start_date: "2026-06-01T09:00:00Z", event_type: "conference", event_status: "scheduled" };
-        await page.route("**/api/events/**", async (route) => {
-            const url = route.request().url();
-            const envelope = url.includes("/export")
-                ? { success: true, data: payload, error: null }
-                : { success: true, data: record, error: null };
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify(envelope),
-            });
-        });
-
-        await page.goto(`/events/${id}`);
-        const downloadPromise = page.waitForEvent("download");
-        await page.getByRole("button", { name: "Export data (GDPR)" }).click();
-        const download = await downloadPromise;
-        expect(download.suggestedFilename()).toBe(`event-${id}-export.json`);
-        const saved = await download.path();
-        expect(saved).not.toBeNull();
-        expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
-        await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
-    });
+    await page.goto(`/events/${id}`);
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export data (GDPR)" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe(`event-${id}-export.json`);
+    const saved = await download.path();
+    expect(saved).not.toBeNull();
+    expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
+    await expect(
+      page.getByRole("button", { name: "Export data (GDPR)" }),
+    ).toBeEnabled();
+  });
 });
 
 // Pins the PRO-H10 page-visit guard itself (WEB-1): with NO session
@@ -256,31 +320,39 @@ test.describe("Event front-end smoke", () => {
 // or broken guard invisible. Read/list/view pages stay public and are
 // deliberately not listed here; see AGENTS.md "Page-visit guard".
 test.describe("Event front-end page-visit guard", () => {
-    test.use({ storageState: { cookies: [], origins: [] } });
+  test.use({ storageState: { cookies: [], origins: [] } });
 
-    const guarded = [
-        "/events/new",
-        "/events/0c4f1e2a-0000-4000-8000-000000000001/edit",
-        "/events/merge",
-    ];
+  const guarded = [
+    "/events/new",
+    "/events/0c4f1e2a-0000-4000-8000-000000000001/edit",
+    "/events/merge",
+  ];
 
-    for (const path of guarded) {
-        test(`anonymous visit to ${path} redirects to /signin`, async ({ page }) => {
-            await page.goto(path);
-            await expect(page).toHaveURL(/\/signin(\?|$)/);
-        });
-    }
+  for (const path of guarded) {
+    test(`anonymous visit to ${path} redirects to /signin`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/signin(\?|$)/);
+    });
+  }
 });
 
 // Pins the anonymous home page: a visitor with no session sees the splash
 // (hero heading + sign-in call to action), not the dashboard.
 test.describe("Event front-end anonymous home", () => {
-    test.use({ storageState: { cookies: [], origins: [] } });
+  test.use({ storageState: { cookies: [], origins: [] } });
 
-    test("anonymous / renders the splash with a sign-in link", async ({ page }) => {
-        await page.goto("/");
-        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-        await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
-        await expect(page.getByRole("heading", { name: "Dashboard" })).toHaveCount(0);
-    });
+  test("anonymous / renders the splash with a sign-in link", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Sign in" }).first(),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toHaveCount(
+      0,
+    );
+  });
 });

@@ -1,8 +1,8 @@
 ### authentication-service — example requests
 # authentication/authentication-service-with-axum — the central SSO
-# provider (not an entity registry). Envelope: BARE loco JSON — a
-# success body is the payload itself, no wrapper; non-2xx is loco's own
-# {"error":"...","description":"..."} (or, for the always-200 signup/
+# provider (not an entity registry). Responses: a success body is the
+# payload itself, no wrapper; non-2xx is an RFC 9457 problem from axa
+# (or, for the always-200 signup/
 # magic-link endpoints, `{}`). See 00-auth-handshake.http for the full
 # walkthrough with inline curl-verified commentary on retrieving a
 # magic-link token in this compose (APP_ENV=production is baked into

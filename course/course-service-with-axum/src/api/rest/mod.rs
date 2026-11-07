@@ -52,7 +52,6 @@ pub use state::AppState;
         handlers::metrics_prom,
     ),
     components(schemas(
-        crate::api::ApiError,
         crate::models::Course,
         crate::models::CourseStatus,
         crate::models::EducationalLevel,

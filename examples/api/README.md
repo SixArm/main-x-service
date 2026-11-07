@@ -95,24 +95,12 @@ token a prior one produced.
 
 ## Response envelope — reads two ways across the family
 
-The family is **not** uniform on wire envelope; each file's header
-comment states which shape that service actually returns (confirmed by
-reading its controller/handler source, not assumed from a sibling):
-
-- **person, worker, event** — always `{"success":bool,"data":...,"error":...}`;
-  `data`/`error` are always present (`null` on the unused side).
-- **place, thing, course** — the same `{"success","data","error"}` shape,
-  but `data`/`error` are *omitted* (not `null`) on the unused side
-  (`#[serde(skip_serializing_if)]`).
-- **organization, care-pathway, case, portfolio, authentication** — bare
-  axa JSON: a success response is the resource itself with no wrapper;
-  a non-2xx is an RFC 9457 problem from axa,
-  `application/problem+json` with `type`, `title`, `status`, `code`, and
-  `detail` where there is more to say (`ErrorDetail`, axa 0.6).
-- **link-graph** — its own envelope, `{"success":bool,"data":...}` on
-  `200` / `{"success":false,"error":"..."}` on `400`. Do not confuse this
-  with the person-style envelope above — the field names coincide but
-  the two are independent implementations.
+Every service answers the same way ([`spec/restful`](../../spec/restful/index.md)
+§1.3): a success is bare JSON, the resource or list object itself with no
+wrapper, and a non-2xx is an RFC 9457 problem, `application/problem+json`
+with `type`, `title`, `status`, a lowercase `code`, `detail` where there is
+more to say, and `errors` for structured context. A `500` has no `detail`.
+FHIR errors stay `OperationOutcome`.
 
 One documented exception within a person-style crate: worker's
 assessment endpoints (`POST/GET .../assessments`) bypass the envelope

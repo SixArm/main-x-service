@@ -199,12 +199,11 @@ Worker is a link **originator** in the federated cross-service graph
 
 Writes are **optimistic** — the assertion is stored and a `linked` /
 `unlinked` event is published on the existing event envelope; the
-target service is **not** called. The three per-record endpoints
-return the crate's uniform `{success,data,error}` envelope
-(`ApiResponse<T>`), matching every other worker REST endpoint. The
-bulk aggregator endpoint (`GET /api/workers/links`) is deliberately
-**not** wrapped — it stays bare `{"edges": [...]}` for the link-graph
-aggregator's HTTP client. See
+target service is **not** called. Like every other worker REST
+endpoint, all four answer bare JSON on success and an RFC 9457 problem
+on failure; the bulk aggregator endpoint (`GET /api/workers/links`)
+returns `{"edges": [...]}` for the link-graph aggregator's HTTP
+client. See
 [spec §9.1](../spec/09-api-surface.md#91-cross-service-link-endpoints)
 for the full contract.
 
@@ -290,29 +289,27 @@ re-validated before persisting.
 
 ## Response Format
 
-All REST endpoints return:
+A success is the payload as bare JSON:
+
+```json
+{ "id": "…", "name": { "family": "Smith", "given": ["Jane"] } }
+```
+
+An error is an RFC 9457 problem, `application/problem+json`:
 
 ```json
 {
-  "success": true,
-  "data": { ... },
-  "error": null
+  "type": "about:blank",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Potential duplicate workers found. Review matches before proceeding.",
+  "code": "duplicate_detected",
+  "errors": { "has_duplicates": true, "potential_matches": [ … ] }
 }
 ```
 
-Error responses:
-
-```json
-{
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable message",
-    "details": { ... }
-  }
-}
-```
+`code` is a stable lowercase token. A `500` has no `detail`; its cause is
+logged. FHIR errors stay `OperationOutcome`.
 
 ## HTTP Status Codes
 
@@ -329,7 +326,7 @@ Error responses:
 
 ## Source Files
 
-- `src/api/mod.rs` — ApiResponse, ApiError
+- `src/api/mod.rs` — `ok` and `ApiProblem`, the response helpers
 - `src/api/rest/mod.rs` — REST API setup, router configuration
 - `src/api/rest/handlers.rs` — All REST handler implementations
 - `src/api/rest/routes.rs` — Route organization

@@ -35,10 +35,8 @@ machine-readable form at `/api-docs/openapi.json`
 
 ### 9.2 Conventions
 
-- **Raw axa JSON — no envelope.** Unlike the older Axum-native
-  entities (person et al. wrap responses in
-  `{success, data, error}`), this service returns bodies directly.
-  The front-end client is written for this.
+- **Bare JSON on success, an RFC 9457 problem on failure**, like every
+  service (`spec/restful` §1.3). The front-end client is written for this.
 - Wire field names are snake_case (`legal_name`, `founding_date`, …)
   per the canonical DTO (§5.1).
 - Status codes: `200` success, `422` validation failure (blank

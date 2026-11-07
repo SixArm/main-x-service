@@ -68,7 +68,7 @@ export interface SearchOptions {
 // Resource-bound REST client for Thing Service. One instance per page
 // is fine; the client is stateless aside from base URL + headers.
 export class ThingRepository {
-  /** @param http - The lower-level envelope-aware HTTP client to delegate to. */
+  /** @param http - The lower-level HTTP client to delegate to. */
   constructor(private readonly http: ApiClient) {}
 
   /**
@@ -89,7 +89,7 @@ export class ThingRepository {
    * Full-text search for Things, normalising the response shape.
    *
    * WHY the normalisation: the service may return either a bare array or a
-   * `{ items, total }` envelope depending on version/endpoint; this method
+   * `{ items, total }` object depending on version/endpoint; this method
    * collapses both into a stable `{ items, total, limit, offset }` so
    * callers never branch.
    *

@@ -78,7 +78,7 @@ async fn check_duplicates_masks_candidates_when_requested() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let candidates = body["data"]["candidates"].as_array().expect("candidates");
+    let candidates = body["candidates"].as_array().expect("candidates");
     assert!(
         !candidates.is_empty(),
         "expected a duplicate hit, got {body}"
@@ -97,7 +97,7 @@ async fn check_duplicates_masks_candidates_when_requested() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let candidates = body["data"]["candidates"].as_array().expect("candidates");
+    let candidates = body["candidates"].as_array().expect("candidates");
     assert!(
         !candidates.is_empty(),
         "expected a duplicate hit, got {body}"
@@ -132,7 +132,7 @@ async fn create_409_masks_the_duplicate_candidate_when_requested() {
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT, "{body}");
-    let details = body["error"]["details"].as_array().expect("details");
+    let details = body["errors"].as_array().expect("errors");
     assert!(
         !details.is_empty(),
         "expected a duplicate candidate, got {body}"

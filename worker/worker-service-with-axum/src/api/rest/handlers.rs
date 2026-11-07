@@ -3,8 +3,9 @@
 //!
 //! Each handler extracts [`AppState`] and the request body/query, runs the
 //! relevant business logic (validation, duplicate detection, matching,
-//! merging, masking, audit queries), and returns an [`ApiResponse`] wrapped in
-//! the appropriate HTTP status. The `#[utoipa::path(...)]` attributes feed the
+//! merging, masking, audit queries), and returns bare JSON
+//! ([`ok`](crate::api::ok)) or an RFC 9457 problem
+//! ([`ApiProblem`](crate::api::ApiProblem)) with the appropriate HTTP status. The `#[utoipa::path(...)]` attributes feed the
 //! OpenAPI document assembled in [`super::ApiDoc`]; the route table that maps
 //! paths to these functions lives in [`super::workers_routes`].
 //!
@@ -12,7 +13,9 @@
 //! [`AppState`] (database, search index, matcher) that cannot be constructed
 //! in a doctest. Behaviour is pinned by the integration tests in `tests/`.
 
+use crate::api::{ApiProblem, ok};
 use axa::client::ClientAddr;
+use axum::response::Response;
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -30,7 +33,6 @@ use super::auth::{
     AuthUser, MaybeAuthUser, audit_context_of, authorize_record, worker_resource_attrs,
 };
 use super::state::AppState;
-use crate::api::ApiResponse;
 use crate::compliance::disclosure::{self, AccessContext};
 use crate::models::Worker;
 
@@ -98,7 +100,7 @@ pub struct CreateWorkerRequest {
 /// Creates a worker after validation and real-time duplicate detection.
 ///
 /// Pipeline: validate (`422` on failure) → assign a UUID if missing →
-/// check duplicates (`409` with candidate matches in `error.details` if any)
+/// check duplicates (`409` with candidate matches in the problem's `errors` if any)
 /// → persist via the repository → index in the search engine (a failure here
 /// is logged, not fatal) → `201` with the stored worker.
 #[utoipa::path(
@@ -124,8 +126,8 @@ pub async fn create_worker(
     // client sees all problems at once rather than one-at-a-time.
     let validation_errors = crate::validation::validate_worker(&payload);
     if !validation_errors.is_empty() {
-        let error = ApiResponse::<Worker>::error(
-            "VALIDATION_ERROR",
+        let error = ApiProblem::new(
+            "validation",
             format!(
                 "Validation failed: {}",
                 validation_errors
@@ -135,7 +137,7 @@ pub async fn create_worker(
                     .join("; ")
             ),
         );
-        return (StatusCode::UNPROCESSABLE_ENTITY, Json(error));
+        return error.respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     // Step 2 — assign a server-side UUID if the client did not supply one, so
@@ -146,25 +148,23 @@ pub async fn create_worker(
 
     // Step 3 — real-time duplicate detection BEFORE the insert. If any
     // candidate clears the review threshold we refuse the create with 409
-    // Conflict and surface the matches in `error.details` so the operator can
+    // Conflict and surface the matches in the problem's `errors` so the operator can
     // review/merge instead of silently creating a near-duplicate record.
     let duplicates = check_duplicates_internal(&state, &payload).await;
     if !duplicates.is_empty() {
-        // Carry the candidate matches in `error.details` so the client can
+        // Carry the candidate matches in the problem's `errors` so the client can
         // render them and decide whether to merge or force-create.
         let dup_response = DuplicateCheckResponse {
             has_duplicates: true,
             potential_matches: duplicates,
         };
         let details = serde_json::to_value(&dup_response).ok();
-        let mut error = ApiResponse::<Worker>::error(
-            "DUPLICATE_DETECTED",
+        let mut error = ApiProblem::new(
+            "duplicate_detected",
             "Potential duplicate workers found. Review matches before proceeding.",
         );
-        if let Some(ref mut err) = error.error {
-            err.details = details;
-        }
-        return (StatusCode::CONFLICT, Json(error));
+        error.errors = details;
+        return error.respond(StatusCode::CONFLICT);
     }
 
     // Step 4 — persist. The repository INSERT also fans out the event publish
@@ -183,16 +183,13 @@ pub async fn create_worker(
                 tracing::warn!("Failed to index worker in search engine: {}", e);
             }
 
-            // 201 Created with the stored worker in the success envelope.
-            (StatusCode::CREATED, Json(ApiResponse::success(worker)))
+            // 201 Created with the stored worker as the body.
+            ok(StatusCode::CREATED, worker)
         }
         Err(e) => {
             // Any repository failure surfaces as 500 with a `DATABASE_ERROR` code.
-            let error = ApiResponse::<Worker>::error(
-                "DATABASE_ERROR",
-                format!("Failed to create worker: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("database_error", format!("Failed to create worker: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -265,11 +262,11 @@ pub async fn list_workers(
     let limit = params.limit.min(100);
 
     if params.offset > MAX_LIST_OFFSET {
-        let error = ApiResponse::<ListResponse>::error(
-            "OFFSET_TOO_LARGE",
+        let error = ApiProblem::new(
+            "offset_too_large",
             format!("offset must not exceed {MAX_LIST_OFFSET}; narrow the query instead"),
         );
-        return (StatusCode::BAD_REQUEST, Json(error));
+        return error.respond(StatusCode::BAD_REQUEST);
     }
 
     // A list is a collection read, same disclosure posture as search
@@ -285,7 +282,7 @@ pub async fn list_workers(
     .await
     .is_err()
     {
-        return audit_unavailable::<ListResponse>();
+        return audit_unavailable();
     }
 
     let limit_u64 = u64::try_from(limit).unwrap_or(100);
@@ -307,14 +304,11 @@ pub async fn list_workers(
                 offset: params.offset,
                 limit,
             };
-            (StatusCode::OK, Json(ApiResponse::success(response)))
+            ok(StatusCode::OK, response)
         }
         Err(e) => {
-            let error = ApiResponse::<ListResponse>::error(
-                "DATABASE_ERROR",
-                format!("Failed to list workers: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("database_error", format!("Failed to list workers: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -361,34 +355,26 @@ pub async fn get_worker(
                     .await
                     .is_err()
                     {
-                        return audit_unavailable::<Worker>();
+                        return audit_unavailable();
                     }
                     let body = if obligations.iter().any(|o| o == "mask") {
                         crate::privacy::mask_worker(&worker)
                     } else {
                         worker
                     };
-                    (StatusCode::OK, Json(ApiResponse::success(body)))
+                    ok(StatusCode::OK, body)
                 }
-                Err((status, reason)) => (
-                    status,
-                    Json(ApiResponse::<Worker>::error("FORBIDDEN", reason)),
-                ),
+                Err((status, reason)) => ApiProblem::new("forbidden", reason).respond(status),
             }
         }
         Ok(None) => {
-            let error = ApiResponse::<Worker>::error(
-                "NOT_FOUND",
-                format!("Worker with id '{id}' not found"),
-            );
-            (StatusCode::NOT_FOUND, Json(error))
+            let error = ApiProblem::new("not_found", format!("Worker with id '{id}' not found"));
+            error.respond(StatusCode::NOT_FOUND)
         }
         Err(e) => {
-            let error = ApiResponse::<Worker>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve worker: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve worker: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -420,8 +406,8 @@ pub async fn update_worker(
     // Validate
     let validation_errors = crate::validation::validate_worker(&payload);
     if !validation_errors.is_empty() {
-        let error = ApiResponse::<Worker>::error(
-            "VALIDATION_ERROR",
+        let error = ApiProblem::new(
+            "validation",
             format!(
                 "Validation failed: {}",
                 validation_errors
@@ -431,7 +417,7 @@ pub async fn update_worker(
                     .join("; ")
             ),
         );
-        return (StatusCode::UNPROCESSABLE_ENTITY, Json(error));
+        return error.respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     // Force the body's id to the path id so the URL is authoritative and a
@@ -445,25 +431,17 @@ pub async fn update_worker(
             if let Err((status, reason)) =
                 authorize_record(&caller, Action::Write, &worker_resource_attrs(&existing))
             {
-                return (
-                    status,
-                    Json(ApiResponse::<Worker>::error("FORBIDDEN", reason)),
-                );
+                return ApiProblem::new("forbidden", reason).respond(status);
             }
         }
         Ok(None) => {
-            let error = ApiResponse::<Worker>::error(
-                "NOT_FOUND",
-                format!("Worker with id '{id}' not found"),
-            );
-            return (StatusCode::NOT_FOUND, Json(error));
+            let error = ApiProblem::new("not_found", format!("Worker with id '{id}' not found"));
+            return error.respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            let error = ApiResponse::<Worker>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve worker: {e}"),
-            );
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve worker: {e}"));
+            return error.respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -479,14 +457,11 @@ pub async fn update_worker(
                 tracing::warn!("Failed to update worker in search engine: {}", e);
             }
 
-            (StatusCode::OK, Json(ApiResponse::success(worker)))
+            ok(StatusCode::OK, worker)
         }
         Err(e) => {
-            let error = ApiResponse::<Worker>::error(
-                "DATABASE_ERROR",
-                format!("Failed to update worker: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("database_error", format!("Failed to update worker: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -517,20 +492,17 @@ pub async fn delete_worker(
             if let Err((status, reason)) =
                 authorize_record(&caller, Action::Delete, &worker_resource_attrs(&worker))
             {
-                return (status, Json(ApiResponse::<()>::error("FORBIDDEN", reason)));
+                return ApiProblem::new("forbidden", reason).respond(status);
             }
         }
         Ok(None) => {
-            let error =
-                ApiResponse::<()>::error("NOT_FOUND", format!("Worker with id '{id}' not found"));
-            return (StatusCode::NOT_FOUND, Json(error));
+            let error = ApiProblem::new("not_found", format!("Worker with id '{id}' not found"));
+            return error.respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            let error = ApiResponse::<()>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve worker: {e}"),
-            );
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve worker: {e}"));
+            return error.respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -549,12 +521,11 @@ pub async fn delete_worker(
             }
 
             // 204 No Content — success with an empty body.
-            (StatusCode::NO_CONTENT, Json(ApiResponse::<()>::success(())))
+            StatusCode::NO_CONTENT.into_response()
         }
         Err(e) => {
-            let error =
-                ApiResponse::<()>::error("DATABASE_ERROR", format!("Failed to delete worker: {e}"));
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("database_error", format!("Failed to delete worker: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -646,7 +617,7 @@ pub async fn search_workers(
     .await
     .is_err()
     {
-        return audit_unavailable::<SearchResponse>();
+        return audit_unavailable();
     }
 
     // Ask the index for `offset + limit` ids: the engine returns ranked ids
@@ -703,12 +674,11 @@ pub async fn search_workers(
                 offset: params.offset,
                 limit,
             };
-            (StatusCode::OK, Json(ApiResponse::success(response)))
+            ok(StatusCode::OK, response)
         }
         Err(e) => {
-            let error =
-                ApiResponse::<SearchResponse>::error("SEARCH_ERROR", format!("Search failed: {e}"));
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("search_error", format!("Search failed: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -820,11 +790,8 @@ pub async fn match_worker(
             let match_results = match state.matcher.find_matches(&payload.worker, &candidates) {
                 Ok(results) => results,
                 Err(e) => {
-                    let error = ApiResponse::<MatchResultsResponse>::error(
-                        "MATCH_ERROR",
-                        format!("Matching failed: {e}"),
-                    );
-                    return (StatusCode::INTERNAL_SERVER_ERROR, Json(error));
+                    let error = ApiProblem::new("match_error", format!("Matching failed: {e}"));
+                    return error.respond(StatusCode::INTERNAL_SERVER_ERROR);
                 }
             };
 
@@ -862,14 +829,11 @@ pub async fn match_worker(
                 total: matches.len(),
                 matches,
             };
-            (StatusCode::OK, Json(ApiResponse::success(response)))
+            ok(StatusCode::OK, response)
         }
         Err(e) => {
-            let error = ApiResponse::<MatchResultsResponse>::error(
-                "MATCH_ERROR",
-                format!("Matching failed: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error = ApiProblem::new("match_error", format!("Matching failed: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -973,7 +937,7 @@ pub async fn check_duplicates(
         has_duplicates: !matches.is_empty(),
         potential_matches: matches,
     };
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ─── Record Merging ─────────────────────────────────────────────────────────
@@ -1099,22 +1063,18 @@ pub async fn merge_workers(
     let main = match state.worker_repository.get_by_id(&req.main_worker_id).await {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "NOT_FOUND",
-                    format!("Main worker {} not found", req.main_worker_id),
-                )),
-            );
+            return ApiProblem::new(
+                "not_found",
+                format!("Main worker {} not found", req.main_worker_id),
+            )
+            .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to fetch main worker: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to fetch main worker: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1125,22 +1085,18 @@ pub async fn merge_workers(
     {
         Ok(Some(p)) => p,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "NOT_FOUND",
-                    format!("Duplicate worker {} not found", req.duplicate_worker_id),
-                )),
-            );
+            return ApiProblem::new(
+                "not_found",
+                format!("Duplicate worker {} not found", req.duplicate_worker_id),
+            )
+            .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<crate::models::MergeResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to fetch duplicate worker: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to fetch duplicate worker: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1156,13 +1112,8 @@ pub async fn merge_workers(
         .merge(&merged, &duplicate.id, &audit_context_of(&caller, client))
         .await
     {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<crate::models::MergeResponse>::error(
-                "DATABASE_ERROR",
-                format!("Failed to merge workers: {e}"),
-            )),
-        );
+        return ApiProblem::new("database_error", format!("Failed to merge workers: {e}"))
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     // Post-merge search-index updates are best-effort: the merge is already
@@ -1194,7 +1145,7 @@ pub async fn merge_workers(
         main_worker: merged,
     };
 
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ─── Batch Deduplication ────────────────────────────────────────────────────
@@ -1225,15 +1176,8 @@ pub async fn batch_deduplicate(
     let workers = match state.worker_repository.list_active(1000, 0).await {
         Ok(p) => p,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(
-                    ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to list workers: {e}"),
-                    ),
-                ),
-            );
+            return ApiProblem::new("database_error", format!("Failed to list workers: {e}"))
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1329,15 +1273,11 @@ pub async fn batch_deduplicate(
     let rows = match crate::db::review_queue::upsert(&state.db, &new_items).await {
         Ok(rows) => rows,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(
-                    ApiResponse::<crate::models::BatchDeduplicationResponse>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to persist review queue: {e}"),
-                    ),
-                ),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to persist review queue: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
     let review_items: Vec<crate::models::ReviewQueueItem> =
@@ -1359,7 +1299,7 @@ pub async fn batch_deduplicate(
         review_items,
     };
 
-    (StatusCode::OK, Json(ApiResponse::success(response)))
+    ok(StatusCode::OK, response)
 }
 
 // ─── Review queue (stored) ──────────────────────────────────────────────────
@@ -1431,16 +1371,12 @@ pub async fn get_review_queue(
     if let Some(status) = query.status.as_deref()
         && !matches!(status, "pending" | "confirmed" | "rejected" | "automerged")
     {
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(
-                ApiResponse::<crate::models::ReviewQueueListResponse>::error(
-                    "INVALID_STATUS",
-                    format!("unknown review status `{status}`"),
-                ),
-            ),
+        return ApiProblem::new(
+            "invalid_status",
+            format!("unknown review status `{status}`"),
         )
-            .into_response();
+        .respond(StatusCode::UNPROCESSABLE_ENTITY)
+        .into_response();
     }
     match crate::db::review_queue::list(
         &state.db,
@@ -1453,24 +1389,18 @@ pub async fn get_review_queue(
             let items: Vec<crate::models::ReviewQueueItem> =
                 rows.iter().map(review_row_to_item).collect();
             let total = items.len();
-            (
+            ok(
                 StatusCode::OK,
-                Json(ApiResponse::success(
-                    crate::models::ReviewQueueListResponse { items, total },
-                )),
+                crate::models::ReviewQueueListResponse { items, total },
             )
-                .into_response()
+            .into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(
-                ApiResponse::<crate::models::ReviewQueueListResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to list review queue: {e}"),
-                ),
-            ),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to list review queue: {e}"),
         )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR)
+        .into_response(),
     }
 }
 
@@ -1503,35 +1433,26 @@ pub async fn review_decision(
     };
     let reviewed_by = caller.claims().map(|c| c.sub.clone());
     match crate::db::review_queue::decide(&state.db, id, token, reviewed_by.as_deref()).await {
-        Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => (
-            StatusCode::OK,
-            Json(ApiResponse::success(review_row_to_item(&row))),
+        Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => {
+            ok(StatusCode::OK, review_row_to_item(&row)).into_response()
+        }
+        Ok(crate::db::review_queue::DecideOutcome::NotFound) => {
+            ApiProblem::new("not_found", format!("no review item {id}"))
+                .respond(StatusCode::NOT_FOUND)
+                .into_response()
+        }
+        Ok(crate::db::review_queue::DecideOutcome::AlreadyDecided(current)) => ApiProblem::new(
+            "invalid_review_transition",
+            format!("item is `{current}`; only `pending` items can be decided"),
         )
-            .into_response(),
-        Ok(crate::db::review_queue::DecideOutcome::NotFound) => (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::<crate::models::ReviewQueueItem>::error(
-                "NOT_FOUND",
-                format!("no review item {id}"),
-            )),
+        .respond(StatusCode::UNPROCESSABLE_ENTITY)
+        .into_response(),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to decide review item: {e}"),
         )
-            .into_response(),
-        Ok(crate::db::review_queue::DecideOutcome::AlreadyDecided(current)) => (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(ApiResponse::<crate::models::ReviewQueueItem>::error(
-                "INVALID_REVIEW_TRANSITION",
-                format!("item is `{current}`; only `pending` items can be decided"),
-            )),
-        )
-            .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<crate::models::ReviewQueueItem>::error(
-                "DATABASE_ERROR",
-                format!("Failed to decide review item: {e}"),
-            )),
-        )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR)
+        .into_response(),
     }
 }
 
@@ -1574,24 +1495,19 @@ pub async fn export_worker_data(
             .await
             .is_err()
             {
-                return audit_unavailable::<serde_json::Value>();
+                return audit_unavailable();
             }
             let export = crate::privacy::export_worker_data(&worker);
-            (StatusCode::OK, Json(ApiResponse::success(export)))
+            ok(StatusCode::OK, export)
         }
         Ok(None) => {
-            let error = ApiResponse::<serde_json::Value>::error(
-                "NOT_FOUND",
-                format!("Worker with id '{id}' not found"),
-            );
-            (StatusCode::NOT_FOUND, Json(error))
+            let error = ApiProblem::new("not_found", format!("Worker with id '{id}' not found"));
+            error.respond(StatusCode::NOT_FOUND)
         }
         Err(e) => {
-            let error = ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve worker: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve worker: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -1636,24 +1552,19 @@ pub async fn get_worker_masked(
             .await
             .is_err()
             {
-                return audit_unavailable::<Worker>();
+                return audit_unavailable();
             }
             let masked = crate::privacy::mask_worker(&worker);
-            (StatusCode::OK, Json(ApiResponse::success(masked)))
+            ok(StatusCode::OK, masked)
         }
         Ok(None) => {
-            let error = ApiResponse::<Worker>::error(
-                "NOT_FOUND",
-                format!("Worker with id '{id}' not found"),
-            );
-            (StatusCode::NOT_FOUND, Json(error))
+            let error = ApiProblem::new("not_found", format!("Worker with id '{id}' not found"));
+            error.respond(StatusCode::NOT_FOUND)
         }
         Err(e) => {
-            let error = ApiResponse::<Worker>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve worker: {e}"),
-            );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            let error =
+                ApiProblem::new("database_error", format!("Failed to retrieve worker: {e}"));
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -1702,13 +1613,13 @@ pub async fn get_worker_audit_logs(
         .get_logs_for_entity("Worker", id, u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
+        Ok(logs) => ok(StatusCode::OK, logs),
         Err(e) => {
-            let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
+            let error = ApiProblem::new(
+                "database_error",
                 format!("Failed to retrieve audit logs: {e}"),
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -1735,13 +1646,13 @@ pub async fn get_recent_audit_logs(
         .get_recent_logs(u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
+        Ok(logs) => ok(StatusCode::OK, logs),
         Err(e) => {
-            let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
+            let error = ApiProblem::new(
+                "database_error",
                 format!("Failed to retrieve audit logs: {e}"),
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -1795,36 +1706,27 @@ pub async fn erase_worker(
     let txn = match state.db.begin().await {
         Ok(txn) => txn,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to start the erasure transaction: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to start the erasure transaction: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
     let outcome =
         match crate::compliance::erasure::erase(&txn, id, actor, &access, &state.audit_log).await {
             Ok(outcome) => outcome,
             Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::<serde_json::Value>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to erase: {e}"),
-                    )),
-                );
+                return ApiProblem::new("database_error", format!("Failed to erase: {e}"))
+                    .respond(StatusCode::INTERNAL_SERVER_ERROR);
             }
         };
     if let Err(e) = txn.commit().await {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to commit the erasure: {e}"),
-            )),
-        );
+        return ApiProblem::new(
+            "database_error",
+            format!("Failed to commit the erasure: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR);
     }
 
     // The search index holds a copy of the personal data, so an erasure
@@ -1837,7 +1739,7 @@ pub async fn erase_worker(
     }
 
     let value = serde_json::to_value(&outcome).unwrap_or_else(|_| serde_json::json!({}));
-    (StatusCode::OK, Json(ApiResponse::success(value)))
+    ok(StatusCode::OK, value)
 }
 
 /// Accounting of disclosures for one worker (HIPAA §164.528).
@@ -1884,31 +1786,18 @@ pub async fn get_worker_disclosures(
     let record = match state.worker_repository.get_by_id(&id).await {
         Ok(Some(record)) => record,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "NOT_FOUND",
-                    format!("Worker with id '{id}' not found"),
-                )),
-            );
+            return ApiProblem::new("not_found", format!("Worker with id '{id}' not found"))
+                .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to retrieve worker: {e}"),
-                )),
-            );
+            return ApiProblem::new("database_error", format!("Failed to retrieve worker: {e}"))
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
     if let Err((status, reason)) =
         authorize_record(&caller, Action::Read, &worker_resource_attrs(&record))
     {
-        return (
-            status,
-            Json(ApiResponse::<serde_json::Value>::error("FORBIDDEN", reason)),
-        );
+        return ApiProblem::new("forbidden", reason).respond(status);
     }
 
     match state
@@ -1918,9 +1807,9 @@ pub async fn get_worker_disclosures(
     {
         Ok(rows) => {
             let auditing = crate::compliance::audit_reads();
-            (
+            ok(
                 StatusCode::OK,
-                Json(ApiResponse::success(serde_json::json!({
+                serde_json::json!({
                     "id": id,
                     "read_auditing_enabled": auditing,
                     "count": rows.len(),
@@ -1931,16 +1820,14 @@ pub async fn get_worker_disclosures(
                          being recorded; only disclosure-flagged mutations appear here"
                     },
                     "disclosures": rows,
-                }))),
+                }),
             )
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to retrieve the accounting of disclosures: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to retrieve the accounting of disclosures: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -2013,13 +1900,11 @@ pub async fn verify_record_integrity(
     {
         Ok(rows) => rows,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to read records for verification: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to read records for verification: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -2046,13 +1931,11 @@ pub async fn verify_record_integrity(
             // mismatch; skipping it is honest, and the count reflects it.
             Ok(None) => {}
             Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::<serde_json::Value>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to assemble record {id} for verification: {e}"),
-                    )),
-                );
+                return ApiProblem::new(
+                    "database_error",
+                    format!("Failed to assemble record {id} for verification: {e}"),
+                )
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
             }
         }
     }
@@ -2077,13 +1960,11 @@ pub async fn verify_record_integrity(
             report.verified = report.mismatched.is_empty();
         }
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to read assessments for verification: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to read assessments for verification: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     }
     let interpretation = if report.verified {
@@ -2095,9 +1976,9 @@ pub async fn verify_record_integrity(
          either an out-of-band SQL edit, or a write path that forgot to rehash; investigate \
          the named ids against the audit trail"
     };
-    (
+    ok(
         StatusCode::OK,
-        Json(ApiResponse::success(serde_json::json!({
+        serde_json::json!({
             "limit": limit,
             "verified": report.verified,
             "records": report.records,
@@ -2105,7 +1986,7 @@ pub async fn verify_record_integrity(
             "unhashed": report.unhashed,
             "mismatched": report.mismatched,
             "interpretation": interpretation,
-        }))),
+        }),
     )
 }
 
@@ -2137,12 +2018,7 @@ pub async fn verify_record_integrity(
 pub async fn take_audit_checkpoint(State(state): State<AppState>) -> impl IntoResponse {
     let now = chrono::Utc::now().timestamp_micros();
     match crate::compliance::checkpoint::Checkpoint::take(&state.db, now).await {
-        Ok(None) => (
-            StatusCode::NO_CONTENT,
-            Json(ApiResponse::<serde_json::Value>::success(
-                serde_json::Value::Null,
-            )),
-        ),
+        Ok(None) => StatusCode::NO_CONTENT.into_response(),
         Ok(Some(checkpoint)) => {
             tracing::info!(
                 target: "audit_checkpoint",
@@ -2155,15 +2031,13 @@ pub async fn take_audit_checkpoint(State(state): State<AppState>) -> impl IntoRe
                 "audit chain checkpoint"
             );
             let value = serde_json::to_value(&checkpoint).unwrap_or(serde_json::Value::Null);
-            (StatusCode::OK, Json(ApiResponse::success(value)))
+            ok(StatusCode::OK, value)
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::error(
-                "DATABASE_ERROR",
-                format!("Failed to take a checkpoint: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to take a checkpoint: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -2196,21 +2070,19 @@ pub async fn verify_audit_checkpoint(
                     "audit chain does not honour a recorded checkpoint"
                 );
             }
-            (
+            ok(
                 StatusCode::OK,
-                Json(ApiResponse::success(serde_json::json!({
+                serde_json::json!({
                     "honoured": honoured,
                     "verdict": verdict,
-                }))),
+                }),
             )
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::error(
-                "DATABASE_ERROR",
-                format!("Failed to verify the checkpoint: {e}"),
-            )),
-        ),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to verify the checkpoint: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -2248,9 +2120,9 @@ pub async fn verify_audit_chain(
                  were written — investigate the named seq/id; a concurrent audit write on a \
                  pooled connection can also fork the chain, which reports as a linkage break"
             };
-            (
+            ok(
                 StatusCode::OK,
-                Json(ApiResponse::success(serde_json::json!({
+                serde_json::json!({
                     "limit": limit,
                     "verified": report.verified,
                     "rows": report.rows,
@@ -2260,15 +2132,15 @@ pub async fn verify_audit_chain(
                     "head": report.head,
                     "breaks": report.breaks,
                     "interpretation": interpretation,
-                }))),
+                }),
             )
         }
         Err(e) => {
-            let error = ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
+            let error = ApiProblem::new(
+                "database_error",
                 format!("Failed to verify the audit chain: {e}"),
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -2279,14 +2151,12 @@ pub async fn verify_audit_chain(
 /// was disclosed — the service is temporarily unable to account for a read
 /// of personal data, so it declines to serve one, and the status is
 /// retryable. Only reachable when `WORKER_AUDIT_FAIL_CLOSED` is on.
-fn audit_unavailable<T: serde::Serialize>() -> (StatusCode, Json<ApiResponse<T>>) {
-    (
-        StatusCode::SERVICE_UNAVAILABLE,
-        Json(ApiResponse::error(
-            "AUDIT_UNAVAILABLE",
-            "the access could not be recorded in the audit trail, so the read was refused",
-        )),
+fn audit_unavailable() -> Response {
+    ApiProblem::new(
+        "audit_unavailable",
+        "the access could not be recorded in the audit trail, so the read was refused",
     )
+    .respond(StatusCode::SERVICE_UNAVAILABLE)
 }
 
 /// Query parameters for the by-user audit endpoint.
@@ -2322,13 +2192,13 @@ pub async fn get_user_audit_logs(
         .get_logs_by_user(&params.user_id, u64::try_from(limit).unwrap_or(0))
         .await
     {
-        Ok(logs) => (StatusCode::OK, Json(ApiResponse::success(logs))),
+        Ok(logs) => ok(StatusCode::OK, logs),
         Err(e) => {
-            let error = ApiResponse::<Vec<crate::db::models::audit_log::Model>>::error(
-                "DATABASE_ERROR",
+            let error = ApiProblem::new(
+                "database_error",
                 format!("Failed to retrieve audit logs: {e}"),
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error))
+            error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }

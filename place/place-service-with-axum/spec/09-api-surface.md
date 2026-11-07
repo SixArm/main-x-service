@@ -38,8 +38,12 @@ tier above. (An earlier draft of this section said Places were not a
 FHIR-resource concern; that was superseded when T-11 shipped and this
 section had not been updated to match.)
 
-Standard response envelope. `409` on duplicate-detected create; `422`
-on validation failure.
+Bare JSON on success, an RFC 9457 problem (`application/problem+json`)
+on failure (`spec/restful` §1.3): `code` is a lowercase token
+(`not_found`, `duplicate_detected`, `validation`, `offset_too_large`, …)
+and `errors` carries context (a duplicate `409`'s candidates, a `422`'s
+field errors). A `500` has no `detail`; its cause is logged. `409` on
+duplicate-detected create; `422` on validation failure.
 
 **Server-managed fields.** `id`, `is_deleted`, `created_at`, `updated_at`,
 and every collection field (`keywords`, `identifiers`,
@@ -53,7 +57,7 @@ stamps `created_at`/`updated_at` to "now" on insert (preserving
 `created_at`/`updated_at` fix already shipped in the event service.
 `name` — the one field the server does **not** own — is also
 `#[serde(default)]` so an omitted value now reaches the normal
-validation path (`422 validation_error`, field `name`) instead of
+validation path (`422 validation`, field `name`) instead of
 being refused by the JSON extractor before any handler code runs.
 
 Authentication is opt-in per handler by default: taking an `AuthUser`

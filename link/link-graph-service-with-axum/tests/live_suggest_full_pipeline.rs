@@ -87,7 +87,7 @@ async fn live_pipeline_posts_a_real_suggested_edge() {
         .error_for_status()
         .expect("links GET should be 200");
     let body: serde_json::Value = response.json().await.expect("parse links response");
-    let links = body["data"].as_array().expect("data is an array of links");
+    let links = body.as_array().expect("the body is an array of links");
     let has_same_identity = links
         .iter()
         .any(|l| l["kind"] == "same_identity" && l["provenance"] == "matcher_suggested");
@@ -110,9 +110,7 @@ async fn live_pipeline_posts_a_real_suggested_edge() {
         .error_for_status()
         .expect("review-queue GET should be 200");
     let body: serde_json::Value = response.json().await.expect("parse review-queue response");
-    let items = body["data"]["items"]
-        .as_array()
-        .expect("data.items is an array");
+    let items = body["items"].as_array().expect("data.items is an array");
     let row = items
         .iter()
         .find(|item| {

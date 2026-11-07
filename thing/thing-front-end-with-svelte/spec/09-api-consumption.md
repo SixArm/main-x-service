@@ -23,5 +23,5 @@ The front-end binds 1:1 to the Thing Service REST surface (see [`thing-service-w
 
 Auth (not against the Thing Service): `POST /api/auth/magic-link`, `GET /api/auth/magic-link/{token}`, `POST /api/auth/token`, `POST /api/auth/signout` against `AUTH_API_URL` — see `src/lib/server/auth.ts` and §8.
 
-Envelope handling is centralised in `ApiClient`; per-endpoint methods on `ThingRepository` return unwrapped `data`.
+Response handling is centralised in `ApiClient`: a success is the bare JSON body, and a failure is an RFC 9457 problem thrown as `ApiError`; per-endpoint methods on `ThingRepository` return the parsed body.
 

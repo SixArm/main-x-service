@@ -10,299 +10,318 @@ import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 test.describe("Thing front-end smoke", () => {
-    // Pins: dashboard shows its heading and the main nav links.
-    test("dashboard renders nav and heading", async ({ page }) => {
-        await page.goto("/");
-        await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-        // The nav is a hamburger dropdown at every viewport width
-        // (deliberate layout design) — open it before asserting links.
-        await page.getByRole("button", { name: "Toggle navigation" }).click();
-        await expect(page.getByRole("link", { name: "Things" })).toBeVisible();
-        await expect(page.getByRole("link", { name: "Match check" })).toBeVisible();
-        await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
+  // Pins: dashboard shows its heading and the main nav links.
+  test("dashboard renders nav and heading", async ({ page }) => {
+    await page.goto("/");
+    await expect(
+      page.getByRole("heading", { name: "Dashboard" }),
+    ).toBeVisible();
+    // The nav is a hamburger dropdown at every viewport width
+    // (deliberate layout design) — open it before asserting links.
+    await page.getByRole("button", { name: "Toggle navigation" }).click();
+    await expect(page.getByRole("link", { name: "Things" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Match check" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Merge" })).toBeVisible();
+  });
+
+  // Pins: the list page renders the search box and a "New thing" link.
+  test("things list renders search box and new thing link", async ({
+    page,
+  }) => {
+    await page.goto("/things");
+    await expect(page.getByRole("heading", { name: "Things" })).toBeVisible();
+    await expect(page.getByRole("searchbox")).toBeVisible();
+    await expect(
+      page.getByRole("main").getByRole("link", { name: "New thing" }),
+    ).toBeVisible();
+  });
+
+  // Pins T-27: the "Mask sensitive" checkbox on /things sets
+  // mask_sensitive on the search call and re-fetches immediately (no
+  // form re-submit needed), rendering the masked vs. unmasked value the
+  // stub returns for the same query.
+  test("things list mask-sensitive toggle re-fetches with mask_sensitive", async ({
+    page,
+  }) => {
+    // The query box is never typed into in this test, so every
+    // fetch (initial load and the toggle's re-fetch) goes through
+    // `repo.list()` → `GET /api/things` (T-15), not `/search`.
+    await page.route("**/api/things**", async (route) => {
+      const url = new URL(route.request().url());
+      const masked = url.searchParams.get("mask_sensitive") === "true";
+      const thing = {
+        id: "0c4f1e2a-0000-4000-8000-00000000000b",
+        name: masked ? "[redacted]" : "Pride and Prejudice",
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([thing]),
+      });
     });
 
-    // Pins: the list page renders the search box and a "New thing" link.
-    test("things list renders search box and new thing link", async ({ page }) => {
-        await page.goto("/things");
-        await expect(page.getByRole("heading", { name: "Things" })).toBeVisible();
-        await expect(page.getByRole("searchbox")).toBeVisible();
-        await expect(page.getByRole("main").getByRole("link", { name: "New thing" })).toBeVisible();
+    await page.goto("/things");
+    await expect(page.getByText("Pride and Prejudice")).toBeVisible();
+
+    await page.getByLabel("Mask sensitive").check();
+    await expect(page.getByText("[redacted]")).toBeVisible();
+    await expect(page.getByText("Pride and Prejudice")).not.toBeVisible();
+
+    await page.getByLabel("Mask sensitive").uncheck();
+    await expect(page.getByText("Pride and Prejudice")).toBeVisible();
+    await expect(page.getByText("[redacted]")).not.toBeVisible();
+  });
+
+  // Pins T-28: the family-wide X-Total-Count/X-Offset headers drive the
+  // "N of M" indicator and the Next control, which re-fetches with the
+  // advanced offset (the client's fixed page size, 50) rather than
+  // stopping at the first 50 results with no way to see more.
+  test("things list next-page control advances the offset", async ({
+    page,
+  }) => {
+    let capturedOffset: string | null = null;
+    // No search term is ever typed, so every fetch goes through
+    // `repo.list()` → `GET /api/things` (T-15), not `/search`.
+    await page.route("**/api/things**", async (route) => {
+      const url = new URL(route.request().url());
+      capturedOffset = url.searchParams.get("offset");
+      const onSecondPage = capturedOffset === "50";
+      const thing = {
+        id: onSecondPage
+          ? "0c4f1e2a-0000-4000-8000-00000000000d"
+          : "0c4f1e2a-0000-4000-8000-00000000000c",
+        name: onSecondPage ? "Second page item" : "First page item",
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: {
+          "X-Total-Count": "100",
+          "X-Limit": "50",
+          "X-Offset": onSecondPage ? "50" : "0",
+        },
+        body: JSON.stringify([thing]),
+      });
     });
 
-    // Pins T-27: the "Mask sensitive" checkbox on /things sets
-    // mask_sensitive on the search call and re-fetches immediately (no
-    // form re-submit needed), rendering the masked vs. unmasked value the
-    // stub returns for the same query.
-    test("things list mask-sensitive toggle re-fetches with mask_sensitive", async ({
-        page,
-    }) => {
-        // The query box is never typed into in this test, so every
-        // fetch (initial load and the toggle's re-fetch) goes through
-        // `repo.list()` → `GET /api/things` (T-15), not `/search`.
-        await page.route("**/api/things**", async (route) => {
-            const url = new URL(route.request().url());
-            const masked = url.searchParams.get("mask_sensitive") === "true";
-            const thing = {
-                id: "0c4f1e2a-0000-4000-8000-00000000000b",
-                name: masked ? "[redacted]" : "Pride and Prejudice",
-            };
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify({ success: true, data: [thing], error: null }),
-            });
-        });
+    await page.goto("/things");
+    await expect(page.getByText("First page item")).toBeVisible();
+    await expect(page.getByText("1–1 of 100")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Next" })).toBeEnabled();
 
-        await page.goto("/things");
-        await expect(page.getByText("Pride and Prejudice")).toBeVisible();
+    await page.getByRole("button", { name: "Next" }).click();
+    expect(capturedOffset).toBe("50");
+    await expect(page.getByText("Second page item")).toBeVisible();
+    await expect(page.getByText("51–51 of 100")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous" })).toBeEnabled();
 
-        await page.getByLabel("Mask sensitive").check();
-        await expect(page.getByText("[redacted]")).toBeVisible();
-        await expect(page.getByText("Pride and Prejudice")).not.toBeVisible();
+    await page.getByRole("button", { name: "Previous" }).click();
+    expect(capturedOffset).toBe("0");
+    await expect(page.getByText("First page item")).toBeVisible();
+  });
 
-        await page.getByLabel("Mask sensitive").uncheck();
-        await expect(page.getByText("Pride and Prejudice")).toBeVisible();
-        await expect(page.getByText("[redacted]")).not.toBeVisible();
+  // Pins: the new-thing form shows the required Name field and Create button.
+  test("new thing form renders required name field", async ({ page }) => {
+    await page.goto("/things/new");
+    await expect(
+      page.getByRole("heading", { name: "New thing" }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/^Name/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Create" })).toBeVisible();
+  });
+
+  // Pins: the match-check page renders with its "Find matches" submit.
+  test("match check form renders", async ({ page }) => {
+    await page.goto("/things/match");
+    await expect(
+      page.getByRole("heading", { name: "Match check" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Find matches/ }),
+    ).toBeVisible();
+  });
+
+  // Pins: the merge page renders both the main and duplicate ID inputs.
+  test("merge form renders both ID inputs", async ({ page }) => {
+    await page.goto("/things/merge");
+    await expect(
+      page.getByRole("heading", { name: "Merge things" }),
+    ).toBeVisible();
+    await expect(page.getByLabel(/Main thing ID/)).toBeVisible();
+    await expect(page.getByLabel(/Duplicate thing ID/)).toBeVisible();
+  });
+
+  // Pins: the merge page seeds both ids from the query string, which is
+  // what the review board's post-confirmation deep link relies on
+  // (`$lib/review`'s `mergeHref`).
+  test("merge form pre-fills both IDs from the query string", async ({
+    page,
+  }) => {
+    await page.goto("/things/merge?main=main-111&duplicate=dup-222");
+    await expect(page.getByLabel(/Main thing ID/)).toHaveValue("main-111");
+    await expect(page.getByLabel(/Duplicate thing ID/)).toHaveValue("dup-222");
+  });
+
+  // Pins: the masked-view toggle (T-19) re-fetches through
+  // GET /api/things/{id}/masked and back, rather than redacting
+  // client-side — the two stubs return visibly different owner
+  // values so the test can tell which endpoint actually answered.
+  test("thing detail toggles between the plain and masked view", async ({
+    page,
+  }) => {
+    const id = "0c4f1e2a-0000-4000-8000-00000000000a";
+    const base = { id, name: "Pride and Prejudice" };
+    await page.route("**/api/things/**", async (route) => {
+      const url = route.request().url();
+      const body = url.includes("/masked")
+        ? { ...base, owner: "[owner withheld]" }
+        : { ...base, owner: "Jane Bennet" };
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      });
     });
 
-    // Pins T-28: the family-wide X-Total-Count/X-Offset headers drive the
-    // "N of M" indicator and the Next control, which re-fetches with the
-    // advanced offset (the client's fixed page size, 50) rather than
-    // stopping at the first 50 results with no way to see more.
-    test("things list next-page control advances the offset", async ({ page }) => {
-        let capturedOffset: string | null = null;
-        // No search term is ever typed, so every fetch goes through
-        // `repo.list()` → `GET /api/things` (T-15), not `/search`.
-        await page.route("**/api/things**", async (route) => {
-            const url = new URL(route.request().url());
-            capturedOffset = url.searchParams.get("offset");
-            const onSecondPage = capturedOffset === "50";
-            const thing = {
-                id: onSecondPage ? "0c4f1e2a-0000-4000-8000-00000000000d" : "0c4f1e2a-0000-4000-8000-00000000000c",
-                name: onSecondPage ? "Second page item" : "First page item",
-            };
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                headers: {
-                    "X-Total-Count": "100",
-                    "X-Limit": "50",
-                    "X-Offset": onSecondPage ? "50" : "0",
-                },
-                body: JSON.stringify({ success: true, data: [thing], error: null }),
-            });
-        });
+    await page.goto(`/things/${id}`);
+    await expect(page.getByText("Jane Bennet")).toBeVisible();
+    await expect(page.getByText("Showing the masked view")).not.toBeVisible();
 
-        await page.goto("/things");
-        await expect(page.getByText("First page item")).toBeVisible();
-        await expect(page.getByText("1–1 of 100")).toBeVisible();
-        await expect(page.getByRole("button", { name: "Previous" })).toBeDisabled();
-        await expect(page.getByRole("button", { name: "Next" })).toBeEnabled();
+    await page.getByRole("button", { name: "Show masked" }).click();
+    await expect(page.getByText("[owner withheld]")).toBeVisible();
+    await expect(page.getByText("Showing the masked view")).toBeVisible();
 
-        await page.getByRole("button", { name: "Next" }).click();
-        expect(capturedOffset).toBe("50");
-        await expect(page.getByText("Second page item")).toBeVisible();
-        await expect(page.getByText("51–51 of 100")).toBeVisible();
-        await expect(page.getByRole("button", { name: "Previous" })).toBeEnabled();
+    await page.getByRole("button", { name: "Show full" }).click();
+    await expect(page.getByText("Jane Bennet")).toBeVisible();
+    await expect(page.getByText("Showing the masked view")).not.toBeVisible();
+  });
 
-        await page.getByRole("button", { name: "Previous" }).click();
-        expect(capturedOffset).toBe("0");
-        await expect(page.getByText("First page item")).toBeVisible();
+  // Pins the FE-4 review screen: the board, the keyboard-reachable queue
+  // table, and the side-by-side comparison the Compare button opens. The
+  // queue and both sides of the pair are stubbed at the network layer so
+  // the smoke project keeps its "no service required" contract.
+  test("review board lists the queue and compares a pair on demand", async ({
+    page,
+  }) => {
+    const idA = "aaaaaaaa-0000-4000-8000-000000000001";
+    const idB = "bbbbbbbb-0000-4000-8000-000000000002";
+    const json = (data: unknown) => JSON.stringify(data);
+
+    await page.route("**/api/things/review-queue**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: json({
+          items: [
+            {
+              id: "r1",
+              thing_id_a: idA,
+              thing_id_b: idB,
+              match_score: 0.91,
+              match_quality: "probable",
+              detection_method: "batch_deduplication",
+              status: "pending",
+              reviewed_by: null,
+              created_at: "2026-08-04T09:00:00Z",
+              reviewed_at: null,
+            },
+          ],
+          total: 1,
+        }),
+      }),
+    );
+    await page.route(`**/api/things/${idA}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: json({
+          id: idA,
+          name: "Acme Widget",
+          additional_type: "Widget",
+        }),
+      }),
+    );
+    await page.route(`**/api/things/${idB}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: json({
+          id: idB,
+          name: "Acme Widgett",
+          additional_type: "Widget",
+        }),
+      }),
+    );
+
+    await page.goto("/review");
+    await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
+    await expect(page.getByTestId("review-board")).toBeVisible();
+    // The status filter must exist and default to every status.
+    await expect(page.getByLabel("Status")).toHaveValue("all");
+
+    // Thing has no provenance column on the wire (see `$lib/review`'s
+    // module doc) — the detection method is what the queue shows at a
+    // glance instead.
+    const list = page.getByTestId("review-list");
+    await expect(list).toBeVisible();
+    await expect(list.getByText("batch_deduplication")).toBeVisible();
+
+    // The keyboard-reachable path into the comparison: a real button,
+    // not a drag.
+    await list.getByRole("button", { name: /^Compare/ }).click();
+
+    const panel = page.getByTestId("review-compare");
+    await expect(panel).toBeVisible();
+    // Both stubbed records, side by side.
+    await expect(panel.getByText("Acme Widget", { exact: true })).toBeVisible();
+    await expect(panel.getByText("Acme Widgett")).toBeVisible();
+    // Thing-service never populates `score_breakdown` on the wire
+    // today (see `$lib/review`'s module doc), so the breakdown
+    // section always renders its documented empty state.
+    await expect(panel.getByTestId("review-no-breakdown")).toBeVisible();
+    // Both decisions are offered as real buttons for a pending item.
+    await expect(
+      panel.getByRole("button", { name: "Confirm duplicate" }),
+    ).toBeEnabled();
+    await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
+  });
+
+  // Pins: the GDPR export button (T-20) fetches GET /api/things/{id}/export
+  // and saves what came back as `thing-<id>-export.json` — a real browser
+  // download (Blob object URL + synthetic anchor), asserted through
+  // Playwright's download event, with the saved bytes compared to the
+  // stubbed payload so a silently-empty file cannot pass.
+  test("thing detail downloads the GDPR export as JSON", async ({ page }) => {
+    const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
+    const payload = {
+      subject: id,
+      exported_at: "2026-09-03T00:00:00Z",
+      records: [],
+    };
+    const record = { id, name: "Pride and Prejudice" };
+    await page.route("**/api/things/**", async (route) => {
+      const url = route.request().url();
+      const body = url.includes("/export") ? payload : record;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      });
     });
 
-    // Pins: the new-thing form shows the required Name field and Create button.
-    test("new thing form renders required name field", async ({ page }) => {
-        await page.goto("/things/new");
-        await expect(page.getByRole("heading", { name: "New thing" })).toBeVisible();
-        await expect(page.getByLabel(/^Name/)).toBeVisible();
-        await expect(page.getByRole("button", { name: "Create" })).toBeVisible();
-    });
-
-    // Pins: the match-check page renders with its "Find matches" submit.
-    test("match check form renders", async ({ page }) => {
-        await page.goto("/things/match");
-        await expect(page.getByRole("heading", { name: "Match check" })).toBeVisible();
-        await expect(page.getByRole("button", { name: /Find matches/ })).toBeVisible();
-    });
-
-    // Pins: the merge page renders both the main and duplicate ID inputs.
-    test("merge form renders both ID inputs", async ({ page }) => {
-        await page.goto("/things/merge");
-        await expect(page.getByRole("heading", { name: "Merge things" })).toBeVisible();
-        await expect(page.getByLabel(/Main thing ID/)).toBeVisible();
-        await expect(page.getByLabel(/Duplicate thing ID/)).toBeVisible();
-    });
-
-    // Pins: the merge page seeds both ids from the query string, which is
-    // what the review board's post-confirmation deep link relies on
-    // (`$lib/review`'s `mergeHref`).
-    test("merge form pre-fills both IDs from the query string", async ({ page }) => {
-        await page.goto("/things/merge?main=main-111&duplicate=dup-222");
-        await expect(page.getByLabel(/Main thing ID/)).toHaveValue("main-111");
-        await expect(page.getByLabel(/Duplicate thing ID/)).toHaveValue("dup-222");
-    });
-
-    // Pins: the masked-view toggle (T-19) re-fetches through
-    // GET /api/things/{id}/masked and back, rather than redacting
-    // client-side — the two stubs return visibly different owner
-    // values so the test can tell which endpoint actually answered.
-    test("thing detail toggles between the plain and masked view", async ({
-        page,
-    }) => {
-        const id = "0c4f1e2a-0000-4000-8000-00000000000a";
-        const base = { id, name: "Pride and Prejudice" };
-        await page.route("**/api/things/**", async (route) => {
-            const url = route.request().url();
-            const envelope = url.includes("/masked")
-                ? { success: true, data: { ...base, owner: "[owner withheld]" }, error: null }
-                : { success: true, data: { ...base, owner: "Jane Bennet" }, error: null };
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify(envelope),
-            });
-        });
-
-        await page.goto(`/things/${id}`);
-        await expect(page.getByText("Jane Bennet")).toBeVisible();
-        await expect(
-            page.getByText("Showing the masked view"),
-        ).not.toBeVisible();
-
-        await page.getByRole("button", { name: "Show masked" }).click();
-        await expect(page.getByText("[owner withheld]")).toBeVisible();
-        await expect(page.getByText("Showing the masked view")).toBeVisible();
-
-        await page.getByRole("button", { name: "Show full" }).click();
-        await expect(page.getByText("Jane Bennet")).toBeVisible();
-        await expect(
-            page.getByText("Showing the masked view"),
-        ).not.toBeVisible();
-    });
-
-    // Pins the FE-4 review screen: the board, the keyboard-reachable queue
-    // table, and the side-by-side comparison the Compare button opens. The
-    // queue and both sides of the pair are stubbed at the network layer so
-    // the smoke project keeps its "no service required" contract.
-    test("review board lists the queue and compares a pair on demand", async ({
-        page,
-    }) => {
-        const idA = "aaaaaaaa-0000-4000-8000-000000000001";
-        const idB = "bbbbbbbb-0000-4000-8000-000000000002";
-        const envelope = (data: unknown) =>
-            JSON.stringify({ success: true, data, error: null });
-
-        await page.route("**/api/things/review-queue**", (route) =>
-            route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: envelope({
-                    items: [
-                        {
-                            id: "r1",
-                            thing_id_a: idA,
-                            thing_id_b: idB,
-                            match_score: 0.91,
-                            match_quality: "probable",
-                            detection_method: "batch_deduplication",
-                            status: "pending",
-                            reviewed_by: null,
-                            created_at: "2026-08-04T09:00:00Z",
-                            reviewed_at: null,
-                        },
-                    ],
-                    total: 1,
-                }),
-            }),
-        );
-        await page.route(`**/api/things/${idA}`, (route) =>
-            route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: envelope({
-                    id: idA,
-                    name: "Acme Widget",
-                    additional_type: "Widget",
-                }),
-            }),
-        );
-        await page.route(`**/api/things/${idB}`, (route) =>
-            route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: envelope({
-                    id: idB,
-                    name: "Acme Widgett",
-                    additional_type: "Widget",
-                }),
-            }),
-        );
-
-        await page.goto("/review");
-        await expect(page.getByRole("heading", { name: "Review" })).toBeVisible();
-        await expect(page.getByTestId("review-board")).toBeVisible();
-        // The status filter must exist and default to every status.
-        await expect(page.getByLabel("Status")).toHaveValue("all");
-
-        // Thing has no provenance column on the wire (see `$lib/review`'s
-        // module doc) — the detection method is what the queue shows at a
-        // glance instead.
-        const list = page.getByTestId("review-list");
-        await expect(list).toBeVisible();
-        await expect(list.getByText("batch_deduplication")).toBeVisible();
-
-        // The keyboard-reachable path into the comparison: a real button,
-        // not a drag.
-        await list.getByRole("button", { name: /^Compare/ }).click();
-
-        const panel = page.getByTestId("review-compare");
-        await expect(panel).toBeVisible();
-        // Both stubbed records, side by side.
-        await expect(panel.getByText("Acme Widget", { exact: true })).toBeVisible();
-        await expect(panel.getByText("Acme Widgett")).toBeVisible();
-        // Thing-service never populates `score_breakdown` on the wire
-        // today (see `$lib/review`'s module doc), so the breakdown
-        // section always renders its documented empty state.
-        await expect(panel.getByTestId("review-no-breakdown")).toBeVisible();
-        // Both decisions are offered as real buttons for a pending item.
-        await expect(
-            panel.getByRole("button", { name: "Confirm duplicate" }),
-        ).toBeEnabled();
-        await expect(panel.getByRole("button", { name: "Reject" })).toBeEnabled();
-    });
-
-    // Pins: the GDPR export button (T-20) fetches GET /api/things/{id}/export
-    // and saves what came back as `thing-<id>-export.json` — a real browser
-    // download (Blob object URL + synthetic anchor), asserted through
-    // Playwright's download event, with the saved bytes compared to the
-    // stubbed payload so a silently-empty file cannot pass.
-    test("thing detail downloads the GDPR export as JSON", async ({ page }) => {
-        const id = "0c4f1e2a-0000-4000-8000-0000000000cc";
-        const payload = { subject: id, exported_at: "2026-09-03T00:00:00Z", records: [] };
-        const record = { id, name: "Pride and Prejudice" };
-        await page.route("**/api/things/**", async (route) => {
-            const url = route.request().url();
-            const envelope = url.includes("/export")
-                ? { success: true, data: payload, error: null }
-                : { success: true, data: record, error: null };
-            await route.fulfill({
-                status: 200,
-                contentType: "application/json",
-                body: JSON.stringify(envelope),
-            });
-        });
-
-        await page.goto(`/things/${id}`);
-        const downloadPromise = page.waitForEvent("download");
-        await page.getByRole("button", { name: "Export data (GDPR)" }).click();
-        const download = await downloadPromise;
-        expect(download.suggestedFilename()).toBe(`thing-${id}-export.json`);
-        const saved = await download.path();
-        expect(saved).not.toBeNull();
-        expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
-        await expect(page.getByRole("button", { name: "Export data (GDPR)" })).toBeEnabled();
-    });
+    await page.goto(`/things/${id}`);
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export data (GDPR)" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe(`thing-${id}-export.json`);
+    const saved = await download.path();
+    expect(saved).not.toBeNull();
+    expect(JSON.parse(readFileSync(saved as string, "utf8"))).toEqual(payload);
+    await expect(
+      page.getByRole("button", { name: "Export data (GDPR)" }),
+    ).toBeEnabled();
+  });
 });
 
 // Pins the PRO-H10 page-visit guard itself (WEB-1): with NO session
@@ -312,29 +331,31 @@ test.describe("Thing front-end smoke", () => {
 // or broken guard invisible. Read/list/view pages stay public and are
 // deliberately not listed here; see AGENTS.md "Page-visit guard".
 test.describe("Thing front-end page-visit guard", () => {
-    test.use({ storageState: { cookies: [], origins: [] } });
+  test.use({ storageState: { cookies: [], origins: [] } });
 
-    const guarded = [
-        "/things/new",
-        "/things/0c4f1e2a-0000-4000-8000-000000000001/edit",
-        "/things/merge",
-        "/review",
-    ];
+  const guarded = [
+    "/things/new",
+    "/things/0c4f1e2a-0000-4000-8000-000000000001/edit",
+    "/things/merge",
+    "/review",
+  ];
 
-    for (const path of guarded) {
-        test(`anonymous visit to ${path} redirects to /signin`, async ({ page }) => {
-            await page.goto(path);
-            await expect(page).toHaveURL(/\/signin(\?|$)/);
-        });
-    }
+  for (const path of guarded) {
+    test(`anonymous visit to ${path} redirects to /signin`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/signin(\?|$)/);
+    });
+  }
 });
 
 // The public tour renders anonymously (no redirect to sign-in).
 test.describe("tour (anonymous)", () => {
-    test.use({ storageState: { cookies: [], origins: [] } });
-    test("tour page renders signed out", async ({ page }) => {
-        await page.goto("/tour");
-        await expect(page).toHaveURL(/\/tour$/);
-        await expect(page.locator("section[id^=s] .steps li")).toHaveCount(28);
-    });
+  test.use({ storageState: { cookies: [], origins: [] } });
+  test("tour page renders signed out", async ({ page }) => {
+    await page.goto("/tour");
+    await expect(page).toHaveURL(/\/tour$/);
+    await expect(page.locator("section[id^=s] .steps li")).toHaveCount(28);
+  });
 });

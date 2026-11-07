@@ -2,7 +2,7 @@
 
 | Term | Meaning |
 | --- | --- |
-| **Envelope** | `{ success, data, error }` JSON wrapper from the service. |
+| **Problem** | The RFC 9457 error body the service answers with; a success is bare JSON. |
 | **Match quality** | `definite` / `certain` / `probable` / `possible` / `unlikely` (per `place-service-with-axum/agents/matching.md`). |
 | **Main / Duplicate** | Merge terminology: main survives, duplicate is soft-deleted. |
 

@@ -10,7 +10,7 @@
 +------------------------------v-------------------------------+
 |  course-front-end-with-svelte          (SvelteKit SPA, :5173) |
 |  SvelteKit 2 + Svelte 5 runes + SVAR DataGrid + Lily Headless |
-|  src/lib/api/{types,client,courses}.ts  (envelope-aware)      |
+|  src/lib/api/{types,client,courses}.ts  (problem-aware)       |
 +------------------------------+-------------------------------+
                                | HTTP JSON  /api/*  (:8084)
 +------------------------------v-------------------------------+

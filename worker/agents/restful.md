@@ -1,7 +1,7 @@
 # RESTful API — Worker entity
 
 Entity-level orientation. The full endpoint reference (parameters,
-envelopes, status codes, FHIR, library API, metrics) is
+response shapes, status codes, FHIR, library API, metrics) is
 [service `agents/restful.md`](../worker-service-with-axum/agents/restful.md);
 the normative inventory is
 [service spec §9](../worker-service-with-axum/spec/09-api-surface.md)

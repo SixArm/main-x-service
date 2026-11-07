@@ -12,6 +12,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- The person, worker, place, thing, and event clients read those services'
+  bare JSON responses. They no longer expect the `{success, data, error}`
+  envelope, which the services dropped for RFC 9457 problems.
+
+### Changed
+
 - axa 0.6.1. Every error axa answers is an RFC 9457 problem,
   `application/problem+json`, with `code` in place of `error` and `detail` in
   place of `description`. Axum's own refusals, such as an unknown route's `404`,

@@ -10,9 +10,9 @@
 +-------------------------------v--------------------------------+
 |              person-front-end-with-svelte (SPA)                 |
 |  SvelteKit 2 + Svelte 5 runes + SVAR DataGrid + Lily Headless   |
-|  src/lib/api/{types,client,persons}.ts  (envelope-aware fetch)  |
+|  src/lib/api/{types,client,persons}.ts  (problem-aware fetch)   |
 +-------------------------------+--------------------------------+
-                                |  HTTP JSON  { success, data, error }
+                                |  HTTP JSON (bare) / RFC 9457 problems
 +-------------------------------v--------------------------------+
 |               person-service-with-axum (registry)              |
 |  REST /api/* (15 endpoints)  |  FHIR R5 /fhir/Person  |  gRPC   |

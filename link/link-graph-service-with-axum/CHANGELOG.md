@@ -16,6 +16,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **Breaking: responses are bare JSON, and errors are RFC 9457 problems.**
+  The `{success, data, error}` envelope is gone: a graph response is
+  `{…, as_of}` itself, and a `400` is `application/problem+json` with
+  `code` `bad_request` and the reason in `detail`. `src/envelope.rs` is now
+  `src/responses.rs`, and the OpenAPI `*Envelope` schemas are `*Response`.
+  See `spec/restful` §1.3.
+- The suggestion job reads person's and worker's lists as bare JSON, since
+  those services dropped their envelope too.
+
+### Changed
+
 - axa 0.6.1. Every error axa answers is an RFC 9457 problem,
   `application/problem+json`, with `code` in place of `error` and `detail` in
   place of `description`. Axum's own refusals, such as an unknown route's `404`,

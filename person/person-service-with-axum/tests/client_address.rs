@@ -86,7 +86,7 @@ async fn every_path_records(
             .await;
         created.assert_status(axum::http::StatusCode::CREATED);
         let body: Value = created.json();
-        let id: Uuid = body["data"]["id"].as_str().unwrap().parse().unwrap();
+        let id: Uuid = body["id"].as_str().unwrap().parse().unwrap();
         assert_eq!(addresses(&ctx.db, id, "CREATE").await, expected, "create");
 
         server
@@ -107,7 +107,7 @@ async fn every_path_records(
             .await;
         linked.assert_status_success();
         let body: Value = linked.json();
-        let link = body["data"]["id"].as_str().unwrap().parse().unwrap();
+        let link = body["id"].as_str().unwrap().parse().unwrap();
         assert_eq!(addresses(&ctx.db, link, "CREATE").await, expected, "link");
 
         server

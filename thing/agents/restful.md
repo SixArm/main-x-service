@@ -20,10 +20,11 @@ Endpoint-by-route consumption map:
 Conventions (shared:
 [agents/share/restful.md](../../agents/share/restful.md)):
 
-- Standard JSON response envelope; per-endpoint methods in the
-  front-end's `ThingRepository` return unwrapped `data`.
+- Bare JSON on success and an RFC 9457 problem on failure
+  (`spec/restful` §1.3); per-endpoint methods in the front-end's
+  `ThingRepository` return the parsed body.
 - `409 Conflict` with candidate matches when create detects a
-  duplicate; `422` with field details on validation failure.
+  duplicate; `422` with field errors (the problem's `errors`) on validation failure.
 - OpenAPI via utoipa; Swagger UI at `/swagger-ui`; Prometheus
   text exposition at `/metrics.prom`.
 - No FHIR surface for this entity; gRPC is a Tonic stub (service §13
@@ -45,7 +46,7 @@ Routes `/`, `/things`, `/things/new`, `/things/[id]`,
 `check-duplicates`, `deduplicate`, `masked`, and `export` are served
 by the API but not yet routed in the UI (entity §13 T-7).
 
-Envelope handling lives in
+Response and problem handling lives in
 [`src/lib/api/client.ts`](../thing-front-end-with-svelte/src/lib/api/client.ts);
 endpoint methods in
 [`src/lib/api/things.ts`](../thing-front-end-with-svelte/src/lib/api/things.ts).

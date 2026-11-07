@@ -89,8 +89,6 @@ pub use state::AppState;
             crate::models::Consent,
             crate::models::ConsentType,
             crate::models::ConsentStatus,
-            crate::api::ApiResponse::<crate::models::Person>,
-            crate::api::ApiError,
             handlers::HealthResponse,
             handlers::CreatePersonRequest,
             handlers::ListQuery,

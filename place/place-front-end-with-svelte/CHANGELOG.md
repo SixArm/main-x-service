@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- The API client reads the service's new responses: a success is the bare
+  body, and an error is an RFC 9457 problem, whose `detail` (else `title`)
+  becomes `ApiError.message`, `code` becomes `ApiError.code`, and `errors`
+  becomes `ApiError.details`. `ApiResponse` and `ApiErrorBody` are replaced
+  by `Problem`.
+
 ### Changed — PickerBar now uses Lily's default themes and text sizes, not app-specific lists
 
 Removed the hand-maintained `THEMES`/`THEME_LABELS` consts from

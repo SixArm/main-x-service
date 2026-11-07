@@ -20,7 +20,7 @@ Front-end endpoint-to-route map:
 | Meta | Swagger UI `/swagger-ui`, Prometheus `/metrics.prom` |
 | Stubs | `/fhir/Event/*` → `501`; gRPC stub |
 
-Envelope: `{ "success": bool, "data": …, "error": { code, message, details } }`.
+Bare JSON on success, an RFC 9457 problem on failure (`spec/restful` §1.3).
 Status codes: 200/201/204/400/404/409/422/500/501 per the service
 reference.
 

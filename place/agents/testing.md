@@ -33,8 +33,8 @@ service surfaces** (entity FR-19).
 
 ### Front-end ↔ service: wire-type tests
 
-`tests/unit/client.test.ts` + `tests/unit/places.test.ts` pin envelope
-unwrapping and repository behaviour against `src/lib/api/types.ts`.
+`tests/unit/client.test.ts` + `tests/unit/places.test.ts` pin response and
+problem handling and repository behaviour against `src/lib/api/types.ts`.
 They mock `fetch` — they prove the front-end matches its *copy* of the
 contract, not the live service.
 

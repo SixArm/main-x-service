@@ -83,18 +83,14 @@ async fn linked_edge_is_projected_and_readable() {
         let resp = request.get(&format!("/api/neighbors/{person}")).await;
         assert_eq!(resp.status_code(), 200);
         let body: Value = resp.json();
-        assert_eq!(body["success"], true);
-        assert_eq!(body["data"]["edges"].as_array().unwrap().len(), 1);
-        assert_eq!(body["data"]["edges"][0]["kind"], "works_at");
-        assert!(
-            body["data"].get("as_of").is_some(),
-            "graph response carries as_of"
-        );
+        assert_eq!(body["edges"].as_array().unwrap().len(), 1);
+        assert_eq!(body["edges"][0]["kind"], "works_at");
+        assert!(body.get("as_of").is_some(), "graph response carries as_of");
 
         // edges filter by kind also finds it.
         let resp = request.get("/api/edges?kind=works_at").await;
         let body: Value = resp.json();
-        assert_eq!(body["data"]["edges"].as_array().unwrap().len(), 1);
+        assert_eq!(body["edges"].as_array().unwrap().len(), 1);
     })
     .await;
 }
@@ -118,7 +114,7 @@ async fn same_identity_is_canonicalised_once() {
 
         let resp = request.get("/api/edges?kind=same_identity").await;
         let body: Value = resp.json();
-        let edges = body["data"]["edges"].as_array().unwrap();
+        let edges = body["edges"].as_array().unwrap();
         assert_eq!(edges.len(), 1);
         assert_eq!(
             edges[0]["from_ref"], person,
@@ -153,7 +149,7 @@ async fn presence_drives_status_lifecycle() {
 
         let body: Value = request.get("/api/edges?status=verified").await.json();
         assert_eq!(
-            body["data"]["edges"].as_array().unwrap().len(),
+            body["edges"].as_array().unwrap().len(),
             1,
             "both alive => verified"
         );
@@ -164,7 +160,7 @@ async fn presence_drives_status_lifecycle() {
             .unwrap();
         let body: Value = request.get("/api/edges?status=dangling").await.json();
         assert_eq!(
-            body["data"]["edges"].as_array().unwrap().len(),
+            body["edges"].as_array().unwrap().len(),
             1,
             "deleted endpoint => dangling"
         );
@@ -199,9 +195,9 @@ async fn single_view_unifies_and_derives_employer() {
             .get(&format!("/api/single-view/{person}"))
             .await
             .json();
-        let ids = body["data"]["identity_refs"].as_array().unwrap();
+        let ids = body["identity_refs"].as_array().unwrap();
         assert_eq!(ids.len(), 2, "person + worker unified");
-        let affs = body["data"]["affiliations"].as_array().unwrap();
+        let affs = body["affiliations"].as_array().unwrap();
         assert_eq!(affs.len(), 1);
         assert_eq!(affs[0]["kind"], "employed_by");
         assert_eq!(affs[0]["to"], org);
@@ -237,11 +233,7 @@ async fn unlinked_removes_the_edge() {
         apply_event(&ctx.db, unlinked).await.unwrap();
 
         let body: Value = request.get("/api/edges").await.json();
-        assert_eq!(
-            body["data"]["edges"].as_array().unwrap().len(),
-            0,
-            "edge removed"
-        );
+        assert_eq!(body["edges"].as_array().unwrap().len(), 0, "edge removed");
     })
     .await;
 }
@@ -256,12 +248,12 @@ async fn freshness_reports_consumed_topics() {
             .await
             .unwrap();
         let body: Value = request.get("/api/health/freshness").await.json();
-        let topics = body["data"]["topics"].as_array().unwrap();
+        let topics = body["topics"].as_array().unwrap();
         assert!(
             topics.iter().any(|t| t["entity"] == "person"),
             "person topic present"
         );
-        assert!(body["data"].get("as_of").is_some());
+        assert!(body.get("as_of").is_some());
     })
     .await;
 }
@@ -337,7 +329,7 @@ async fn merged_repoints_edges_onto_the_survivor() {
             .get(&format!("/api/neighbors/{survivor}"))
             .await
             .json();
-        let edges = body["data"]["edges"].as_array().unwrap();
+        let edges = body["edges"].as_array().unwrap();
         assert_eq!(edges.len(), 1, "edge repointed to the survivor");
         assert_eq!(edges[0]["from_ref"], survivor);
         assert_eq!(edges[0]["to_ref"], org);
@@ -345,7 +337,7 @@ async fn merged_repoints_edges_onto_the_survivor() {
         // ...and the merged-away ref carries none.
         let gone: Value = request.get(&format!("/api/neighbors/{dup}")).await.json();
         assert_eq!(
-            gone["data"]["edges"].as_array().unwrap().len(),
+            gone["edges"].as_array().unwrap().len(),
             0,
             "the duplicate has no edges after the merge"
         );
@@ -386,7 +378,7 @@ async fn merged_dedups_a_colliding_edge() {
             .await
             .json();
         assert_eq!(
-            body["data"]["edges"].as_array().unwrap().len(),
+            body["edges"].as_array().unwrap().len(),
             1,
             "the colliding edge was de-duplicated, not doubled"
         );

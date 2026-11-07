@@ -39,7 +39,7 @@ Reviewers reject PRs that change behaviour without touching all three.
 | §6 Functional Requirements | The trio's composed behaviour; each FR names its owner |
 | §7 Non-Functional Requirements | Benches, deployment artefacts, locales, SSO plan |
 | §8 Architecture | Dependency direction, axa boot shape, deployment topology |
-| §9 API Surface | Service routes + front-end routes + envelope |
+| §9 API Surface | Service routes + front-end routes + response shapes |
 | §11 Testing Strategy | The bridge test + front-end client tests as composition pins |
 | §13 Tasks | Live entity-level work queue — cross-subproject work only |
 

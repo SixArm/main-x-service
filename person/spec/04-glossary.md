@@ -16,7 +16,7 @@ front-end [spec §4](../person-front-end-with-svelte/spec/04-glossary.md).
 | **Matcher model** | The matcher's flat `Person` builder shape — what `MatchingEngine` scores |
 | **Adapter** | `src/matching/adapter.rs` in the service — the lossy projection service model → matcher model (§5.3) |
 | **Canonical algorithm** | The matcher crate's scoring — the reference the service embeds as `matcher_lib` |
-| **Envelope** | The REST response wrapper `{ "success": bool, "data": …, "error": … }` shared by service and front-end |
+| **Problem** | An RFC 9457 error body (`application/problem+json`: `type`, `title`, `status`, `detail`, `code`, `errors`). Successes are bare JSON, with no wrapper |
 | **Match** | A comparison between two persons yielding a 0.00–1.00 score plus per-component breakdown |
 | **Merge** | Transfers a duplicate's data onto a surviving record, soft-deletes the duplicate, writes a `Replaces` link |
 | **Review queue** | Persisted candidate duplicate pairs: `Pending` / `Confirmed` / `Rejected` / `AutoMerged` |

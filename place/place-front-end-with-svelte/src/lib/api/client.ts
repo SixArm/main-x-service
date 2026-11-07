@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApiResponse } from "./types.js";
+import type { Problem } from "./types.js";
 
 /** Construction options for {@link ApiClient}. */
 export interface ClientOptions {
@@ -26,37 +26,34 @@ export interface RequestOptions {
 }
 
 /**
- * Error thrown for any non-success HTTP outcome (network-level failures
+ * Error thrown for any non-2xx HTTP outcome (network-level failures
  * still surface as the underlying fetch rejection).
  *
- * Carries the HTTP status plus the service's structured error body so
+ * Carries the HTTP status plus the parsed RFC 9457 {@link Problem} so
  * callers can branch on {@link ApiError.isNotFound} / `isConflict` /
  * `isValidation` rather than re-inspecting raw status codes.
  */
 export class ApiError extends Error {
   /** HTTP status code of the failed response. */
   readonly status: number;
-  /** Machine-readable error code from the body, or `"UNKNOWN"`. */
+  /** Machine-readable error code from the problem, or `"unknown"`. */
   readonly code: string;
-  /** Optional structured error details from the body. */
+  /** The problem's structured `errors` (e.g. duplicate candidates). */
   readonly details: unknown;
 
   /**
    * @param status - HTTP status code of the response.
-   * @param body - Parsed service error body, or `null` if none/unparseable.
+   * @param body - Parsed problem, or `null` if none/unparseable.
    * @param fallbackMessage - Used as the message when the body has none.
    */
-  constructor(
-    status: number,
-    body: ApiErrorBody | null,
-    fallbackMessage?: string,
-  ) {
-    // Prefer the server-supplied message; degrade to a generic "HTTP <status>".
-    super(body?.message ?? fallbackMessage ?? `HTTP ${status}`);
+  constructor(status: number, body: Problem | null, fallbackMessage?: string) {
+    // Prefer the server-supplied detail, then the status title; degrade to
+    // a generic "HTTP <status>".
+    super(body?.detail ?? body?.title ?? fallbackMessage ?? `HTTP ${status}`);
     this.name = "ApiError";
     this.status = status;
-    this.code = body?.code ?? "UNKNOWN";
-    this.details = body?.details;
+    this.code = body?.code ?? "unknown";
+    this.details = body?.errors;
   }
 
   /** True for `404 Not Found` (e.g. unknown place id). */
@@ -73,8 +70,8 @@ export class ApiError extends Error {
   }
 }
 
-// Tiny fetch wrapper that understands the Place Service ApiResponse<T>
-// envelope. Allows fetch injection for SSR load functions (use
+// Tiny fetch wrapper over the Place Service: a success is the bare JSON
+// payload, and a failure is an RFC 9457 problem. Allows fetch injection for SSR load functions (use
 // `event.fetch`) and tests.
 export class ApiClient {
   private readonly baseUrl: string;
@@ -94,21 +91,21 @@ export class ApiClient {
   }
 
   /**
-   * Issue a `GET` request and return the unwrapped `data` payload.
+   * Issue a `GET` request and return the parsed payload.
    * @typeParam T - Expected response payload type.
    */
   get<T>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("GET", path, opts);
   }
   /**
-   * Issue a `POST` request and return the unwrapped `data` payload.
+   * Issue a `POST` request and return the parsed payload.
    * @typeParam T - Expected response payload type.
    */
   post<T>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("POST", path, opts);
   }
   /**
-   * Issue a `PUT` request and return the unwrapped `data` payload.
+   * Issue a `PUT` request and return the parsed payload.
    * @typeParam T - Expected response payload type.
    */
   put<T>(path: string, opts?: RequestOptions): Promise<T> {
@@ -123,15 +120,15 @@ export class ApiClient {
   }
 
   /**
-   * Core request pipeline: build the URL, send, then unwrap the
-   * `ApiResponse<T>` envelope into either a value or an {@link ApiError}.
+   * Core request pipeline: build the URL, send, then classify the
+   * outcome as either the parsed body or an {@link ApiError}.
    *
    * @typeParam T - Expected response payload type.
    * @param method - HTTP method verb.
    * @param path - Request path (absolute or relative to the base URL).
    * @param opts - Optional query/body/headers/signal.
-   * @returns The envelope's `data` field (or `undefined` for 204/empty).
-   * @throws {ApiError} On non-2xx status, `success: false`, or non-JSON body.
+   * @returns The parsed body as `T` (or `undefined` for 204/empty).
+   * @throws {ApiError} On non-2xx status, or a non-JSON body.
    */
   private async request<T>(
     method: string,
@@ -156,11 +153,11 @@ export class ApiClient {
     }
 
     // Read the body once as text so we can guard against empty/non-JSON.
-    let parsed: ApiResponse<T> | null = null;
+    let parsed: unknown = null;
     const text = await response.text();
     if (text.length > 0) {
       try {
-        parsed = JSON.parse(text) as ApiResponse<T>;
+        parsed = JSON.parse(text) as unknown;
       } catch {
         // Body present but not JSON: surface a truncated preview.
         throw new ApiError(
@@ -171,15 +168,12 @@ export class ApiClient {
       }
     }
 
-    // HTTP-level failure: prefer the envelope's structured error.
+    // HTTP-level failure: the body is a problem.
     if (!response.ok) {
-      throw new ApiError(response.status, parsed?.error ?? null);
+      throw new ApiError(response.status, asProblem(parsed));
     }
-    // 2xx but the envelope flags failure (defensive against the service).
-    if (parsed && parsed.success === false) {
-      throw new ApiError(response.status, parsed.error);
-    }
-    return (parsed?.data ?? undefined) as T;
+    // Success: the body is the payload (undefined if none).
+    return (parsed ?? undefined) as T;
   }
 
   /**
@@ -205,4 +199,11 @@ export class ApiClient {
     }
     return url.toString();
   }
+}
+
+/** `value` as a problem when it is an object, else `null`. */
+function asProblem(value: unknown): Problem | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Problem)
+    : null;
 }

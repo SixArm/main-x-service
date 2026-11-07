@@ -68,7 +68,9 @@ describe("requireSignedIn", () => {
   // Pins: a signed-in visitor (any non-null session id) passes through
   // silently — no throw, no return value to check.
   it("does not throw when a session is present", () => {
-    expect(() => requireSignedIn({ sessionId: "some-session-id" })).not.toThrow();
+    expect(() =>
+      requireSignedIn({ sessionId: "some-session-id" }),
+    ).not.toThrow();
   });
 });
 

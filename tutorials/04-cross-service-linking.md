@@ -186,10 +186,10 @@ curl -s http://localhost:8092/_health       # link-graph
 ```json
 {"status":"healthy","service":"person-service","version":"0.5.0"}
 {"status":"healthy","service":"worker-service","version":"0.5.0"}
-{"success":true,"data":{"status":"healthy","service":"place-service","version":"0.5.0"}}
-{"success":true,"data":{"status":"healthy","service":"thing-service","version":"0.5.0"}}
+{"status":"healthy","service":"place-service","version":"0.5.0"}
+{"status":"healthy","service":"thing-service","version":"0.5.0"}
 {"status":"healthy","service":"event-service","version":"0.5.0"}
-{"success":true,"data":{"status":"healthy","service":"course-service","version":"0.3.0"}}
+{"status":"healthy","service":"course-service","version":"0.3.0"}
 {"ok":true}
 {"ok":true}
 {"ok":true}
@@ -198,11 +198,11 @@ curl -s http://localhost:8092/_health       # link-graph
 {"ok":true}
 ```
 
-All twelve `200`. Note the three distinct health-body shapes across the
-family (bare, `{success,data:{...}}`, and `{"ok":true}`) — a real,
-pre-existing inconsistency this tutorial did not introduce, worth knowing
-if you're scripting a health check across services rather than eyeballing
-it.
+All twelve `200`. Note the two distinct health-body shapes across the
+family (a `{status, service, version}` object and `{"ok":true}`), worth
+knowing if you're scripting a health check across services rather than
+eyeballing it. Until 2026-11-07 a third shape wrapped the first in
+`{success, data}`.
 
 ## 2. Create the source records: a person, a worker, and a case
 
@@ -224,11 +224,11 @@ curl -s -i -X POST http://localhost:8082/api/workers \
 ```
 HTTP/1.1 201 Created
 ...
-{"success":true,"data":{"id":"a9718af2-6fe1-4618-b98d-1d1b4249531f","identifiers":[],"active":true,"name":{"use_type":null,"family":"Ito","given":["Sakura"],"prefix":[],"suffix":[]},"...":"..."},"error":null}
+{"id":"a9718af2-6fe1-4618-b98d-1d1b4249531f","identifiers":[],"active":true,"name":{"use_type":null,"family":"Ito","given":["Sakura"],"prefix":[],"suffix":[]},"...":"..."}
 
 HTTP/1.1 201 Created
 ...
-{"success":true,"data":{"id":"498c9c4f-a20c-48ea-a4a5-9c3bbc4373ff","identifiers":[],"active":true,"name":{"use_type":null,"family":"Ito","given":["Sakura"],"prefix":[],"suffix":[]},"worker_type":null,"...":"..."},"error":null}
+{"id":"498c9c4f-a20c-48ea-a4a5-9c3bbc4373ff","identifiers":[],"active":true,"name":{"use_type":null,"family":"Ito","given":["Sakura"],"prefix":[],"suffix":[]},"worker_type":null,"...":"..."}
 ```
 
 Substitute your own run's ids for the rest of this tutorial:
@@ -242,8 +242,7 @@ Then a governmental case naming that person as its subject (reusing the
 body shape [`examples/api/case.http`](../examples/api/case.http) already
 curl-verifies — but with the real `PERSON_ID` above in `subjects`, not the
 file's placeholder `person:abc`; the case service is controller-style, so
-its create response is **bare** JSON, not the `{success,data,error}`
-envelope person/worker use):
+its create response is bare JSON, like every service's):
 
 ```sh
 curl -s -i -X POST http://localhost:8089/api/cases \
@@ -295,7 +294,7 @@ curl -s -i -X POST http://localhost:8081/api/persons/${PERSON_ID}/links \
 ```
 HTTP/1.1 200 OK
 ...
-{"success":true,"data":{"id":"b6b8e17d-922e-41e2-93c4-e58d003ab7d0","from_ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","kind":"same_identity","to_ref":"worker:498c9c4f-a20c-48ea-a4a5-9c3bbc4373ff","role":null,"confidence":null,"provenance":"operator","valid_from":null,"valid_to":null},"error":null}
+{"id":"b6b8e17d-922e-41e2-93c4-e58d003ab7d0","from_ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","kind":"same_identity","to_ref":"worker:498c9c4f-a20c-48ea-a4a5-9c3bbc4373ff","role":null,"confidence":null,"provenance":"operator","valid_from":null,"valid_to":null}
 ```
 
 Case is the reference originator of `subject_of` (§9, §10 — the
@@ -313,8 +312,7 @@ HTTP/1.1 200 OK
 {"id":"d9e47aec-564b-4479-80ce-1d7d1dc39a04","from_ref":"case:f44c9955-19cc-4201-8a6c-e6d8cc857ff8","kind":"subject_of","to_ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","role":null,"confidence":null,"provenance":"operator","valid_from":null,"valid_to":null}
 ```
 
-(Note case's link-write response is bare JSON — same envelope
-inconsistency as its `POST /api/cases` above, not new here.) Both writes
+Both writes
 are `200`, both are local to the originating service's own database, and
 neither call touched link-graph or the other endpoint's service at all.
 
@@ -328,8 +326,8 @@ curl -s "http://localhost:8092/api/neighbors/person:${PERSON_ID}"
 ```
 
 ```json
-{"success":true,"data":{"topics":[],"as_of":null}}
-{"success":true,"data":{"ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","edges":[],"as_of":null}}
+{"topics":[],"as_of":null}
+{"ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","edges":[],"as_of":null}
 ```
 
 Both empty. This is not lag in the usual sense — it's the gap
@@ -438,10 +436,10 @@ curl -s "http://localhost:8092/api/neighbors/person:${PERSON_ID}"
 ```
 
 ```json
-{"success":true,"data":{"ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","edges":[
+{"ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","edges":[
   {"edge_id":"b6b8e17d-922e-41e2-93c4-e58d003ab7d0","from_ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","to_ref":"worker:498c9c4f-a20c-48ea-a4a5-9c3bbc4373ff","kind":"same_identity","directed":false,"role":null,"confidence":null,"provenance":"operator","valid_from":null,"valid_to":null,"status":"verified","observed_at":"2026-08-04T10:11:56.623905Z","source_event_id":"b6b8e17d-922e-41e2-93c4-e58d003ab7d0"},
   {"edge_id":"d9e47aec-564b-4479-80ce-1d7d1dc39a04","from_ref":"case:f44c9955-19cc-4201-8a6c-e6d8cc857ff8","to_ref":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","kind":"subject_of","directed":true,"role":null,"confidence":null,"provenance":"operator","valid_from":null,"valid_to":null,"status":"verified","observed_at":"2026-08-04T10:11:56.619042Z","source_event_id":"d9e47aec-564b-4479-80ce-1d7d1dc39a04"}
-],"as_of":null}}
+],"as_of":null}
 ```
 
 Real, worth noticing:
@@ -479,11 +477,11 @@ curl -s "http://localhost:8092/api/single-view/person:${PERSON_ID}"
 ```
 
 ```json
-{"success":true,"data":{
+{
   "identity_refs":["person:a9718af2-6fe1-4618-b98d-1d1b4249531f","worker:498c9c4f-a20c-48ea-a4a5-9c3bbc4373ff"],
   "affiliations":[{"from":"case:f44c9955-19cc-4201-8a6c-e6d8cc857ff8","to":"person:a9718af2-6fe1-4618-b98d-1d1b4249531f","kind":"subject_of"}],
   "as_of":null
-}}
+}
 ```
 
 `identity_refs` is the `same_identity`-unified set (person + worker,
@@ -547,8 +545,8 @@ curl -s "http://localhost:8092/api/edges?kind=subject_of"           # shows the 
 ```
 
 ```json
-{"success":true,"data":{"ref":"person:...","edges":[{"...":"same_identity edge only..."}],"as_of":null}}
-{"success":true,"data":{"edges":[{"edge_id":"...","from_ref":"case:...","to_ref":"person:88888888-...","kind":"subject_of","...","status":"dangling","...}]}}
+{"ref":"person:...","edges":[{"...":"same_identity edge only..."}],"as_of":null}
+{"edges":[{"edge_id":"...","from_ref":"case:...","to_ref":"person:88888888-...","kind":"subject_of","...","status":"dangling","...}]}
 ```
 
 A bonus, unplanned confirmation that lazy verify-on-read (§6) is doing

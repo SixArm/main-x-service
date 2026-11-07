@@ -68,8 +68,7 @@ async fn create(server: &TestServer, header: &HeaderName, value: &HeaderValue) -
         .json(&unique_worker())
         .await;
     created.assert_status(axum::http::StatusCode::CREATED);
-    let body: Value = created.json();
-    body["data"].clone()
+    created.json()
 }
 
 fn id_of(value: &Value) -> Uuid {
@@ -128,7 +127,7 @@ async fn every_path_records(
             .await;
         linked.assert_status_success();
         let body: Value = linked.json();
-        let link = id_of(&body["data"]);
+        let link = id_of(&body);
         assert_eq!(addresses(&ctx.db, link, "CREATE").await, one, "link");
 
         let assessment = server

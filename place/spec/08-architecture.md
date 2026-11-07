@@ -14,7 +14,7 @@
 |          /places/match /places/merge                                |
 |  src/lib/api: types.ts + client.ts + places.ts (wire contract)      |
 +----------------------------+---------------------------------------+
-                             | REST (JSON envelope, PUBLIC_API_BASE_URL)
+                             | REST (JSON / RFC 9457, PUBLIC_API_BASE_URL)
 +----------------------------v---------------------------------------+
 |              place-service-with-axum (axa / Axum)              |
 |  +---------------+ +----------------+ +-------------------------+   |

@@ -1,8 +1,8 @@
 ### place-service — example requests
 # place/place-service-with-axum — "person-style" layout (src/api/rest/).
-# Envelope: {"success":bool,"data":...,"error":...} but data/error are
-# OMITTED (not null) on the unused side — #[serde(skip_serializing_if)],
-# src/api/mod.rs. Different from person/worker/event's "always both keys".
+# Responses: bare JSON on success; an RFC 9457 problem
+# (application/problem+json: type, title, status, detail, code, errors)
+# on failure — spec/restful §1.3, src/api/mod.rs.
 # Gated by PLACE_REQUIRE_AUTH (default off).
 #
 # GOTCHA (curl-verified): Place has NO #[serde(default)] anywhere, so

@@ -45,19 +45,7 @@ const KEY_MOVED_BY: &str = "moved_by=";
 /// Keyword prefix for the worker-role snapshot.
 const KEY_WORKER_ROLE: &str = "worker_role=";
 
-/// The upstream `{success, data, error}` envelope. We only consume `data`.
-#[derive(Debug, Deserialize)]
-struct ApiResponse<T> {
-    /// Payload, present on success; `None` when the service returns no data.
-    data: Option<T>,
-    /// Service-reported success flag. Unused by this client (status is
-    /// authoritative), hence `#[allow(dead_code)]`.
-    #[serde(default)]
-    #[allow(dead_code)]
-    success: bool,
-}
-
-/// The `data` shape returned by the search endpoint: a list of events.
+/// The body returned by the search endpoint: a list of events.
 #[derive(Debug, Deserialize, Default)]
 struct SearchEnvelope {
     /// Raw event DTOs; non-folder-move events are filtered out downstream.
@@ -245,13 +233,11 @@ impl HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<SearchEnvelope> = response
+        let body: SearchEnvelope = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
         let mut events: Vec<MoveEvent> = body
-            .data
-            .unwrap_or_default()
             .events
             .into_iter()
             .filter_map(EventDto::into_move_event)
@@ -270,7 +256,7 @@ impl Client for HttpClient {
     ///
     /// # Errors
     /// Returns [`Error::Transport`] on a non-success status and
-    /// [`Error::BadResponse`] when the response has no usable `data`.
+    /// [`Error::BadResponse`] when the response body does not parse.
     async fn record(&self, input: RecordMove) -> Result<MoveEvent, Error> {
         let now = Utc::now();
         let payload = json!({
@@ -315,13 +301,12 @@ impl Client for HttpClient {
                 "record returned non-success: {body}"
             )));
         }
-        let body: ApiResponse<EventDto> = response
+        let body: EventDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        body.data
-            .and_then(EventDto::into_move_event)
-            .ok_or_else(|| Error::BadResponse("record returned empty data".into()))
+        EventDto::into_move_event(body)
+            .ok_or_else(|| Error::BadResponse("record returned a record it cannot use".into()))
     }
 
     /// `GET /api/events/search?event_type=FolderMove&limit=500` — all

@@ -19,7 +19,7 @@ layered in `App::after_routes`.
 ```rust
 use course_service::app::App;                  // `App` functions (boot, routes, after_routes)
 use course_service::api::rest::{courses_routes, AppState};
-use course_service::api::{ApiResponse, ApiError};
+use course_service::api::{ApiProblem, ok};
 use course_service::models::{Course, CourseInstance, CourseIdentifier};
 use course_service::matching::{CourseMatcher, MatchResult, MatchConfidence};
 ```
@@ -32,11 +32,11 @@ The binary boots through the axa CLI (`cargo run -- start`); the
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/health` | Service health check (envelope-wrapped `HealthResponse`) |
+| GET | `/api/health` | Service health check (`HealthResponse`) |
 | GET | `/api/whoami` | Echoes the verified bearer's claims (T-15) — public when `COURSE_REQUIRE_AUTH` is off. |
-| GET | `/_health` | axa built-in readiness (DB + queue) — plain, no envelope |
-| GET | `/_ping` | axa built-in liveness — plain, no envelope |
-| GET | `/metrics.prom` | Prometheus metrics (T-16) — mounted at the application **root** (not under `/api`), public, `text/plain; version=0.0.4`. NOT envelope-wrapped. |
+| GET | `/_health` | axa built-in readiness (DB + queue) |
+| GET | `/_ping` | axa built-in liveness |
+| GET | `/metrics.prom` | Prometheus metrics (T-16) — mounted at the application **root** (not under `/api`), public, `text/plain; version=0.0.4`. |
 
 `GET /metrics.prom` worked example:
 
@@ -71,23 +71,21 @@ Configure the scraper with `metrics_path: /metrics.prom`.
 | DELETE | `/api/courses/{id}` | Soft-delete (sets `deleted_at`). |
 
 On a duplicate, `POST /api/courses` returns `409 Conflict` with the
-ranked `ScoredCandidate[]` under `error.details` (a deterministic
+ranked `ScoredCandidate[]` under the problem's `errors` (a deterministic
 short-circuit — shared `provider_id` + `course_code`, DOI, Wikidata, or
 `same_as` URL — pins the score at `1.0`; FR-1 / FR-20):
 
 ```jsonc
 // HTTP/1.1 409 Conflict
+// Content-Type: application/problem+json
 {
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "DUPLICATE",
-    "message": "Potential duplicate course(s) detected",
-    "details": [
-      { "course_id": "9c2b…", "name": "Intro to Computer Science",
-        "course_code": "CS101", "score": 1.0, "quality": "certain" }
-    ]
-  }
+  "type": "about:blank", "title": "Conflict", "status": 409,
+  "detail": "A probable duplicate already exists; see `errors` for ranked candidates.",
+  "code": "duplicate_candidate",
+  "errors": [
+    { "course_id": "9c2b…", "name": "Intro to Computer Science",
+      "course_code": "CS101", "score": 1.0, "quality": "certain" }
+  ]
 }
 ```
 
@@ -186,21 +184,23 @@ states the non-standard shape explicitly), `POST /fhir/Basic` (create),
 /fhir/Basic/{id}`. Responses are `application/fhir+json`; every
 non-2xx body is a FHIR `OperationOutcome`.
 
-## Response envelope
+## Responses
 
-```json
-{ "success": true, "data": {…}, "error": null }
-```
-
-Error envelope:
+A success is the bare JSON payload, with no wrapper. An error is an
+RFC 9457 problem (`application/problem+json`, `spec/restful` §1.3):
 
 ```json
 {
-  "success": false,
-  "data": null,
-  "error": { "code": "…", "message": "…", "details": null }
+  "type": "about:blank", "title": "Not Found", "status": 404,
+  "detail": "…", "code": "not_found"
 }
 ```
+
+`code` is a stable lowercase token (`not_found`, `validation`,
+`conflict`, `duplicate_candidate`, `not_implemented`, …), and `errors`
+carries structured context: the field-scoped `ValidationError[]` on a
+`422`, the ranked candidates on a duplicate `409`. A `500` has no
+`detail`; its cause is logged, not sent.
 
 ## HTTP status codes
 
@@ -228,7 +228,7 @@ The full spec is rendered at runtime by [`utoipa`](https://docs.rs/utoipa):
 - `src/app.rs` — axa `Hooks`: registers `courses_routes()` in
   `App::routes`, builds `AppState` into the `AppContext` shared
   store and layers Swagger UI + CORS in `after_routes`
-- `src/api/mod.rs` — `ApiResponse`, `ApiError`
+- `src/api/mod.rs` — `ok`, `ApiProblem`
 - `src/api/rest/mod.rs` — `courses_routes()` (axa `Routes`, prefix
   `/api`), `ApiDoc`
   aggregator

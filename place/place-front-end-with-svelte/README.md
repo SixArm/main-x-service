@@ -75,7 +75,7 @@ src/
     config.ts              - same-origin BFF proxy base (/api/proxy)
     api/
       types.ts             - Place, PostalAddress, GeoCoordinates, MatchResult, … (mirrors the Rust models)
-      client.ts            - ApiClient + ApiError (envelope-aware fetch)
+      client.ts            - ApiClient + ApiError (bare JSON / RFC 9457 problems)
       places.ts           - PlaceRepository (CRUD + search + match + merge + audit)
     forms/
       form.svelte.ts       - createForm rune-based store
@@ -103,7 +103,7 @@ src/
         audit/+page.svelte
 tests/
   unit/
-    client.test.ts         - ApiClient envelope + error tests
+    client.test.ts         - ApiClient response + problem tests
     places.test.ts        - PlaceRepository wrapping tests
   e2e/
     places.spec.ts        - smoke tests

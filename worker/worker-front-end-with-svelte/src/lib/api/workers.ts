@@ -244,7 +244,7 @@ export class WorkerRepository {
 
   /**
    * Withdraw (soft-delete) one outbound link. The service replies with an
-   * empty envelope, so there is nothing to read back.
+   * empty object, so there is nothing to read back.
    *
    * @throws {ApiError} `isNotFound` when the link is unknown or already
    *   withdrawn.

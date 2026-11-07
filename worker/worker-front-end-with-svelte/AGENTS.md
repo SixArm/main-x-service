@@ -98,7 +98,7 @@ just this app. A visitor who signs in from a guarded page lands on
 | Concern | Location |
 | --- | --- |
 | Wire format types | `src/lib/api/types.ts` |
-| HTTP envelope handling | `src/lib/api/client.ts` |
+| HTTP response and problem handling | `src/lib/api/client.ts` |
 | Worker endpoints | `src/lib/api/workers.ts` |
 | Reusable form pieces | `src/lib/forms/` |
 | Worker-specific components | `src/lib/components/` |

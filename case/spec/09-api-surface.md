@@ -43,8 +43,8 @@ is protected by it, and create/update/delete/merge stamp the audit
 [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 (supersedes the RS256-JWT + JWKS model).
 
-Conventions: **raw axa JSON** (no `{success, data, error}` envelope —
-this is the loco-era convention, unlike the pre-loco person service).
+Conventions: bare JSON on success and an RFC 9457 problem on failure,
+like every service (`spec/restful` §1.3).
 `404` for unknown / soft-deleted `pid`; `422` for a validation failure
 (blank `title`, malformed `opened_date`, blank identifier value, blank
 subject/keyword — family convention); `400` for a malformed body or a

@@ -47,8 +47,8 @@ disagree, §13 wins.**
   `LinkedEvent` / `UnlinkedEvent` decode (closed-registry `edge_kind`
   validation) with DB-free tests. Every consumed event advances the
   per-topic freshness watermark.
-- **Read API** (`src/controllers/graph.rs`, enveloped
-  `{success,data,error}` + `as_of`) — `GET /api/neighbors/{ref}`
+- **Read API** (`src/controllers/graph.rs`, bare JSON with `as_of`,
+  RFC 9457 problems on `400` since 2026-11-07) — `GET /api/neighbors/{ref}`
   (bounded BFS, `kind`/`direction`/`depth≤2`), `GET /api/edges`
   (from/to/kind/status), `GET /api/single-view/{ref}`,
   `GET /api/health/freshness`. `400` on malformed ref / unknown kind /

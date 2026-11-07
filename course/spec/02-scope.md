@@ -6,7 +6,7 @@ This spec owns the **cross-subproject contract**:
 
 - Composition: front-end → service REST API → embedded matcher.
 - The service ↔ matcher DTO contract (the adapter projection, §5.3).
-- The service ↔ front-end wire contract (response envelope, `/api`
+- The service ↔ front-end wire contract (bare JSON + RFC 9457 problems, `/api`
   base path, `{ items, total }` search shape, TypeScript type
   mirroring, §5.4).
 - Shared invariants that more than one subproject must uphold (§5.5).

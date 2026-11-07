@@ -13,7 +13,7 @@ src/
 ├── bin/main.rs              # binary entry — axa CLI: cli::main::<App, Migrator>()
 ├── app.rs                   # `App` functions impl (boot, routes, after_routes)
 ├── api/
-│   ├── mod.rs               # ApiResponse, ApiError
+│   ├── mod.rs               # ok, ApiProblem
 │   └── rest/                # controllers: handlers + courses_routes() + ApiDoc + AppState
 │                             #   + auth.rs (T-15) + version.rs (T-25) + fhir.rs (T-20 controller)
 ├── models/                  # Course, CourseInstance, Provider, identifier, …

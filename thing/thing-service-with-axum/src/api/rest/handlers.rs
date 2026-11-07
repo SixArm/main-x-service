@@ -1,5 +1,7 @@
 //! REST handlers for the Thing Service.
 
+use crate::api::{ApiProblem, ok};
+use axum::response::Response;
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -11,7 +13,6 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use super::state::AppState;
-use crate::api::ApiResponse;
 use crate::db::audit::AuditContext;
 use crate::matching::confidence_label;
 use crate::models::merge::{MergeRecord, MergeRequest, MergeResponse};
@@ -33,12 +34,19 @@ fn status_for(err: &crate::Error) -> StatusCode {
     }
 }
 
-/// Build a failure response `(status, Json(envelope))` from a crate error.
-fn fail(err: &crate::Error) -> (StatusCode, Json<ApiResponse<Thing>>) {
-    (
-        status_for(err),
-        Json(ApiResponse::error("error", err.to_string())),
-    )
+/// The problem `code` for a crate error, matching [`status_for`].
+fn code_for(err: &crate::Error) -> &'static str {
+    match err {
+        crate::Error::NotFound => "not_found",
+        crate::Error::Validation(_) => "validation",
+        crate::Error::Conflict(_) => "conflict",
+        _ => "internal_error",
+    }
+}
+
+/// Build a problem response from a crate error.
+fn fail(err: &crate::Error) -> Response {
+    ApiProblem::new(code_for(err), err.to_string()).respond(status_for(err))
 }
 
 /// Health-check payload.
@@ -56,11 +64,11 @@ pub struct HealthResponse {
 #[utoipa::path(get, path = "/api/health", tag = "health",
     responses((status = 200, description = "Service healthy", body = HealthResponse)))]
 pub async fn health() -> impl IntoResponse {
-    Json(ApiResponse::success(HealthResponse {
+    Json(HealthResponse {
         status: "healthy".into(),
         service: "thing-service".into(),
         version: env!("CARGO_PKG_VERSION").into(),
-    }))
+    })
 }
 
 /// Prometheus metrics endpoint (text-exposition format).
@@ -101,8 +109,8 @@ pub struct CreateThingQuery {
     request_body = Thing,
     responses(
         (status = 201, description = "Created", body = Thing),
-        (status = 409, description = "Duplicate detected", body = crate::api::ApiError),
-        (status = 422, description = "Validation error", body = crate::api::ApiError),
+        (status = 409, description = "Duplicate detected"),
+        (status = 422, description = "Validation error"),
     ))]
 pub async fn create_thing(
     State(state): State<AppState>,
@@ -115,14 +123,9 @@ pub async fn create_thing(
     let errors = validate_thing(&thing);
     if !errors.is_empty() {
         // 422: well-formed JSON, but the record violates data-quality rules.
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(ApiResponse::error_with_details(
-                "validation_error",
-                "thing failed validation",
-                errors,
-            )),
-        );
+        return ApiProblem::new("validation", "thing failed validation")
+            .with_errors(serde_json::to_value(errors).ok())
+            .respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     // `id` is server-managed (see `Thing::id`'s docs): a client that omits
@@ -142,14 +145,9 @@ pub async fn create_thing(
         .collect();
     if !dups.is_empty() {
         // 409: caller should resolve/merge rather than create a second record.
-        return (
-            StatusCode::CONFLICT,
-            Json(ApiResponse::error_with_details(
-                "duplicate_detected",
-                "potential duplicates found",
-                dups,
-            )),
-        );
+        return ApiProblem::new("duplicate_detected", "potential duplicates found")
+            .with_errors(serde_json::to_value(dups).ok())
+            .respond(StatusCode::CONFLICT);
     }
 
     match state.thing_repository.create(&thing).await {
@@ -175,12 +173,9 @@ pub async fn create_thing(
                     .await;
             }
             // 201 Created with the stored (hydrated) record.
-            (StatusCode::CREATED, Json(ApiResponse::success(stored)))
+            ok(StatusCode::CREATED, stored)
         }
-        Err(e) => (
-            status_for(&e),
-            Json(ApiResponse::error("error", e.to_string())),
-        ),
+        Err(e) => fail(&e),
     }
 }
 
@@ -190,7 +185,7 @@ pub async fn create_thing(
     responses((status = 200, body = Thing), (status = 404, description = "Not found")))]
 pub async fn get_thing(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
     match state.thing_repository.get_by_id(&id).await {
-        Ok(Some(t)) => (StatusCode::OK, Json(ApiResponse::success(t))),
+        Ok(Some(t)) => ok(StatusCode::OK, t),
         Ok(None) => fail(&crate::Error::NotFound),
         Err(e) => fail(&e),
     }
@@ -201,7 +196,7 @@ pub async fn get_thing(State(state): State<AppState>, Path(id): Path<Uuid>) -> i
     params(("id" = Uuid, Path, description = "Thing id")),
     request_body = Thing,
     responses((status = 200, body = Thing), (status = 404, description = "Not found"),
-        (status = 422, description = "Validation error", body = crate::api::ApiError)))]
+        (status = 422, description = "Validation error")))]
 pub async fn update_thing(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -211,14 +206,9 @@ pub async fn update_thing(
     normalize_thing(&mut thing);
     let errors = validate_thing(&thing);
     if !errors.is_empty() {
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(ApiResponse::error_with_details(
-                "validation_error",
-                "thing failed validation",
-                errors,
-            )),
-        );
+        return ApiProblem::new("validation", "thing failed validation")
+            .with_errors(serde_json::to_value(errors).ok())
+            .respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
     let old = state.thing_repository.get_by_id(&id).await.ok().flatten();
     match state.thing_repository.update(&thing).await {
@@ -241,7 +231,7 @@ pub async fn update_thing(
                     .log_update("thing", stored.id, old_v, new_v, &AuditContext::default())
                     .await;
             }
-            (StatusCode::OK, Json(ApiResponse::success(stored)))
+            ok(StatusCode::OK, stored)
         }
         Err(e) => fail(&e),
     }
@@ -339,10 +329,7 @@ pub async fn search_things(
         }
     }
     let total = results.len();
-    (
-        StatusCode::OK,
-        Json(ApiResponse::success(SearchResponse { results, total })),
-    )
+    ok(StatusCode::OK, SearchResponse { results, total })
 }
 
 /// Query parameters for `GET /api/things` (the plain collection list).
@@ -415,19 +402,13 @@ pub struct ListResponse {
 #[utoipa::path(get, path = "/api/things", tag = "things",
     params(ListQuery),
     responses((status = 200, body = ListResponse), (status = 400)))]
-pub async fn list_things(
-    State(state): State<AppState>,
-    Query(q): Query<ListQuery>,
-) -> impl IntoResponse {
+pub async fn list_things(State(state): State<AppState>, Query(q): Query<ListQuery>) -> Response {
     if q.offset.unwrap_or(0) > LIST_MAX_OFFSET {
-        return (
-            StatusCode::BAD_REQUEST,
-            HeaderMap::new(),
-            Json(ApiResponse::<ListResponse>::error(
-                "OFFSET_TOO_LARGE",
-                format!("offset must not exceed {LIST_MAX_OFFSET}; narrow the query instead"),
-            )),
-        );
+        return ApiProblem::new(
+            "offset_too_large",
+            format!("offset must not exceed {LIST_MAX_OFFSET}; narrow the query instead"),
+        )
+        .respond(StatusCode::BAD_REQUEST);
     }
     let (limit, offset) = resolve_list_page(&q);
     let mask_sensitive = q.mask_sensitive.unwrap_or(false);
@@ -458,8 +439,9 @@ pub async fn list_things(
     (
         StatusCode::OK,
         headers,
-        Json(ApiResponse::success(ListResponse { results, total })),
+        Json(ListResponse { results, total }),
     )
+        .into_response()
 }
 
 /// A scored candidate thing returned by match / duplicate endpoints.
@@ -540,7 +522,7 @@ pub async fn match_thing(
     Json(thing): Json<Thing>,
 ) -> impl IntoResponse {
     let candidates = find_candidates(&state, &thing, false).await;
-    (StatusCode::OK, Json(ApiResponse::success(candidates)))
+    ok(StatusCode::OK, candidates)
 }
 
 /// Duplicate-check response.
@@ -574,12 +556,12 @@ pub async fn check_duplicates(
     let candidates = find_candidates(&state, &thing, q.mask_sensitive.unwrap_or(false)).await;
     let threshold = state.matcher.threshold();
     let duplicates_found = candidates.iter().any(|c| c.score >= threshold);
-    (
+    ok(
         StatusCode::OK,
-        Json(ApiResponse::success(DuplicateCheckResponse {
+        DuplicateCheckResponse {
             duplicates_found,
             candidates,
-        })),
+        },
     )
 }
 
@@ -594,16 +576,11 @@ pub async fn merge_things(
     let main = match state.thing_repository.get_by_id(&req.main_thing_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::error("not_found", "main thing not found")),
-            );
+            return ApiProblem::new("not_found", "main thing not found")
+                .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                status_for(&e),
-                Json(ApiResponse::error("error", e.to_string())),
-            );
+            return fail(&e);
         }
     };
     let dup = match state
@@ -613,16 +590,11 @@ pub async fn merge_things(
     {
         Ok(Some(t)) => t,
         Ok(None) => {
-            return (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::error("not_found", "duplicate thing not found")),
-            );
+            return ApiProblem::new("not_found", "duplicate thing not found")
+                .respond(StatusCode::NOT_FOUND);
         }
         Err(e) => {
-            return (
-                status_for(&e),
-                Json(ApiResponse::error("error", e.to_string())),
-            );
+            return fail(&e);
         }
     };
 
@@ -634,10 +606,7 @@ pub async fn merge_things(
     let main = match state.thing_repository.merge(&main, &dup.id).await {
         Ok(t) => t,
         Err(e) => {
-            return (
-                status_for(&e),
-                Json(ApiResponse::error("error", e.to_string())),
-            );
+            return fail(&e);
         }
     };
     let _ = state.search_engine.delete_thing(&dup.id.to_string());
@@ -653,10 +622,7 @@ pub async fn merge_things(
     let record = match state.thing_repository.record_merge(&record).await {
         Ok(r) => r,
         Err(e) => {
-            return (
-                status_for(&e),
-                Json(ApiResponse::error("error", e.to_string())),
-            );
+            return fail(&e);
         }
     };
     let _ = state
@@ -668,12 +634,12 @@ pub async fn merge_things(
         ))
         .await;
 
-    (
+    ok(
         StatusCode::OK,
-        Json(ApiResponse::success(MergeResponse {
+        MergeResponse {
             merge_record: record,
             main_thing: main,
-        })),
+        },
     )
 }
 
@@ -818,13 +784,11 @@ pub async fn deduplicate(
     let rows = match crate::db::review_queue::upsert(&state.db, &new_items).await {
         Ok(rows) => rows,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<BatchDeduplicationResponse>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to persist review queue: {e}"),
-                )),
-            );
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to persist review queue: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
     let review_items: Vec<ReviewQueueItem> = rows.iter().map(review_row_to_item).collect();
@@ -837,15 +801,15 @@ pub async fn deduplicate(
         .iter()
         .filter(|r| r.status == ReviewStatus::AutoMerged)
         .count();
-    (
+    ok(
         StatusCode::OK,
-        Json(ApiResponse::success(BatchDeduplicationResponse {
+        BatchDeduplicationResponse {
             things_scanned: things.len(),
             duplicates_found,
             auto_merged,
             queued_for_review,
             review_items,
-        })),
+        },
     )
 }
 
@@ -876,7 +840,7 @@ pub struct ReviewQueueListQuery {
     pub limit: Option<u64>,
 }
 
-/// Response envelope for `GET /api/things/review-queue`.
+/// Response body for `GET /api/things/review-queue`.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ReviewQueueListResponse {
     /// The stored review-queue items (newest first).
@@ -937,14 +901,12 @@ pub async fn get_review_queue(
     if let Some(status) = query.status.as_deref()
         && !matches!(status, "pending" | "confirmed" | "rejected" | "automerged")
     {
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(ApiResponse::<ReviewQueueListResponse>::error(
-                "INVALID_STATUS",
-                format!("unknown review status `{status}`"),
-            )),
+        return ApiProblem::new(
+            "invalid_status",
+            format!("unknown review status `{status}`"),
         )
-            .into_response();
+        .respond(StatusCode::UNPROCESSABLE_ENTITY)
+        .into_response();
     }
     match crate::db::review_queue::list(
         &state.db,
@@ -956,23 +918,14 @@ pub async fn get_review_queue(
         Ok(rows) => {
             let items: Vec<ReviewQueueItem> = rows.iter().map(review_row_to_item).collect();
             let total = items.len();
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success(ReviewQueueListResponse {
-                    items,
-                    total,
-                })),
-            )
-                .into_response()
+            ok(StatusCode::OK, ReviewQueueListResponse { items, total }).into_response()
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<ReviewQueueListResponse>::error(
-                "DATABASE_ERROR",
-                format!("Failed to list review queue: {e}"),
-            )),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to list review queue: {e}"),
         )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR)
+        .into_response(),
     }
 }
 
@@ -1001,35 +954,26 @@ pub async fn review_decision(
     // drift from person/worker), so the reviewer identity is not
     // recorded here.
     match crate::db::review_queue::decide(&state.db, id, token, None).await {
-        Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => (
-            StatusCode::OK,
-            Json(ApiResponse::success(review_row_to_item(&row))),
+        Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => {
+            ok(StatusCode::OK, review_row_to_item(&row)).into_response()
+        }
+        Ok(crate::db::review_queue::DecideOutcome::NotFound) => {
+            ApiProblem::new("not_found", format!("no review item {id}"))
+                .respond(StatusCode::NOT_FOUND)
+                .into_response()
+        }
+        Ok(crate::db::review_queue::DecideOutcome::AlreadyDecided(current)) => ApiProblem::new(
+            "invalid_review_transition",
+            format!("item is `{current}`; only `pending` items can be decided"),
         )
-            .into_response(),
-        Ok(crate::db::review_queue::DecideOutcome::NotFound) => (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::<ReviewQueueItem>::error(
-                "NOT_FOUND",
-                format!("no review item {id}"),
-            )),
+        .respond(StatusCode::UNPROCESSABLE_ENTITY)
+        .into_response(),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to decide review item: {e}"),
         )
-            .into_response(),
-        Ok(crate::db::review_queue::DecideOutcome::AlreadyDecided(current)) => (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            Json(ApiResponse::<ReviewQueueItem>::error(
-                "INVALID_REVIEW_TRANSITION",
-                format!("item is `{current}`; only `pending` items can be decided"),
-            )),
-        )
-            .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<ReviewQueueItem>::error(
-                "DATABASE_ERROR",
-                format!("Failed to decide review item: {e}"),
-            )),
-        )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR)
+        .into_response(),
     }
 }
 
@@ -1042,15 +986,9 @@ pub async fn export_thing_data(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     match state.thing_repository.get_by_id(&id).await {
-        Ok(Some(t)) => (StatusCode::OK, Json(ApiResponse::success(gdpr_export(&t)))),
-        Ok(None) => (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::error("not_found", "thing not found")),
-        ),
-        Err(e) => (
-            status_for(&e),
-            Json(ApiResponse::error("error", e.to_string())),
-        ),
+        Ok(Some(t)) => ok(StatusCode::OK, gdpr_export(&t)),
+        Ok(None) => ApiProblem::new("not_found", "thing not found").respond(StatusCode::NOT_FOUND),
+        Err(e) => fail(&e),
     }
 }
 
@@ -1063,7 +1001,7 @@ pub async fn masked_thing(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     match state.thing_repository.get_by_id(&id).await {
-        Ok(Some(t)) => (StatusCode::OK, Json(ApiResponse::success(mask_thing(&t)))),
+        Ok(Some(t)) => ok(StatusCode::OK, mask_thing(&t)),
         Ok(None) => fail(&crate::Error::NotFound),
         Err(e) => fail(&e),
     }
@@ -1087,11 +1025,8 @@ pub async fn audit_for_thing(
 ) -> impl IntoResponse {
     let limit = q.limit.unwrap_or(50).min(500);
     match state.audit_log.list_for_entity(id, limit).await {
-        Ok(entries) => (StatusCode::OK, Json(ApiResponse::success(entries))),
-        Err(e) => (
-            status_for(&e),
-            Json(ApiResponse::error("error", e.to_string())),
-        ),
+        Ok(entries) => ok(StatusCode::OK, entries),
+        Err(e) => fail(&e),
     }
 }
 
@@ -1105,11 +1040,8 @@ pub async fn audit_recent(
 ) -> impl IntoResponse {
     let limit = q.limit.unwrap_or(50).min(500);
     match state.audit_log.list_recent(limit).await {
-        Ok(entries) => (StatusCode::OK, Json(ApiResponse::success(entries))),
-        Err(e) => (
-            status_for(&e),
-            Json(ApiResponse::error("error", e.to_string())),
-        ),
+        Ok(entries) => ok(StatusCode::OK, entries),
+        Err(e) => fail(&e),
     }
 }
 
@@ -1147,14 +1079,12 @@ pub async fn verify_record_integrity(
     {
         Ok(rows) => rows,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to read records for verification: {e}"),
-                )),
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to read records for verification: {e}"),
             )
-                .into_response();
+            .respond(StatusCode::INTERNAL_SERVER_ERROR)
+            .into_response();
         }
     };
 
@@ -1175,14 +1105,12 @@ pub async fn verify_record_integrity(
             // than reported: neither is a finding.
             Ok(None) => {}
             Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::<serde_json::Value>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to assemble a record for verification: {e}"),
-                    )),
+                return ApiProblem::new(
+                    "database_error",
+                    format!("Failed to assemble a record for verification: {e}"),
                 )
-                    .into_response();
+                .respond(StatusCode::INTERNAL_SERVER_ERROR)
+                .into_response();
             }
         }
     }
@@ -1222,14 +1150,12 @@ pub async fn verify_audit_integrity(
             Json(crate::compliance::audit_integrity::verify(&rows)),
         )
             .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to read audit rows for verification: {e}"),
-            )),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to read audit rows for verification: {e}"),
         )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR)
+        .into_response(),
     }
 }
 

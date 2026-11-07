@@ -54,7 +54,7 @@ fn endpoints() -> Vec<EntityRef> {
 }
 
 fn status_count(body: &Value) -> usize {
-    body["data"]["edges"].as_array().unwrap().len()
+    body["edges"].as_array().unwrap().len()
 }
 
 /// Both endpoints resolve alive ⇒ the unverified edge settles to verified.

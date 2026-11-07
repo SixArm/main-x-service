@@ -23,7 +23,7 @@ front-end [spec §4](../place-front-end-with-svelte/spec/04-glossary.md).
 | **Geo-radius search** | `GET /api/places/nearby?lat=&lon=&radius_km=` — find places within R km of a coordinate |
 | **Hierarchy** | `contained_in_place` / `contains_place` parent–child links; cycles are rejected |
 | **Gazetteer** | An authoritative geographic-name register (national mapping agency, GeoNames, OSM) — an import source, roadmap §15 |
-| **Envelope** | The REST response wrapper shared by service and front-end |
+| **Problem** | The RFC 9457 error body the service answers with; a success is bare JSON |
 | **Match** | A comparison between two places yielding a 0.00–1.00 score plus per-component breakdown |
 | **Merge** | Transfers a duplicate's data onto a surviving record, soft-deletes the duplicate, writes a `Replaces` link |
 | **Review queue** | Persisted candidate duplicate pairs: `Pending` / `Confirmed` / `Rejected` / `AutoMerged` |

@@ -21,5 +21,5 @@ The front-end binds 1:1 to the Place Service REST surface (see [`place-service-w
 | `GET /api/places/{id}/masked` | (available — not yet routed; T-19) |
 | `GET /api/places/{id}/export` | (available — not yet routed; T-20) |
 
-Envelope handling is centralised in `ApiClient`; per-endpoint methods on `PlaceRepository` return unwrapped `data`.
+Response handling is centralised in `ApiClient`: a success is the bare body, and an RFC 9457 problem becomes an `ApiError`; per-endpoint methods on `PlaceRepository` return the body.
 

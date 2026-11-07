@@ -56,7 +56,8 @@ curl http://localhost:5150/api/health
 
 REST routes mount under `/api/things/*`. See
 [`agents/restful.md`](agents/restful.md) for the full list. All
-endpoints return the standard `{success, data, error}` envelope.
+endpoints return bare JSON on success and an RFC 9457 problem on
+failure (`spec/restful` §1.3).
 Duplicate handling includes a stored review queue:
 `GET /api/things/review-queue` (filter `status`, `limit`) and
 `POST /api/things/review-queue/{id}/decision` (decide a pending item,

@@ -1,6 +1,6 @@
 // Unit tests for PersonRepository: that each method hits the right
 // endpoint/verb, and that search response normalization handles every
-// envelope shape. Uses an injected fake fetch (no network).
+// response shape. Uses an injected fake fetch (no network).
 import { describe, expect, it } from "vitest";
 import { ApiClient } from "../../src/lib/api/client";
 import { PersonRepository } from "../../src/lib/api/persons";
@@ -76,7 +76,7 @@ describe("PersonRepository", () => {
       fetch: mockFetch(async (input, init) => {
         capturedUrl = String(input);
         capturedBody = init?.body as string;
-        return jsonResponse({ success: true, data: samplePerson, error: null });
+        return jsonResponse(samplePerson);
       }),
     });
     const repo = new PersonRepository(client);
@@ -100,13 +100,17 @@ describe("PersonRepository", () => {
   it("GETs /api/persons/{id}/export on exportGdpr()", async () => {
     let capturedUrl = "";
     let capturedMethod = "";
-    const payload = { subject: "p1", exported_at: "2026-09-03T00:00:00Z", records: [] };
+    const payload = {
+      subject: "p1",
+      exported_at: "2026-09-03T00:00:00Z",
+      records: [],
+    };
     const client = new ApiClient({
       baseUrl: "http://test",
       fetch: mockFetch(async (input, init) => {
         capturedUrl = String(input);
         capturedMethod = init?.method ?? "GET";
-        return jsonResponse({ success: true, data: payload, error: null });
+        return jsonResponse(payload);
       }),
     });
     const repo = new PersonRepository(client);
@@ -124,11 +128,7 @@ describe("PersonRepository", () => {
       fetch: mockFetch(async (input, init) => {
         capturedUrl = String(input);
         capturedMethod = init?.method ?? "GET";
-        return jsonResponse({
-          success: true,
-          data: { ...samplePerson, tax_id: null },
-          error: null,
-        });
+        return jsonResponse({ ...samplePerson, tax_id: null });
       }),
     });
     const repo = new PersonRepository(client);
@@ -143,9 +143,7 @@ describe("PersonRepository", () => {
   it("normalises bare-array search responses to {items, total}", async () => {
     const client = new ApiClient({
       baseUrl: "http://test",
-      fetch: mockFetch(async () =>
-        jsonResponse({ success: true, data: [samplePerson], error: null }),
-      ),
+      fetch: mockFetch(async () => jsonResponse([samplePerson])),
     });
     const repo = new PersonRepository(client);
     const result = await repo.search({ q: "Smith" });
@@ -159,11 +157,7 @@ describe("PersonRepository", () => {
     const client = new ApiClient({
       baseUrl: "http://test",
       fetch: mockFetch(async () =>
-        jsonResponse({
-          success: true,
-          data: { items: [samplePerson], total: 42 },
-          error: null,
-        }),
+        jsonResponse({ items: [samplePerson], total: 42 }),
       ),
     });
     const repo = new PersonRepository(client);
@@ -187,11 +181,7 @@ describe("PersonRepository", () => {
     const client = new ApiClient({
       baseUrl: "http://test",
       fetch: mockFetch(async () =>
-        jsonResponse({
-          success: true,
-          data: { matches: [sampleMatch], total: 1 },
-          error: null,
-        }),
+        jsonResponse({ matches: [sampleMatch], total: 1 }),
       ),
     });
     const repo = new PersonRepository(client);
@@ -202,9 +192,7 @@ describe("PersonRepository", () => {
   it("accepts a bare-array /api/persons/match response too", async () => {
     const client = new ApiClient({
       baseUrl: "http://test",
-      fetch: mockFetch(async () =>
-        jsonResponse({ success: true, data: [sampleMatch], error: null }),
-      ),
+      fetch: mockFetch(async () => jsonResponse([sampleMatch])),
     });
     const repo = new PersonRepository(client);
     const result = await repo.match({ name: { family: "Smith" } });
@@ -216,9 +204,8 @@ describe("PersonRepository", () => {
       baseUrl: "http://test",
       fetch: mockFetch(async () =>
         jsonResponse({
-          success: true,
-          data: { has_duplicates: true, potential_matches: [sampleMatch] },
-          error: null,
+          has_duplicates: true,
+          potential_matches: [sampleMatch],
         }),
       ),
     });
@@ -230,7 +217,7 @@ describe("PersonRepository", () => {
   // ─── Cross-service links ────────────────────────────────────────
 
   // Pins: listLinks GETs the per-person links collection and returns the
-  // unwrapped array (the service wraps it in the standard envelope).
+  // bare array.
   it("GETs /api/persons/{id}/links on listLinks", async () => {
     let capturedUrl = "";
     let capturedMethod = "";
@@ -239,7 +226,7 @@ describe("PersonRepository", () => {
       fetch: mockFetch(async (input, init) => {
         capturedUrl = String(input);
         capturedMethod = init?.method ?? "";
-        return jsonResponse({ success: true, data: [sampleLink], error: null });
+        return jsonResponse([sampleLink]);
       }),
     });
     const repo = new PersonRepository(client);
@@ -262,7 +249,7 @@ describe("PersonRepository", () => {
         capturedUrl = String(input);
         capturedMethod = init?.method ?? "";
         capturedBody = init?.body as string;
-        return jsonResponse({ success: true, data: sampleLink, error: null });
+        return jsonResponse(sampleLink);
       }),
     });
     const repo = new PersonRepository(client);
@@ -290,7 +277,7 @@ describe("PersonRepository", () => {
       fetch: mockFetch(async (input, init) => {
         capturedUrl = String(input);
         capturedMethod = init?.method ?? "";
-        return jsonResponse({ success: true, data: {}, error: null });
+        return jsonResponse({});
       }),
     });
     const repo = new PersonRepository(client);
@@ -310,18 +297,14 @@ describe("PersonRepository", () => {
       baseUrl: "http://test",
       fetch: mockFetch(async (input) => {
         capturedUrl = String(input);
-        return jsonResponse({
-          success: true,
-          data: { items: [sampleReviewItem], total: 1 },
-          error: null,
-        });
+        return jsonResponse({ items: [sampleReviewItem], total: 1 });
       }),
     });
     const repo = new PersonRepository(client);
     const items = await repo.listReviewQueue();
     expect(capturedUrl).toContain("/api/persons/review-queue");
     expect(new URL(capturedUrl).search).toBe("");
-    // The envelope's `items` array is unwrapped for the caller.
+    // The response object's `items` array is unwrapped for the caller.
     expect(items).toHaveLength(1);
     expect(items[0]?.provenance).toBe("operator");
   });
@@ -333,11 +316,7 @@ describe("PersonRepository", () => {
       baseUrl: "http://test",
       fetch: mockFetch(async (input) => {
         capturedUrl = String(input);
-        return jsonResponse({
-          success: true,
-          data: { items: [], total: 0 },
-          error: null,
-        });
+        return jsonResponse({ items: [], total: 0 });
       }),
     });
     const repo = new PersonRepository(client);
@@ -356,11 +335,7 @@ describe("PersonRepository", () => {
       baseUrl: "http://test",
       fetch: mockFetch(async (input) => {
         capturedUrl = String(input);
-        return jsonResponse({
-          success: true,
-          data: { items: [], total: 0 },
-          error: null,
-        });
+        return jsonResponse({ items: [], total: 0 });
       }),
     });
     const repo = new PersonRepository(client);
@@ -383,11 +358,7 @@ describe("PersonRepository", () => {
         capturedUrl = String(input);
         capturedMethod = init?.method ?? "";
         capturedBody = init?.body as string;
-        return jsonResponse({
-          success: true,
-          data: { ...sampleReviewItem, status: "confirmed" },
-          error: null,
-        });
+        return jsonResponse({ ...sampleReviewItem, status: "confirmed" });
       }),
     });
     const repo = new PersonRepository(client);
@@ -406,13 +377,10 @@ describe("PersonRepository", () => {
       fetch: mockFetch(async () =>
         jsonResponse(
           {
-            success: false,
-            data: null,
-            error: {
-              code: "VALIDATION_ERROR",
-              message:
-                "edge kind `same_identity` does not permit person → organization",
-            },
+            type: "about:blank",
+            detail:
+              "edge kind `same_identity` does not permit person → organization",
+            code: "validation",
           },
           422,
         ),
@@ -442,7 +410,7 @@ describe("PersonRepository", () => {
         const url = new URL(String(input));
         capturedPathname = url.pathname;
         capturedLimits.push(url.searchParams.get("limit") ?? "");
-        return jsonResponse({ success: true, data: [], error: null });
+        return jsonResponse([]);
       }),
     });
     const repo = new PersonRepository(client);

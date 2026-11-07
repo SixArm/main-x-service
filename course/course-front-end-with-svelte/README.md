@@ -82,7 +82,7 @@ src/
       session.ts            - httpOnly session-cookie helpers
     api/
       types.ts             - Course, CourseIdentifier, MatchResult, … (mirrors the Rust models)
-      client.ts            - ApiClient + ApiError (envelope-aware fetch)
+      client.ts            - ApiClient + ApiError (fetch; RFC 9457 problems → ApiError)
       courses.ts           - CourseRepository (CRUD + search + match + merge + audit)
     forms/
       form.svelte.ts       - createForm rune-based store
@@ -116,7 +116,7 @@ src/
         audit/+page.svelte
 tests/
   unit/
-    client.test.ts            - ApiClient envelope + error tests
+    client.test.ts            - ApiClient success + problem error tests
     courses.test.ts           - CourseRepository wrapping + search params
     form.test.ts              - createForm rune controller
     courseFormValidate.test.ts - FR-4 validation + normalizeForWire

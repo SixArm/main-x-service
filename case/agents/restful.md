@@ -1,7 +1,7 @@
 # RESTful API Reference — Case Entity
 
-The service is axa and returns **raw JSON** — no
-`{success, data, error}` envelope (unlike the pre-loco person service).
+The service is axa and returns bare JSON on success and an RFC 9457
+problem on failure, like every service (`spec/restful` §1.3).
 Source:
 [`src/controllers/cases.rs`](../case-service-with-axum/src/controllers/cases.rs).
 Base URL in development: `http://localhost:5150`.

@@ -29,6 +29,7 @@
 //! machine ([`AssessmentStatus::can_transition_to`]), so an assessment
 //! cannot be walked backwards or resurrected from a terminal state.
 
+use crate::api::ApiProblem;
 use axa::client::ClientAddr;
 use std::collections::BTreeMap;
 
@@ -366,53 +367,37 @@ pub fn apply_filters(
 
 /// `404` — unknown worker id.
 fn worker_not_found(id: Uuid) -> Response {
-    (
-        StatusCode::NOT_FOUND,
-        Json(json!({ "error": format!("Worker with id '{id}' not found") })),
-    )
-        .into_response()
+    ApiProblem::new("not_found", format!("Worker with id '{id}' not found"))
+        .respond(StatusCode::NOT_FOUND)
 }
 
 /// `404` — unknown (or withdrawn, or other-worker) assessment id.
 fn assessment_not_found(id: Uuid) -> Response {
-    (
-        StatusCode::NOT_FOUND,
-        Json(json!({ "error": format!("Assessment with id '{id}' not found") })),
-    )
-        .into_response()
+    ApiProblem::new("not_found", format!("Assessment with id '{id}' not found"))
+        .respond(StatusCode::NOT_FOUND)
 }
 
 /// `500` — database or data-integrity failure.
 fn db_error(e: &crate::Error) -> Response {
-    (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        Json(json!({ "error": format!("{e}") })),
-    )
-        .into_response()
+    ApiProblem::new("database_error", format!("{e}")).respond(StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 /// `422` — one message (token parse / lifecycle refusal).
 fn unprocessable(message: &str) -> Response {
-    (
-        StatusCode::UNPROCESSABLE_ENTITY,
-        Json(json!({ "error": message })),
-    )
-        .into_response()
+    ApiProblem::new("validation", message).respond(StatusCode::UNPROCESSABLE_ENTITY)
 }
 
-/// `422` — the full validation problem list.
+/// `422` — the full validation problem list, sent as `errors`.
 fn validation_failed(errors: &[crate::validation::ValidationError]) -> Response {
-    (
-        StatusCode::UNPROCESSABLE_ENTITY,
-        Json(json!({ "error": "Validation failed", "details": errors })),
-    )
-        .into_response()
+    ApiProblem::new("validation", "Validation failed")
+        .with_errors(serde_json::to_value(errors).ok())
+        .respond(StatusCode::UNPROCESSABLE_ENTITY)
 }
 
-/// Map a record-level authorization rejection to a JSON error response
+/// Map a record-level authorization rejection to a problem response
 /// (`403` policy-denied / `401` fail-safe).
 fn rejection((status, reason): (StatusCode, String)) -> Response {
-    (status, Json(json!({ "error": reason }))).into_response()
+    ApiProblem::new("forbidden", reason).respond(status)
 }
 
 /// Parse a category token, or a `422`-ready message.

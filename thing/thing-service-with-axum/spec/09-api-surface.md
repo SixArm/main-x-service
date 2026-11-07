@@ -14,8 +14,11 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 This crate does **not** expose a FHIR R5 surface — Things are not a
 FHIR-resource concern.
 
-Standard response envelope. `409` on duplicate-detected create; `422`
-on validation failure.
+All REST endpoints return bare JSON on success and an RFC 9457 problem
+(`application/problem+json`) on failure (`spec/restful` §1.3). A `500`
+has no `detail`; its cause is logged. `409` on duplicate-detected create
+(candidates in the problem's `errors`); `422` on validation failure
+(field errors in `errors`).
 
 **Server-managed fields.** `id`, `is_deleted`, `created_at`,
 `updated_at`, and every collection field (`alternate_names`,
@@ -29,7 +32,7 @@ stamps `created_at`/`updated_at` to "now" on insert (preserving
 `created_at`/`updated_at` fix already shipped in the event service.
 `name` — the one field the server does **not** own — is also
 `#[serde(default)]` so an omitted value now reaches the normal
-validation path (`422 validation_error`, field `name`) instead of
+validation path (`422 validation`, field `name`) instead of
 being refused by the JSON extractor before any handler code runs.
 
 Authentication is opt-in per handler: taking an `AuthUser` argument

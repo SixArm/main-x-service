@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApiResponse } from "./types.js";
+import type { Problem } from "./types.js";
 
 /**
  * Name of the browser-readable CSRF double-submit cookie. Must match
@@ -55,11 +55,11 @@ export interface RequestOptions {
 }
 
 /**
- * Typed error thrown for any non-success response (non-2xx status, or a
- * 2xx envelope with `success: false`). Carries the HTTP `status`, the
- * machine `code` from the error envelope, and any endpoint-specific
- * `details` (e.g. duplicate `MatchResult[]` on a 409). Callers branch
- * on the `isNotFound` / `isConflict` / `isValidation` getters.
+ * Typed error thrown for any non-2xx response. Carries the HTTP `status`,
+ * the machine `code` from the RFC 9457 {@link Problem}, and the problem's
+ * structured `errors` as `details` (e.g. duplicate `MatchResult[]` on a
+ * 409). Callers branch on the `isNotFound` / `isConflict` /
+ * `isValidation` getters.
  */
 export class ApiError extends Error {
   readonly status: number;
@@ -68,19 +68,15 @@ export class ApiError extends Error {
 
   /**
    * @param status - HTTP status code of the failed response.
-   * @param body - Parsed error envelope, or `null` if none was available.
-   * @param fallbackMessage - Message to use when the envelope has none.
+   * @param body - Parsed problem, or `null` if none was available.
+   * @param fallbackMessage - Message to use when the problem has none.
    */
-  constructor(
-    status: number,
-    body: ApiErrorBody | null,
-    fallbackMessage?: string,
-  ) {
-    super(body?.message ?? fallbackMessage ?? `HTTP ${status}`);
+  constructor(status: number, body: Problem | null, fallbackMessage?: string) {
+    super(body?.detail ?? body?.title ?? fallbackMessage ?? `HTTP ${status}`);
     this.name = "ApiError";
     this.status = status;
-    this.code = body?.code ?? "UNKNOWN";
-    this.details = body?.details;
+    this.code = body?.code ?? "unknown";
+    this.details = body?.errors;
   }
 
   /** True when the resource was not found (HTTP 404). */
@@ -98,9 +94,9 @@ export class ApiError extends Error {
 }
 
 /**
- * Tiny fetch wrapper that understands the Course Service
- * {@link ApiResponse} envelope: it unwraps `data` on success and
- * raises {@link ApiError} on failure. Allows fetch injection for SSR
+ * Tiny fetch wrapper over the Course Service: a success is the bare JSON
+ * payload, and a failure is an RFC 9457 {@link Problem}, raised as
+ * {@link ApiError}. Allows fetch injection for SSR
  * load functions (pass `event.fetch`) and tests. Stateless aside from
  * its base URL and default headers, so one instance can be shared
  * freely.
@@ -156,11 +152,10 @@ export class ApiClient {
 
   /**
    * Core request pipeline shared by all verbs: builds the URL,
-   * serialises the body, awaits the response, then unwraps the
-   * {@link ApiResponse} envelope or throws {@link ApiError}.
+   * serialises the body, awaits the response, then returns the parsed
+   * body or throws {@link ApiError}.
    *
-   * @throws {ApiError} On a 204-less non-JSON body, a non-2xx status,
-   *   or a 2xx envelope whose `success` is `false`.
+   * @throws {ApiError} On a 204-less non-JSON body, or a non-2xx status.
    */
   private async request<T>(
     method: string,
@@ -195,19 +190,19 @@ export class ApiClient {
 
     const response = await this.fetchFn(url, init);
 
-    // 204 No Content (e.g. DELETE) carries no envelope to unwrap.
+    // 204 No Content (e.g. DELETE) carries no body.
     if (response.status === 204) {
       return undefined as T;
     }
 
     // Read the body as text first so we can give a useful error on
     // non-JSON responses instead of an opaque SyntaxError. Empty
-    // bodies stay `null` and fall through to the data check below.
-    let parsed: ApiResponse<T> | null = null;
+    // bodies stay `null`.
+    let parsed: unknown = null;
     const text = await response.text();
     if (text.length > 0) {
       try {
-        parsed = JSON.parse(text) as ApiResponse<T>;
+        parsed = JSON.parse(text) as unknown;
       } catch {
         throw new ApiError(
           response.status,
@@ -217,15 +212,12 @@ export class ApiClient {
       }
     }
 
-    // Non-2xx → error, surfacing the envelope's error body if present.
+    // Non-2xx → error, surfacing the problem if present.
     if (!response.ok) {
-      throw new ApiError(response.status, parsed?.error ?? null);
+      throw new ApiError(response.status, asProblem(parsed));
     }
-    // A 2xx can still signal failure via `success: false`.
-    if (parsed && parsed.success === false) {
-      throw new ApiError(response.status, parsed.error);
-    }
-    return (parsed?.data ?? undefined) as T;
+    // Success: the body is the payload (undefined if none).
+    return (parsed ?? undefined) as T;
   }
 
   /**
@@ -254,4 +246,11 @@ export class ApiClient {
     }
     return url.toString();
   }
+}
+
+/** `value` as a problem when it is an object, else `null`. */
+function asProblem(value: unknown): Problem | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Problem)
+    : null;
 }

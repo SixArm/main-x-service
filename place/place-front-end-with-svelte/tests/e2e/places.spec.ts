@@ -124,21 +124,13 @@ test.describe("Place front-end smoke", () => {
     };
     await page.route("**/api/places/**", async (route) => {
       const url = route.request().url();
-      const envelope = url.includes("/masked")
-        ? {
-            success: true,
-            data: { ...base, telephone: "***-***-5309" },
-            error: null,
-          }
-        : {
-            success: true,
-            data: { ...base, telephone: "+1-555-867-5309" },
-            error: null,
-          };
+      const body = url.includes("/masked")
+        ? { ...base, telephone: "***-***-5309" }
+        : { ...base, telephone: "+1-555-867-5309" };
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(envelope),
+        body: JSON.stringify(body),
       });
     });
 
@@ -180,11 +172,7 @@ test.describe("Place front-end smoke", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          success: true,
-          data: { results: [place], total: masked ? 1 : 2 },
-          error: null,
-        }),
+        body: JSON.stringify({ results: [place], total: masked ? 1 : 2 }),
       });
     });
 
@@ -212,14 +200,13 @@ test.describe("Place front-end smoke", () => {
   }) => {
     const idA = "aaaaaaaa-0000-4000-8000-000000000001";
     const idB = "bbbbbbbb-0000-4000-8000-000000000002";
-    const envelope = (data: unknown) =>
-      JSON.stringify({ success: true, data, error: null });
+    const json = (data: unknown) => JSON.stringify(data);
 
     await page.route("**/api/places/review-queue**", (route) =>
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: envelope({
+        body: json({
           items: [
             {
               id: "r1",
@@ -242,7 +229,7 @@ test.describe("Place front-end smoke", () => {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: envelope({
+        body: json({
           id: idA,
           name: "Central Library",
           address: { address_locality: "Springfield" },
@@ -253,7 +240,7 @@ test.describe("Place front-end smoke", () => {
       route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: envelope({
+        body: json({
           id: idB,
           name: "Central Libary",
           address: { address_locality: "Springfield" },
@@ -312,13 +299,11 @@ test.describe("Place front-end smoke", () => {
     };
     await page.route("**/api/places/**", async (route) => {
       const url = route.request().url();
-      const envelope = url.includes("/export")
-        ? { success: true, data: payload, error: null }
-        : { success: true, data: record, error: null };
+      const body = url.includes("/export") ? payload : record;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(envelope),
+        body: JSON.stringify(body),
       });
     });
 

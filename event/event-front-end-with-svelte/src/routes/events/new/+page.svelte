@@ -34,18 +34,31 @@
     // Create handler passed to the form. On 409 with candidate details,
     // populate `duplicates` and re-throw a message (so the form shows it)
     // rather than navigating; other errors propagate unchanged.
+    /** The duplicate candidates a `409` carries, or none. */
+    function duplicateCandidates(err: unknown): MatchResult[] {
+        if (!(err instanceof ApiError) || !err.isConflict) return [];
+        const details = err.details as
+            | MatchResult[]
+            | { potential_matches?: MatchResult[] }
+            | null
+            | undefined;
+        return Array.isArray(details)
+            ? details
+            : (details?.potential_matches ?? []);
+    }
+
     async function handleSubmit(value: Event) {
         duplicates = [];
         try {
             const created = await repo.create(value);
             if (created.id) goto(`/events/${created.id}`);
         } catch (err) {
-            if (
-                err instanceof ApiError &&
-                err.isConflict &&
-                Array.isArray(err.details)
-            ) {
-                duplicates = err.details as MatchResult[];
+            // The service's 409 problem carries `{ has_duplicates,
+            // potential_matches }` in `errors`; an older one sent the
+            // MatchResult[] alone. Accept both.
+            const candidates = duplicateCandidates(err);
+            if (candidates.length > 0) {
+                duplicates = candidates;
                 throw new Error(
                     translate("new.duplicatesDetected").replace(
                         "{n}",

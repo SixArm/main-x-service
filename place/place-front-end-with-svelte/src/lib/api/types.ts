@@ -2,30 +2,25 @@
 // (schema.org/Place-based). Reference:
 // place-service-with-axum/agents/models.md.
 
-// ─── HTTP envelope ───────────────────────────────────────────────────
+// ─── Errors ──────────────────────────────────────────────────────────
 
 /**
- * Standard response envelope returned by every Place Service endpoint.
- * Exactly one of `data` (on success) or `error` (on failure) is populated.
- * @typeParam T - The success payload type.
+ * An RFC 9457 problem, the body of every failed Place Service response.
+ * A success is the bare payload, with no wrapper.
  */
-export interface ApiResponse<T> {
-  /** `true` on success; `false` signals a structured failure. */
-  success: boolean;
-  /** Success payload, or `null` on failure / no content. */
-  data: T | null;
-  /** Structured error, or `null` on success. */
-  error: ApiErrorBody | null;
-}
-
-/** Structured error body inside a failed {@link ApiResponse}. */
-export interface ApiErrorBody {
-  /** Machine-readable error code (e.g. `"VALIDATION_ERROR"`). */
-  code: string;
-  /** Human-readable error message. */
-  message: string;
-  /** Optional extra context (e.g. per-field validation messages). */
-  details?: unknown;
+export interface Problem {
+  /** A URI naming the problem type; `"about:blank"` when there is none. */
+  type: string;
+  /** A short summary of the status, such as `"Not Found"`. */
+  title: string;
+  /** The HTTP status code. */
+  status: number;
+  /** What went wrong, for display. Absent on a `500`. */
+  detail?: string;
+  /** Stable lowercase code for branching, such as `"duplicate_detected"`. */
+  code?: string;
+  /** Structured context, such as duplicate candidates. */
+  errors?: unknown;
 }
 
 // ─── PostalAddress (schema.org/PostalAddress) ────────────────────────
@@ -411,7 +406,7 @@ export interface ReviewQueueItem {
 /** One operator verdict for a pending review item. */
 export type ReviewDecision = "confirmed" | "rejected";
 
-/** Response envelope for the stored review-queue list. */
+/** Response body for the stored review-queue list. */
 export interface ReviewQueueListResponse {
   /** The stored review-queue items (newest first). */
   items: ReviewQueueItem[];

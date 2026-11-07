@@ -9,7 +9,7 @@ and the pointer; field-by-field tables live in the per-crate docs.
 |---|---|---|---|
 | Service `Place` (canonical) | `place-service-with-axum/src/models/place.rs` | schema.org/Place: `name`, `alternate_name`, `place_type`, `PostalAddress`, `GeoCoordinates`, GLN + `identifiers`, hierarchy, opening hours, amenities, soft-delete flags | [service agents/models.md](../place-service-with-axum/agents/models.md) |
 | Matcher `Place` (flat builder) | `place-matcher-rust-crate/src/models.rs` | 15 optional fields: `name`, `alternate_names`, bare `latitude`/`longitude`, `category` (34-variant), `place_ids` (scheme + value), `address`, `phone`, `email`, country code, capacity; `#[non_exhaustive]`, built via `Place::builder()` | [matcher spec §3](../place-matcher-rust-crate/spec/03-data-model.md) |
-| Front-end TypeScript types | `place-front-end-with-svelte/src/lib/api/types.ts` | Mirrors the service wire format + the response envelope | [front-end AGENTS.md](../place-front-end-with-svelte/AGENTS.md) |
+| Front-end TypeScript types | `place-front-end-with-svelte/src/lib/api/types.ts` | Mirrors the service wire format + the RFC 9457 problem | [front-end AGENTS.md](../place-front-end-with-svelte/AGENTS.md) |
 
 ## Key supporting types (service)
 

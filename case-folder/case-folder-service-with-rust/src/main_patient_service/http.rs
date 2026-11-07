@@ -13,16 +13,6 @@ use uuid::Uuid;
 use super::{Client, CreatePatient, Error, NHS_NUMBER_SYSTEM, Patient};
 use crate::nhs::{format_nhs_number, normalise_nhs_number};
 
-/// Wraps the service's `{success,data,error}` envelope. We only consume `data`.
-#[derive(Debug, Deserialize)]
-struct ApiResponse<T> {
-    /// Payload, present on success.
-    data: Option<T>,
-    /// Service-reported success flag (checked on the search path).
-    #[serde(default)]
-    success: bool,
-}
-
 /// Wire shape of an upstream FHIR-style `Person`, trimmed to what the
 /// tracker reads.
 #[derive(Debug, Deserialize)]
@@ -61,7 +51,7 @@ struct NameDto {
     given: Vec<String>,
 }
 
-/// The `data` shape returned by the person search endpoint.
+/// The body returned by the person search endpoint.
 #[derive(Debug, Deserialize, Default)]
 struct SearchEnvelope {
     /// Matching persons.
@@ -158,14 +148,10 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<SearchEnvelope> = response
+        let envelope: SearchEnvelope = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        if !body.success {
-            return Err(Error::BadResponse("search returned success=false".into()));
-        }
-        let envelope = body.data.unwrap_or_default();
         let target_digits = normalised.as_str();
         let matched = envelope.persons.into_iter().find(|p| {
             p.identifiers.iter().any(|i| {
@@ -197,11 +183,11 @@ impl Client for HttpClient {
                 response.status()
             )));
         }
-        let body: ApiResponse<PersonDto> = response
+        let body: PersonDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        Ok(body.data.map(PersonDto::into_patient))
+        Ok(Some(PersonDto::into_patient(body)))
     }
 
     /// `POST /api/persons` — registers a new patient. Sends the NHS
@@ -210,7 +196,7 @@ impl Client for HttpClient {
     ///
     /// # Errors
     /// Returns [`Error::Transport`] on a non-success status and
-    /// [`Error::BadResponse`] when the response has no usable `data`.
+    /// [`Error::BadResponse`] when the response body does not parse.
     async fn create(&self, input: CreatePatient) -> Result<Patient, Error> {
         let normalised = normalise_nhs_number(&input.nhs_number);
         let (given, family) = split_name(&input.name);
@@ -250,13 +236,11 @@ impl Client for HttpClient {
                 "create returned non-success: {body}"
             )));
         }
-        let body: ApiResponse<PersonDto> = response
+        let body: PersonDto = response
             .json()
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
-        body.data
-            .map(PersonDto::into_patient)
-            .ok_or_else(|| Error::BadResponse("create returned empty data".into()))
+        Ok(PersonDto::into_patient(body))
     }
 }
 

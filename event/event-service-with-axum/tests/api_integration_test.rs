@@ -13,7 +13,7 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use event_service::{api::ApiResponse, models::Event};
+use event_service::models::Event;
 use serde_json::json;
 use tower::ServiceExt;
 
@@ -85,8 +85,7 @@ async fn create_event_round_trip() {
         String::from_utf8_lossy(&body)
     );
 
-    let created: ApiResponse<Event> = serde_json::from_slice(&body).unwrap();
-    let event = created.data.expect("event in body");
+    let event: Event = serde_json::from_slice(&body).unwrap();
     assert_eq!(event.name, title);
     assert_ne!(event.id.to_string(), "00000000-0000-0000-0000-000000000000");
 
@@ -103,8 +102,7 @@ async fn create_event_round_trip() {
     let body = axum::body::to_bytes(get.into_body(), usize::MAX)
         .await
         .unwrap();
-    let fetched: ApiResponse<Event> = serde_json::from_slice(&body).unwrap();
-    let fetched = fetched.data.expect("event in body");
+    let fetched: Event = serde_json::from_slice(&body).unwrap();
     assert_eq!(fetched.id, event.id);
     assert_eq!(fetched.name, title);
 }
@@ -230,8 +228,7 @@ async fn create_event_from_a_minimal_hand_written_body_succeeds() {
         String::from_utf8_lossy(&body)
     );
 
-    let created: ApiResponse<Event> = serde_json::from_slice(&body).unwrap();
-    let event = created.data.expect("event in body");
+    let event: Event = serde_json::from_slice(&body).unwrap();
     assert_eq!(event.name, title);
 
     // The id is server-minted, not the nil sentinel the omitted field

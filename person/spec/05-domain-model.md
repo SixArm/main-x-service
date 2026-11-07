@@ -153,7 +153,8 @@ timestamps, …) are dropped
 
 The front-end mirrors the service's wire format in
 `src/lib/api/types.ts` (`Person`, `HumanName`, `MatchResult`, …) and
-unwraps the shared envelope in `src/lib/api/client.ts`. The service
+parses responses in `src/lib/api/client.ts`: bare JSON on success, an
+RFC 9457 problem on failure. The service
 model is upstream: if a field changes in the service, the front-end
 types MUST be fixed in the same change cycle (front-end
 [`AGENTS.md`](../person-front-end-with-svelte/AGENTS.md)).

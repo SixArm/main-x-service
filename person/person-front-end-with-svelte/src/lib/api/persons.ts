@@ -156,7 +156,7 @@ export class PersonRepository {
    * Check whether a candidate person would collide with existing records,
    * without creating anything. Mirrors the duplicate detection that
    * {@link create} runs implicitly — same envelope shape as a create's
-   * `409` `error.details` (`{ has_duplicates, potential_matches }`,
+   * `409` problem's `errors` (`{ has_duplicates, potential_matches }`,
    * verified live — PRO-P4), not a bare array.
    */
   async checkDuplicates(candidate: Partial<Person>): Promise<MatchResult[]> {

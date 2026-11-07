@@ -284,29 +284,27 @@ auth+ABAC guard as `/api/*` (not on the public allow-list).
 
 ## Response Format
 
-All REST endpoints return:
+A success is the payload as bare JSON:
+
+```json
+{ "id": "…", "name": { "family": "Smith", "given": ["Jane"] } }
+```
+
+An error is an RFC 9457 problem, `application/problem+json`:
 
 ```json
 {
-  "success": true,
-  "data": { ... },
-  "error": null
+  "type": "about:blank",
+  "title": "Conflict",
+  "status": 409,
+  "detail": "Potential duplicate persons found. Review matches before proceeding.",
+  "code": "duplicate_detected",
+  "errors": { "has_duplicates": true, "potential_matches": [ … ] }
 }
 ```
 
-Error responses:
-
-```json
-{
-  "success": false,
-  "data": null,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable message",
-    "details": { ... }
-  }
-}
-```
+`code` is a stable lowercase token. A `500` has no `detail`; its cause is
+logged. FHIR errors stay `OperationOutcome`.
 
 ## HTTP Status Codes
 
@@ -323,7 +321,7 @@ Error responses:
 
 ## Source Files
 
-- `src/api/mod.rs` — ApiResponse, ApiError
+- `src/api/mod.rs` — `ok` and `ApiProblem`, the response helpers
 - `src/api/rest/mod.rs` — REST API setup, router configuration
 - `src/api/rest/handlers.rs` — All REST handler implementations
 - `src/api/rest/routes.rs` — Route organization

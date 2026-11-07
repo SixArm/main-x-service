@@ -16,8 +16,10 @@
 //! enqueue the job. Mutating routes are gated by the blanket auth guard;
 //! `import` is a declared destructive POST (`auth::DESTRUCTIVE_POST_SUFFIXES`).
 
+use crate::api::{ApiProblem, ok};
 use axa::AppContext;
 use axa::worker::BackgroundWorker;
+use axum::response::Response;
 use axum::{
     Json,
     extract::{Multipart, Path, Query, State},
@@ -31,7 +33,6 @@ use uuid::Uuid;
 use authentication_verifier::Action;
 use std::collections::BTreeMap;
 
-use crate::api::ApiResponse;
 use crate::api::rest::AppState;
 use crate::api::rest::auth::{MaybeAuthUser, authorize_record};
 use crate::bulk::pipeline::export_requires_elevation;
@@ -230,16 +231,13 @@ impl From<bulk_jobs::Model> for BulkJobView {
 /// is valid for *this operation* is a separate question from whether the
 /// token is valid at all; see [`parse_import_format`] for the import-side
 /// enforcement.
-fn parse_format(format: Option<&str>) -> Result<BulkFormat, (StatusCode, Json<ApiResponse<()>>)> {
+fn parse_format(format: Option<&str>) -> Result<BulkFormat, ApiProblem> {
     match format {
         None => Ok(BulkFormat::Jsonl),
         Some(f) => BulkFormat::parse(f).ok_or_else(|| {
-            (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::<()>::error(
-                    "UNSUPPORTED_FORMAT",
-                    format!("format '{f}' is not supported; use 'jsonl', 'csv', or 'parquet'"),
-                )),
+            ApiProblem::new(
+                "unsupported_format",
+                format!("format '{f}' is not supported; use 'jsonl', 'csv', or 'parquet'"),
             )
         }),
     }
@@ -247,20 +245,15 @@ fn parse_format(format: Option<&str>) -> Result<BulkFormat, (StatusCode, Json<Ap
 
 /// [`parse_format`], plus rejecting an export-only format (§12 lean:
 /// Parquet is export-only) before an import job is ever created.
-fn parse_import_format(
-    format: Option<&str>,
-) -> Result<BulkFormat, (StatusCode, Json<ApiResponse<()>>)> {
+fn parse_import_format(format: Option<&str>) -> Result<BulkFormat, ApiProblem> {
     let parsed = parse_format(format)?;
     if parsed.is_export_only() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(ApiResponse::<()>::error(
-                "UNSUPPORTED_FORMAT",
-                format!(
-                    "format '{}' is export-only and cannot be used for import",
-                    parsed.as_str()
-                ),
-            )),
+        return Err(ApiProblem::new(
+            "unsupported_format",
+            format!(
+                "format '{}' is export-only and cannot be used for import",
+                parsed.as_str()
+            ),
         ));
     }
     Ok(parsed)
@@ -316,24 +309,20 @@ pub async fn import_person(
                     "file" => match spool_field_capped(field, MAX_IMPORT_BYTES, &spool).await {
                         CappedRead::Ok => have_file = true,
                         CappedRead::TooLarge => {
-                            return (
-                                StatusCode::PAYLOAD_TOO_LARGE,
-                                Json(ApiResponse::<JobAccepted>::error(
-                                    "IMPORT_TOO_LARGE",
-                                    format!(
-                                        "uploaded file exceeds the {MAX_IMPORT_BYTES}-byte import cap"
-                                    ),
-                                )),
-                            );
+                            return ApiProblem::new(
+                                "import_too_large",
+                                format!(
+                                    "uploaded file exceeds the {MAX_IMPORT_BYTES}-byte import cap"
+                                ),
+                            )
+                            .respond(StatusCode::PAYLOAD_TOO_LARGE);
                         }
                         CappedRead::Read(e) => {
-                            return (
-                                StatusCode::BAD_REQUEST,
-                                Json(ApiResponse::<JobAccepted>::error(
-                                    "BAD_UPLOAD",
-                                    format!("failed to read uploaded file: {e}"),
-                                )),
-                            );
+                            return ApiProblem::new(
+                                "bad_upload",
+                                format!("failed to read uploaded file: {e}"),
+                            )
+                            .respond(StatusCode::BAD_REQUEST);
                         }
                     },
                     "format" => format_field = field.text().await.ok(),
@@ -348,30 +337,23 @@ pub async fn import_person(
             }
             Ok(None) => break,
             Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(ApiResponse::<JobAccepted>::error(
-                        "BAD_MULTIPART",
-                        format!("malformed multipart body: {e}"),
-                    )),
-                );
+                return ApiProblem::new("bad_multipart", format!("malformed multipart body: {e}"))
+                    .respond(StatusCode::BAD_REQUEST);
             }
         }
     }
 
     let format = match parse_import_format(format_field.as_deref()) {
         Ok(f) => f,
-        Err((status, body)) => return (status, Json(remap(body))),
+        Err(refusal) => return refusal.respond(StatusCode::BAD_REQUEST),
     };
 
     if !have_file {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(ApiResponse::<JobAccepted>::error(
-                "MISSING_FILE",
-                "an import requires a 'file' multipart field",
-            )),
-        );
+        return ApiProblem::new(
+            "missing_file",
+            "an import requires a 'file' multipart field",
+        )
+        .respond(StatusCode::BAD_REQUEST);
     }
 
     match enqueue_import(
@@ -385,14 +367,10 @@ pub async fn import_person(
     )
     .await
     {
-        Ok(job_id) => (
-            StatusCode::ACCEPTED,
-            Json(ApiResponse::success(JobAccepted { job_id })),
-        ),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<JobAccepted>::error("BULK_ENQUEUE_FAILED", e)),
-        ),
+        Ok(job_id) => ok(StatusCode::ACCEPTED, JobAccepted { job_id }),
+        Err(e) => {
+            ApiProblem::new("bulk_enqueue_failed", e).respond(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
@@ -470,7 +448,7 @@ pub async fn export_person(
     let idempotency_key = idempotency_key_of(&headers);
     let format = match parse_format(req.format.as_deref()) {
         Ok(f) => f,
-        Err((status, body)) => return (status, Json(remap(body))),
+        Err(refusal) => return refusal.respond(StatusCode::BAD_REQUEST),
     };
 
     // Parse the masking profile (default masked); an unknown token → 400.
@@ -479,13 +457,11 @@ pub async fn export_person(
         Some(s) => match MaskingProfile::parse(s) {
             Some(p) => p,
             None => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(ApiResponse::<JobAccepted>::error(
-                        "UNSUPPORTED_MASKING_PROFILE",
-                        format!("masking_profile '{s}' is not supported; use 'masked' or 'full'"),
-                    )),
-                );
+                return ApiProblem::new(
+                    "unsupported_masking_profile",
+                    format!("masking_profile '{s}' is not supported; use 'masked' or 'full'"),
+                )
+                .respond(StatusCode::BAD_REQUEST);
             }
         },
     };
@@ -506,7 +482,7 @@ pub async fn export_person(
         } else {
             "FORBIDDEN"
         };
-        return (status, Json(ApiResponse::<JobAccepted>::error(code, msg)));
+        return ApiProblem::new(code, msg).respond(status);
     }
 
     let mut params = serde_json::Map::new();
@@ -538,32 +514,16 @@ pub async fn export_person(
     match created {
         // SEC-B9: a retried submit resolves to the original job and is not
         // re-enqueued (the work runs exactly once).
-        Ok((job, true)) => (
-            StatusCode::ACCEPTED,
-            Json(ApiResponse::success(JobAccepted { job_id: job.id })),
-        ),
+        Ok((job, true)) => ok(StatusCode::ACCEPTED, JobAccepted { job_id: job.id }),
         Ok((job, false)) => {
             match BulkJobWorker::perform_later(&ctx, BulkJobArgs { job_id: job.id }).await {
-                Ok(_job_ref) => (
-                    StatusCode::ACCEPTED,
-                    Json(ApiResponse::success(JobAccepted { job_id: job.id })),
-                ),
-                Err(e) => (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::<JobAccepted>::error(
-                        "BULK_ENQUEUE_FAILED",
-                        e.to_string(),
-                    )),
-                ),
+                Ok(_job_ref) => ok(StatusCode::ACCEPTED, JobAccepted { job_id: job.id }),
+                Err(e) => ApiProblem::new("bulk_enqueue_failed", e.to_string())
+                    .respond(StatusCode::INTERNAL_SERVER_ERROR),
             }
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<JobAccepted>::error(
-                "DATABASE_ERROR",
-                e.to_string(),
-            )),
-        ),
+        Err(e) => ApiProblem::new("database_error", e.to_string())
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -651,15 +611,13 @@ async fn job_status(
     caller: &MaybeAuthUser,
     id: Uuid,
     expect: BulkKind,
-) -> (StatusCode, Json<ApiResponse<BulkJobView>>) {
+) -> Response {
     let not_found = || {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::<BulkJobView>::error(
-                "NOT_FOUND",
-                format!("{} job '{id}' not found", expect.as_str()),
-            )),
+        ApiProblem::new(
+            "not_found",
+            format!("{} job '{id}' not found", expect.as_str()),
         )
+        .respond(StatusCode::NOT_FOUND)
     };
     match bulk_jobs::find_by_id(&state.db, id).await {
         Ok(Some(job)) if job.kind == expect.as_str() => {
@@ -668,19 +626,11 @@ async fn job_status(
             {
                 return not_found();
             }
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success(BulkJobView::from(job))),
-            )
+            ok(StatusCode::OK, BulkJobView::from(job))
         }
         Ok(_) => not_found(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<BulkJobView>::error(
-                "DATABASE_ERROR",
-                e.to_string(),
-            )),
-        ),
+        Err(e) => ApiProblem::new("database_error", e.to_string())
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -707,26 +657,10 @@ pub async fn list_bulk_jobs(
     match bulk_jobs::list_recent(&state.db, limit).await {
         Ok(jobs) => {
             let views: Vec<BulkJobView> = jobs.into_iter().map(BulkJobView::from).collect();
-            (StatusCode::OK, Json(ApiResponse::success(views)))
+            ok(StatusCode::OK, views)
         }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<Vec<BulkJobView>>::error(
-                "DATABASE_ERROR",
-                e.to_string(),
-            )),
-        ),
-    }
-}
-
-/// Re-wrap a unit-typed error envelope as a `JobAccepted`-typed one, so
-/// the format-validation helper can be shared by both submit handlers.
-fn remap(body: Json<ApiResponse<()>>) -> ApiResponse<JobAccepted> {
-    let ApiResponse { error, .. } = body.0;
-    ApiResponse {
-        success: false,
-        data: None,
-        error,
+        Err(e) => ApiProblem::new("database_error", e.to_string())
+            .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 

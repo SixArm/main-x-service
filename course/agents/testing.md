@@ -25,7 +25,7 @@ Normative strategy: entity spec [§11](../spec/11-testing-strategy.md).
   pin the adapter routing (entity spec §5.3) **and** the canonical
   matcher behaviour as the service consumes it. Touch the adapter, a
   matcher weight, or a deterministic scheme → touch these tests.
-- **Front-end unit tests** pin the envelope and `CourseRepository`
+- **Front-end unit tests** pin the bare-JSON / problem handling and `CourseRepository`
   wrapping — the consumer-side view of the wire contract. Touch the
   service wire format → touch these tests.
 - **Integration tests** pin the full HTTP surface against real

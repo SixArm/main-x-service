@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApiResponse } from "./types.js";
+import type { Problem } from "./types.js";
 
 /**
  * Name of the browser-readable CSRF double-submit cookie. Must match
@@ -51,33 +51,29 @@ export interface RequestOptions {
 }
 
 /**
- * Error thrown by {@link ApiClient} for any non-2xx response or
- * `success: false` envelope. Carries the HTTP status and the service's
- * machine-readable error code/details so callers can branch on them.
+ * Error thrown by {@link ApiClient} for any non-2xx response. Carries the
+ * HTTP status and the parsed RFC 9457 {@link Problem}'s machine-readable
+ * `code` and structured `errors` so callers can branch on them.
  */
 export class ApiError extends Error {
   /** HTTP status code of the failed response. */
   readonly status: number;
-  /** Service error code (`UNKNOWN` if none provided). */
+  /** Machine-readable error code from the problem, or `"unknown"`. */
   readonly code: string;
-  /** Endpoint-specific extra detail (e.g. duplicate candidates on 409). */
+  /** The problem's structured `errors` (e.g. duplicate candidates on 409). */
   readonly details: unknown;
 
   /**
    * @param status - HTTP status of the response.
-   * @param body - Parsed error envelope, or null if none was available.
+   * @param body - Parsed problem, or null if none was available.
    * @param fallbackMessage - Message to use when the body has none.
    */
-  constructor(
-    status: number,
-    body: ApiErrorBody | null,
-    fallbackMessage?: string,
-  ) {
-    super(body?.message ?? fallbackMessage ?? `HTTP ${status}`);
+  constructor(status: number, body: Problem | null, fallbackMessage?: string) {
+    super(body?.detail ?? body?.title ?? fallbackMessage ?? `HTTP ${status}`);
     this.name = "ApiError";
     this.status = status;
-    this.code = body?.code ?? "UNKNOWN";
-    this.details = body?.details;
+    this.code = body?.code ?? "unknown";
+    this.details = body?.errors;
   }
 
   /** True for HTTP 404 — record not found. */
@@ -95,9 +91,9 @@ export class ApiError extends Error {
 }
 
 /**
- * Tiny `fetch` wrapper that understands the Worker Service
- * {@link ApiResponse} envelope: it unwraps `data` on success and throws an
- * {@link ApiError} otherwise. Allows `fetch` injection for SvelteKit SSR
+ * Tiny `fetch` wrapper over the Worker Service: a success is the bare JSON
+ * payload, and a failure is an RFC 9457 {@link Problem}, thrown as an
+ * {@link ApiError}. Allows `fetch` injection for SvelteKit SSR
  * load functions (pass `event.fetch`) and for unit tests. Stateless aside
  * from base URL + default headers, so one instance can be freely shared.
  */
@@ -124,24 +120,24 @@ export class ApiClient {
 
   /**
    * Issue a GET request and return the unwrapped payload.
-   * @returns The `data` field of the response envelope.
-   * @throws {ApiError} On non-2xx or `success: false`.
+   * @returns The parsed response body.
+   * @throws {ApiError} On a non-2xx status.
    */
   get<T>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("GET", path, opts);
   }
   /**
    * Issue a POST request and return the unwrapped payload.
-   * @returns The `data` field of the response envelope.
-   * @throws {ApiError} On non-2xx or `success: false`.
+   * @returns The parsed response body.
+   * @throws {ApiError} On a non-2xx status.
    */
   post<T>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("POST", path, opts);
   }
   /**
    * Issue a PUT request and return the unwrapped payload.
-   * @returns The `data` field of the response envelope.
-   * @throws {ApiError} On non-2xx or `success: false`.
+   * @returns The parsed response body.
+   * @throws {ApiError} On a non-2xx status.
    */
   put<T>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("PUT", path, opts);
@@ -149,16 +145,16 @@ export class ApiClient {
   /**
    * Issue a DELETE request. Defaults to `void` since the service replies
    * `204 No Content`.
-   * @throws {ApiError} On non-2xx or `success: false`.
+   * @throws {ApiError} On a non-2xx status.
    */
   delete<T = void>(path: string, opts?: RequestOptions): Promise<T> {
     return this.request<T>("DELETE", path, opts);
   }
 
   /**
-   * Shared request pipeline: build URL, send, then unwrap the envelope or
-   * throw {@link ApiError}.
-   * @throws {ApiError} On non-2xx, `success: false`, or non-JSON bodies.
+   * Shared request pipeline: build URL, send, then return the parsed body
+   * or throw {@link ApiError}.
+   * @throws {ApiError} On a non-2xx status, or a non-JSON body.
    */
   private async request<T>(
     method: string,
@@ -195,11 +191,11 @@ export class ApiClient {
     }
 
     // Read as text first so we can surface non-JSON bodies in the error.
-    let parsed: ApiResponse<T> | null = null;
+    let parsed: unknown = null;
     const text = await response.text();
     if (text.length > 0) {
       try {
-        parsed = JSON.parse(text) as ApiResponse<T>;
+        parsed = JSON.parse(text) as unknown;
       } catch {
         // Body wasn't JSON — likely a proxy/gateway error page.
         throw new ApiError(
@@ -210,15 +206,12 @@ export class ApiClient {
       }
     }
 
-    // HTTP-level failure: prefer the parsed envelope's error if present.
+    // HTTP-level failure: the body, when there is one, is a problem.
     if (!response.ok) {
-      throw new ApiError(response.status, parsed?.error ?? null);
+      throw new ApiError(response.status, asProblem(parsed));
     }
-    // Application-level failure signalled inside a 2xx envelope.
-    if (parsed && parsed.success === false) {
-      throw new ApiError(response.status, parsed.error);
-    }
-    return (parsed?.data ?? undefined) as T;
+    // Success: the body is the payload (undefined if none).
+    return (parsed ?? undefined) as T;
   }
 
   /** Join the path onto the base URL and append non-nullish query params. */
@@ -242,4 +235,11 @@ export class ApiClient {
     }
     return url.toString();
   }
+}
+
+/** `value` as a problem when it is an object, else `null`. */
+function asProblem(value: unknown): Problem | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Problem)
+    : null;
 }

@@ -61,7 +61,7 @@ pub async fn create_test_router() -> Router {
 /// - The name used to be `Integration <suffix> <micros>`. Consecutive
 ///   microsecond timestamps share nearly every leading digit, so two such
 ///   names scored ~0.92 on Jaro-Winkler — over the match threshold. Every
-///   create after the first came back `409 DUPLICATE_CANDIDATE` against a
+///   create after the first came back `409 duplicate_candidate` against a
 ///   record an earlier test had left behind.
 /// - Swapping the timestamp for a random UUID was not enough: with the
 ///   constant `Integration ` prefix still in front, Jaro-Winkler's prefix

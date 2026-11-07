@@ -21,9 +21,10 @@ reference (parameters, payloads, status codes):
 | Metrics | `GET /metrics.prom` (Prometheus text exposition) |
 | gRPC | Tonic stub — not yet implemented (service §13 T-6) |
 
-All REST endpoints return the envelope
-`{ "success": bool, "data": …, "error": … }`; `409` carries duplicate
-candidates, `422` carries validation errors.
+All REST endpoints return bare JSON on success and an RFC 9457 problem
+on failure ([`spec/restful`](../../spec/restful/index.md) §1.3); a `409`
+problem carries duplicate candidates in `errors`, and a `422` carries the
+validation failures in `detail`.
 
 ### 9.2 Front-end operator routes
 

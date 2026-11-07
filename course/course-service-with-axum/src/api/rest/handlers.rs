@@ -9,10 +9,11 @@
 //!
 //! Error mapping:
 //! - `Error::NotFound` → 404
-//! - `Error::Validation` → 422 (with `details`)
+//! - `Error::Validation` → 422 (with `errors`)
 //! - `Error::Conflict` → 409
 //! - `Error::Database` / `Error::Search` / `Error::Matching` / etc → 500
 
+use crate::api::{ApiProblem, ok};
 use axum::{
     Json,
     extract::{Path, Query, State},
@@ -25,7 +26,6 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use super::state::AppState;
-use crate::api::{ApiError, ApiResponse};
 use crate::db::audit::{AuditContext, AuditEntry};
 use crate::models::{
     BatchDeduplicationRequest, BatchDeduplicationResponse, Course, CourseInstance, DecideOutcome,
@@ -55,11 +55,11 @@ pub struct HealthResponse {
     tag = "health",
 )]
 pub async fn health(State(_state): State<AppState>) -> impl IntoResponse {
-    Json(ApiResponse::success(HealthResponse {
+    Json(HealthResponse {
         status: "healthy",
         service: "course-service",
         version: env!("CARGO_PKG_VERSION"),
-    }))
+    })
 }
 
 /// The `501` shim, kept as a deliberate marker for the one endpoint
@@ -68,11 +68,11 @@ pub async fn health(State(_state): State<AppState>) -> impl IntoResponse {
 /// declaration in `mod.rs`; keeping it stable lets the router
 /// table double as documentation.
 pub async fn not_implemented(State(_state): State<AppState>) -> impl IntoResponse {
-    let body: ApiResponse<()> = ApiResponse::error(
-        "NOT_IMPLEMENTED",
+    ApiProblem::new(
+        "not_implemented",
         "Endpoint not yet implemented — see spec.md §13 for status.",
-    );
-    (StatusCode::NOT_IMPLEMENTED, Json(body))
+    )
+    .respond(StatusCode::NOT_IMPLEMENTED)
 }
 
 /// Prometheus metrics in text-exposition format.
@@ -181,8 +181,8 @@ pub struct ScoredCandidate {
     request_body = Course,
     responses(
         (status = 201, description = "Created", body = Course),
-        (status = 409, description = "Probable duplicate", body = ApiError),
-        (status = 422, description = "Validation failure", body = ApiError),
+        (status = 409, description = "Probable duplicate"),
+        (status = 422, description = "Validation failure"),
     ),
     tag = "courses",
 )]
@@ -206,12 +206,12 @@ pub async fn create_course(
 
     match find_probable_duplicates(&state, &course).await {
         Ok(hits) if !hits.is_empty() => {
-            let body: ApiResponse<Vec<ScoredCandidate>> = ApiResponse::error_with_details(
-                "DUPLICATE_CANDIDATE",
-                "A probable duplicate already exists; see `details` for ranked candidates.",
-                &hits,
-            );
-            return (StatusCode::CONFLICT, Json(body)).into_response();
+            return ApiProblem::new(
+                "duplicate_candidate",
+                "A probable duplicate already exists; see `errors` for ranked candidates.",
+            )
+            .with_errors(serde_json::to_value(&hits).ok())
+            .respond(StatusCode::CONFLICT);
         }
         Ok(_) => {}
         Err(e) => return error_response(&e),
@@ -233,7 +233,7 @@ pub async fn create_course(
     )
     .await;
     crate::metrics::Metrics::global().course_created_total.inc();
-    (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response()
+    ok(StatusCode::CREATED, created)
 }
 
 /// FR-2 — get by id. Embeds the `instances` collection so a single
@@ -246,7 +246,7 @@ pub async fn create_course(
     params(("id" = uuid::Uuid, Path,)),
     responses(
         (status = 200, body = Course),
-        (status = 404, body = ApiError),
+        (status = 404),
     ),
     tag = "courses",
 )]
@@ -262,7 +262,7 @@ pub async fn get_course(State(state): State<AppState>, Path(id): Path<Uuid>) -> 
             tracing::warn!("hydrating instances on GET course failed: {e}");
         }
     }
-    Json(ApiResponse::success(course)).into_response()
+    Json(course).into_response()
 }
 
 /// FR-3 — replace.
@@ -272,8 +272,8 @@ pub async fn get_course(State(state): State<AppState>, Path(id): Path<Uuid>) -> 
     request_body = Course,
     responses(
         (status = 200, body = Course),
-        (status = 404, body = ApiError),
-        (status = 422, body = ApiError),
+        (status = 404),
+        (status = 422),
     ),
     tag = "courses",
 )]
@@ -312,7 +312,7 @@ pub async fn update_course(
     )
     .await;
     crate::metrics::Metrics::global().course_updated_total.inc();
-    Json(ApiResponse::success(updated)).into_response()
+    Json(updated).into_response()
 }
 
 /// FR-4 — soft delete.
@@ -321,7 +321,7 @@ pub async fn update_course(
     params(("id" = uuid::Uuid, Path,)),
     responses(
         (status = 204, description = "Soft-deleted"),
-        (status = 404, body = ApiError),
+        (status = 404),
     ),
     tag = "courses",
 )]
@@ -367,10 +367,10 @@ pub async fn search_courses(
     let ids: Vec<String> = if query.trim().is_empty() {
         match state.course_repository.list(q.limit, q.offset).await {
             Ok(rows) => {
-                return Json(ApiResponse::success(SearchResponse {
+                return Json(SearchResponse {
                     total: rows.len(),
                     items: rows,
-                }))
+                })
                 .into_response();
             }
             Err(e) => return error_response(&e),
@@ -405,7 +405,7 @@ pub async fn search_courses(
         }
     }
     let total = items.len();
-    Json(ApiResponse::success(SearchResponse { items, total })).into_response()
+    Json(SearchResponse { items, total }).into_response()
 }
 
 // ────────────────── Instance sub-resource (FR-10..FR-13) ──────────────────
@@ -416,7 +416,7 @@ pub async fn search_courses(
     params(("id" = uuid::Uuid, Path,)),
     responses(
         (status = 200, body = Vec<CourseInstance>),
-        (status = 404, body = ApiError),
+        (status = 404),
     ),
     tag = "instances",
 )]
@@ -428,7 +428,7 @@ pub async fn list_instances(
         return e;
     }
     match state.course_repository.list_instances(&course_id).await {
-        Ok(items) => Json(ApiResponse::success(items)).into_response(),
+        Ok(items) => Json(items).into_response(),
         Err(e) => error_response(&e),
     }
 }
@@ -440,8 +440,8 @@ pub async fn list_instances(
     request_body = CourseInstance,
     responses(
         (status = 201, body = CourseInstance),
-        (status = 404, body = ApiError),
-        (status = 422, body = ApiError),
+        (status = 404),
+        (status = 422),
     ),
     tag = "instances",
 )]
@@ -461,7 +461,7 @@ pub async fn create_instance(
     match state.course_repository.create_instance(&instance).await {
         Ok(created) => {
             record_instance_create(&state, course_id, &created).await;
-            (StatusCode::CREATED, Json(ApiResponse::success(created))).into_response()
+            ok(StatusCode::CREATED, created)
         }
         Err(e) => error_response(&e),
     }
@@ -477,8 +477,8 @@ pub async fn create_instance(
     request_body = CourseInstance,
     responses(
         (status = 200, body = CourseInstance),
-        (status = 404, body = ApiError),
-        (status = 422, body = ApiError),
+        (status = 404),
+        (status = 422),
     ),
     tag = "instances",
 )]
@@ -502,7 +502,7 @@ pub async fn update_instance_handler(
     match state.course_repository.update_instance(&instance).await {
         Ok(updated) => {
             record_instance_update(&state, course_id, prior.as_ref(), &updated).await;
-            Json(ApiResponse::success(updated)).into_response()
+            Json(updated).into_response()
         }
         Err(crate::Error::NotFound) => not_found_response("CourseInstance not found"),
         Err(e) => error_response(&e),
@@ -520,7 +520,7 @@ pub async fn update_instance_handler(
     ),
     responses(
         (status = 200, body = CourseInstance),
-        (status = 404, body = ApiError),
+        (status = 404),
     ),
     tag = "instances",
 )]
@@ -533,7 +533,7 @@ pub async fn get_instance(
         .get_instance(&course_id, &instance_id)
         .await
     {
-        Ok(Some(i)) => Json(ApiResponse::success(i)).into_response(),
+        Ok(Some(i)) => Json(i).into_response(),
         Ok(None) => not_found_response("CourseInstance not found"),
         Err(e) => error_response(&e),
     }
@@ -548,7 +548,7 @@ pub async fn get_instance(
     ),
     responses(
         (status = 204, description = "Soft-deleted"),
-        (status = 404, body = ApiError),
+        (status = 404),
     ),
     tag = "instances",
 )]
@@ -602,7 +602,7 @@ pub async fn check_duplicates(
     Json(course): Json<Course>,
 ) -> impl IntoResponse {
     match find_probable_duplicates(&state, &course).await {
-        Ok(hits) => Json(ApiResponse::success(hits)).into_response(),
+        Ok(hits) => Json(hits).into_response(),
         Err(e) => error_response(&e),
     }
 }
@@ -677,20 +677,19 @@ fn confidence_label(c: crate::matching::MatchConfidence) -> &'static str {
 }
 
 /// Build a `422 Unprocessable Entity` response carrying the field-scoped
-/// validation errors in the envelope's `details`.
+/// validation errors in the problem's `errors`.
 fn validation_response(errs: &[ValidationError]) -> axum::response::Response {
-    let body: ApiResponse<Vec<ValidationError>> = ApiResponse::error_with_details(
-        "VALIDATION_FAILED",
-        "Request failed validation; see `details` for field-scoped errors.",
-        errs,
-    );
-    (StatusCode::UNPROCESSABLE_ENTITY, Json(body)).into_response()
+    ApiProblem::new(
+        "validation",
+        "Request failed validation; see `errors` for field-scoped errors.",
+    )
+    .with_errors(serde_json::to_value(errs).ok())
+    .respond(StatusCode::UNPROCESSABLE_ENTITY)
 }
 
 /// Build a `404 Not Found` response with the given human-readable message.
 fn not_found_response(msg: &str) -> axum::response::Response {
-    let body: ApiResponse<()> = ApiResponse::error("NOT_FOUND", msg);
-    (StatusCode::NOT_FOUND, Json(body)).into_response()
+    ApiProblem::new("not_found", msg).respond(StatusCode::NOT_FOUND)
 }
 
 // ────────────────── Match + Merge (FR-6, FR-8) ──────────────────
@@ -703,7 +702,7 @@ fn not_found_response(msg: &str) -> axum::response::Response {
     request_body = Course,
     responses(
         (status = 200, body = Vec<ScoredCandidate>),
-        (status = 422, body = ApiError),
+        (status = 422),
     ),
     tag = "matching",
 )]
@@ -712,14 +711,14 @@ pub async fn match_course(
     Json(probe): Json<Course>,
 ) -> impl IntoResponse {
     if probe.name.trim().is_empty() {
-        let body: ApiResponse<()> = ApiResponse::error(
-            "VALIDATION_FAILED",
+        return ApiProblem::new(
+            "validation",
             "match request requires a non-empty `name` for blocking",
-        );
-        return (StatusCode::UNPROCESSABLE_ENTITY, Json(body)).into_response();
+        )
+        .respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
     match score_all_blocked_candidates(&state, &probe).await {
-        Ok(hits) => Json(ApiResponse::success(hits)).into_response(),
+        Ok(hits) => Json(hits).into_response(),
         Err(e) => error_response(&e),
     }
 }
@@ -730,8 +729,8 @@ pub async fn match_course(
     request_body = MergeRequest,
     responses(
         (status = 200, body = MergeResponse),
-        (status = 404, body = ApiError),
-        (status = 422, body = ApiError),
+        (status = 404),
+        (status = 422),
     ),
     tag = "matching",
 )]
@@ -828,10 +827,10 @@ pub async fn merge_courses(
     .await;
     crate::metrics::Metrics::global().course_merged_total.inc();
 
-    Json(ApiResponse::success(MergeResponse {
+    Json(MergeResponse {
         merge_record,
         main_course: updated,
-    }))
+    })
     .into_response()
 }
 
@@ -989,7 +988,7 @@ async fn score_all_blocked_candidates(
     request_body = BatchDeduplicationRequest,
     responses(
         (status = 200, body = BatchDeduplicationResponse),
-        (status = 422, body = ApiError),
+        (status = 422),
     ),
     tag = "matching",
 )]
@@ -1008,7 +1007,7 @@ pub async fn deduplicate(
     }
 
     match run_batch_dedup(&state, &req).await {
-        Ok(resp) => Json(ApiResponse::success(resp)).into_response(),
+        Ok(resp) => Json(resp).into_response(),
         Err(e) => error_response(&e),
     }
 }
@@ -1224,11 +1223,7 @@ pub async fn get_review_queue(
     {
         Ok(items) => {
             let total = items.len();
-            Json(ApiResponse::success(ReviewQueueListResponse {
-                items,
-                total,
-            }))
-            .into_response()
+            Json(ReviewQueueListResponse { items, total }).into_response()
         }
         Err(e) => error_response(&e),
     }
@@ -1245,8 +1240,8 @@ pub async fn get_review_queue(
     request_body = ReviewDecisionRequest,
     responses(
         (status = 200, body = ReviewQueueItem),
-        (status = 404, body = ApiError),
-        (status = 422, body = ApiError),
+        (status = 404),
+        (status = 422),
     ),
     tag = "matching",
 )]
@@ -1266,7 +1261,7 @@ pub async fn review_decision(
         .decide_review_item(id, req.status, req.reviewed_by.as_deref())
         .await
     {
-        Ok(DecideOutcome::Decided(item)) => Json(ApiResponse::success(*item)).into_response(),
+        Ok(DecideOutcome::Decided(item)) => Json(*item).into_response(),
         Ok(DecideOutcome::NotFound) => not_found_response("Review item not found"),
         Ok(DecideOutcome::AlreadyDecided(current)) => validation_response(&[ValidationError {
             field: "status".into(),
@@ -1284,7 +1279,7 @@ pub async fn review_decision(
     params(("id" = uuid::Uuid, Path,)),
     responses(
         (status = 200, body = Course),
-        (status = 404, body = ApiError),
+        (status = 404),
     ),
     tag = "privacy",
 )]
@@ -1293,7 +1288,7 @@ pub async fn masked_course(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     match state.course_repository.get_by_id(&id).await {
-        Ok(Some(c)) => Json(ApiResponse::success(crate::privacy::mask_course(&c))).into_response(),
+        Ok(Some(c)) => Json(crate::privacy::mask_course(&c)).into_response(),
         Ok(None) => not_found_response("Course not found"),
         Err(e) => error_response(&e),
     }
@@ -1305,7 +1300,7 @@ pub async fn masked_course(
     params(("id" = uuid::Uuid, Path,)),
     responses(
         (status = 200, description = "GDPR Article-15 portability envelope"),
-        (status = 404, body = ApiError),
+        (status = 404),
     ),
     tag = "privacy",
 )]
@@ -1314,9 +1309,7 @@ pub async fn export_course_data(
     Path(id): Path<Uuid>,
 ) -> impl IntoResponse {
     match state.course_repository.get_by_id(&id).await {
-        Ok(Some(c)) => {
-            Json(ApiResponse::success(crate::privacy::export_course(&c))).into_response()
-        }
+        Ok(Some(c)) => Json(crate::privacy::export_course(&c)).into_response(),
         Ok(None) => not_found_response("Course not found"),
         Err(e) => error_response(&e),
     }
@@ -1351,7 +1344,7 @@ pub async fn audit_for_course(
     Query(q): Query<AuditQuery>,
 ) -> impl IntoResponse {
     match state.audit_log.list_for_entity(id, q.limit).await {
-        Ok(rows) => Json(ApiResponse::success(rows)).into_response(),
+        Ok(rows) => Json(rows).into_response(),
         Err(e) => error_response(&e),
     }
 }
@@ -1368,7 +1361,7 @@ pub async fn audit_recent(
     Query(q): Query<AuditQuery>,
 ) -> impl IntoResponse {
     match state.audit_log.list_recent(q.limit).await {
-        Ok(rows) => Json(ApiResponse::success(rows)).into_response(),
+        Ok(rows) => Json(rows).into_response(),
         Err(e) => error_response(&e),
     }
 }
@@ -1567,17 +1560,16 @@ async fn record_instance_delete(
 
 /// Central error → HTTP mapping shared by every handler. Maps the
 /// domain [`Error`](enum@crate::Error) variants to status + stable code
-/// (404 / 422 / 409, everything else 500) and wraps the message in the
-/// standard failure envelope.
+/// (404 / 422 / 409, everything else 500) and answers with a problem;
+/// a 500's message is logged, not sent.
 fn error_response(e: &crate::Error) -> axum::response::Response {
     let (status, code) = match e {
-        crate::Error::NotFound => (StatusCode::NOT_FOUND, "NOT_FOUND"),
-        crate::Error::Validation(_) => (StatusCode::UNPROCESSABLE_ENTITY, "VALIDATION_FAILED"),
-        crate::Error::Conflict(_) => (StatusCode::CONFLICT, "CONFLICT"),
-        _ => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR"),
+        crate::Error::NotFound => (StatusCode::NOT_FOUND, "not_found"),
+        crate::Error::Validation(_) => (StatusCode::UNPROCESSABLE_ENTITY, "validation"),
+        crate::Error::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
+        _ => (StatusCode::INTERNAL_SERVER_ERROR, "internal_error"),
     };
-    let body: ApiResponse<()> = ApiResponse::error(code, e.to_string());
-    (status, Json(body)).into_response()
+    ApiProblem::new(code, e.to_string()).respond(status)
 }
 
 /// Verify audit-row integrity.
@@ -1608,14 +1600,11 @@ pub async fn verify_audit_integrity(
             Json(crate::compliance::audit_integrity::verify(&rows)),
         )
             .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<serde_json::Value>::error(
-                "DATABASE_ERROR",
-                format!("Failed to read audit rows for verification: {e}"),
-            )),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to read audit rows for verification: {e}"),
         )
-            .into_response(),
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -1648,14 +1637,11 @@ pub async fn verify_record_integrity(
     {
         Ok(rows) => rows,
         Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<serde_json::Value>::error(
-                    "DATABASE_ERROR",
-                    format!("Failed to read records for verification: {e}"),
-                )),
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to read records for verification: {e}"),
             )
-                .into_response();
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
@@ -1678,14 +1664,11 @@ pub async fn verify_record_integrity(
             // finding.
             Ok(None) => {}
             Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(ApiResponse::<serde_json::Value>::error(
-                        "DATABASE_ERROR",
-                        format!("Failed to assemble a record for verification: {e}"),
-                    )),
+                return ApiProblem::new(
+                    "database_error",
+                    format!("Failed to assemble a record for verification: {e}"),
                 )
-                    .into_response();
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
             }
         }
     }

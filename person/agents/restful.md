@@ -16,7 +16,7 @@ Normative summary: entity [spec §9](../spec/09-api-surface.md).
 | Metrics | `/metrics.prom` | Prometheus text exposition |
 | gRPC | — | Tonic stub (service §13 T-6) |
 
-Envelope everywhere: `{ "success": bool, "data": …, "error": … }`.
+Bare JSON on success, an RFC 9457 problem on failure (`spec/restful` §1.3).
 Status idioms: `409` = duplicate candidates on create, `422` =
 validation failure, `401` = (future) missing/invalid session or
 PASETO token. See

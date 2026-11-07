@@ -1,7 +1,7 @@
 # RESTful API — Course Entity
 
 Orientation only. The complete endpoint reference (parameters,
-envelopes, status codes) is
+response shapes, status codes) is
 [`course-service/agents/restful.md`](../course-service-with-axum/agents/restful.md);
 the normative summary is entity spec [§9](../spec/09-api-surface.md).
 
@@ -11,8 +11,8 @@ the normative summary is entity spec [§9](../spec/09-api-surface.md).
   Default port **8084**. The front-end's `CourseRepository`
   ([`src/lib/api/courses.ts`](../course-front-end-with-svelte/src/lib/api/courses.ts))
   hard-assumes this.
-- Envelope everywhere:
-  `{ "success": bool, "data": …, "error": { code, message, details } }`.
+- Bare JSON on success, an RFC 9457 problem on failure (`spec/restful`
+  §1.3): `{ type, title, status, detail, code, errors }`.
 - Search returns `{ items, total }` (service FR-19 — the front-end
   depends on `items`).
 - Status idioms: `201` create, `409` + `MatchResult[]` duplicate on
