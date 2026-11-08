@@ -617,14 +617,28 @@ pub async fn delete_and_emit(
 
 /// Fold a duplicate into a survivor and emit the pair of events (`Merged`
 /// on the survivor, `Deleted` on the duplicate), atomically under the
-/// active transport. Under `outbox`, both writes and both outbox rows
-/// share one transaction. Returns `(merged_survivor, duplicate_pid,
-/// duplicate_title)` for the caller's merge-record / audit follow-up.
+/// active transport. Both writes share one transaction under either
+/// transport; under `outbox` the outbox and audit rows join it, and under
+/// `memory` the in-memory events and best-effort audit rows follow the
+/// commit. Returns `(merged_survivor, duplicate_pid, duplicate_title)`
+/// for the caller's merge-record follow-up.
+///
+/// SEC-B5 (CS-M1): `main` and `duplicate` were read, unlocked, by the
+/// handler before this runs, so a second merge could retire either in
+/// between. Under both transports the transaction first locks both rows
+/// `FOR UPDATE`, in pid order so two opposing merges cannot deadlock,
+/// then re-checks that both are still active. A merge that lost the race
+/// fails closed with [`ModelError::EntityNotFound`] and writes nothing,
+/// rather than folding a retired duplicate's data into the survivor or
+/// writing the merge into a survivor that is itself gone. This used to
+/// happen only under `outbox`, and checked only the duplicate.
 ///
 /// # Errors
 ///
-/// When either write (or, for `outbox`, the transaction / outbox inserts)
-/// fails; the transaction rolls back the whole merge on any error.
+/// [`ModelError::EntityNotFound`] when either row is no longer active
+/// once locked; otherwise when either write (or, for `outbox`, the
+/// outbox / audit inserts) fails. The transaction rolls back the whole
+/// merge on any error.
 pub async fn merge_and_emit(
     db: &PgPool,
     main: CaseModel,
@@ -633,71 +647,62 @@ pub async fn merge_and_emit(
     actor: Option<&str>,
 ) -> ModelResult<(CaseModel, Uuid, String)> {
     let (dup_pid, dup_title) = (duplicate.pid, duplicate.title.clone());
-    let outcome = match transport() {
-        EventTransport::Memory => {
-            let merged = main.update_data(db, merged_case).await?;
-            duplicate.soft_delete(db).await?;
-            publish_with_actor(
-                EventKind::Merged,
-                &merged.pid.to_string(),
-                &merged.title,
-                actor,
-            );
-            publish_with_actor(EventKind::Deleted, &dup_pid.to_string(), &dup_title, actor);
-            audit_best_effort(db, merged.pid, "merged", actor, Some(merged.data.clone())).await;
-            audit_best_effort(db, dup_pid, "merged_into", actor, None).await;
-            (merged, dup_pid, dup_title)
-        }
-        EventTransport::Outbox => {
-            let mut txn = db.begin().await?;
-            // SEC-B5 (TOCTOU): `main`/`duplicate` were read (unlocked) in the
-            // handler before this transaction. Lock both rows `FOR UPDATE`
-            // (pid order, so opposing merges cannot deadlock) and re-check
-            // the duplicate is still active before writing, so two
-            // concurrent merges of the same duplicate cannot both fan its
-            // data into different survivors — the loser fails closed.
-            let mut lock_pids = [main.pid, dup_pid];
-            lock_pids.sort();
-            for pid in lock_pids {
-                CaseModel::lock_for_update(&mut txn, pid).await?;
-            }
-            let duplicate_active = CaseModel::is_active(&mut txn, dup_pid).await?;
-            if !duplicate_active {
-                txn.rollback().await?;
-                return Err(ModelError::EntityNotFound);
-            }
-            let merged = main.update_data(&mut *txn, merged_case).await?;
-            duplicate.soft_delete(&mut *txn).await?;
-            let merged_env = envelope(
-                EventKind::Merged,
-                &merged.pid.to_string(),
-                &merged.title,
-                actor,
-            );
-            OutboxPublisher.publish(&mut *txn, &merged_env).await?;
-            let deleted_env = envelope(EventKind::Deleted, &dup_pid.to_string(), &dup_title, actor);
-            OutboxPublisher.publish(&mut *txn, &deleted_env).await?;
-            // Both audit rows join the same transaction as the merge.
-            AuditModel::record(
-                &mut *txn,
-                merged.pid,
-                "merged",
-                actor,
-                Some(merged.data.clone()),
-            )
-            .await?;
-            AuditModel::record(&mut *txn, dup_pid, "merged_into", actor, None).await?;
-            txn.commit().await?;
-            (merged, dup_pid, dup_title)
-        }
-    };
+    let main_pid = main.pid;
+    let outbox = transport().is_outbox();
+    let mut txn = db.begin().await?;
+    let mut lock_pids = [main_pid, dup_pid];
+    lock_pids.sort();
+    for pid in lock_pids {
+        CaseModel::lock_for_update(&mut txn, pid).await?;
+    }
+    if !CaseModel::is_active(&mut txn, main_pid).await?
+        || !CaseModel::is_active(&mut txn, dup_pid).await?
+    {
+        txn.rollback().await?;
+        return Err(ModelError::EntityNotFound);
+    }
+    let merged = main.update_data(&mut *txn, merged_case).await?;
+    duplicate.soft_delete(&mut *txn).await?;
+    if outbox {
+        let merged_env = envelope(
+            EventKind::Merged,
+            &merged.pid.to_string(),
+            &merged.title,
+            actor,
+        );
+        OutboxPublisher.publish(&mut *txn, &merged_env).await?;
+        let deleted_env = envelope(EventKind::Deleted, &dup_pid.to_string(), &dup_title, actor);
+        OutboxPublisher.publish(&mut *txn, &deleted_env).await?;
+        // Both audit rows join the same transaction as the merge.
+        AuditModel::record(
+            &mut *txn,
+            merged.pid,
+            "merged",
+            actor,
+            Some(merged.data.clone()),
+        )
+        .await?;
+        AuditModel::record(&mut *txn, dup_pid, "merged_into", actor, None).await?;
+    }
+    txn.commit().await?;
+    if !outbox {
+        publish_with_actor(
+            EventKind::Merged,
+            &merged.pid.to_string(),
+            &merged.title,
+            actor,
+        );
+        publish_with_actor(EventKind::Deleted, &dup_pid.to_string(), &dup_title, actor);
+        audit_best_effort(db, merged.pid, "merged", actor, Some(merged.data.clone())).await;
+        audit_best_effort(db, dup_pid, "merged_into", actor, None).await;
+    }
     // The survivor absorbed the duplicate's title and identifiers, so it
     // is re-indexed with the merged payload; the duplicate is
     // soft-deleted and leaves the index. Doing only one of the two would
     // let a merged pair keep matching as two records.
-    index_best_effort(outcome.0.pid, merged_case);
-    deindex_best_effort(outcome.1);
-    Ok(outcome)
+    index_best_effort(merged.pid, merged_case);
+    deindex_best_effort(dup_pid);
+    Ok((merged, dup_pid, dup_title))
 }
 
 /// The §4.2 `data` payload for a `linked` event — the full edge detail,

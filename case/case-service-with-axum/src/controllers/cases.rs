@@ -889,8 +889,9 @@ async fn merge(
     let outcome = merge_cases(&main.to_case()?, &duplicate.to_case()?);
 
     // Update the survivor + retire the duplicate + emit the `Merged` /
-    // `Deleted` pair, all atomic under the active transport (one
-    // transaction for `outbox`).
+    // `Deleted` pair in one transaction that locks both rows and
+    // re-checks both are active, so a merge that lost a race to another
+    // answers 404 and writes nothing (SEC-B5, CS-M1).
     let (merged, dup_pid, _dup_title) =
         streaming::merge_and_emit(&ctx.db, main, duplicate, &outcome.merged, caller.actor())
             .await?;

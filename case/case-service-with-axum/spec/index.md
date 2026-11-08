@@ -847,6 +847,22 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **CS-M1 (S) — merge locks both rows under both transports.**
+  *(Done 2026-11-08; repo `tasks.md` CS-M1, the same fix as
+  care-pathway's CP-M1.)* `streaming::merge_and_emit` took its SEC-B5
+  `FOR UPDATE` lock only under the `outbox` transport and re-checked only
+  the duplicate, so under the default `memory` transport two concurrent
+  merges could interleave and fold a retired duplicate into a survivor.
+  It now opens one transaction under both transports, locks survivor and
+  duplicate `FOR UPDATE` in pid order, re-checks both are active, and
+  fails closed with `EntityNotFound` (`404`) writing nothing if either is
+  gone. Under `memory` the in-memory events and best-effort audit rows
+  follow the commit. `tests/requests/cases.rs`
+  `merge_refuses_a_duplicate_retired_after_it_was_read` and
+  `merge_waits_for_a_concurrent_lock_then_fails_closed` (a second
+  connection holds the duplicate's lock until `pg_stat_activity` shows
+  the merge blocked) both failed before.
+
 - [x] **CS-E1 (S) — erasure removes the case from the search index.**
   *(Done 2026-11-08; repo `tasks.md` CS-E1.)* The erase handler calls
   `streaming::deindex_best_effort` after the commit, as soft delete does;
@@ -1282,7 +1298,8 @@ the other v1 edge kinds even though it shares the same edge shape.
   `MAX_ITEM_LEN` = 512 chars (report-everything, `src/validation.rs`).
 - [x] **SEC-B5 (security): lock merge participants against a concurrent
   race.** The merge handler already `422`s `main == duplicate`; the
-  `outbox` merge path (`streaming::merge_and_emit`) now also locks both
+  merge path (`streaming::merge_and_emit`; under both transports since
+  CS-M1, originally `outbox` only) now also locks both
   participant rows `FOR UPDATE` (pid-ordered, deadlock-free) and re-checks
   the duplicate is still active before writing, so two concurrent merges of
   the same duplicate cannot both apply (the loser fails closed). (Repo

@@ -1695,3 +1695,159 @@ async fn erasure_removes_the_case_from_the_search_index() {
     })
     .await;
 }
+
+/// Create two distinct cases through the API and load both rows.
+async fn two_cases(
+    request: &axa::TestServer,
+    db: &sqlx::PgPool,
+) -> (
+    case_service::models::cases::Model,
+    case_service::models::cases::Model,
+) {
+    use case_service::models::cases::Model as CaseModel;
+    let mut pids = Vec::new();
+    for title in ["Zoning permit dispute", "Fishing licence renewal"] {
+        let created = request
+            .post("/api/cases")
+            .json(&json!({ "title": format!("{title} {}", uuid::Uuid::new_v4()) }))
+            .await;
+        assert_eq!(created.status_code(), 200);
+        pids.push(created.json::<Value>()["pid"].as_str().unwrap().to_string());
+    }
+    let main = CaseModel::find_by_pid(db, &pids[0]).await.unwrap();
+    let duplicate = CaseModel::find_by_pid(db, &pids[1]).await.unwrap();
+    (main, duplicate)
+}
+
+/// Retire `pid` the way a concurrent merge or delete would, on `conn`.
+async fn retire(conn: &mut sqlx::PgConnection, pid: uuid::Uuid) {
+    sqlx::query("UPDATE cases SET active = false, deleted_at = now() WHERE pid = $1")
+        .bind(pid)
+        .execute(conn)
+        .await
+        .expect("retire the row");
+}
+
+// CS-M1 (SEC-B5): the handler reads both rows unlocked, so by the time
+// the merge writes, the duplicate may already have been merged away. The
+// merge must re-check liveness under its lock and fail closed, under the
+// default `memory` transport as well as `outbox`, rather than fold a
+// retired duplicate's data into the survivor.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merge_refuses_a_duplicate_retired_after_it_was_read() {
+    use case_service::models::{ModelError, cases::Model as CaseModel};
+    use case_service::streaming;
+
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        let (main, duplicate) = two_cases(&request, &ctx.db).await;
+        let (main_pid, dup_pid) = (main.pid, duplicate.pid);
+        let before = main.data.clone();
+        let mut folded = main.to_case().unwrap();
+        folded
+            .keywords
+            .push("folded-from-a-retired-duplicate".to_string());
+
+        // Retired after the read, before the merge runs.
+        let mut conn = ctx.db.acquire().await.unwrap();
+        retire(&mut conn, dup_pid).await;
+        drop(conn);
+
+        let outcome = streaming::merge_and_emit(&ctx.db, main, duplicate, &folded, None).await;
+        assert!(
+            matches!(outcome, Err(ModelError::EntityNotFound)),
+            "a merge whose duplicate is gone must fail closed, got {:?}",
+            outcome.map(|(m, _, _)| m.pid)
+        );
+        let survivor = CaseModel::find_by_pid(&ctx.db, &main_pid.to_string())
+            .await
+            .unwrap();
+        assert_eq!(survivor.data, before, "the survivor must be untouched");
+    })
+    .await;
+}
+
+// CS-M1 (SEC-B5), concurrently: a second connection holds the
+// duplicate's row lock, as a concurrent merge would. The merge must wait
+// for it, and once the holder retires the duplicate and commits, fail
+// closed. Deterministic: the test waits until Postgres reports the merge
+// blocked on a lock before it lets the holder commit.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merge_waits_for_a_concurrent_lock_then_fails_closed() {
+    use case_service::models::{ModelError, cases::Model as CaseModel};
+    use case_service::streaming;
+    use sqlx::Connection as _;
+
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        let (main, duplicate) = two_cases(&request, &ctx.db).await;
+        let (main_pid, dup_pid) = (main.pid, duplicate.pid);
+        let before = main.data.clone();
+        let folded = main.to_case().unwrap();
+
+        // The holder: its own connection, outside the pool.
+        let mut holder = sqlx::PgConnection::connect_with(&ctx.db.connect_options())
+            .await
+            .unwrap();
+        let mut held = holder.begin().await.unwrap();
+        sqlx::query("SELECT id FROM cases WHERE pid = $1 FOR UPDATE")
+            .bind(dup_pid)
+            .fetch_one(&mut *held)
+            .await
+            .unwrap();
+
+        let merging = tokio::spawn({
+            let db = ctx.db.clone();
+            async move {
+                streaming::merge_and_emit(&db, main, duplicate, &folded, None)
+                    .await
+                    .map(|(m, _, _)| m.pid)
+            }
+        });
+
+        // Wait until the merge is blocked on a row lock (or, wrongly,
+        // already done). Watched from a third connection outside the
+        // pool: the merge holds the pool's connection while it waits.
+        let mut watcher = sqlx::PgConnection::connect_with(&ctx.db.connect_options())
+            .await
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            let waiting: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_stat_activity \
+                 WHERE datname = current_database() AND wait_event_type = 'Lock' \
+                   AND query ILIKE '%cases%'",
+            )
+            .fetch_one(&mut watcher)
+            .await
+            .unwrap();
+            if waiting > 0 || merging.is_finished() {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the merge neither blocked nor finished"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert!(!merging.is_finished(), "the merge must wait for the lock");
+
+        retire(&mut held, dup_pid).await;
+        held.commit().await.unwrap();
+
+        let outcome = merging.await.unwrap();
+        assert!(
+            matches!(outcome, Err(ModelError::EntityNotFound)),
+            "the merge that lost the race must fail closed, got {outcome:?}"
+        );
+        let survivor = CaseModel::find_by_pid(&ctx.db, &main_pid.to_string())
+            .await
+            .unwrap();
+        assert_eq!(survivor.data, before, "the survivor must be untouched");
+    })
+    .await;
+}

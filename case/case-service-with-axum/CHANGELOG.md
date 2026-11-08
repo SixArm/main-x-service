@@ -11,6 +11,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- **Merge locks both cases under both transports** (repo `tasks.md`
+  CS-M1). The SEC-B5 `FOR UPDATE` lock on survivor and duplicate was
+  taken only under the `outbox` transport, and only the duplicate was
+  re-checked, so under the default `memory` transport two concurrent
+  merges could interleave and fold a retired case into a survivor. The
+  merge now locks both rows in pid order in one transaction under either
+  transport, re-checks both are active, and answers `404` writing nothing
+  if either is gone. Two DB tests, one with a second connection holding
+  the duplicate's lock, failed before.
+
 - **Erasure removes the case from the search index** (repo `tasks.md`
   CS-E1). Soft delete and merge de-indexed a retired case, but erasure did
   not, so the erased title, subjects and identifiers stayed in the

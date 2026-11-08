@@ -8666,7 +8666,14 @@ test failed before its fix. DB suites: care-pathway 100 → 104, case
 69 → 70, organization 50 → 51. Case's own merge (CS, SEC-B5) still
 locks only under the `outbox` transport; care-pathway's now locks under
 both.
-- [ ] **CS-M1 (S)** case's merge takes its SEC-B5 row lock only under the
+- [x] **CS-M1 (S)** case's merge takes its SEC-B5 row lock only under the
   `outbox` transport and re-checks only the duplicate. Care-pathway's
   CP-M1 fix locks under both transports and re-checks both rows; make
   case's match, with the same two DB tests.
+
+*Done 2026-11-08.* CS-M1: case's `merge_and_emit` locks both rows
+`FOR UPDATE` in pid order under both transports and re-checks both are
+active, failing closed with `404`
+(`merge_refuses_a_duplicate_retired_after_it_was_read`,
+`merge_waits_for_a_concurrent_lock_then_fails_closed`, both failing
+before). DB suite: case 70 → 72.
