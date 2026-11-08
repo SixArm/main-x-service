@@ -32,7 +32,7 @@ use uuid::Uuid;
 
 use person_service::{
     api::rest::links::LinkView,
-    db::models::audit_log,
+    db::AuditLogRepository,
     db::review_queue::{self, NewReviewItem},
     models::{Person, ReviewQueueItem, ReviewStatus},
 };
@@ -365,8 +365,6 @@ async fn ordinary_review_decision_is_unaffected_by_t32() {
 #[tokio::test]
 #[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
 async fn matcher_suggested_link_creation_is_audited() {
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
     let app = common::create_test_router().await;
     let db = common::db().await;
     let family = common::unique_person_name("XSvcAudit");
@@ -388,10 +386,8 @@ async fn matcher_suggested_link_creation_is_audited() {
     let link = serde_json::from_value::<LinkView>(body).unwrap();
     let link_id: Uuid = link.id.parse().expect("link id is a UUID");
 
-    let audit_rows = audit_log::Entity::find()
-        .filter(audit_log::Column::EntityType.eq("person_link"))
-        .filter(audit_log::Column::EntityId.eq(link_id))
-        .all(&db)
+    let audit_rows = AuditLogRepository::new(db)
+        .rows_for(Some("person_link"), link_id, None)
         .await
         .expect("audit query succeeds");
     assert_eq!(

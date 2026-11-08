@@ -5,12 +5,12 @@
 | Capability | Notes |
 |---|---|
 | Project chassis | Cargo, modular architecture, 40+ dependencies |
-| Database schema | 12+ tables, SeaORM entities, indexes, audit triggers |
+| Database schema | 12+ tables, plain-SQL `sqlx::migrate!` migrations, indexes |
 | Matching | Probabilistic + deterministic; Jaro-Winkler + Levenshtein + Soundex; configurable weights |
 | Search | Tantivy 11-field index; fuzzy + phonetic + bulk + blocking |
 | REST API | 35+ endpoints (person CRUD, search, match/dedup/merge, review queue, links, bulk import/export, privacy, audit/compliance) + OpenAPI/Swagger + CORS + structured errors — see [agents/restful.md](../agents/restful.md) for the full table |
 | FHIR R5 | `Patient` primary resource (full CRUD + search) + `Person` read-only alias, `GET /fhir/metadata` `CapabilityStatement`, searchset `Bundle`, `OperationOutcome` errors (T-11); inbound `from_fhir_person` parses every field FHIR carries an equivalent for — the name array beyond the first (`additional_names`), `maritalStatus`, `multipleBirth[x]`, the `managingOrganization` reference, and identifier-type coding — rather than silently dropping them, with a malformed `managingOrganization` reference rejected via `OperationOutcome` instead of coerced (PRO-P1) |
-| Repository | SeaORM CRUD with transactions, soft delete |
+| Repository | sqlx CRUD (every statement a checked literal in `src/db/`, `.sqlx/` committed) with transactions, soft delete, digests stamped over the stored record (INT-V1) |
 | Event streaming | In-memory publisher (default) or a Postgres transactional outbox (`PERSON_EVENT_TRANSPORT=outbox`) drained by a relay to `LoggingSink` or, behind the `fluvio` feature, a real-broker `FluvioSink` (Created / Updated / Deleted / Merged / Linked / Unlinked) |
 | Audit log | AuditLogRepository with old / new JSON + user context; hash-chained with checkpointing and out-of-band-edit / wholesale-deletion detection (`src/compliance/`) |
 | Duplicate detection | Real-time + explicit + batch with review queue |

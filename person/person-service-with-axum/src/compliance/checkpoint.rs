@@ -46,8 +46,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::db::models::audit_log;
-
 /// Format version, bound into the MAC so a later change to the
 /// checkpoint's shape cannot be mistaken for a forged value.
 pub const CHECKPOINT_VERSION: &str = "cp1";
@@ -145,31 +143,19 @@ impl Checkpoint {
     /// # Errors
     ///
     /// When the queries fail.
-    pub async fn take(
-        db: &sea_orm::DatabaseConnection,
-        taken_at_micros: i64,
-    ) -> crate::Result<Option<Self>> {
-        use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
-
-        let Some(anchor) = audit_log::Entity::find()
-            .filter(audit_log::Column::Hash.is_not_null())
-            .order_by_desc(audit_log::Column::Seq)
-            .one(db)
-            .await?
+    pub async fn take(db: &sqlx::PgPool, taken_at_micros: i64) -> crate::Result<Option<Self>> {
+        let Some((anchor_seq, anchor_hash)) = crate::db::audit::latest_chained_row(db).await?
         else {
             return Ok(None);
         };
-        let Some(head) = anchor.hash.clone() else {
+        let Some(head) = anchor_hash else {
             return Ok(None);
         };
-        let rows_at_or_before = audit_log::Entity::find()
-            .filter(audit_log::Column::Seq.lte(anchor.seq))
-            .count(db)
-            .await?;
+        let rows_at_or_before = crate::db::audit::count_at_or_before(db, anchor_seq).await?;
 
         let mut checkpoint = Self {
             version: CHECKPOINT_VERSION.to_string(),
-            anchor_id: anchor.seq,
+            anchor_id: anchor_seq,
             head,
             rows_at_or_before,
             taken_at_micros,
@@ -188,12 +174,7 @@ impl Checkpoint {
     /// # Errors
     ///
     /// When the queries fail.
-    pub async fn verify_against(
-        &self,
-        db: &sea_orm::DatabaseConnection,
-    ) -> crate::Result<CheckpointVerdict> {
-        use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
-
+    pub async fn verify_against(&self, db: &sqlx::PgPool) -> crate::Result<CheckpointVerdict> {
         match super::mac::verify(
             super::mac::Domain::Checkpoint,
             self.mac.as_deref(),
@@ -214,26 +195,19 @@ impl Checkpoint {
             }
         }
 
-        let Some(anchor) = audit_log::Entity::find()
-            .filter(audit_log::Column::Seq.eq(self.anchor_id))
-            .one(db)
-            .await?
-        else {
+        let Some(anchor_hash) = crate::db::audit::hash_at(db, self.anchor_id).await? else {
             return Ok(CheckpointVerdict::AnchorMissing {
                 anchor_id: self.anchor_id,
             });
         };
-        let found = anchor.hash.unwrap_or_default();
+        let found = anchor_hash.unwrap_or_default();
         if found != self.head {
             return Ok(CheckpointVerdict::HeadChanged {
                 expected: self.head.clone(),
                 found,
             });
         }
-        let now = audit_log::Entity::find()
-            .filter(audit_log::Column::Seq.lte(self.anchor_id))
-            .count(db)
-            .await?;
+        let now = crate::db::audit::count_at_or_before(db, self.anchor_id).await?;
         if now < self.rows_at_or_before {
             return Ok(CheckpointVerdict::RowsDeleted {
                 expected: self.rows_at_or_before,

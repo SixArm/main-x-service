@@ -19,7 +19,7 @@
 FROM rust:1.97-slim AS builder
 
 # Build dependencies — `libssl-dev` for openssl-sys, `libpq-dev` for
-# the PostgreSQL C client headers SeaORM links against via sqlx.
+# the PostgreSQL C client headers (sqlx itself is pure Rust).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         libssl-dev \
@@ -41,18 +41,17 @@ COPY link/entity-ref-rust-crate link/entity-ref-rust-crate
 COPY authentication/authentication-verifier-rust-crate authentication/authentication-verifier-rust-crate
 
 # This crate itself: manifests first (better layer caching), then the
-# nested `migration` sub-crate (loco's sea-orm-migration bridge —
-# depended on as `migration = { path = "migration" }`), the sibling
-# `migrations/` directory of raw SQL the migration crate embeds via
-# `include_str!("../../migrations/…")`, `benches/` (Cargo.toml declares
+# plain-SQL `migrations/` that `sqlx::migrate!` embeds, the `.sqlx/`
+# query data the `query!` macros check against (no database at build
+# time), `benches/` (Cargo.toml declares
 # `[[bench]]` targets — cargo refuses to parse the manifest for ANY
 # target, including `--bin`-only builds, if a declared bench file is
 # missing), the IEC 62304 §5.3.3 SOUP register (`src/compliance/soup.rs`
 # embeds `compliance/soup.tsv` via a relative `include_str!`), then
 # sources.
 COPY person/person-service-with-axum/Cargo.toml person/person-service-with-axum/Cargo.lock person/person-service-with-axum/
-COPY person/person-service-with-axum/migration person/person-service-with-axum/migration
 COPY person/person-service-with-axum/migrations person/person-service-with-axum/migrations
+COPY person/person-service-with-axum/.sqlx person/person-service-with-axum/.sqlx
 COPY person/person-service-with-axum/benches person/person-service-with-axum/benches
 COPY person/person-service-with-axum/compliance person/person-service-with-axum/compliance
 COPY person/person-service-with-axum/src person/person-service-with-axum/src
@@ -60,12 +59,15 @@ COPY person/person-service-with-axum/src person/person-service-with-axum/src
 WORKDIR /app/person/person-service-with-axum
 
 # Build the binary target declared by src/bin/main.rs.
+# `SQLX_OFFLINE=true` makes the `query!` macros read `.sqlx/` instead of
+# connecting to a database.
+ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin person-service
 
 # Stage 2: runtime — minimal Debian 13 slim base.
 FROM debian:13-slim
 
-# Runtime libraries. libpq5 for the SeaORM PostgreSQL connector,
+# Runtime libraries. libpq5 for the PostgreSQL connector,
 # libssl3 for openssl, ca-certificates for HTTPS chains (PASETO
 # key-set fetch), curl for the HEALTHCHECK below.
 RUN apt-get update && apt-get install -y --no-install-recommends \

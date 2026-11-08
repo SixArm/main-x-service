@@ -8,7 +8,7 @@
 //! - `RESTful` API via Axum
 //! - HL7 FHIR R5 support
 //! - gRPC API via Tonic
-//! - `PostgreSQL` persistence via `SeaORM`
+//! - `PostgreSQL` persistence via sqlx, every statement a checked literal
 //! - Event streaming via Fluvio
 //! - Data quality validation
 //! - Privacy and data masking
@@ -35,7 +35,7 @@ pub mod client_limits;
 /// (`spec/compliance` §8.5 step 3).
 pub mod compliance;
 pub mod config;
-/// PostgreSQL persistence: SeaORM entities, repositories, audit log.
+/// PostgreSQL persistence: row structs, repositories, audit log, outbox.
 pub mod db;
 /// Crate-wide [`Error`] enum and [`Result`] alias.
 pub mod error;

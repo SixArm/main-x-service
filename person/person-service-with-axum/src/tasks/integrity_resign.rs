@@ -46,7 +46,6 @@
 //! supports — re-run to finish.
 
 use axa::prelude::*;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use crate::compliance::mac::{self, MacVerdict};
 
@@ -258,16 +257,10 @@ async fn resign_audit(
     report: &mut ResignReport,
 ) -> Result<()> {
     use crate::compliance::audit_chain;
-    use crate::db::models::audit_log;
-    use sea_orm::ActiveModelTrait as _;
-    use sea_orm::ActiveValue::Set;
+    use crate::db::AuditLogRepository;
 
-    let rows = audit_log::Entity::find()
-        .filter(audit_log::Column::Mac.is_not_null())
-        .order_by_asc(audit_log::Column::Seq)
-        .limit(limit)
-        .all(&ctx.db)
-        .await?;
+    let audit = AuditLogRepository::new(ctx.db.clone());
+    let rows = audit.rows_with_mac(limit).await.map_err(task_error)?;
 
     for row in rows {
         let preimage =
@@ -278,9 +271,7 @@ async fn resign_audit(
 
         if apply && decision == Decision::Resign {
             let fresh = mac::tag(mac::Domain::AuditChain, &preimage);
-            let mut active: audit_log::ActiveModel = row.into();
-            active.mac = Set(fresh);
-            active.update(&ctx.db).await?;
+            audit.set_mac(row.id, fresh).await.map_err(task_error)?;
         }
     }
     Ok(())
@@ -301,23 +292,17 @@ async fn resign_records(
     report: &mut ResignReport,
 ) -> Result<()> {
     use crate::compliance::record_integrity;
-    use crate::db::models::persons;
-    use crate::db::repositories::{PersonRepository, SeaOrmPersonRepository};
-    use sea_orm::ActiveModelTrait as _;
-    use sea_orm::ActiveValue::Set;
+    use crate::db::repositories::{
+        PersonRepository, PgPersonRepository, rows_with_content_mac, set_content_mac,
+    };
 
-    let repository = SeaOrmPersonRepository::new(ctx.db.clone());
-    let rows = persons::Entity::find()
-        .filter(persons::Column::ContentMac.is_not_null())
-        .order_by_asc(persons::Column::Id)
-        .limit(limit)
-        .all(&ctx.db)
-        .await?;
+    let repository = PgPersonRepository::new(ctx.db.clone());
+    let rows = rows_with_content_mac(&ctx.db, limit)
+        .await
+        .map_err(task_error)?;
 
     for row in rows {
-        let deleted_micros = row
-            .deleted_at
-            .and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok());
+        let deleted_micros = row.deleted_at.map(|d| d.timestamp_micros());
         // A row that vanished between the two queries is skipped rather
         // than reported: it is not a finding.
         let Ok(Some(assembled)) = repository.get_by_id(&row.id).await else {
@@ -335,12 +320,18 @@ async fn resign_records(
 
         if apply && decision == Decision::Resign {
             let fresh = mac::tag(mac::Domain::Record, &preimage);
-            let mut active: persons::ActiveModel = row.into();
-            active.content_mac = Set(fresh);
-            active.update(&ctx.db).await?;
+            set_content_mac(&ctx.db, row.id, fresh)
+                .await
+                .map_err(task_error)?;
         }
     }
     Ok(())
+}
+
+/// A database error, as the task's error.
+#[allow(clippy::needless_pass_by_value)]
+fn task_error(error: crate::Error) -> Error {
+    Error::string(&error.to_string())
 }
 
 #[cfg(test)]

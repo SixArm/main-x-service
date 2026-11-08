@@ -14,19 +14,19 @@ async fn review_queue_round_trip() {
         eprintln!("REVIEW_QUEUE_TEST_DATABASE_URL unset; skipping DB round-trip");
         return;
     };
-    use sea_orm::ConnectionTrait;
-    let db = sea_orm::Database::connect(&url).await.expect("connect");
-    db.execute_unprepared(include_str!(
-        "../migrations/2026071900000001_create_review_queue/up.sql"
+    use sqlx::Executor as _;
+    let db = sqlx::PgPool::connect(&url).await.expect("connect");
+    db.execute(include_str!(
+        "../migrations/2026071900000001_create_review_queue.up.sql"
     ))
     .await
     .expect("apply migration");
-    db.execute_unprepared(include_str!(
-        "../migrations/2026080200000001_review_queue_provenance/up.sql"
+    db.execute(include_str!(
+        "../migrations/2026080200000001_review_queue_provenance.up.sql"
     ))
     .await
     .expect("apply provenance migration");
-    db.execute_unprepared("DELETE FROM review_queue")
+    db.execute("DELETE FROM review_queue")
         .await
         .expect("clean slate");
 

@@ -13,7 +13,7 @@
 - Data validation + phone / address normalisation at the boundary.
 - Per-field privacy masking, GDPR Article 15 export, consent model.
 - REST API (Axum) + FHIR R5 Person + gRPC (Create/Get/List/Delete Person).
-- PostgreSQL persistence via SeaORM, with migrations.
+- PostgreSQL persistence via sqlx, with plain-SQL migrations.
 - Observability (tracing + OpenTelemetry OTLP).
 
 ### 2.2 Out of scope (today)

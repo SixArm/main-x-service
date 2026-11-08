@@ -7,13 +7,14 @@ service crate**. This is an architectural invariant, not an accident.
 
 | Subproject | Persistent state |
 |---|---|
-| person-service | PostgreSQL (SeaORM, 12+ tables) + Tantivy search index on disk |
+| person-service | PostgreSQL (sqlx, 12+ tables) + Tantivy search index on disk |
 | person-matcher | **None** — pure library; no IO, no files, no global state |
 | person-front-end | **None durable** — in-memory page state only; no localStorage of person data |
 
 ### 10.2 Service persistence (summary)
 
-PostgreSQL 18+ via SeaORM with migrations. Tables: `persons`,
+PostgreSQL 18+ via sqlx (no ORM; every statement a checked literal in
+`src/db/`) with plain-SQL migrations. Tables: `persons`,
 `person_names`, `person_identifiers`, `person_addresses`,
 `person_contacts`, `person_links`, `organizations`,
 `organization_addresses`, `organization_contacts`,
@@ -32,8 +33,9 @@ fully-normalized target schema — former JSONB child collections
 JSONB retained only for audit snapshots and match-score breakdowns.
 
 Relationship to the migrations: the service crate's
-`migrations/*/up.sql` files (wrapped by its SeaORM `migration/`
-crate) are the **operative** DDL. The migration chain (create
+`migrations/*.up.sql` files (run by `sqlx::migrate!`; until
+2026-11-08 they were wrapped by a SeaORM `migration/` crate) are the
+**operative** DDL. The migration chain (create
 `patient_*` → rename to `person_*` → 2026-06 child-table additions)
 converges on the same shape for 16 of the 17 tables. Known
 divergences as of 2026-06-13:

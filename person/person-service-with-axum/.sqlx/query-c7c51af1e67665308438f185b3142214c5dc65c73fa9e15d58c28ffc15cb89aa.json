@@ -1,0 +1,156 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO entity_links\n             (id, from_pid, kind, to_ref, role, confidence, provenance, valid_from, valid_to,\n              deleted_at)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)\n         ON CONFLICT (from_pid, kind, to_ref, valid_from) DO UPDATE SET\n             role = EXCLUDED.role,\n             confidence = EXCLUDED.confidence,\n             provenance = EXCLUDED.provenance,\n             valid_to = EXCLUDED.valid_to,\n             deleted_at = EXCLUDED.deleted_at\n         RETURNING id, from_pid, kind, to_ref, role, confidence, provenance, valid_from,\n                   valid_to, created_at, deleted_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "from_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "from_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "to_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "to_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "confidence",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "confidence"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "provenance",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "valid_from",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "valid_from"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "valid_to",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "valid_to"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Float8",
+        "Text",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "c7c51af1e67665308438f185b3142214c5dc65c73fa9e15d58c28ffc15cb89aa"
+}

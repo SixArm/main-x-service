@@ -194,17 +194,20 @@ Enum: `Male`, `Female`, `Other`, `Unknown`
 
 **File:** `src/db/models.rs`
 
-SeaORM entity modules for PostgreSQL persistence:
+Row structs for PostgreSQL persistence (one per table, read by `sqlx::query_as!`):
 
-- `persons` — Core person table
-- `person_names` — Person names (primary + additional)
-- `person_identifiers` — External identifiers
-- `person_addresses` — Physical addresses
-- `person_contacts` — Contact points
-- `person_links` — Person-to-person links
-- `organizations` — Organization records
-- `organization_addresses` — Organization addresses
-- `organization_contacts` — Organization contacts
-- `organization_identifiers` — Organization identifiers
-- `person_match_scores` — Match score history
-- `audit_log` — HIPAA-compliant audit trail
+- `PersonRow` — `persons`, the core person table
+- `NameRow` — `person_names` (primary + additional)
+- `IdentifierRow` — `person_identifiers`
+- `AddressRow` — `person_addresses`
+- `ContactRow` — `person_contacts`
+- `LinkRow` — `person_links` (person-to-person)
+- `DocumentRow`, `EmergencyContactRow`, `EmergencyTelecomRow` — documents, emergency contacts and their telecom
+- `audit_log::Model` — the HIPAA-compliant, hash-chained audit trail
+- `event_outbox::Model`, `entity_links::Model`, `bulk_jobs::Model` — outbox, cross-service links, bulk jobs
+
+The `organizations` and `person_match_scores` tables are in the schema but
+no code reads them; erasure still sweeps `person_match_scores`.
+
+Migrations live in `migrations/` as plain SQL `<version>_<name>.up.sql` /
+`.down.sql` pairs, embedded and run by `sqlx::migrate!`.

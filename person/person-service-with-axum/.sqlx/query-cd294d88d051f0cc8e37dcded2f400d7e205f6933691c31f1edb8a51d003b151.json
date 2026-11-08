@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, person_id, use_type, family, given, prefix, suffix, is_primary\n         FROM person_names WHERE person_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "person_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "use_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "use_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "family",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "family"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "given",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "given"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "prefix",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "prefix"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "suffix",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "suffix"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "is_primary",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "is_primary"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cd294d88d051f0cc8e37dcded2f400d7e205f6933691c31f1edb8a51d003b151"
+}

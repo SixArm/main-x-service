@@ -8,12 +8,12 @@
 
 #[cfg(feature = "paseto")]
 use authentication_verifier::Verifier;
-use sea_orm::DatabaseConnection;
+use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::bulk::store::ArtifactStore;
 use crate::config::Config;
-use crate::db::{AuditLogRepository, PersonRepository, SeaOrmPersonRepository};
+use crate::db::{AuditLogRepository, PersonRepository, PgPersonRepository};
 use crate::matching::{PersonMatcher, ProbabilisticMatcher};
 use crate::search::SearchEngine;
 use crate::streaming::{EventProducer, InMemoryEventPublisher};
@@ -21,8 +21,8 @@ use crate::streaming::{EventProducer, InMemoryEventPublisher};
 /// Shared application state
 #[derive(Clone)]
 pub struct AppState {
-    /// Database connection
-    pub db: DatabaseConnection,
+    /// Database connection pool
+    pub db: PgPool,
 
     /// Person repository for database operations
     pub person_repository: Arc<dyn PersonRepository>,
@@ -71,7 +71,7 @@ impl AppState {
     /// built (e.g. `PERSON_BULK_ARTIFACT_BACKEND=s3` without the `s3`
     /// cargo feature, or with an incomplete S3 configuration).
     pub async fn new(
-        db: DatabaseConnection,
+        db: PgPool,
         search_engine: SearchEngine,
         matcher: ProbabilisticMatcher,
         config: Config,
@@ -86,7 +86,7 @@ impl AppState {
         // the configured event transport (durable event bus, Phase 2;
         // `PERSON_EVENT_TRANSPORT`, default `memory`).
         let person_repository = Arc::new(
-            SeaOrmPersonRepository::new(db.clone())
+            PgPersonRepository::new(db.clone())
                 .with_event_publisher(event_publisher.clone())
                 .with_audit_log(audit_log.clone())
                 .with_transport(crate::streaming::transport()),

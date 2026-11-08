@@ -83,6 +83,44 @@ DATABASE_URL=… cargo test --test api_integration_test
 cargo bench
 ```
 
+## Database: sqlx, all SQL in `src/db/`
+
+Since 2026-11-08 this crate is on sqlx, not SeaORM (spec §10, §13 SQ-1;
+the repo's `spec/tech-stack/index.md` §5; event-service was the
+person-style template, case and care-pathway the templates for the hash
+chain and erasure). The rules that keep it reviewable:
+
+- Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`
+  literal in `src/db/`. Handlers, the gRPC server, the relay, bulk,
+  compliance and tasks call functions there; they never hold SQL. Tests
+  may run their own ground-truth SQL.
+- No `QueryBuilder`, `raw_sql` or `AssertSqlSafe`. The clippy stage
+  refuses them unless `ci/sql-allowlist.txt` names the file. Write an
+  optional filter as `($1::text IS NULL OR col = $1)` instead; a choice
+  of table is a `match` over literal statements (`db::erasure`).
+- A helper running several statements takes `&mut PgConnection` or an
+  `axa::sqlx::Db`, so the outbox, audit and child rows commit in the
+  caller's transaction. The audit chain's lock, head read and insert run
+  on one connection.
+- Every person write stamps its digests over the record **as stored**,
+  read back in its own transaction (`stamp_digests`, INT-V1). A write
+  path that skips it is a false tamper report waiting to happen;
+  `tests/api_integration_test.rs` `a_written_record_verifies` guards it.
+- Builds read `.sqlx/` with `SQLX_OFFLINE=true`. After changing a query
+  or a migration, migrate a database and run `SQLX_OFFLINE=false cargo
+  sqlx prepare -- --all-targets`, then commit `.sqlx/`. CI's `test-db`
+  stage runs `cargo sqlx prepare --check`. The bulk reconcile query
+  reads `axa_queue`, which a boot or `db migrate` creates.
+- Migrations are `migrations/<version>_<name>.up.sql` / `.down.sql`,
+  embedded by `sqlx::migrate!` as `db::MIGRATOR`. Never edit an applied
+  one: sqlx checks each file's checksum and refuses a changed one. Some
+  names are legacy (`create_patients`); they stay as they are.
+- Timestamps are `chrono` in the person rows. Do not turn on sqlx's
+  `time` feature: with both, sqlx 0.9.0's macros warn on every timestamp
+  column. The audit trail, bulk jobs, outbox and entity links keep their
+  `time` types above `src/db/`, filled from `chrono` twins (`*Raw` in
+  `db::models`), so the chain pre-image and the wire are unchanged.
+
 ## Durable event bus
 
 The transactional-outbox event bus (`src/db/outbox.rs`, `src/relay.rs`)

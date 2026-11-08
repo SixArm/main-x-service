@@ -4,7 +4,7 @@
 
 ```
 src/
-├── bin/main.rs              # binary entry: cli::main::<App, Migrator>()
+├── bin/main.rs              # binary entry: App::run(axa::cli::parse(…))
 ├── app.rs                   # axa App Hooks (routes, after_routes, queue)
 ├── api/
 │   ├── mod.rs               # ok, ApiProblem (responses)
@@ -13,7 +13,7 @@ src/
 │   └── grpc/                # real Tonic server (T-6): mod.rs (serve + generated
 │                             # proto module) + service.rs (PersonGrpcService)
 ├── models/                  # Person, HumanName, Identifier, …
-├── db/                      # SeaORM entities + repositories + audit
+├── db/                      # all SQL: sqlx row structs, repositories, audit, outbox, erasure
 ├── matching/                # algorithms + scoring + phonetic
 ├── search/                  # Tantivy index + query
 ├── streaming/               # EventProducer trait + InMemoryEventPublisher
@@ -26,9 +26,10 @@ src/
 
 The crate boots through **axa**. The binary target is
 `src/bin/main.rs`, whose `main()` calls
-`axa::cli::main::<App, Migrator>()` — axa parses the subcommands
-(`start`, `db migrate`, `task`, …) and dispatches against the crate's
-`App` hooks (`src/app.rs`) and the migration crate's `Migrator`. There
+`App::run(axa::cli::parse(…))` — axa parses the subcommands
+(`start`, `db migrate`, `task`, …) and `App::run` (`src/app.rs`)
+dispatches them; `db` commands run `db::MIGRATOR` (`sqlx::migrate!`)
+through `axa::sqlx`. There
 is no hand-rolled `Config::from_env → AppState → serve` path.
 
 `App` (in `src/app.rs`) implements axa's `Hooks`:
@@ -71,7 +72,7 @@ through `App::boot_test`.
 
 | Trait | Implementations |
 |---|---|
-| `PersonRepository` | `SeaOrmPersonRepository` |
+| `PersonRepository` | `PgPersonRepository` (sqlx) |
 | `PersonMatcher` | `ProbabilisticMatcher`, `DeterministicMatcher` |
 | `EventProducer` | `InMemoryEventPublisher` (Fluvio planned) |
 | `EventConsumer` | stub |

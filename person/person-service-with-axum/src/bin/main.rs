@@ -1,6 +1,6 @@
 //! Person Service binary entry point.
 //!
-//! Boots the axa application (Axum REST API, `SeaORM` persistence,
+//! Boots the axa application (Axum REST API, sqlx persistence,
 //! matching, search, streaming, observability) via the axa CLI. See
 //! [`person_service::app::App`] for the wiring and `lib.rs` for the
 //! supported library surface.

@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT system, value, use_type\n             FROM person_emergency_contact_telecom\n             WHERE emergency_contact_id = $1 ORDER BY position ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "system",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_emergency_contact_telecom",
+            "name": "system"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "value",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_emergency_contact_telecom",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "use_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_emergency_contact_telecom",
+            "name": "use_type"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "0f83f160111c33da907fff793492a92d98308c6f6b0c5e716e9ae57f03206a1b"
+}

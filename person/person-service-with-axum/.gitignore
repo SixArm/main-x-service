@@ -45,4 +45,3 @@
 # the resolved graph for the binary; these are build artifacts of
 # path dependencies built standalone.
 fuzz/Cargo.lock
-migration/Cargo.lock

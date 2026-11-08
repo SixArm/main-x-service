@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO person_addresses\n                 (id, person_id, use_type, line1, line2, city, state, postal_code, country,\n                  is_primary, created_at, updated_at)\n             VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d219b8c85f000dfc577381a43ba727b83f6edfeb7ed929ed85b274e78c07df70"
+}

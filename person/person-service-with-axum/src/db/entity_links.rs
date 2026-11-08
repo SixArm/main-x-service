@@ -13,27 +13,22 @@
 //! in `api::rest::links`; this layer never touches the far service.
 //!
 //! Domain dates are `chrono::NaiveDate` (matching the rest of the domain
-//! layer); the SeaORM row stores `time::Date`, bridged via
-//! [`crate::db::convert`].
+//! layer); the row handed back stores `time::Date`, as it did under
+//! `SeaORM`, bridged via [`crate::db::convert`].
 
+use axa::sqlx::Db;
 use chrono::NaiveDate;
-use sea_orm::sea_query::OnConflict;
-use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    QueryFilter, QueryOrder,
-};
+use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::Result;
-use crate::db::convert::date_to_time;
-use crate::db::models::entity_links;
+use crate::db::convert::offset_to_ts;
+use crate::db::models::{EntityLinkRaw, entity_links};
 
 /// The column values for a new (or re-asserted) outbound edge — the
 /// validated, ready-to-persist shape the controller hands to [`upsert`].
-/// Kept separate from the `SeaORM` `ActiveModel` so the controller does not
-/// construct entity internals directly. Dates are domain-side
-/// `chrono::NaiveDate`; [`upsert`] bridges them to `time::Date`.
+/// Dates are domain-side `chrono::NaiveDate`.
 #[derive(Debug, Clone)]
 pub struct NewEdge {
     /// The originating person's `id`.
@@ -61,48 +56,42 @@ pub struct NewEdge {
 /// edge (clears `deleted_at`) rather than inserting a duplicate, so the
 /// edge id is stable across re-asserts.
 ///
-/// Generic over [`ConnectionTrait`] so the caller can pass either the
-/// pooled `&DatabaseConnection` or its own `&DatabaseTransaction`.
+/// Takes a [`Db`], so the caller can pass either the pool or its own open
+/// transaction. `created_at` defaults to `now()` at the database (it is not
+/// in the insert), so a revived edge keeps its original creation time.
 ///
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the insert/upsert fails.
-pub async fn upsert<C: ConnectionTrait>(db: &C, edge: &NewEdge) -> Result<entity_links::Model> {
-    let am = entity_links::ActiveModel {
-        id: ActiveValue::set(Uuid::new_v4()),
-        from_pid: ActiveValue::set(edge.from_pid),
-        kind: ActiveValue::set(edge.kind.clone()),
-        to_ref: ActiveValue::set(edge.to_ref.clone()),
-        role: ActiveValue::set(edge.role.clone()),
-        confidence: ActiveValue::set(edge.confidence),
-        provenance: ActiveValue::set(edge.provenance.clone()),
-        valid_from: ActiveValue::set(edge.valid_from.map(date_to_time)),
-        valid_to: ActiveValue::set(edge.valid_to.map(date_to_time)),
-        deleted_at: ActiveValue::set(None),
-        // `created_at` defaults to now() at the DB (NOT set here), so a
-        // revived edge keeps its original creation time.
-        created_at: ActiveValue::not_set(),
-    };
-    let row = entity_links::Entity::insert(am)
-        .on_conflict(
-            OnConflict::columns([
-                entity_links::Column::FromPid,
-                entity_links::Column::Kind,
-                entity_links::Column::ToRef,
-                entity_links::Column::ValidFrom,
-            ])
-            .update_columns([
-                entity_links::Column::Role,
-                entity_links::Column::Confidence,
-                entity_links::Column::Provenance,
-                entity_links::Column::ValidTo,
-                entity_links::Column::DeletedAt,
-            ])
-            .to_owned(),
-        )
-        .exec_with_returning(db)
-        .await?;
-    Ok(row)
+pub async fn upsert(db: impl Into<Db<'_>>, edge: &NewEdge) -> Result<entity_links::Model> {
+    let mut conn = db.into().acquire().await?;
+    let row = sqlx::query_as!(
+        EntityLinkRaw,
+        "INSERT INTO entity_links
+             (id, from_pid, kind, to_ref, role, confidence, provenance, valid_from, valid_to,
+              deleted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)
+         ON CONFLICT (from_pid, kind, to_ref, valid_from) DO UPDATE SET
+             role = EXCLUDED.role,
+             confidence = EXCLUDED.confidence,
+             provenance = EXCLUDED.provenance,
+             valid_to = EXCLUDED.valid_to,
+             deleted_at = EXCLUDED.deleted_at
+         RETURNING id, from_pid, kind, to_ref, role, confidence, provenance, valid_from,
+                   valid_to, created_at, deleted_at",
+        Uuid::new_v4(),
+        edge.from_pid,
+        edge.kind,
+        edge.to_ref,
+        edge.role,
+        edge.confidence,
+        edge.provenance,
+        edge.valid_from,
+        edge.valid_to,
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(row.into())
 }
 
 /// List a person's **active** outbound edges (not soft-deleted), newest
@@ -111,17 +100,19 @@ pub async fn upsert<C: ConnectionTrait>(db: &C, edge: &NewEdge) -> Result<entity
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the query fails.
-pub async fn list_active(
-    db: &DatabaseConnection,
-    from_pid: Uuid,
-) -> Result<Vec<entity_links::Model>> {
-    let rows = entity_links::Entity::find()
-        .filter(entity_links::Column::FromPid.eq(from_pid))
-        .filter(entity_links::Column::DeletedAt.is_null())
-        .order_by_desc(entity_links::Column::CreatedAt)
-        .all(db)
-        .await?;
-    Ok(rows)
+pub async fn list_active(db: &PgPool, from_pid: Uuid) -> Result<Vec<entity_links::Model>> {
+    let rows = sqlx::query_as!(
+        EntityLinkRaw,
+        "SELECT id, from_pid, kind, to_ref, role, confidence, provenance, valid_from,
+                valid_to, created_at, deleted_at
+         FROM entity_links
+         WHERE from_pid = $1 AND deleted_at IS NULL
+         ORDER BY created_at DESC",
+        from_pid,
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows.into_iter().map(Into::into).collect())
 }
 
 /// Find one active edge by its id **scoped to a person** (`from_pid`), so
@@ -132,17 +123,23 @@ pub async fn list_active(
 ///
 /// Returns [`crate::Error::Database`] when the query fails.
 pub async fn find_active(
-    db: &DatabaseConnection,
+    db: &PgPool,
     from_pid: Uuid,
     id: Uuid,
 ) -> Result<Option<entity_links::Model>> {
-    let row = entity_links::Entity::find()
-        .filter(entity_links::Column::Id.eq(id))
-        .filter(entity_links::Column::FromPid.eq(from_pid))
-        .filter(entity_links::Column::DeletedAt.is_null())
-        .one(db)
-        .await?;
-    Ok(row)
+    let row = sqlx::query_as!(
+        EntityLinkRaw,
+        "SELECT id, from_pid, kind, to_ref, role, confidence, provenance, valid_from,
+                valid_to, created_at, deleted_at
+         FROM entity_links
+         WHERE id = $1 AND from_pid = $2 AND deleted_at IS NULL
+         LIMIT 1",
+        id,
+        from_pid,
+    )
+    .fetch_optional(db)
+    .await?;
+    Ok(row.map(Into::into))
 }
 
 /// Find one active edge by its **natural key** — `(from_pid, kind,
@@ -158,21 +155,28 @@ pub async fn find_active(
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the query fails.
-pub async fn find_active_by_key<C: ConnectionTrait>(
-    db: &C,
+pub async fn find_active_by_key(
+    db: impl Into<Db<'_>>,
     from_pid: Uuid,
     kind: &str,
     to_ref: &str,
 ) -> Result<Option<entity_links::Model>> {
-    let row = entity_links::Entity::find()
-        .filter(entity_links::Column::FromPid.eq(from_pid))
-        .filter(entity_links::Column::Kind.eq(kind))
-        .filter(entity_links::Column::ToRef.eq(to_ref))
-        .filter(entity_links::Column::ValidFrom.is_null())
-        .filter(entity_links::Column::DeletedAt.is_null())
-        .one(db)
-        .await?;
-    Ok(row)
+    let mut conn = db.into().acquire().await?;
+    let row = sqlx::query_as!(
+        EntityLinkRaw,
+        "SELECT id, from_pid, kind, to_ref, role, confidence, provenance, valid_from,
+                valid_to, created_at, deleted_at
+         FROM entity_links
+         WHERE from_pid = $1 AND kind = $2 AND to_ref = $3
+           AND valid_from IS NULL AND deleted_at IS NULL
+         LIMIT 1",
+        from_pid,
+        kind,
+        to_ref,
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(row.map(Into::into))
 }
 
 /// Every **active** outbound edge across all persons, oldest first — the
@@ -183,32 +187,51 @@ pub async fn find_active_by_key<C: ConnectionTrait>(
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the query fails.
-pub async fn list_all_active<C: ConnectionTrait>(
-    db: &C,
+pub async fn list_all_active(
+    db: impl Into<Db<'_>>,
     since: Option<OffsetDateTime>,
 ) -> Result<Vec<entity_links::Model>> {
-    let mut query = entity_links::Entity::find().filter(entity_links::Column::DeletedAt.is_null());
-    if let Some(since) = since {
-        query = query.filter(entity_links::Column::CreatedAt.gte(since));
-    }
-    let rows = query
-        .order_by_asc(entity_links::Column::CreatedAt)
-        .all(db)
-        .await?;
-    Ok(rows)
+    let mut conn = db.into().acquire().await?;
+    let rows = sqlx::query_as!(
+        EntityLinkRaw,
+        "SELECT id, from_pid, kind, to_ref, role, confidence, provenance, valid_from,
+                valid_to, created_at, deleted_at
+         FROM entity_links
+         WHERE deleted_at IS NULL AND ($1::timestamptz IS NULL OR created_at >= $1)
+         ORDER BY created_at ASC",
+        since.map(offset_to_ts),
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(rows.into_iter().map(Into::into).collect())
 }
 
 /// Soft-delete (withdraw) an edge: stamp `deleted_at = now()`.
 ///
+/// Only `deleted_at` is written, as `SeaORM`'s update of the loaded model
+/// did, and an id that matches no row is an error.
+///
 /// # Errors
 ///
-/// Returns [`crate::Error::Database`] when the update fails.
-pub async fn soft_delete<C: ConnectionTrait>(
-    db: &C,
+/// Returns [`crate::Error::Database`] when the update fails or matches no
+/// row.
+pub async fn soft_delete(
+    db: impl Into<Db<'_>>,
     row: entity_links::Model,
 ) -> Result<entity_links::Model> {
-    let mut am: entity_links::ActiveModel = row.into();
-    am.deleted_at = ActiveValue::set(Some(OffsetDateTime::now_utc()));
-    let updated = am.update(db).await?;
-    Ok(updated)
+    let mut conn = db.into().acquire().await?;
+    let deleted_at = offset_to_ts(OffsetDateTime::now_utc());
+    let updated = sqlx::query_as!(
+        EntityLinkRaw,
+        "UPDATE entity_links SET deleted_at = $2
+         WHERE id = $1
+         RETURNING id, from_pid, kind, to_ref, role, confidence, provenance, valid_from,
+                   valid_to, created_at, deleted_at",
+        row.id,
+        deleted_at,
+    )
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(super::not_updated)?;
+    Ok(updated.into())
 }

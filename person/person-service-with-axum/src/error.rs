@@ -4,8 +4,8 @@
 //! [`Result<T>`](Result) = `std::result::Result<T, Error>`. [`Error`] is
 //! a flat `thiserror` enum with one variant per failure domain; the API
 //! layer maps each variant onto an HTTP status code. Only
-//! [`sea_orm::DbErr`] is wired up with `#[from]` for `?`-conversion; the
-//! rest are constructed explicitly (often via the
+//! [`sqlx::Error`] converts with `?` (into [`Error::Database`]); the rest
+//! are constructed explicitly (often via the
 //! [`database`](Error::database) / [`validation`](Error::validation) /
 //! [`internal`](Error::internal) helpers) so the call site stays the
 //! source of truth for the message.
@@ -22,9 +22,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// responses and logs.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// A database / ORM failure. Auto-converts from [`sea_orm::DbErr`].
+    /// A database failure, carrying the driver's message. Auto-converts
+    /// from [`sqlx::Error`].
     #[error("Database error: {0}")]
-    Database(#[from] sea_orm::DbErr),
+    Database(String),
 
     /// A connection-pool failure (e.g. could not acquire a connection).
     #[error("Connection pool error: {0}")]
@@ -68,10 +69,10 @@ pub enum Error {
 }
 
 impl Error {
-    /// Build a [`Database`](Error::Database) error from a custom message
-    /// (wraps it in [`sea_orm::DbErr::Custom`]).
+    /// Build a [`Database`](Error::Database) error from a custom message,
+    /// worded as it was under `SeaORM` (`Custom Error: …`).
     pub fn database(msg: impl Into<String>) -> Self {
-        Error::Database(sea_orm::DbErr::Custom(msg.into()))
+        Error::Database(format!("Custom Error: {}", msg.into()))
     }
 
     /// Build a [`Validation`](Error::Validation) error from a message.
@@ -82,5 +83,13 @@ impl Error {
     /// Build an [`Internal`](Error::Internal) error from a message.
     pub fn internal(msg: impl Into<String>) -> Self {
         Error::Internal(msg.into())
+    }
+}
+
+/// Every sqlx failure is an [`Error::Database`], carrying sqlx's own
+/// message, so `?` on a query reads the same everywhere in `src/db/`.
+impl From<sqlx::Error> for Error {
+    fn from(e: sqlx::Error) -> Self {
+        Self::Database(e.to_string())
     }
 }

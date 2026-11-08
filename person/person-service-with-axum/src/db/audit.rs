@@ -5,16 +5,20 @@
 //! user agent). The `log_create` / `log_update` / `log_delete` helpers are
 //! thin wrappers over the private `log_action` insert. Query helpers back
 //! the audit REST endpoints (per-entity, recent, per-user history).
+//!
+//! Every statement against `audit_log` is here, including the address
+//! retention sweep ([`scrub_addresses`]), the checkpoint reads, and the
+//! `integrity_resign` task's re-MAC.
 
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set,
-};
+use axa::sqlx::Db;
 use serde_json::Value as JsonValue;
+use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::models::audit_log;
+use super::convert::offset_to_ts;
+use super::models::{AuditLogRaw, audit_log};
 use super::repositories::AuditContext;
+use super::{not_updated, to_i64};
 use crate::Result;
 use crate::compliance::audit_chain;
 
@@ -27,11 +31,11 @@ const CHAIN_LOCK_KEY: i64 = 0x6D78_695F_7072_736E; // "mxi_prsn"
 
 /// Reads and writes the `audit_log` table.
 ///
-/// Holds a cloned [`DatabaseConnection`]; construct one per shared
-/// application state and wrap in an `Arc` to share across handlers.
+/// Holds a cloned [`PgPool`]; construct one per shared application state
+/// and wrap in an `Arc` to share across handlers.
 pub struct AuditLogRepository {
-    /// The `SeaORM` connection used for every audit query/insert.
-    db: DatabaseConnection,
+    /// The pool used for every audit query/insert.
+    db: PgPool,
 }
 
 /// The `entity_type` spellings that mean "person", newest first in
@@ -80,7 +84,7 @@ pub fn entity_type_spellings(entity_type: &str) -> Vec<&str> {
 impl AuditLogRepository {
     /// Wrap a database connection in an audit repository.
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self { db }
     }
 
@@ -218,8 +222,8 @@ impl AuditLogRepository {
         .await
     }
 
-    /// SEC-B10: insert one audit row on an arbitrary connection `conn` —
-    /// which may be a `&DatabaseTransaction`, so a caller can write the audit
+    /// SEC-B10: insert one audit row on `db` — the pool, or a caller's
+    /// connection such as an open transaction, so a caller can write the audit
     /// **inside** the same transaction as the entity change and have both
     /// commit (or roll back) atomically. A crash after the entity commit can
     /// then no longer lose the audit row.
@@ -230,9 +234,9 @@ impl AuditLogRepository {
     // Mirrors the private `log_action` field list plus the target connection;
     // the audit row genuinely has this many independent columns.
     #[allow(clippy::too_many_arguments)]
-    pub async fn log_action_on<C: ConnectionTrait>(
+    pub async fn log_action_on(
         &self,
-        conn: &C,
+        conn: impl Into<Db<'_>>,
         action: &str,
         entity_type: &str,
         entity_id: Uuid,
@@ -307,30 +311,18 @@ impl AuditLogRepository {
     /// # Errors
     ///
     /// Returns [`crate::Error::Database`] if the update fails.
-    pub async fn redact_for_entity<C: ConnectionTrait>(
-        &self,
-        conn: &C,
-        entity_id: Uuid,
-    ) -> Result<u64> {
+    pub async fn redact_for_entity(&self, conn: impl Into<Db<'_>>, entity_id: Uuid) -> Result<u64> {
         let now = audit_chain::trunc_micros(time::OffsetDateTime::now_utc());
-        let result = audit_log::Entity::update_many()
-            .col_expr(
-                audit_log::Column::OldValues,
-                sea_orm::sea_query::Expr::value(sea_orm::Value::Json(None)),
-            )
-            .col_expr(
-                audit_log::Column::NewValues,
-                sea_orm::sea_query::Expr::value(sea_orm::Value::Json(None)),
-            )
-            .col_expr(
-                audit_log::Column::RedactedAt,
-                sea_orm::sea_query::Expr::value(now),
-            )
-            .filter(audit_log::Column::EntityId.eq(entity_id))
-            .filter(audit_log::Column::RedactedAt.is_null())
-            .exec(conn)
-            .await?;
-        Ok(result.rows_affected)
+        let mut conn = conn.into().acquire().await?;
+        let result = sqlx::query!(
+            "UPDATE audit_log SET old_values = NULL, new_values = NULL, redacted_at = $2
+             WHERE entity_id = $1 AND redacted_at IS NULL",
+            entity_id,
+            offset_to_ts(now),
+        )
+        .execute(&mut *conn)
+        .await?;
+        Ok(result.rows_affected())
     }
 
     /// Append the chained `erased` accountability row for a GDPR Art. 17
@@ -345,9 +337,9 @@ impl AuditLogRepository {
     /// # Errors
     ///
     /// Returns [`crate::Error::Database`] if the insert fails.
-    pub async fn log_erasure<C: ConnectionTrait>(
+    pub async fn log_erasure(
         &self,
-        conn: &C,
+        conn: impl Into<Db<'_>>,
         entity_id: Uuid,
         actor: Option<&str>,
         client: Option<std::net::IpAddr>,
@@ -375,9 +367,9 @@ impl AuditLogRepository {
 
     /// The chained insert both write paths share.
     #[allow(clippy::too_many_arguments)]
-    async fn log_chained<C: ConnectionTrait>(
+    async fn log_chained(
         &self,
-        conn: &C,
+        conn: impl Into<Db<'_>>,
         action: &str,
         entity_type: &str,
         entity_id: Uuid,
@@ -393,20 +385,19 @@ impl AuditLogRepository {
         // inside a caller's transaction is fully serialised; on a pooled
         // connection each statement is its own implicit transaction and a
         // concurrent fork remains possible, which verification reports as
-        // a `linkage` break rather than hiding.
-        if conn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
-            conn.execute_raw(sea_orm::Statement::from_string(
-                sea_orm::DatabaseBackend::Postgres,
-                format!("SELECT pg_advisory_xact_lock({CHAIN_LOCK_KEY})"),
-            ))
+        // a `linkage` break rather than hiding. The lock, the head read and
+        // the insert all run on one connection, so under a transaction the
+        // lock covers both.
+        let mut conn = conn.into().acquire().await?;
+        sqlx::query!("SELECT pg_advisory_xact_lock($1)", CHAIN_LOCK_KEY)
+            .execute(&mut *conn)
             .await?;
-        }
         // Both chain heads from the same row, so each algorithm binds
         // its *own* predecessor. Binding the SHA-256 head into the SHA-3
         // digest would make the second chain's linkage rest on SHA-256's
         // collision resistance — the dependency two algorithms exist to
         // avoid.
-        let (prev_hash, prev_hash_sha3) = Self::chain_heads(conn).await?;
+        let (prev_hash, prev_hash_sha3) = Self::chain_heads(&mut *conn).await?;
 
         let id = Uuid::new_v4();
         // Truncated to microseconds so the value hashed here is the value
@@ -441,32 +432,36 @@ impl AuditLogRepository {
             &audit_chain::preimage(&chain_input),
         );
 
-        let new_audit = audit_log::ActiveModel {
-            id: Set(id),
-            timestamp: Set(timestamp),
-            user_id: Set(ctx.user_id.clone()),
-            action: Set(action.to_string()),
-            entity_type: Set(entity_type.to_string()),
-            entity_id: Set(entity_id),
-            old_values: Set(old_values),
-            new_values: Set(new_values),
-            ip_address: Set(ctx.ip_address.clone()),
-            user_agent: Set(ctx.user_agent.clone()),
-            prev_hash: Set(prev_hash),
-            prev_hash_sha3: Set(prev_hash_sha3),
-            hash_sha3: Set(Some(hash_sha3)),
-            mac: Set(mac),
-            hash: Set(Some(hash)),
-            context: Set(context),
-            disclosure: Set(disclosure),
-            redacted_at: Set(None),
-            ip_salt: Set(ip_salt),
-            ip_commitment: Set(ip_commitment),
-            // `seq` is a BIGSERIAL: let Postgres assign the append order.
-            seq: sea_orm::ActiveValue::NotSet,
-        };
-
-        new_audit.insert(conn).await?;
+        // `seq` is a BIGSERIAL: Postgres assigns the append order.
+        sqlx::query!(
+            "INSERT INTO audit_log
+                 (id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                  new_values, ip_address, user_agent, prev_hash, prev_hash_sha3, hash_sha3,
+                  mac, hash, context, disclosure, redacted_at, ip_salt, ip_commitment)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+                     $17, NULL, $18, $19)",
+            id,
+            offset_to_ts(timestamp),
+            ctx.user_id,
+            action,
+            entity_type,
+            entity_id,
+            old_values,
+            new_values,
+            ctx.ip_address,
+            ctx.user_agent,
+            prev_hash,
+            prev_hash_sha3,
+            hash_sha3,
+            mac,
+            hash,
+            context,
+            disclosure,
+            ip_salt,
+            ip_commitment,
+        )
+        .execute(&mut *conn)
+        .await?;
 
         Ok(())
     }
@@ -478,12 +473,10 @@ impl AuditLogRepository {
     /// # Errors
     ///
     /// Returns [`crate::Error::Database`] if the query fails.
-    pub async fn chain_heads<C: ConnectionTrait>(
-        conn: &C,
-    ) -> Result<(Option<String>, Option<String>)> {
-        let last = audit_log::Entity::find()
-            .order_by_desc(audit_log::Column::Seq)
-            .one(conn)
+    pub async fn chain_heads(conn: impl Into<Db<'_>>) -> Result<(Option<String>, Option<String>)> {
+        let mut conn = conn.into().acquire().await?;
+        let last = sqlx::query!("SELECT hash, hash_sha3 FROM audit_log ORDER BY seq DESC LIMIT 1")
+            .fetch_optional(&mut *conn)
             .await?;
         Ok(match last {
             Some(row) => (row.hash, row.hash_sha3),
@@ -499,12 +492,8 @@ impl AuditLogRepository {
     /// # Errors
     ///
     /// Returns [`crate::Error::Database`] if the query fails.
-    pub async fn chain_head<C: ConnectionTrait>(conn: &C) -> Result<Option<String>> {
-        let last = audit_log::Entity::find()
-            .order_by_desc(audit_log::Column::Seq)
-            .one(conn)
-            .await?;
-        Ok(last.and_then(|row| row.hash))
+    pub async fn chain_head(conn: impl Into<Db<'_>>) -> Result<Option<String>> {
+        Ok(Self::chain_heads(conn).await?.0)
     }
 
     /// The newest `limit` rows in **ascending `seq` order** — the shape
@@ -517,11 +506,21 @@ impl AuditLogRepository {
     ///
     /// Returns [`crate::Error::Database`] if the query fails.
     pub async fn chain_tail(&self, limit: u64) -> Result<Vec<audit_log::Model>> {
-        let mut rows = audit_log::Entity::find()
-            .order_by_desc(audit_log::Column::Seq)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
+        let mut rows: Vec<audit_log::Model> = sqlx::query_as!(
+            AuditLogRaw,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, seq, prev_hash, prev_hash_sha3, hash,
+                    hash_sha3, mac, context, disclosure, redacted_at, ip_salt, ip_commitment
+             FROM audit_log
+             ORDER BY seq DESC
+             LIMIT $1",
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect();
         rows.reverse();
         Ok(rows)
     }
@@ -536,15 +535,15 @@ impl AuditLogRepository {
     }
 
     /// SEC-B10: transaction-scoped `UPDATE` audit — like [`log_update`], but
-    /// inserted on `conn` (e.g. `&DatabaseTransaction`) so it commits
+    /// inserted on `conn` (e.g. an open transaction) so it commits
     /// atomically with the entity change.
     ///
     /// # Errors
     ///
     /// Returns [`crate::Error::Database`] if the audit row insert fails.
-    pub async fn log_update_on<C: ConnectionTrait>(
+    pub async fn log_update_on(
         &self,
-        conn: &C,
+        conn: impl Into<Db<'_>>,
         entity_type: &str,
         entity_id: Uuid,
         old_values: JsonValue,
@@ -564,15 +563,15 @@ impl AuditLogRepository {
     }
 
     /// SEC-B10: transaction-scoped `DELETE` audit — like [`log_delete`], but
-    /// inserted on `conn` (e.g. `&DatabaseTransaction`) so it commits
+    /// inserted on `conn` (e.g. an open transaction) so it commits
     /// atomically with the entity change.
     ///
     /// # Errors
     ///
     /// Returns [`crate::Error::Database`] if the audit row insert fails.
-    pub async fn log_delete_on<C: ConnectionTrait>(
+    pub async fn log_delete_on(
         &self,
-        conn: &C,
+        conn: impl Into<Db<'_>>,
         entity_type: &str,
         entity_id: Uuid,
         old_values: JsonValue,
@@ -601,15 +600,24 @@ impl AuditLogRepository {
         entity_id: Uuid,
         limit: u64,
     ) -> Result<Vec<audit_log::Model>> {
-        let logs = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityType.is_in(entity_type_spellings(entity_type)))
-            .filter(audit_log::Column::EntityId.eq(entity_id))
-            .order_by_desc(audit_log::Column::Timestamp)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
+        let spellings = entity_type_spellings(entity_type);
+        let logs = sqlx::query_as!(
+            AuditLogRaw,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, seq, prev_hash, prev_hash_sha3, hash,
+                    hash_sha3, mac, context, disclosure, redacted_at, ip_salt, ip_commitment
+             FROM audit_log
+             WHERE entity_type = ANY($1::text[]) AND entity_id = $2
+             ORDER BY timestamp DESC
+             LIMIT $3",
+            &spellings as &[&str],
+            entity_id,
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
-        Ok(logs)
+        Ok(logs.into_iter().map(Into::into).collect())
     }
 
     /// Every audit row for one entity flagged as an outward
@@ -626,16 +634,23 @@ impl AuditLogRepository {
         entity_id: Uuid,
         limit: u64,
     ) -> Result<Vec<audit_log::Model>> {
-        let logs = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityType.is_in(ENTITY_TYPE_SPELLINGS))
-            .filter(audit_log::Column::EntityId.eq(entity_id))
-            .filter(audit_log::Column::Disclosure.eq(true))
-            .order_by_desc(audit_log::Column::Timestamp)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
+        let logs = sqlx::query_as!(
+            AuditLogRaw,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, seq, prev_hash, prev_hash_sha3, hash,
+                    hash_sha3, mac, context, disclosure, redacted_at, ip_salt, ip_commitment
+             FROM audit_log
+             WHERE entity_type = ANY($1::text[]) AND entity_id = $2 AND disclosure = true
+             ORDER BY timestamp DESC
+             LIMIT $3",
+            &ENTITY_TYPE_SPELLINGS as &[&str],
+            entity_id,
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
-        Ok(logs)
+        Ok(logs.into_iter().map(Into::into).collect())
     }
 
     /// Return the `limit` most recent audit rows system-wide.
@@ -644,13 +659,20 @@ impl AuditLogRepository {
     ///
     /// Returns [`crate::Error::Database`] if the query fails.
     pub async fn get_recent_logs(&self, limit: u64) -> Result<Vec<audit_log::Model>> {
-        let logs = audit_log::Entity::find()
-            .order_by_desc(audit_log::Column::Timestamp)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
+        let logs = sqlx::query_as!(
+            AuditLogRaw,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, seq, prev_hash, prev_hash_sha3, hash,
+                    hash_sha3, mac, context, disclosure, redacted_at, ip_salt, ip_commitment
+             FROM audit_log
+             ORDER BY timestamp DESC
+             LIMIT $1",
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
-        Ok(logs)
+        Ok(logs.into_iter().map(Into::into).collect())
     }
 
     /// Return up to `limit` audit rows for one user id, newest first.
@@ -663,15 +685,178 @@ impl AuditLogRepository {
         user_id: &str,
         limit: u64,
     ) -> Result<Vec<audit_log::Model>> {
-        let logs = audit_log::Entity::find()
-            .filter(audit_log::Column::UserId.eq(user_id))
-            .order_by_desc(audit_log::Column::Timestamp)
-            .limit(limit)
-            .all(&self.db)
-            .await?;
+        let logs = sqlx::query_as!(
+            AuditLogRaw,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, seq, prev_hash, prev_hash_sha3, hash,
+                    hash_sha3, mac, context, disclosure, redacted_at, ip_salt, ip_commitment
+             FROM audit_log
+             WHERE user_id = $1
+             ORDER BY timestamp DESC
+             LIMIT $2",
+            user_id,
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
-        Ok(logs)
+        Ok(logs.into_iter().map(Into::into).collect())
     }
+
+    /// Every audit row about `entity_id`, in append (`seq`) order,
+    /// optionally narrowed to one `entity_type` and one `action`. A
+    /// ground-truth read for tests and operators.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the query fails.
+    pub async fn rows_for(
+        &self,
+        entity_type: Option<&str>,
+        entity_id: Uuid,
+        action: Option<&str>,
+    ) -> Result<Vec<audit_log::Model>> {
+        let logs = sqlx::query_as!(
+            AuditLogRaw,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, seq, prev_hash, prev_hash_sha3, hash,
+                    hash_sha3, mac, context, disclosure, redacted_at, ip_salt, ip_commitment
+             FROM audit_log
+             WHERE entity_id = $1
+               AND ($2::text IS NULL OR entity_type = $2)
+               AND ($3::text IS NULL OR action = $3)
+             ORDER BY seq",
+            entity_id,
+            entity_type,
+            action,
+        )
+        .fetch_all(&self.db)
+        .await?;
+        Ok(logs.into_iter().map(Into::into).collect())
+    }
+
+    /// Up to `limit` rows carrying a MAC, oldest first — the
+    /// `integrity_resign` task's walk.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the query fails.
+    pub async fn rows_with_mac(&self, limit: u64) -> Result<Vec<audit_log::Model>> {
+        let logs = sqlx::query_as!(
+            AuditLogRaw,
+            "SELECT id, timestamp, user_id, action, entity_type, entity_id, old_values,
+                    new_values, ip_address, user_agent, seq, prev_hash, prev_hash_sha3, hash,
+                    hash_sha3, mac, context, disclosure, redacted_at, ip_salt, ip_commitment
+             FROM audit_log
+             WHERE mac IS NOT NULL
+             ORDER BY seq ASC
+             LIMIT $1",
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
+        Ok(logs.into_iter().map(Into::into).collect())
+    }
+
+    /// Replace one row's MAC, the only column `integrity_resign` writes.
+    /// No matching row is an error, as it was under `SeaORM`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the update fails or matches
+    /// no row.
+    pub async fn set_mac(&self, id: Uuid, mac: Option<String>) -> Result<()> {
+        let done = sqlx::query!("UPDATE audit_log SET mac = $2 WHERE id = $1", id, mac)
+            .execute(&self.db)
+            .await?;
+        if done.rows_affected() == 0 {
+            return Err(not_updated());
+        }
+        Ok(())
+    }
+}
+
+/// The newest chained row, as `(seq, hash)`: the anchor a checkpoint
+/// records. `None` when no row carries a hash.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn latest_chained_row(db: &PgPool) -> Result<Option<(i64, Option<String>)>> {
+    let row = sqlx::query!(
+        "SELECT seq, hash FROM audit_log WHERE hash IS NOT NULL ORDER BY seq DESC LIMIT 1"
+    )
+    .fetch_optional(db)
+    .await?;
+    Ok(row.map(|r| (r.seq, r.hash)))
+}
+
+/// The hash of the row at `seq`: `None` when there is no such row, and
+/// `Some(None)` when it carries no hash.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn hash_at(db: &PgPool, seq: i64) -> Result<Option<Option<String>>> {
+    let row = sqlx::query!("SELECT hash FROM audit_log WHERE seq = $1 LIMIT 1", seq)
+        .fetch_optional(db)
+        .await?;
+    Ok(row.map(|r| r.hash))
+}
+
+/// How many rows sit at or before `seq`.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn count_at_or_before(db: &PgPool, seq: i64) -> Result<u64> {
+    let n = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM audit_log WHERE seq <= $1"#,
+        seq
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(u64::try_from(n).unwrap_or(0))
+}
+
+/// Remove the caller's address and its salt from rows older than `days`,
+/// where the chain does not bind the address itself, returning how many
+/// went ([`crate::compliance::address_retention`]). One statement, so
+/// replicas running it together do no harm.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the update fails.
+pub async fn scrub_addresses(db: &PgPool, days: i32) -> Result<u64> {
+    let done = sqlx::query!(
+        r#"UPDATE audit_log SET ip_address = NULL, ip_salt = NULL
+           WHERE ip_address IS NOT NULL
+             AND "timestamp" < now() - make_interval(days => $1)
+             AND (ip_commitment IS NOT NULL OR hash IS NULL OR redacted_at IS NOT NULL)"#,
+        days,
+    )
+    .execute(db)
+    .await?;
+    Ok(done.rows_affected())
+}
+
+/// How many rows past `days` still hold an address their chain hash
+/// binds, so cannot be scrubbed.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn count_unscrubbable_addresses(db: &PgPool, days: i32) -> Result<i64> {
+    let n = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM audit_log
+           WHERE ip_address IS NOT NULL
+             AND "timestamp" < now() - make_interval(days => $1)
+             AND ip_commitment IS NULL AND hash IS NOT NULL AND redacted_at IS NULL"#,
+        days,
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(n)
 }
 
 /// Database-backed pins for the tamper-evident audit chain
@@ -727,25 +912,23 @@ mod chain_tests {
     use super::AuditLogRepository;
     use crate::compliance::audit_chain;
     use crate::db::repositories::AuditContext;
-    use sea_orm::{ConnectionTrait, Statement};
     use serial_test::serial;
+    use sqlx::PgPool;
     use uuid::Uuid;
 
-    async fn connect() -> sea_orm::DatabaseConnection {
+    async fn connect() -> PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
 
     /// Remove every audit row, so a run starts from an empty chain.
-    async fn clear(db: &sea_orm::DatabaseConnection) {
-        db.execute_raw(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            "DELETE FROM audit_log".to_string(),
-        ))
-        .await
-        .expect("clear audit_log");
+    async fn clear(db: &PgPool) {
+        sqlx::query!("DELETE FROM audit_log")
+            .execute(db)
+            .await
+            .expect("clear audit_log");
     }
 
     fn ctx() -> AuditContext {
@@ -823,13 +1006,12 @@ mod chain_tests {
         .expect("log create");
         assert!(repo.verify_chain(1000).await.expect("verify").verified);
 
-        db.execute_raw(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
+        sqlx::query!(
             r#"UPDATE audit_log
                SET new_values = jsonb_set(new_values, '{family_name}', '"Tampered"')
                WHERE new_values IS NOT NULL"#
-                .to_string(),
-        ))
+        )
+        .execute(&db)
         .await
         .expect("tamper");
 
@@ -906,12 +1088,10 @@ mod chain_tests {
         }
         assert!(repo.verify_chain(1000).await.expect("verify").verified);
 
-        db.execute_raw(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            "DELETE FROM audit_log WHERE seq = (SELECT MIN(seq) + 1 FROM audit_log)".to_string(),
-        ))
-        .await
-        .expect("delete a row");
+        sqlx::query!("DELETE FROM audit_log WHERE seq = (SELECT MIN(seq) + 1 FROM audit_log)")
+            .execute(&db)
+            .await
+            .expect("delete a row");
 
         let report = repo.verify_chain(1000).await.expect("verify");
         assert!(!report.verified, "a deleted row must break the chain");

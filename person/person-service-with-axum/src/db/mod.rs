@@ -1,15 +1,19 @@
-//! PostgreSQL persistence layer: connection setup, SeaORM entities, and
-//! repositories.
+//! Database access — the connection pool, the migrator, the repository,
+//! the audit log, the outbox, the entity links, the bulk jobs, the review
+//! queue and erasure. **Every SQL statement this service runs is in this
+//! directory** (spec/tech-stack §5.2), written as a `sqlx::query!` /
+//! `query_as!` / `query_scalar!` literal so the compiler checks it against
+//! the schema.
 //!
-//! This module owns the database boundary. [`create_connection`](crate::db::create_connection) builds
-//! a pooled [`DatabaseConnection`](sea_orm::DatabaseConnection) from [`DatabaseConfig`](crate::config::DatabaseConfig). Submodules:
-//! [`models`](crate::db::models) holds the SeaORM entity definitions, [`schema`](crate::db::schema) the table
-//! definitions, [`repositories`](crate::db::repositories) the data-access traits and their SeaORM
-//! implementations ([`PersonRepository`](crate::db::repositories::PersonRepository) / [`SeaOrmPersonRepository`](crate::db::repositories::SeaOrmPersonRepository)),
-//! and [`audit`](crate::db::audit) the HIPAA-style [`AuditLogRepository`](crate::db::audit::AuditLogRepository). The key traits
-//! and types are re-exported here for convenience.
+//! [`create_connection`] builds a pooled [`PgPool`] from
+//! [`DatabaseConfig`]. The submodules cover the row structs ([`models`]),
+//! the repository trait and its implementation ([`repositories`]:
+//! [`PersonRepository`] / [`PgPersonRepository`]), and the HIPAA-style
+//! [`AuditLogRepository`] ([`audit`]). The key traits and types are
+//! re-exported here for convenience.
 
-use sea_orm::{Database, DatabaseConnection};
+use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 
 use crate::Result;
 use crate::config::DatabaseConfig;
@@ -22,36 +26,52 @@ pub mod bulk_jobs;
 pub mod convert;
 /// Cross-service entity-link write-side persistence (`same_identity`).
 pub mod entity_links;
-/// SeaORM entity (ActiveModel/Model) definitions.
+/// The statements of a GDPR Art. 17 erasure.
+pub mod erasure;
+/// Row structs, one per table read whole.
 pub mod models;
 /// Transactional-outbox write + relay surface (durable event bus, Phase 2).
 pub mod outbox;
-/// Repository traits and their SeaORM implementations.
+/// Repository traits and their sqlx implementations.
 pub mod repositories;
 pub mod review_queue;
-/// Table/column schema definitions.
-pub mod schema;
 
 pub use audit::AuditLogRepository;
-pub use repositories::{AuditContext, PersonRepository, SeaOrmPersonRepository};
+pub use repositories::{AuditContext, PersonRepository, PgPersonRepository};
+
+/// The schema migrations: the plain SQL files under `migrations/`, one
+/// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
+/// time. `person-service db migrate | down | reset | status` and the boot
+/// auto-migrate run these through `axa::sqlx`.
+pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// Open a pooled `PostgreSQL` connection from the given configuration.
 ///
 /// Applies the configured min/max pool sizes. Connection errors are
-/// mapped to [`crate::Error::Pool`]. The returned
-/// [`DatabaseConnection`] is cheap to clone and is shared across
-/// handlers via [`AppState`](crate::api::rest::state::AppState).
+/// mapped to [`crate::Error::Pool`]. The returned [`PgPool`] is cheap to
+/// clone and is shared across handlers via
+/// [`AppState`](crate::api::rest::state::AppState).
 ///
 /// # Errors
 ///
 /// Returns [`crate::Error::Pool`] if the database connection cannot be
 /// established.
-pub async fn create_connection(config: &DatabaseConfig) -> Result<DatabaseConnection> {
-    let mut opt = sea_orm::ConnectOptions::new(&config.url);
-    opt.max_connections(config.max_connections)
-        .min_connections(config.min_connections);
-
-    Database::connect(opt)
+pub async fn create_connection(config: &DatabaseConfig) -> Result<PgPool> {
+    PgPoolOptions::new()
+        .max_connections(config.max_connections)
+        .min_connections(config.min_connections)
+        .connect(&config.url)
         .await
         .map_err(|e| crate::Error::Pool(e.to_string()))
+}
+
+/// "No row matched" on an update or soft delete, worded as `SeaORM`'s
+/// `RecordNotUpdated` was, so the error a caller sees is unchanged.
+pub(crate) fn not_updated() -> crate::Error {
+    crate::Error::Database("None of the records are updated".to_string())
+}
+
+/// A `u64` count or limit as the `BIGINT` Postgres takes, saturating.
+pub(crate) fn to_i64(n: u64) -> i64 {
+    i64::try_from(n).unwrap_or(i64::MAX)
 }

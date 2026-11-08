@@ -25,7 +25,7 @@ This spec owns the **cross-subproject contract**:
 - Real-time + explicit + batch duplicate detection, review queue,
   merge.
 - Validation, normalisation, privacy masking, GDPR export, consent.
-- REST API + FHIR R5 Person + gRPC stub; PostgreSQL via SeaORM.
+- REST API + FHIR R5 Person + gRPC stub; PostgreSQL via sqlx.
 
 **person-matcher-rust-crate** owns:
 

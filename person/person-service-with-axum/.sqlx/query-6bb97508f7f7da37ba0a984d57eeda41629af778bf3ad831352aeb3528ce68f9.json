@@ -1,0 +1,245 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, active, gender, birth_date, tax_id, deceased, deceased_datetime,\n                marital_status, multiple_birth, managing_organization_id, created_at,\n                updated_at, created_by, updated_by, deleted_at, deleted_by, content_hash,\n                content_hash_sha3, content_mac\n         FROM persons\n         WHERE id = $1 AND ($2 OR deleted_at IS NULL)\n         LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "gender",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "gender"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "birth_date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "birth_date"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "tax_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "tax_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "deceased",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "deceased"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "deceased_datetime",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "deceased_datetime"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "marital_status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "marital_status"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "multiple_birth",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "multiple_birth"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "managing_organization_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "managing_organization_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "created_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "created_by"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "updated_by"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "deleted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "deleted_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "deleted_by"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "content_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "content_hash_sha3",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "content_hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "content_mac",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "content_mac"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "6bb97508f7f7da37ba0a984d57eeda41629af778bf3ad831352aeb3528ce68f9"
+}

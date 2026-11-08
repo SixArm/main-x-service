@@ -1,7 +1,62 @@
 ## 10. Persistence
 
-PostgreSQL 18+ via SeaORM. Schema overview:
-[`agents/share/postgresql.md`](../../../agents/share/postgresql.md).
+PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-08; SeaORM
+before). Schema overview:
+[`agents/share/postgresql.md`](../../../agents/share/postgresql.md). The
+rules, from the family's `spec/tech-stack/index.md` §5.2:
+
+- **All SQL is in `src/db/`.** `repositories.rs` (the person repository,
+  the record-integrity reads and the `integrity_resign` MAC writes),
+  `audit.rs` (the hash-chained audit log, the checkpoint reads, the
+  address-retention scrub), `outbox.rs` (including the relay's poll, ack
+  and retention purge), `entity_links.rs`, `bulk_jobs.rs` (including the
+  lost-job reconcile and the SEC-B3 stable-key lock), `review_queue.rs`,
+  `erasure.rs` (the statements of a GDPR erasure) and `mod.rs` (the pool
+  and the migrator). Nothing outside that directory runs a statement,
+  except tests. `models.rs` holds plain row structs, one field per
+  column, with no behaviour.
+- **Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`
+  literal**, checked at compile time against the schema. The check data
+  is committed in `.sqlx/` and the build reads it offline
+  (`SQLX_OFFLINE=true`); `scripts/ci-check.sh test-db` runs `cargo sqlx
+  prepare --check` against a freshly migrated database. Regenerate after
+  any query or migration change with `cargo sqlx prepare --
+  --all-targets` against a migrated database.
+- **No dynamic SQL.** There is no `QueryBuilder`, `raw_sql` or
+  `AssertSqlSafe` in this crate, and no `ci/sql-allowlist.txt` entry.
+  Optional filters are static parameters (`$1::text IS NULL OR …`), and
+  erasure's child-table sweep has one literal statement per table.
+- **Transactions.** A helper that runs several statements takes
+  `&mut PgConnection` or an `axa::sqlx::Db`, so it runs inside the
+  caller's transaction. A create's or update's child rows, its digest
+  stamp and its `event_outbox` row commit with the `persons` row; a
+  merge's row locks, survivor update, duplicate soft delete, both outbox
+  rows and both audit rows commit together; an erasure commits whole.
+  The audit chain's advisory lock, head read and insert run on one
+  connection. An update or soft delete that matches no row is an error,
+  as it was under SeaORM, with the same message.
+- **Record digests are stamped over the record as stored** (INT-V1),
+  read back inside the write's transaction, so a fresh or updated record
+  verifies. Before, they covered the value the caller sent, which
+  storage does not keep exactly (an address's `use` is not stored, a
+  time of death is truncated to microseconds), so such a record failed
+  `/api/records/verify`.
+- **Timestamps** are `chrono` in the person rows, as in the domain
+  model. The audit trail, bulk jobs, outbox and entity links keep the
+  `time` types they had as SeaORM models, converted at the edge of
+  `src/db/`, so the audit chain's pre-image and every serialized row are
+  unchanged. Every sqlx error is `Error::Database` carrying sqlx's
+  message.
+- **Migrations** are plain SQL in sqlx's reversible flat layout,
+  `migrations/<version>_<name>.up.sql` / `.down.sql`, embedded by
+  `sqlx::migrate!` (`db::MIGRATOR`) and tracked in `_sqlx_migrations`.
+  `person-service db migrate | down [steps] | reset | status` and the
+  boot auto-migrate run them through `axa::sqlx`. The 22 files are the
+  same SQL the SeaORM `migration/` wrapper crate ran, version prefixes
+  and names kept. A `pg_dump --schema-only` of a database migrated each
+  way is identical apart from the bookkeeping table (`seaql_migrations`
+  → `_sqlx_migrations`), so a database the old code migrated must be
+  recreated.
 
 ### 10.1 Tables (12+)
 

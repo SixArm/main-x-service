@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO person_emergency_contacts\n                 (id, person_id, name, relationship, is_primary, address_use_type,\n                  address_line1, address_line2, address_city, address_state,\n                  address_postal_code, address_country, position)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a628f6fcb5842fd85b7935b29f8bbc6360806ca1d5603dd68e4464d6c37c87b8"
+}

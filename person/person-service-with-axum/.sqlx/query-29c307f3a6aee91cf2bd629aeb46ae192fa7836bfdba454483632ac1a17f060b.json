@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE bulk_jobs\n         SET status = $2, rows_total = $3, rows_processed = $3, rows_created = $4,\n             rows_upserted = $5, rows_to_review = $6, rows_errored = $7,\n             error_report_url = $8, updated_at = $9\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "29c307f3a6aee91cf2bd629aeb46ae192fa7836bfdba454483632ac1a17f060b"
+}

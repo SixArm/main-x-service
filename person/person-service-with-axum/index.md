@@ -14,7 +14,7 @@ The Person Service is an identity-registry system that maintains a centralized r
 - ✅ **Full-Text Search**: Powered by Tantivy for fast, accurate person searches
 - ✅ **RESTful API**: Modern HTTP API with OpenAPI/Swagger documentation
 - ✅ **Event Streaming**: Real-time person event publishing with audit logging
-- ✅ **Database Integration**: PostgreSQL with SeaORM and migrations
+- ✅ **Database Integration**: PostgreSQL with sqlx (every statement a compile-time-checked literal) and plain-SQL migrations
 - ✅ **Podman Ready**: Multi-stage container builds, Podman Compose for dev/test/prod
 - ✅ **Integration Tests**: Comprehensive test coverage
 - ✅ **Production Hardened**: Security, monitoring, and compliance features
@@ -216,7 +216,7 @@ cargo run -- start            # or: cargo run -- start
 podman compose up -d
 
 # Run migrations (first time)
-podman compose exec person-server sea-orm-cli migrate up
+podman compose exec person-server /app/person-service db migrate
 
 # View logs
 podman compose logs -f
@@ -263,7 +263,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 | **Web Framework**    | Axum                                 | HTTP server and routing                  |
 | **Web Framework**    | axa                                 | HTTP server and routing                  |
 | **Database**         | PostgreSQL 18+                       | Data persistence                         |
-| **ORM**              | SeaORM                               | Async database object-relational mapper  |
+| **Database access**  | sqlx (no ORM)                        | Checked SQL literals, pool, migrations   |
 | **Search Engine**    | Tantivy                              | Full-text search indexing                |
 | **Event Streaming**  | In-Memory (extendable to Kafka/NATS) | Event publishing                         |
 | **API Docs**         | Utoipa                               | OpenAPI 3.0 specification                |
@@ -306,7 +306,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
          │               │                       │
 ┌────────▼─────┐  ┌──────▼──────┐  ┌────────────▼──────┐
 │  PostgreSQL  │  │   Tantivy   │  │  Event Stream     │
-│  (SeaORM)    │  │   Search    │  │  (In-Memory)      │
+│  (sqlx)      │  │   Search    │  │  (In-Memory)      │
 │              │  │   Index     │  │                   │
 │  - persons  │  │             │  │  - PersonEvents  │
 │  - audit_log │  │             │  │  - Subscribers    │
@@ -402,17 +402,20 @@ cargo fix --allow-dirty
 ### Database Migrations
 
 ```bash
-# Create new migration
-sea-orm-cli migrate generate migration_name
+# Create a new migration: add a pair of plain SQL files,
+#   migrations/<version>_<name>.up.sql and .down.sql
 
 # Run pending migrations
-sea-orm-cli migrate up
+cargo run -- db migrate
 
-# Revert last migration
-sea-orm-cli migrate down
+# Revert the last migration (development and test only)
+AXA_DESTROY_DATA=true cargo run -- db down 1
 
 # Check migration status
-sea-orm-cli migrate status
+cargo run -- db status
+
+# After changing a query or a migration, regenerate and commit .sqlx/
+SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets
 ```
 
 ### Seed demo data
@@ -421,7 +424,7 @@ sea-orm-cli migrate status
 fixture ([`examples/data/persons.jsonl`](../../examples/data/README.md),
 50 rows including five deliberate duplicate pairs) into the `persons`
 table, for the tutorials. It inserts via the model-layer create
-(`db::repositories::SeaOrmPersonRepository::create`) rather than
+(`db::repositories::PgPersonRepository::create`) rather than
 `POST /api/persons`, deliberately bypassing real-time duplicate
 detection — the normal create endpoint returns `409` on the second half
 of every duplicate pair, which would silently drop half the fixture.
@@ -638,7 +641,7 @@ podman build -t person-server:v1.0.0 .
 1. Build release binary: `cargo build --release`
 2. Copy binary: `cp target/release/person-service /opt/person-service/`
 3. Set up environment: `cp .env.production.example /opt/person-service/.env`
-4. Run migrations: `sea-orm-cli migrate up`
+4. Run migrations: `./person-service db migrate`
 5. Start service: `./person-service`
 
 ### Kubernetes (Future)
@@ -702,15 +705,16 @@ person-service-with-axum/
 │   │   ├── fhir/           # FHIR R5 (Patient primary + Person alias), Bundle, OperationOutcome
 │   │   └── grpc/           # gRPC server (stub)
 │   ├── db/
-│   │   ├── models.rs       # SeaORM entities
-│   │   ├── schema.rs       # SeaORM schema
-│   │   ├── repositories.rs # Data access layer (CRUD, search, merge)
+│   │   ├── mod.rs          # Pool + `MIGRATOR` (`sqlx::migrate!`); all SQL lives in db/
+│   │   ├── models.rs       # Row structs, one per table
+│   │   ├── repositories.rs # Data access layer (CRUD, search, merge, digest stamp)
 │   │   ├── audit.rs        # Audit log repository
 │   │   ├── outbox.rs       # Transactional outbox (durable event bus)
 │   │   ├── entity_links.rs # Cross-service `entity_links` persistence
 │   │   ├── review_queue.rs # Dedup review-queue persistence
 │   │   ├── bulk_jobs.rs    # Bulk import/export job persistence
-│   │   └── convert.rs      # Domain ⇄ SeaORM conversions
+│   │   ├── erasure.rs      # The statements of a GDPR erasure
+│   │   └── convert.rs      # chrono ⇄ time at the edge of db/
 │   ├── matching/
 │   │   ├── algorithms.rs   # Matching algorithms (name, DOB, gender, address, identifier, tax_id, document)
 │   │   ├── phonetic.rs     # Soundex phonetic matching
@@ -748,8 +752,8 @@ person-service-with-axum/
 │   ├── error.rs             # Error types
 │   ├── app.rs               # axa `Hooks` (boot, routes, workers)
 │   └── lib.rs                # Library root
-├── migrations/             # Raw SQL, wrapped via include_str! by migration/
-├── migration/              # Migrator crate root
+├── migrations/             # Plain SQL `<version>_<name>.{up,down}.sql`, run by `sqlx::migrate!`
+├── .sqlx/                  # Committed compile-time query data (`SQLX_OFFLINE=true`)
 ├── tests/                  # Integration tests (api_integration_test, duplicate_detection, enforcement, review_queue_db, seed_examples_db, fluvio_relay)
 ├── benches/                # Criterion benchmarks (matching, search, validation)
 ├── fuzz/                   # cargo-fuzz targets
@@ -768,7 +772,7 @@ spec-driven work (see [spec/13-tasks.md](spec/13-tasks.md) for what has
 landed since):
 
 1. **Phase 1-6**: Core infrastructure, models, configuration
-2. **Phase 7**: Database Integration (SeaORM, PostgreSQL)
+2. **Phase 7**: Database Integration (PostgreSQL; SeaORM then, sqlx since 2026-11-08)
 3. **Phase 8**: Event Streaming & Audit Logging
 4. **Phase 9**: REST API Implementation
 5. **Phase 10**: Integration Testing
@@ -820,7 +824,7 @@ Built with excellent Rust crates:
 
 - [Tokio](https://tokio.rs/) - Async runtime
 - [Axum](https://github.com/tokio-rs/axum) - Web framework
-- [SeaORM](https://www.sea-ql.org/SeaORM/) - Async ORM and query builder
+- [sqlx](https://github.com/launchbadge/sqlx) - Async PostgreSQL driver with compile-time-checked queries
 - [Loco](https://axa/) - Web framework conventions (backend-only)
 - [OpenTelemetry](https://opentelemetry.io/) - Observability framework
 - [Tantivy](https://github.com/tantivy-search/tantivy) - Search engine

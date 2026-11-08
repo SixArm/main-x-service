@@ -1,33 +1,39 @@
 //! Person persistence via the repository pattern.
 //!
 //! [`PersonRepository`] is the storage-agnostic trait the rest of the
-//! service depends on; [`SeaOrmPersonRepository`] is the PostgreSQL
+//! service depends on; [`PgPersonRepository`] is the PostgreSQL
 //! implementation. The implementation maps the rich domain [`Person`](crate::models::Person)
 //! to/from the normalized child tables (names, identifiers, addresses,
-//! contacts, links), wraps multi-table writes in a transaction, performs
-//! soft deletes, and — when configured — publishes a
-//! [`PersonEvent`](crate::streaming::PersonEvent) and writes an audit row
-//! for every mutation. [`AuditContext`] carries who/where provenance
-//! into those audit rows.
+//! contacts, links, documents, emergency contacts, photos), wraps
+//! multi-table writes in a transaction, performs soft deletes, and — when
+//! configured — publishes a [`PersonEvent`](crate::streaming::PersonEvent)
+//! and writes an audit row for every mutation. [`AuditContext`] carries
+//! who/where provenance into those audit rows.
+//!
+//! Every statement against the person tables is here, as a `query!` /
+//! `query_as!` / `query_scalar!` literal, including the record-integrity
+//! reads behind `/api/records/verify` and the `integrity_resign` task.
+//!
+//! ## Record digests (INT-V1)
+//!
+//! Each write stamps the record's digests **over the record as stored**,
+//! read back inside the write's own transaction ([`stamp_digests`]), not
+//! over the value the caller sent. The two differ: storage drops an
+//! address's `use`, truncates a time of death to microseconds, and skips a
+//! telecom entry it cannot tag, so a digest over the caller's value made
+//! a fresh record fail `/api/records/verify`.
 
 // SEC-G4: user text in a `LIKE` pattern is escaped so it matches literally.
 use axa::cursor_pagination::escape_like;
-use chrono::Utc;
-use sea_orm::sea_query::Expr;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, TransactionTrait,
-};
-use time::OffsetDateTime;
+use chrono::{DateTime, Utc};
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-use super::convert::{date_to_time, offset_to_ts, time_to_date, ts_to_offset};
-
 use super::models::{
-    person_addresses, person_contacts, person_documents, person_emergency_contact_telecom,
-    person_emergency_contacts, person_identifiers, person_links, person_names, person_photos,
-    persons,
+    AddressRow, ContactRow, DocumentRow, EmergencyContactRow, EmergencyTelecomRow, IdentifierRow,
+    LinkRow, NameRow, PersonRow,
 };
+use super::{not_updated, to_i64};
 use crate::Result;
 use crate::db::outbox::OutboxInsert;
 use crate::models::{
@@ -51,189 +57,367 @@ fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: Option<&String>) -> Option<T
     serde_json::from_value(serde_json::Value::String(t.clone())).ok()
 }
 
+/// A list position as the `INTEGER` column takes it.
+fn position(i: usize) -> i32 {
+    i32::try_from(i).unwrap_or(i32::MAX)
+}
+
+/// The `gender` column's value: the DB CHECK constraint enforces lowercase
+/// (`male`/`female`/`other`/`unknown`); `Gender`'s serde
+/// `rename_all = "lowercase"` produces the same shape.
+fn gender_tag(person: &Person) -> String {
+    format!("{:?}", person.gender).to_lowercase()
+}
+
+/// Insert the `persons` parent row for `person`, with `created_at` and
+/// `updated_at` both the transaction's `CURRENT_TIMESTAMP` and no digests:
+/// [`stamp_digests`] writes those once the child rows are in.
+///
+/// The transaction's time, not this process's clock, because the digest
+/// stamp is an `UPDATE`, and the `update_patients_updated_at` trigger sets
+/// `updated_at` to `CURRENT_TIMESTAMP` as it lands. Stamping `created_at`
+/// from the same clock keeps the two equal on a fresh record, as they were.
+async fn insert_person_row(
+    conn: &mut PgConnection,
+    person: &Person,
+    created_by: Option<&str>,
+) -> Result<()> {
+    sqlx::query!(
+        "INSERT INTO persons
+             (id, active, gender, birth_date, tax_id, deceased, deceased_datetime,
+              marital_status, multiple_birth, managing_organization_id, created_at, updated_at,
+              created_by, updated_by, deleted_at, deleted_by, content_hash, content_hash_sha3,
+              content_mac)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+                 $11, NULL, NULL, NULL, NULL, NULL, NULL)",
+        person.id,
+        person.active,
+        gender_tag(person),
+        person.birth_date,
+        person.tax_id,
+        person.deceased,
+        person.deceased_datetime,
+        person.marital_status,
+        person.multiple_birth,
+        person.managing_organization,
+        created_by,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Insert one `person_names` row.
+async fn insert_name(
+    conn: &mut PgConnection,
+    person_id: Uuid,
+    name: &HumanName,
+    is_primary: bool,
+) -> Result<()> {
+    sqlx::query!(
+        "INSERT INTO person_names
+             (id, person_id, use_type, family, given, prefix, suffix, is_primary, created_at,
+              updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+        Uuid::new_v4(),
+        person_id,
+        name.use_type.as_ref().and_then(enum_to_tag),
+        name.family,
+        &name.given,
+        &name.prefix,
+        &name.suffix,
+        is_primary,
+        Utc::now(),
+        Utc::now(),
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Insert every child row of `person` on `conn`: the primary name
+/// (flagged `is_primary = true`) and additional names, identifiers,
+/// addresses and contacts (the first of each flagged primary by
+/// position), links, documents, emergency contacts with their telecom
+/// rows, and photos.
+///
+/// `NameUse` / `IdentifierUse` / `ContactPointSystem` / `ContactPointUse`
+/// / `LinkType` go through [`enum_to_tag`] (their own
+/// `#[serde(rename_all = "lowercase")]`). PERSON-CONTACT-CASE found that
+/// these five once used `format!("{:?}")` (`PascalCase`: `"Old"`,
+/// `"Phone"`, `"Replaces"`), which every one of these columns'
+/// lowercase-only CHECK constraints rejects with a `500 DATABASE_ERROR`.
+/// An address's `use` is not stored (`use_type` is written `NULL`).
+async fn insert_children(conn: &mut PgConnection, person: &Person) -> Result<()> {
+    insert_name(conn, person.id, &person.name, true).await?;
+    for name in &person.additional_names {
+        insert_name(conn, person.id, name, false).await?;
+    }
+    for id in &person.identifiers {
+        sqlx::query!(
+            "INSERT INTO person_identifiers
+                 (id, person_id, use_type, identifier_type, system, value, assigner, created_at,
+                  updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            Uuid::new_v4(),
+            person.id,
+            id.use_type.as_ref().and_then(enum_to_tag),
+            // `IdentifierType`'s `#[serde(rename_all = "UPPERCASE")]`
+            // matches every named variant (`MRN`, `SSN`, …) and `Other`
+            // (`OTHER`), which the CHECK constraint wants.
+            enum_to_tag(&id.identifier_type).unwrap_or_default(),
+            id.system,
+            id.value,
+            id.assigner,
+            Utc::now(),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for (idx, addr) in person.addresses.iter().enumerate() {
+        sqlx::query!(
+            "INSERT INTO person_addresses
+                 (id, person_id, use_type, line1, line2, city, state, postal_code, country,
+                  is_primary, created_at, updated_at)
+             VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+            Uuid::new_v4(),
+            person.id,
+            addr.line1,
+            addr.line2,
+            addr.city,
+            addr.state,
+            addr.postal_code,
+            addr.country,
+            idx == 0,
+            Utc::now(),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for (idx, cp) in person.telecom.iter().enumerate() {
+        sqlx::query!(
+            "INSERT INTO person_contacts
+                 (id, person_id, system, value, use_type, is_primary, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            Uuid::new_v4(),
+            person.id,
+            enum_to_tag(&cp.system).unwrap_or_default(),
+            cp.value,
+            cp.use_type.as_ref().and_then(enum_to_tag),
+            idx == 0,
+            Utc::now(),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for link in &person.links {
+        sqlx::query!(
+            "INSERT INTO person_links
+                 (id, person_id, other_person_id, link_type, created_at, created_by)
+             VALUES ($1, $2, $3, $4, $5, NULL)",
+            Uuid::new_v4(),
+            person.id,
+            link.other_person_id,
+            // `LinkType`'s `#[serde(rename_all = "lowercase")]` matches the
+            // CHECK constraint for `Replaces`/`Refer`/`Seealso`;
+            // `ReplacedBy` carries its own `#[serde(rename = "replaced_by")]`
+            // (PRO-P2, 2026-08-29).
+            enum_to_tag(&link.link_type).unwrap_or_default(),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    insert_extra_collections(conn, person).await
+}
+
 /// Insert the normalized document / emergency-contact (+ telecom) / photo
 /// child rows for `person` on connection `conn`.
-async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
-    conn: &C,
-    person: &Person,
-) -> Result<()> {
+async fn insert_extra_collections(conn: &mut PgConnection, person: &Person) -> Result<()> {
     for (i, doc) in person.documents.iter().enumerate() {
-        person_documents::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            person_id: Set(person.id),
-            document_type: Set(enum_to_tag(&doc.document_type).unwrap_or_default()),
-            number: Set(doc.number.clone()),
-            issuing_country: Set(doc.issuing_country.clone()),
-            issuing_authority: Set(doc.issuing_authority.clone()),
-            issue_date: Set(doc.issue_date.map(date_to_time)),
-            expiry_date: Set(doc.expiry_date.map(date_to_time)),
-            verified: Set(doc.verified),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
+        sqlx::query!(
+            "INSERT INTO person_documents
+                 (id, person_id, document_type, number, issuing_country, issuing_authority,
+                  issue_date, expiry_date, verified, position)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            Uuid::new_v4(),
+            person.id,
+            enum_to_tag(&doc.document_type).unwrap_or_default(),
+            doc.number,
+            doc.issuing_country,
+            doc.issuing_authority,
+            doc.issue_date,
+            doc.expiry_date,
+            doc.verified,
+            position(i),
+        )
+        .execute(&mut *conn)
         .await?;
     }
     for (i, ec) in person.emergency_contacts.iter().enumerate() {
         let ec_id = Uuid::new_v4();
         let addr = ec.address.as_ref();
-        person_emergency_contacts::ActiveModel {
-            id: Set(ec_id),
-            person_id: Set(person.id),
-            name: Set(ec.name.clone()),
-            relationship: Set(ec.relationship.clone()),
-            is_primary: Set(ec.is_primary),
-            address_use_type: Set(addr.and_then(|a| a.use_type.as_ref().and_then(enum_to_tag))),
-            address_line1: Set(addr.and_then(|a| a.line1.clone())),
-            address_line2: Set(addr.and_then(|a| a.line2.clone())),
-            address_city: Set(addr.and_then(|a| a.city.clone())),
-            address_state: Set(addr.and_then(|a| a.state.clone())),
-            address_postal_code: Set(addr.and_then(|a| a.postal_code.clone())),
-            address_country: Set(addr.and_then(|a| a.country.clone())),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
+        sqlx::query!(
+            "INSERT INTO person_emergency_contacts
+                 (id, person_id, name, relationship, is_primary, address_use_type,
+                  address_line1, address_line2, address_city, address_state,
+                  address_postal_code, address_country, position)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+            ec_id,
+            person.id,
+            ec.name,
+            ec.relationship,
+            ec.is_primary,
+            addr.and_then(|a| a.use_type.as_ref().and_then(enum_to_tag)),
+            addr.and_then(|a| a.line1.clone()),
+            addr.and_then(|a| a.line2.clone()),
+            addr.and_then(|a| a.city.clone()),
+            addr.and_then(|a| a.state.clone()),
+            addr.and_then(|a| a.postal_code.clone()),
+            addr.and_then(|a| a.country.clone()),
+            position(i),
+        )
+        .execute(&mut *conn)
         .await?;
         for (j, cp) in ec.telecom.iter().enumerate() {
-            person_emergency_contact_telecom::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                emergency_contact_id: Set(ec_id),
-                system: Set(enum_to_tag(&cp.system).unwrap_or_default()),
-                value: Set(cp.value.clone()),
-                use_type: Set(cp.use_type.as_ref().and_then(enum_to_tag)),
-                position: Set(i32::try_from(j).unwrap_or(i32::MAX)),
-            }
-            .insert(conn)
+            sqlx::query!(
+                "INSERT INTO person_emergency_contact_telecom
+                     (id, emergency_contact_id, system, value, use_type, position)
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+                Uuid::new_v4(),
+                ec_id,
+                enum_to_tag(&cp.system).unwrap_or_default(),
+                cp.value,
+                cp.use_type.as_ref().and_then(enum_to_tag),
+                position(j),
+            )
+            .execute(&mut *conn)
             .await?;
         }
     }
     for (i, url) in person.photo.iter().enumerate() {
-        person_photos::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            person_id: Set(person.id),
-            url: Set(url.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
+        sqlx::query!(
+            "INSERT INTO person_photos (id, person_id, url, position) VALUES ($1, $2, $3, $4)",
+            Uuid::new_v4(),
+            person.id,
+            url,
+            position(i),
+        )
+        .execute(&mut *conn)
         .await?;
     }
     Ok(())
 }
 
+/// Delete every child row of person `id` on `conn`. Deleting the
+/// emergency contacts cascades to their telecom rows.
+async fn delete_children(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    sqlx::query!("DELETE FROM person_names WHERE person_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM person_identifiers WHERE person_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM person_addresses WHERE person_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM person_contacts WHERE person_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM person_links WHERE person_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!(
+        "DELETE FROM person_emergency_contacts WHERE person_id = $1",
+        id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!("DELETE FROM person_documents WHERE person_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM person_photos WHERE person_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
 /// Apply a person's parent-row update and wholesale child-row replacement
-/// on `conn`. Shared by [`PersonRepository::update`] and
-/// [`PersonRepository::merge`]: preserves `created_*`, stamps `updated_at`
-/// to now and `updated_by` to `ctx`'s actor, deletes every child row for
-/// the person, then re-inserts them from the domain model. Runs on the
-/// caller's connection/transaction so it shares that commit boundary.
-async fn apply_update_rows<C: ConnectionTrait>(
-    conn: &C,
+/// on `conn`, then stamp its digests over the record as stored. Shared by
+/// [`PersonRepository::update`] and [`PersonRepository::merge`]: preserves
+/// `created_*`, stamps `updated_at` to now and `updated_by` to `ctx`'s
+/// actor, deletes every child row for the person, then re-inserts them
+/// from the domain model. Runs on the caller's transaction so it shares
+/// that commit boundary.
+///
+/// An id that matches no row is an error, as it was under `SeaORM`.
+async fn apply_update_rows(
+    conn: &mut PgConnection,
     person: &Person,
     ctx: &AuditContext,
 ) -> Result<()> {
-    // Update the parent `persons` row (only scalar fields; `..Default`
-    // leaves created_* untouched).
-    // The row's existing soft-delete stamp is bound into the digest, so
-    // it has to be read before rehashing. `..Default::default()` below
-    // leaves the column itself untouched, which is why the value must come
-    // from the database rather than from the domain model (which does not
-    // carry it).
-    //
-    // Note the absence of compiler help here: because this initializer
-    // uses `..Default::default()`, adding `content_hash` to the entity did
-    // *not* break this function the way it broke `to_active_models`. A
-    // write path that forgets to rehash produces a row that verification
-    // reports as tampered — a false positive on an integrity control,
-    // which is worse than no control at all. The DB-gated tests exercise
-    // create / update / merge / delete / erase for exactly this reason.
-    let existing_deleted_at = persons::Entity::find_by_id(person.id)
-        .one(conn)
-        .await?
-        .and_then(|row| row.deleted_at)
-        .map(|d| d.unix_timestamp_nanos() / 1_000);
-    let d = crate::compliance::record_integrity::digests_with_deleted_at(
-        person,
-        existing_deleted_at.and_then(|m| i64::try_from(m).ok()),
-    )?;
+    let done = sqlx::query!(
+        "UPDATE persons
+         SET active = $2, gender = $3, birth_date = $4, tax_id = $5, deceased = $6,
+             deceased_datetime = $7, marital_status = $8, multiple_birth = $9,
+             managing_organization_id = $10, updated_at = $11, updated_by = $12
+         WHERE id = $1",
+        person.id,
+        person.active,
+        gender_tag(person),
+        person.birth_date,
+        person.tax_id,
+        person.deceased,
+        person.deceased_datetime,
+        person.marital_status,
+        person.multiple_birth,
+        person.managing_organization,
+        Utc::now(),
+        // SEC-B8: the real caller when one is known.
+        ctx.user_id,
+    )
+    .execute(&mut *conn)
+    .await?;
+    if done.rows_affected() == 0 {
+        return Err(not_updated());
+    }
 
-    let update_model = persons::ActiveModel {
-        id: Set(person.id),
-        active: Set(person.active),
-        content_hash: Set(Some(d.sha256)),
-        content_hash_sha3: Set(Some(d.sha3)),
-        content_mac: Set(d.mac),
-        // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
-        // Gender's serde rename_all="lowercase" produces the same shape.
-        gender: Set(format!("{:?}", person.gender).to_lowercase()),
-        birth_date: Set(person.birth_date.map(date_to_time)),
-        tax_id: Set(person.tax_id.clone()),
-        deceased: Set(person.deceased),
-        deceased_datetime: Set(person.deceased_datetime.map(ts_to_offset)),
-        marital_status: Set(person.marital_status.clone()),
-        multiple_birth: Set(person.multiple_birth),
-        managing_organization_id: Set(person.managing_organization),
-        updated_at: Set(OffsetDateTime::now_utc()),
-        // SEC-B8: the real caller when one is known, instead of the
-        // previously-hard-coded `None` — every row now records who
-        // actually applied the update, not just that it happened.
-        updated_by: Set(ctx.user_id.clone()),
-        ..Default::default()
-    };
-    update_model.update(conn).await?;
+    delete_children(conn, person.id).await?;
+    insert_children(conn, person).await?;
+    stamp_digests(conn, person.id).await
+}
 
-    // Delete existing associated child rows.
-    person_names::Entity::delete_many()
-        .filter(person_names::Column::PersonId.eq(person.id))
-        .exec(conn)
-        .await?;
-    person_identifiers::Entity::delete_many()
-        .filter(person_identifiers::Column::PersonId.eq(person.id))
-        .exec(conn)
-        .await?;
-    person_addresses::Entity::delete_many()
-        .filter(person_addresses::Column::PersonId.eq(person.id))
-        .exec(conn)
-        .await?;
-    person_contacts::Entity::delete_many()
-        .filter(person_contacts::Column::PersonId.eq(person.id))
-        .exec(conn)
-        .await?;
-    person_links::Entity::delete_many()
-        .filter(person_links::Column::PersonId.eq(person.id))
-        .exec(conn)
-        .await?;
-    // Deleting emergency contacts cascades to their telecom rows.
-    person_emergency_contacts::Entity::delete_many()
-        .filter(person_emergency_contacts::Column::PersonId.eq(person.id))
-        .exec(conn)
-        .await?;
-    person_documents::Entity::delete_many()
-        .filter(person_documents::Column::PersonId.eq(person.id))
-        .exec(conn)
-        .await?;
-    person_photos::Entity::delete_many()
-        .filter(person_photos::Column::PersonId.eq(person.id))
-        .exec(conn)
-        .await?;
-
-    // Re-insert associated child rows.
-    let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-        SeaOrmPersonRepository::to_active_models(person)?;
-    for name in new_names {
-        name.insert(conn).await?;
-    }
-    for identifier in new_identifiers {
-        identifier.insert(conn).await?;
-    }
-    for address in new_addresses {
-        address.insert(conn).await?;
-    }
-    for contact in new_contacts {
-        contact.insert(conn).await?;
-    }
-    for link in new_links {
-        link.insert(conn).await?;
-    }
-    insert_extra_collections(conn, person).await?;
+/// Write every digest of person `id` over the record **as stored**, read
+/// back on `conn` inside the write's transaction (INT-V1), with the row's
+/// own soft-delete stamp bound in.
+///
+/// The digest leaves out `created_at` and `updated_at`
+/// ([`crate::compliance::record_integrity`]), so the `updated_at` the
+/// trigger writes as this `UPDATE` lands cannot disturb it.
+///
+/// # Errors
+///
+/// When the record cannot be read back or serialized, or the update fails.
+async fn stamp_digests(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    let row = fetch_person_row(conn, id, true).await?.ok_or_else(|| {
+        crate::Error::Validation("person not found while stamping digests".into())
+    })?;
+    let deleted_at = row.deleted_at.map(|d| d.timestamp_micros());
+    let stored = assemble(conn, row).await?;
+    let d = crate::compliance::record_integrity::digests_with_deleted_at(&stored, deleted_at)?;
+    sqlx::query!(
+        "UPDATE persons SET content_hash = $2, content_hash_sha3 = $3, content_mac = $4
+         WHERE id = $1",
+        id,
+        d.sha256,
+        d.sha3,
+        d.mac,
+    )
+    .execute(&mut *conn)
+    .await?;
     Ok(())
 }
 
@@ -242,54 +426,232 @@ async fn apply_update_rows<C: ConnectionTrait>(
 /// the child rows) in place. Factored from [`PersonRepository::delete`]'s
 /// soft-delete so [`PersonRepository::merge`] can reuse it on its own
 /// transaction.
-async fn apply_soft_delete_row<C: ConnectionTrait>(
-    conn: &C,
+///
+/// An id that matches no row is an error, as it was under `SeaORM`.
+async fn apply_soft_delete_row(
+    conn: &mut PgConnection,
     id: &Uuid,
     person: Option<&Person>,
     ctx: &AuditContext,
 ) -> Result<()> {
-    let deleted_at = OffsetDateTime::now_utc();
+    let deleted_at = Utc::now();
     // A soft delete changes the record's lifecycle state, which the digest
     // binds — so it must be rehashed, or every deleted record would read
     // as tampered. `person` is the assembled record the caller already
     // loaded for the audit trail; when it is absent (the row was gone
     // before we looked) there is nothing to rehash and the column is left
-    // as it was.
+    // as it was. Only the SHA-256 column is rewritten here, as before.
     let content_hash = person
         .map(|p| {
             crate::compliance::record_integrity::digests_with_deleted_at(
                 p,
-                i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok(),
+                Some(deleted_at.timestamp_micros()),
             )
         })
-        .transpose()?;
-    let row = persons::ActiveModel {
-        id: Set(*id),
-        deleted_at: Set(Some(deleted_at)),
-        // SEC-B8: the real caller when one is known, instead of the
-        // previously-hard-coded `"system"`.
-        deleted_by: Set(ctx.user_id.clone().or_else(|| Some("system".to_string()))),
-        content_hash: content_hash
-            .as_ref()
-            .map_or(sea_orm::ActiveValue::NotSet, |h| {
-                Set(Some(h.sha256.clone()))
-            }),
-        ..Default::default()
-    };
-    row.update(conn).await?;
+        .transpose()?
+        .map(|d| d.sha256);
+    let done = sqlx::query!(
+        "UPDATE persons
+         SET deleted_at = $2, deleted_by = $3, content_hash = COALESCE($4, content_hash)
+         WHERE id = $1",
+        id,
+        deleted_at,
+        // SEC-B8: the real caller when one is known.
+        ctx.user_id.clone().or_else(|| Some("system".to_string())),
+        content_hash,
+    )
+    .execute(&mut *conn)
+    .await?;
+    if done.rows_affected() == 0 {
+        return Err(not_updated());
+    }
     Ok(())
 }
 
-/// The active-model tuple produced by exploding a [`Person`] into the
-/// parent row plus its child-table rows, ready for insertion.
-type PersonActiveModels = (
-    persons::ActiveModel,
-    Vec<person_names::ActiveModel>,
-    Vec<person_identifiers::ActiveModel>,
-    Vec<person_addresses::ActiveModel>,
-    Vec<person_contacts::ActiveModel>,
-    Vec<person_links::ActiveModel>,
-);
+/// Read one `persons` row; a soft-deleted row only when `include_deleted`.
+async fn fetch_person_row(
+    conn: &mut PgConnection,
+    id: Uuid,
+    include_deleted: bool,
+) -> Result<Option<PersonRow>> {
+    let row = sqlx::query_as!(
+        PersonRow,
+        "SELECT id, active, gender, birth_date, tax_id, deceased, deceased_datetime,
+                marital_status, multiple_birth, managing_organization_id, created_at,
+                updated_at, created_by, updated_by, deleted_at, deleted_by, content_hash,
+                content_hash_sha3, content_mac
+         FROM persons
+         WHERE id = $1 AND ($2 OR deleted_at IS NULL)
+         LIMIT 1",
+        id,
+        include_deleted,
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(row)
+}
+
+/// Load every child row of `row` on `conn` and reassemble the domain
+/// [`Person`].
+async fn assemble(conn: &mut PgConnection, row: PersonRow) -> Result<Person> {
+    let id = row.id;
+    let names = sqlx::query_as!(
+        NameRow,
+        "SELECT id, person_id, use_type, family, given, prefix, suffix, is_primary
+         FROM person_names WHERE person_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let identifiers = sqlx::query_as!(
+        IdentifierRow,
+        "SELECT id, person_id, use_type, identifier_type, system, value, assigner
+         FROM person_identifiers WHERE person_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let addresses = sqlx::query_as!(
+        AddressRow,
+        "SELECT id, person_id, line1, line2, city, state, postal_code, country
+         FROM person_addresses WHERE person_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let contacts = sqlx::query_as!(
+        ContactRow,
+        "SELECT id, person_id, system, value, use_type
+         FROM person_contacts WHERE person_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let links = sqlx::query_as!(
+        LinkRow,
+        "SELECT id, person_id, other_person_id, link_type
+         FROM person_links WHERE person_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut person = PgPersonRepository::from_db_models(
+        row,
+        &names,
+        &identifiers,
+        &addresses,
+        &contacts,
+        &links,
+    )?;
+    load_extra_collections(conn, &mut person).await?;
+    Ok(person)
+}
+
+/// Read and assemble person `id` on `conn`; a soft-deleted one only when
+/// `include_deleted`.
+async fn read_person(
+    conn: &mut PgConnection,
+    id: Uuid,
+    include_deleted: bool,
+) -> Result<Option<Person>> {
+    match fetch_person_row(conn, id, include_deleted).await? {
+        Some(row) => Ok(Some(assemble(conn, row).await?)),
+        None => Ok(None),
+    }
+}
+
+/// Load the normalized document / emergency-contact / photo child rows
+/// for `person.id` and populate them onto `person`.
+async fn load_extra_collections(conn: &mut PgConnection, person: &mut Person) -> Result<()> {
+    let id = person.id;
+
+    let doc_rows = sqlx::query_as!(
+        DocumentRow,
+        "SELECT document_type, number, issuing_country, issuing_authority, issue_date,
+                expiry_date, verified
+         FROM person_documents WHERE person_id = $1 ORDER BY position ASC",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    person.documents = doc_rows
+        .into_iter()
+        .map(|r| IdentityDocument {
+            document_type: tag_to_enum(Some(&r.document_type)).unwrap_or(DocumentType::Other),
+            number: r.number,
+            issuing_country: r.issuing_country,
+            issuing_authority: r.issuing_authority,
+            issue_date: r.issue_date,
+            expiry_date: r.expiry_date,
+            verified: r.verified,
+        })
+        .collect();
+
+    let ec_rows = sqlx::query_as!(
+        EmergencyContactRow,
+        "SELECT id, name, relationship, is_primary, address_use_type, address_line1,
+                address_line2, address_city, address_state, address_postal_code,
+                address_country
+         FROM person_emergency_contacts WHERE person_id = $1 ORDER BY position ASC",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut emergency_contacts = Vec::with_capacity(ec_rows.len());
+    for ec in ec_rows {
+        let tel_rows = sqlx::query_as!(
+            EmergencyTelecomRow,
+            "SELECT system, value, use_type
+             FROM person_emergency_contact_telecom
+             WHERE emergency_contact_id = $1 ORDER BY position ASC",
+            ec.id,
+        )
+        .fetch_all(&mut *conn)
+        .await?;
+        let telecom = tel_rows
+            .into_iter()
+            .map(|t| ContactPoint {
+                system: tag_to_enum(Some(&t.system)).unwrap_or(ContactPointSystem::Other),
+                value: t.value,
+                use_type: tag_to_enum(t.use_type.as_ref()),
+            })
+            .collect();
+        let has_address = ec.address_use_type.is_some()
+            || ec.address_line1.is_some()
+            || ec.address_line2.is_some()
+            || ec.address_city.is_some()
+            || ec.address_state.is_some()
+            || ec.address_postal_code.is_some()
+            || ec.address_country.is_some();
+        let address = has_address.then(|| Address {
+            use_type: tag_to_enum(ec.address_use_type.as_ref()),
+            line1: ec.address_line1,
+            line2: ec.address_line2,
+            city: ec.address_city,
+            state: ec.address_state,
+            postal_code: ec.address_postal_code,
+            country: ec.address_country,
+        });
+        emergency_contacts.push(EmergencyContact {
+            name: ec.name,
+            relationship: ec.relationship,
+            telecom,
+            address,
+            is_primary: ec.is_primary,
+        });
+    }
+    person.emergency_contacts = emergency_contacts;
+
+    let photos = sqlx::query_scalar!(
+        "SELECT url FROM person_photos WHERE person_id = $1 ORDER BY position ASC",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    person.photo = photos;
+
+    Ok(())
+}
 
 /// Request provenance attached to audit-log writes.
 ///
@@ -366,13 +728,13 @@ pub trait PersonRepository: Send + Sync {
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Person>>;
 }
 
-/// `PostgreSQL` [`PersonRepository`] backed by `SeaORM`.
+/// `PostgreSQL` [`PersonRepository`] backed by sqlx.
 ///
 /// Optionally fans out to an event publisher and audit log; both are set
 /// via the `with_*` builder methods and are no-ops when absent.
-pub struct SeaOrmPersonRepository {
-    /// The `SeaORM` connection (cheap to clone, internally pooled).
-    db: DatabaseConnection,
+pub struct PgPersonRepository {
+    /// The connection pool (cheap to clone).
+    db: PgPool,
     /// Optional sink for [`PersonEvent`](crate::streaming::PersonEvent)s.
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
     /// Optional audit-trail writer.
@@ -384,12 +746,12 @@ pub struct SeaOrmPersonRepository {
     transport: EventTransport,
 }
 
-impl SeaOrmPersonRepository {
+impl PgPersonRepository {
     /// Build a repository over `db` with no event/audit sinks attached and
     /// the default [`EventTransport::Memory`] transport (behaviour
     /// unchanged from before the outbox landed).
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self {
             db,
             event_publisher: None,
@@ -409,17 +771,11 @@ impl SeaOrmPersonRepository {
 
     /// When the outbox transport is active, enqueue one `event_outbox`
     /// row for `kind` applied to `person` **on `conn`** — pass the open
-    /// `&DatabaseTransaction` so the row commits with the entity write
-    /// (the outbox atomicity guarantee). A no-op under
-    /// [`EventTransport::Memory`].
-    ///
-    /// The `ConnectionTrait` generic lives here on a concrete method (not
-    /// on the object-safe [`PersonRepository`] trait), which is how a
-    /// `dyn`-trait repository threads the outbox insert into its own
-    /// transaction.
-    async fn enqueue_outbox<C: ConnectionTrait>(
+    /// transaction so the row commits with the entity write (the outbox
+    /// atomicity guarantee). A no-op under [`EventTransport::Memory`].
+    async fn enqueue_outbox(
         &self,
-        conn: &C,
+        conn: &mut PgConnection,
         person: &Person,
         kind: EventKind,
     ) -> Result<()> {
@@ -514,161 +870,10 @@ impl SeaOrmPersonRepository {
         }
     }
 
-    /// Explode a domain [`Person`] into the `SeaORM` active models for the
-    /// parent row and each child table.
-    ///
-    /// The primary name gets `is_primary = true`; the first address and
-    /// first contact are flagged primary by position. `gender` is
-    /// lowercased by hand to honor its DB CHECK constraint;
-    /// `NameUse`/`IdentifierUse`/`ContactPointSystem`/`ContactPointUse`/
-    /// `LinkType` go through [`enum_to_tag`] (their own
-    /// `#[serde(rename_all = "lowercase")]`), which the sibling
-    /// `person_addresses`/emergency-contact tables already relied on —
-    /// PERSON-CONTACT-CASE found that these five instead used
-    /// `format!("{:?}")` (`PascalCase`: `"Old"`, `"Phone"`, `"Replaces"`),
-    /// which every one of these columns' lowercase-only CHECK constraints
-    /// rejects with a `500 DATABASE_ERROR`. Nothing caught it because no
-    /// test ever posted a name/identifier with `use_type` set or a
-    /// `telecom` entry — and the merge workflow's own `Replaces` link and
-    /// `Old`-aliased name hit it on **every** merge, unconditionally.
-    /// Build the `person_names` active models: the primary name (flagged
-    /// `is_primary = true`) followed by any additional names.
-    fn name_active_models(person: &Person) -> Vec<person_names::ActiveModel> {
-        let to_model = |name: &HumanName, is_primary: bool| person_names::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            person_id: Set(person.id),
-            use_type: Set(name.use_type.as_ref().and_then(enum_to_tag)),
-            family: Set(name.family.clone()),
-            given: Set(name.given.clone()),
-            prefix: Set(name.prefix.clone()),
-            suffix: Set(name.suffix.clone()),
-            is_primary: Set(is_primary),
-            created_at: Set(OffsetDateTime::now_utc()),
-            updated_at: Set(OffsetDateTime::now_utc()),
-        };
-
-        let mut names = vec![to_model(&person.name, true)];
-        names.extend(person.additional_names.iter().map(|n| to_model(n, false)));
-        names
-    }
-
-    fn to_active_models(person: &Person) -> Result<PersonActiveModels> {
-        // Both digests from one call, so neither can be stamped
-        // without the other (see `record_integrity::digests`).
-        let digests = crate::compliance::record_integrity::digests_of_live(person)?;
-        let new_person = persons::ActiveModel {
-            id: Set(person.id),
-            active: Set(person.active),
-            // DB CHECK constraint enforces lowercase ('male'/'female'/'other'/'unknown');
-            // Gender's serde rename_all="lowercase" produces the same shape.
-            gender: Set(format!("{:?}", person.gender).to_lowercase()),
-            birth_date: Set(person.birth_date.map(date_to_time)),
-            tax_id: Set(person.tax_id.clone()),
-            deceased: Set(person.deceased),
-            deceased_datetime: Set(person.deceased_datetime.map(ts_to_offset)),
-            marital_status: Set(person.marital_status.clone()),
-            multiple_birth: Set(person.multiple_birth),
-            managing_organization_id: Set(person.managing_organization),
-            created_at: Set(OffsetDateTime::now_utc()),
-            updated_at: Set(OffsetDateTime::now_utc()),
-            created_by: Set(None),
-            updated_by: Set(None),
-            deleted_at: Set(None),
-            deleted_by: Set(None),
-            // A new record is live, so the digest binds `deleted_at` as
-            // `None`.
-            content_hash: Set(Some(digests.sha256.clone())),
-            content_hash_sha3: Set(Some(digests.sha3.clone())),
-            content_mac: Set(digests.mac.clone()),
-        };
-
-        let names = Self::name_active_models(person);
-
-        // Identifiers
-        let identifiers = person
-            .identifiers
-            .iter()
-            .map(|id| person_identifiers::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                person_id: Set(person.id),
-                use_type: Set(id.use_type.as_ref().and_then(enum_to_tag)),
-                // `IdentifierType`'s `#[serde(rename_all = "UPPERCASE")]`
-                // already matches every named variant's Debug output
-                // (`MRN`, `SSN`, …) except `Other` (Debug: `"Other"`,
-                // CHECK: `'OTHER'`) — `enum_to_tag` gets that one right too.
-                identifier_type: Set(enum_to_tag(&id.identifier_type).unwrap_or_default()),
-                system: Set(id.system.clone()),
-                value: Set(id.value.clone()),
-                assigner: Set(id.assigner.clone()),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            })
-            .collect();
-
-        // Addresses
-        let addresses = person
-            .addresses
-            .iter()
-            .enumerate()
-            .map(|(idx, addr)| person_addresses::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                person_id: Set(person.id),
-                use_type: Set(None),
-                line1: Set(addr.line1.clone()),
-                line2: Set(addr.line2.clone()),
-                city: Set(addr.city.clone()),
-                state: Set(addr.state.clone()),
-                postal_code: Set(addr.postal_code.clone()),
-                country: Set(addr.country.clone()),
-                is_primary: Set(idx == 0),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            })
-            .collect();
-
-        // Contacts
-        let contacts = person
-            .telecom
-            .iter()
-            .enumerate()
-            .map(|(idx, cp)| person_contacts::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                person_id: Set(person.id),
-                system: Set(enum_to_tag(&cp.system).unwrap_or_default()),
-                value: Set(cp.value.clone()),
-                use_type: Set(cp.use_type.as_ref().and_then(enum_to_tag)),
-                is_primary: Set(idx == 0),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            })
-            .collect();
-
-        // Links
-        let links = person
-            .links
-            .iter()
-            .map(|link| person_links::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                person_id: Set(person.id),
-                other_person_id: Set(link.other_person_id),
-                // `LinkType`'s `#[serde(rename_all = "lowercase")]` matches
-                // the CHECK constraint for `Replaces`/`Refer`/`Seealso`
-                // (single words); `ReplacedBy` carries its own
-                // `#[serde(rename = "replaced_by")]` override so it matches
-                // the CHECK constraint too (PRO-P2, 2026-08-29).
-                link_type: Set(enum_to_tag(&link.link_type).unwrap_or_default()),
-                created_at: Set(OffsetDateTime::now_utc()),
-                created_by: Set(None),
-            })
-            .collect();
-
-        Ok((new_person, names, identifiers, addresses, contacts, links))
-    }
-
     /// Rebuild a domain [`HumanName`] from a stored `person_names` row,
     /// parsing the stored lowercase `use_type` tag back to its
     /// [`NameUse`](crate::models::NameUse) variant via [`tag_to_enum`].
-    fn human_name_from_db(n: &person_names::Model) -> HumanName {
+    fn human_name_from_db(n: &NameRow) -> HumanName {
         let use_type = tag_to_enum(n.use_type.as_ref());
         HumanName {
             use_type,
@@ -681,7 +886,7 @@ impl SeaOrmPersonRepository {
 
     /// Rebuild a domain [`Identifier`] from a stored `person_identifiers`
     /// row, parsing the stringified `identifier_type` / `use_type`.
-    fn identifier_from_db(id: &person_identifiers::Model) -> Identifier {
+    fn identifier_from_db(id: &IdentifierRow) -> Identifier {
         use crate::models::IdentifierType;
         // Falls back to `Other` for an unrecognized tag — covers both the
         // literal `'OTHER'` row and any forward-compatible unknown value.
@@ -701,15 +906,15 @@ impl SeaOrmPersonRepository {
     ///
     /// Parses stringified enums back to their domain variants (unknown
     /// values fall back to `Other`/`Unknown` or are dropped). Errors if no
-    /// primary name is present. Note `tax_id`, `documents`, and
-    /// `emergency_contacts` are not yet persisted and come back empty.
+    /// primary name is present. `documents`, `emergency_contacts` and
+    /// `photo` come back empty and are loaded by `load_extra_collections`.
     fn from_db_models(
-        db_person: persons::Model,
-        db_names: &[person_names::Model],
-        db_identifiers: &[person_identifiers::Model],
-        db_addresses: &[person_addresses::Model],
-        db_contacts: &[person_contacts::Model],
-        db_links: &[person_links::Model],
+        db_person: PersonRow,
+        db_names: &[NameRow],
+        db_identifiers: &[IdentifierRow],
+        db_addresses: &[AddressRow],
+        db_contacts: &[ContactRow],
+        db_links: &[LinkRow],
     ) -> Result<Person> {
         use crate::models::{ContactPointSystem, Gender, LinkType};
 
@@ -774,9 +979,7 @@ impl SeaOrmPersonRepository {
             .collect();
 
         // Links. A row this crate itself wrote always has a recognized
-        // tag; `filter_map` only guards against a hand-edited row (or
-        // `ReplacedBy`, whose write side has the residual case mismatch
-        // noted at its `Set(...)` call above).
+        // tag; `filter_map` only guards against a hand-edited row.
         let links = db_links
             .iter()
             .filter_map(|link| {
@@ -796,9 +999,9 @@ impl SeaOrmPersonRepository {
             additional_names,
             telecom,
             gender,
-            birth_date: db_person.birth_date.map(time_to_date),
+            birth_date: db_person.birth_date,
             deceased: db_person.deceased,
-            deceased_datetime: db_person.deceased_datetime.map(offset_to_ts),
+            deceased_datetime: db_person.deceased_datetime,
             addresses,
             marital_status: db_person.marital_status,
             multiple_birth: db_person.multiple_birth,
@@ -809,204 +1012,41 @@ impl SeaOrmPersonRepository {
             photo: vec![],
             managing_organization: db_person.managing_organization_id,
             links,
-            created_at: offset_to_ts(db_person.created_at),
-            updated_at: offset_to_ts(db_person.updated_at),
+            created_at: db_person.created_at,
+            updated_at: db_person.updated_at,
         })
-    }
-
-    /// Fetch every child row (names/identifiers/addresses/contacts/links)
-    /// for one person, in a fixed tuple order.
-    async fn load_associations(
-        &self,
-        person_id: &Uuid,
-    ) -> Result<(
-        Vec<person_names::Model>,
-        Vec<person_identifiers::Model>,
-        Vec<person_addresses::Model>,
-        Vec<person_contacts::Model>,
-        Vec<person_links::Model>,
-    )> {
-        let db_names = person_names::Entity::find()
-            .filter(person_names::Column::PersonId.eq(*person_id))
-            .all(&self.db)
-            .await?;
-
-        let db_identifiers = person_identifiers::Entity::find()
-            .filter(person_identifiers::Column::PersonId.eq(*person_id))
-            .all(&self.db)
-            .await?;
-
-        let db_addresses = person_addresses::Entity::find()
-            .filter(person_addresses::Column::PersonId.eq(*person_id))
-            .all(&self.db)
-            .await?;
-
-        let db_contacts = person_contacts::Entity::find()
-            .filter(person_contacts::Column::PersonId.eq(*person_id))
-            .all(&self.db)
-            .await?;
-
-        let db_links = person_links::Entity::find()
-            .filter(person_links::Column::PersonId.eq(*person_id))
-            .all(&self.db)
-            .await?;
-
-        Ok((
-            db_names,
-            db_identifiers,
-            db_addresses,
-            db_contacts,
-            db_links,
-        ))
-    }
-
-    /// Load the normalized document / emergency-contact / photo child rows
-    /// for `person.id` and populate them onto `person`.
-    async fn load_extra_collections(&self, person: &mut Person) -> Result<()> {
-        let id = person.id;
-
-        let doc_rows = person_documents::Entity::find()
-            .filter(person_documents::Column::PersonId.eq(id))
-            .order_by_asc(person_documents::Column::Position)
-            .all(&self.db)
-            .await?;
-        person.documents = doc_rows
-            .into_iter()
-            .map(|r| IdentityDocument {
-                document_type: tag_to_enum(Some(&r.document_type)).unwrap_or(DocumentType::Other),
-                number: r.number,
-                issuing_country: r.issuing_country,
-                issuing_authority: r.issuing_authority,
-                issue_date: r.issue_date.map(time_to_date),
-                expiry_date: r.expiry_date.map(time_to_date),
-                verified: r.verified,
-            })
-            .collect();
-
-        let ec_rows = person_emergency_contacts::Entity::find()
-            .filter(person_emergency_contacts::Column::PersonId.eq(id))
-            .order_by_asc(person_emergency_contacts::Column::Position)
-            .all(&self.db)
-            .await?;
-        let mut emergency_contacts = Vec::with_capacity(ec_rows.len());
-        for ec in ec_rows {
-            let tel_rows = person_emergency_contact_telecom::Entity::find()
-                .filter(person_emergency_contact_telecom::Column::EmergencyContactId.eq(ec.id))
-                .order_by_asc(person_emergency_contact_telecom::Column::Position)
-                .all(&self.db)
-                .await?;
-            let telecom = tel_rows
-                .into_iter()
-                .map(|t| ContactPoint {
-                    system: tag_to_enum(Some(&t.system)).unwrap_or(ContactPointSystem::Other),
-                    value: t.value,
-                    use_type: tag_to_enum(t.use_type.as_ref()),
-                })
-                .collect();
-            let has_address = ec.address_use_type.is_some()
-                || ec.address_line1.is_some()
-                || ec.address_line2.is_some()
-                || ec.address_city.is_some()
-                || ec.address_state.is_some()
-                || ec.address_postal_code.is_some()
-                || ec.address_country.is_some();
-            let address = has_address.then(|| Address {
-                use_type: tag_to_enum(ec.address_use_type.as_ref()),
-                line1: ec.address_line1,
-                line2: ec.address_line2,
-                city: ec.address_city,
-                state: ec.address_state,
-                postal_code: ec.address_postal_code,
-                country: ec.address_country,
-            });
-            emergency_contacts.push(EmergencyContact {
-                name: ec.name,
-                relationship: ec.relationship,
-                telecom,
-                address,
-                is_primary: ec.is_primary,
-            });
-        }
-        person.emergency_contacts = emergency_contacts;
-
-        let photo_rows = person_photos::Entity::find()
-            .filter(person_photos::Column::PersonId.eq(id))
-            .order_by_asc(person_photos::Column::Position)
-            .all(&self.db)
-            .await?;
-        person.photo = photo_rows.into_iter().map(|r| r.url).collect();
-
-        Ok(())
     }
 }
 
 #[async_trait::async_trait]
-impl PersonRepository for SeaOrmPersonRepository {
-    /// Insert the person and all child rows in one transaction, then
-    /// reload, publish a `Created` event, and write a CREATE audit row.
+impl PersonRepository for PgPersonRepository {
+    /// Insert the person and all child rows in one transaction, stamp its
+    /// digests over the stored record, then reload, publish a `Created`
+    /// event, and write a CREATE audit row.
     async fn create(&self, person: &Person, ctx: &AuditContext) -> Result<Person> {
-        let txn = self.db.begin().await?;
+        let mut txn = self.db.begin().await?;
 
-        let (mut new_person, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            Self::to_active_models(person)?;
-        // SEC-B8: stamp the real caller when one is known, instead of the
-        // previously-hard-coded `None`.
-        new_person.created_by = Set(ctx.user_id.clone());
-
-        // Insert person
-        let db_person = new_person.insert(&txn).await?;
-
-        // Insert names
-        for name in new_names {
-            name.insert(&txn).await?;
-        }
-
-        // Insert identifiers
-        for identifier in new_identifiers {
-            identifier.insert(&txn).await?;
-        }
-
-        // Insert addresses
-        for address in new_addresses {
-            address.insert(&txn).await?;
-        }
-
-        // Insert contacts
-        for contact in new_contacts {
-            contact.insert(&txn).await?;
-        }
-
-        // Insert links
-        for link in new_links {
-            link.insert(&txn).await?;
-        }
-
-        // Insert documents / emergency contacts / photos (normalized).
-        insert_extra_collections(&txn, person).await?;
+        // SEC-B8: stamp the real caller when one is known.
+        insert_person_row(&mut txn, person, ctx.user_id.as_deref()).await?;
+        insert_children(&mut txn, person).await?;
+        // Digests over the record as stored, in this transaction (INT-V1).
+        stamp_digests(&mut txn, person.id).await?;
 
         // Durable event bus (Phase 2): under the outbox transport, write
         // the `event_outbox` row **inside this same transaction**, before
         // the commit, so the entity rows and the event commit atomically
         // (or roll back together). A no-op under the memory transport,
         // which keeps the post-commit in-memory publish below.
-        self.enqueue_outbox(&txn, person, EventKind::Created)
+        self.enqueue_outbox(&mut txn, person, EventKind::Created)
             .await?;
 
         txn.commit().await?;
 
-        // Load associations
-        let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
-            self.load_associations(&db_person.id).await?;
-
-        let mut result = Self::from_db_models(
-            db_person,
-            &db_names,
-            &db_identifiers,
-            &db_addresses,
-            &db_contacts,
-            &db_links,
-        )?;
-        self.load_extra_collections(&mut result).await?;
+        let mut conn = self.db.acquire().await?;
+        let result = read_person(&mut conn, person.id, true)
+            .await?
+            .ok_or_else(|| crate::Error::Validation("Person not found after create".to_string()))?;
+        drop(conn);
 
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Created {
@@ -1025,28 +1065,8 @@ impl PersonRepository for SeaOrmPersonRepository {
 
     /// Load a person and its associations, skipping soft-deleted rows.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Person>> {
-        let db_person = persons::Entity::find_by_id(*id)
-            .filter(persons::Column::DeletedAt.is_null())
-            .one(&self.db)
-            .await?;
-
-        let Some(db_person) = db_person else {
-            return Ok(None);
-        };
-
-        let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
-            self.load_associations(id).await?;
-
-        let mut person = Self::from_db_models(
-            db_person,
-            &db_names,
-            &db_identifiers,
-            &db_addresses,
-            &db_contacts,
-            &db_links,
-        )?;
-        self.load_extra_collections(&mut person).await?;
-        Ok(Some(person))
+        let mut conn = self.db.acquire().await?;
+        read_person(&mut conn, *id, false).await
     }
 
     /// Update the parent row, then delete-and-reinsert all child rows in
@@ -1056,14 +1076,14 @@ impl PersonRepository for SeaOrmPersonRepository {
         // Get old values for audit
         let old_person = self.get_by_id(&person.id).await?;
 
-        let txn = self.db.begin().await?;
+        let mut txn = self.db.begin().await?;
 
-        // Parent-row update + wholesale child-row replacement, shared with
-        // `merge` (see `apply_update_rows`).
-        apply_update_rows(&txn, person, ctx).await?;
+        // Parent-row update + wholesale child-row replacement + digest
+        // stamp, shared with `merge` (see `apply_update_rows`).
+        apply_update_rows(&mut txn, person, ctx).await?;
 
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, person, EventKind::Updated)
+        self.enqueue_outbox(&mut txn, person, EventKind::Updated)
             .await?;
 
         txn.commit().await?;
@@ -1099,8 +1119,9 @@ impl PersonRepository for SeaOrmPersonRepository {
     /// for the survivor (carrying the duplicate's pid via `merged_from`)
     /// and a `Deleted` outbox row for the duplicate are enqueued on the
     /// same transaction, so the whole merge and both events commit (or
-    /// roll back) together. Post-commit it publishes the in-memory
-    /// `Merged` + `Deleted` events and writes the UPDATE/DELETE audit rows.
+    /// roll back) together. The UPDATE/DELETE audit rows are written in
+    /// the same transaction (SEC-B10); post-commit it publishes the
+    /// in-memory `Merged` + `Deleted` events.
     async fn merge(
         &self,
         survivor: &Person,
@@ -1115,7 +1136,7 @@ impl PersonRepository for SeaOrmPersonRepository {
 
         // The whole merge — survivor row updates + duplicate soft-delete +
         // both outbox rows — commits (or rolls back) under one transaction.
-        let txn = self.db.begin().await?;
+        let mut txn = self.db.begin().await?;
 
         // SEC-B5 (TOCTOU): the merged payload was computed from unlocked
         // reads, so lock both participant rows `FOR UPDATE` before writing
@@ -1128,16 +1149,20 @@ impl PersonRepository for SeaOrmPersonRepository {
         let mut lock_ids = [survivor.id, *duplicate_id];
         lock_ids.sort();
         for id in lock_ids {
-            persons::Entity::find_by_id(id)
-                .lock_exclusive()
-                .one(&txn)
-                .await?;
+            sqlx::query_scalar!(
+                "SELECT id FROM persons WHERE id = $1 LIMIT 1 FOR UPDATE",
+                id
+            )
+            .fetch_optional(&mut *txn)
+            .await?;
         }
-        let duplicate_still_active = persons::Entity::find_by_id(*duplicate_id)
-            .filter(persons::Column::DeletedAt.is_null())
-            .one(&txn)
-            .await?
-            .is_some();
+        let duplicate_still_active = sqlx::query_scalar!(
+            "SELECT id FROM persons WHERE id = $1 AND deleted_at IS NULL LIMIT 1",
+            duplicate_id,
+        )
+        .fetch_optional(&mut *txn)
+        .await?
+        .is_some();
         if !duplicate_still_active {
             txn.rollback().await?;
             return Err(crate::Error::Validation(format!(
@@ -1146,14 +1171,14 @@ impl PersonRepository for SeaOrmPersonRepository {
         }
 
         // Apply the survivor's parent + child rows (shared with `update`).
-        apply_update_rows(&txn, survivor, ctx).await?;
+        apply_update_rows(&mut txn, survivor, ctx).await?;
 
         // Soft-delete the duplicate (shared with `delete`). The
         // pre-image loaded above for the audit trail doubles as the record
         // to rehash, so the duplicate's tombstone carries a correct digest
         // instead of reading as tampered. The same `ctx` applies to both
         // halves of the merge — one operator initiated the whole action.
-        apply_soft_delete_row(&txn, duplicate_id, old_duplicate.as_ref(), ctx).await?;
+        apply_soft_delete_row(&mut txn, duplicate_id, old_duplicate.as_ref(), ctx).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the
         // survivor (carrying the duplicate's pid via `merged_from`, so a
@@ -1162,23 +1187,22 @@ impl PersonRepository for SeaOrmPersonRepository {
         // transaction. A no-op under the memory transport.
         if self.transport.is_outbox() {
             OutboxInsert::for_merge(survivor, duplicate_id)?
-                .insert_on(&txn)
+                .insert_on(&mut txn)
                 .await?;
             if let Some(dup) = old_duplicate.as_ref() {
                 OutboxInsert::for_event(dup, EventKind::Deleted)?
-                    .insert_on(&txn)
+                    .insert_on(&mut txn)
                     .await?;
             }
         }
 
         // SEC-B10: write the merge audit rows **inside** the transaction so
         // they commit atomically with the merge — a crash after commit can no
-        // longer leave a durable merge with no audit trail (the previous code
-        // logged post-commit, best-effort). An audit-write failure now rolls
-        // the whole merge back. The survivor's new-value is its applied
-        // payload (`survivor`), the same data written by `apply_update_rows`.
-        // SEC-B8: both rows now carry the real acting operator (`ctx`)
-        // rather than the previously-hard-coded `"system"` default.
+        // longer leave a durable merge with no audit trail. An audit-write
+        // failure rolls the whole merge back. The survivor's new-value is its
+        // applied payload (`survivor`), the same data written by
+        // `apply_update_rows`. SEC-B8: both rows carry the real acting
+        // operator (`ctx`).
         if let Some(ref audit_log) = self.audit_log {
             if let Some(old_json) = old_survivor
                 .as_ref()
@@ -1186,7 +1210,7 @@ impl PersonRepository for SeaOrmPersonRepository {
                 && let Ok(new_json) = serde_json::to_value(survivor)
             {
                 audit_log
-                    .log_update_on(&txn, "Person", survivor.id, old_json, new_json, ctx)
+                    .log_update_on(&mut *txn, "Person", survivor.id, old_json, new_json, ctx)
                     .await?;
             }
             if let Some(dup_json) = old_duplicate
@@ -1194,7 +1218,7 @@ impl PersonRepository for SeaOrmPersonRepository {
                 .and_then(|p| serde_json::to_value(p).ok())
             {
                 audit_log
-                    .log_delete_on(&txn, "Person", *duplicate_id, dup_json, ctx)
+                    .log_delete_on(&mut *txn, "Person", *duplicate_id, dup_json, ctx)
                     .await?;
             }
         }
@@ -1233,14 +1257,16 @@ impl PersonRepository for SeaOrmPersonRepository {
         // tombstone write and the `deleted` outbox row commit atomically;
         // the memory transport keeps the plain, tx-free update.
         if self.transport.is_outbox() {
-            let txn = self.db.begin().await?;
-            apply_soft_delete_row(&txn, id, old_person.as_ref(), ctx).await?;
+            let mut txn = self.db.begin().await?;
+            apply_soft_delete_row(&mut txn, id, old_person.as_ref(), ctx).await?;
             if let Some(old) = old_person.as_ref() {
-                self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
+                self.enqueue_outbox(&mut txn, old, EventKind::Deleted)
+                    .await?;
             }
             txn.commit().await?;
         } else {
-            apply_soft_delete_row(&self.db, id, old_person.as_ref(), ctx).await?;
+            let mut conn = self.db.acquire().await?;
+            apply_soft_delete_row(&mut conn, id, old_person.as_ref(), ctx).await?;
         }
 
         // Publish event
@@ -1271,17 +1297,12 @@ impl PersonRepository for SeaOrmPersonRepository {
         // DoS vector. Postgres `LIKE` treats `\` as the escape char.
         let search_pattern = format!("%{}%", escape_like(&query.to_lowercase()));
 
-        let person_ids: Vec<Uuid> = person_names::Entity::find()
-            .filter(Expr::cust_with_values(
-                "LOWER(family) LIKE $1",
-                [search_pattern],
-            ))
-            .select_only()
-            .column(person_names::Column::PersonId)
-            .distinct()
-            .into_tuple()
-            .all(&self.db)
-            .await?;
+        let person_ids = sqlx::query_scalar!(
+            "SELECT DISTINCT person_id FROM person_names WHERE LOWER(family) LIKE $1",
+            search_pattern,
+        )
+        .fetch_all(&self.db)
+        .await?;
 
         let mut persons = Vec::new();
         for person_id in person_ids {
@@ -1296,32 +1317,141 @@ impl PersonRepository for SeaOrmPersonRepository {
     /// Page through active, non-deleted persons, hydrating each to a full
     /// record. (One follow-up `get_by_id` per row — fine for modest pages.)
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Person>> {
-        // `order_by_asc(Id)` is load-bearing, not cosmetic: without an
-        // explicit ORDER BY, Postgres does not guarantee a stable row
-        // order across repeated `LIMIT`/`OFFSET` queries, so a caller
-        // paginating through every page (bulk export; the link-graph
-        // suggestion job's person/worker enumeration, T-31) could silently
-        // skip or duplicate rows between pages. Ordering by the primary
-        // key is cheap (already indexed) and gives every page a
-        // deterministic, non-overlapping slice.
-        let db_persons: Vec<persons::Model> = persons::Entity::find()
-            .filter(persons::Column::DeletedAt.is_null())
-            .filter(persons::Column::Active.eq(true))
-            .order_by_asc(persons::Column::Id)
-            .limit(limit)
-            .offset(offset)
-            .all(&self.db)
-            .await?;
+        // `ORDER BY id` is load-bearing, not cosmetic: without an explicit
+        // ORDER BY, Postgres does not guarantee a stable row order across
+        // repeated `LIMIT`/`OFFSET` queries, so a caller paginating through
+        // every page (bulk export; the link-graph suggestion job's
+        // person/worker enumeration, T-31) could silently skip or duplicate
+        // rows between pages. Ordering by the primary key is cheap (already
+        // indexed) and gives every page a deterministic, non-overlapping
+        // slice.
+        let ids = sqlx::query_scalar!(
+            "SELECT id FROM persons
+             WHERE deleted_at IS NULL AND active = true
+             ORDER BY id ASC
+             LIMIT $1 OFFSET $2",
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
         let mut persons = Vec::new();
-        for db_person in db_persons {
-            if let Some(person) = self.get_by_id(&db_person.id).await? {
+        for id in ids {
+            if let Some(person) = self.get_by_id(&id).await? {
                 persons.push(person);
             }
         }
 
         Ok(persons)
     }
+}
+
+/// One `persons` row's stored digests and soft-delete stamp, as
+/// `/api/records/verify` and `integrity_resign` read them.
+#[derive(Debug, Clone)]
+pub struct StoredDigests {
+    /// The record's id.
+    pub id: Uuid,
+    /// The stored SHA-256 content hash.
+    pub content_hash: Option<String>,
+    /// The stored SHA-3 content hash.
+    pub content_hash_sha3: Option<String>,
+    /// The stored keyed MAC.
+    pub content_mac: Option<String>,
+    /// The soft-delete stamp.
+    pub deleted_at: Option<DateTime<Utc>>,
+}
+
+/// The `limit` most recently updated `persons` rows' stored digests, for
+/// `/api/records/verify`.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn rows_for_verification(db: &PgPool, limit: i64) -> Result<Vec<StoredDigests>> {
+    let rows = sqlx::query_as!(
+        StoredDigests,
+        "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at
+         FROM persons
+         ORDER BY updated_at DESC
+         LIMIT $1",
+        limit,
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
+/// Up to `limit` `persons` rows carrying a MAC, in id order — the
+/// `integrity_resign` task's walk.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn rows_with_content_mac(db: &PgPool, limit: u64) -> Result<Vec<StoredDigests>> {
+    let rows = sqlx::query_as!(
+        StoredDigests,
+        "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at
+         FROM persons
+         WHERE content_mac IS NOT NULL
+         ORDER BY id ASC
+         LIMIT $1",
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
+/// Replace one person's MAC, the only column `integrity_resign` writes.
+/// No matching row is an error, as it was under `SeaORM`.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the update fails or matches no
+/// row.
+pub async fn set_content_mac(db: &PgPool, id: Uuid, mac: Option<String>) -> Result<()> {
+    let done = sqlx::query!("UPDATE persons SET content_mac = $2 WHERE id = $1", id, mac)
+        .execute(db)
+        .await?;
+    if done.rows_affected() == 0 {
+        return Err(not_updated());
+    }
+    Ok(())
+}
+
+/// How many rows `persons` holds, deleted or not.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn count_persons(db: &PgPool) -> Result<u64> {
+    let n = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM persons"#)
+        .fetch_one(db)
+        .await?;
+    Ok(u64::try_from(n).unwrap_or(0))
+}
+
+/// The ids of the persons holding identifier `(system, value)`, deleted or
+/// not, for the bulk import's stable-key lookup.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn person_ids_with_identifier(
+    db: &PgPool,
+    system: &str,
+    value: &str,
+) -> Result<Vec<Uuid>> {
+    let ids = sqlx::query_scalar!(
+        "SELECT person_id FROM person_identifiers WHERE system = $1 AND value = $2",
+        system,
+        value,
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(ids)
 }
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path.
@@ -1331,11 +1461,11 @@ impl PersonRepository for SeaOrmPersonRepository {
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
-    use super::{AuditContext, PersonRepository, SeaOrmPersonRepository, escape_like};
-    use crate::db::models::event_outbox;
+    use super::{AuditContext, PersonRepository, PgPersonRepository, escape_like};
+    use crate::db::outbox::Model as OutboxRow;
     use crate::models::{Gender, HumanName, Person};
     use crate::streaming::EventTransport;
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+    use sqlx::PgPool;
 
     /// SEC-G4: `LIKE` wildcards in a search query are neutralised so they
     /// match literally and cannot scan every row (`%`) or force pathological
@@ -1349,9 +1479,9 @@ mod tests {
         assert_eq!(escape_like("a\\%"), "a\\\\\\%");
     }
 
-    async fn connect() -> sea_orm::DatabaseConnection {
+    async fn connect() -> PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
@@ -1375,17 +1505,14 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let person = repo
             .create(&a_person("Created"), &AuditContext::default())
             .await
             .unwrap();
 
-        let rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(person.id))
-            .filter(event_outbox::Column::Kind.eq("created"))
-            .all(&db)
+        let rows = OutboxRow::rows_for(&db, person.id, Some("created"))
             .await
             .unwrap();
         assert_eq!(rows.len(), 1, "one created outbox row for the new person");
@@ -1399,7 +1526,7 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let survivor = repo
             .create(&a_person("Survivor"), &AuditContext::default())
@@ -1417,10 +1544,7 @@ mod tests {
         assert_eq!(merged.id, survivor.id);
 
         // Survivor: exactly one `merged` row, carrying the duplicate pid.
-        let merged_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(survivor.id))
-            .filter(event_outbox::Column::Kind.eq("merged"))
-            .all(&db)
+        let merged_rows = OutboxRow::rows_for(&db, survivor.id, Some("merged"))
             .await
             .unwrap();
         assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
@@ -1431,10 +1555,7 @@ mod tests {
         );
 
         // Duplicate: a `deleted` row.
-        let deleted_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(duplicate.id))
-            .filter(event_outbox::Column::Kind.eq("deleted"))
-            .all(&db)
+        let deleted_rows = OutboxRow::rows_for(&db, duplicate.id, Some("deleted"))
             .await
             .unwrap();
         assert_eq!(
@@ -1453,11 +1574,10 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_writes_the_audit_rows_in_transaction() {
         use crate::db::audit::AuditLogRepository;
-        use crate::db::models::audit_log;
 
         let db = connect().await;
         let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
-        let repo = SeaOrmPersonRepository::new(db.clone()).with_audit_log(audit);
+        let repo = PgPersonRepository::new(db.clone()).with_audit_log(audit.clone());
 
         let survivor = repo
             .create(&a_person("AuditSurvivor"), &AuditContext::default())
@@ -1477,10 +1597,8 @@ mod tests {
             .await
             .unwrap();
 
-        let survivor_update = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityId.eq(survivor.id))
-            .filter(audit_log::Column::Action.eq("UPDATE"))
-            .all(&db)
+        let survivor_update = audit
+            .rows_for(None, survivor.id, Some("UPDATE"))
             .await
             .unwrap();
         assert!(
@@ -1493,10 +1611,8 @@ mod tests {
             "the merge's UPDATE audit row must carry the real actor, not \"system\""
         );
 
-        let duplicate_delete = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityId.eq(duplicate.id))
-            .filter(audit_log::Column::Action.eq("DELETE"))
-            .all(&db)
+        let duplicate_delete = audit
+            .rows_for(None, duplicate.id, Some("DELETE"))
             .await
             .unwrap();
         assert!(
@@ -1517,11 +1633,10 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn create_and_update_audit_rows_carry_the_real_actor() {
         use crate::db::audit::AuditLogRepository;
-        use crate::db::models::audit_log;
 
         let db = connect().await;
         let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
-        let repo = SeaOrmPersonRepository::new(db.clone()).with_audit_log(audit);
+        let repo = PgPersonRepository::new(db.clone()).with_audit_log(audit.clone());
 
         let create_ctx = AuditContext {
             user_id: Some("operator-create-7".to_string()),
@@ -1533,10 +1648,8 @@ mod tests {
             .await
             .unwrap();
 
-        let create_rows = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityId.eq(person.id))
-            .filter(audit_log::Column::Action.eq("CREATE"))
-            .all(&db)
+        let create_rows = audit
+            .rows_for(None, person.id, Some("CREATE"))
             .await
             .unwrap();
         assert_eq!(create_rows.len(), 1, "one CREATE audit row");
@@ -1554,10 +1667,8 @@ mod tests {
         person.name.family = "RealActorCreateRenamed".to_string();
         repo.update(&person, &update_ctx).await.unwrap();
 
-        let update_rows = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityId.eq(person.id))
-            .filter(audit_log::Column::Action.eq("UPDATE"))
-            .all(&db)
+        let update_rows = audit
+            .rows_for(None, person.id, Some("UPDATE"))
             .await
             .unwrap();
         assert_eq!(update_rows.len(), 1, "one UPDATE audit row");

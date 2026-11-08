@@ -1255,3 +1255,31 @@ PR; split larger tasks (`T-12a`, `T-12b`).
       `claims_from_token` / `enforce_request` shared by REST and gRPC;
       `tests/keycloak_guard.rs`. Verifier side: `authentication-verifier`
       KC-1; reference: organization-service.
+
+- [x] **SQ-1: move from SeaORM to sqlx (2026-11-08).** Every statement
+      is a `query!` / `query_as!` / `query_scalar!` literal in `src/db/`
+      (101, `.sqlx/` committed), including the SQL that used to sit in
+      handlers, compliance, bulk, the relay and the tasks; no
+      `QueryBuilder`, no allowlist entry. The 22 migrations move
+      unchanged into sqlx's flat layout and the `migration/` crate is
+      removed; `pg_dump --schema-only` old vs new is identical apart from
+      the bookkeeping table. Spec §10 has the rules.
+      - **INT-V1 fixed here.** Digests covered the caller's value, not
+        the stored record (an address's `use` is not stored; a time of
+        death is truncated to microseconds), so a fresh record failed
+        `/api/records/verify`. Create, update and merge now stamp over
+        the record read back in the write's transaction. The DB test
+        `a_written_record_verifies` failed on the SeaORM code and passes.
+      - **Erasure (case's CS-G1, CS-E1): not affected.** It already ran
+        in one transaction and dropped the record from the Tantivy index
+        after the commit.
+      - Kept as they were, and worth a task each: a soft delete rewrites
+        only `content_hash`, leaving `content_hash_sha3` and
+        `content_mac` stale (invisible today, since verification skips
+        soft-deleted rows); erasure nulls the two digests but not
+        `content_mac`; erasure's redaction sweep runs before the chain
+        lock is taken (case took it first, in its CS-G1 fix); the SEC-B3
+        import guard holds a pooled transaction while the repository
+        takes others, so it needs a pool of at least two.
+      - Unit tests 415, DB suite 76 (was 75). Unique normal dependencies
+        393 → 354.

@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, person_id, line1, line2, city, state, postal_code, country\n         FROM person_addresses WHERE person_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "person_addresses",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "person_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "person_addresses",
+            "name": "person_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "line1",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_addresses",
+            "name": "line1"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "line2",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_addresses",
+            "name": "line2"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "city",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_addresses",
+            "name": "city"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "state",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_addresses",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "postal_code",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_addresses",
+            "name": "postal_code"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "country",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_addresses",
+            "name": "country"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "6e2a54aceb65b85af8911349fc39d7146331272f5b6bcfdeb73bab2f6c5ca464"
+}

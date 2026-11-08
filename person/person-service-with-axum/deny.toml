@@ -52,12 +52,12 @@ allow = [
     "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.8
-# Local, unpublished crates (the service itself, its `migration` member)
-# carry no `license` field and must not be license-checked.
+# Local, unpublished crates (the service itself and its path
+# dependencies) carry no `license` field and must not be license-checked.
 private = { ignore = true }
 
 [bans]
-# Duplicate versions are a warning (the loco/sea-orm stack pulls a few);
+# Duplicate versions are a warning (the axa/sqlx stack pulls a few);
 # not a hard failure, so the gate stays green while still surfacing bloat.
 multiple-versions = "warn"
 wildcards = "warn"

@@ -8553,8 +8553,10 @@ All three were there before the move, on SeaORM. Fixed 2026-11-07.
     SeaORM code); it guards it from 2026-11-08.
   - [x] care-pathway: not affected (the test passed on the old code); it
     guards it from 2026-11-08.
-  - [ ] person, worker: still on SeaORM; each lands the test, passing,
-    with its sqlx move.
+  - [x] person: had the defect (storage drops an address's `use` and
+    truncates a time of death); fixed in its sqlx move 2026-11-08 with
+    `stamp_digests`, the test failing on the old code.
+  - [ ] worker: still on SeaORM; lands the test, passing, with its move.
 
 ## Found 2026-11-07 (moving link-graph to sqlx)
 
@@ -8677,3 +8679,21 @@ active, failing closed with `404`
 (`merge_refuses_a_duplicate_retired_after_it_was_read`,
 `merge_waits_for_a_concurrent_lock_then_fails_closed`, both failing
 before). DB suite: case 70 → 72.
+
+## Found 2026-11-08 (moving person to sqlx)
+
+Erasure had neither of case's gaps. These were there on SeaORM and are
+kept as they were (crate spec §13 SQ-1).
+
+- [ ] **PE-D1 (S)** A soft delete rewrites only `content_hash`, leaving
+  the SHA-3 digest and the MAC stale. Verification skips deleted rows, so
+  it is invisible until a deleted row is restored or verified.
+- [ ] **PE-E1 (S)** Erasure nulls the two hashes but not `content_mac`,
+  so a keyed digest of the erased content survives.
+- [ ] **PE-E2 (S)** Erasure redacts audit rows before taking the chain's
+  advisory lock; case (CS-G1) takes it first, so no unredacted row about
+  the subject can commit in between.
+- [ ] **PE-B1 (S)** The SEC-B3 import guard holds a pooled transaction
+  while the repository takes other connections, so imports need a pool of
+  at least two; one connection deadlocks. Run the write on the guard's
+  transaction, as organization, case and care-pathway now do.

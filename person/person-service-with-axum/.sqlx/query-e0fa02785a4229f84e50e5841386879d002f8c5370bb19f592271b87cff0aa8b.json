@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT document_type, number, issuing_country, issuing_authority, issue_date,\n                expiry_date, verified\n         FROM person_documents WHERE person_id = $1 ORDER BY position ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "document_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_documents",
+            "name": "document_type"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "number",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_documents",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "issuing_country",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_documents",
+            "name": "issuing_country"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "issuing_authority",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_documents",
+            "name": "issuing_authority"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "issue_date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "person_documents",
+            "name": "issue_date"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "expiry_date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "person_documents",
+            "name": "expiry_date"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "verified",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "person_documents",
+            "name": "verified"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "e0fa02785a4229f84e50e5841386879d002f8c5370bb19f592271b87cff0aa8b"
+}

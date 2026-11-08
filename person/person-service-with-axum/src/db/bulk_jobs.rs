@@ -2,19 +2,21 @@
 //! §3).
 //!
 //! Thin data-access helpers over the [`bulk_jobs`](crate::db::models::bulk_jobs)
-//! SeaORM entity: create/enqueue a job, load one by id, and update its
+//! table: create/enqueue a job, load one by id, and update its
 //! status + per-row counts + artifact references as the background worker
 //! progresses. The bulk **logic** lives in [`crate::bulk`]; this module
 //! only reads and writes the row.
 
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use sqlx::{PgConnection, PgPool};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use super::convert::offset_to_ts;
+use super::to_i64;
 use crate::Result;
 use crate::bulk::pipeline::ImportOutcome;
 use crate::bulk::{BulkFormat, BulkKind, JobStatus};
-use crate::db::models::bulk_jobs;
+use crate::db::models::{BulkJobRaw, bulk_jobs};
 
 pub use bulk_jobs::Model;
 
@@ -78,35 +80,39 @@ impl NewBulkJob {
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] if the insert fails.
-pub async fn create(db: &DatabaseConnection, job: NewBulkJob) -> Result<Model> {
+pub async fn create(db: &PgPool, job: NewBulkJob) -> Result<Model> {
     let now = OffsetDateTime::now_utc();
     // SEC-B4: stamp a retention deadline so a stale export of personal data
     // is not indefinitely retrievable (enforced at the status handler).
     let expires_at = now + time::Duration::seconds(crate::bulk::BULK_ARTIFACT_TTL_SECS);
-    let model = bulk_jobs::ActiveModel {
-        id: Set(Uuid::new_v4()),
-        kind: Set(job.kind.as_str().to_string()),
-        entity: Set(crate::streaming::ENTITY.to_string()),
-        format: Set(job.format.as_str().to_string()),
-        status: Set(JobStatus::Queued.as_str().to_string()),
-        params: Set(job.params),
-        rows_total: Set(None),
-        rows_processed: Set(0),
-        rows_created: Set(0),
-        rows_upserted: Set(0),
-        rows_to_review: Set(0),
-        rows_errored: Set(0),
-        actor: Set(job.actor),
-        idempotency_key: Set(job.idempotency_key),
-        input_url: Set(job.input_url),
-        result_url: Set(None),
-        error_report_url: Set(None),
-        created_at: Set(now),
-        updated_at: Set(now),
-        expires_at: Set(Some(expires_at)),
-        artifact_deleted_at: Set(None),
-    };
-    Ok(model.insert(db).await?)
+    let row = sqlx::query_as!(
+        BulkJobRaw,
+        "INSERT INTO bulk_jobs
+             (id, kind, entity, format, status, params, rows_total, rows_processed,
+              rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+              idempotency_key, input_url, result_url, error_report_url, created_at,
+              updated_at, expires_at, artifact_deleted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NULL, 0, 0, 0, 0, 0, $7, $8, $9, NULL, NULL, $10,
+                 $10, $11, NULL)
+         RETURNING id, kind, entity, format, status, params, rows_total, rows_processed,
+                rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                idempotency_key, input_url, result_url, error_report_url, created_at,
+                updated_at, expires_at, artifact_deleted_at",
+        Uuid::new_v4(),
+        job.kind.as_str(),
+        crate::streaming::ENTITY,
+        job.format.as_str(),
+        JobStatus::Queued.as_str(),
+        job.params,
+        job.actor,
+        job.idempotency_key,
+        job.input_url,
+        offset_to_ts(now),
+        offset_to_ts(expires_at),
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(row.into())
 }
 
 /// Load one bulk job by id, or `None` if absent.
@@ -114,8 +120,21 @@ pub async fn create(db: &DatabaseConnection, job: NewBulkJob) -> Result<Model> {
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] if the query fails.
-pub async fn find_by_id(db: &DatabaseConnection, id: Uuid) -> Result<Option<Model>> {
-    Ok(bulk_jobs::Entity::find_by_id(id).one(db).await?)
+pub async fn find_by_id(db: &PgPool, id: Uuid) -> Result<Option<Model>> {
+    let row = sqlx::query_as!(
+        BulkJobRaw,
+        "SELECT id, kind, entity, format, status, params, rows_total, rows_processed,
+                rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                idempotency_key, input_url, result_url, error_report_url, created_at,
+                updated_at, expires_at, artifact_deleted_at
+         FROM bulk_jobs
+         WHERE id = $1
+         LIMIT 1",
+        id,
+    )
+    .fetch_optional(db)
+    .await?;
+    Ok(row.map(Into::into))
 }
 
 /// Find an existing job for this entity + `kind` bearing `idempotency_key`
@@ -126,17 +145,26 @@ pub async fn find_by_id(db: &DatabaseConnection, id: Uuid) -> Result<Option<Mode
 ///
 /// Returns [`crate::Error::Database`] if the query fails.
 pub async fn find_by_idempotency_key(
-    db: &DatabaseConnection,
+    db: &PgPool,
     kind: BulkKind,
     key: &str,
 ) -> Result<Option<Model>> {
-    use sea_orm::{ColumnTrait, QueryFilter};
-    Ok(bulk_jobs::Entity::find()
-        .filter(bulk_jobs::Column::Entity.eq(crate::streaming::ENTITY))
-        .filter(bulk_jobs::Column::Kind.eq(kind.as_str()))
-        .filter(bulk_jobs::Column::IdempotencyKey.eq(key))
-        .one(db)
-        .await?)
+    let row = sqlx::query_as!(
+        BulkJobRaw,
+        "SELECT id, kind, entity, format, status, params, rows_total, rows_processed,
+                rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                idempotency_key, input_url, result_url, error_report_url, created_at,
+                updated_at, expires_at, artifact_deleted_at
+         FROM bulk_jobs
+         WHERE entity = $1 AND kind = $2 AND idempotency_key = $3
+         LIMIT 1",
+        crate::streaming::ENTITY,
+        kind.as_str(),
+        key,
+    )
+    .fetch_optional(db)
+    .await?;
+    Ok(row.map(Into::into))
 }
 
 /// Create a job **idempotently** (SEC-B9): if it carries an idempotency key
@@ -151,10 +179,7 @@ pub async fn find_by_idempotency_key(
 ///
 /// Returns [`crate::Error::Database`] if the query/insert fails for a reason
 /// other than a losing idempotency race.
-pub async fn create_or_get_idempotent(
-    db: &DatabaseConnection,
-    job: NewBulkJob,
-) -> Result<(Model, bool)> {
+pub async fn create_or_get_idempotent(db: &PgPool, job: NewBulkJob) -> Result<(Model, bool)> {
     if let Some(key) = job.idempotency_key.clone() {
         if let Some(existing) = find_by_idempotency_key(db, job.kind, &key).await? {
             return Ok((existing, true));
@@ -181,13 +206,21 @@ pub async fn create_or_get_idempotent(
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] if the query fails.
-pub async fn list_recent(db: &DatabaseConnection, limit: u64) -> Result<Vec<Model>> {
-    use sea_orm::{QueryOrder, QuerySelect};
-    Ok(bulk_jobs::Entity::find()
-        .order_by_desc(bulk_jobs::Column::CreatedAt)
-        .limit(limit)
-        .all(db)
-        .await?)
+pub async fn list_recent(db: &PgPool, limit: u64) -> Result<Vec<Model>> {
+    let rows = sqlx::query_as!(
+        BulkJobRaw,
+        "SELECT id, kind, entity, format, status, params, rows_total, rows_processed,
+                rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                idempotency_key, input_url, result_url, error_report_url, created_at,
+                updated_at, expires_at, artifact_deleted_at
+         FROM bulk_jobs
+         ORDER BY created_at DESC
+         LIMIT $1",
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows.into_iter().map(Into::into).collect())
 }
 
 /// Attach the uploaded input artifact reference to an import job.
@@ -195,12 +228,16 @@ pub async fn list_recent(db: &DatabaseConnection, limit: u64) -> Result<Vec<Mode
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] if the update fails.
-pub async fn set_input_url(db: &DatabaseConnection, id: Uuid, input_url: String) -> Result<()> {
-    let mut active: bulk_jobs::ActiveModel = load_active(db, id).await?;
-    active.input_url = Set(Some(input_url));
-    active.updated_at = Set(OffsetDateTime::now_utc());
-    active.update(db).await?;
-    Ok(())
+pub async fn set_input_url(db: &PgPool, id: Uuid, input_url: String) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE bulk_jobs SET input_url = $2, updated_at = $3 WHERE id = $1",
+        id,
+        input_url,
+        now(),
+    )
+    .execute(db)
+    .await?;
+    found(id, done.rows_affected())
 }
 
 /// Transition a job to a new status, stamping `updated_at`.
@@ -208,12 +245,16 @@ pub async fn set_input_url(db: &DatabaseConnection, id: Uuid, input_url: String)
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] if the update fails.
-pub async fn set_status(db: &DatabaseConnection, id: Uuid, status: JobStatus) -> Result<()> {
-    let mut active: bulk_jobs::ActiveModel = load_active(db, id).await?;
-    active.status = Set(status.as_str().to_string());
-    active.updated_at = Set(OffsetDateTime::now_utc());
-    active.update(db).await?;
-    Ok(())
+pub async fn set_status(db: &PgPool, id: Uuid, status: JobStatus) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE bulk_jobs SET status = $2, updated_at = $3 WHERE id = $1",
+        id,
+        status.as_str(),
+        now(),
+    )
+    .execute(db)
+    .await?;
+    found(id, done.rows_affected())
 }
 
 /// Record the outcome of an import run: final status, per-row counts, and
@@ -223,7 +264,7 @@ pub async fn set_status(db: &DatabaseConnection, id: Uuid, status: JobStatus) ->
 ///
 /// Returns [`crate::Error::Database`] if the update fails.
 pub async fn finish_import(
-    db: &DatabaseConnection,
+    db: &PgPool,
     id: Uuid,
     outcome: &ImportOutcome,
     error_report_url: Option<String>,
@@ -233,18 +274,25 @@ pub async fn finish_import(
     } else {
         JobStatus::Completed
     };
-    let mut active: bulk_jobs::ActiveModel = load_active(db, id).await?;
-    active.status = Set(status.as_str().to_string());
-    active.rows_total = Set(Some(i64_of(outcome.rows_total)));
-    active.rows_processed = Set(i64_of(outcome.rows_total));
-    active.rows_created = Set(i64_of(outcome.rows_created));
-    active.rows_upserted = Set(i64_of(outcome.rows_upserted));
-    active.rows_to_review = Set(i64_of(outcome.rows_to_review));
-    active.rows_errored = Set(i64_of(outcome.rows_errored));
-    active.error_report_url = Set(error_report_url);
-    active.updated_at = Set(OffsetDateTime::now_utc());
-    active.update(db).await?;
-    Ok(())
+    let done = sqlx::query!(
+        "UPDATE bulk_jobs
+         SET status = $2, rows_total = $3, rows_processed = $3, rows_created = $4,
+             rows_upserted = $5, rows_to_review = $6, rows_errored = $7,
+             error_report_url = $8, updated_at = $9
+         WHERE id = $1",
+        id,
+        status.as_str(),
+        i64_of(outcome.rows_total),
+        i64_of(outcome.rows_created),
+        i64_of(outcome.rows_upserted),
+        i64_of(outcome.rows_to_review),
+        i64_of(outcome.rows_errored),
+        error_report_url,
+        now(),
+    )
+    .execute(db)
+    .await?;
+    found(id, done.rows_affected())
 }
 
 /// Record the outcome of an export run: `completed` status, row count,
@@ -254,19 +302,25 @@ pub async fn finish_import(
 ///
 /// Returns [`crate::Error::Database`] if the update fails.
 pub async fn finish_export(
-    db: &DatabaseConnection,
+    db: &PgPool,
     id: Uuid,
     rows_total: u64,
     result_url: String,
 ) -> Result<()> {
-    let mut active: bulk_jobs::ActiveModel = load_active(db, id).await?;
-    active.status = Set(JobStatus::Completed.as_str().to_string());
-    active.rows_total = Set(Some(i64_of(rows_total)));
-    active.rows_processed = Set(i64_of(rows_total));
-    active.result_url = Set(Some(result_url));
-    active.updated_at = Set(OffsetDateTime::now_utc());
-    active.update(db).await?;
-    Ok(())
+    let done = sqlx::query!(
+        "UPDATE bulk_jobs
+         SET status = $2, rows_total = $3, rows_processed = $3, result_url = $4,
+             updated_at = $5
+         WHERE id = $1",
+        id,
+        JobStatus::Completed.as_str(),
+        i64_of(rows_total),
+        result_url,
+        now(),
+    )
+    .execute(db)
+    .await?;
+    found(id, done.rows_affected())
 }
 
 /// Stamp `artifact_deleted_at = now` on a job (SEC-B4 follow-up): the
@@ -277,13 +331,16 @@ pub async fn finish_export(
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] if the update fails.
-pub async fn mark_artifact_deleted(db: &DatabaseConnection, id: Uuid) -> Result<()> {
-    let mut active: bulk_jobs::ActiveModel = load_active(db, id).await?;
-    let now = OffsetDateTime::now_utc();
-    active.artifact_deleted_at = Set(Some(now));
-    active.updated_at = Set(now);
-    active.update(db).await?;
-    Ok(())
+pub async fn mark_artifact_deleted(db: &PgPool, id: Uuid) -> Result<()> {
+    let now = now();
+    let done = sqlx::query!(
+        "UPDATE bulk_jobs SET artifact_deleted_at = $2, updated_at = $2 WHERE id = $1",
+        id,
+        now,
+    )
+    .execute(db)
+    .await?;
+    found(id, done.rows_affected())
 }
 
 /// Jobs eligible for the physical-artifact sweep (SEC-B4 follow-up): past
@@ -298,27 +355,88 @@ pub async fn mark_artifact_deleted(db: &DatabaseConnection, id: Uuid) -> Result<
 ///
 /// Returns [`crate::Error::Database`] if the query fails.
 pub async fn list_artifact_sweep_candidates(
-    db: &DatabaseConnection,
+    db: &PgPool,
     now: OffsetDateTime,
     limit: u64,
 ) -> Result<Vec<Model>> {
-    use sea_orm::{ColumnTrait, QueryFilter, QueryOrder, QuerySelect};
-    Ok(bulk_jobs::Entity::find()
-        .filter(bulk_jobs::Column::ExpiresAt.is_not_null())
-        .filter(bulk_jobs::Column::ExpiresAt.lte(now))
-        .filter(bulk_jobs::Column::ArtifactDeletedAt.is_null())
-        .order_by_asc(bulk_jobs::Column::ExpiresAt)
-        .limit(limit)
-        .all(db)
-        .await?)
+    let rows = sqlx::query_as!(
+        BulkJobRaw,
+        "SELECT id, kind, entity, format, status, params, rows_total, rows_processed,
+                rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                idempotency_key, input_url, result_url, error_report_url, created_at,
+                updated_at, expires_at, artifact_deleted_at
+         FROM bulk_jobs
+         WHERE expires_at IS NOT NULL AND expires_at <= $1 AND artifact_deleted_at IS NULL
+         ORDER BY expires_at ASC
+         LIMIT $2",
+        offset_to_ts(now),
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows.into_iter().map(Into::into).collect())
 }
 
-/// Load a job as an `ActiveModel` for update, erroring if it is gone.
-async fn load_active(db: &DatabaseConnection, id: Uuid) -> Result<bulk_jobs::ActiveModel> {
-    let model = find_by_id(db, id)
-        .await?
-        .ok_or_else(|| crate::Error::Internal(format!("bulk job {id} not found")))?;
-    Ok(model.into())
+/// Move every lost job to `failed` in one statement, so a job cannot
+/// finish between the check and the write ([`crate::bulk::reconcile`]).
+/// `worker` is the queue worker's class name; a job is lost when no live
+/// queue row for it remains and either one has failed or it has none and
+/// has not changed for `grace_minutes`. Returns the ids moved.
+///
+/// # Errors
+///
+/// When the statement fails, including when `axa_queue` does not exist.
+pub async fn mark_lost(db: &PgPool, worker: &str, grace_minutes: i32) -> Result<Vec<Uuid>> {
+    let moved = sqlx::query_scalar!(
+        "UPDATE bulk_jobs b
+         SET status = 'failed', updated_at = now()
+         WHERE b.status IN ('queued', 'running')
+           AND NOT EXISTS (
+               SELECT 1 FROM axa_queue q
+               WHERE q.name = $1 AND q.args->>'job_id' = b.id::text AND q.status <> 'failed'
+           )
+           AND (
+               EXISTS (
+                   SELECT 1 FROM axa_queue q
+                   WHERE q.name = $1 AND q.args->>'job_id' = b.id::text AND q.status = 'failed'
+               )
+               OR b.updated_at < now() - make_interval(mins => $2)
+           )
+         RETURNING b.id",
+        worker,
+        grace_minutes,
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(moved)
+}
+
+/// SEC-B3: take a transaction-scoped advisory lock on a bulk import row's
+/// stable key, held to the end of `conn`'s transaction, so two importers of
+/// the same key serialise ([`crate::bulk::pipeline`]).
+///
+/// # Errors
+///
+/// When the lock query fails.
+pub async fn lock_stable_key(conn: &mut PgConnection, key: &str) -> Result<()> {
+    sqlx::query!("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", key)
+        .execute(conn)
+        .await?;
+    Ok(())
+}
+
+/// The time an update stamps on `updated_at`, as the database takes it.
+fn now() -> chrono::DateTime<chrono::Utc> {
+    offset_to_ts(OffsetDateTime::now_utc())
+}
+
+/// An update that matched no row is the "not found" error the previous
+/// load-then-update reported.
+fn found(id: Uuid, rows: u64) -> Result<()> {
+    if rows == 0 {
+        return Err(crate::Error::Internal(format!("bulk job {id} not found")));
+    }
+    Ok(())
 }
 
 /// Saturating `u64` → `i64` for count columns.
@@ -363,12 +481,12 @@ mod tests {
 mod db_tests {
     use super::{NewBulkJob, create, create_or_get_idempotent, find_by_id};
     use crate::bulk::{BulkFormat, BulkKind};
-    use sea_orm::DatabaseConnection;
+    use sqlx::PgPool;
     use uuid::Uuid;
 
-    async fn connect() -> DatabaseConnection {
+    async fn connect() -> PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\" FROM audit_log\n           WHERE ip_address IS NOT NULL\n             AND \"timestamp\" < now() - make_interval(days => $1)\n             AND ip_commitment IS NULL AND hash IS NOT NULL AND redacted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0140e3e5ec446a6bd6c4dc98e00ff94af59ed56102f240e60654ecd9be68d7c0"
+}

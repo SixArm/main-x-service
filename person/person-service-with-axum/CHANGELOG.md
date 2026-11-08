@@ -10,6 +10,48 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Changed
 
+- **Persistence moves from SeaORM to sqlx** (spec §10, §13 SQ-1; the
+  repo's `spec/tech-stack/index.md` §5). Every statement is a
+  `query!` / `query_as!` / `query_scalar!` literal in `src/db/`, 101 of
+  them, checked against the committed `.sqlx/` data; the SQL that lived
+  in handlers, compliance, bulk, the relay and the tasks (record
+  verification, erasure, checkpoints, the address scrub, the lost-job
+  reconcile, the SEC-B3 lock, the MAC re-sign) moved in. Optional
+  filters are static parameters and erasure's table sweep is one literal
+  per table, so there is no `QueryBuilder` and no allowlist entry. The
+  22 migrations move unchanged into sqlx's flat layout, names kept, and
+  the `migration/` crate is gone; `pg_dump --schema-only` of a database
+  migrated each way is identical apart from the bookkeeping table, so a
+  database the old code migrated must be recreated. The hash chain and
+  checkpoints, address retention, record digests and MACs, ABAC
+  masking, `same_identity` links, bulk, gRPC, FHIR, the outbox, the
+  review queue, merge and consent behave as before; every serialized row
+  keeps its shape, the audit timestamp included. Unique normal
+  dependencies fall from 393 to 354. `SeaOrmPersonRepository` is now
+  `PgPersonRepository`.
+- A database error's text is sqlx's own message
+  (`Database error: error returned from database: …`) rather than
+  SeaORM's wrapping of it (`Database error: Execution Error: …`). An
+  update or soft delete that matches no row is still `None of the
+  records are updated`.
+- A new person's `created_at` and `updated_at` are the write
+  transaction's `CURRENT_TIMESTAMP`, not this process's clock, so they
+  stay equal now that the digest stamp is an `UPDATE` the
+  `updated_at` trigger sees.
+
+### Fixed
+
+- **INT-V1: a fresh or updated record failed `/api/records/verify`.**
+  Its digests covered the person the caller sent, but storage does not
+  keep that exactly: an address's `use` is not stored and a time of death
+  is truncated to microseconds. Create, update and merge now stamp all
+  three digests over the record read back inside the write's
+  transaction (`stamp_digests`). The new DB test
+  `a_written_record_verifies` (a fresh and an updated record verify, a
+  row edited in SQL is flagged) failed on the SeaORM code and passes.
+
+### Changed
+
 - Search escapes `LIKE` wildcards with `axa::pagination::escape_like`, in
   place of this crate's identical copy.
 

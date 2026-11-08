@@ -28,7 +28,7 @@
            |                    |                    |
  +---------v------+   +---------v--------+   +-------v---------+
  |  PostgreSQL    |   |  Tantivy index   |   |  Event stream   |
- |  (SeaORM,      |   |  (11 fields,     |   |  (in-memory;    |
+ |  (sqlx,        |   |  (11 fields,     |   |  (in-memory;    |
  |  12+ tables)   |   |  local disk)     |   |  durable = §15) |
  +----------------+   +------------------+   +-----------------+
 

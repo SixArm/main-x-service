@@ -1,10 +1,11 @@
 //! Date/time conversions across the persistence boundary.
 //!
-//! Domain models use `chrono` (`DateTime<Utc>`, `NaiveDate`); the SeaORM
-//! entity models use the `time` crate (`OffsetDateTime`, `Date`) because
-//! SeaORM 1.1 has no native `chrono` support configured here. These
-//! helpers translate between the two representations when reading/writing
-//! rows.
+//! Domain models and the person row structs both use `chrono`
+//! (`DateTime<Utc>`, `NaiveDate`), which is what sqlx maps `TIMESTAMPTZ`
+//! and `DATE` to, so they need no conversion. The audit trail, the bulk
+//! jobs, the outbox and the entity links still hand `time` values
+//! (`OffsetDateTime`, `Date`) to the code above `src/db/`, as they did
+//! under `SeaORM`; these helpers translate at that edge.
 
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use time::{Date as TimeDate, Month, OffsetDateTime};

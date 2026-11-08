@@ -28,7 +28,6 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ed25519_dalek::SigningKey;
 use person_service::api::grpc::{proto, service::PersonGrpcService};
 use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
-use sea_orm::ConnectionTrait as _;
 use serde_json::json;
 use serial_test::serial;
 use sha2::{Digest, Sha256};
@@ -252,27 +251,22 @@ async fn list_persons_over_grpc_applies_sec_g3_disposition() {
     let masked_id = uuid::Uuid::parse_str(&masked.id).expect("valid uuid");
     // `managing_organization_id` is FK-constrained, so the denying org
     // must actually exist first.
-    db.execute_raw(sea_orm::Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Postgres,
-        "INSERT INTO organizations (id, name) VALUES ($1, 'SEC-G3 test org')",
-        [denied_org.into()],
-    ))
-    .await
-    .expect("create the denying organization");
-    db.execute_raw(sea_orm::Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Postgres,
-        "UPDATE persons SET managing_organization_id = $1 WHERE id = $2",
-        [denied_org.into(), denied_id.into()],
-    ))
-    .await
-    .expect("set managing_organization_id");
-    db.execute_raw(sea_orm::Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Postgres,
-        "UPDATE persons SET deceased = true WHERE id = $1",
-        [masked_id.into()],
-    ))
-    .await
-    .expect("mark deceased");
+    sqlx::query("INSERT INTO organizations (id, name) VALUES ($1, 'SEC-G3 test org')")
+        .bind(denied_org)
+        .execute(&db)
+        .await
+        .expect("create the denying organization");
+    sqlx::query("UPDATE persons SET managing_organization_id = $1 WHERE id = $2")
+        .bind(denied_org)
+        .bind(denied_id)
+        .execute(&db)
+        .await
+        .expect("set managing_organization_id");
+    sqlx::query("UPDATE persons SET deceased = true WHERE id = $1")
+        .bind(masked_id)
+        .execute(&db)
+        .await
+        .expect("mark deceased");
 
     let request = bearer_request(
         proto::ListPersonsRequest {

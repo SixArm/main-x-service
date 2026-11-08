@@ -95,7 +95,7 @@ async fn delete_job_artifacts(store: &dyn ArtifactStore, job: &Model) -> Result<
 /// fails; per-job failures are counted in [`SweepOutcome::jobs_failed`],
 /// not propagated.
 pub async fn sweep(
-    db: &sea_orm::DatabaseConnection,
+    db: &sqlx::PgPool,
     store: &dyn ArtifactStore,
     limit: u64,
 ) -> Result<SweepOutcome> {
@@ -248,16 +248,17 @@ mod tests {
 /// them but they MUST compile under `cargo test --no-run`.
 #[cfg(test)]
 mod db_tests {
-    use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
+    use sqlx::PgPool;
     use time::{Duration, OffsetDateTime};
     use uuid::Uuid;
 
     use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
     use crate::db::bulk_jobs;
+    use crate::db::convert::offset_to_ts;
 
-    async fn connect() -> DatabaseConnection {
+    async fn connect() -> PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
@@ -266,36 +267,28 @@ mod db_tests {
     /// which always stamps a 7-day-out `expires_at`), so the test can
     /// pick an already-past or not-yet-past deadline.
     async fn insert_job(
-        db: &DatabaseConnection,
+        db: &PgPool,
         expires_at: Option<OffsetDateTime>,
         input_url: Option<String>,
     ) -> Uuid {
         let id = Uuid::new_v4();
-        let now = OffsetDateTime::now_utc();
-        let model = crate::db::models::bulk_jobs::ActiveModel {
-            id: Set(id),
-            kind: Set("import".to_string()),
-            entity: Set("person".to_string()),
-            format: Set("jsonl".to_string()),
-            status: Set("completed".to_string()),
-            params: Set(serde_json::json!({})),
-            rows_total: Set(Some(0)),
-            rows_processed: Set(0),
-            rows_created: Set(0),
-            rows_upserted: Set(0),
-            rows_to_review: Set(0),
-            rows_errored: Set(0),
-            actor: Set(None),
-            idempotency_key: Set(None),
-            input_url: Set(input_url),
-            result_url: Set(None),
-            error_report_url: Set(None),
-            created_at: Set(now),
-            updated_at: Set(now),
-            expires_at: Set(expires_at),
-            artifact_deleted_at: Set(None),
-        };
-        model.insert(db).await.expect("insert test bulk job");
+        let now = offset_to_ts(OffsetDateTime::now_utc());
+        sqlx::query!(
+            "INSERT INTO bulk_jobs
+                 (id, kind, entity, format, status, params, rows_total, rows_processed,
+                  rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                  idempotency_key, input_url, result_url, error_report_url, created_at,
+                  updated_at, expires_at, artifact_deleted_at)
+             VALUES ($1, 'import', 'person', 'jsonl', 'completed', '{}', 0, 0, 0, 0, 0, 0,
+                     NULL, NULL, $2, NULL, NULL, $3, $3, $4, NULL)",
+            id,
+            input_url,
+            now,
+            expires_at.map(offset_to_ts),
+        )
+        .execute(db)
+        .await
+        .expect("insert test bulk job");
         id
     }
 

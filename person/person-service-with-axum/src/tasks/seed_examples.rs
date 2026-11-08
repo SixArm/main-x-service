@@ -15,7 +15,7 @@
 //! returns `409` on the second half of every pair — EX-1 confirmed this
 //! live against a running service — so seeding through it would
 //! silently drop half the fixture. This task instead calls the
-//! **model-layer create** ([`SeaOrmPersonRepository::create`]) directly.
+//! **model-layer create** ([`PgPersonRepository::create`]) directly.
 //! That insert has no duplicate check, and — because no event publisher
 //! or audit log is attached to the repository here — writes no audit
 //! row and publishes no event either. This is **deliberate for a seed
@@ -35,10 +35,9 @@
 use std::path::Path;
 
 use axa::prelude::*;
-use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait};
+use sqlx::PgPool;
 
-use crate::db::models::persons;
-use crate::db::repositories::{AuditContext, PersonRepository, SeaOrmPersonRepository};
+use crate::db::repositories::{AuditContext, PersonRepository, PgPersonRepository};
 use crate::models::Person;
 
 /// The fixture's location, relative to this crate's manifest directory
@@ -97,15 +96,17 @@ pub struct SeedReport {
 
 /// Seed `persons` from `fixture`, unless the table already holds rows.
 ///
-/// Inserts via [`SeaOrmPersonRepository::create`] — the model-layer
+/// Inserts via [`PgPersonRepository::create`] — the model-layer
 /// create, deliberately bypassing duplicate detection (see the module
 /// docs) — with no event publisher and no audit log attached.
 ///
 /// # Errors
 ///
 /// When the row count query or an insert fails.
-pub async fn seed(db: &DatabaseConnection, fixture: &[Person]) -> Result<SeedReport> {
-    let existing = persons::Entity::find().count(db).await?;
+pub async fn seed(db: &PgPool, fixture: &[Person]) -> Result<SeedReport> {
+    let existing = crate::db::repositories::count_persons(db)
+        .await
+        .map_err(|e| Error::string(&e.to_string()))?;
     if existing > 0 {
         println!(
             "persons table is not empty ({existing} rows) — skipping seed; reset the database first if you want to reseed"
@@ -118,7 +119,7 @@ pub async fn seed(db: &DatabaseConnection, fixture: &[Person]) -> Result<SeedRep
         });
     }
 
-    let repo = SeaOrmPersonRepository::new(db.clone());
+    let repo = PgPersonRepository::new(db.clone());
     let mut created = 0usize;
     for person in fixture {
         // A CLI seed task has no authenticated caller — `AuditContext::default()`

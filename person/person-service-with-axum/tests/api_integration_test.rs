@@ -1266,16 +1266,30 @@ async fn test_erasure_of_an_unknown_id_is_answered_not_refused() {
 async fn assert_person_data_destroyed(id: uuid::Uuid) {
     let conn = common::db().await;
 
-    for (table, label) in [
-        ("person_identifiers", "identifiers"),
-        ("person_addresses", "addresses"),
-        ("person_contacts", "contacts"),
-        ("person_documents", "documents"),
-        ("person_photos", "photos"),
+    for (sql, label) in [
+        (
+            "SELECT count(*) AS n FROM person_identifiers WHERE person_id = $1",
+            "identifiers",
+        ),
+        (
+            "SELECT count(*) AS n FROM person_addresses WHERE person_id = $1",
+            "addresses",
+        ),
+        (
+            "SELECT count(*) AS n FROM person_contacts WHERE person_id = $1",
+            "contacts",
+        ),
+        (
+            "SELECT count(*) AS n FROM person_documents WHERE person_id = $1",
+            "documents",
+        ),
+        (
+            "SELECT count(*) AS n FROM person_photos WHERE person_id = $1",
+            "photos",
+        ),
     ] {
-        let sql = format!("SELECT count(*) AS n FROM {table} WHERE person_id = $1");
         assert_eq!(
-            common::count_rows(&conn, &sql, id).await,
+            common::count_rows(&conn, sql, id).await,
             0,
             "{label} survived erasure"
         );
@@ -1580,8 +1594,6 @@ async fn test_every_write_path_rehashes_the_record() {
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL database"]
 async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
-    use sea_orm::ConnectionTrait as _;
-
     let app = common::create_test_router().await;
     let payload = json!({
         "name": {
@@ -1600,13 +1612,11 @@ async fn test_out_of_band_sql_edit_to_a_child_table_is_detected() {
 
     // Edit the stored identifier directly, writing no audit row.
     let conn = common::db().await;
-    conn.execute_raw(sea_orm::Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Postgres,
-        "UPDATE person_identifiers SET value = 'TAMPERED' WHERE person_id = $1",
-        [id.into()],
-    ))
-    .await
-    .expect("tamper");
+    sqlx::query("UPDATE person_identifiers SET value = 'TAMPERED' WHERE person_id = $1")
+        .bind(id)
+        .execute(&conn)
+        .await
+        .expect("tamper");
 
     // The audit chain is untouched — that is the point.
     let verify = app
@@ -1716,8 +1726,6 @@ async fn assert_records_verify(app: &axum::Router, stage: &str) {
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL database"]
 async fn test_a_recorded_checkpoint_detects_wholesale_deletion() {
-    use sea_orm::ConnectionTrait as _;
-
     let app = common::create_test_router().await;
     create_person(
         &app,
@@ -1751,12 +1759,10 @@ async fn test_a_recorded_checkpoint_detects_wholesale_deletion() {
     // Delete the trail as an attacker with SQL access would. No audit row
     // is written; nothing in-band records it.
     let conn = common::db().await;
-    conn.execute_raw(sea_orm::Statement::from_string(
-        sea_orm::DatabaseBackend::Postgres,
-        "DELETE FROM audit_log".to_string(),
-    ))
-    .await
-    .expect("delete the trail");
+    sqlx::query("DELETE FROM audit_log")
+        .execute(&conn)
+        .await
+        .expect("delete the trail");
 
     // The chain's own verification is perfectly happy — the blind spot.
     let chain = app
@@ -1949,4 +1955,131 @@ async fn test_links_endpoints_answer_bare_json() {
         .unwrap();
     let deleted: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(deleted, json!({}));
+}
+
+/// Whether `/api/records/verify` names `id` as mismatched.
+async fn is_mismatched(app: &axum::Router, id: uuid::Uuid) -> bool {
+    let report = record_integrity_report(app).await;
+    report["mismatched"]
+        .as_array()
+        .expect("a mismatched list")
+        .iter()
+        .any(|m| m["id"].as_str() == Some(id.to_string().as_str()))
+}
+
+/// INT-V1: a record verifies as it is **stored**, not as the caller sent
+/// it. A fresh record and an updated one both verify, and a row edited in
+/// SQL is still flagged, so the first two checks cannot pass by verifying
+/// nothing.
+///
+/// The payload carries what the stored record does not keep exactly as
+/// sent: an address `use`, a sub-microsecond time of death, and every
+/// child collection.
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL database"]
+async fn a_written_record_verifies() {
+    let app = common::create_test_router().await;
+    let payload = json!({
+        "name": {
+            "use": "official",
+            "family": format!("Verifies{}", uuid::Uuid::new_v4().simple()),
+            "given": ["Written", "Stored"],
+            "prefix": ["Dr"],
+            "suffix": ["Jr"]
+        },
+        "additional_names": [
+            { "use": "maiden", "family": "Before", "given": ["Ann"] },
+            { "use": "nickname", "family": "Short", "given": ["Annie"] }
+        ],
+        "gender": "female",
+        "birth_date": "1950-02-03",
+        "deceased": true,
+        "deceased_datetime": "2020-01-02T03:04:05.123456789Z",
+        "marital_status": "M",
+        "multiple_birth": false,
+        "identifiers": [{
+            "use": "official",
+            "identifier_type": "SSN",
+            "system": "http://hl7.org/fhir/sid/us-ssn",
+            "value": format!("SSN-{}", uuid::Uuid::new_v4())
+        }],
+        "telecom": [
+            { "system": "phone", "value": "+15550100", "use": "home" },
+            { "system": "email", "value": "ann@example.org", "use": "work" }
+        ],
+        "addresses": [
+            { "use": "home", "line1": "1 Main St", "city": "Springfield", "postal_code": "12345", "country": "US" },
+            { "use": "work", "line1": "2 Side St", "city": "Shelbyville", "country": "US" }
+        ],
+        "documents": [{
+            "document_type": "PASSPORT",
+            "number": "P123",
+            "issuing_country": "US",
+            "issue_date": "2010-01-01",
+            "expiry_date": "2030-01-01",
+            "verified": true
+        }],
+        "emergency_contacts": [{
+            "name": "Bob",
+            "relationship": "spouse",
+            "telecom": [{ "system": "phone", "value": "+15550101", "use": "mobile" }],
+            "address": { "use": "home", "city": "Springfield" },
+            "is_primary": true
+        }],
+        "photo": ["https://example.org/a.png"],
+        "created_at": "2001-01-01T00:00:00.987654321Z",
+        "updated_at": "2001-01-01T00:00:00.987654321Z"
+    });
+    let id = create_person(&app, &payload).await;
+    assert!(
+        !is_mismatched(&app, id).await,
+        "a fresh record must verify: {}",
+        record_integrity_report(&app).await
+    );
+
+    let mut changed = payload.clone();
+    changed["id"] = json!(id);
+    changed["marital_status"] = json!("W");
+    changed["deceased_datetime"] = json!("2021-05-06T07:08:09.987654321Z");
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/persons/{id}"))
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&changed).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        response.status().is_success(),
+        "update failed: {:?}",
+        response.status()
+    );
+    assert!(
+        !is_mismatched(&app, id).await,
+        "an updated record must verify: {}",
+        record_integrity_report(&app).await
+    );
+
+    // And verification still catches a change made behind the service's
+    // back, so the two checks above cannot pass by verifying nothing.
+    let conn = common::db().await;
+    sqlx::query(
+        "UPDATE person_names SET family = family || ' (edited in SQL)' \
+         WHERE person_id = $1 AND is_primary",
+    )
+    .bind(id)
+    .execute(&conn)
+    .await
+    .expect("tamper with the row");
+    assert!(
+        is_mismatched(&app, id).await,
+        "a row edited in SQL must be flagged"
+    );
+    // Leave no deliberately-corrupted record behind: the database is
+    // shared with every other DB-gated target in this crate.
+    common::purge_record(&conn, id).await;
 }

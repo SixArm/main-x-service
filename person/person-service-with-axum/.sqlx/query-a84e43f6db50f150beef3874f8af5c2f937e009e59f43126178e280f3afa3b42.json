@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM person_emergency_contact_telecom WHERE emergency_contact_id IN\n             (SELECT id FROM person_emergency_contacts WHERE person_id = $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a84e43f6db50f150beef3874f8af5c2f937e009e59f43126178e280f3afa3b42"
+}

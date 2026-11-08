@@ -388,7 +388,7 @@ mod tests {
         let packages = locked_packages();
         for expected in [
             "axa",
-            "sea-orm",
+            "sqlx",
             "axum",
             "sha2",
             "sha3",

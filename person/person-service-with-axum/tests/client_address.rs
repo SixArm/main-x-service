@@ -12,10 +12,10 @@ use axum::http::{HeaderName, HeaderValue};
 use person_service::app::App;
 use person_service::compliance::{disclosure, erasure};
 use person_service::config::Config;
-use person_service::db::models::audit_log;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use person_service::db::AuditLogRepository;
 use serde_json::{Value, json};
 use serial_test::serial;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 /// A person the duplicate check cannot match to one from an earlier run: a
@@ -46,11 +46,9 @@ fn unique_person() -> Value {
 }
 
 /// The addresses on the rows for `entity_id` with `action`.
-async fn addresses(db: &DatabaseConnection, entity_id: Uuid, action: &str) -> Vec<Option<String>> {
-    audit_log::Entity::find()
-        .filter(audit_log::Column::EntityId.eq(entity_id))
-        .filter(audit_log::Column::Action.eq(action))
-        .all(db)
+async fn addresses(db: &PgPool, entity_id: Uuid, action: &str) -> Vec<Option<String>> {
+    AuditLogRepository::new(db.clone())
+        .rows_for(None, entity_id, Some(action))
         .await
         .unwrap()
         .into_iter()

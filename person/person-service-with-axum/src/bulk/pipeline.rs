@@ -42,15 +42,11 @@
 //! export query (`include_soft_deleted = true` is rejected as
 //! not-yet-supported rather than leaking or ignoring it).
 
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, EntityTrait, QueryFilter,
-    Statement, TransactionTrait,
-};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::Result;
 use crate::db::PersonRepository;
-use crate::db::models::person_identifiers;
 use crate::db::review_queue::{self, NewReviewItem};
 use crate::matching::PersonMatcher;
 use crate::models::Person;
@@ -171,18 +167,14 @@ pub fn apply_masking(records: Vec<Person>, masking_profile: MaskingProfile) -> V
 /// Look up the non-deleted person owning an identifier `(system, value)`,
 /// if any. Returns the first live match.
 async fn find_by_identifier(
-    db: &DatabaseConnection,
+    db: &PgPool,
     repo: &dyn PersonRepository,
     system: &str,
     value: &str,
 ) -> Result<Option<Person>> {
-    let rows = person_identifiers::Entity::find()
-        .filter(person_identifiers::Column::System.eq(system))
-        .filter(person_identifiers::Column::Value.eq(value))
-        .all(db)
-        .await?;
-    for row in rows {
-        if let Some(person) = repo.get_by_id(&row.person_id).await? {
+    let ids = crate::db::repositories::person_ids_with_identifier(db, system, value).await?;
+    for person_id in ids {
+        if let Some(person) = repo.get_by_id(&person_id).await? {
             return Ok(Some(person));
         }
     }
@@ -192,7 +184,7 @@ async fn find_by_identifier(
 /// Resolve the existing record (if any) that `person`'s stable key points
 /// at, so the caller can decide create-vs-upsert.
 async fn find_existing(
-    db: &DatabaseConnection,
+    db: &PgPool,
     repo: &dyn PersonRepository,
     person: &Person,
 ) -> Result<Option<Person>> {
@@ -239,20 +231,14 @@ fn stable_key_lock_string(key: &StableKey) -> String {
 /// create/update transactions commit within this window; the lock (not the
 /// connection) provides the mutual exclusion. Returns `(saved, was_upsert)`.
 async fn import_upsert_locked(
-    db: &DatabaseConnection,
+    db: &PgPool,
     repo: &dyn PersonRepository,
     person: &mut Person,
     ctx: &crate::db::AuditContext,
 ) -> Result<(Person, bool)> {
     let key = resolve_stable_key(person);
-    let guard = db.begin().await?;
-    guard
-        .execute_raw(Statement::from_sql_and_values(
-            DatabaseBackend::Postgres,
-            "SELECT pg_advisory_xact_lock(hashtext($1)::bigint)",
-            [stable_key_lock_string(&key).into()],
-        ))
-        .await?;
+    let mut guard = db.begin().await?;
+    crate::db::bulk_jobs::lock_stable_key(&mut guard, &stable_key_lock_string(&key)).await?;
 
     let existing = find_existing(db, repo, person).await?;
     let result = if let Some(existing) = existing {
@@ -410,7 +396,7 @@ async fn find_keyless_duplicate(
 /// of [`process_import_job`] to keep its per-row dispatch readable; only
 /// called on the non-dry-run path (dry-run classifies without this).
 async fn create_and_queue_for_review(
-    db: &DatabaseConnection,
+    db: &PgPool,
     repo: &dyn PersonRepository,
     search: &SearchEngine,
     mut person: Person,
@@ -457,7 +443,7 @@ async fn create_and_queue_for_review(
 /// As [`process_import_stream`].
 #[allow(clippy::too_many_arguments)] // db/repo/search/matcher/input/format/params/ctx — each an independent collaborator
 pub async fn process_import_job(
-    db: &DatabaseConnection,
+    db: &PgPool,
     repo: &dyn PersonRepository,
     search: &SearchEngine,
     matcher: &dyn PersonMatcher,
@@ -502,7 +488,7 @@ pub async fn process_import_job(
 /// rows upsert idempotently (§6).
 #[allow(clippy::too_many_arguments)] // db/repo/search/matcher/reader/format/params/ctx — each an independent collaborator
 pub async fn process_import_stream(
-    db: &DatabaseConnection,
+    db: &PgPool,
     repo: &dyn PersonRepository,
     search: &SearchEngine,
     matcher: &dyn PersonMatcher,
@@ -698,14 +684,14 @@ mod db_tests {
     };
     use crate::bulk::{csv, jsonl};
     use crate::config::Config;
-    use crate::db::{AuditContext, PersonRepository, SeaOrmPersonRepository};
+    use crate::db::{AuditContext, PersonRepository, PgPersonRepository};
     use crate::matching::ProbabilisticMatcher;
     use crate::models::{Gender, HumanName, Identifier, IdentifierType, Person};
     use crate::search::SearchEngine;
 
-    async fn connect() -> sea_orm::DatabaseConnection {
+    async fn connect() -> sqlx::PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        sqlx::PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
@@ -737,7 +723,7 @@ mod db_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn import_creates_then_upserts_idempotently_with_error_report() {
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
         let (_dir, search) = search_engine();
 
         // One record keyed by a unique SSN, one keyed by pid, and one
@@ -811,9 +797,6 @@ mod db_tests {
     #[tokio::test]
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn concurrent_imports_of_one_stable_key_yield_one_record() {
-        use crate::db::models::person_identifiers;
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
         let db = connect().await;
         let system = "http://hl7.org/fhir/sid/us-ssn".to_string();
         let value = format!("SSN-{}", uuid::Uuid::new_v4());
@@ -827,9 +810,9 @@ mod db_tests {
         let input = jsonl::encode(std::slice::from_ref(&p)).unwrap();
 
         // Two importers racing the identical single-row file on a shared pool.
-        let spawn_import = |db: sea_orm::DatabaseConnection, input: Vec<u8>| {
+        let spawn_import = |db: sqlx::PgPool, input: Vec<u8>| {
             tokio::spawn(async move {
-                let repo = SeaOrmPersonRepository::new(db.clone());
+                let repo = PgPersonRepository::new(db.clone());
                 let dir = tempfile::tempdir().unwrap();
                 let search = SearchEngine::new(dir.path()).unwrap();
                 let out = process_import_job(
@@ -868,13 +851,10 @@ mod db_tests {
         );
 
         // Ground truth: exactly one distinct person owns that identifier.
-        let rows = person_identifiers::Entity::find()
-            .filter(person_identifiers::Column::System.eq(system))
-            .filter(person_identifiers::Column::Value.eq(value))
-            .all(&db)
+        let rows = crate::db::repositories::person_ids_with_identifier(&db, &system, &value)
             .await
             .unwrap();
-        let distinct: std::collections::HashSet<_> = rows.iter().map(|r| r.person_id).collect();
+        let distinct: std::collections::HashSet<_> = rows.iter().copied().collect();
         assert_eq!(
             distinct.len(),
             1,
@@ -886,7 +866,7 @@ mod db_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn dry_run_commits_nothing() {
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
         let (_dir, search) = search_engine();
 
         let p = person("DryRun");
@@ -915,7 +895,7 @@ mod db_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn export_round_trips_through_jsonl() {
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
 
         let created = repo
             .create(&person("Exported"), &AuditContext::default())
@@ -962,7 +942,7 @@ mod db_tests {
         use crate::models::{Identifier, IdentifierType};
 
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
         let audit = AuditLogRepository::new(db.clone());
 
         let mut p = person("MaskedExport");
@@ -1051,7 +1031,7 @@ mod db_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn export_rejects_include_soft_deleted() {
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
         let err = process_export_job(
             &repo,
             &ExportParams {
@@ -1073,14 +1053,12 @@ mod db_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn keyless_row_with_a_likely_duplicate_creates_and_queues_for_review() {
         use crate::db::audit::AuditLogRepository;
-        use crate::db::models::audit_log;
         use crate::db::review_queue;
         use chrono::NaiveDate;
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
         let db = connect().await;
         let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
-        let repo = SeaOrmPersonRepository::new(db.clone()).with_audit_log(audit);
+        let repo = PgPersonRepository::new(db.clone()).with_audit_log(audit.clone());
         let (_dir, search) = search_engine();
 
         // A unique family name (per test run) so this run's search-blocking
@@ -1157,12 +1135,7 @@ mod db_tests {
         } else {
             pair.record_id_a
         };
-        let create_rows = audit_log::Entity::find()
-            .filter(audit_log::Column::EntityId.eq(new_id))
-            .filter(audit_log::Column::Action.eq("CREATE"))
-            .all(&db)
-            .await
-            .unwrap();
+        let create_rows = audit.rows_for(None, new_id, Some("CREATE")).await.unwrap();
         assert_eq!(create_rows.len(), 1, "one CREATE audit row for the import");
         assert_eq!(
             create_rows[0].user_id.as_deref(),
@@ -1178,7 +1151,7 @@ mod db_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn csv_import_creates_a_keyed_row() {
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
         let (_dir, search) = search_engine();
 
         let mut p = person("CsvImported");
@@ -1216,7 +1189,7 @@ mod db_tests {
         use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
 
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
         let (_dir, search) = search_engine();
 
         // Keyed rows, each with its own stable key, plus a malformed row in
@@ -1288,7 +1261,7 @@ mod db_tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn csv_export_round_trips() {
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
 
         let created = repo
             .create(&person("CsvExported"), &AuditContext::default())
@@ -1329,7 +1302,7 @@ mod db_tests {
         use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
         let db = connect().await;
-        let repo = SeaOrmPersonRepository::new(db.clone());
+        let repo = PgPersonRepository::new(db.clone());
 
         repo.create(&person("ParquetExported"), &AuditContext::default())
             .await

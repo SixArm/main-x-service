@@ -42,11 +42,9 @@
 
 mod common;
 
-use person_service::db::models::event_outbox;
-use person_service::db::outbox::OutboxInsert;
+use person_service::db::outbox::{Model as OutboxRow, OutboxInsert};
 use person_service::models::{Gender, HumanName, Person};
 use person_service::relay::{self, FluvioSink};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 #[tokio::test]
 #[ignore = "requires PostgreSQL AND a live Fluvio broker; see this file's module docs"]
@@ -69,7 +67,12 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
 
     let insert = OutboxInsert::for_event(&person, person_service::streaming::EventKind::Created)
         .expect("build the outbox row from the envelope");
-    insert.insert_on(&db).await.expect("enqueue the outbox row");
+    let mut conn = db.acquire().await.expect("a connection");
+    insert
+        .insert_on(&mut conn)
+        .await
+        .expect("enqueue the outbox row");
+    drop(conn);
 
     let sink = FluvioSink::connect(&endpoint, "mxi.person.events.test")
         .await
@@ -80,11 +83,11 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
         .expect("drain_once against the real sink");
     assert!(published >= 1, "at least this row's send should succeed");
 
-    let row = event_outbox::Entity::find()
-        .filter(event_outbox::Column::EntityPid.eq(person.id))
-        .one(&db)
+    let row = OutboxRow::rows_for(&db, person.id, None)
         .await
         .expect("load the outbox row")
+        .into_iter()
+        .next()
         .expect("the row exists");
     assert!(
         row.published_at.is_some(),
