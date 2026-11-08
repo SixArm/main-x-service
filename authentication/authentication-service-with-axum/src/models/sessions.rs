@@ -305,12 +305,16 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn scrub_user_agent_for_user(db: &PgPool, user_pid: Uuid) -> ModelResult<u64> {
+    pub async fn scrub_user_agent_for_user(
+        db: impl Into<axa::sqlx::Db<'_>>,
+        user_pid: Uuid,
+    ) -> ModelResult<u64> {
+        let mut conn = db.into().acquire().await?;
         let res = sqlx::query!(
             "UPDATE sessions SET user_agent = NULL WHERE user_pid = $1",
             user_pid,
         )
-        .execute(db)
+        .execute(&mut *conn)
         .await?;
         Ok(res.rows_affected())
     }

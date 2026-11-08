@@ -83,6 +83,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- GDPR erasure (`DELETE /api/auth/account`) is atomic (AU-G1). Its four
+  statements — revoke the sessions, tombstone the user, scrub
+  `auth_events.email`, scrub `sessions.user_agent` — run in one
+  transaction, so a failure part-way no longer leaves the subject half
+  erased. The `account_erased` audit row is still written after, on the
+  pool, best-effort.
+- `db truncate` clears `auth_rate_limits` with the other tables (AU-T1),
+  so a truncated database no longer rate-limits addresses it no longer
+  knows.
+- The entity spec (`authentication/spec/10-persistence.md`) describes
+  the sessions table that shipped — a bigint `id` key with the opaque id
+  in `jid` — instead of a `sid`-keyed one that never did, and lists every
+  column of all four tables (AU-D1).
+
 - **Behind a proxy, sessions and `auth_events` now record the client.**
   `source_ip` was the raw connection, which is the proxy's address on every row.
   It now comes from `axa::client::ClientAddr`, which believes `X-Forwarded-For`

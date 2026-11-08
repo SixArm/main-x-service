@@ -851,7 +851,8 @@ impl Model {
     ///
     /// # Errors
     /// - Returns an error if the database update fails.
-    pub async fn erase(self, db: &PgPool) -> ModelResult<Model> {
+    pub async fn erase(self, db: impl Into<axa::sqlx::Db<'_>>) -> ModelResult<Model> {
+        let mut conn = db.into().acquire().await?;
         let email = tombstone_email(&self.pid);
         validate(TOMBSTONE_NAME, &email)?;
         let row = sqlx::query_as!(
@@ -873,7 +874,7 @@ impl Model {
             TOMBSTONE_NAME,
             Local::now().fixed_offset(),
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         updated(row)
     }

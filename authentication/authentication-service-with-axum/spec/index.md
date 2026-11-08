@@ -88,8 +88,9 @@ sign-in.
   unusable random hash. `deleted_at` (GDPR Art. 17) soft-deletes the
   account: when set, the `email`/`name` are anonymised to a tombstone
   and every read path treats the user as gone.
-- **sessions** — server-side cookie session (per shared §3): `sid`
-  (opaque pk, **not** a JWT), `user_pid`, `data` (JSONB — session
+- **sessions** — server-side cookie session (per shared §3): `jid`
+  (the opaque session id, unique, stored hashed; **not** a JWT — the
+  shared design's `sid`; the pk is a bigint `id`), `user_pid`, `data` (JSONB — session
   payload; holds the user's ABAC attributes under `attrs`, copied at
   establishment so `POST /token` mints the `attrs` claim from the
   session alone), `created_at`, `last_seen_at`, `idle_expires_at`,
@@ -594,6 +595,33 @@ per-subject `GET /api/auth/account/audit` — a subject's own trail reachable
 only by that subject.
 
 ## 13. Tasks (live work queue)
+
+- [x] **2026-11-08 — AU-G1: GDPR erasure is one transaction.**
+      `DELETE /api/auth/account` ran its four statements (revoke the
+      sessions, tombstone the user, NULL `auth_events.email`, NULL
+      `sessions.user_agent`) each on the pool, so a failure part-way left
+      the subject half erased. They now run in one transaction
+      (`users::Model::erase`, `AuthEvent::scrub_subject_email` and
+      `sessions::Model::scrub_user_agent_for_user` take
+      `impl Into<axa::sqlx::Db>` so they can join it). The
+      `account_erased` audit row is still written best-effort on the pool
+      after the commit, so it records only an erasure that happened and
+      cannot abort one. Test
+      `account_erasure_failing_late_leaves_nothing_changed` installs a
+      trigger that refuses the user-agent scrub and checks the sessions,
+      the account and the audit emails are all untouched, then that a
+      retry erases fully; it failed before the fix.
+- [x] **2026-11-08 — AU-T1: `db truncate` clears `auth_rate_limits`.**
+      `models::delete_all_rows` now empties the rate limiter's table with
+      the other three, so a truncated database no longer throttles
+      addresses it has no record of. Test `truncate_clears_rate_limit_state`
+      (failed before the fix).
+- [x] **2026-11-08 — AU-D1: the entity spec's sessions schema.**
+      `authentication/spec/10-persistence.md` described a `sid`-primary-key
+      sessions table that never shipped. It now gives the tables the
+      migrations build: `sessions` keyed by a bigint `id` with the opaque
+      id in the hashed, unique `jid`, plus `users`, `auth_events` and
+      `auth_rate_limits` with every later column.
 
 - [x] **2026-11-08 — Move from SeaORM to sqlx** (spec/tech-stack §5).
       Every statement is a `query!` / `query_as!` / `query_scalar!`

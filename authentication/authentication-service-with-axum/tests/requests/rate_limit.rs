@@ -175,3 +175,33 @@ async fn rejection_does_not_consume_further_quota() {
     })
     .await;
 }
+
+/// AU-T1: `db truncate` clears the rate limiter too. Fill one key's
+/// window, truncate, and the key is allowed again at the same instant —
+/// before the fix its rows survived and it stayed throttled.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn truncate_clears_rate_limit_state() {
+    request::<App, _, _>(|_request, ctx| async move {
+        rate_limit::reset(&ctx.db).await.unwrap();
+        let key = "rl-truncate@example.com";
+        let now = Utc::now();
+        for _ in 0..rate_limit::MAX_REQUESTS {
+            rate_limit::check_at(&ctx.db, key, now)
+                .await
+                .expect("within quota");
+        }
+        rate_limit::check_at(&ctx.db, key, now)
+            .await
+            .expect_err("over quota before the truncate");
+
+        App::truncate(&ctx).await.expect("truncate");
+
+        assert!(
+            rate_limit::check_at(&ctx.db, key, now).await.is_ok(),
+            "a truncated database must not still rate-limit the address"
+        );
+    })
+    .await;
+}

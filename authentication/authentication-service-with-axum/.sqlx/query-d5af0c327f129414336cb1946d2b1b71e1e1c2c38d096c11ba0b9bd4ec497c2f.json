@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DROP FUNCTION au_g1_fail_scrub()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d5af0c327f129414336cb1946d2b1b71e1e1c2c38d096c11ba0b9bd4ec497c2f"
+}

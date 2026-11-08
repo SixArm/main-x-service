@@ -259,13 +259,18 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn scrub_subject_email(db: &PgPool, user_pid: Uuid, email: &str) -> ModelResult<u64> {
+    pub async fn scrub_subject_email(
+        db: impl Into<axa::sqlx::Db<'_>>,
+        user_pid: Uuid,
+        email: &str,
+    ) -> ModelResult<u64> {
+        let mut conn = db.into().acquire().await?;
         let res = sqlx::query!(
             "UPDATE auth_events SET email = NULL WHERE user_pid = $1 OR email = $2",
             user_pid,
             normalise_email(email),
         )
-        .execute(db)
+        .execute(&mut *conn)
         .await?;
         Ok(res.rows_affected())
     }

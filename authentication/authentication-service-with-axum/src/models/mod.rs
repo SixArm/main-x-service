@@ -125,11 +125,12 @@ pub(crate) fn to_i64(n: u64) -> i64 {
 /// Delete every row from the service's tables, for `db truncate` and the
 /// test harness.
 ///
-/// `DELETE`, not `TRUNCATE`, and identities are not restarted: exactly
-/// what the `SeaORM` era's `truncate_table` did, on the same three tables
-/// in the same order. `auth_rate_limits` was never truncated and still is
-/// not; [`auth_rate_limits::delete_all`] clears it for the tests that need
-/// it empty.
+/// `DELETE`, not `TRUNCATE`, and identities are not restarted: what the
+/// `SeaORM` era's `truncate_table` did on `auth_events`, `sessions` and
+/// `users`, in that order. AU-T1: `auth_rate_limits` is cleared too. It
+/// was not before, so a truncated database still rate-limited addresses
+/// it no longer had any record of; its rows are keyed by email, not by a
+/// foreign key, so nothing else would ever clear them.
 ///
 /// # Errors
 ///
@@ -139,5 +140,6 @@ pub async fn delete_all_rows(db: &sqlx::PgPool) -> Result<(), sqlx::Error> {
     sqlx::query!("DELETE FROM auth_events").execute(db).await?;
     sqlx::query!("DELETE FROM sessions").execute(db).await?;
     sqlx::query!("DELETE FROM users").execute(db).await?;
+    auth_rate_limits::delete_all(db).await?;
     Ok(())
 }

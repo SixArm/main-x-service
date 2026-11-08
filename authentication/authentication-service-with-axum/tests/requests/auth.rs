@@ -923,6 +923,122 @@ async fn account_erasure_soft_deletes_anonymises_revokes_and_audits() {
     .await;
 }
 
+/// AU-G1: GDPR erasure is all or nothing. A trigger makes the **last**
+/// step — scrubbing `sessions.user_agent` — fail for this one subject,
+/// and the erasure must then leave every earlier step undone too: the
+/// sessions still active, the account still un-erased under its original
+/// email, and the audit trail's email unscrubbed. Before the fix the
+/// three earlier statements had already committed one by one, leaving
+/// the subject half erased.
+///
+/// The trigger fires only on an `UPDATE` that names `user_agent` in its
+/// `SET` list, which only the scrub does. It is installed and dropped
+/// around the one request, before any assertion, and the suite is
+/// `#[serial]`, so it cannot reach another test.
+#[cfg(feature = "paseto")]
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn account_erasure_failing_late_leaves_nothing_changed() {
+    request::<App, _, _>(|request, ctx| async move {
+        let logged_in = prepare_data::init_user_login(&request, &ctx).await;
+        let pid = logged_in.user.pid;
+        let original_email = logged_in.user.email.clone();
+        let (auth_key, auth_value) = prepare_data::auth_header(&logged_in.token);
+
+        sqlx::query!(
+            "CREATE OR REPLACE FUNCTION au_g1_fail_scrub() RETURNS trigger
+                 LANGUAGE plpgsql AS $$
+                 BEGIN RAISE EXCEPTION 'AU-G1 test: user_agent scrub refused'; END $$"
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("install the failing function");
+        sqlx::query!("DROP TRIGGER IF EXISTS au_g1_fail_scrub ON sessions")
+            .execute(&ctx.db)
+            .await
+            .expect("clear any stale trigger");
+        sqlx::query!(
+            "CREATE TRIGGER au_g1_fail_scrub BEFORE UPDATE OF user_agent ON sessions
+                 FOR EACH ROW EXECUTE FUNCTION au_g1_fail_scrub()"
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("install the failing trigger");
+
+        let erase = request
+            .delete("/api/auth/account")
+            .add_header(auth_key.clone(), auth_value.clone())
+            .await;
+
+        sqlx::query!("DROP TRIGGER au_g1_fail_scrub ON sessions")
+            .execute(&ctx.db)
+            .await
+            .expect("drop the failing trigger");
+        sqlx::query!("DROP FUNCTION au_g1_fail_scrub()")
+            .execute(&ctx.db)
+            .await
+            .expect("drop the failing function");
+
+        assert_eq!(
+            erase.status_code(),
+            500,
+            "a failed scrub must fail the erasure: {}",
+            erase.text()
+        );
+
+        // Step 1 undone: the sessions are still live.
+        let sessions = sessions::Model::find_all_by_user_pid(&ctx.db, pid)
+            .await
+            .expect("sessions should query");
+        assert!(!sessions.is_empty(), "the login session must exist");
+        assert!(
+            sessions.iter().all(sessions::Model::is_active),
+            "no session may be revoked by a failed erasure"
+        );
+        // Step 2 undone: the account still resolves, un-erased.
+        let user = users::Model::find_by_email(&ctx.db, &original_email)
+            .await
+            .expect("a failed erasure must leave the account under its email");
+        assert!(user.deleted_at.is_none(), "deleted_at must not be stamped");
+        assert_eq!(user.name, logged_in.user.name, "name must be untouched");
+        // Step 3 undone: the audit trail still carries the email.
+        let events = AuthEvent::for_subject(&ctx.db, pid, &original_email)
+            .await
+            .expect("subject audit should query");
+        assert!(
+            events
+                .iter()
+                .any(|e| e.email.as_deref() == Some(original_email.as_str())),
+            "the audit email scrub must be rolled back; got {events:?}"
+        );
+        assert!(
+            events.iter().all(|e| e.event != "account_erased"),
+            "no account_erased row for an erasure that did not happen"
+        );
+
+        // The bearer still works, and a retry with the fault gone erases fully.
+        let retry = request
+            .delete("/api/auth/account")
+            .add_header(auth_key, auth_value)
+            .await;
+        assert_eq!(retry.status_code(), 200, "the retry should succeed");
+        let erased = users::Model::find_by_pid(&ctx.db, &pid.to_string())
+            .await
+            .expect("the row survives erasure");
+        assert!(erased.deleted_at.is_some(), "the retry must erase");
+        let sessions = sessions::Model::find_all_by_user_pid(&ctx.db, pid)
+            .await
+            .expect("sessions should query");
+        assert!(
+            sessions
+                .iter()
+                .all(|s| !s.is_active() && s.user_agent.is_none())
+        );
+    })
+    .await;
+}
+
 /// spec §13 T-13: every `/api/*` response carries the negotiated
 /// `Accepts-version` header, regardless of the handler's own status
 /// code. `/api/auth/audit/recent` is admin-gated (`403` for a

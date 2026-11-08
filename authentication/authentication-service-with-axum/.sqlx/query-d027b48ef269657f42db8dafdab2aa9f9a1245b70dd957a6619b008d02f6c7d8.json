@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "CREATE OR REPLACE FUNCTION au_g1_fail_scrub() RETURNS trigger\n                 LANGUAGE plpgsql AS $$\n                 BEGIN RAISE EXCEPTION 'AU-G1 test: user_agent scrub refused'; END $$",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d027b48ef269657f42db8dafdab2aa9f9a1245b70dd957a6619b008d02f6c7d8"
+}

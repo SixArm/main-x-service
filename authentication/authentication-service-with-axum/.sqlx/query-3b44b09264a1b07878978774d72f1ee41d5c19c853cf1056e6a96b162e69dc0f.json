@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DROP TRIGGER IF EXISTS au_g1_fail_scrub ON sessions",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "3b44b09264a1b07878978774d72f1ee41d5c19c853cf1056e6a96b162e69dc0f"
+}

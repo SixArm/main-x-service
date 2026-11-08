@@ -774,18 +774,29 @@ async fn delete_account(
 
     let pid = user.pid;
     let email = user.email.clone();
+    // AU-G1: the four steps are one transaction, so a failure part-way
+    // leaves the subject exactly as they were rather than half erased
+    // (sessions revoked but the account intact, or the account tombstoned
+    // but the audit trail still carrying the email). On an early return
+    // the transaction drops and rolls back.
+    let mut txn = ctx.db.begin().await?;
     // Revoke every live session first so a concurrent request cannot use
     // a session that outlives the anonymisation.
-    sessions::Model::revoke_all_for_user(&ctx.db, pid).await?;
-    user.erase(&ctx.db).await?;
+    sessions::Model::revoke_all_for_user(&mut *txn, pid).await?;
+    user.erase(&mut *txn).await?;
     // SEC-A7: erasing the `users` row is not enough — the subject's email
     // also survives in the audit trail (`auth_events.email`, incl. pre-account
     // `unknown_email` rows) and in `sessions.user_agent`. Scrub both so the
     // GDPR erasure is complete.
-    AuthEvent::scrub_subject_email(&ctx.db, pid, &email).await?;
-    sessions::Model::scrub_user_agent_for_user(&ctx.db, pid).await?;
+    AuthEvent::scrub_subject_email(&mut *txn, pid, &email).await?;
+    sessions::Model::scrub_user_agent_for_user(&mut *txn, pid).await?;
+    txn.commit().await?;
     // The final `account_erased` audit row carries only the pid — writing the
-    // email here would re-introduce the address we just scrubbed.
+    // email here would re-introduce the address we just scrubbed. It is
+    // written after the commit, best-effort on the pool, as before: inside
+    // the transaction a failed insert would abort the erasure it records,
+    // and auditing must never break the request path. So it is written
+    // only for an erasure that actually happened.
     AuthEvent::record_best_effort(
         &ctx.db,
         "account_erased",
