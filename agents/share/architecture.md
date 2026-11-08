@@ -46,8 +46,8 @@ capability matrix in [overview.md](overview.md)).
         |                         |                         |
 +-------v--------+   +------------v-----------+  +----------v---------+
 | PostgreSQL     |   | Tantivy full-text      |  | Event transport    |
-| (sqlx or       |   | index (6 crates; the   |  | in-memory (default)|
-|  SeaORM)       |   | rest use ILIKE)        |  | or Postgres outbox |
+| (sqlx, plain   |   | index (6 crates; the   |  | in-memory (default)|
+|  SQL migrations)|   | rest use ILIKE)        |  | or Postgres outbox |
 | entity rows,   |   |                        |  | → relay → Fluvio   |
 | audit, outbox, |   +------------------------+  +----------+---------+
 | entity_links   |                                          |
@@ -79,7 +79,7 @@ src/
 ├── api/rest/              mod · handlers · routes · state (AppState) · auth · links
 ├── api/fhir/  api/grpc/   FHIR R5 resource + gRPC stub
 ├── models/                domain model (HumanName, Identifier, Address, …)
-├── db/                    mod · models (SeaORM) · repositories · audit · outbox · convert
+├── db/                    every SQL statement: mod · models (rows) · repositories · audit · outbox · convert
 ├── matching/              adapter to the *-matcher crate + scoring
 ├── search/                Tantivy index + query
 ├── streaming/             mod · envelope (durable Envelope) · producer · consumer
@@ -98,7 +98,7 @@ drift.
 src/
 ├── app.rs                 boot, routes, workers, CLI
 ├── controllers/           one module per resource (+ docs, metrics; fhir where present)
-├── models/                CRUD helpers over the JSONB payload + _entities/ (SeaORM)
+├── models/                every SQL statement: CRUD over the JSONB payload, one module per table
 ├── auth.rs                offline PASETO verify + ABAC (authorize_record)
 ├── merge.rs               pure record-merge logic
 ├── streaming.rs           durable Envelope + EventPublisher seam (single file)
@@ -106,14 +106,11 @@ src/
 └── openapi.rs             hand-written OpenAPI 3 doc
 ```
 
-The family is moving from SeaORM to sqlx one crate at a time
-([`spec/tech-stack`](../../spec/tech-stack/index.md) §5.4 lists which). On sqlx,
-migrations are plain SQL in `migrations/<version>_<name>.up.sql` and
+Every service is on sqlx ([`spec/tech-stack`](../../spec/tech-stack/index.md)
+§5). Migrations are plain SQL in `migrations/<version>_<name>.up.sql` and
 `.down.sql`, run by `sqlx::migrate!`, and every statement is a `query!` literal
-in one directory: `src/db/` (person-style) or `src/models/` (controller-style).
-Still on SeaORM, migrations live in a crate-root `migration/` directory (a
-`sea-orm-migration` migrator), and `authentication-service` keeps its own in
-`src/migration/`.
+in one directory: `src/db/` (person-style) or `src/models/` (controller-style),
+checked at compile time against the committed `.sqlx/`.
 
 ## Cross-cutting subsystems
 

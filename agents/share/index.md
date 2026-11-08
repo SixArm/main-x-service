@@ -33,7 +33,7 @@ Per-crate `spec.md`:
 - Soft delete support with complete audit trails
 - Privacy: Data masking, GDPR data export, consent management (a per-crate subset — see the capability matrix)
 - Event Streaming: Real-time event publishing with audit logging
-- Database Integration: PostgreSQL with literal sqlx queries and plain SQL migrations (SeaORM where not yet moved; `spec/tech-stack` §5.4)
+- Database Integration: PostgreSQL with literal sqlx queries and plain SQL migrations
 - Podman Ready: Multi-stage builds, Podman Compose for dev/test/prod
 - Testing: Comprehensive unit tests, integration tests, benchmark tests
 - Observability with tracing, log levels, and OpenTelemetry

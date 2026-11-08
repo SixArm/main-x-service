@@ -35,9 +35,9 @@ table is in
 [`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md); the summary below
 maps each concern to its technology.
 
-The family is moving from SeaORM to sqlx, so that a reviewer can read the exact
-SQL. §5 describes that move, and a crate's own `Cargo.toml` says which side it
-is on.
+Every service reaches Postgres through sqlx, with literal, compile-checked SQL, so
+that a reviewer can read the exact statements. §5 describes the rules and how the
+family moved off SeaORM, which no crate uses since 2026-11-08.
 
 | Concern | Technology | Purpose |
 |---|---|---|
@@ -47,7 +47,7 @@ is on.
 | Shared service plumbing | axa | Routes, middleware, errors, configuration, CLI, jobs (library, not framework) |
 | HTTP layer | hyper, tower, tower-http | CORS, compression, tracing middleware |
 | Database | PostgreSQL 18+ | Persistence (NOT SQLite) |
-| Database access | sqlx 0.9 (target); SeaORM 2.0 + sea-orm-migration (being replaced) | Direct, reviewable SQL; schema migrations |
+| Database access | sqlx 0.9, `query!` literals and `sqlx::migrate!` plain SQL | Direct, reviewable SQL; schema migrations |
 | Search | Tantivy 0.22 | Embedded full-text search — live on all ten entity registries |
 | API docs | Utoipa 5 + utoipa-swagger-ui 9 (or hand-written OpenAPI) | OpenAPI 3.0 spec + Swagger UI |
 | Serialization | Serde + serde_json | JSON request/response |
@@ -91,9 +91,9 @@ ecosystem fragmentation across the ten entity slices.
 | Podman | Docker | OCI-compatible, rootless, daemonless |
 | Tokio | async_std | One async runtime across the family |
 | MiMalloc | jemalloc | Faster MUSL static builds |
-| PostgreSQL | SQLite | One production database; SeaORM Postgres feature only |
-| chrono | jiff | One date/time crate (sea-orm has no `with-jiff`) |
-| sea-orm `with-chrono` / `with-time` | sea-orm `with-jiff` | `with-jiff` does not exist in sea-orm 2.0 |
+| PostgreSQL | SQLite | One production database; sqlx's `postgres` feature only |
+| chrono | jiff | One date/time crate at the database boundary: sqlx's `chrono` feature, which axa turns on |
+| sqlx `chrono` | sqlx `time` alongside it | With both on, sqlx 0.9.0's macros warn on every timestamp column |
 | Postgres-backed background jobs (the `axa_queue` table) | SQLite / external broker | No extra infra dependency for the job queue |
 
 ### 2.1 Known drift toward the target
@@ -104,7 +104,7 @@ to be closed, not as an alternative standard:
 
 | Crate | Deviation | Target |
 |---|---|---|
-| Older services (`person` and peers) | SeaORM columns use `with-time` (the `time` crate) at the persistence boundary; the domain layer is `chrono` (bridged in `db/convert.rs`) | unify on SeaORM `with-chrono` |
+| Older services (`person`, `worker`, `event`) | some wire and audit types are still the `time` crate, filled from `chrono` rows through crate-private twins in `src/db/` | one date/time crate end to end |
 | Event streaming | default transport is still the in-memory publisher (`<ENTITY>_EVENT_TRANSPORT` defaults to `memory`); the durable Postgres outbox and the `FluvioSink` relay are implemented on all ten registries but opt-in, and only case's relay points at a live deployed broker today | flip the default, and point the remaining nine relays at a broker |
 
 Closed since this table was last drift-checked: Tantivy full-text search (was ILIKE/`pg_trgm`) is now live on all ten entity registries — see [`search/index.md`](../search/index.md).
@@ -261,10 +261,10 @@ because macOS cannot load a stripped `sqlx-macros`.
 | Aspect | Value |
 |---|---|
 | Rust edition (target) | 2024 |
-| MSRV | **Rust 1.96** — current stable minus two, declared per crate and enforced in CI ([`../rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md)) |
+| MSRV | **Rust 1.97** — current stable minus two, declared per crate and enforced in CI ([`../rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md)) |
 | axa | 0.8, from crates.io |
 | Axum | 0.8 |
-| SeaORM | 2.0 |
+| sqlx | 0.9 |
 | PostgreSQL | 18+ |
 | Svelte / SvelteKit | 5 / 2 |
 | Service crate versions | per-crate (`person-service` 0.5.0, `organization-service` 0.1.0, …) |
@@ -274,18 +274,17 @@ Crate versions are independent: each service, matcher, library, and
 front-end carries its own SemVer in its manifest.
 
 **MSRV is no longer a README claim.** It is the current stable minus
-two — **1.96** today, derived from stable 1.98.0 — declared as
+two — **1.97** today, derived from stable 1.99.1 — declared as
 `rust-version` in all 46 non-`fuzz` manifests, sourced from
 [`ci/msrv.txt`](../../ci/msrv.txt), and checked by
 `scripts/ci-check.sh msrv`, which compiles every crate against that
 toolchain. The policy, including why N-2 and how to bump it, is
 [`../rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md). Note that the
-binding constraint is the dependency graph, not our code: `axa`,
-`sea-orm`, and `sqlx` already require 1.94.
+binding constraint is the dependency graph, not our code: `axa` and `sqlx`
+already require 1.94.
 
-The remaining edition deviation is the twelve `migration/` sub-crates,
-which are still `edition = "2021"`. Every
-top-level crate is on 2024.
+Every crate is on edition 2024; the `migration/` sub-crates that were still on
+2021 went with SeaORM.
 
 ---
 
