@@ -3548,7 +3548,7 @@ dependencies = [
  "csv",
  "ed25519-dalek 3.0.0",
  "fluvio",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "include_dir",
  "insta",
  "integrity-mac",
