@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE audit_log SET ip_address = NULL, ip_salt = NULL\n           WHERE ip_address IS NOT NULL\n             AND \"timestamp\" < $1\n             AND (ip_commitment IS NOT NULL OR hash IS NULL OR redacted_at IS NOT NULL)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fa56453ca4e6573eea8bccc15a0c5290bf51b5c5c5101258f8f13e4d8a07ac96"
+}

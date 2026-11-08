@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed
+
+- Address retention (`scrub_addresses`, `count_unscrubbable_addresses`)
+  measures "older than N days" on this process's clock, the clock that
+  stamped `audit_log."timestamp"` (the chain hashes it, so the database
+  cannot). It compared with Postgres `now()`, so an application clock
+  behind the database's scrubbed addresses early by the drift, and one
+  ahead kept them past their retention.
+
 ### Changed
 
 - **Persistence moves from SeaORM to sqlx** (spec §10, §13 SQ-1; the
