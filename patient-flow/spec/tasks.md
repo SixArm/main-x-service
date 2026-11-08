@@ -320,6 +320,19 @@ code + tests in one PR.
   `tests/keycloak_guard.rs` (DB-free). Verifier side:
   `authentication-verifier` KC-1; reference: organization-service.
 
+- [x] PF-T26 **Move from SeaORM to sqlx (2026-11-08).** Repo
+  `spec/tech-stack/index.md` §5. Every statement is a `query!` /
+  `query_as!` / `query_scalar!` literal in `src/models/`, including
+  the queries the controllers, the seed task and the truncate used to
+  build themselves; `.sqlx/` committed. The five SeaORM schema-builder
+  migrations are plain SQL under `migrations/`, written from a
+  `pg_dump` of the old schema and proven identical by a second dump.
+  `migration/` and `src/models/_entities/` are gone. Wire JSON,
+  locking (`FOR UPDATE` on placement), audit + outbox in the mutation's
+  transaction, and the error statuses are unchanged. Unit tests 74, DB
+  suite 9, both as before. No record-integrity module, so INT-V1 does
+  not apply. (PF-D3, PF-D9, PF-D12)
+
 ## Production gates (P0 — design-only until a real deployment)
 
 - [ ] PF-T-G1 Clinical safety case (DCB0129/0160) + named CSO.

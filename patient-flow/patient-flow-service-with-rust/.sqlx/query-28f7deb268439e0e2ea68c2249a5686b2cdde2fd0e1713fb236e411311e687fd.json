@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, ward_pid, name, sex_designation, side_room,\n                      closed_to_admissions, deleted_at AS \"deleted_at: _\"\n               FROM bays\n               WHERE pid = $1 AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "ward_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "ward_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "sex_designation",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "sex_designation"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "side_room",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "side_room"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "closed_to_admissions",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "closed_to_admissions"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bays",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "28f7deb268439e0e2ea68c2249a5686b2cdde2fd0e1713fb236e411311e687fd"
+}

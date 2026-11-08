@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM wards",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "e591e9dbdd651f6ce61dfefa74f9dcd9e7cee90db83cacafbc47d0bebd835c46"
+}

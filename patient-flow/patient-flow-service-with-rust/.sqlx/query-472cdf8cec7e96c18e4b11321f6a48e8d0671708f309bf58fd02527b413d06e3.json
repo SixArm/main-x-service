@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, stay_pid, precaution, organism, status,\n                      requires_side_room, flagged_at AS \"flagged_at: _\",\n                      cleared_at AS \"cleared_at: _\"\n               FROM infection_flags\n               WHERE stay_pid = $1 AND cleared_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "stay_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "stay_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "precaution",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "precaution"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "organism",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "organism"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "requires_side_room",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "requires_side_room"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "flagged_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "flagged_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "cleared_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "infection_flags",
+            "name": "cleared_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "472cdf8cec7e96c18e4b11321f6a48e8d0671708f309bf58fd02527b413d06e3"
+}

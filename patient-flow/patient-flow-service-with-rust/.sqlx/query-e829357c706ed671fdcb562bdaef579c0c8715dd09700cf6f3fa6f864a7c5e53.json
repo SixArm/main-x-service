@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM stays",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "e829357c706ed671fdcb562bdaef579c0c8715dd09700cf6f3fa6f864a7c5e53"
+}

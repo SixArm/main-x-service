@@ -4,8 +4,8 @@ A back-end **JSON API** for hospital patient flow and bed management
 in a UK NHS hospital setting: live bed states, inpatient stays from
 admission to discharge, bed requests and allocation, infection
 control, virtual wards, and 'hospital at a glance' capacity views.
-Implemented in Rust on [Loco](https://axa) (Axum + SeaORM +
-PostgreSQL). No built-in UI — the
+Implemented in Rust on [axa](https://github.com/publicprojects-io/axa)
+(Axum + sqlx + PostgreSQL). No built-in UI — the
 [Svelte sibling](../patient-flow-front-end-with-svelte/) provides
 the ward whiteboard and touchscreen client.
 

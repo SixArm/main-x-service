@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, stay_pid, from_bed_pid, to_bed_pid, reason,\n                      moved_at AS \"moved_at: _\", moved_by_ref\n               FROM transfers\n               WHERE stay_pid = $1\n               ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "stay_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "stay_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "from_bed_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "from_bed_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "to_bed_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "to_bed_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "reason",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "moved_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "moved_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "moved_by_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "transfers",
+            "name": "moved_by_ref"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "0083010bb3bef492477fbd95d8099e22aa3b5fe1c0905bdaa6a32e009caa0788"
+}

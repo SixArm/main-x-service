@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM infection_flags",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "3b4fbed113b91fb715fdd4ff085d8f6a789e4f20686baf43caca39beaaa5a641"
+}

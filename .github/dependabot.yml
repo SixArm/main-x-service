@@ -499,20 +499,6 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/patient-flow/patient-flow-service-with-rust/migration"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "rust"
-    groups:
-      routine:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "cargo"
     directory: "/person/person-matcher-rust-crate"
     schedule:
       interval: "weekly"

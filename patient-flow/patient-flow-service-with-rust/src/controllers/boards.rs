@@ -15,7 +15,6 @@ use authentication_verifier::Action;
 use axa::extract::Path;
 use axa::prelude::*;
 use axum::http::{HeaderMap, StatusCode, header};
-use sea_orm::QueryOrder;
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -24,11 +23,11 @@ use crate::auth::{self, MaybeAuthUser};
 use crate::flow::bed_state::BedState;
 use crate::flow::journey;
 use crate::metrics::Metrics;
-use crate::models::_entities::{
-    bays, bed_requests, beds, infection_flags, red_green_days, sites, stays, wards,
-};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
+use crate::models::{
+    bays, bed_requests, beds, infection_flags, red_green_days, sites, stays, wards,
+};
 
 /// Weak `ETag` over a serializable view (everything except `as_of`).
 fn etag_of<T: Serialize>(value: &T) -> String {
@@ -121,36 +120,13 @@ async fn whiteboard(
     let masked = obligations.iter().any(|o| o == "mask");
     let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
     let today = now.date_naive();
-    let bay_rows = bays::Entity::find()
-        .filter(bays::Column::WardPid.eq(ward.pid))
-        .filter(bays::Column::DeletedAt.is_null())
-        .order_by_asc(bays::Column::Id)
-        .all(&ctx.db)
-        .await?;
+    let bay_rows = bays::Model::active_in_ward(&ctx.db, ward.pid).await?;
     let bay_pids: Vec<Uuid> = bay_rows.iter().map(|b| b.pid).collect();
-    let bed_rows = beds::Entity::find()
-        .filter(beds::Column::BayPid.is_in(bay_pids))
-        .filter(beds::Column::DeletedAt.is_null())
-        .order_by_asc(beds::Column::Id)
-        .all(&ctx.db)
-        .await?;
-    let stay_rows = stays::Entity::find()
-        .filter(stays::Column::WardPid.eq(ward.pid))
-        .filter(stays::Column::DischargedAt.is_null())
-        .filter(stays::Column::DeletedAt.is_null())
-        .all(&ctx.db)
-        .await?;
+    let bed_rows = beds::Model::active_in_bays(&ctx.db, &bay_pids).await?;
+    let stay_rows = stays::Model::current_in_ward(&ctx.db, ward.pid).await?;
     let stay_pids: Vec<Uuid> = stay_rows.iter().map(|s| s.pid).collect();
-    let flags = infection_flags::Entity::find()
-        .filter(infection_flags::Column::StayPid.is_in(stay_pids.clone()))
-        .filter(infection_flags::Column::ClearedAt.is_null())
-        .all(&ctx.db)
-        .await?;
-    let rg_today = red_green_days::Entity::find()
-        .filter(red_green_days::Column::StayPid.is_in(stay_pids))
-        .filter(red_green_days::Column::Day.eq(today))
-        .all(&ctx.db)
-        .await?;
+    let flags = infection_flags::Model::open_for_stays(&ctx.db, &stay_pids).await?;
+    let rg_today = red_green_days::Model::for_stays_on(&ctx.db, &stay_pids, today).await?;
     let mut cards = Vec::with_capacity(bed_rows.len());
     for bed in &bed_rows {
         let bay = bay_rows.iter().find(|b| b.pid == bed.bay_pid);
@@ -278,29 +254,11 @@ struct AtAGlance {
 async fn glance(ctx: &AppContext) -> Result<AtAGlance> {
     let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
     let today = now.date_naive();
-    let ward_rows = wards::Entity::find()
-        .filter(wards::Column::DeletedAt.is_null())
-        .order_by_asc(wards::Column::Id)
-        .all(&ctx.db)
-        .await?;
-    let bay_rows = bays::Entity::find()
-        .filter(bays::Column::DeletedAt.is_null())
-        .all(&ctx.db)
-        .await?;
-    let bed_rows = beds::Entity::find()
-        .filter(beds::Column::DeletedAt.is_null())
-        .all(&ctx.db)
-        .await?;
-    let stay_rows = stays::Entity::find()
-        .filter(stays::Column::DischargedAt.is_null())
-        .filter(stays::Column::DeletedAt.is_null())
-        .all(&ctx.db)
-        .await?;
-    let open_requests = bed_requests::Entity::find()
-        .filter(bed_requests::Column::DeletedAt.is_null())
-        .filter(bed_requests::Column::Status.eq("open"))
-        .all(&ctx.db)
-        .await?;
+    let ward_rows = wards::Model::all_active_ordered(&ctx.db).await?;
+    let bay_rows = bays::Model::all_active(&ctx.db).await?;
+    let bed_rows = beds::Model::all_active(&ctx.db).await?;
+    let stay_rows = stays::Model::all_current(&ctx.db).await?;
+    let open_requests = bed_requests::Model::all_open(&ctx.db).await?;
     let mut rows = Vec::with_capacity(ward_rows.len());
     for ward in &ward_rows {
         let ward_bays: Vec<Uuid> = bay_rows
@@ -457,11 +415,7 @@ async fn locate(
     if parsed.entity_type != entity_ref::EntityType::Person {
         return Err(super::unprocessable("person_ref must reference a person"));
     }
-    let stay = stays::Entity::find()
-        .filter(stays::Column::PersonRef.eq(person_ref.clone()))
-        .filter(stays::Column::DeletedAt.is_null())
-        .order_by_desc(stays::Column::Id)
-        .one(&ctx.db)
+    let stay = stays::Model::latest_for_person(&ctx.db, &person_ref)
         .await?
         .ok_or(Error::NotFound)?;
     let obligations =
@@ -482,12 +436,7 @@ async fn locate(
         _ => (None, None, None),
     };
     let site = match &ward {
-        Some(w) => {
-            sites::Entity::find()
-                .filter(sites::Column::Pid.eq(w.site_pid))
-                .one(&ctx.db)
-                .await?
-        }
+        Some(w) => sites::Model::find_any(&ctx.db, w.site_pid).await?,
         None => None,
     };
     // Locate is personal data: every read is audited (spec `audit.md`).

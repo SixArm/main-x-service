@@ -74,7 +74,7 @@
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
-use crate::models::_entities::{stays, wards};
+use crate::models::{stays, wards};
 use authentication_verifier::{Action, Claims, Policy, ReloadablePolicy};
 #[cfg(feature = "paseto")]
 use authentication_verifier::{ReloadableVerifier, Verifier};
@@ -1525,8 +1525,8 @@ mod tests {
     }
 
     /// A stay model for the resource-attribute tests.
-    fn a_stay(ward: Option<uuid::Uuid>, status: &str) -> crate::models::_entities::stays::Model {
-        crate::models::_entities::stays::Model {
+    fn a_stay(ward: Option<uuid::Uuid>, status: &str) -> crate::models::stays::Model {
+        crate::models::stays::Model {
             created_at: chrono::Utc::now().into(),
             updated_at: chrono::Utc::now().into(),
             id: 1,

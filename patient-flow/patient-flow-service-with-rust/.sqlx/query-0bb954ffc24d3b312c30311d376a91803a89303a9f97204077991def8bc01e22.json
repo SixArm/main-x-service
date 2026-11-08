@@ -1,0 +1,184 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, site_pid, name, code, kind, specialty, open,\n                      escalation, closed_to_admissions, place_ref,\n                      deleted_at AS \"deleted_at: _\"\n               FROM wards\n               WHERE pid = $1 AND deleted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "site_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "site_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "code",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "code"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "kind",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "specialty",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "specialty"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "open",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "open"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "escalation",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "escalation"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "closed_to_admissions",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "closed_to_admissions"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "place_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "place_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "wards",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "0bb954ffc24d3b312c30311d376a91803a89303a9f97204077991def8bc01e22"
+}

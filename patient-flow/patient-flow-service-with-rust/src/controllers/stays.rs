@@ -9,7 +9,6 @@
 use authentication_verifier::Action;
 use axa::extract::{Json, Path};
 use axa::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -18,11 +17,11 @@ use crate::auth::{self, MaybeAuthUser};
 use crate::flow::bed_state::{BedState, Transition};
 use crate::flow::{journey, tokens};
 use crate::metrics::Metrics;
-use crate::models::_entities::{
-    bays, beds, infection_flags, red_green_days, stays, transfers, wards,
-};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
+use crate::models::{
+    bays, bed_requests, beds, infection_flags, red_green_days, stays, transfers, wards,
+};
 use crate::streaming;
 use crate::validation::Problems;
 
@@ -159,36 +158,26 @@ fn validate_admit(p: &AdmitPayload) -> Vec<String> {
 }
 
 /// The bed's bay + ward context, loaded together.
-async fn bed_context<C: sea_orm::ConnectionTrait>(
-    db: &C,
+async fn bed_context(
+    db: &mut sqlx::PgConnection,
     bed: &beds::Model,
 ) -> Result<(bays::Model, wards::Model)> {
-    let bay = records::find_bay(db, bed.bay_pid).await?;
-    let ward = records::find_ward(db, bay.ward_pid).await?;
+    let bay = records::find_bay(&mut *db, bed.bay_pid).await?;
+    let ward = records::find_ward(&mut *db, bay.ward_pid).await?;
     Ok((bay, ward))
 }
 
 /// Load + exclusively lock an active bed row inside `txn`.
-async fn lock_bed(txn: &sea_orm::DatabaseTransaction, pid: Uuid) -> Result<beds::Model> {
-    beds::Entity::find()
-        .filter(beds::Column::Pid.eq(pid))
-        .filter(beds::Column::DeletedAt.is_null())
-        .lock_exclusive()
-        .one(txn)
+async fn lock_bed(txn: &mut sqlx::PgConnection, pid: Uuid) -> Result<beds::Model> {
+    beds::Model::lock_active(txn, pid)
         .await?
         .ok_or(Error::NotFound)
 }
 
 /// The one-occupant invariant: no other active stay may reference the
 /// bed.
-async fn assert_unoccupied(txn: &sea_orm::DatabaseTransaction, bed_pid: Uuid) -> Result<()> {
-    let occupant = stays::Entity::find()
-        .filter(stays::Column::BedPid.eq(bed_pid))
-        .filter(stays::Column::DischargedAt.is_null())
-        .filter(stays::Column::DeletedAt.is_null())
-        .one(txn)
-        .await?;
-    if occupant.is_some() {
+async fn assert_unoccupied(txn: &mut sqlx::PgConnection, bed_pid: Uuid) -> Result<()> {
+    if stays::Model::bed_is_occupied(txn, bed_pid).await? {
         return Err(unprocessable("bed already has an active occupant"));
     }
     Ok(())
@@ -196,12 +185,8 @@ async fn assert_unoccupied(txn: &sea_orm::DatabaseTransaction, bed_pid: Uuid) ->
 
 /// Whether the stay carries an uncleared transmissible infection flag
 /// (contact/droplet/airborne ⇒ the vacated bed needs a deep clean).
-async fn is_infectious<C: sea_orm::ConnectionTrait>(db: &C, stay_pid: Uuid) -> Result<bool> {
-    let flags = infection_flags::Entity::find()
-        .filter(infection_flags::Column::StayPid.eq(stay_pid))
-        .filter(infection_flags::Column::ClearedAt.is_null())
-        .all(db)
-        .await?;
+async fn is_infectious(db: &sqlx::PgPool, stay_pid: Uuid) -> Result<bool> {
+    let flags = infection_flags::Model::open_for_stay(db, stay_pid).await?;
     Ok(flags.iter().any(|f| f.precaution != "protective"))
 }
 
@@ -232,61 +217,59 @@ async fn admit(
             .await
             .unwrap_or_else(|| payload.person_ref.clone())
     };
-    let txn = ctx.db.begin().await?;
-    let bed = lock_bed(&txn, payload.bed_pid).await?;
-    assert_unoccupied(&txn, bed.pid).await?;
-    let (_, ward) = bed_context(&txn, &bed).await?;
+    let mut txn = ctx.db.begin().await?;
+    let bed = lock_bed(&mut txn, payload.bed_pid).await?;
+    assert_unoccupied(&mut txn, bed.pid).await?;
+    let (_, ward) = bed_context(&mut txn, &bed).await?;
     if !ward.open {
         return Err(unprocessable("ward is closed"));
     }
     let outcome = super::topology::apply_transition(&bed, &Transition::Admit)?;
-    let bed_row = super::topology::persist_outcome(&txn, bed, &outcome, caller.actor()).await?;
-    let stay = stays::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        person_ref: ActiveValue::set(payload.person_ref.clone()),
-        display_name: ActiveValue::set(display_name),
-        status: ActiveValue::set("admitted".to_string()),
-        admitted_at: ActiveValue::set(chrono::Utc::now().into()),
-        source: ActiveValue::set(payload.source.clone()),
-        ward_pid: ActiveValue::set(Some(ward.pid)),
-        bed_pid: ActiveValue::set(Some(bed_row.pid)),
-        home_location_note: ActiveValue::set(payload.home_location_note.clone()),
-        named_nurse_ref: ActiveValue::set(payload.named_nurse_ref.clone()),
-        consultant_ref: ActiveValue::set(payload.consultant_ref.clone()),
-        senior_review_at: ActiveValue::set(None),
-        edd: ActiveValue::set(payload.edd),
-        ccd: ActiveValue::set(payload.ccd.clone()),
-        ccd_met: ActiveValue::set(false),
-        discharge_pathway: ActiveValue::set(None),
-        discharge_ready_at: ActiveValue::set(None),
-        discharged_at: ActiveValue::set(None),
-        discharge_destination: ActiveValue::set(None),
-        alerts: ActiveValue::set(serde_json::json!(payload.alerts)),
-        deleted_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let bed_row = super::topology::persist_outcome(&mut txn, bed, &outcome, caller.actor()).await?;
+    let stay = stays::Model::insert(
+        &mut *txn,
+        &stays::NewStay {
+            pid: Uuid::new_v4(),
+            person_ref: &payload.person_ref,
+            display_name: &display_name,
+            status: "admitted",
+            admitted_at: chrono::Utc::now().into(),
+            source: &payload.source,
+            ward_pid: Some(ward.pid),
+            bed_pid: Some(bed_row.pid),
+            home_location_note: payload.home_location_note.as_deref(),
+            named_nurse_ref: payload.named_nurse_ref.as_deref(),
+            consultant_ref: payload.consultant_ref.as_deref(),
+            edd: payload.edd,
+            ccd: payload.ccd.as_deref(),
+            alerts: serde_json::json!(payload.alerts),
+        },
+    )
     .await?;
-    transfers::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        stay_pid: ActiveValue::set(stay.pid),
-        from_bed_pid: ActiveValue::set(None),
-        to_bed_pid: ActiveValue::set(Some(bed_row.pid)),
-        reason: ActiveValue::set("admission".to_string()),
-        moved_at: ActiveValue::set(chrono::Utc::now().into()),
-        moved_by_ref: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    transfers::Model::insert(
+        &mut *txn,
+        &transfers::NewTransfer {
+            pid: Uuid::new_v4(),
+            stay_pid: stay.pid,
+            from_bed_pid: None,
+            to_bed_pid: Some(bed_row.pid),
+            reason: "admission",
+            moved_at: chrono::Utc::now().into(),
+            moved_by_ref: None,
+        },
+    )
     .await?;
     // Fulfil the originating bed request, when named.
     if let Some(request_pid) = payload.bed_request_pid
-        && let Ok(request) = records::find_bed_request(&txn, request_pid).await
+        && let Ok(request) = records::find_bed_request(&mut *txn, request_pid).await
     {
-        let mut active: crate::models::_entities::bed_requests::ActiveModel = request.into();
-        active.status = ActiveValue::set("fulfilled".to_string());
-        active.resolved_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-        active.update(&txn).await?;
+        bed_requests::Model::resolve(
+            &mut *txn,
+            request.id,
+            "fulfilled",
+            chrono::Utc::now().into(),
+        )
+        .await?;
     }
     let snapshot = serde_json::json!({
         "ward_pid": ward.pid.to_string(),
@@ -295,7 +278,7 @@ async fn admit(
         "edd_missing": stay.edd.is_none(),
     });
     Audit::record(
-        &txn,
+        &mut *txn,
         "stay",
         stay.pid,
         "stay_admitted",
@@ -304,7 +287,7 @@ async fn admit(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "stay",
         "stay_admitted",
         &stay.pid.to_string(),
@@ -351,21 +334,9 @@ async fn get_stay(
     if obligations.iter().any(|o| o == "mask") {
         stay = auth::mask_stay(stay);
     }
-    let transfer_rows = transfers::Entity::find()
-        .filter(transfers::Column::StayPid.eq(stay.pid))
-        .order_by_asc(transfers::Column::Id)
-        .all(&ctx.db)
-        .await?;
-    let red_green = red_green_days::Entity::find()
-        .filter(red_green_days::Column::StayPid.eq(stay.pid))
-        .order_by_asc(red_green_days::Column::Day)
-        .all(&ctx.db)
-        .await?;
-    let flags = infection_flags::Entity::find()
-        .filter(infection_flags::Column::StayPid.eq(stay.pid))
-        .order_by_asc(infection_flags::Column::Id)
-        .all(&ctx.db)
-        .await?;
+    let transfer_rows = transfers::Model::for_stay(&ctx.db, stay.pid).await?;
+    let red_green = red_green_days::Model::for_stay(&ctx.db, stay.pid).await?;
+    let flags = infection_flags::Model::for_stay(&ctx.db, stay.pid).await?;
     let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
     let detail = StayDetail {
         length_of_stay_days: journey::length_of_stay_days(
@@ -438,11 +409,7 @@ async fn stay_time_analysis(
     let stay = records::find_stay(&ctx.db, records::parse_pid(&pid)?).await?;
     auth::authorize_record(&caller, Action::Read, &auth::stay_resource_attrs(&stay))
         .map_err(record_rejection)?;
-    let rows = red_green_days::Entity::find()
-        .filter(red_green_days::Column::StayPid.eq(stay.pid))
-        .order_by_asc(red_green_days::Column::Day)
-        .all(&ctx.db)
-        .await?;
+    let rows = red_green_days::Model::for_stay(&ctx.db, stay.pid).await?;
     let classifications: Vec<(chrono::NaiveDate, String)> = rows
         .iter()
         .map(|r| (r.day, r.classification.clone()))
@@ -522,40 +489,23 @@ async fn update_stay(
     if stay.status == "discharged" {
         return Err(unprocessable("stay is discharged"));
     }
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     let ward_pid = stay.ward_pid;
     let stay_pid = stay.pid;
-    let mut active: stays::ActiveModel = stay.into();
-    if let Some(v) = payload.display_name {
-        active.display_name = ActiveValue::set(v);
-    }
-    if let Some(v) = payload.named_nurse_ref {
-        active.named_nurse_ref = ActiveValue::set(Some(v));
-    }
-    if let Some(v) = payload.consultant_ref {
-        active.consultant_ref = ActiveValue::set(Some(v));
-    }
-    if let Some(v) = payload.edd {
-        active.edd = ActiveValue::set(Some(v));
-    }
-    if let Some(v) = payload.ccd {
-        active.ccd = ActiveValue::set(Some(v));
-    }
-    if let Some(v) = payload.ccd_met {
-        active.ccd_met = ActiveValue::set(v);
-    }
-    if payload.senior_review_now {
-        active.senior_review_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-    }
-    if let Some(v) = payload.alerts {
-        active.alerts = ActiveValue::set(serde_json::json!(v));
-    }
-    if let Some(v) = payload.home_location_note {
-        active.home_location_note = ActiveValue::set(Some(v));
-    }
-    let row = active.update(&txn).await?;
+    let changes = stays::StayChanges {
+        display_name: payload.display_name,
+        named_nurse_ref: payload.named_nurse_ref,
+        consultant_ref: payload.consultant_ref,
+        edd: payload.edd,
+        ccd: payload.ccd,
+        ccd_met: payload.ccd_met,
+        senior_review_at: payload.senior_review_now.then(|| chrono::Utc::now().into()),
+        alerts: payload.alerts.map(|v| serde_json::json!(v)),
+        home_location_note: payload.home_location_note,
+    };
+    let row = stays::Model::update(&mut *txn, stay.id, &changes).await?;
     Audit::record(
-        &txn,
+        &mut *txn,
         "stay",
         stay_pid,
         "updated",
@@ -564,7 +514,7 @@ async fn update_stay(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "stay",
         "updated",
         &stay_pid.to_string(),
@@ -608,25 +558,25 @@ async fn transfer(
         return Err(unprocessable("destination is the current bed"));
     }
     let infectious = is_infectious(&ctx.db, stay.pid).await?;
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     // Lock both beds in pid order (deadlock avoidance), then re-load.
     let (first, second) = if from_bed_pid < payload.to_bed_pid {
         (from_bed_pid, payload.to_bed_pid)
     } else {
         (payload.to_bed_pid, from_bed_pid)
     };
-    let bed_a = lock_bed(&txn, first).await?;
-    let bed_b = lock_bed(&txn, second).await?;
+    let bed_a = lock_bed(&mut txn, first).await?;
+    let bed_b = lock_bed(&mut txn, second).await?;
     let (from_bed, to_bed) = if bed_a.pid == from_bed_pid {
         (bed_a, bed_b)
     } else {
         (bed_b, bed_a)
     };
-    assert_unoccupied(&txn, to_bed.pid).await?;
+    assert_unoccupied(&mut txn, to_bed.pid).await?;
     // Destination eligibility (same rules as allocation): a stay with
     // an uncleared transmissible flag may only move to a side room /
     // isolation-capable bed (spec `infection-control.md`).
-    let (to_bay, to_ward) = bed_context(&txn, &to_bed).await?;
+    let (to_bay, to_ward) = bed_context(&mut txn, &to_bed).await?;
     let facts = crate::flow::allocation::BedFacts {
         state: BedState::parse(&to_bed.state).map_err(|e| unprocessable(&e.to_string()))?,
         ward_open: to_ward.open,
@@ -670,27 +620,25 @@ async fn transfer(
     }
     // Vacate the old bed, occupy the new one.
     let out_old = super::topology::apply_transition(&from_bed, &Transition::Vacate { infectious })?;
-    super::topology::persist_outcome(&txn, from_bed, &out_old, caller.actor()).await?;
+    super::topology::persist_outcome(&mut txn, from_bed, &out_old, caller.actor()).await?;
     let out_new = super::topology::apply_transition(&to_bed, &Transition::Admit)?;
     let to_bed_row =
-        super::topology::persist_outcome(&txn, to_bed, &out_new, caller.actor()).await?;
+        super::topology::persist_outcome(&mut txn, to_bed, &out_new, caller.actor()).await?;
     let stay_pid = stay.pid;
     let display_name = stay.display_name.clone();
-    let mut active: stays::ActiveModel = stay.into();
-    active.ward_pid = ActiveValue::set(Some(to_ward.pid));
-    active.bed_pid = ActiveValue::set(Some(to_bed_row.pid));
-    let row = active.update(&txn).await?;
-    transfers::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        stay_pid: ActiveValue::set(stay_pid),
-        from_bed_pid: ActiveValue::set(Some(from_bed_pid)),
-        to_bed_pid: ActiveValue::set(Some(to_bed_row.pid)),
-        reason: ActiveValue::set(payload.reason.clone()),
-        moved_at: ActiveValue::set(chrono::Utc::now().into()),
-        moved_by_ref: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let row = stays::Model::set_location(&mut *txn, stay.id, to_ward.pid, to_bed_row.pid).await?;
+    transfers::Model::insert(
+        &mut *txn,
+        &transfers::NewTransfer {
+            pid: Uuid::new_v4(),
+            stay_pid,
+            from_bed_pid: Some(from_bed_pid),
+            to_bed_pid: Some(to_bed_row.pid),
+            reason: &payload.reason,
+            moved_at: chrono::Utc::now().into(),
+            moved_by_ref: None,
+        },
+    )
     .await?;
     let snapshot = serde_json::json!({
         "ward_pid": to_ward.pid.to_string(),
@@ -702,7 +650,7 @@ async fn transfer(
         "override_reason": payload.override_reason,
     });
     Audit::record(
-        &txn,
+        &mut *txn,
         "stay",
         stay_pid,
         "stay_transferred",
@@ -711,7 +659,7 @@ async fn transfer(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "stay",
         "stay_transferred",
         &stay_pid.to_string(),
@@ -748,21 +696,23 @@ async fn discharge_ready(
     if !stay.ccd_met {
         return Err(unprocessable("clinical criteria for discharge are not met"));
     }
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     let stay_pid = stay.pid;
     let ward_pid = stay.ward_pid;
     let display_name = stay.display_name.clone();
-    let mut active: stays::ActiveModel = stay.into();
-    active.status = ActiveValue::set("discharge_ready".to_string());
-    active.discharge_ready_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-    active.discharge_pathway = ActiveValue::set(Some(payload.pathway.clone()));
-    let row = active.update(&txn).await?;
+    let row = stays::Model::mark_discharge_ready(
+        &mut *txn,
+        stay.id,
+        chrono::Utc::now().into(),
+        &payload.pathway,
+    )
+    .await?;
     let snapshot = serde_json::json!({
         "pathway": payload.pathway,
         "ward_pid": ward_pid.map(|w| w.to_string()),
     });
     Audit::record(
-        &txn,
+        &mut *txn,
         "stay",
         stay_pid,
         "stay_discharge_ready",
@@ -771,7 +721,7 @@ async fn discharge_ready(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "stay",
         "stay_discharge_ready",
         &stay_pid.to_string(),
@@ -804,52 +754,47 @@ async fn discharge(
         return Err(unprocessable("stay is already discharged"));
     }
     let infectious = is_infectious(&ctx.db, stay.pid).await?;
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     // Vacate the bed (if any — virtual stays always have a slot too).
     if let Some(bed_pid) = stay.bed_pid {
-        let bed = lock_bed(&txn, bed_pid).await?;
+        let bed = lock_bed(&mut txn, bed_pid).await?;
         let outcome = super::topology::apply_transition(&bed, &Transition::Vacate { infectious })?;
-        super::topology::persist_outcome(&txn, bed, &outcome, caller.actor()).await?;
-        transfers::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
-            stay_pid: ActiveValue::set(stay.pid),
-            from_bed_pid: ActiveValue::set(Some(bed_pid)),
-            to_bed_pid: ActiveValue::set(None),
-            reason: ActiveValue::set("discharge".to_string()),
-            moved_at: ActiveValue::set(chrono::Utc::now().into()),
-            moved_by_ref: ActiveValue::set(None),
-            ..Default::default()
-        }
-        .insert(&txn)
+        super::topology::persist_outcome(&mut txn, bed, &outcome, caller.actor()).await?;
+        transfers::Model::insert(
+            &mut *txn,
+            &transfers::NewTransfer {
+                pid: Uuid::new_v4(),
+                stay_pid: stay.pid,
+                from_bed_pid: Some(bed_pid),
+                to_bed_pid: None,
+                reason: "discharge",
+                moved_at: chrono::Utc::now().into(),
+                moved_by_ref: None,
+            },
+        )
         .await?;
     }
     // Close out open infection flags (the bed keeps its deep-clean flag).
-    let open_flags = infection_flags::Entity::find()
-        .filter(infection_flags::Column::StayPid.eq(stay.pid))
-        .filter(infection_flags::Column::ClearedAt.is_null())
-        .all(&txn)
-        .await?;
+    let open_flags = infection_flags::Model::open_for_stay(&mut *txn, stay.pid).await?;
     for flag in open_flags {
-        let mut active: infection_flags::ActiveModel = flag.into();
-        active.status = ActiveValue::set("cleared".to_string());
-        active.cleared_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-        active.update(&txn).await?;
+        infection_flags::Model::clear(&mut *txn, flag.id, chrono::Utc::now().into()).await?;
     }
     let stay_pid = stay.pid;
     let ward_pid = stay.ward_pid;
     let display_name = stay.display_name.clone();
-    let mut active: stays::ActiveModel = stay.into();
-    active.status = ActiveValue::set("discharged".to_string());
-    active.discharged_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-    active.discharge_destination = ActiveValue::set(Some(payload.destination.clone()));
-    active.bed_pid = ActiveValue::set(None);
-    let row = active.update(&txn).await?;
+    let row = stays::Model::discharge(
+        &mut *txn,
+        stay.id,
+        chrono::Utc::now().into(),
+        &payload.destination,
+    )
+    .await?;
     let snapshot = serde_json::json!({
         "destination": payload.destination,
         "ward_pid": ward_pid.map(|w| w.to_string()),
     });
     Audit::record(
-        &txn,
+        &mut *txn,
         "stay",
         stay_pid,
         "stay_discharged",
@@ -858,7 +803,7 @@ async fn discharge(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "stay",
         "stay_discharged",
         &stay_pid.to_string(),
@@ -888,28 +833,26 @@ async fn red_green(
         return Err(unprocessable("stay is discharged"));
     }
     let today = chrono::Utc::now().date_naive();
-    let txn = ctx.db.begin().await?;
-    let existing = red_green_days::Entity::find()
-        .filter(red_green_days::Column::StayPid.eq(stay.pid))
-        .filter(red_green_days::Column::Day.eq(today))
-        .one(&txn)
-        .await?;
+    let mut txn = ctx.db.begin().await?;
+    let existing = red_green_days::Model::for_stay_on(&mut *txn, stay.pid, today).await?;
     let row = if let Some(existing) = existing {
-        let mut active: red_green_days::ActiveModel = existing.into();
-        active.classification = ActiveValue::set(payload.classification.clone());
-        active.delay_reasons = ActiveValue::set(serde_json::json!(payload.delay_reasons));
-        active.note = ActiveValue::set(payload.note.clone());
-        active.update(&txn).await?
+        red_green_days::Model::reclassify(
+            &mut *txn,
+            existing.id,
+            &payload.classification,
+            serde_json::json!(payload.delay_reasons),
+            payload.note.as_deref(),
+        )
+        .await?
     } else {
-        red_green_days::ActiveModel {
-            stay_pid: ActiveValue::set(stay.pid),
-            day: ActiveValue::set(today),
-            classification: ActiveValue::set(payload.classification.clone()),
-            delay_reasons: ActiveValue::set(serde_json::json!(payload.delay_reasons)),
-            note: ActiveValue::set(payload.note.clone()),
-            ..Default::default()
-        }
-        .insert(&txn)
+        red_green_days::Model::insert(
+            &mut *txn,
+            stay.pid,
+            today,
+            &payload.classification,
+            serde_json::json!(payload.delay_reasons),
+            payload.note.as_deref(),
+        )
         .await?
     };
     let snapshot = serde_json::json!({
@@ -919,7 +862,7 @@ async fn red_green(
         "ward_pid": stay.ward_pid.map(|w| w.to_string()),
     });
     Audit::record(
-        &txn,
+        &mut *txn,
         "red_green",
         stay.pid,
         "red_green_recorded",
@@ -928,7 +871,7 @@ async fn red_green(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "red_green",
         "red_green_recorded",
         &stay.pid.to_string(),
@@ -958,19 +901,19 @@ async fn add_flag(
     if stay.status == "discharged" {
         return Err(unprocessable("stay is discharged"));
     }
-    let txn = ctx.db.begin().await?;
-    let row = infection_flags::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        stay_pid: ActiveValue::set(stay.pid),
-        precaution: ActiveValue::set(payload.precaution.clone()),
-        organism: ActiveValue::set(payload.organism.clone()),
-        status: ActiveValue::set(payload.status.clone()),
-        requires_side_room: ActiveValue::set(payload.requires_side_room),
-        flagged_at: ActiveValue::set(chrono::Utc::now().into()),
-        cleared_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let mut txn = ctx.db.begin().await?;
+    let row = infection_flags::Model::insert(
+        &mut *txn,
+        &infection_flags::NewFlag {
+            pid: Uuid::new_v4(),
+            stay_pid: stay.pid,
+            precaution: &payload.precaution,
+            organism: payload.organism.as_deref(),
+            status: &payload.status,
+            requires_side_room: payload.requires_side_room,
+            flagged_at: chrono::Utc::now().into(),
+        },
+    )
     .await?;
     let snapshot = serde_json::json!({
         "precaution": payload.precaution,
@@ -979,7 +922,7 @@ async fn add_flag(
         "ward_pid": stay.ward_pid.map(|w| w.to_string()),
     });
     Audit::record(
-        &txn,
+        &mut *txn,
         "infection_flag",
         row.pid,
         "infection_flagged",
@@ -988,7 +931,7 @@ async fn add_flag(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "infection_flag",
         "infection_flagged",
         &row.pid.to_string(),
@@ -1011,23 +954,18 @@ async fn clear_flag(
     Path((pid, flag_pid)): Path<(String, String)>,
 ) -> Result<Response> {
     let stay = records::find_stay(&ctx.db, records::parse_pid(&pid)?).await?;
-    let flag = infection_flags::Entity::find()
-        .filter(infection_flags::Column::Pid.eq(records::parse_pid(&flag_pid)?))
-        .filter(infection_flags::Column::StayPid.eq(stay.pid))
-        .one(&ctx.db)
-        .await?
-        .ok_or(Error::NotFound)?;
+    let flag =
+        infection_flags::Model::find_on_stay(&ctx.db, records::parse_pid(&flag_pid)?, stay.pid)
+            .await?
+            .ok_or(Error::NotFound)?;
     if flag.cleared_at.is_some() {
         return Err(unprocessable("flag is already cleared"));
     }
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     let flag_pid = flag.pid;
-    let mut active: infection_flags::ActiveModel = flag.into();
-    active.status = ActiveValue::set("cleared".to_string());
-    active.cleared_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-    active.update(&txn).await?;
+    infection_flags::Model::clear(&mut *txn, flag.id, chrono::Utc::now().into()).await?;
     Audit::record(
-        &txn,
+        &mut *txn,
         "infection_flag",
         flag_pid,
         "infection_cleared",
@@ -1037,7 +975,7 @@ async fn clear_flag(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "infection_flag",
         "infection_cleared",
         &flag_pid.to_string(),

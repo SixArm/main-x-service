@@ -1,0 +1,317 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO stays (pid, person_ref, display_name, status, admitted_at, source,\n                                  ward_pid, bed_pid, home_location_note, named_nurse_ref,\n                                  consultant_ref, senior_review_at, edd, ccd, ccd_met,\n                                  discharge_pathway, discharge_ready_at, discharged_at,\n                                  discharge_destination, alerts, deleted_at)\n               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULL, $12, $13, false,\n                       NULL, NULL, NULL, NULL, $14, NULL)\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "person_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "person_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "display_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "admitted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "admitted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "source",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "ward_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "ward_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "bed_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "bed_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "home_location_note",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "home_location_note"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "named_nurse_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "named_nurse_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "consultant_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "consultant_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "senior_review_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "senior_review_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "edd",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "edd"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "ccd",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "ccd"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "ccd_met",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "ccd_met"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "discharge_pathway",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "discharge_pathway"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "discharge_ready_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "discharge_ready_at"
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "discharged_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "discharged_at"
+          }
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "discharge_destination",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "discharge_destination"
+          }
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "alerts",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "alerts"
+          }
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "stays",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Varchar",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Date",
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "776b708694cdbd840eeed9d5d3b0fb21f4b2645db7b60ea5800c3532d86c32dc"
+}

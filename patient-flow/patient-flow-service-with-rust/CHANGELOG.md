@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — SeaORM replaced by sqlx
+
+- **Persistence is sqlx with no ORM** (`../spec/tasks.md` PF-T26;
+  repo `spec/tech-stack/index.md` §5). All SQL is in `src/models/`, as
+  73 `query!` / `query_as!` / `query_scalar!` literals checked at
+  compile time against the committed `.sqlx/`; there is no dynamic SQL
+  and no `ci/sql-allowlist.txt` entry. The queries the topology, stay,
+  bed-request and board controllers, the seed task and `App::truncate`
+  built themselves moved into one module per table, each with a plain
+  `Model` row struct in place of the SeaORM entity. The whiteboard's
+  `IN` lists are `= ANY($1)`; an empty list still matches nothing.
+- **The `migration/` crate is removed.** Its five migrations were
+  SeaORM schema-builder Rust (four through axa's `create_table`, one
+  already SQL); they are now plain SQL in sqlx's flat
+  `migrations/<version>_<name>.up.sql` / `.down.sql` layout, written from
+  a `pg_dump --schema-only` of the database the old code built, in the
+  same order. They are recorded in `_sqlx_migrations` instead of
+  `seaql_migrations`, and the schema is otherwise identical (a second
+  `pg_dump` diff is empty). A database the old code migrated has no
+  `_sqlx_migrations`, so recreate it.
+- `axa` takes its `sqlx` feature instead of `sea-orm`, so `ctx.db` is a
+  `sqlx::PgPool`; `sea-orm` and `sea-orm-migration` are gone (291 → 252
+  unique normal dependencies). `chrono` names its own `serde` feature,
+  which SeaORM used to turn on. Every row serializes exactly as before,
+  `beds.virtual` included (still `is_virtual` on the wire).
+- Library API: `models::ModelError` / `ModelResult` replace axa's
+  SeaORM-only ones and convert into the same `axa::Error`, so a missing
+  row is still `404` and a broken constraint still `409`. Helpers take an
+  `axa::sqlx::Db` instead of a `ConnectionTrait`, and
+  `streaming::emit_on` likewise; handlers pass `&mut *txn`, so the
+  change, its audit row and its outbox row still share one transaction.
+  `controllers::topology::persist_outcome` takes a `&mut PgConnection`.
+- Partial `PUT` updates (ward, bay, stay) are one `UPDATE` with
+  `COALESCE($n, col)` per field, so a field left out stays as it was, as
+  with SeaORM's `ActiveModel`. One difference: an empty update body now
+  runs an `UPDATE` that changes nothing, where SeaORM skipped the
+  statement and re-read the row. The response is the same. An update or
+  soft delete that matches no row is still an error (`500`); SeaORM
+  called it "record not updated", sqlx "no rows returned".
+- Bed locks are still `SELECT … FOR UPDATE` inside the handler's
+  transaction, and the unused relay poll is still `FOR UPDATE SKIP
+  LOCKED`.
+- `db status` prints one tab-separated line per migration to stdout
+  (SeaORM logged it). `db reset` and the test boot recreate the schema
+  with `axa::sqlx::dangerously_recreate` in place of SeaORM's `fresh`.
+- `database.enable_logging` no longer reaches the driver: a plain sqlx
+  pool logs each statement at `DEBUG` (target `sqlx::query`) and a slow
+  one at `WARN`.
+- `[profile.release.build-override] strip = false`: with stripping on,
+  macOS cannot load the stripped `sqlx-macros` dylib and a release build
+  fails. The shipped binary is unchanged.
+
 ### Changed
 
 - The seed task runs only in development or test

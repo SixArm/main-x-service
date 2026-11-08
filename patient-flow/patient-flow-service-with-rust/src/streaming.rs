@@ -22,7 +22,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
-use sea_orm::ConnectionTrait;
+use axa::sqlx::Db;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -171,8 +171,8 @@ pub fn transport() -> EventTransport {
 /// # Errors
 ///
 /// When the outbox insert fails (the `memory` path is infallible).
-pub async fn emit_on<C: ConnectionTrait>(
-    conn: &C,
+pub async fn emit_on(
+    conn: impl Into<Db<'_>>,
     entity: &str,
     kind: &str,
     pid: &str,
@@ -183,10 +183,10 @@ pub async fn emit_on<C: ConnectionTrait>(
     let env = envelope(entity, kind, pid, name, actor, data);
     if transport().is_outbox() {
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
-            .map_err(axa::Error::Model)?
+            .map_err(axa::Error::from)?
             .insert_on(conn)
             .await
-            .map_err(axa::Error::Model)?;
+            .map_err(axa::Error::from)?;
     } else {
         let mut events = publisher()
             .events

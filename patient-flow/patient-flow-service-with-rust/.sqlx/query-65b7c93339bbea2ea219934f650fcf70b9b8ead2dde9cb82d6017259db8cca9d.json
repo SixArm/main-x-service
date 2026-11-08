@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM sites",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "65b7c93339bbea2ea219934f650fcf70b9b8ead2dde9cb82d6017259db8cca9d"
+}

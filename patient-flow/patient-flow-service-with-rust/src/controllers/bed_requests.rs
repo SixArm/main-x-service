@@ -4,7 +4,6 @@
 
 use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -14,9 +13,9 @@ use crate::flow::allocation::{self, BedFacts, Overrides, Requirements};
 use crate::flow::bed_state::{BedState, Transition};
 use crate::flow::tokens;
 use crate::metrics::Metrics;
-use crate::models::_entities::{bays, bed_requests, beds, wards};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
+use crate::models::{bays, bed_requests, beds, wards};
 use crate::streaming;
 use crate::validation::Problems;
 
@@ -82,24 +81,15 @@ fn validate_request(p: &RequestPayload) -> Vec<String> {
 /// Assemble [`BedFacts`] for every active bed, joined to its bay and
 /// ward, against one request. Returns `(bed, bay, ward, facts)`.
 async fn all_bed_facts(
-    db: &DatabaseConnection,
+    db: &sqlx::PgPool,
     request: &bed_requests::Model,
 ) -> Result<Vec<(beds::Model, bays::Model, wards::Model, BedFacts)>> {
     let requirements: Requirements =
         serde_json::from_value(request.requirements.clone()).unwrap_or_default();
     let _ = &requirements; // facts are requirement-independent; kept for clarity
-    let ward_rows = wards::Entity::find()
-        .filter(wards::Column::DeletedAt.is_null())
-        .all(db)
-        .await?;
-    let bay_rows = bays::Entity::find()
-        .filter(bays::Column::DeletedAt.is_null())
-        .all(db)
-        .await?;
-    let bed_rows = beds::Entity::find()
-        .filter(beds::Column::DeletedAt.is_null())
-        .all(db)
-        .await?;
+    let ward_rows = wards::Model::all_active(db).await?;
+    let bay_rows = bays::Model::all_active(db).await?;
+    let bed_rows = beds::Model::all_active(db).await?;
     let mut out = Vec::new();
     for bed in bed_rows {
         let Some(bay) = bay_rows.iter().find(|b| b.pid == bed.bay_pid) else {
@@ -141,7 +131,7 @@ async fn all_bed_facts(
 /// The ranked eligible beds for a request (no overrides applied —
 /// this is the advisory list).
 async fn eligible_for(
-    db: &DatabaseConnection,
+    db: &sqlx::PgPool,
     request: &bed_requests::Model,
 ) -> Result<Vec<EligibleBed>> {
     let requirements: Requirements =
@@ -179,28 +169,23 @@ async fn create(
     if let Some(ward_pid) = payload.target_ward_pid {
         records::find_ward(&ctx.db, ward_pid).await?;
     }
-    let txn = ctx.db.begin().await?;
-    let row = bed_requests::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        person_ref: ActiveValue::set(payload.person_ref.clone()),
-        origin: ActiveValue::set(payload.origin.clone()),
-        target_ward_pid: ActiveValue::set(payload.target_ward_pid),
-        specialty: ActiveValue::set(payload.specialty.clone()),
-        priority: ActiveValue::set(payload.priority.clone()),
-        requirements: ActiveValue::set(
-            serde_json::to_value(&payload.requirements).unwrap_or_default(),
-        ),
-        status: ActiveValue::set("open".to_string()),
-        allocated_bed_pid: ActiveValue::set(None),
-        requested_at: ActiveValue::set(chrono::Utc::now().into()),
-        resolved_at: ActiveValue::set(None),
-        deleted_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let mut txn = ctx.db.begin().await?;
+    let row = bed_requests::Model::insert(
+        &mut *txn,
+        &bed_requests::NewBedRequest {
+            pid: Uuid::new_v4(),
+            person_ref: &payload.person_ref,
+            origin: &payload.origin,
+            target_ward_pid: payload.target_ward_pid,
+            specialty: payload.specialty.as_deref(),
+            priority: &payload.priority,
+            requirements: serde_json::to_value(&payload.requirements).unwrap_or_default(),
+            requested_at: chrono::Utc::now().into(),
+        },
+    )
     .await?;
     Audit::record(
-        &txn,
+        &mut *txn,
         "bed_request",
         row.pid,
         "created",
@@ -209,7 +194,7 @@ async fn create(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "bed_request",
         "bed_request_created",
         &row.pid.to_string(),
@@ -234,12 +219,7 @@ struct ListParams {
 #[debug_handler]
 async fn list(State(ctx): State<AppContext>, Query(params): Query<ListParams>) -> Result<Response> {
     let status = params.status.unwrap_or_else(|| "open".to_string());
-    let rows = bed_requests::Entity::find()
-        .filter(bed_requests::Column::DeletedAt.is_null())
-        .filter(bed_requests::Column::Status.eq(status))
-        .order_by_asc(bed_requests::Column::Id)
-        .all(&ctx.db)
-        .await?;
+    let rows = bed_requests::Model::with_status(&ctx.db, &status).await?;
     let mut views = Vec::with_capacity(rows.len());
     for request in rows {
         let eligible = if request.status == "open" {
@@ -317,22 +297,15 @@ async fn allocate(
     if !breaches.is_empty() {
         return Err(unprocessable(&format!("bed ineligible: {breaches:?}")));
     }
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     // Lock + re-check the bed, then reserve it.
-    let bed = beds::Entity::find()
-        .filter(beds::Column::Pid.eq(payload.bed_pid))
-        .filter(beds::Column::DeletedAt.is_null())
-        .lock_exclusive()
-        .one(&txn)
+    let bed = beds::Model::lock_active(&mut *txn, payload.bed_pid)
         .await?
         .ok_or(Error::NotFound)?;
     let outcome = super::topology::apply_transition(&bed, &Transition::Allocate)?;
-    super::topology::persist_outcome(&txn, bed, &outcome, caller.actor()).await?;
+    super::topology::persist_outcome(&mut txn, bed, &outcome, caller.actor()).await?;
     let request_pid = request.pid;
-    let mut active: bed_requests::ActiveModel = request.into();
-    active.status = ActiveValue::set("allocated".to_string());
-    active.allocated_bed_pid = ActiveValue::set(Some(payload.bed_pid));
-    let row = active.update(&txn).await?;
+    let row = bed_requests::Model::allocate(&mut *txn, request.id, payload.bed_pid).await?;
     let snapshot = serde_json::json!({
         "bed_pid": payload.bed_pid.to_string(),
         "override_sex": payload.override_sex,
@@ -340,7 +313,7 @@ async fn allocate(
         "override_reason": payload.override_reason,
     });
     Audit::record(
-        &txn,
+        &mut *txn,
         "bed_request",
         request_pid,
         "bed_request_allocated",
@@ -349,7 +322,7 @@ async fn allocate(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "bed_request",
         "bed_request_allocated",
         &request_pid.to_string(),
@@ -374,28 +347,26 @@ async fn cancel(
     if !matches!(request.status.as_str(), "open" | "allocated") {
         return Err(unprocessable(&format!("request is {}", request.status)));
     }
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     if let Some(bed_pid) = request.allocated_bed_pid {
-        let bed = beds::Entity::find()
-            .filter(beds::Column::Pid.eq(bed_pid))
-            .filter(beds::Column::DeletedAt.is_null())
-            .lock_exclusive()
-            .one(&txn)
-            .await?;
+        let bed = beds::Model::lock_active(&mut *txn, bed_pid).await?;
         if let Some(bed) = bed
             && bed.state == "reserved"
         {
             let outcome = super::topology::apply_transition(&bed, &Transition::Release)?;
-            super::topology::persist_outcome(&txn, bed, &outcome, caller.actor()).await?;
+            super::topology::persist_outcome(&mut txn, bed, &outcome, caller.actor()).await?;
         }
     }
     let request_pid = request.pid;
-    let mut active: bed_requests::ActiveModel = request.into();
-    active.status = ActiveValue::set("cancelled".to_string());
-    active.resolved_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-    let row = active.update(&txn).await?;
+    let row = bed_requests::Model::resolve(
+        &mut *txn,
+        request.id,
+        "cancelled",
+        chrono::Utc::now().into(),
+    )
+    .await?;
     Audit::record(
-        &txn,
+        &mut *txn,
         "bed_request",
         request_pid,
         "bed_request_cancelled",
@@ -404,7 +375,7 @@ async fn cancel(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "bed_request",
         "bed_request_cancelled",
         &request_pid.to_string(),

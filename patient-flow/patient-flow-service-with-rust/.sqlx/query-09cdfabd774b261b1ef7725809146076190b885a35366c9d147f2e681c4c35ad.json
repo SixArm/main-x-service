@@ -1,0 +1,115 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE red_green_days SET classification = $2, delay_reasons = $3, note = $4\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, stay_pid, day, classification, delay_reasons, note",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "red_green_days",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "red_green_days",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "red_green_days",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "stay_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "red_green_days",
+            "name": "stay_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "day",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "red_green_days",
+            "name": "day"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "classification",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "red_green_days",
+            "name": "classification"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "delay_reasons",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "red_green_days",
+            "name": "delay_reasons"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "note",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "red_green_days",
+            "name": "note"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar",
+        "Jsonb",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "09cdfabd774b261b1ef7725809146076190b885a35366c9d147f2e681c4c35ad"
+}

@@ -1,0 +1,5 @@
+-- Children first.
+DROP TABLE IF EXISTS beds;
+DROP TABLE IF EXISTS bays;
+DROP TABLE IF EXISTS wards;
+DROP TABLE IF EXISTS sites;

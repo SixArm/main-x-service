@@ -5,8 +5,8 @@ subproject. Read this **before** opening a PR.
 
 ## What this project is
 
-A **back-end JSON API**, written in Rust on [Loco](https://axa)
-(Axum + SeaORM + PostgreSQL), for hospital patient flow and bed
+A **back-end JSON API**, written in Rust on [axa](https://github.com/publicprojects-io/axa)
+(Axum + sqlx + PostgreSQL), for hospital patient flow and bed
 management: wards, bays, beds and their live state machine, inpatient
 stays from admission to discharge, bed requests and rule-checked
 allocation, infection-control flags, virtual wards, and the derived
@@ -57,11 +57,12 @@ cross-cutting spec's [scope boundary](../spec/scope.md).
 ## Layout (target — see [../spec/architecture.md](../spec/architecture.md))
 
 ```
-src/app.rs · src/controllers/ · src/models/ (+_entities/) ·
+src/app.rs · src/controllers/ · src/models/ (all SQL; one module per table) ·
 src/clients.rs (one generic EntityRef-keyed resolver, http|stub
   mode via PATIENT_FLOW_UPSTREAM_MODE — not per-service modules) ·
 src/flow/ (pure core) · src/auth.rs · src/streaming.rs ·
-src/validation.rs · src/openapi.rs · migration/ · tests/requests/
+src/validation.rs · src/openapi.rs · migrations/ (plain SQL) · .sqlx/ ·
+tests/requests/
 ```
 
 ## Running

@@ -1,0 +1,196 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, bay_pid, number, state, state_since AS \"state_since: _\",\n                      closure_reason, deep_clean_required, isolation_capable, oxygen,\n                      bariatric, virtual AS is_virtual, deleted_at AS \"deleted_at: _\"\n               FROM beds\n               WHERE pid = $1 AND deleted_at IS NULL\n               FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "bay_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "bay_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "number",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "number"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "state",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "state_since: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "state_since"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "closure_reason",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "closure_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "deep_clean_required",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "deep_clean_required"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "isolation_capable",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "isolation_capable"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "oxygen",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "oxygen"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "bariatric",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "bariatric"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "is_virtual",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "virtual"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "71b65a56587657129e2ca55f3f25c7e081524fb338de80c258dd0717a50c3dd0"
+}

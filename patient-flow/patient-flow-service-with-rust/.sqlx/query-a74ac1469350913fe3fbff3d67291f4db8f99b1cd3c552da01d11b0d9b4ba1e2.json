@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM bed_requests",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "a74ac1469350913fe3fbff3d67291f4db8f99b1cd3c552da01d11b0d9b4ba1e2"
+}

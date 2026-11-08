@@ -9,7 +9,7 @@
  patient-flow-front-end-with-svelte  (SvelteKit BFF)
         │  Authorization: Bearer v4.public.…  (short-lived PASETO)
         ▼
- patient-flow-service-with-rust  (axa: Axum + SeaORM + PostgreSQL)
+ patient-flow-service-with-rust  (axa: Axum + sqlx + PostgreSQL)
         │  EntityRef lookups (read-only, cached, stub-able)
         ▼
  person / worker / place / organization / authentication services
@@ -28,7 +28,7 @@ src/
 ├── controllers/           wards, bays, beds, stays, bed_requests,
 │                          whiteboard, at_a_glance, locate, capacity,
 │                          audits, docs, metrics
-├── models/                CRUD helpers + _entities/ (SeaORM)
+├── models/                row structs + every SQL statement (sqlx)
 ├── clients.rs             one generic EntityRef-keyed display-name
 │                          resolver — http|stub mode (not a
 │                          per-service trait/module split)
@@ -38,7 +38,8 @@ src/
 ├── streaming.rs           Envelope + EventPublisher seam
 ├── validation.rs          payload validation → 422
 └── openapi.rs             OpenAPI 3 doc
-migration/                 sea-orm-migration crate (crate root)
+migrations/                plain-SQL sqlx migrations (crate root)
+.sqlx/                     committed compile-time query data
 ```
 
 Key decisions (numbered in [design.md](design.md)):
@@ -70,7 +71,7 @@ per [auth.md](auth.md). Touchscreen mode is a CSS/layout concern
 
 ## Data & availability
 
-PostgreSQL 18, SeaORM migrations, connection pooling, health
+PostgreSQL 18, plain-SQL sqlx migrations, connection pooling, health
 endpoints, stateless horizontal scaling (whiteboard reads are the
 hot path and are plain indexed queries). In-memory axa cache for
 upstream display-name lookups.

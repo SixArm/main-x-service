@@ -1,0 +1,197 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE bed_requests SET status = 'allocated', allocated_bed_pid = $2\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, origin, target_ward_pid, specialty, priority,\n                         requirements, status, allocated_bed_pid,\n                         requested_at AS \"requested_at: _\", resolved_at AS \"resolved_at: _\",\n                         deleted_at AS \"deleted_at: _\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "person_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "person_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "origin",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "origin"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "target_ward_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "target_ward_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "specialty",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "specialty"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "priority",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "priority"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "requirements",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "requirements"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "allocated_bed_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "allocated_bed_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "requested_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "requested_at"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "resolved_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "resolved_at"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "bed_requests",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "e56d9c6251b93b8a7834dd92da9ceabefa179174427bceb028dc397bb8a89d66"
+}

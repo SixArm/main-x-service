@@ -17,7 +17,8 @@
 //!   stays, bed requests, boards, audits.
 //! - [`flow`] — the **pure core**: bed state machine, allocation rules,
 //!   `Red2Green` / DTOC logic. DB-free and exhaustively unit-tested.
-//! - [`models`] — `SeaORM` entities + CRUD helpers.
+//! - [`models`] — row structs and every SQL statement the service runs
+//!   (sqlx `query!` literals), plus the migrator.
 //! - [`clients`] — upstream service lookups (stub-first).
 //! - [`auth`] — offline PASETO verification + ABAC + masking.
 //! - [`streaming`] — event envelope + in-memory / outbox transports.

@@ -7,7 +7,6 @@
 
 use axa::extract::{Json, Path};
 use axa::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -16,9 +15,9 @@ use crate::auth::MaybeAuthUser;
 use crate::flow::bed_state::{self, BedContext, BedState, Transition};
 use crate::flow::tokens;
 use crate::metrics::Metrics;
-use crate::models::_entities::{bays, beds, sites, wards};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::records;
+use crate::models::{bays, beds, sites, wards};
 use crate::streaming;
 use crate::validation::Problems;
 
@@ -159,20 +158,20 @@ async fn create_site(
     Json(payload): Json<SitePayload>,
 ) -> Result<Response> {
     ensure_valid(&validate_site(&payload))?;
-    let txn = ctx.db.begin().await?;
-    let row = sites::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        name: ActiveValue::set(payload.name.clone()),
-        place_ref: ActiveValue::set(payload.place_ref.clone()),
-        organization_ref: ActiveValue::set(payload.organization_ref.clone()),
-        deleted_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let mut txn = ctx.db.begin().await?;
+    let row = sites::Model::insert(
+        &mut *txn,
+        &sites::NewSite {
+            pid: Uuid::new_v4(),
+            name: &payload.name,
+            place_ref: payload.place_ref.as_deref(),
+            organization_ref: payload.organization_ref.as_deref(),
+        },
+    )
     .await?;
-    Audit::record(&txn, "site", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(&mut *txn, "site", row.pid, "created", caller.actor(), None).await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "site",
         "created",
         &row.pid.to_string(),
@@ -190,12 +189,7 @@ async fn create_site(
 /// `GET /api/sites` — active sites.
 #[debug_handler]
 async fn list_sites(State(ctx): State<AppContext>) -> Result<Response> {
-    let rows = sites::Entity::find()
-        .filter(sites::Column::DeletedAt.is_null())
-        .order_by_asc(sites::Column::Id)
-        .limit(200)
-        .all(&ctx.db)
-        .await?;
+    let rows = sites::Model::list_active(&ctx.db, 200).await?;
     format::json(rows)
 }
 
@@ -208,26 +202,26 @@ async fn create_ward(
 ) -> Result<Response> {
     ensure_valid(&validate_ward(&payload))?;
     records::find_site(&ctx.db, payload.site_pid).await?;
-    let txn = ctx.db.begin().await?;
-    let row = wards::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        site_pid: ActiveValue::set(payload.site_pid),
-        name: ActiveValue::set(payload.name.clone()),
-        code: ActiveValue::set(payload.code.clone()),
-        kind: ActiveValue::set(payload.kind.clone()),
-        specialty: ActiveValue::set(payload.specialty.clone()),
-        open: ActiveValue::set(payload.open),
-        escalation: ActiveValue::set(payload.escalation),
-        closed_to_admissions: ActiveValue::set(payload.closed_to_admissions),
-        place_ref: ActiveValue::set(payload.place_ref.clone()),
-        deleted_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let mut txn = ctx.db.begin().await?;
+    let row = wards::Model::insert(
+        &mut *txn,
+        &wards::NewWard {
+            pid: Uuid::new_v4(),
+            site_pid: payload.site_pid,
+            name: &payload.name,
+            code: &payload.code,
+            kind: &payload.kind,
+            specialty: payload.specialty.as_deref(),
+            open: payload.open,
+            escalation: payload.escalation,
+            closed_to_admissions: payload.closed_to_admissions,
+            place_ref: payload.place_ref.as_deref(),
+        },
+    )
     .await?;
-    Audit::record(&txn, "ward", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(&mut *txn, "ward", row.pid, "created", caller.actor(), None).await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "ward",
         "created",
         &row.pid.to_string(),
@@ -245,12 +239,7 @@ async fn create_ward(
 /// `GET /api/wards` — active wards.
 #[debug_handler]
 async fn list_wards(State(ctx): State<AppContext>) -> Result<Response> {
-    let rows = wards::Entity::find()
-        .filter(wards::Column::DeletedAt.is_null())
-        .order_by_asc(wards::Column::Id)
-        .limit(500)
-        .all(&ctx.db)
-        .await?;
+    let rows = wards::Model::list_active(&ctx.db, 500).await?;
     format::json(rows)
 }
 
@@ -291,28 +280,19 @@ async fn update_ward(
     problems.cap_opt("specialty", payload.specialty.as_deref());
     ensure_valid(&problems.into_vec())?;
     let ward = records::find_ward(&ctx.db, records::parse_pid(&pid)?).await?;
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     let before = serde_json::to_value(&ward).ok();
-    let mut active: wards::ActiveModel = ward.into();
-    if let Some(name) = payload.name {
-        active.name = ActiveValue::set(name);
-    }
-    if let Some(specialty) = payload.specialty {
-        active.specialty = ActiveValue::set(Some(specialty));
-    }
-    if let Some(open) = payload.open {
-        active.open = ActiveValue::set(open);
-    }
-    if let Some(escalation) = payload.escalation {
-        active.escalation = ActiveValue::set(escalation);
-    }
-    if let Some(closed) = payload.closed_to_admissions {
-        active.closed_to_admissions = ActiveValue::set(closed);
-    }
-    let row = active.update(&txn).await?;
+    let changes = wards::WardChanges {
+        name: payload.name,
+        specialty: payload.specialty,
+        open: payload.open,
+        escalation: payload.escalation,
+        closed_to_admissions: payload.closed_to_admissions,
+    };
+    let row = wards::Model::update(&mut *txn, ward.id, &changes).await?;
     let snapshot = serde_json::json!({ "before": before, "ward_pid": row.pid.to_string() });
     Audit::record(
-        &txn,
+        &mut *txn,
         "ward",
         row.pid,
         "updated",
@@ -321,7 +301,7 @@ async fn update_ward(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "ward",
         "updated",
         &row.pid.to_string(),
@@ -343,22 +323,22 @@ async fn create_bay(
 ) -> Result<Response> {
     ensure_valid(&validate_bay(&payload))?;
     records::find_ward(&ctx.db, payload.ward_pid).await?;
-    let txn = ctx.db.begin().await?;
-    let row = bays::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        ward_pid: ActiveValue::set(payload.ward_pid),
-        name: ActiveValue::set(payload.name.clone()),
-        sex_designation: ActiveValue::set(payload.sex_designation.clone()),
-        side_room: ActiveValue::set(payload.side_room),
-        closed_to_admissions: ActiveValue::set(payload.closed_to_admissions),
-        deleted_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let mut txn = ctx.db.begin().await?;
+    let row = bays::Model::insert(
+        &mut *txn,
+        &bays::NewBay {
+            pid: Uuid::new_v4(),
+            ward_pid: payload.ward_pid,
+            name: &payload.name,
+            sex_designation: &payload.sex_designation,
+            side_room: payload.side_room,
+            closed_to_admissions: payload.closed_to_admissions,
+        },
+    )
     .await?;
-    Audit::record(&txn, "bay", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(&mut *txn, "bay", row.pid, "created", caller.actor(), None).await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "bay",
         "created",
         &row.pid.to_string(),
@@ -397,17 +377,16 @@ async fn update_bay(
     );
     ensure_valid(&problems.into_vec())?;
     let bay = records::find_bay(&ctx.db, records::parse_pid(&pid)?).await?;
-    let txn = ctx.db.begin().await?;
-    let mut active: bays::ActiveModel = bay.into();
-    if let Some(sex) = payload.sex_designation {
-        active.sex_designation = ActiveValue::set(sex);
-    }
-    if let Some(closed) = payload.closed_to_admissions {
-        active.closed_to_admissions = ActiveValue::set(closed);
-    }
-    let row = active.update(&txn).await?;
+    let mut txn = ctx.db.begin().await?;
+    let row = bays::Model::update(
+        &mut *txn,
+        bay.id,
+        payload.sex_designation.as_deref(),
+        payload.closed_to_admissions,
+    )
+    .await?;
     Audit::record(
-        &txn,
+        &mut *txn,
         "bay",
         row.pid,
         "updated",
@@ -416,7 +395,7 @@ async fn update_bay(
     )
     .await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "bay",
         "updated",
         &row.pid.to_string(),
@@ -445,27 +424,25 @@ async fn create_bed(
             "virtual slots live on virtual wards; physical beds on physical wards",
         ));
     }
-    let txn = ctx.db.begin().await?;
-    let row = beds::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        bay_pid: ActiveValue::set(payload.bay_pid),
-        number: ActiveValue::set(payload.number.clone()),
-        state: ActiveValue::set(BedState::Available.token().to_string()),
-        state_since: ActiveValue::set(chrono::Utc::now().into()),
-        closure_reason: ActiveValue::set(None),
-        deep_clean_required: ActiveValue::set(false),
-        isolation_capable: ActiveValue::set(payload.isolation_capable),
-        oxygen: ActiveValue::set(payload.oxygen),
-        bariatric: ActiveValue::set(payload.bariatric),
-        is_virtual: ActiveValue::set(payload.r#virtual),
-        deleted_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let mut txn = ctx.db.begin().await?;
+    let row = beds::Model::insert(
+        &mut *txn,
+        &beds::NewBed {
+            pid: Uuid::new_v4(),
+            bay_pid: payload.bay_pid,
+            number: &payload.number,
+            state: BedState::Available.token(),
+            state_since: chrono::Utc::now().into(),
+            isolation_capable: payload.isolation_capable,
+            oxygen: payload.oxygen,
+            bariatric: payload.bariatric,
+            is_virtual: payload.r#virtual,
+        },
+    )
     .await?;
-    Audit::record(&txn, "bed", row.pid, "created", caller.actor(), None).await?;
+    Audit::record(&mut *txn, "bed", row.pid, "created", caller.actor(), None).await?;
     streaming::emit_on(
-        &txn,
+        &mut *txn,
         "bed",
         "created",
         &row.pid.to_string(),
@@ -515,17 +492,13 @@ async fn bed_state(
         }
         other => return Err(unprocessable(&format!("unknown transition {other:?}"))),
     };
-    let txn = ctx.db.begin().await?;
+    let mut txn = ctx.db.begin().await?;
     // Lock the bed row for the read-check-write (PF-D9).
-    let bed = beds::Entity::find()
-        .filter(beds::Column::Pid.eq(records::parse_pid(&pid)?))
-        .filter(beds::Column::DeletedAt.is_null())
-        .lock_exclusive()
-        .one(&txn)
+    let bed = beds::Model::lock_active(&mut *txn, records::parse_pid(&pid)?)
         .await?
         .ok_or_else(|| Error::NotFound)?;
     let outcome = apply_transition(&bed, &transition)?;
-    let row = persist_outcome(&txn, bed, &outcome, caller.actor()).await?;
+    let row = persist_outcome(&mut txn, bed, &outcome, caller.actor()).await?;
     txn.commit().await?;
     Metrics::global().bed_state_changed_total.inc();
     format::json(row)
@@ -547,7 +520,7 @@ pub(crate) fn apply_transition(
 /// Persist a transition outcome: update the bed row, audit (with
 /// old/new state), and emit `bed_state_changed` — all on `txn`.
 pub(crate) async fn persist_outcome(
-    txn: &sea_orm::DatabaseTransaction,
+    txn: &mut sqlx::PgConnection,
     bed: beds::Model,
     outcome: &bed_state::Outcome,
     actor: Option<&str>,
@@ -555,12 +528,17 @@ pub(crate) async fn persist_outcome(
     let old_state = bed.state.clone();
     let pid = bed.pid;
     let number = bed.number.clone();
-    let mut active: beds::ActiveModel = bed.into();
-    active.state = ActiveValue::set(outcome.state.token().to_string());
-    active.state_since = ActiveValue::set(chrono::Utc::now().into());
-    active.deep_clean_required = ActiveValue::set(outcome.deep_clean_required);
-    active.closure_reason = ActiveValue::set(outcome.closure_reason.clone());
-    let row = active.update(txn).await?;
+    let row = beds::Model::set_state(
+        &mut *txn,
+        bed.id,
+        &beds::StateChange {
+            state: outcome.state.token(),
+            state_since: chrono::Utc::now().into(),
+            deep_clean_required: outcome.deep_clean_required,
+            closure_reason: outcome.closure_reason.as_deref(),
+        },
+    )
+    .await?;
     let detail = serde_json::json!({
         "from": old_state,
         "to": outcome.state.token(),
@@ -568,7 +546,7 @@ pub(crate) async fn persist_outcome(
         "closure_reason": outcome.closure_reason,
     });
     Audit::record(
-        txn,
+        &mut *txn,
         "bed",
         pid,
         "bed_state_changed",
@@ -599,14 +577,12 @@ macro_rules! soft_delete_handler {
             Path(pid): Path<String>,
         ) -> Result<Response> {
             let row = records::$finder(&ctx.db, records::parse_pid(&pid)?).await?;
-            let txn = ctx.db.begin().await?;
+            let mut txn = ctx.db.begin().await?;
             let pid = row.pid;
-            let mut active: $module::ActiveModel = row.into();
-            active.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-            active.update(&txn).await?;
-            Audit::record(&txn, $entity, pid, "deleted", caller.actor(), None).await?;
+            $module::Model::soft_delete(&mut *txn, row.id, chrono::Utc::now().into()).await?;
+            Audit::record(&mut *txn, $entity, pid, "deleted", caller.actor(), None).await?;
             streaming::emit_on(
-                &txn,
+                &mut *txn,
                 $entity,
                 "deleted",
                 &pid.to_string(),

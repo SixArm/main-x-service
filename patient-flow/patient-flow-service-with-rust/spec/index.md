@@ -12,8 +12,8 @@ adds its spec detail here in the same PR as the code.
 
 Per [architecture](../../spec/architecture.md) and the family
 [rust-loco-stack](../../../agents/share/rust-axum-stack.md):
-Rust 2024, axa (Axum + SeaORM), PostgreSQL 18, crate-root
-`migration/`, controller-style `src/controllers/` layout, pure
+Rust 2024, axa (Axum + sqlx), PostgreSQL 18, plain-SQL crate-root
+`migrations/`, controller-style `src/controllers/` layout, pure
 `src/flow/` core, stub-first upstream clients, offline PASETO +
 ABAC, OpenAPI/Swagger, `Accepts-version` header versioning,
 tracing + OTLP, Podman.
@@ -33,18 +33,37 @@ tracing + OTLP, Podman.
 
 ## Edition-specific implementation notes
 
-- **Layout**: `src/{app,auth,clients,metrics,openapi,streaming,
-  validation,version}.rs`, `src/flow/` (pure core), `src/models/`
-  (+`_entities/`), `src/controllers/{topology,stays,bed_requests,
-  boards,audits,docs,metrics}.rs`, `src/tasks/seed.rs`, crate-root
-  `migration/`.
-- **Migration gotcha**: axa's `create_table` helper **pluralizes**
-  table names via `cruet::to_plural` — every patient-flow table name
-  is already plural so this is a no-op, except `event_outbox`, whose
-  migration is written as explicit SQL to keep the exact name the
-  SeaORM entity declares. (The sibling services' copied
-  `event_outbox` migrations shared this hazard — fixed family-wide
-  2026-07-18: case, care-pathway, organization, portfolio.)
+- **Layout**: `src/{app,auth,clients,client_limits,metrics,openapi,
+  streaming,validation}.rs`, `src/flow/` (pure core), `src/models/`
+  (one module per table), `src/controllers/{topology,stays,
+  bed_requests,boards,audits,docs,metrics}.rs`, `src/tasks/seed.rs`,
+  crate-root `migrations/` and `.sqlx/`.
+- **Persistence (sqlx, 2026-11-08)**: every SQL statement the service
+  runs is a `sqlx::query!` / `query_as!` / `query_scalar!` literal in
+  `src/models/`, the crate's one SQL area (repo
+  `spec/tech-stack/index.md` §5). Each module owns one table: a plain
+  `Model` row struct, serialized as-is by the read endpoints, and the
+  statements against it. Helpers take an `axa::sqlx::Db`, so a handler
+  passes its open transaction (`&mut *txn`) and the row change, its
+  audit row and its outbox row still commit together (PF-D9). The
+  compile-time query data is committed in `.sqlx/` and builds run with
+  `SQLX_OFFLINE=true`. There is no `QueryBuilder`, `raw_sql` or
+  `AssertSqlSafe`: the whiteboard's `IN` lists are `= ANY($1)`, and
+  the partial `PUT` updates are `COALESCE($n, col)`, which leaves an
+  absent field as it was, the way the `SeaORM` `ActiveModel` did.
+- **Migrations**: five plain-SQL pairs under `migrations/`
+  (`<version>_<name>.up.sql` / `.down.sql`), run by `sqlx::migrate!`
+  through `axa::sqlx` for `db migrate | down | reset | status` and the
+  boot auto-migrate. They were written from a `pg_dump --schema-only`
+  of the database the old `SeaORM` schema-builder migrations produced,
+  and a dump of the new schema is identical apart from the bookkeeping
+  table (`_sqlx_migrations` for `seaql_migrations`), so a database the
+  old build migrated must be recreated. `event_outbox` keeps its
+  `SERIAL` (`integer`) id; every other table has a `bigint` identity.
+- **No `updated_at` maintenance**: no statement sets `updated_at`, and
+  there is no trigger, so it always equals `created_at`. That was true
+  under `SeaORM` too (its `ActiveModel` updates wrote only the fields
+  set), and is kept rather than fixed in the move.
 - **Clients**: one `src/clients.rs` module (mode-switched `stub` /
   `http` via `PATIENT_FLOW_UPSTREAM_MODE`, default `stub`) rather
   than per-service trait modules — patient-flow needs only

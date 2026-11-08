@@ -1,27 +1,56 @@
-//! `event_outbox` model — the transactional-outbox write surface for
-//! the durable event bus (Phase 2; `agents/share/event-bus.md` §3).
+//! `event_outbox` — the transactional-outbox write surface for the
+//! durable event bus (Phase 2; `agents/share/event-bus.md` §3).
 //!
 //! [`OutboxInsert::from_envelope`] is the **pure** envelope→row mapping
 //! (unit-testable DB-free). [`OutboxInsert::insert_on`] performs the
-//! in-transaction `INSERT` — generic over [`ConnectionTrait`] so the
-//! handler passes its own `&DatabaseTransaction`, giving the entity
-//! write and the event one commit boundary. [`Model::unpublished`] /
-//! [`Model::mark_published`] are the Phase-3 relay's poll + ack
-//! (roadmap; the relay itself is not built yet).
+//! in-transaction `INSERT` — it takes a [`Db`], so the handler passes its
+//! own transaction, giving the entity write and the event one commit
+//! boundary. [`Model::unpublished`] / [`Model::mark_published`] are the
+//! Phase-3 relay's poll + ack (roadmap; the relay itself is not built
+//! yet).
 
-use axa::prelude::*;
-use sea_orm::sea_query::Expr;
-use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect, prelude::DateTimeWithTimeZone};
+use axa::sqlx::Db;
+use chrono::{DateTime, FixedOffset};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub use super::_entities::event_outbox::{self, ActiveModel, Entity, Model};
+use super::{ModelError, ModelResult};
 use crate::streaming::{Envelope, EventView};
 
-impl ActiveModelBehavior for super::_entities::event_outbox::ActiveModel {}
+/// One persisted outbox row: a canonical envelope awaiting relay to the
+/// durable bus.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row creation timestamp.
+    pub created_at: DateTime<FixedOffset>,
+    /// Row last-update timestamp.
+    pub updated_at: DateTime<FixedOffset>,
+    /// Auto-increment pk (`SERIAL`, so `i32`); also the global relay
+    /// order.
+    pub id: i32,
+    /// Envelope id — the consumer dedup key.
+    pub event_id: Uuid,
+    /// The entity name (e.g. `stay`).
+    pub entity: String,
+    /// The record pid — the bus partition key.
+    pub entity_pid: Uuid,
+    /// The change kind: `created` / `updated` / `deleted` / ….
+    pub kind: String,
+    /// When the change occurred (stamped at enqueue).
+    pub occurred_at: DateTime<FixedOffset>,
+    /// The acting user's pid, or `None` when unauthenticated.
+    pub actor: Option<String>,
+    /// The envelope schema version.
+    pub schema_version: i32,
+    /// The full canonical envelope as JSONB.
+    pub payload: serde_json::Value,
+    /// `None` until the relay ships the row to the bus.
+    pub published_at: Option<DateTime<FixedOffset>>,
+}
 
 /// The column values for one outbox row, derived from a canonical
-/// [`Envelope`] plus the enqueue timestamp. A plain struct (separate
-/// from the `ActiveModel`) so the derivation is unit-testable DB-free.
+/// [`Envelope`] plus the enqueue timestamp. A plain struct so the
+/// derivation is unit-testable DB-free.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutboxInsert {
     /// Envelope dedup id.
@@ -33,7 +62,7 @@ pub struct OutboxInsert {
     /// Change kind token (`created`, `bed_state_changed`, …).
     pub kind: String,
     /// When the change occurred.
-    pub occurred_at: DateTimeWithTimeZone,
+    pub occurred_at: DateTime<FixedOffset>,
     /// Actor pid, if any.
     pub actor: Option<String>,
     /// Envelope schema version.
@@ -49,7 +78,7 @@ impl OutboxInsert {
     /// # Errors
     ///
     /// When `env.pid` is not a UUID, or the envelope fails to serialize.
-    pub fn from_envelope(env: &Envelope, occurred_at: DateTimeWithTimeZone) -> ModelResult<Self> {
+    pub fn from_envelope(env: &Envelope, occurred_at: DateTime<FixedOffset>) -> ModelResult<Self> {
         let entity_pid = Uuid::parse_str(&env.pid).map_err(|e| ModelError::Any(Box::new(e)))?;
         let payload = serde_json::to_value(env).map_err(|e| ModelError::Any(Box::new(e)))?;
         Ok(Self {
@@ -64,30 +93,36 @@ impl OutboxInsert {
         })
     }
 
-    /// Build the `ActiveModel` (`published_at` starts `NULL`).
-    fn active_model(&self) -> ActiveModel {
-        event_outbox::ActiveModel {
-            event_id: ActiveValue::set(self.event_id),
-            entity: ActiveValue::set(self.entity.clone()),
-            entity_pid: ActiveValue::set(self.entity_pid),
-            kind: ActiveValue::set(self.kind.clone()),
-            occurred_at: ActiveValue::set(self.occurred_at),
-            actor: ActiveValue::set(self.actor.clone()),
-            schema_version: ActiveValue::set(self.schema_version),
-            payload: ActiveValue::set(self.payload.clone()),
-            published_at: ActiveValue::set(None),
-            ..Default::default()
-        }
-    }
-
-    /// Durably enqueue this event **on the given connection** — pass a
-    /// `&DatabaseTransaction` to share the mutation's commit boundary.
+    /// Durably enqueue this event **on the given connection** — pass the
+    /// mutation's transaction to share its commit boundary.
+    /// `published_at` starts `NULL`.
     ///
     /// # Errors
     ///
     /// When the insert fails (e.g. a duplicate `event_id`).
-    pub async fn insert_on<C: ConnectionTrait>(&self, conn: &C) -> ModelResult<Model> {
-        let row = self.active_model().insert(conn).await?;
+    pub async fn insert_on(&self, db: impl Into<Db<'_>>) -> ModelResult<Model> {
+        let mut conn = db.into().acquire().await?;
+        // `id`, `created_at` and `updated_at` are column defaults.
+        let row = sqlx::query_as!(
+            Model,
+            r#"INSERT INTO event_outbox (event_id, entity, entity_pid, kind, occurred_at,
+                                         actor, schema_version, payload, published_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL)
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, event_id, entity, entity_pid, kind,
+                         occurred_at AS "occurred_at: _", actor, schema_version, payload,
+                         published_at AS "published_at: _""#,
+            self.event_id,
+            self.entity,
+            self.entity_pid,
+            self.kind,
+            self.occurred_at,
+            self.actor,
+            self.schema_version,
+            self.payload,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
         Ok(row)
     }
 }
@@ -100,15 +135,17 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn recent(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<EventView>> {
-        let rows = event_outbox::Entity::find()
-            .order_by_desc(event_outbox::Column::Id)
-            .limit(limit)
-            .all(db)
-            .await?;
-        let views = rows
-            .iter()
-            .filter_map(|row| serde_json::from_value::<Envelope>(row.payload.clone()).ok())
+    pub async fn recent(db: impl Into<Db<'_>>, limit: u64) -> ModelResult<Vec<EventView>> {
+        let mut conn = db.into().acquire().await?;
+        let payloads = sqlx::query_scalar!(
+            "SELECT payload FROM event_outbox ORDER BY id DESC LIMIT $1",
+            super::to_i64(limit),
+        )
+        .fetch_all(&mut *conn)
+        .await?;
+        let views = payloads
+            .into_iter()
+            .filter_map(|payload| serde_json::from_value::<Envelope>(payload).ok())
             .map(|env| EventView::from(&env))
             .collect();
         Ok(views)
@@ -121,17 +158,23 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn unpublished<C: ConnectionTrait>(db: &C, limit: u64) -> ModelResult<Vec<Self>> {
-        let rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::PublishedAt.is_null())
-            .order_by_asc(event_outbox::Column::Id)
-            .limit(limit)
-            .lock_with_behavior(
-                sea_orm::sea_query::LockType::Update,
-                sea_orm::sea_query::LockBehavior::SkipLocked,
-            )
-            .all(db)
-            .await?;
+    pub async fn unpublished(db: impl Into<Db<'_>>, limit: u64) -> ModelResult<Vec<Self>> {
+        let mut conn = db.into().acquire().await?;
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, event_id, entity, entity_pid, kind,
+                      occurred_at AS "occurred_at: _", actor, schema_version, payload,
+                      published_at AS "published_at: _"
+               FROM event_outbox
+               WHERE published_at IS NULL
+               ORDER BY id
+               LIMIT $1
+               FOR UPDATE SKIP LOCKED"#,
+            super::to_i64(limit),
+        )
+        .fetch_all(&mut *conn)
+        .await?;
         Ok(rows)
     }
 
@@ -140,16 +183,18 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn mark_published<C: ConnectionTrait>(db: &C, ids: &[i32]) -> ModelResult<u64> {
+    pub async fn mark_published(db: impl Into<Db<'_>>, ids: &[i32]) -> ModelResult<u64> {
         if ids.is_empty() {
             return Ok(0);
         }
-        let res = event_outbox::Entity::update_many()
-            .col_expr(event_outbox::Column::PublishedAt, Expr::current_timestamp())
-            .filter(event_outbox::Column::Id.is_in(ids.iter().copied()))
-            .exec(db)
-            .await?;
-        Ok(res.rows_affected)
+        let mut conn = db.into().acquire().await?;
+        let done = sqlx::query!(
+            "UPDATE event_outbox SET published_at = CURRENT_TIMESTAMP WHERE id = ANY($1)",
+            ids,
+        )
+        .execute(&mut *conn)
+        .await?;
+        Ok(done.rows_affected())
     }
 }
 

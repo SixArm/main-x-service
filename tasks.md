@@ -8571,3 +8571,22 @@ All three were there on SeaORM, and the move keeps them as they were.
 - [x] **LG-D1 (S)** link-graph `spec/14` names `config/{development,test,
   production}.yaml`, which do not exist (configuration is environment
   only).
+
+## Found 2026-11-08 (moving patient-flow to sqlx)
+
+All were there on SeaORM, and the move keeps them as they were.
+
+- [ ] **PF-U1 (S)** `updated_at` never changes on any patient-flow table:
+  writes set only the given fields and there is no trigger, so it always
+  equals `created_at`. Stamp it on every update, with a test.
+- [ ] **PF-R1 (S)** Two concurrent same-day Red2Green POSTs for one stay
+  answer `409` from the unique index instead of the second updating the
+  day. Upsert on that key, with a test.
+- [ ] **PF-C1 (S)** `config/production.yaml` is loco-era YAML that axa
+  never reads, and the edition spec still describes
+  `config/{development,test,production}.yaml`. Remove both.
+- [ ] **PF-D1 (S)** The README says 64 unit tests (there are 75), and
+  `deny.toml` carries 12 ignores cargo-deny reports as unmatched.
+- [ ] **PF-O1 (S)** The relay helpers `unpublished` / `mark_published` are
+  unused and nothing pins their `FOR UPDATE SKIP LOCKED`; wire or remove
+  them, and add the two-relay DB test the other crates have.

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM red_green_days",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "03bfe6d558dff1c02663a84534b204a8398974cee68e5786e2764061fe5a477d"
+}
