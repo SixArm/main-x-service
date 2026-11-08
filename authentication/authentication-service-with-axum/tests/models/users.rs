@@ -8,7 +8,7 @@ use authentication_service::{
     models::users::{self, Model, NewUser, RegisterParams},
 };
 use axa::testing::prelude::*;
-use chrono::{Duration, offset::Local};
+use chrono::Duration;
 use insta::assert_debug_snapshot;
 use serial_test::serial;
 
@@ -294,7 +294,19 @@ async fn magic_link() {
         "Magic link expiration should be initially unset"
     );
 
+    // The expiry is the database's time, so it is measured against the
+    // database's clock, read on either side of the call.
+    let db_now = || async {
+        sqlx::query_scalar!(
+            r#"SELECT clock_timestamp() AS "now!: chrono::DateTime<chrono::FixedOffset>""#
+        )
+        .fetch_one(&boot.app_context.db)
+        .await
+        .expect("read database clock")
+    };
+    let before = db_now().await;
     let create_result = user.create_magic_link(&boot.app_context.db).await;
+    let after = db_now().await;
 
     assert!(
         create_result.is_ok(),
@@ -342,17 +354,11 @@ async fn magic_link() {
         "Magic link expiration should be set after creation"
     );
 
-    let now = Local::now();
-    let should_expired_at = now + Duration::minutes(users::MAGIC_LINK_EXPIRATION_MIN.into());
+    let ttl = Duration::minutes(users::MAGIC_LINK_EXPIRATION_MIN.into());
     let actual_expiration = updated_user.magic_link_expiration.unwrap();
 
     assert!(
-        actual_expiration >= now,
-        "Magic link expiration should be in the future or now"
-    );
-
-    assert!(
-        actual_expiration <= should_expired_at,
-        "Magic link expiration exceeds expected maximum expiration time"
+        before + ttl <= actual_expiration && actual_expiration <= after + ttl,
+        "{before} + {ttl} <= {actual_expiration} <= {after} + {ttl}"
     );
 }

@@ -30,7 +30,7 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Duration, FixedOffset, offset::Local};
+use chrono::{DateTime, FixedOffset, offset::Local};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use sqlx::PgPool;
@@ -746,13 +746,17 @@ impl Model {
         // *plaintext* (for the email/log) — so the usable token is never read
         // back out of the DB.
         let plaintext = crate::hash::random_string(MAGIC_LINK_LENGTH as usize);
-        let expired = Local::now() + Duration::minutes(MAGIC_LINK_EXPIRATION_MIN.into());
+        // The expiry is computed by the database, because redemption
+        // (`consume_magic_token`) compares it with Postgres `now()`. Taking
+        // it from this process's clock would shorten or lengthen every link
+        // by however far the two clocks have drifted apart.
 
         validate(&self.name, &self.email)?;
         let row = sqlx::query_as!(
             Self,
             r#"UPDATE users
-               SET magic_link_token = $2, magic_link_expiration = $3
+               SET magic_link_token = $2,
+                   magic_link_expiration = now() + make_interval(mins => $3)
                WHERE id = $1
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
                          id, pid, email, password, api_key, name,
@@ -764,7 +768,7 @@ impl Model {
                          deleted_at AS "deleted_at: _", attributes"#,
             self.id,
             crate::secret_hash::hash(&plaintext),
-            expired.fixed_offset(),
+            i32::from(MAGIC_LINK_EXPIRATION_MIN),
         )
         .fetch_optional(db)
         .await?;

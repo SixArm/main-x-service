@@ -18,7 +18,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   it with Postgres `now()`, so an application clock that drifted from the
   database's moved the retention edge by the drift: with the clock 8.6
   hours behind, `scrub(0)` left the newest rows' addresses in place.
-  Sessions and magic-link expiry still take the application's clock.
+  (`sessions.created_at` was already the database's default.)
+- A magic link's expiry is now `now() + 5 minutes` in the database, not
+  this process's clock plus five minutes. Redemption compares it with
+  Postgres `now()`, so an application clock behind the database's made
+  every link arrive already expired, and one ahead kept links alive past
+  their five minutes.
 
 ### Changed
 

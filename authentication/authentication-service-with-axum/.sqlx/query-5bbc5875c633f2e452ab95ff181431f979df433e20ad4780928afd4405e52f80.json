@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE users\n               SET magic_link_token = $2, magic_link_expiration = $3\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, email, password, api_key, name,\n                         reset_token, reset_sent_at AS \"reset_sent_at: _\",\n                         email_verification_token,\n                         email_verification_sent_at AS \"email_verification_sent_at: _\",\n                         email_verified_at AS \"email_verified_at: _\",\n                         magic_link_token, magic_link_expiration AS \"magic_link_expiration: _\",\n                         deleted_at AS \"deleted_at: _\", attributes",
+  "query": "UPDATE users\n               SET magic_link_token = $2,\n                   magic_link_expiration = now() + make_interval(mins => $3)\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, email, password, api_key, name,\n                         reset_token, reset_sent_at AS \"reset_sent_at: _\",\n                         email_verification_token,\n                         email_verification_sent_at AS \"email_verification_sent_at: _\",\n                         email_verified_at AS \"email_verified_at: _\",\n                         magic_link_token, magic_link_expiration AS \"magic_link_expiration: _\",\n                         deleted_at AS \"deleted_at: _\", attributes",
   "describe": {
     "columns": [
       {
@@ -195,7 +195,7 @@
       "Left": [
         "Int8",
         "Varchar",
-        "Timestamptz"
+        "Int4"
       ]
     },
     "nullable": [
@@ -218,5 +218,5 @@
       false
     ]
   },
-  "hash": "5a76060dc151392974121b5e2e8f756fcb5c8caa5acb47db51dda7dbca24a5f3"
+  "hash": "5bbc5875c633f2e452ab95ff181431f979df433e20ad4780928afd4405e52f80"
 }
