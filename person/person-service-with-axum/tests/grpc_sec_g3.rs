@@ -184,6 +184,87 @@ fn sec_g3_policy(denied_org: uuid::Uuid) -> serde_json::Value {
     })
 }
 
+/// More than one `ListPersons` page (the server caps a page at 100).
+const SEEDED_ROWS: u128 = 120;
+
+/// Seed [`SEEDED_ROWS`] active persons whose ids sort ahead of any random
+/// v4 fixture id (`00000000-0000-0000-0000-…`), so a first page of the
+/// id-ordered list holds none of the fixtures. Removes leftovers from an
+/// interrupted earlier run first.
+async fn seed_rows_ahead_of_fixtures(db: &sqlx::PgPool) -> Vec<uuid::Uuid> {
+    use person_service::db::{AuditContext, PersonRepository, PgPersonRepository};
+    use person_service::models::{Gender, HumanName, Person};
+
+    let ids: Vec<uuid::Uuid> = (1..=SEEDED_ROWS).map(uuid::Uuid::from_u128).collect();
+    purge_seeded(db, &ids).await;
+    let repo = PgPersonRepository::new(db.clone());
+    for id in &ids {
+        let mut person = Person::new(
+            HumanName {
+                use_type: None,
+                family: format!("SecG3Seed{}", id.simple()),
+                given: vec!["Seed".to_string()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Unknown,
+        );
+        person.id = *id;
+        repo.create(&person, &AuditContext::default())
+            .await
+            .expect("seed a person ahead of the fixtures");
+    }
+    ids
+}
+
+async fn purge_seeded(db: &sqlx::PgPool, ids: &[uuid::Uuid]) {
+    sqlx::query("DELETE FROM persons WHERE id = ANY($1)")
+        .bind(ids)
+        .execute(db)
+        .await
+        .expect("purge seeded persons");
+}
+
+/// The `ListPersons` page (as `reader`) whose first row is `id`: the
+/// offset is `id`'s position in `list_active`'s order (active, not
+/// deleted, by id), read from the database, and the row at that offset
+/// is asserted to be `id`.
+async fn page_at(
+    client: &mut proto::person_service_client::PersonServiceClient<tonic::transport::Channel>,
+    reader: &str,
+    db: &sqlx::PgPool,
+    id: uuid::Uuid,
+) -> Vec<proto::Person> {
+    let offset: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM persons
+         WHERE deleted_at IS NULL AND active = true AND id < $1",
+    )
+    .bind(id)
+    .fetch_one(db)
+    .await
+    .expect("position of the fixture");
+    let at: uuid::Uuid = sqlx::query_scalar(
+        "SELECT id FROM persons
+         WHERE deleted_at IS NULL AND active = true
+         ORDER BY id ASC OFFSET $1 LIMIT 1",
+    )
+    .bind(offset)
+    .fetch_one(db)
+    .await
+    .expect("the row at the fixture's position");
+    assert_eq!(at, id, "the page must start at the fixture itself");
+    let offset = u32::try_from(offset).expect("offset fits the request");
+    client
+        .list_persons(bearer_request(
+            proto::ListPersonsRequest { limit: 100, offset },
+            reader,
+        ))
+        .await
+        .expect("ListPersons")
+        .into_inner()
+        .persons
+}
+
 /// Drives three records — denied, masked, and full — through a real
 /// `ListPersons` call and asserts each gets the disposition the policy
 /// implies: the denied record never appears, the masked one appears
@@ -205,6 +286,9 @@ async fn list_persons_over_grpc_applies_sec_g3_disposition() {
 
     let state = common::create_test_app_state().await;
     let db = common::db().await;
+    // PE-G1: more active persons than one page holds, all sorting ahead
+    // of any fixture, so the fixtures cannot land on the first page.
+    let seeded = seed_rows_ahead_of_fixtures(&db).await;
     let mut client = start_test_server(state).await;
     // The policy under test declares no `write` rule, so the default
     // decision (§5 of authorization-attributes.md) denies an unmatched
@@ -268,26 +352,28 @@ async fn list_persons_over_grpc_applies_sec_g3_disposition() {
         .await
         .expect("mark deceased");
 
-    let request = bearer_request(
-        proto::ListPersonsRequest {
-            limit: 500,
-            offset: 0,
-        },
+    // PE-G1: list the page that starts at each fixture's own position in
+    // `list_active`'s id order, rather than one page from offset 0 that a
+    // shared database can fill before any fixture is reached. The
+    // position comes from ground-truth SQL, and is checked to be the
+    // fixture itself, so the absence of the denied record below is the
+    // policy omitting a row the server read, never a row it did not.
+    let denied_page = page_at(&mut client, &reader, &db, denied_id).await;
+    let masked_page = page_at(&mut client, &reader, &db, masked_id).await;
+    let full_page = page_at(
+        &mut client,
         &reader,
-    );
-    let listed = client
-        .list_persons(request)
-        .await
-        .expect("ListPersons")
-        .into_inner()
-        .persons;
+        &db,
+        uuid::Uuid::parse_str(&full.id).expect("valid uuid"),
+    )
+    .await;
 
     assert!(
-        !listed.iter().any(|p| p.id == denied.id),
+        !denied_page.iter().any(|p| p.id == denied.id),
         "a record the policy denies must be omitted (concealment), not merely 403'd"
     );
 
-    let masked_hit = listed
+    let masked_hit = masked_page
         .iter()
         .find(|p| p.id == masked.id)
         .expect("a masked record must still appear, just redacted");
@@ -302,7 +388,7 @@ async fn list_persons_over_grpc_applies_sec_g3_disposition() {
         masked_hit.tax_id
     );
 
-    let full_hit = listed
+    let full_hit = full_page
         .iter()
         .find(|p| p.id == full.id)
         .expect("a record with no denying/masking rule must appear in full");
@@ -311,6 +397,15 @@ async fn list_persons_over_grpc_applies_sec_g3_disposition() {
         Some("123456789"),
         "no obligation applies to the full record, so tax_id must be unredacted"
     );
+
+    purge_seeded(&db, &seeded).await;
+    for id in [
+        denied_id,
+        masked_id,
+        uuid::Uuid::parse_str(&full.id).expect("valid uuid"),
+    ] {
+        common::purge_record(&db, id).await;
+    }
 
     unsafe {
         std::env::remove_var("PERSON_REQUIRE_AUTH");

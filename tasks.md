@@ -8697,12 +8697,15 @@ kept as they were (crate spec §13 SQ-1).
   while the repository takes other connections, so imports need a pool of
   at least two; one connection deadlocks. Run the write on the guard's
   transaction, as organization, case and care-pathway now do.
-- [ ] **PE-E3 (S)** Erasure's tombstone name is inserted with
+- [x] **PE-E3 (S)** Erasure's tombstone name is inserted with
   `is_primary` left at its default, `false`, so an erased row does not
   assemble into a `Person` ("Person has no primary name") on any path
   that reads deleted rows. Found writing the PE-E1 test.
-- [ ] **PE-G1 (S)** `tests/grpc_sec_g3.rs` asks `ListPersons` for 500
+- [x] **PE-G1 (S)** `tests/grpc_sec_g3.rs` asks `ListPersons` for 500
   rows, but the server caps a page at 100 (`MAX_LIST_LIMIT`). The suites
   share one database, which holds over 100 active persons by the time
   it runs, so the test fails whenever a fixture's random id sorts past
   the page. Seen once in two full runs.
+  **Done 2026-11-08** (with PE-E3): the test lists the page starting at
+  each fixture's position, and seeds 120 rows ahead to keep it honest;
+  the tombstone is inserted primary, with a backfill migration.

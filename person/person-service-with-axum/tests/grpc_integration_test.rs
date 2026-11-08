@@ -107,10 +107,22 @@ async fn create_get_list_delete_round_trip_over_real_grpc() {
     assert_eq!(got.id, created.id);
     assert_eq!(got.family_name, family_name);
 
+    // PE-G1: the server caps a page at 100, and the shared test database
+    // holds more active persons than that, so list the page that starts
+    // at the new record's own position in the id order, not offset 0.
+    let created_id = uuid::Uuid::parse_str(&created.id).expect("valid uuid");
+    let position: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM persons
+         WHERE deleted_at IS NULL AND active = true AND id < $1",
+    )
+    .bind(created_id)
+    .fetch_one(&common::db().await)
+    .await
+    .expect("position of the new record");
     let list = client
         .list_persons(proto::ListPersonsRequest {
-            limit: 500,
-            offset: 0,
+            limit: 100,
+            offset: u32::try_from(position).expect("offset fits the request"),
         })
         .await
         .expect("ListPersons")

@@ -82,6 +82,29 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   organization, case and care-pathway do. `create` and `update` are now
   those methods on a transaction of their own. DB test
   `import_on_a_one_connection_pool_completes`.
+- **PE-E3: an erased person could not be reassembled.** Erasure wrote
+  its `(erased)` tombstone name with `is_primary` left at `false`, so
+  any read of the deleted row through the repository
+  (`stored_record`, and `stamp_digests` / `read_person` with deleted
+  rows included) failed with "Person has no primary name". The live
+  REST and gRPC reads skip deleted rows, so they were unaffected. The
+  tombstone is now inserted primary, and the new migration
+  `2026110800000001_erased_tombstone_name_primary` flags tombstones
+  earlier erasures wrote (only a given-name-less `(erased)` name on a
+  retired, unhashed row of a person with no primary name). The digests
+  stay NULL (PE-E1); nothing is rehashed. DB tests
+  `an_erased_record_reassembles_as_its_tombstone` (failed before) and
+  `the_backfill_flags_an_old_non_primary_tombstone`; the HTTP erasure
+  test now also asserts the tombstone is primary.
+- **PE-G1: the gRPC SEC-G3 list test was flaky.** It asked `ListPersons`
+  for 500 rows from offset 0, but the server caps a page at 100, so on a
+  shared database with more than 100 active persons a fixture could fall
+  outside the page (and the denied record's absence was then vacuous).
+  The test now lists the page starting at each fixture's position in the
+  id order, read from SQL and checked to be the fixture, and seeds 120
+  active persons whose ids sort first so the old form would always fail.
+  `create_get_list_delete_round_trip_over_real_grpc` had the same
+  pattern and gets the same fix. The server's page cap is unchanged.
 
 ### Changed
 

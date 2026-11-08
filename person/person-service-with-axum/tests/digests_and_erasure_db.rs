@@ -143,8 +143,8 @@ async fn erasure_nulls_the_mac_with_the_hashes() {
         .unwrap();
     txn.commit().await.unwrap();
 
-    // Read the columns directly: an erased record's tombstone name is not
-    // marked primary, so it does not assemble into a `Person`.
+    // Read the columns directly, so this check does not depend on the
+    // erased record assembling (that is PE-E3's test, below).
     let (hash, sha3, mac): (Option<String>, Option<String>, Option<String>) = sqlx::query_as(
         "SELECT content_hash, content_hash_sha3, content_mac FROM persons WHERE id = $1",
     )
@@ -271,4 +271,112 @@ async fn erasure_redacts_an_audit_row_appended_while_it_waits() {
     assert!(report.verified, "the chain must still verify: {report:?}");
 
     purge(&db, id).await;
+}
+
+/// PE-E3: an erased record still assembles. Its tombstone name is the
+/// primary name, so a read of the deleted row through the repository
+/// returns the tombstone rather than failing with "Person has no primary
+/// name". The erased content stays gone and the digests stay NULL (PE-E1).
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn an_erased_record_reassembles_as_its_tombstone() {
+    with_mac_key();
+    let db = connect().await;
+    let repo = PgPersonRepository::new(db.clone());
+    let mut person = a_person("ErasedReassembled");
+    person.tax_id = Some("123-45-6789".to_string());
+    person.additional_names.push(HumanName {
+        use_type: None,
+        family: "AliasToErase".to_string(),
+        given: vec!["Alias".to_string()],
+        prefix: vec![],
+        suffix: vec![],
+    });
+    let created = repo
+        .create(&person, &AuditContext::default())
+        .await
+        .unwrap();
+
+    let audit = AuditLogRepository::new(db.clone());
+    let access = AccessContext::from_parts(None, None, None);
+    let mut txn = db.begin().await.unwrap();
+    erasure::erase(&mut txn, created.id, Some("tester"), &access, &audit)
+        .await
+        .unwrap();
+    txn.commit().await.unwrap();
+
+    let (stored, digests) = stored_record(&db, created.id)
+        .await
+        .expect("an erased record must assemble through the repository")
+        .expect("the erased row is retained");
+    assert_eq!(stored.name.family, erasure::TOMBSTONE_NAME);
+    assert!(stored.name.given.is_empty(), "no given name survives");
+    assert!(
+        stored.additional_names.is_empty(),
+        "no alias survives erasure: {:?}",
+        stored.additional_names
+    );
+    assert_eq!(stored.tax_id, None, "the tax id is scrubbed");
+    assert_eq!(stored.birth_date, None, "the birth date is scrubbed");
+    assert_eq!(stored.gender, Gender::Unknown);
+    assert!(digests.deleted_at.is_some(), "the erased record is retired");
+    assert_eq!(digests.content_hash, None);
+    assert_eq!(digests.content_hash_sha3, None);
+    assert_eq!(
+        digests.content_mac, None,
+        "PE-E1: no MAC over erased content"
+    );
+
+    purge(&db, created.id).await;
+}
+
+/// PE-E3: the backfill migration flags a tombstone an earlier erasure
+/// wrote non-primary, so that record assembles too. The earlier erasure
+/// is simulated by un-flagging a fresh tombstone; the migration's SQL is
+/// then run again (it is idempotent and narrow).
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+async fn the_backfill_flags_an_old_non_primary_tombstone() {
+    with_mac_key();
+    let db = connect().await;
+    let repo = PgPersonRepository::new(db.clone());
+    let created = repo
+        .create(&a_person("ErasedBackfill"), &AuditContext::default())
+        .await
+        .unwrap();
+    let audit = AuditLogRepository::new(db.clone());
+    let access = AccessContext::from_parts(None, None, None);
+    let mut txn = db.begin().await.unwrap();
+    erasure::erase(&mut txn, created.id, Some("tester"), &access, &audit)
+        .await
+        .unwrap();
+    txn.commit().await.unwrap();
+
+    sqlx::query("UPDATE person_names SET is_primary = FALSE WHERE person_id = $1")
+        .bind(created.id)
+        .execute(&db)
+        .await
+        .unwrap();
+    assert!(
+        stored_record(&db, created.id).await.is_err(),
+        "the simulated pre-fix tombstone must fail to assemble, or this tests nothing"
+    );
+
+    // One statement, so it runs as one prepared query.
+    sqlx::query(include_str!(
+        "../migrations/2026110800000001_erased_tombstone_name_primary.up.sql"
+    ))
+    .execute(&db)
+    .await
+    .expect("run the backfill");
+
+    let (stored, digests) = stored_record(&db, created.id)
+        .await
+        .expect("the backfilled tombstone assembles")
+        .expect("the erased row is retained");
+    assert_eq!(stored.name.family, erasure::TOMBSTONE_NAME);
+    assert_eq!(digests.content_hash, None, "the backfill rehashes nothing");
+    assert_eq!(digests.content_mac, None);
+
+    purge(&db, created.id).await;
 }

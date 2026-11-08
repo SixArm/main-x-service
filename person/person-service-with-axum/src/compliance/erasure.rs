@@ -44,10 +44,11 @@
 //! would break, and a retained-but-blanked row would still leak how many
 //! addresses or identifiers a subject had.
 //!
-//! One name row is written back as a tombstone. The service's read paths
-//! assume a person has at least one name; a person with none would
-//! deserialize into a shape later code treats as impossible, so an erased
-//! record would become a landmine rather than degrading cleanly.
+//! One name row is written back as a tombstone, flagged as the primary
+//! name. The service's read paths assume a person has a primary name; a
+//! person with none fails to assemble ("Person has no primary name"), so
+//! an erased record would become a landmine rather than degrading
+//! cleanly (PE-E3: the tombstone used to be inserted non-primary).
 
 use serde::Serialize;
 use sqlx::PgConnection;

@@ -1316,3 +1316,21 @@ PR; split larger tasks (`T-12a`, `T-12b`).
       timed out acquiring a second connection before.
       - Each new test failed with its fix reverted and passes with it.
         Unit tests 415, DB suite 80 (was 76).
+- [x] **PE-E3: an erased record reassembles (2026-11-08).**
+      `db::erasure::insert_tombstone_name` inserts the tombstone with
+      `is_primary = TRUE`, so `assemble` finds a primary name on an
+      erased row; migration
+      `2026110800000001_erased_tombstone_name_primary` flags the
+      tombstones earlier erasures wrote. Hashes and MAC stay NULL
+      (PE-E1). DB tests `an_erased_record_reassembles_as_its_tombstone`
+      (failed with "Person has no primary name" before) and
+      `the_backfill_flags_an_old_non_primary_tombstone`.
+- [x] **PE-G1: the gRPC list tests are deterministic (2026-11-08).**
+      `tests/grpc_sec_g3.rs` lists the page starting at each fixture's
+      SQL-derived position in `list_active`'s id order (asserted to be
+      the fixture), instead of one 500-row request the 100-row cap
+      truncated; it seeds 120 active persons ahead of the fixtures,
+      which reproduced the failure before the fix. The round-trip test
+      in `tests/grpc_integration_test.rs` gets the same fix.
+      `MAX_LIST_LIMIT` is unchanged.
+      - Unit tests 415, DB suite 82 (was 80).
