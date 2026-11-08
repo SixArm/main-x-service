@@ -10,6 +10,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- The outbox relay's ack stamps `published_at` from this process's clock,
+  the clock `purge_published` builds its retention cutoff on. It took
+  Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged
+  delivered rows early or kept them late by the drift.
+
 - **A record now verifies the moment it is written** (repo `tasks.md`
   EVT-V1). `GET /api/records/verify` reported every new event as
   mismatched: the digests covered the event the caller sent, but the

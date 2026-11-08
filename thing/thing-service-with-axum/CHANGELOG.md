@@ -8,6 +8,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed
+
+- The outbox relay's ack stamps `published_at` from this process's clock,
+  the clock `purge_published` builds its retention cutoff on. It took
+  Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged
+  delivered rows early or kept them late by the drift.
+
 ### Fixed — a freshly written record failed `GET /api/records/verify` (INT-V1)
 
 - **Record digests now cover the record as stored.** The write path

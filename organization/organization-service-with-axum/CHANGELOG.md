@@ -11,6 +11,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- The outbox relay's ack stamps `published_at` from this process's clock,
+  the clock `purge_published` builds its retention cutoff on. It took
+  Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged
+  delivered rows early or kept them late by the drift.
+
 - Lost-job reconcile (`mark_lost`) measures its 15-minute grace on this
   process's clock, the clock that stamps `bulk_jobs.updated_at`. It
   compared with Postgres `now()`, so an application clock 15 minutes or

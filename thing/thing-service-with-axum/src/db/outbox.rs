@@ -198,8 +198,11 @@ pub async fn mark_published(conn: &mut PgConnection, ids: &[i64]) -> Result<u64>
         return Ok(0);
     }
     let done = sqlx::query!(
-        "UPDATE event_outbox SET published_at = CURRENT_TIMESTAMP WHERE id = ANY($1)",
+        "UPDATE event_outbox SET published_at = $2 WHERE id = ANY($1)",
         ids,
+        // This process's clock, because `purge_published` measures its
+        // cutoff on it: Postgres time would move retention by the drift.
+        chrono::Utc::now(),
     )
     .execute(conn)
     .await?;

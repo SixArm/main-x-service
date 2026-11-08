@@ -10,6 +10,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- The outbox relay's ack stamps `published_at` from this process's clock,
+  the clock `purge_published` builds its retention cutoff on. It took
+  Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged
+  delivered rows early or kept them late by the drift.
+
 - Address retention (`scrub_addresses`, `count_unscrubbable_addresses`)
   measures "older than N days" on this process's clock, the clock that
   stamped `audit_log."timestamp"` (the chain hashes it, so the database

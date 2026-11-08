@@ -11,6 +11,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- The outbox relay's ack stamps `published_at` from this process's clock,
+  the clock `purge_published` builds its retention cutoff on. It took
+  Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged
+  delivered rows early or kept them late by the drift.
+
 - **A freshly written course now passes `GET /api/records/verify`**
   (spec §13 T-32, repo `tasks.md` INT-V1). The write path computed the
   three record digests from the course the caller sent, before it was

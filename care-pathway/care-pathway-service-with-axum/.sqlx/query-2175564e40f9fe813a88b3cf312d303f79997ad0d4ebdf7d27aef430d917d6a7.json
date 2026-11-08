@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE event_outbox SET published_at = $2 WHERE id = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4Array",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2175564e40f9fe813a88b3cf312d303f79997ad0d4ebdf7d27aef430d917d6a7"
+}
