@@ -42,7 +42,7 @@
 //! export query (`include_soft_deleted = true` is rejected as
 //! not-yet-supported rather than leaking or ignoring it).
 
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::Result;
@@ -165,16 +165,17 @@ pub fn apply_masking(records: Vec<Person>, masking_profile: MaskingProfile) -> V
 }
 
 /// Look up the non-deleted person owning an identifier `(system, value)`,
-/// if any. Returns the first live match.
+/// if any, on `conn`. Returns the first live match.
 async fn find_by_identifier(
-    db: &PgPool,
+    conn: &mut PgConnection,
     repo: &dyn PersonRepository,
     system: &str,
     value: &str,
 ) -> Result<Option<Person>> {
-    let ids = crate::db::repositories::person_ids_with_identifier(db, system, value).await?;
+    let ids =
+        crate::db::repositories::person_ids_with_identifier(&mut *conn, system, value).await?;
     for person_id in ids {
-        if let Some(person) = repo.get_by_id(&person_id).await? {
+        if let Some(person) = repo.get_by_id_on(&mut *conn, &person_id).await? {
             return Ok(Some(person));
         }
     }
@@ -182,16 +183,17 @@ async fn find_by_identifier(
 }
 
 /// Resolve the existing record (if any) that `person`'s stable key points
-/// at, so the caller can decide create-vs-upsert.
+/// at, so the caller can decide create-vs-upsert. Reads on `conn`, which
+/// for a real import is the transaction holding the stable-key lock.
 async fn find_existing(
-    db: &PgPool,
+    conn: &mut PgConnection,
     repo: &dyn PersonRepository,
     person: &Person,
 ) -> Result<Option<Person>> {
     match resolve_stable_key(person) {
-        StableKey::Pid(id) => repo.get_by_id(&id).await,
+        StableKey::Pid(id) => repo.get_by_id_on(conn, &id).await,
         StableKey::Identifier { system, value } => {
-            find_by_identifier(db, repo, &system, &value).await
+            find_by_identifier(conn, repo, &system, &value).await
         }
     }
 }
@@ -224,12 +226,18 @@ fn stable_key_lock_string(key: &StableKey) -> String {
 /// registry intentionally permits duplicate identifiers — dedup is a
 /// workflow — so a `UNIQUE(system,value)` constraint is the wrong tool).
 ///
-/// A guard transaction takes `pg_advisory_xact_lock(hashtext(key))` and
-/// holds it across find → create/update → commit, so a second importer of
-/// the same key blocks until the first commits and then observes the
-/// just-written record and upserts it in place. The repository's own
-/// create/update transactions commit within this window; the lock (not the
-/// connection) provides the mutual exclusion. Returns `(saved, was_upsert)`.
+/// One transaction takes `pg_advisory_xact_lock(hashtext(key))`, then the
+/// lookup and the create/update run **on it** ([`PersonRepository::create_on`]
+/// / [`PersonRepository::update_on`]), so the row, its digests and its
+/// outbox row commit together with the lock still held, and a second
+/// importer of the same key blocks until then and upserts the row it
+/// finds. The in-memory event and the audit row follow the commit
+/// ([`PersonRepository::after_commit`]).
+///
+/// PE-B1: the write used to run through `repo.create` / `repo.update`,
+/// each taking a pooled connection of its own while this one held the
+/// lock, so an import needed a pool of at least two and deadlocked on
+/// one. Now one upsert uses one connection. Returns `(saved, was_upsert)`.
 async fn import_upsert_locked(
     db: &PgPool,
     repo: &dyn PersonRepository,
@@ -237,26 +245,28 @@ async fn import_upsert_locked(
     ctx: &crate::db::AuditContext,
 ) -> Result<(Person, bool)> {
     let key = resolve_stable_key(person);
-    let mut guard = db.begin().await?;
-    crate::db::bulk_jobs::lock_stable_key(&mut guard, &stable_key_lock_string(&key)).await?;
+    let mut txn = db.begin().await?;
+    crate::db::bulk_jobs::lock_stable_key(&mut txn, &stable_key_lock_string(&key)).await?;
 
-    let existing = find_existing(db, repo, person).await?;
-    let result = if let Some(existing) = existing {
-        // Upsert in place: keep the existing record's pid so the stable key
-        // maps to one record across re-imports and concurrent importers.
-        person.id = existing.id;
-        repo.update(person, ctx).await.map(|saved| (saved, true))
-    } else {
-        if person.id == Uuid::nil() {
-            person.id = Uuid::new_v4();
-        }
-        repo.create(person, ctx).await.map(|saved| (saved, false))
-    };
-    // Commit the guard to release the advisory lock only after the write has
-    // committed, so a waiter observes the row. On a write error the guard is
-    // dropped (rolled back) and the lock releases anyway.
-    guard.commit().await?;
-    result
+    // On an error the transaction drops and rolls back, releasing the lock.
+    let (saved, was_upsert, after) =
+        if let Some(existing) = find_existing(&mut txn, repo, person).await? {
+            // Upsert in place: keep the existing record's pid so the stable
+            // key maps to one record across re-imports and concurrent
+            // importers.
+            person.id = existing.id;
+            let (saved, after) = repo.update_on(&mut txn, person, ctx).await?;
+            (saved, true, after)
+        } else {
+            if person.id == Uuid::nil() {
+                person.id = Uuid::new_v4();
+            }
+            let (saved, after) = repo.create_on(&mut txn, person, ctx).await?;
+            (saved, false, after)
+        };
+    txn.commit().await?;
+    repo.after_commit(after).await;
+    Ok((saved, was_upsert))
 }
 
 /// One decoded import row, format-agnostic — the shape [`decode_import_rows`]
@@ -561,7 +571,11 @@ pub async fn process_import_stream(
             // Classify only; no lock/write. A concurrent create between this
             // read and a later real run is immaterial — dry-run commits
             // nothing.
-            match find_existing(db, repo, &person).await {
+            let existing = match db.acquire().await {
+                Ok(mut conn) => find_existing(&mut conn, repo, &person).await,
+                Err(e) => Err(e.into()),
+            };
+            match existing {
                 Ok(existing) => {
                     if existing.is_some() {
                         outcome.rows_upserted += 1;
@@ -860,6 +874,71 @@ mod db_tests {
             1,
             "exactly one person may own the stable-key identifier"
         );
+    }
+
+    /// PE-B1: a keyed import completes on a pool of **one** connection,
+    /// both the create and the re-import's upsert. The SEC-B3 guard used to
+    /// hold its transaction while the repository took a second pooled
+    /// connection, so every keyed row waited out the acquire timeout and
+    /// failed. The audit log shares the pool, so the post-commit audit row
+    /// is on it too.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn import_on_a_one_connection_pool_completes() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let db = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(1)
+            .acquire_timeout(std::time::Duration::from_secs(5))
+            .connect(&url)
+            .await
+            .expect("connect to DATABASE_URL");
+        let audit = std::sync::Arc::new(crate::db::AuditLogRepository::new(db.clone()));
+        let repo = PgPersonRepository::new(db.clone()).with_audit_log(audit);
+        let (_dir, search) = search_engine();
+
+        let mut p = person("OneConnection");
+        p.identifiers.push(Identifier::new(
+            IdentifierType::SSN,
+            "http://hl7.org/fhir/sid/us-ssn".to_string(),
+            format!("SSN-{}", uuid::Uuid::new_v4()),
+        ));
+        let input = jsonl::encode(std::slice::from_ref(&p)).unwrap();
+        let (matcher, params, ctx) = (matcher(), ImportParams::default(), AuditContext::default());
+
+        let run = || {
+            process_import_job(
+                &db,
+                &repo,
+                &search,
+                &matcher,
+                &input,
+                BulkFormat::Jsonl,
+                &params,
+                &ctx,
+            )
+        };
+        let first = tokio::time::timeout(std::time::Duration::from_secs(30), run())
+            .await
+            .expect("the import must not hang on a one-connection pool")
+            .unwrap();
+        assert_eq!(
+            (first.rows_created, first.rows_errored),
+            (1, 0),
+            "created on one connection; errors: {:?}",
+            first.errors
+        );
+        let second = tokio::time::timeout(std::time::Duration::from_secs(30), run())
+            .await
+            .expect("the re-import must not hang on a one-connection pool")
+            .unwrap();
+        assert_eq!(
+            (second.rows_upserted, second.rows_errored),
+            (1, 0),
+            "upserted on one connection; errors: {:?}",
+            second.errors
+        );
+        let saved = repo.get_by_id(&p.id).await.unwrap().expect("persisted");
+        assert_eq!(saved.name.family, "OneConnection");
     }
 
     #[tokio::test]

@@ -422,50 +422,37 @@ async fn stamp_digests(conn: &mut PgConnection, id: Uuid) -> Result<()> {
 }
 
 /// Soft-delete the person `id` on `conn` by stamping `deleted_at` /
-/// `deleted_by` (from `ctx`'s actor) and leaving every other column (and
-/// the child rows) in place. Factored from [`PersonRepository::delete`]'s
-/// soft-delete so [`PersonRepository::merge`] can reuse it on its own
-/// transaction.
+/// `deleted_by` (from `ctx`'s actor), leaving every other column (and the
+/// child rows) in place, then restamping every digest over the row as now
+/// stored. Factored from [`PersonRepository::delete`]'s soft-delete so
+/// [`PersonRepository::merge`] can reuse it on its own transaction.
+///
+/// PE-D1: `deleted_at` is part of the record's pre-image, so a soft
+/// delete changes all three digests. It used to rewrite only
+/// `content_hash`, from the caller's pre-loaded copy, leaving
+/// `content_hash_sha3` and `content_mac` describing the live record.
+/// [`stamp_digests`] now writes all three over the stored row, on `conn`,
+/// so a caller passing its transaction gets them in the same write.
 ///
 /// An id that matches no row is an error, as it was under `SeaORM`.
 async fn apply_soft_delete_row(
     conn: &mut PgConnection,
     id: &Uuid,
-    person: Option<&Person>,
     ctx: &AuditContext,
 ) -> Result<()> {
-    let deleted_at = Utc::now();
-    // A soft delete changes the record's lifecycle state, which the digest
-    // binds — so it must be rehashed, or every deleted record would read
-    // as tampered. `person` is the assembled record the caller already
-    // loaded for the audit trail; when it is absent (the row was gone
-    // before we looked) there is nothing to rehash and the column is left
-    // as it was. Only the SHA-256 column is rewritten here, as before.
-    let content_hash = person
-        .map(|p| {
-            crate::compliance::record_integrity::digests_with_deleted_at(
-                p,
-                Some(deleted_at.timestamp_micros()),
-            )
-        })
-        .transpose()?
-        .map(|d| d.sha256);
     let done = sqlx::query!(
-        "UPDATE persons
-         SET deleted_at = $2, deleted_by = $3, content_hash = COALESCE($4, content_hash)
-         WHERE id = $1",
+        "UPDATE persons SET deleted_at = $2, deleted_by = $3 WHERE id = $1",
         id,
-        deleted_at,
+        Utc::now(),
         // SEC-B8: the real caller when one is known.
         ctx.user_id.clone().or_else(|| Some("system".to_string())),
-        content_hash,
     )
     .execute(&mut *conn)
     .await?;
     if done.rows_affected() == 0 {
         return Err(not_updated());
     }
-    Ok(())
+    stamp_digests(conn, *id).await
 }
 
 /// Read one `persons` row; a soft-deleted row only when `include_deleted`.
@@ -678,6 +665,32 @@ impl Default for AuditContext {
     }
 }
 
+/// The side effects of a create or update made on a caller's
+/// transaction ([`PersonRepository::create_on`] /
+/// [`PersonRepository::update_on`]): the in-memory event and the
+/// best-effort audit row. Run them with
+/// [`PersonRepository::after_commit`] once that transaction has
+/// committed; dropping this on a rollback is correct, since an event or
+/// audit row for a write that never landed would describe a record that
+/// does not exist.
+#[must_use = "run it with `after_commit` once the transaction has committed"]
+pub struct AfterCommit {
+    /// The event to publish.
+    event: crate::streaming::PersonEvent,
+    /// The audit row to write: `(action, id, old values, new values)`.
+    audit: Option<AuditEntry>,
+    /// The acting caller, for the audit row.
+    ctx: AuditContext,
+}
+
+/// One pending audit row: `(action, id, old values, new values)`.
+type AuditEntry = (
+    &'static str,
+    Uuid,
+    Option<serde_json::Value>,
+    Option<serde_json::Value>,
+);
+
 /// Storage-agnostic CRUD + search interface for [`Person`] records.
 ///
 /// `Send + Sync` so it can be shared as `Arc<dyn PersonRepository>`
@@ -692,6 +705,39 @@ pub trait PersonRepository: Send + Sync {
 
     /// Fetch a non-deleted person by id, or `None` if absent/soft-deleted.
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Person>>;
+
+    /// [`Self::get_by_id`] on the caller's connection `conn`, so a caller
+    /// holding a transaction (and a lock on it) reads without taking a
+    /// second pooled connection.
+    async fn get_by_id_on(&self, conn: &mut PgConnection, id: &Uuid) -> Result<Option<Person>>;
+
+    /// [`Self::create`]'s writes on the caller's open transaction `conn`:
+    /// the rows, the digests and (under the outbox transport) the outbox
+    /// row. Returns the stored form and the [`AfterCommit`] side effects,
+    /// which the caller runs once it has committed. This is what lets a
+    /// caller hold a lock across the write: the bulk import takes its
+    /// stable-key advisory lock (SEC-B3) on `conn` and writes on it too, so
+    /// one pooled connection is enough (PE-B1).
+    async fn create_on(
+        &self,
+        conn: &mut PgConnection,
+        person: &Person,
+        ctx: &AuditContext,
+    ) -> Result<(Person, AfterCommit)>;
+
+    /// [`Self::update`]'s writes on the caller's open transaction `conn`,
+    /// as [`Self::create_on`].
+    async fn update_on(
+        &self,
+        conn: &mut PgConnection,
+        person: &Person,
+        ctx: &AuditContext,
+    ) -> Result<(Person, AfterCommit)>;
+
+    /// Publish the event and write the audit row of a
+    /// [`Self::create_on`] / [`Self::update_on`] whose transaction has
+    /// committed.
+    async fn after_commit(&self, after: AfterCommit);
 
     /// Replace a person and all its child rows, returning the new state.
     /// `ctx` is the acting caller (SEC-B8): stamped onto `updated_by` and
@@ -1021,45 +1067,14 @@ impl PgPersonRepository {
 #[async_trait::async_trait]
 impl PersonRepository for PgPersonRepository {
     /// Insert the person and all child rows in one transaction, stamp its
-    /// digests over the stored record, then reload, publish a `Created`
-    /// event, and write a CREATE audit row.
+    /// digests over the stored record, then publish a `Created` event and
+    /// write a CREATE audit row ([`Self::create_on`], then
+    /// [`Self::after_commit`]).
     async fn create(&self, person: &Person, ctx: &AuditContext) -> Result<Person> {
         let mut txn = self.db.begin().await?;
-
-        // SEC-B8: stamp the real caller when one is known.
-        insert_person_row(&mut txn, person, ctx.user_id.as_deref()).await?;
-        insert_children(&mut txn, person).await?;
-        // Digests over the record as stored, in this transaction (INT-V1).
-        stamp_digests(&mut txn, person.id).await?;
-
-        // Durable event bus (Phase 2): under the outbox transport, write
-        // the `event_outbox` row **inside this same transaction**, before
-        // the commit, so the entity rows and the event commit atomically
-        // (or roll back together). A no-op under the memory transport,
-        // which keeps the post-commit in-memory publish below.
-        self.enqueue_outbox(&mut txn, person, EventKind::Created)
-            .await?;
-
+        let (result, after) = self.create_on(&mut txn, person, ctx).await?;
         txn.commit().await?;
-
-        let mut conn = self.db.acquire().await?;
-        let result = read_person(&mut conn, person.id, true)
-            .await?
-            .ok_or_else(|| crate::Error::Validation("Person not found after create".to_string()))?;
-        drop(conn);
-
-        // Publish event
-        self.publish_event(crate::streaming::PersonEvent::Created {
-            person: result.clone(),
-            timestamp: Utc::now(),
-        });
-
-        // Log audit
-        if let Ok(person_json) = serde_json::to_value(&result) {
-            self.log_audit("CREATE", result.id, None, Some(person_json), ctx)
-                .await;
-        }
-
+        self.after_commit(after).await;
         Ok(result)
     }
 
@@ -1069,48 +1084,100 @@ impl PersonRepository for PgPersonRepository {
         read_person(&mut conn, *id, false).await
     }
 
+    async fn get_by_id_on(&self, conn: &mut PgConnection, id: &Uuid) -> Result<Option<Person>> {
+        read_person(conn, *id, false).await
+    }
+
+    async fn create_on(
+        &self,
+        conn: &mut PgConnection,
+        person: &Person,
+        ctx: &AuditContext,
+    ) -> Result<(Person, AfterCommit)> {
+        // SEC-B8: stamp the real caller when one is known.
+        insert_person_row(conn, person, ctx.user_id.as_deref()).await?;
+        insert_children(conn, person).await?;
+        // Digests over the record as stored, in this transaction (INT-V1).
+        stamp_digests(conn, person.id).await?;
+
+        // Durable event bus (Phase 2): under the outbox transport, write
+        // the `event_outbox` row **inside this same transaction**, before
+        // the commit, so the entity rows and the event commit atomically
+        // (or roll back together). A no-op under the memory transport,
+        // which keeps the post-commit in-memory publish.
+        self.enqueue_outbox(conn, person, EventKind::Created)
+            .await?;
+
+        let result = read_person(conn, person.id, true)
+            .await?
+            .ok_or_else(|| crate::Error::Validation("Person not found after create".to_string()))?;
+        let audit = serde_json::to_value(&result)
+            .ok()
+            .map(|json| ("CREATE", result.id, None, Some(json)));
+        let after = AfterCommit {
+            event: crate::streaming::PersonEvent::Created {
+                person: result.clone(),
+                timestamp: Utc::now(),
+            },
+            audit,
+            ctx: ctx.clone(),
+        };
+        Ok((result, after))
+    }
+
     /// Update the parent row, then delete-and-reinsert all child rows in
     /// one transaction (a simple full-replace), publish an `Updated`
-    /// event, and write an UPDATE audit row with the before/after JSON.
+    /// event, and write an UPDATE audit row with the before/after JSON
+    /// ([`Self::update_on`], then [`Self::after_commit`]).
     async fn update(&self, person: &Person, ctx: &AuditContext) -> Result<Person> {
-        // Get old values for audit
-        let old_person = self.get_by_id(&person.id).await?;
-
         let mut txn = self.db.begin().await?;
+        let (result, after) = self.update_on(&mut txn, person, ctx).await?;
+        txn.commit().await?;
+        self.after_commit(after).await;
+        Ok(result)
+    }
+
+    async fn update_on(
+        &self,
+        conn: &mut PgConnection,
+        person: &Person,
+        ctx: &AuditContext,
+    ) -> Result<(Person, AfterCommit)> {
+        // Old values for audit.
+        let old_person = read_person(conn, person.id, false).await?;
 
         // Parent-row update + wholesale child-row replacement + digest
         // stamp, shared with `merge` (see `apply_update_rows`).
-        apply_update_rows(&mut txn, person, ctx).await?;
+        apply_update_rows(conn, person, ctx).await?;
 
-        // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&mut txn, person, EventKind::Updated)
+        // Outbox row shares the update transaction (see `create_on`).
+        self.enqueue_outbox(conn, person, EventKind::Updated)
             .await?;
 
-        txn.commit().await?;
-
-        // Fetch and return updated person
-        let result = self
-            .get_by_id(&person.id)
+        let result = read_person(conn, person.id, false)
             .await?
             .ok_or_else(|| crate::Error::Validation("Person not found after update".to_string()))?;
-
-        // Publish event
-        self.publish_event(crate::streaming::PersonEvent::Updated {
-            person: result.clone(),
-            timestamp: Utc::now(),
-        });
-
-        // Log audit
-        if let Some(old_json) = old_person
+        let audit = old_person
             .as_ref()
             .and_then(|p| serde_json::to_value(p).ok())
-            && let Ok(new_json) = serde_json::to_value(&result)
-        {
-            self.log_audit("UPDATE", result.id, Some(old_json), Some(new_json), ctx)
-                .await;
-        }
+            .zip(serde_json::to_value(&result).ok())
+            .map(|(old, new)| ("UPDATE", result.id, Some(old), Some(new)));
+        let after = AfterCommit {
+            event: crate::streaming::PersonEvent::Updated {
+                person: result.clone(),
+                timestamp: Utc::now(),
+            },
+            audit,
+            ctx: ctx.clone(),
+        };
+        Ok((result, after))
+    }
 
-        Ok(result)
+    async fn after_commit(&self, after: AfterCommit) {
+        self.publish_event(after.event);
+        if let Some((action, id, old, new)) = after.audit {
+            self.log_audit(action, id, old, new, &after.ctx).await;
+        }
     }
 
     /// Merge `duplicate_id` into `survivor` atomically: apply the
@@ -1173,12 +1240,12 @@ impl PersonRepository for PgPersonRepository {
         // Apply the survivor's parent + child rows (shared with `update`).
         apply_update_rows(&mut txn, survivor, ctx).await?;
 
-        // Soft-delete the duplicate (shared with `delete`). The
-        // pre-image loaded above for the audit trail doubles as the record
-        // to rehash, so the duplicate's tombstone carries a correct digest
-        // instead of reading as tampered. The same `ctx` applies to both
-        // halves of the merge — one operator initiated the whole action.
-        apply_soft_delete_row(&mut txn, duplicate_id, old_duplicate.as_ref(), ctx).await?;
+        // Soft-delete the duplicate (shared with `delete`), restamping all
+        // three digests over its stored row on this transaction (PE-D1),
+        // so its tombstone does not read as tampered. The same `ctx`
+        // applies to both halves of the merge — one operator initiated
+        // the whole action.
+        apply_soft_delete_row(&mut txn, duplicate_id, ctx).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the
         // survivor (carrying the duplicate's pid via `merged_from`, so a
@@ -1251,23 +1318,17 @@ impl PersonRepository for PgPersonRepository {
         // Get old values for audit
         let old_person = self.get_by_id(id).await?;
 
-        // Soft delete: stamp `deleted_at`/`deleted_by` only. Unlike
-        // create/update, this is a single row update with no existing
-        // transaction. Under the outbox transport we open one here so the
-        // tombstone write and the `deleted` outbox row commit atomically;
-        // the memory transport keeps the plain, tx-free update.
-        if self.transport.is_outbox() {
-            let mut txn = self.db.begin().await?;
-            apply_soft_delete_row(&mut txn, id, old_person.as_ref(), ctx).await?;
-            if let Some(old) = old_person.as_ref() {
-                self.enqueue_outbox(&mut txn, old, EventKind::Deleted)
-                    .await?;
-            }
-            txn.commit().await?;
-        } else {
-            let mut conn = self.db.acquire().await?;
-            apply_soft_delete_row(&mut conn, id, old_person.as_ref(), ctx).await?;
+        // Soft delete: stamp `deleted_at`/`deleted_by` and restamp the
+        // digests (PE-D1), in one transaction under either transport, so
+        // no reader sees the new stamp with the old digests. Under the
+        // outbox transport the `deleted` outbox row commits with them.
+        let mut txn = self.db.begin().await?;
+        apply_soft_delete_row(&mut txn, id, ctx).await?;
+        if let Some(old) = old_person.as_ref() {
+            self.enqueue_outbox(&mut txn, old, EventKind::Deleted)
+                .await?;
         }
+        txn.commit().await?;
 
         // Publish event
         self.publish_event(crate::streaming::PersonEvent::Deleted {
@@ -1363,6 +1424,30 @@ pub struct StoredDigests {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
+/// One record **as stored**, soft-deleted or not, with its stored digests:
+/// the input a check of a row's digests needs, including the deleted rows
+/// `/api/records/verify` skips (the PE-D1 test reads them through this).
+/// `None` when no row has `id`.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if a query fails.
+pub async fn stored_record(db: &PgPool, id: Uuid) -> Result<Option<(Person, StoredDigests)>> {
+    let mut conn = db.acquire().await?;
+    let Some(row) = fetch_person_row(&mut conn, id, true).await? else {
+        return Ok(None);
+    };
+    let digests = StoredDigests {
+        id: row.id,
+        content_hash: row.content_hash.clone(),
+        content_hash_sha3: row.content_hash_sha3.clone(),
+        content_mac: row.content_mac.clone(),
+        deleted_at: row.deleted_at,
+    };
+    let person = assemble(&mut conn, row).await?;
+    Ok(Some((person, digests)))
+}
+
 /// The `limit` most recently updated `persons` rows' stored digests, for
 /// `/api/records/verify`.
 ///
@@ -1434,22 +1519,24 @@ pub async fn count_persons(db: &PgPool) -> Result<u64> {
 }
 
 /// The ids of the persons holding identifier `(system, value)`, deleted or
-/// not, for the bulk import's stable-key lookup.
+/// not, for the bulk import's stable-key lookup, on a pool or on the
+/// import's own transaction.
 ///
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] if the query fails.
 pub async fn person_ids_with_identifier(
-    db: &PgPool,
+    conn: impl Into<axa::sqlx::Db<'_>>,
     system: &str,
     value: &str,
 ) -> Result<Vec<Uuid>> {
+    let mut conn = conn.into().acquire().await?;
     let ids = sqlx::query_scalar!(
         "SELECT person_id FROM person_identifiers WHERE system = $1 AND value = $2",
         system,
         value,
     )
-    .fetch_all(db)
+    .fetch_all(&mut *conn)
     .await?;
     Ok(ids)
 }

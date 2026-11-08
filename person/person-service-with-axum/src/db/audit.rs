@@ -27,7 +27,27 @@ use crate::compliance::audit_chain;
 /// The chain head must be read and its successor inserted without another
 /// writer interleaving, or two rows would claim the same predecessor and
 /// verification would report a fork.
-const CHAIN_LOCK_KEY: i64 = 0x6D78_695F_7072_736E; // "mxi_prsn"
+pub const CHAIN_LOCK_KEY: i64 = 0x6D78_695F_7072_736E; // "mxi_prsn"
+
+/// Take the chain's append lock ([`CHAIN_LOCK_KEY`]) on `conn`, held to
+/// the end of the enclosing transaction.
+///
+/// Every chained append takes it itself; this is for a caller that needs
+/// it *earlier* in the same transaction. The GDPR erasure takes it before
+/// its redaction sweep (PE-E2), as case's does, so no audit row about the
+/// subject can commit between the sweep and the erasure's own `erased`
+/// row and survive unredacted. Taking it again in the same transaction is
+/// a no-op, since advisory locks are re-entrant per session.
+///
+/// # Errors
+///
+/// When the lock query fails.
+pub async fn lock_chain(conn: &mut sqlx::PgConnection) -> Result<()> {
+    sqlx::query!("SELECT pg_advisory_xact_lock($1)", CHAIN_LOCK_KEY)
+        .execute(conn)
+        .await?;
+    Ok(())
+}
 
 /// Reads and writes the `audit_log` table.
 ///

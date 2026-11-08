@@ -1283,3 +1283,36 @@ PR; split larger tasks (`T-12a`, `T-12b`).
         takes others, so it needs a pool of at least two.
       - Unit tests 415, DB suite 76 (was 75). Unique normal dependencies
         393 → 354.
+
+- [x] **PE-D1: a soft delete restamps every digest (2026-11-08).**
+      `deleted_at` is in the pre-image, but a soft delete rewrote only
+      `content_hash`. `apply_soft_delete_row` now ends in
+      `stamp_digests`, over the stored row, on the write's transaction
+      (delete and merge's duplicate half; the memory-transport delete is
+      one transaction now too). DB test
+      `tests/digests_and_erasure_db.rs::a_soft_delete_restamps_every_digest`
+      reads the deleted row through `db::repositories::stored_record`
+      and recomputes all three with a MAC key set.
+- [x] **PE-E1: erasure nulls the MAC (2026-11-08).** `scrub_person`
+      sets `content_mac` to NULL with the two hashes, for the hashes'
+      own reason: the child rows are gone, so there is no record to
+      certify, and NULL reads as "not hashed", not as tampered. DB test
+      `erasure_nulls_the_mac_with_the_hashes`.
+- [x] **PE-E2: erasure takes the chain lock before redacting
+      (2026-11-08).** New `db::audit::lock_chain`, called on the
+      erasure's transaction after the entity rows and before
+      `redact_for_entity`, as case's CS-G1. DB test
+      `erasure_redacts_an_audit_row_appended_while_it_waits`: a second
+      session holds the lock, waits for `pg_locks` to show the erasure
+      blocked on it, appends a chained row about the subject, releases;
+      the row is redacted and the chain verifies.
+- [x] **PE-B1: a bulk import runs on one connection (2026-11-08).**
+      `PersonRepository` gains `get_by_id_on`, `create_on`,
+      `update_on` (writes on the caller's transaction) and
+      `after_commit` (in-memory event, audit row); `create` / `update`
+      are those on a transaction of their own. `import_upsert_locked`
+      takes the SEC-B3 lock, looks up and writes on one transaction.
+      DB test `bulk::pipeline::db_tests::import_on_a_one_connection_pool_completes`
+      timed out acquiring a second connection before.
+      - Each new test failed with its fix reverted and passes with it.
+        Unit tests 415, DB suite 80 (was 76).

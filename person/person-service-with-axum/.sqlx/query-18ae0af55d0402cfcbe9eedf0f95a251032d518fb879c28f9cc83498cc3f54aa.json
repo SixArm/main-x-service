@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE persons SET deleted_at = $2, deleted_by = $3 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "18ae0af55d0402cfcbe9eedf0f95a251032d518fb879c28f9cc83498cc3f54aa"
+}

@@ -49,6 +49,39 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   transaction (`stamp_digests`). The new DB test
   `a_written_record_verifies` (a fresh and an updated record verify, a
   row edited in SQL is flagged) failed on the SeaORM code and passes.
+- **PE-D1: a soft delete left two of a record's three digests stale.**
+  `deleted_at` is in the record's pre-image, but a soft delete rewrote
+  only `content_hash`, from the caller's copy, so `content_hash_sha3`
+  and `content_mac` still described the live record. Soft delete (and
+  the duplicate's half of a merge) now restamps all three with
+  `stamp_digests`, over the row as stored, in the write's transaction;
+  under the memory transport the delete is now one transaction too. DB
+  test `a_soft_delete_restamps_every_digest`.
+- **PE-E1: erasure kept the record's MAC.** It nulled the two hashes but
+  not `content_mac`, a keyed digest of the erased content. It is now
+  nulled with them rather than restamped over the tombstone, because the
+  hashes are nulled for the reason that applies to it equally: the
+  child rows are gone, so there is no record left to certify, and NULL
+  is the value verification already reports as "not hashed" rather than
+  as tampered. DB test `erasure_nulls_the_mac_with_the_hashes`.
+- **PE-E2: an audit row about the subject could survive an erasure
+  unredacted.** The redaction sweep ran before the chain's advisory lock
+  was taken (by the `erased` append), so a chained row committed in
+  between missed the sweep. The erasure now takes the lock
+  (`db::audit::lock_chain`) on its transaction before the sweep, after
+  the entity rows, as case does. DB test
+  `erasure_redacts_an_audit_row_appended_while_it_waits` holds the lock
+  from a second session, waits until `pg_locks` shows the erasure
+  blocked on it, appends a row about the subject, and releases.
+- **PE-B1: a bulk import deadlocked on a one-connection pool.** The
+  SEC-B3 guard held a pooled transaction while the lookup and
+  `create`/`update` took others. The repository gains `get_by_id_on`,
+  `create_on` and `update_on`, which run on the caller's transaction,
+  and `after_commit` for the in-memory event and audit row; the import
+  takes the stable-key lock, looks up and writes on one transaction, as
+  organization, case and care-pathway do. `create` and `update` are now
+  those methods on a transaction of their own. DB test
+  `import_on_a_one_connection_pool_completes`.
 
 ### Changed
 

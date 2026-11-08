@@ -8685,15 +8685,24 @@ before). DB suite: case 70 → 72.
 Erasure had neither of case's gaps. These were there on SeaORM and are
 kept as they were (crate spec §13 SQ-1).
 
-- [ ] **PE-D1 (S)** A soft delete rewrites only `content_hash`, leaving
+- [x] **PE-D1 (S)** A soft delete rewrites only `content_hash`, leaving
   the SHA-3 digest and the MAC stale. Verification skips deleted rows, so
   it is invisible until a deleted row is restored or verified.
-- [ ] **PE-E1 (S)** Erasure nulls the two hashes but not `content_mac`,
+- [x] **PE-E1 (S)** Erasure nulls the two hashes but not `content_mac`,
   so a keyed digest of the erased content survives.
-- [ ] **PE-E2 (S)** Erasure redacts audit rows before taking the chain's
+- [x] **PE-E2 (S)** Erasure redacts audit rows before taking the chain's
   advisory lock; case (CS-G1) takes it first, so no unredacted row about
   the subject can commit in between.
-- [ ] **PE-B1 (S)** The SEC-B3 import guard holds a pooled transaction
+- [x] **PE-B1 (S)** The SEC-B3 import guard holds a pooled transaction
   while the repository takes other connections, so imports need a pool of
   at least two; one connection deadlocks. Run the write on the guard's
   transaction, as organization, case and care-pathway now do.
+- [ ] **PE-E3 (S)** Erasure's tombstone name is inserted with
+  `is_primary` left at its default, `false`, so an erased row does not
+  assemble into a `Person` ("Person has no primary name") on any path
+  that reads deleted rows. Found writing the PE-E1 test.
+- [ ] **PE-G1 (S)** `tests/grpc_sec_g3.rs` asks `ListPersons` for 500
+  rows, but the server caps a page at 100 (`MAX_LIST_LIMIT`). The suites
+  share one database, which holds over 100 active persons by the time
+  it runs, so the test fails whenever a fixture's random id sorts past
+  the page. Seen once in two full runs.
