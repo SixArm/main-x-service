@@ -37,8 +37,8 @@ migration
 
 **Key methods:** `create_passwordless(db, email, name)`,
 `find_by_email`, `find_by_pid`, `find_active_by_pid` (excludes
-GDPR-erased accounts), `is_deleted()`, `find_by_magic_token` (enforces
-expiry), `consume_magic_token` (SEC-A4 atomic single-use),
+GDPR-erased accounts), `is_deleted()`, `consume_magic_token` (SEC-A4 atomic
+single-use, expiry checked by the database),
 `create_magic_link`, `clear_magic_link`, `verified`,
 `erase` (GDPR soft-delete + anonymise). The pure
 `tombstone_email(pid)` + `TOMBSTONE_NAME` shape the anonymised values.

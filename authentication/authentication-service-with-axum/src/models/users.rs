@@ -357,7 +357,7 @@ impl Model {
     /// the token exists AND is unexpired. Because it is one statement, two
     /// concurrent redemptions of the same link race on it — exactly one gets
     /// a row (the winner), the other gets none — so a magic link is truly
-    /// single-use even under concurrency. The prior `find_by_magic_token`
+    /// single-use even under concurrency. The removed `find_by_magic_token`
     /// (SELECT) + `clear_magic_link` (UPDATE) let both concurrent requests
     /// pass the read and each mint a session.
     ///
@@ -387,53 +387,6 @@ impl Model {
         .fetch_optional(db)
         .await?;
         user.ok_or(ModelError::EntityNotFound)
-    }
-
-    /// finds a user by the magic token and verify and token expiration
-    ///
-    /// # Errors
-    ///
-    /// When could not find user by the given token or DB query error ot token expired
-    pub async fn find_by_magic_token(db: &PgPool, token: &str) -> ModelResult<Self> {
-        // SEC-A9: the DB stores the token's hash; match on the hash of the
-        // presented plaintext.
-        let user = sqlx::query_as!(
-            Self,
-            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
-                      id, pid, email, password, api_key, name,
-                      reset_token, reset_sent_at AS "reset_sent_at: _",
-                      email_verification_token,
-                      email_verification_sent_at AS "email_verification_sent_at: _",
-                      email_verified_at AS "email_verified_at: _",
-                      magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
-                      deleted_at AS "deleted_at: _", attributes
-               FROM users
-               WHERE magic_link_token = $1
-               LIMIT 1"#,
-            crate::secret_hash::hash(token),
-        )
-        .fetch_optional(db)
-        .await?;
-
-        let user = user.ok_or(ModelError::EntityNotFound)?;
-        if let Some(expired_at) = user.magic_link_expiration {
-            if expired_at >= Local::now() {
-                Ok(user)
-            } else {
-                tracing::debug!(
-                    user_pid = user.pid.to_string(),
-                    token_expiration = expired_at.to_string(),
-                    "magic token expired for the user."
-                );
-                Err(ModelError::msg("magic token expired"))
-            }
-        } else {
-            tracing::error!(
-                user_pid = user.pid.to_string(),
-                "magic link expiration time not exists"
-            );
-            Err(ModelError::msg("expiration token not exists"))
-        }
     }
 
     /// finds a user by the provided reset token

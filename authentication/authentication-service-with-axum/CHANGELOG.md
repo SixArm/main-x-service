@@ -25,6 +25,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   every link arrive already expired, and one ahead kept links alive past
   their five minutes.
 
+### Removed
+
+- `users::Model::find_by_magic_token`. Nothing called it since
+  `consume_magic_token` replaced it (SEC-A4), and it checked expiry
+  against this process's clock rather than the database's.
+
 ### Changed
 
 - Persistence moved from SeaORM to sqlx (spec/tech-stack §5). Every
