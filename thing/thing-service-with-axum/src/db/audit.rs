@@ -247,8 +247,14 @@ impl AuditLogRepository {
         Ok(rows.into_iter().map(AuditEntry::from).collect())
     }
 
-    /// The rows `GET /api/audit/verify` recomputes, whole (digests
-    /// included), ordered by `id` descending as they always have been.
+    /// The newest `limit` rows, whole (digests included), for
+    /// `GET /api/audit/verify` to recompute.
+    ///
+    /// Newest is `created_at` descending. `id` is a random UUID, so
+    /// ordering by it alone picked an arbitrary sample and a tampered
+    /// recent row could go unchecked (repo `tasks.md` LG-A1). `id` breaks
+    /// ties between rows stamped in the same microsecond, so the sample
+    /// is deterministic.
     ///
     /// # Errors
     ///
@@ -259,7 +265,7 @@ impl AuditLogRepository {
             "SELECT id, entity_type, entity_id, action, user_id, user_ip_address, user_agent,
                     old_values, new_values, created_at, hash, hash_sha3, mac
              FROM audit_log
-             ORDER BY id DESC
+             ORDER BY created_at DESC, id DESC
              LIMIT $1",
             to_i64(limit),
         )

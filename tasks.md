@@ -8560,6 +8560,11 @@ All three were there on SeaORM, and the move keeps them as they were.
   1000" audit rows by `ORDER BY id DESC`, but `id` is a random UUID, so it
   checks an arbitrary 1000. Order by the row's sequence or `created_at`,
   and test that a tampered newest row is caught.
+  - course, event, place and thing had the same `ORDER BY id DESC` in
+    `src/db/audit.rs` `rows_for_verification` (`GET /api/audit/verify`)
+    and are fixed (2026-11-08): each orders by its timestamp
+    (`created_at`; `timestamp` in event), `id DESC` as tie-breaker, with a
+    `tests/audit_verify.rs` DB test that failed before the fix.
 - [x] **LG-T1 (S)** `db truncate` leaves `processed_events`, so a truncated
   database still dedupes events it no longer holds. Clear it with the rest,
   or say why not.

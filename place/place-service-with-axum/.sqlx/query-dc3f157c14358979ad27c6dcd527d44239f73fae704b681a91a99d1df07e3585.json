@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, entity_type, entity_id, action, user_id, user_ip_address, user_agent,\n                    old_values, new_values, created_at, hash, hash_sha3, mac\n             FROM audit_log\n             ORDER BY id DESC\n             LIMIT $1",
+  "query": "SELECT id, entity_type, entity_id, action, user_id, user_ip_address, user_agent,\n                    old_values, new_values, created_at, hash, hash_sha3, mac\n             FROM audit_log\n             ORDER BY created_at DESC, id DESC\n             LIMIT $1",
   "describe": {
     "columns": [
       {
@@ -168,5 +168,5 @@
       true
     ]
   },
-  "hash": "9d7d65d440caf9512dc166792397ce853799033b9c0edafb853f3a5616f5d222"
+  "hash": "dc3f157c14358979ad27c6dcd527d44239f73fae704b681a91a99d1df07e3585"
 }

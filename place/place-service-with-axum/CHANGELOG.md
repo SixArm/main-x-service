@@ -25,6 +25,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   record and an updated one verify, and that a row edited in SQL is
   still flagged. Records written before this fix keep their wrong
   digests and are still reported.
+- **`GET /api/audit/verify` checks the newest rows** (spec §13 LG-A1,
+  repo `tasks.md` LG-A1). It ordered by `id`, a random UUID, so "the
+  newest N" was an arbitrary N and a tampered recent row could be
+  missed. It now orders by `created_at DESC, id DESC`. Digests are
+  unchanged. A new DB test, `tests/audit_verify.rs`, failed before the
+  fix and passes after.
 
 ### Changed — SeaORM replaced by sqlx
 

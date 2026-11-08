@@ -672,6 +672,18 @@ clearly described manual check confirms the acceptance criterion.
   `CURRENT_TIMESTAMP`; `tests/api_integration_test.rs`
   `a_written_record_verifies` and `tests/rest_outbox_transport.rs` pin
   both fixes.
+- [x] **LG-A1 (S) — audit verify examines the newest rows.** *(Done
+  2026-11-08; repo `tasks.md` LG-A1, found in link-graph, fixed here in
+  event-service.)* `GET /api/audit/verify` was meant to check the newest
+  `limit` audit rows but `AuditLogRepository::rows_for_verification`
+  ordered by `id DESC`, a random UUID, so it checked an arbitrary sample
+  and a tampered recent row could go unexamined. It now orders by
+  `timestamp DESC, id DESC` (`id` breaks same-microsecond ties). The audit
+  pre-image and digests are unchanged. `tests/audit_verify.rs` records
+  12 rows, gives the newest the nil UUID so `id DESC` sorts it last
+  (`id` is outside the pre-image), tampers with it in SQL, and asserts
+  `?limit=3` reports it; it failed before the fix (`verified: true`,
+  `mismatched: []`).
 
 - [x] **T-17 (M) — SeaORM → sqlx.** *(Done 2026-11-07;
   spec/tech-stack §5, following place's pilot and thing.)* Replaced
