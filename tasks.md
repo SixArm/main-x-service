@@ -8538,7 +8538,7 @@ All three were there before the move, on SeaORM. Fixed 2026-11-07.
 - [x] **EVT-D1 (S)** `cargo doc -D warnings` fails on event's broken
   intra-doc links (grpc, rest, `db/audit.rs`), so the crate-local
   `quality.yml` doc job is red.
-- [ ] **INT-V1 (M)** The EVT-V1 defect is family-wide: a fresh record
+- [x] **INT-V1 (M)** The EVT-V1 defect is family-wide: a fresh record
   fails `/api/records/verify` because its digests cover the caller's value,
   not the record as stored. Each crate with record integrity gets the DB
   test `a_written_record_verifies` (a fresh and an updated record verify; a
@@ -8556,7 +8556,9 @@ All three were there before the move, on SeaORM. Fixed 2026-11-07.
   - [x] person: had the defect (storage drops an address's `use` and
     truncates a time of death); fixed in its sqlx move 2026-11-08 with
     `stamp_digests`, the test failing on the old code.
-  - [ ] worker: still on SeaORM; lands the test, passing, with its move.
+  - [x] worker: had the defect (storage drops an address's `use_type` and
+    truncates a time of death); fixed in its sqlx move `37fd7ab2`, the
+    rich-payload test failing on the old code.
 
 ## Found 2026-11-07 (moving link-graph to sqlx)
 
