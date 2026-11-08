@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Lost-job reconcile (`mark_lost`) measures its 15-minute grace on this
+  process's clock, the clock that stamps `bulk_jobs.updated_at`. It
+  compared with Postgres `now()`, so an application clock 15 minutes or
+  more behind the database's failed a queued job on the next sweep while
+  it might still be enqueued, and one ahead left a lost job `queued` or
+  `running` for longer than the grace.
+
 ### Changed — axa 0.9
 
 - axa 0.9.0 and its `axa-worker` 0.2.0. On boot `Queue::connect` now also

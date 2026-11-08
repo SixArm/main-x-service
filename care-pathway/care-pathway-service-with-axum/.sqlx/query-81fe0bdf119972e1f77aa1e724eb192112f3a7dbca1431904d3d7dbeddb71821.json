@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE bulk_jobs b\n         SET status = 'failed', error = 'lost by the job queue', updated_at = now()\n         WHERE b.status IN ('queued', 'running')\n           AND NOT EXISTS (\n               SELECT 1 FROM axa_queue q\n               WHERE q.name IN ($1, $2) AND q.args->>'job_id' = b.id::text AND q.status <> 'failed'\n           )\n           AND (\n               EXISTS (\n                   SELECT 1 FROM axa_queue q\n                   WHERE q.name IN ($1, $2) AND q.args->>'job_id' = b.id::text AND q.status = 'failed'\n               )\n               OR b.updated_at < $3\n           )\n         RETURNING b.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bulk_jobs",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "81fe0bdf119972e1f77aa1e724eb192112f3a7dbca1431904d3d7dbeddb71821"
+}

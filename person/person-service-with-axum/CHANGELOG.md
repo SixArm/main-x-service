@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed
+
+- Address retention (`scrub_addresses`, `count_unscrubbable_addresses`)
+  measures "older than N days" on this process's clock, the clock that
+  stamped `audit_log."timestamp"` (the chain hashes it, so the database
+  cannot). It compared with Postgres `now()`, so an application clock
+  behind the database's scrubbed addresses early by the drift, and one
+  ahead kept them past their retention.
+- Lost-job reconcile (`mark_lost`) measures its 15-minute grace on this
+  process's clock, the clock that stamps `bulk_jobs.updated_at`. It
+  compared with Postgres `now()`, so an application clock 15 minutes or
+  more behind the database's failed a queued job on the next sweep while
+  it might still be enqueued, and one ahead left a lost job `queued` or
+  `running` for longer than the grace.
+
 ### Changed — axa 0.9
 
 - axa 0.9.0 and its `axa-worker` 0.2.0. On boot `Queue::connect` now also

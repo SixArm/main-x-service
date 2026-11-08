@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\" FROM audit_log\n           WHERE ip_address IS NOT NULL\n             AND \"timestamp\" < $1\n             AND ip_commitment IS NULL AND hash IS NOT NULL AND redacted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "2e39a7fbd3c623779e618d9f3bcf79ddc1da5e438a47165b0d9ec291ca6395cb"
+}

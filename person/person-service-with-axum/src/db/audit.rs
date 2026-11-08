@@ -839,6 +839,14 @@ pub async fn count_at_or_before(db: &PgPool, seq: i64) -> Result<u64> {
     Ok(u64::try_from(n).unwrap_or(0))
 }
 
+/// The instant before which a row is older than `days`, by this process's
+/// clock. `"timestamp"` is stamped by this process, not the database,
+/// because the chain hashes it, so the edge is measured on the same clock:
+/// Postgres `now()` would move it by however far the two clocks differ.
+fn retention_cutoff(days: i32) -> chrono::DateTime<chrono::Utc> {
+    chrono::Utc::now() - chrono::Duration::days(i64::from(days))
+}
+
 /// Remove the caller's address and its salt from rows older than `days`,
 /// where the chain does not bind the address itself, returning how many
 /// went ([`crate::compliance::address_retention`]). One statement, so
@@ -851,9 +859,9 @@ pub async fn scrub_addresses(db: &PgPool, days: i32) -> Result<u64> {
     let done = sqlx::query!(
         r#"UPDATE audit_log SET ip_address = NULL, ip_salt = NULL
            WHERE ip_address IS NOT NULL
-             AND "timestamp" < now() - make_interval(days => $1)
+             AND "timestamp" < $1
              AND (ip_commitment IS NOT NULL OR hash IS NULL OR redacted_at IS NOT NULL)"#,
-        days,
+        retention_cutoff(days),
     )
     .execute(db)
     .await?;
@@ -870,9 +878,9 @@ pub async fn count_unscrubbable_addresses(db: &PgPool, days: i32) -> Result<i64>
     let n = sqlx::query_scalar!(
         r#"SELECT count(*) AS "n!" FROM audit_log
            WHERE ip_address IS NOT NULL
-             AND "timestamp" < now() - make_interval(days => $1)
+             AND "timestamp" < $1
              AND ip_commitment IS NULL AND hash IS NOT NULL AND redacted_at IS NULL"#,
-        days,
+        retention_cutoff(days),
     )
     .fetch_one(db)
     .await?;

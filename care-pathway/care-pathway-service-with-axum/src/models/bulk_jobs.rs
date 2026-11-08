@@ -572,12 +572,14 @@ pub async fn mark_lost(
                    SELECT 1 FROM axa_queue q
                    WHERE q.name IN ($1, $2) AND q.args->>'job_id' = b.id::text AND q.status = 'failed'
                )
-               OR b.updated_at < now() - make_interval(mins => $3)
+               OR b.updated_at < $3
            )
          RETURNING b.id",
         job_worker,
         export_worker,
-        grace_minutes,
+        // `updated_at` is stamped by this process, so the grace is measured
+        // on its clock too: Postgres `now()` would move it by the drift.
+        chrono::Utc::now() - chrono::Duration::minutes(i64::from(grace_minutes)),
     )
     .fetch_all(db)
     .await
