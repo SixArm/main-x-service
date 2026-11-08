@@ -18,15 +18,14 @@
 //! `500` with a message rather than taking the process down (security
 //! invariant 2: never panic on stored/untrusted input).
 
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
-};
+use axa::sqlx::Db;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::Result;
 use crate::db::convert::{date_to_time, offset_to_ts, time_to_date, ts_to_offset};
-use crate::db::models::worker_assessments as row;
+use crate::db::models::{AssessmentRaw, worker_assessments as row};
+use crate::db::not_updated;
 use crate::models::assessment::{
     Assessment, AssessmentCategory, AssessmentResult, AssessmentStatus,
 };
@@ -113,14 +112,14 @@ fn model_from_domain(a: &Assessment) -> Result<row::Model> {
 
 /// Record a new assessment administration.
 ///
-/// Generic over [`ConnectionTrait`] so a caller can pass either the
-/// pooled connection or its own transaction.
+/// Takes the pool or a caller's own connection, such as an open
+/// transaction.
 ///
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the insert fails, or
 /// [`crate::Error::Internal`] when the results cannot be serialized.
-pub async fn insert<C: ConnectionTrait>(db: &C, assessment: &Assessment) -> Result<row::Model> {
+pub async fn insert(db: impl Into<Db<'_>>, assessment: &Assessment) -> Result<row::Model> {
     write_hashed(db, model_from_domain(assessment)?, true).await
 }
 
@@ -129,10 +128,8 @@ pub async fn insert<C: ConnectionTrait>(db: &C, assessment: &Assessment) -> Resu
 /// The digest is taken over `row` and then stored **on** `row`, so the
 /// hash input and the written value are the same object — there is no
 /// parallel hash-input structure that could drift out of step with the
-/// columns actually persisted. Every field is marked dirty
-/// ([`reset_all`](sea_orm::ActiveModelTrait::reset_all)), because a
-/// `Model` converts to an `ActiveModel` whose fields are all `Unchanged`
-/// and would otherwise write nothing.
+/// columns actually persisted. Every column is written, the update
+/// included, and the row comes back through `RETURNING`.
 ///
 /// This is one statement, matching how the audit chain hashes its rows
 /// before insert. The earlier implementation wrote the row and then
@@ -148,8 +145,8 @@ pub async fn insert<C: ConnectionTrait>(db: &C, assessment: &Assessment) -> Resu
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the write fails.
-async fn write_hashed<C: ConnectionTrait>(
-    db: &C,
+async fn write_hashed(
+    db: impl Into<Db<'_>>,
     mut row: row::Model,
     insert: bool,
 ) -> Result<row::Model> {
@@ -157,13 +154,79 @@ async fn write_hashed<C: ConnectionTrait>(
     row.content_hash = Some(d.sha256);
     row.content_hash_sha3 = Some(d.sha3);
     row.content_mac = d.mac;
-    let active: row::ActiveModel = row.into();
-    let active = active.reset_all();
-    Ok(if insert {
-        active.insert(db).await?
+    let mut conn = db.into().acquire().await?;
+    let stored = if insert {
+        Some(
+            sqlx::query_as!(
+                AssessmentRaw,
+                "INSERT INTO worker_assessments
+                     (id, worker_id, category, instrument, provider, status, administered_on,
+                      expires_on, administered_by, notes, results, created_at, updated_at,
+                      deleted_at, content_hash, content_hash_sha3, content_mac)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                         $16, $17)
+                 RETURNING id, worker_id, category, instrument, provider, status,
+                           administered_on, expires_on, administered_by, notes, results,
+                           created_at, updated_at, deleted_at, content_hash,
+                           content_hash_sha3, content_mac",
+                row.id,
+                row.worker_id,
+                row.category,
+                row.instrument,
+                row.provider,
+                row.status,
+                row.administered_on.map(time_to_date),
+                row.expires_on.map(time_to_date),
+                row.administered_by,
+                row.notes,
+                row.results,
+                offset_to_ts(row.created_at),
+                offset_to_ts(row.updated_at),
+                row.deleted_at.map(offset_to_ts),
+                row.content_hash,
+                row.content_hash_sha3,
+                row.content_mac,
+            )
+            .fetch_one(&mut *conn)
+            .await?,
+        )
     } else {
-        active.update(db).await?
-    })
+        // Every column but the key, as the `SeaORM` full-row update wrote
+        // them. A row that is gone is an error, as it was there.
+        sqlx::query_as!(
+            AssessmentRaw,
+            "UPDATE worker_assessments
+             SET worker_id = $2, category = $3, instrument = $4, provider = $5, status = $6,
+                 administered_on = $7, expires_on = $8, administered_by = $9, notes = $10,
+                 results = $11, created_at = $12, updated_at = $13, deleted_at = $14,
+                 content_hash = $15, content_hash_sha3 = $16, content_mac = $17
+             WHERE id = $1
+             RETURNING id, worker_id, category, instrument, provider, status,
+                       administered_on, expires_on, administered_by, notes, results,
+                       created_at, updated_at, deleted_at, content_hash, content_hash_sha3,
+                       content_mac",
+            row.id,
+            row.worker_id,
+            row.category,
+            row.instrument,
+            row.provider,
+            row.status,
+            row.administered_on.map(time_to_date),
+            row.expires_on.map(time_to_date),
+            row.administered_by,
+            row.notes,
+            row.results,
+            offset_to_ts(row.created_at),
+            offset_to_ts(row.updated_at),
+            row.deleted_at.map(offset_to_ts),
+            row.content_hash,
+            row.content_hash_sha3,
+            row.content_mac,
+        )
+        .fetch_optional(&mut *conn)
+        .await?
+    };
+    stored.map(Into::into).ok_or_else(not_updated)
 }
 
 /// One worker's **live** assessments, most recently administered first
@@ -172,18 +235,21 @@ async fn write_hashed<C: ConnectionTrait>(
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the query fails.
-pub async fn list_for_worker<C: ConnectionTrait>(
-    db: &C,
-    worker_id: Uuid,
-) -> Result<Vec<row::Model>> {
-    let rows = row::Entity::find()
-        .filter(row::Column::WorkerId.eq(worker_id))
-        .filter(row::Column::DeletedAt.is_null())
-        .order_by_desc(row::Column::AdministeredOn)
-        .order_by_desc(row::Column::CreatedAt)
-        .all(db)
-        .await?;
-    Ok(rows)
+pub async fn list_for_worker(db: impl Into<Db<'_>>, worker_id: Uuid) -> Result<Vec<row::Model>> {
+    let mut conn = db.into().acquire().await?;
+    let rows = sqlx::query_as!(
+        AssessmentRaw,
+        "SELECT id, worker_id, category, instrument, provider, status, administered_on,
+                expires_on, administered_by, notes, results, created_at, updated_at,
+                deleted_at, content_hash, content_hash_sha3, content_mac
+         FROM worker_assessments
+         WHERE worker_id = $1 AND deleted_at IS NULL
+         ORDER BY administered_on DESC, created_at DESC",
+        worker_id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(rows.into_iter().map(Into::into).collect())
 }
 
 /// Find one live assessment by id **scoped to its worker**, so an id
@@ -193,18 +259,45 @@ pub async fn list_for_worker<C: ConnectionTrait>(
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the query fails.
-pub async fn find<C: ConnectionTrait>(
-    db: &C,
-    worker_id: Uuid,
-    id: Uuid,
-) -> Result<Option<row::Model>> {
-    let found = row::Entity::find()
-        .filter(row::Column::Id.eq(id))
-        .filter(row::Column::WorkerId.eq(worker_id))
-        .filter(row::Column::DeletedAt.is_null())
-        .one(db)
-        .await?;
-    Ok(found)
+pub async fn find(db: impl Into<Db<'_>>, worker_id: Uuid, id: Uuid) -> Result<Option<row::Model>> {
+    let mut conn = db.into().acquire().await?;
+    let found = sqlx::query_as!(
+        AssessmentRaw,
+        "SELECT id, worker_id, category, instrument, provider, status, administered_on,
+                expires_on, administered_by, notes, results, created_at, updated_at,
+                deleted_at, content_hash, content_hash_sha3, content_mac
+         FROM worker_assessments
+         WHERE id = $1 AND worker_id = $2 AND deleted_at IS NULL
+         LIMIT 1",
+        id,
+        worker_id,
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(found.map(Into::into))
+}
+
+/// Up to `limit` assessment rows, deleted or not, in no particular order
+/// (the query has no `ORDER BY`, as before) — the assessment half of
+/// `/api/records/verify`.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] when the query fails.
+pub async fn rows_for_verification(db: impl Into<Db<'_>>, limit: i64) -> Result<Vec<row::Model>> {
+    let mut conn = db.into().acquire().await?;
+    let rows = sqlx::query_as!(
+        AssessmentRaw,
+        "SELECT id, worker_id, category, instrument, provider, status, administered_on,
+                expires_on, administered_by, notes, results, created_at, updated_at,
+                deleted_at, content_hash, content_hash_sha3, content_mac
+         FROM worker_assessments
+         LIMIT $1",
+        limit,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(rows.into_iter().map(Into::into).collect())
 }
 
 /// The mutable columns of an assessment update. `None` leaves the
@@ -255,8 +348,8 @@ impl AssessmentUpdate {
 /// Returns [`crate::Error::Database`] when the update fails, or
 /// [`crate::Error::Internal`] when the new results cannot be
 /// serialized.
-pub async fn update<C: ConnectionTrait>(
-    db: &C,
+pub async fn update(
+    db: impl Into<Db<'_>>,
     stored: row::Model,
     change: &AssessmentUpdate,
 ) -> Result<row::Model> {
@@ -308,7 +401,7 @@ fn apply_change(mut row: row::Model, change: &AssessmentUpdate) -> Result<row::M
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the update fails.
-pub async fn soft_delete<C: ConnectionTrait>(db: &C, mut stored: row::Model) -> Result<row::Model> {
+pub async fn soft_delete(db: impl Into<Db<'_>>, mut stored: row::Model) -> Result<row::Model> {
     // A withdrawal changes `deleted_at`, which the digest binds, so the
     // row rehashes like any other write.
     let now = OffsetDateTime::now_utc();
@@ -451,7 +544,7 @@ mod tests {
         use crate::compliance::record_integrity::{assessment_hash, verify_assessments};
 
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
-        let db = sea_orm::Database::connect(&url).await.expect("connect");
+        let db = sqlx::PgPool::connect(&url).await.expect("connect");
         let worker_id = Uuid::new_v4();
 
         // Awkward numbers on purpose: a whole float, a repeating decimal,
@@ -534,7 +627,7 @@ mod tests {
     #[ignore = "requires DATABASE_URL to a migrated Postgres"]
     async fn round_trip_insert_find_update_delete() {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
-        let db = sea_orm::Database::connect(&url).await.expect("connect");
+        let db = sqlx::PgPool::connect(&url).await.expect("connect");
         let worker_id = Uuid::new_v4();
 
         let mut assessment = Assessment::new(

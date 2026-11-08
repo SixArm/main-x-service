@@ -8,7 +8,7 @@ Rich, FHIR-shaped, vector sub-records: `HumanName`, `Identifier`
 (MRN / SSN / DL / NPI / PPN / TAX / ODS / Other), `IdentityDocument`,
 `EmergencyContact`, `Address`, `ContactPoint`, `WorkerLink`, plus
 merge / review-queue / consent / organization support types and the
-SeaORM table entities.
+sqlx row structs.
 
 → Full field tables:
 [service `agents/models.md`](../worker-service-with-axum/agents/models.md);

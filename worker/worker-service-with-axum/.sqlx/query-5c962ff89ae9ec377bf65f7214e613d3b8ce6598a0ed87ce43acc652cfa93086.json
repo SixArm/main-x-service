@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM worker_emergency_contacts WHERE worker_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5c962ff89ae9ec377bf65f7214e613d3b8ce6598a0ed87ce43acc652cfa93086"
+}

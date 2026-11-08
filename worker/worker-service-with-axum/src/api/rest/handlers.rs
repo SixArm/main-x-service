@@ -1696,10 +1696,8 @@ pub async fn erase_worker(
     caller: MaybeAuthUser,
     access: AccessContext,
 ) -> impl IntoResponse {
-    use sea_orm::TransactionTrait as _;
-
     let actor = caller.claims().map(|c| c.sub.as_str());
-    let txn = match state.db.begin().await {
+    let mut txn = match state.db.begin().await {
         Ok(txn) => txn,
         Err(e) => {
             return ApiProblem::new(
@@ -1710,7 +1708,9 @@ pub async fn erase_worker(
         }
     };
     let outcome =
-        match crate::compliance::erasure::erase(&txn, id, actor, &access, &state.audit_log).await {
+        match crate::compliance::erasure::erase(&mut txn, id, actor, &access, &state.audit_log)
+            .await
+        {
             Ok(outcome) => outcome,
             Err(e) => {
                 return ApiProblem::new("database_error", format!("Failed to erase: {e}"))
@@ -1827,25 +1827,6 @@ pub async fn get_worker_disclosures(
     }
 }
 
-/// Pull the three stored digest columns and the soft-delete stamp off a
-/// raw verification row.
-///
-/// Split out of `verify_record_integrity` to keep it under the line
-/// limit; the columns travel together because they describe one row's
-/// stored integrity state.
-fn stored_digests(
-    row: &sea_orm::QueryResult,
-) -> (Option<String>, Option<String>, Option<String>, Option<i64>) {
-    let get = |name: &str| -> Option<String> { row.try_get("", name).unwrap_or(None) };
-    let deleted_at: Option<time::OffsetDateTime> = row.try_get("", "deleted_at").unwrap_or(None);
-    (
-        get("content_hash"),
-        get("content_hash_sha3"),
-        get("content_mac"),
-        deleted_at.and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok()),
-    )
-}
-
 /// Verify row-level record integrity across a page of worker records.
 ///
 /// `GET /api/records/verify?limit=100` — recomputes each record's content
@@ -1877,23 +1858,11 @@ pub async fn verify_record_integrity(
     State(state): State<AppState>,
     Query(params): Query<AuditLogQuery>,
 ) -> impl IntoResponse {
-    use sea_orm::{ConnectionTrait as _, EntityTrait as _, QuerySelect as _};
-
     // Verification is O(rows) with a SHA-256 and a record assembly each,
     // so an unbounded limit is a CPU denial-of-service (SEC-M1).
     let limit = params.limit.clamp(1, 500);
 
-    let rows = match state
-        .db
-        .query_all_raw(sea_orm::Statement::from_sql_and_values(
-            sea_orm::DatabaseBackend::Postgres,
-            "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at \
-             FROM workers \
-             ORDER BY updated_at DESC LIMIT $1",
-            [limit.into()],
-        ))
-        .await
-    {
+    let rows = match crate::db::repositories::rows_for_verification(&state.db, limit).await {
         Ok(rows) => rows,
         Err(e) => {
             return ApiProblem::new(
@@ -1909,10 +1878,13 @@ pub async fn verify_record_integrity(
     // there. One query per record, which is why the limit is capped.
     let mut records = Vec::with_capacity(rows.len());
     for row in rows {
-        let Ok(id) = row.try_get::<Uuid>("", "id") else {
-            continue;
-        };
-        let stored = stored_digests(&row);
+        let id = row.id;
+        let stored = (
+            row.content_hash,
+            row.content_hash_sha3,
+            row.content_mac,
+            row.deleted_at.map(|d| d.timestamp_micros()),
+        );
         match state.worker_repository.get_by_id(&id).await {
             Ok(Some(worker)) => {
                 records.push(crate::compliance::record_integrity::StoredRecord {
@@ -1942,11 +1914,7 @@ pub async fn verify_record_integrity(
     // are verified alongside and folded into the same report — a caller
     // asking "is this service's data intact?" should not have to know the
     // answer lives in two places.
-    match crate::db::models::worker_assessments::Entity::find()
-        .limit(u64::try_from(limit).unwrap_or(500))
-        .all(&state.db)
-        .await
-    {
+    match crate::db::assessments::rows_for_verification(&state.db, limit).await {
         Ok(rows) => {
             let assessments = crate::compliance::record_integrity::verify_assessments(&rows);
             report.records += assessments.records;

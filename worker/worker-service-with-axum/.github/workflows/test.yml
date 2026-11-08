@@ -79,9 +79,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libpq-dev postgresql-client
 
-      - name: Install SeaORM CLI
-        run: cargo install sea-orm-cli
-
       - name: Cache cargo registry
         uses: actions/cache@v3
         with:
@@ -97,7 +94,8 @@ jobs:
       - name: Run database migrations
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/worker_service_test
-        run: sea-orm-cli migrate up
+          SQLX_OFFLINE: "true"
+        run: cargo run --bin worker-service -- db migrate
 
       # `--include-ignored` runs BOTH the default (DB-free) tests and the
       # `#[ignore]`d DB-backed request/enforcement suites against the
@@ -107,6 +105,7 @@ jobs:
       - name: Run tests (incl. DB-gated + enforcement)
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/worker_service_test
+          SQLX_OFFLINE: "true"
           SEARCH_INDEX_PATH: /tmp/test_index
           MATCHING_THRESHOLD: 0.7
           RUST_LOG: info

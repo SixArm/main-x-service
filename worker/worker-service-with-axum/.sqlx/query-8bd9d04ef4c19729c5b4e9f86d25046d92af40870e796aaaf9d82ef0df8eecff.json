@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workers\n         SET deleted_at = $2, deleted_by = 'system',\n             content_hash = CASE WHEN $3 THEN $4 ELSE content_hash END,\n             content_hash_sha3 = CASE WHEN $3 THEN $5 ELSE content_hash_sha3 END,\n             content_mac = CASE WHEN $3 THEN $6 ELSE content_mac END\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Bool",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8bd9d04ef4c19729c5b4e9f86d25046d92af40870e796aaaf9d82ef0df8eecff"
+}

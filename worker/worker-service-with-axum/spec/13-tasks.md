@@ -764,3 +764,43 @@ clearly described manual check confirms the acceptance criterion.
     `ListWorkers` test proving a record an ABAC policy would filter from
     REST's list is excluded from gRPC's too; green against a real Postgres
     (`scripts/ci-check.sh test-db worker/worker-service-with-axum`).
+
+- [x] **SQ-1: move from SeaORM to sqlx (2026-11-08).** Every statement
+      is a `query!` / `query_as!` / `query_scalar!` literal in `src/db/`
+      (91, `.sqlx/` committed), including the SQL that used to sit in
+      handlers, compliance, the relay and the task; no `QueryBuilder`,
+      no allowlist entry. The 24 migrations move unchanged into sqlx's
+      flat layout and the `migration/` crate is removed; `pg_dump
+      --schema-only` old vs new is identical apart from the bookkeeping
+      table. Spec §10 has the rules. The relay poll's `FOR UPDATE SKIP
+      LOCKED` pin on SeaORM's SQL text is now a DB test of the lock.
+      - **INT-V1 fixed here.** Digests covered the caller's value, not
+        the stored record (an address's `use_type` is not stored; a time
+        of death is truncated to microseconds), so a fresh record failed
+        `/api/records/verify`. Create, update and merge now stamp over
+        the record read back in the write's transaction. The DB test
+        `a_written_record_verifies` failed on the SeaORM code and passes.
+      - **Erasure (case's CS-G1, CS-E1): not affected.** It already ran
+        in one transaction and dropped the record from the Tantivy index
+        after the commit.
+      - Kept as they were, and worth a task each:
+        - **WK-D1.** The name and identifier uses, the identifier type,
+          a contact's system and use, and a link's type are written in
+          their Rust `Debug` spelling (`Official`, `Other`, `Phone`,
+          `Seealso`), which the tables' lowercase CHECK constraints
+          refuse. Any create or update carrying a telecom entry, a link,
+          a name or identifier use, or an `Other`/`ODS` identifier
+          answers `500`. Person fixed the same thing as
+          PERSON-CONTACT-CASE.
+        - **WK-E1.** Erasure nulls the two digests but not
+          `content_mac`.
+        - **WK-E2.** Erasure's redaction sweep runs before the chain
+          lock is taken (case took it first, in its CS-G1 fix).
+        - **WK-A1.** `assessments::list_for_worker` says assessments
+          with no administration date sort last, but `ORDER BY
+          administered_on DESC` puts them first.
+        - **WK-A2.** The assessment half of `/api/records/verify` reads
+          `LIMIT n` rows with no `ORDER BY`, so which assessments a
+          capped window covers is arbitrary.
+      - Unit tests 373 (was 374; the SQL-text pin became a DB test), DB
+        suite 47 (was 45). Unique normal dependencies 389 → 350.

@@ -26,12 +26,16 @@ tower = { version = "0.5", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precision"] }
 
-# Database (PostgreSQL ORM)
-sea-orm = { version = "2.0", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "with-uuid", "with-json", "with-bigdecimal"] }
-bigdecimal = { version = "0.4", features = ["serde"] }
+# Database: sqlx directly, no ORM. Every statement is a `query!` /
+# `query_as!` / `query_scalar!` literal in `src/db/`, checked at compile
+# time against the committed `.sqlx/` data (spec/tech-stack §5). The same
+# driver axa's `sqlx` feature already pulls in, so this adds no new
+# database stack. Timestamps map to `chrono`, which the domain models
+# already use: with sqlx's `time` feature on as well, sqlx 0.9.0's macros
+# warn on every timestamp column.
+sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "macros", "migrate", "uuid", "chrono", "json"] }
 
-axa = { version = "0.8", features = ["sea-orm", "openapi", "opentelemetry", "versioning", "ratelimit"] }
-migration = { path = "migration" }
+axa = { version = "0.8", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 
 # Search Engine
 tantivy = "0.27"
@@ -57,7 +61,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # Utilities
 uuid = { version = "1.29", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
-time = "0.3"
+# The audit trail, the outbox, the entity links, the review queue and the
+# assessments keep `time` types at the edges of the database layer.
+# `serde` keeps the timestamps of rows serialized on the wire in the form
+# they had, which SeaORM had been enabling for this crate.
+time = { version = "0.3", features = ["serde"] }
 thiserror = "2.0"
 dotenvy = "0.15"
 async-trait = "0.1"
@@ -131,7 +139,7 @@ keycloak = ["authentication-verifier/keycloak"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa = { version = "0.8", features = ["sea-orm", "testing", "openapi", "opentelemetry", "versioning", "ratelimit"] }
+axa = { version = "0.8", features = ["sqlx", "testing", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
@@ -139,10 +147,6 @@ authentication-verifier = { path = "../../authentication/authentication-verifier
 # `audit_log`, so running them concurrently would have one test wipe
 # another's chain mid-append.
 serial_test = "4.0.1"
-# `mock`: a `DatabaseConnection` that errors on any query, standing in
-# for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used
-# by tests/common/mod.rs's no-DB test router.
-sea-orm = { version = "2.0", features = ["mock"] }
 # Testing
 assertables = "10"
 tokio-test = "0.4"
@@ -224,6 +228,13 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+# Proc macros and build scripts are not stripped. With `strip = true`
+# reaching them, macOS refuses to load the stripped `sqlx-macros` dylib
+# that `query!` runs in, and a release build fails. The shipped binary is
+# still stripped; only host-side build tools are not.
+[profile.release.build-override]
+strip = false
 
 [profile.bench]
 inherits = "release"

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE entity_links SET deleted_at = NOW()\n         WHERE from_pid = $1 AND deleted_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cf0425259b9f77a8394c009e8e9cc49632d89bd86eab43dce2d164d9287e71e4"
+}

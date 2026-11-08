@@ -1,0 +1,257 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, active, worker_type, gender, birth_date, tax_id, deceased,\n                deceased_datetime, marital_status, multiple_birth, managing_organization_id,\n                created_at, updated_at, created_by, updated_by, deleted_at, deleted_by,\n                content_hash, content_hash_sha3, content_mac\n         FROM workers\n         WHERE id = $1 AND ($2 OR deleted_at IS NULL)\n         LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "worker_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "worker_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "gender",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "gender"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "birth_date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "birth_date"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "tax_id",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "tax_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "deceased",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "deceased"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "deceased_datetime",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "deceased_datetime"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "marital_status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "marital_status"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "multiple_birth",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "multiple_birth"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "managing_organization_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "managing_organization_id"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "created_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "created_by"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "updated_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "updated_by"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "deleted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "deleted_by",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "deleted_by"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "content_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "content_hash_sha3",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "content_hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "content_mac",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "content_mac"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "66868f9e11c2f2cf6732e6e0c843db520d5e593754217627d97e80a533c88e4f"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO worker_names\n             (id, worker_id, use_type, family, given, prefix, suffix, is_primary, created_at,\n              updated_at)\n         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Bool",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bdd0d10fe05e494f43b76aca3568f0055c7cae2acc3d847c503b96d73cca26bd"
+}

@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at\n         FROM workers\n         WHERE content_mac IS NOT NULL\n         ORDER BY id ASC\n         LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "content_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "content_hash_sha3",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "content_hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "content_mac",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "content_mac"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "deleted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workers",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "976eb8b36882241979447e18703ddc852ef8e0255670e0f353a3bed2fdd85691"
+}

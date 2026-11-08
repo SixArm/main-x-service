@@ -1,27 +1,35 @@
-//! Repository layer translating between domain [`Worker`]s and SeaORM rows.
+//! Repository layer translating between domain [`Worker`]s and their rows.
 //!
 //! [`WorkerRepository`] is the async trait the API depends on;
-//! [`SeaOrmWorkerRepository`] is the PostgreSQL/SeaORM implementation. The
-//! implementation owns the mapping in both directions (`to_active_models` /
+//! [`PgWorkerRepository`] is the `PostgreSQL` implementation over sqlx. The
+//! implementation owns the mapping in both directions (`insert_children` /
 //! `from_db_models`), runs multi-table writes in a transaction, and — when
 //! configured — publishes [`crate::streaming::WorkerEvent`]s and writes audit
 //! entries on every mutation. [`AuditContext`] carries the actor metadata
 //! recorded alongside those audit entries.
+//!
+//! Every statement against the worker tables is here, as a `query!` /
+//! `query_as!` / `query_scalar!` literal, including the record-integrity
+//! reads behind `/api/records/verify` and the `integrity_resign` task.
+//!
+//! ## Record digests (INT-V1)
+//!
+//! Each write stamps the record's digests **over the record as stored**,
+//! read back inside the write's own transaction ([`stamp_digests`]), not
+//! over the value the caller sent. The two differ: storage drops an
+//! address's `use_type` and truncates a time of death to microseconds, so
+//! a digest over the caller's value made a fresh record fail
+//! `/api/records/verify`.
 
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, TransactionTrait,
-};
-use time::OffsetDateTime;
+use chrono::Utc;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-use super::convert::{date_to_time, offset_to_ts, time_to_date, ts_to_offset};
-
 use super::models::{
-    worker_addresses, worker_contacts, worker_documents, worker_emergency_contact_telecom,
-    worker_emergency_contacts, worker_identifiers, worker_links, worker_names, worker_photos,
-    workers,
+    AddressRow, ContactRow, DocumentRow, EmergencyContactRow, EmergencyTelecomRow, IdentifierRow,
+    LinkRow, NameRow, WorkerRow,
 };
+use super::{not_updated, to_i64};
 use crate::Result;
 use crate::db::outbox::OutboxInsert;
 use crate::models::{
@@ -29,17 +37,6 @@ use crate::models::{
     Identifier, IdentityDocument, Worker, WorkerLink, WorkerType,
 };
 use crate::streaming::{EventKind, EventTransport};
-
-/// The full set of `SeaORM` `ActiveModel`s produced from one [`Worker`]: the
-/// core row plus its name / identifier / address / contact / link child rows.
-type WorkerActiveModels = (
-    workers::ActiveModel,
-    Vec<worker_names::ActiveModel>,
-    Vec<worker_identifiers::ActiveModel>,
-    Vec<worker_addresses::ActiveModel>,
-    Vec<worker_contacts::ActiveModel>,
-    Vec<worker_links::ActiveModel>,
-);
 
 /// Serialize a fieldless enum to its canonical serde string tag.
 ///
@@ -65,221 +62,611 @@ fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: Option<&str>) -> Option<T> {
     serde_json::from_value(serde_json::Value::String(t.to_string())).ok()
 }
 
+/// A list position as the `INTEGER` column takes it.
+fn position(i: usize) -> i32 {
+    i32::try_from(i).unwrap_or(i32::MAX)
+}
+
+/// The `gender` column's value, lowercased for the `workers_gender_check`
+/// CHECK constraint (`male`/`female`/`other`/`unknown`).
+fn gender_tag(worker: &Worker) -> String {
+    format!("{:?}", worker.gender).to_lowercase()
+}
+
+/// The `worker_type` column's value: its `Display` form.
+fn worker_type_tag(worker: &Worker) -> Option<String> {
+    worker
+        .worker_type
+        .as_ref()
+        .map(std::string::ToString::to_string)
+}
+
+/// Insert the `workers` parent row for `worker`, with `created_at` and
+/// `updated_at` both the transaction's `CURRENT_TIMESTAMP` and no digests:
+/// [`stamp_digests`] writes those once the child rows are in.
+///
+/// The transaction's time, not this process's clock, because the digest
+/// stamp is an `UPDATE`, and the `update_workers_updated_at` trigger sets
+/// `updated_at` to `CURRENT_TIMESTAMP` as it lands. Stamping `created_at`
+/// from the same clock keeps the two equal on a fresh record.
+async fn insert_worker_row(conn: &mut PgConnection, worker: &Worker) -> Result<()> {
+    sqlx::query!(
+        "INSERT INTO workers
+             (id, active, worker_type, gender, birth_date, tax_id, deceased, deceased_datetime,
+              marital_status, multiple_birth, managing_organization_id, created_at, updated_at,
+              created_by, updated_by, deleted_at, deleted_by, content_hash, content_hash_sha3,
+              content_mac)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP,
+                 CURRENT_TIMESTAMP, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
+        worker.id,
+        worker.active,
+        worker_type_tag(worker),
+        gender_tag(worker),
+        worker.birth_date,
+        worker.tax_id,
+        worker.deceased,
+        worker.deceased_datetime,
+        worker.marital_status,
+        worker.multiple_birth,
+        worker.managing_organization,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Insert one `worker_names` row. The name use goes in its `Debug` form,
+/// as it always has (see [`insert_children`]).
+async fn insert_name(
+    conn: &mut PgConnection,
+    worker_id: Uuid,
+    name: &HumanName,
+    is_primary: bool,
+) -> Result<()> {
+    sqlx::query!(
+        "INSERT INTO worker_names
+             (id, worker_id, use_type, family, given, prefix, suffix, is_primary, created_at,
+              updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+        Uuid::new_v4(),
+        worker_id,
+        name.use_type.as_ref().map(|u| format!("{u:?}")),
+        name.family,
+        &name.given,
+        &name.prefix,
+        &name.suffix,
+        is_primary,
+        Utc::now(),
+        Utc::now(),
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Insert every child row of `worker` on `conn`: the primary name
+/// (flagged `is_primary = true`) and additional names, identifiers,
+/// addresses and contacts (the first of each flagged primary by
+/// position), links, documents, emergency contacts with their telecom
+/// rows, and photos.
+///
+/// The name, identifier and contact uses, the identifier type, the contact
+/// system and the link type are stored in their `Debug` form
+/// (`format!("{:?}", …)`), exactly as the `SeaORM` code stored them, and
+/// [`PgWorkerRepository::from_db_models`] parses those forms back. Several
+/// of them (`Official`, `Phone`, `Seealso`, `Other`) fall outside the
+/// tables' lowercase CHECK constraints, so a write carrying one is refused
+/// by Postgres; that defect is kept as it was, not fixed here. An
+/// address's `use_type` is not stored (it is written `NULL`).
+async fn insert_children(conn: &mut PgConnection, worker: &Worker) -> Result<()> {
+    insert_name(conn, worker.id, &worker.name, true).await?;
+    for name in &worker.additional_names {
+        insert_name(conn, worker.id, name, false).await?;
+    }
+    for id in &worker.identifiers {
+        sqlx::query!(
+            "INSERT INTO worker_identifiers
+                 (id, worker_id, use_type, identifier_type, system, value, assigner, created_at,
+                  updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            Uuid::new_v4(),
+            worker.id,
+            id.use_type.as_ref().map(|u| format!("{u:?}")),
+            format!("{:?}", id.identifier_type),
+            id.system,
+            id.value,
+            id.assigner,
+            Utc::now(),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for (idx, addr) in worker.addresses.iter().enumerate() {
+        sqlx::query!(
+            "INSERT INTO worker_addresses
+                 (id, worker_id, use_type, line1, line2, city, state, postal_code, country,
+                  is_primary, created_at, updated_at)
+             VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+            Uuid::new_v4(),
+            worker.id,
+            addr.line1,
+            addr.line2,
+            addr.city,
+            addr.state,
+            addr.postal_code,
+            addr.country,
+            idx == 0,
+            Utc::now(),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for (idx, cp) in worker.telecom.iter().enumerate() {
+        sqlx::query!(
+            "INSERT INTO worker_contacts
+                 (id, worker_id, system, value, use_type, is_primary, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+            Uuid::new_v4(),
+            worker.id,
+            format!("{:?}", cp.system),
+            cp.value,
+            cp.use_type.as_ref().map(|u| format!("{u:?}")),
+            idx == 0,
+            Utc::now(),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    for link in &worker.links {
+        sqlx::query!(
+            "INSERT INTO worker_links
+                 (id, worker_id, other_worker_id, link_type, created_at, created_by)
+             VALUES ($1, $2, $3, $4, $5, NULL)",
+            Uuid::new_v4(),
+            worker.id,
+            link.other_worker_id,
+            format!("{:?}", link.link_type),
+            Utc::now(),
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    insert_extra_collections(conn, worker).await
+}
+
 /// Insert the normalized document / emergency-contact (+ telecom) / photo
 /// child rows for `worker` on connection `conn`.
 ///
-/// These three collections live in their own tables (rather than the flat
-/// name/identifier/address/contact set handled by `to_active_models`) and
-/// preserve list order via a `position` column. Each child row gets a fresh
-/// UUID; emergency-contact telecom rows reference the parent contact's UUID.
-/// Generic over `ConnectionTrait` so it runs equally on a pooled connection or
-/// inside a transaction.
-///
-/// # Errors
-///
-/// Returns an error if any child-row insert fails; when run inside a
-/// transaction the caller rolls the whole write back.
-async fn insert_extra_collections<C: sea_orm::ConnectionTrait>(
-    conn: &C,
-    worker: &Worker,
-) -> Result<()> {
+/// These three collections live in their own tables and preserve list
+/// order via a `position` column. Each child row gets a fresh UUID;
+/// emergency-contact telecom rows reference the parent contact's UUID.
+async fn insert_extra_collections(conn: &mut PgConnection, worker: &Worker) -> Result<()> {
     for (i, doc) in worker.documents.iter().enumerate() {
-        worker_documents::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            worker_id: Set(worker.id),
-            document_type: Set(enum_to_tag(&doc.document_type).unwrap_or_default()),
-            number: Set(doc.number.clone()),
-            issuing_country: Set(doc.issuing_country.clone()),
-            issuing_authority: Set(doc.issuing_authority.clone()),
-            issue_date: Set(doc.issue_date.map(date_to_time)),
-            expiry_date: Set(doc.expiry_date.map(date_to_time)),
-            verified: Set(doc.verified),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
+        sqlx::query!(
+            "INSERT INTO worker_documents
+                 (id, worker_id, document_type, number, issuing_country, issuing_authority,
+                  issue_date, expiry_date, verified, position)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            Uuid::new_v4(),
+            worker.id,
+            enum_to_tag(&doc.document_type).unwrap_or_default(),
+            doc.number,
+            doc.issuing_country,
+            doc.issuing_authority,
+            doc.issue_date,
+            doc.expiry_date,
+            doc.verified,
+            position(i),
+        )
+        .execute(&mut *conn)
         .await?;
     }
     for (i, ec) in worker.emergency_contacts.iter().enumerate() {
         let ec_id = Uuid::new_v4();
         let addr = ec.address.as_ref();
-        worker_emergency_contacts::ActiveModel {
-            id: Set(ec_id),
-            worker_id: Set(worker.id),
-            name: Set(ec.name.clone()),
-            relationship: Set(ec.relationship.clone()),
-            is_primary: Set(ec.is_primary),
-            address_use_type: Set(addr.and_then(|a| a.use_type.as_ref().and_then(enum_to_tag))),
-            address_line1: Set(addr.and_then(|a| a.line1.clone())),
-            address_line2: Set(addr.and_then(|a| a.line2.clone())),
-            address_city: Set(addr.and_then(|a| a.city.clone())),
-            address_state: Set(addr.and_then(|a| a.state.clone())),
-            address_postal_code: Set(addr.and_then(|a| a.postal_code.clone())),
-            address_country: Set(addr.and_then(|a| a.country.clone())),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
+        sqlx::query!(
+            "INSERT INTO worker_emergency_contacts
+                 (id, worker_id, name, relationship, is_primary, address_use_type,
+                  address_line1, address_line2, address_city, address_state,
+                  address_postal_code, address_country, position)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+            ec_id,
+            worker.id,
+            ec.name,
+            ec.relationship,
+            ec.is_primary,
+            addr.and_then(|a| a.use_type.as_ref().and_then(enum_to_tag)),
+            addr.and_then(|a| a.line1.clone()),
+            addr.and_then(|a| a.line2.clone()),
+            addr.and_then(|a| a.city.clone()),
+            addr.and_then(|a| a.state.clone()),
+            addr.and_then(|a| a.postal_code.clone()),
+            addr.and_then(|a| a.country.clone()),
+            position(i),
+        )
+        .execute(&mut *conn)
         .await?;
         for (j, cp) in ec.telecom.iter().enumerate() {
-            worker_emergency_contact_telecom::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                emergency_contact_id: Set(ec_id),
-                system: Set(enum_to_tag(&cp.system).unwrap_or_default()),
-                value: Set(cp.value.clone()),
-                use_type: Set(cp.use_type.as_ref().and_then(enum_to_tag)),
-                position: Set(i32::try_from(j).unwrap_or(i32::MAX)),
-            }
-            .insert(conn)
+            sqlx::query!(
+                "INSERT INTO worker_emergency_contact_telecom
+                     (id, emergency_contact_id, system, value, use_type, position)
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+                Uuid::new_v4(),
+                ec_id,
+                enum_to_tag(&cp.system).unwrap_or_default(),
+                cp.value,
+                cp.use_type.as_ref().and_then(enum_to_tag),
+                position(j),
+            )
+            .execute(&mut *conn)
             .await?;
         }
     }
     for (i, url) in worker.photo.iter().enumerate() {
-        worker_photos::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            worker_id: Set(worker.id),
-            url: Set(url.clone()),
-            position: Set(i32::try_from(i).unwrap_or(i32::MAX)),
-        }
-        .insert(conn)
+        sqlx::query!(
+            "INSERT INTO worker_photos (id, worker_id, url, position) VALUES ($1, $2, $3, $4)",
+            Uuid::new_v4(),
+            worker.id,
+            url,
+            position(i),
+        )
+        .execute(&mut *conn)
         .await?;
     }
     Ok(())
 }
 
-/// The parent-row `ActiveModel` for a worker update, digests included.
-///
-/// Shared by [`apply_worker_row_replacement`] and the `update`
-/// implementation, which previously built it twice — pre-existing drift
-/// that a second digest would have doubled.
-fn worker_update_model(
-    worker: &Worker,
-    digests: crate::compliance::record_integrity::Digests,
-) -> workers::ActiveModel {
-    workers::ActiveModel {
-        id: Set(worker.id),
-        active: Set(worker.active),
-        content_hash: Set(Some(digests.sha256)),
-        content_hash_sha3: Set(Some(digests.sha3)),
-        content_mac: Set(digests.mac),
-        worker_type: Set(worker
-            .worker_type
-            .as_ref()
-            .map(std::string::ToString::to_string)),
-        // Lowercased for the `workers_gender_check` CHECK constraint.
-        gender: Set(format!("{:?}", worker.gender).to_lowercase()),
-        birth_date: Set(worker.birth_date.map(date_to_time)),
-        tax_id: Set(worker.tax_id.clone()),
-        deceased: Set(worker.deceased),
-        deceased_datetime: Set(worker.deceased_datetime.map(ts_to_offset)),
-        marital_status: Set(worker.marital_status.clone()),
-        multiple_birth: Set(worker.multiple_birth),
-        managing_organization_id: Set(worker.managing_organization),
-        updated_at: Set(OffsetDateTime::now_utc()),
-        updated_by: Set(None),
-        ..Default::default()
-    }
+/// Delete every child row of worker `id` on `conn`. Deleting the
+/// emergency contacts cascades to their telecom rows.
+async fn delete_children(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    sqlx::query!("DELETE FROM worker_names WHERE worker_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM worker_identifiers WHERE worker_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM worker_addresses WHERE worker_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM worker_contacts WHERE worker_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM worker_links WHERE worker_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!(
+        "DELETE FROM worker_emergency_contacts WHERE worker_id = $1",
+        id
+    )
+    .execute(&mut *conn)
+    .await?;
+    sqlx::query!("DELETE FROM worker_documents WHERE worker_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query!("DELETE FROM worker_photos WHERE worker_id = $1", id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
 }
 
-/// The content hash a record should carry after an in-place update.
+/// Apply a worker's parent-row update and wholesale child-row replacement
+/// on `conn`, then stamp its digests over the record as stored. Shared by
+/// [`WorkerRepository::update`] and [`WorkerRepository::merge`]: writes the
+/// demographic columns, stamps `updated_at` to now and `updated_by` to
+/// `NULL`, leaves `created_*` and the soft-delete stamp alone, deletes every
+/// child row for the worker, then re-inserts them from the domain model.
+/// Runs on the caller's transaction so it shares that commit boundary.
 ///
-/// Reads the row's existing soft-delete stamp, which the digest binds and
-/// which an `..Default::default()` update leaves untouched, so it cannot
-/// come from the domain model (which does not carry it).
+/// An id that matches no row is an error, as it was under `SeaORM`.
+async fn apply_update_rows(conn: &mut PgConnection, worker: &Worker) -> Result<()> {
+    let done = sqlx::query!(
+        "UPDATE workers
+         SET active = $2, worker_type = $3, gender = $4, birth_date = $5, tax_id = $6,
+             deceased = $7, deceased_datetime = $8, marital_status = $9,
+             multiple_birth = $10, managing_organization_id = $11, updated_at = $12,
+             updated_by = NULL
+         WHERE id = $1",
+        worker.id,
+        worker.active,
+        worker_type_tag(worker),
+        gender_tag(worker),
+        worker.birth_date,
+        worker.tax_id,
+        worker.deceased,
+        worker.deceased_datetime,
+        worker.marital_status,
+        worker.multiple_birth,
+        worker.managing_organization,
+        Utc::now(),
+    )
+    .execute(&mut *conn)
+    .await?;
+    if done.rows_affected() == 0 {
+        return Err(not_updated());
+    }
+
+    delete_children(conn, worker.id).await?;
+    insert_children(conn, worker).await?;
+    stamp_digests(conn, worker.id).await
+}
+
+/// Write every digest of worker `id` over the record **as stored**, read
+/// back on `conn` inside the write's transaction (INT-V1), with the row's
+/// own soft-delete stamp bound in.
 ///
-/// Extracted because both `apply_worker_row_replacement` and the `update`
-/// implementation need it — this crate writes the parent row in two
-/// places, pre-existing drift that is at least not duplicated further
-/// here.
-///
-/// Note the absence of compiler help at either call site: both build their
-/// `ActiveModel` with `..Default::default()`, so adding `content_hash` to
-/// the entity did not break them the way it broke the create path. A write
-/// that forgets to rehash produces a *false* tamper report, which is worse
-/// than no control at all; the DB-gated tests exercise every path for
-/// exactly this reason.
+/// The digest leaves out `created_at` and `updated_at`
+/// ([`crate::compliance::record_integrity`]), so the `updated_at` the
+/// trigger writes as this `UPDATE` lands cannot disturb it.
 ///
 /// # Errors
 ///
-/// Returns an error if the lookup fails or the record cannot be hashed.
-async fn content_hash_for_update<C: ConnectionTrait>(
-    conn: &C,
-    worker: &Worker,
-) -> Result<crate::compliance::record_integrity::Digests> {
-    let existing_deleted_at = workers::Entity::find_by_id(worker.id)
-        .one(conn)
-        .await?
-        .and_then(|row| row.deleted_at)
-        .and_then(|d| i64::try_from(d.unix_timestamp_nanos() / 1_000).ok());
-    crate::compliance::record_integrity::digests_with_deleted_at(worker, existing_deleted_at)
+/// When the record cannot be read back or serialized, or the update fails.
+async fn stamp_digests(conn: &mut PgConnection, id: Uuid) -> Result<()> {
+    let row = fetch_worker_row(conn, id, true).await?.ok_or_else(|| {
+        crate::Error::Validation("worker not found while stamping digests".into())
+    })?;
+    let deleted_at = row.deleted_at.map(|d| d.timestamp_micros());
+    let stored = assemble(conn, row).await?;
+    let d = crate::compliance::record_integrity::digests_with_deleted_at(&stored, deleted_at)?;
+    sqlx::query!(
+        "UPDATE workers SET content_hash = $2, content_hash_sha3 = $3, content_mac = $4
+         WHERE id = $1",
+        id,
+        d.sha256,
+        d.sha3,
+        d.mac,
+    )
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
-/// Apply a worker's parent-row update and wholesale child-row replacement on
-/// `conn`: update the `workers` row (stamping `updated_at`), delete every
-/// child row for the worker, then re-insert them from the domain model.
+/// Soft-delete worker `id` on `conn` by stamping `deleted_at` and
+/// `deleted_by = 'system'`, leaving every other column (and the child
+/// rows) in place. Shared by [`WorkerRepository::delete`] and
+/// [`WorkerRepository::merge`].
 ///
-/// Runs on the caller's connection/transaction so it shares that commit
-/// boundary. Used by [`WorkerRepository::merge`] to apply the survivor's
-/// rows atomically alongside the duplicate's soft-delete and the outbox rows.
+/// A soft delete changes the lifecycle state the digest binds, so it is
+/// rehashed, or every deleted record would read as tampered: `worker` is
+/// the assembled record the caller already loaded for the audit trail,
+/// and all three digest columns are rewritten over it. When it is absent
+/// (the row was gone before we looked) there is nothing to rehash and the
+/// columns are left as they were.
 ///
-/// # Errors
+/// An id that matches no row is an error, as it was under `SeaORM`.
+async fn apply_soft_delete_row(
+    conn: &mut PgConnection,
+    id: &Uuid,
+    worker: Option<&Worker>,
+) -> Result<()> {
+    let deleted_at = Utc::now();
+    let tombstone = worker
+        .map(|w| {
+            crate::compliance::record_integrity::digests_with_deleted_at(
+                w,
+                Some(deleted_at.timestamp_micros()),
+            )
+        })
+        .transpose()?;
+    let rehash = tombstone.is_some();
+    let (sha256, sha3, mac) = tombstone.map_or((None, None, None), |d| {
+        (Some(d.sha256), Some(d.sha3), d.mac)
+    });
+    let done = sqlx::query!(
+        "UPDATE workers
+         SET deleted_at = $2, deleted_by = 'system',
+             content_hash = CASE WHEN $3 THEN $4 ELSE content_hash END,
+             content_hash_sha3 = CASE WHEN $3 THEN $5 ELSE content_hash_sha3 END,
+             content_mac = CASE WHEN $3 THEN $6 ELSE content_mac END
+         WHERE id = $1",
+        id,
+        deleted_at,
+        rehash,
+        sha256,
+        sha3,
+        mac,
+    )
+    .execute(&mut *conn)
+    .await?;
+    if done.rows_affected() == 0 {
+        return Err(not_updated());
+    }
+    Ok(())
+}
+
+/// Read one `workers` row; a soft-deleted row only when `include_deleted`.
+async fn fetch_worker_row(
+    conn: &mut PgConnection,
+    id: Uuid,
+    include_deleted: bool,
+) -> Result<Option<WorkerRow>> {
+    let row = sqlx::query_as!(
+        WorkerRow,
+        "SELECT id, active, worker_type, gender, birth_date, tax_id, deceased,
+                deceased_datetime, marital_status, multiple_birth, managing_organization_id,
+                created_at, updated_at, created_by, updated_by, deleted_at, deleted_by,
+                content_hash, content_hash_sha3, content_mac
+         FROM workers
+         WHERE id = $1 AND ($2 OR deleted_at IS NULL)
+         LIMIT 1",
+        id,
+        include_deleted,
+    )
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(row)
+}
+
+/// Load every child row of `row` on `conn` and reassemble the domain
+/// [`Worker`].
+async fn assemble(conn: &mut PgConnection, row: WorkerRow) -> Result<Worker> {
+    let id = row.id;
+    let names = sqlx::query_as!(
+        NameRow,
+        "SELECT id, worker_id, use_type, family, given, prefix, suffix, is_primary
+         FROM worker_names WHERE worker_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let identifiers = sqlx::query_as!(
+        IdentifierRow,
+        "SELECT id, worker_id, use_type, identifier_type, system, value, assigner
+         FROM worker_identifiers WHERE worker_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let addresses = sqlx::query_as!(
+        AddressRow,
+        "SELECT id, worker_id, line1, line2, city, state, postal_code, country
+         FROM worker_addresses WHERE worker_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let contacts = sqlx::query_as!(
+        ContactRow,
+        "SELECT id, worker_id, system, value, use_type
+         FROM worker_contacts WHERE worker_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let links = sqlx::query_as!(
+        LinkRow,
+        "SELECT id, worker_id, other_worker_id, link_type
+         FROM worker_links WHERE worker_id = $1",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut worker = PgWorkerRepository::from_db_models(
+        row,
+        &names,
+        &identifiers,
+        &addresses,
+        &contacts,
+        &links,
+    )?;
+    load_extra_collections(conn, &mut worker).await?;
+    Ok(worker)
+}
+
+/// Read and assemble worker `id` on `conn`; a soft-deleted one only when
+/// `include_deleted`.
+async fn read_worker(
+    conn: &mut PgConnection,
+    id: Uuid,
+    include_deleted: bool,
+) -> Result<Option<Worker>> {
+    match fetch_worker_row(conn, id, include_deleted).await? {
+        Some(row) => Ok(Some(assemble(conn, row).await?)),
+        None => Ok(None),
+    }
+}
+
+/// Load the normalized document / emergency-contact / photo child rows
+/// for `worker.id` and populate them onto `worker`.
 ///
-/// Returns an error if any update/delete/insert query fails.
-async fn apply_worker_row_replacement<C: ConnectionTrait>(conn: &C, worker: &Worker) -> Result<()> {
-    let d = content_hash_for_update(conn, worker).await?;
+/// The companion to [`insert_extra_collections`]: each collection is read
+/// back ordered by its `position` column so list order is preserved, and
+/// emergency-contact telecom rows are fetched per contact. String tags are
+/// decoded with [`tag_to_enum`], falling back to the `Other` variant for an
+/// unknown tag. An emergency-contact address is reconstructed only when at
+/// least one flattened address column is present.
+async fn load_extra_collections(conn: &mut PgConnection, worker: &mut Worker) -> Result<()> {
+    let id = worker.id;
 
-    let update_model = worker_update_model(worker, d);
-    update_model.update(conn).await?;
+    let doc_rows = sqlx::query_as!(
+        DocumentRow,
+        "SELECT document_type, number, issuing_country, issuing_authority, issue_date,
+                expiry_date, verified
+         FROM worker_documents WHERE worker_id = $1 ORDER BY position ASC",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    worker.documents = doc_rows
+        .into_iter()
+        .map(|r| IdentityDocument {
+            document_type: tag_to_enum(Some(r.document_type.as_str()))
+                .unwrap_or(DocumentType::Other),
+            number: r.number,
+            issuing_country: r.issuing_country,
+            issuing_authority: r.issuing_authority,
+            issue_date: r.issue_date,
+            expiry_date: r.expiry_date,
+            verified: r.verified,
+        })
+        .collect();
 
-    worker_names::Entity::delete_many()
-        .filter(worker_names::Column::WorkerId.eq(worker.id))
-        .exec(conn)
+    let ec_rows = sqlx::query_as!(
+        EmergencyContactRow,
+        "SELECT id, name, relationship, is_primary, address_use_type, address_line1,
+                address_line2, address_city, address_state, address_postal_code,
+                address_country
+         FROM worker_emergency_contacts WHERE worker_id = $1 ORDER BY position ASC",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut emergency_contacts = Vec::with_capacity(ec_rows.len());
+    for ec in ec_rows {
+        let tel_rows = sqlx::query_as!(
+            EmergencyTelecomRow,
+            "SELECT system, value, use_type
+             FROM worker_emergency_contact_telecom
+             WHERE emergency_contact_id = $1 ORDER BY position ASC",
+            ec.id,
+        )
+        .fetch_all(&mut *conn)
         .await?;
-    worker_identifiers::Entity::delete_many()
-        .filter(worker_identifiers::Column::WorkerId.eq(worker.id))
-        .exec(conn)
-        .await?;
-    worker_addresses::Entity::delete_many()
-        .filter(worker_addresses::Column::WorkerId.eq(worker.id))
-        .exec(conn)
-        .await?;
-    worker_contacts::Entity::delete_many()
-        .filter(worker_contacts::Column::WorkerId.eq(worker.id))
-        .exec(conn)
-        .await?;
-    worker_links::Entity::delete_many()
-        .filter(worker_links::Column::WorkerId.eq(worker.id))
-        .exec(conn)
-        .await?;
-    worker_emergency_contacts::Entity::delete_many()
-        .filter(worker_emergency_contacts::Column::WorkerId.eq(worker.id))
-        .exec(conn)
-        .await?;
-    worker_documents::Entity::delete_many()
-        .filter(worker_documents::Column::WorkerId.eq(worker.id))
-        .exec(conn)
-        .await?;
-    worker_photos::Entity::delete_many()
-        .filter(worker_photos::Column::WorkerId.eq(worker.id))
-        .exec(conn)
-        .await?;
+        let telecom = tel_rows
+            .into_iter()
+            .map(|t| ContactPoint {
+                system: tag_to_enum(Some(t.system.as_str())).unwrap_or(ContactPointSystem::Other),
+                value: t.value,
+                use_type: tag_to_enum(t.use_type.as_deref()),
+            })
+            .collect();
+        let has_address = ec.address_use_type.is_some()
+            || ec.address_line1.is_some()
+            || ec.address_line2.is_some()
+            || ec.address_city.is_some()
+            || ec.address_state.is_some()
+            || ec.address_postal_code.is_some()
+            || ec.address_country.is_some();
+        let address = has_address.then(|| Address {
+            use_type: tag_to_enum(ec.address_use_type.as_deref()),
+            line1: ec.address_line1,
+            line2: ec.address_line2,
+            city: ec.address_city,
+            state: ec.address_state,
+            postal_code: ec.address_postal_code,
+            country: ec.address_country,
+        });
+        emergency_contacts.push(EmergencyContact {
+            name: ec.name,
+            relationship: ec.relationship,
+            telecom,
+            address,
+            is_primary: ec.is_primary,
+        });
+    }
+    worker.emergency_contacts = emergency_contacts;
 
-    let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-        SeaOrmWorkerRepository::to_active_models(worker)?;
-    for name in new_names {
-        name.insert(conn).await?;
-    }
-    for identifier in new_identifiers {
-        identifier.insert(conn).await?;
-    }
-    for address in new_addresses {
-        address.insert(conn).await?;
-    }
-    for contact in new_contacts {
-        contact.insert(conn).await?;
-    }
-    for link in new_links {
-        link.insert(conn).await?;
-    }
-    insert_extra_collections(conn, worker).await?;
+    let photos = sqlx::query_scalar!(
+        "SELECT url FROM worker_photos WHERE worker_id = $1 ORDER BY position ASC",
+        id,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    worker.photo = photos;
+
     Ok(())
 }
 
@@ -370,14 +757,14 @@ pub trait WorkerRepository: Send + Sync {
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Worker>>;
 }
 
-/// SeaORM/PostgreSQL implementation of [`WorkerRepository`].
+/// `PostgreSQL` implementation of [`WorkerRepository`] over sqlx.
 ///
 /// Optionally wired with an event publisher and an audit-log repository via
 /// the `with_*` builder methods; when present, every mutation publishes an
 /// event and records an audit entry.
-pub struct SeaOrmWorkerRepository {
-    /// Pooled database connection.
-    db: DatabaseConnection,
+pub struct PgWorkerRepository {
+    /// The connection pool (cheap to clone).
+    db: PgPool,
     /// Optional event publisher; mutations emit events when set.
     event_publisher: Option<std::sync::Arc<dyn crate::streaming::EventProducer>>,
     /// Optional audit repository; mutations log entries when set.
@@ -389,12 +776,12 @@ pub struct SeaOrmWorkerRepository {
     transport: EventTransport,
 }
 
-impl SeaOrmWorkerRepository {
+impl PgWorkerRepository {
     /// Builds a repository over `db` with no event publisher or audit log,
     /// and the default [`EventTransport::Memory`] transport (behaviour
     /// unchanged from before the outbox landed).
     #[must_use]
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: PgPool) -> Self {
         Self {
             db,
             event_publisher: None,
@@ -414,22 +801,16 @@ impl SeaOrmWorkerRepository {
 
     /// When the outbox transport is active, enqueue one `event_outbox`
     /// row for `kind` applied to `worker` **on `conn`** — pass the open
-    /// `&DatabaseTransaction` so the row commits with the entity write
-    /// (the outbox atomicity guarantee). A no-op under
-    /// [`EventTransport::Memory`].
-    ///
-    /// The `ConnectionTrait` generic lives here on a concrete method (not
-    /// on the object-safe [`WorkerRepository`] trait), which is how a
-    /// `dyn`-trait repository threads the outbox insert into its own
-    /// transaction.
+    /// transaction so the row commits with the entity write (the outbox
+    /// atomicity guarantee). A no-op under [`EventTransport::Memory`].
     ///
     /// # Errors
     ///
     /// Returns an error if the outbox `INSERT` fails (e.g. a duplicate
     /// `event_id`) or the envelope cannot be built.
-    async fn enqueue_outbox<C: ConnectionTrait>(
+    async fn enqueue_outbox(
         &self,
-        conn: &C,
+        conn: &mut PgConnection,
         worker: &Worker,
         kind: EventKind,
     ) -> Result<()> {
@@ -535,161 +916,9 @@ impl SeaOrmWorkerRepository {
         }
     }
 
-    /// Builds the `worker_names` rows for `worker`: the primary name (flagged
-    /// `is_primary`) followed by any additional names.
-    fn name_active_models(worker: &Worker) -> Vec<worker_names::ActiveModel> {
-        let mut names = vec![worker_names::ActiveModel {
-            id: Set(Uuid::new_v4()),
-            worker_id: Set(worker.id),
-            use_type: Set(worker.name.use_type.as_ref().map(|u| format!("{u:?}"))),
-            family: Set(worker.name.family.clone()),
-            given: Set(worker.name.given.clone()),
-            prefix: Set(worker.name.prefix.clone()),
-            suffix: Set(worker.name.suffix.clone()),
-            is_primary: Set(true),
-            created_at: Set(OffsetDateTime::now_utc()),
-            updated_at: Set(OffsetDateTime::now_utc()),
-        }];
-
-        for add_name in &worker.additional_names {
-            names.push(worker_names::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                worker_id: Set(worker.id),
-                use_type: Set(add_name.use_type.as_ref().map(|u| format!("{u:?}"))),
-                family: Set(add_name.family.clone()),
-                given: Set(add_name.given.clone()),
-                prefix: Set(add_name.prefix.clone()),
-                suffix: Set(add_name.suffix.clone()),
-                is_primary: Set(false),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            });
-        }
-        names
-    }
-
-    /// Flattens a domain [`Worker`] into the set of `SeaORM` `ActiveModel`s for
-    /// each backing table (worker row plus name/identifier/address/contact/
-    /// link rows). The first name is marked primary; the first address and
-    /// contact are marked primary. Demographic/use-type enums are stored via
-    /// their `Debug` form (`format!("{:?}", …)`) — except `gender`, which is
-    /// lowercased to honor the `workers_gender_check` CHECK constraint —
-    /// while `worker_type` uses its `Display`/`to_string`;
-    /// [`from_db_models`](Self::from_db_models) parses these string forms
-    /// back. Fresh UUIDs and `now_utc()` timestamps are
-    /// assigned to child rows. This does not cover the document / emergency-
-    /// contact / photo collections — those are handled by
-    /// [`insert_extra_collections`].
-    fn to_active_models(worker: &Worker) -> Result<WorkerActiveModels> {
-        // Both digests from one call, so neither can be stamped without
-        // the other (see `record_integrity::digests`).
-        let d = crate::compliance::record_integrity::digests_of_live(worker)?;
-        let new_worker = workers::ActiveModel {
-            id: Set(worker.id),
-            active: Set(worker.active),
-            // A new record is live, so the digest binds `deleted_at` as
-            // `None`.
-            content_hash: Set(Some(d.sha256)),
-            content_hash_sha3: Set(Some(d.sha3)),
-            content_mac: Set(d.mac),
-            worker_type: Set(worker
-                .worker_type
-                .as_ref()
-                .map(std::string::ToString::to_string)),
-            // Lowercased for the `workers_gender_check` CHECK constraint.
-            gender: Set(format!("{:?}", worker.gender).to_lowercase()),
-            birth_date: Set(worker.birth_date.map(date_to_time)),
-            tax_id: Set(worker.tax_id.clone()),
-            deceased: Set(worker.deceased),
-            deceased_datetime: Set(worker.deceased_datetime.map(ts_to_offset)),
-            marital_status: Set(worker.marital_status.clone()),
-            multiple_birth: Set(worker.multiple_birth),
-            managing_organization_id: Set(worker.managing_organization),
-            created_at: Set(OffsetDateTime::now_utc()),
-            updated_at: Set(OffsetDateTime::now_utc()),
-            created_by: Set(None),
-            updated_by: Set(None),
-            deleted_at: Set(None),
-            deleted_by: Set(None),
-        };
-
-        let names = Self::name_active_models(worker);
-
-        // Identifiers
-        let identifiers = worker
-            .identifiers
-            .iter()
-            .map(|id| worker_identifiers::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                worker_id: Set(worker.id),
-                use_type: Set(id.use_type.as_ref().map(|u| format!("{u:?}"))),
-                identifier_type: Set(format!("{:?}", id.identifier_type)),
-                system: Set(id.system.clone()),
-                value: Set(id.value.clone()),
-                assigner: Set(id.assigner.clone()),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            })
-            .collect();
-
-        // Addresses
-        let addresses = worker
-            .addresses
-            .iter()
-            .enumerate()
-            .map(|(idx, addr)| worker_addresses::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                worker_id: Set(worker.id),
-                use_type: Set(None),
-                line1: Set(addr.line1.clone()),
-                line2: Set(addr.line2.clone()),
-                city: Set(addr.city.clone()),
-                state: Set(addr.state.clone()),
-                postal_code: Set(addr.postal_code.clone()),
-                country: Set(addr.country.clone()),
-                is_primary: Set(idx == 0),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            })
-            .collect();
-
-        // Contacts
-        let contacts = worker
-            .telecom
-            .iter()
-            .enumerate()
-            .map(|(idx, cp)| worker_contacts::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                worker_id: Set(worker.id),
-                system: Set(format!("{:?}", cp.system)),
-                value: Set(cp.value.clone()),
-                use_type: Set(cp.use_type.as_ref().map(|u| format!("{u:?}"))),
-                is_primary: Set(idx == 0),
-                created_at: Set(OffsetDateTime::now_utc()),
-                updated_at: Set(OffsetDateTime::now_utc()),
-            })
-            .collect();
-
-        // Links
-        let links = worker
-            .links
-            .iter()
-            .map(|link| worker_links::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                worker_id: Set(worker.id),
-                other_worker_id: Set(link.other_worker_id),
-                link_type: Set(format!("{:?}", link.link_type)),
-                created_at: Set(OffsetDateTime::now_utc()),
-                created_by: Set(None),
-            })
-            .collect();
-
-        Ok((new_worker, names, identifiers, addresses, contacts, links))
-    }
-
     /// Maps one `worker_names` row back into a domain [`HumanName`], parsing
     /// the string-stored name-use tag.
-    fn human_name_from_db(n: &worker_names::Model) -> HumanName {
+    fn human_name_from_db(n: &NameRow) -> HumanName {
         use crate::models::NameUse;
 
         HumanName {
@@ -712,7 +941,7 @@ impl SeaOrmWorkerRepository {
 
     /// Maps the `worker_identifiers` rows back into domain [`Identifier`]s,
     /// parsing the string-stored type / use-type tags.
-    fn identifiers_from_db(db_identifiers: &[worker_identifiers::Model]) -> Vec<Identifier> {
+    fn identifiers_from_db(db_identifiers: &[IdentifierRow]) -> Vec<Identifier> {
         use crate::models::{IdentifierType, IdentifierUse};
 
         db_identifiers
@@ -751,7 +980,7 @@ impl SeaOrmWorkerRepository {
 
     /// Maps the `worker_contacts` rows back into domain [`ContactPoint`]s,
     /// dropping any row whose system tag is unrecognized.
-    fn telecom_from_db(db_contacts: &[worker_contacts::Model]) -> Vec<ContactPoint> {
+    fn telecom_from_db(db_contacts: &[ContactRow]) -> Vec<ContactPoint> {
         use crate::models::{ContactPointSystem, ContactPointUse};
 
         db_contacts
@@ -792,20 +1021,19 @@ impl SeaOrmWorkerRepository {
     /// returns a [`crate::Error::Validation`] if none is present. Unparseable
     /// contact/link tags are dropped (`filter_map`) rather than erroring. The
     /// `documents` / `emergency_contacts` / `photo` collections are left empty
-    /// here and populated separately by
-    /// [`load_extra_collections`](Self::load_extra_collections).
+    /// here and populated separately by [`load_extra_collections`].
     ///
     /// # Errors
     ///
     /// Returns [`crate::Error::Validation`] if `db_names` contains no primary
     /// name row.
     fn from_db_models(
-        db_worker: workers::Model,
-        db_names: &[worker_names::Model],
-        db_identifiers: &[worker_identifiers::Model],
-        db_addresses: &[worker_addresses::Model],
-        db_contacts: &[worker_contacts::Model],
-        db_links: &[worker_links::Model],
+        db_worker: WorkerRow,
+        db_names: &[NameRow],
+        db_identifiers: &[IdentifierRow],
+        db_addresses: &[AddressRow],
+        db_contacts: &[ContactRow],
+        db_links: &[LinkRow],
     ) -> Result<Worker> {
         use crate::models::{Gender, LinkType};
 
@@ -896,9 +1124,9 @@ impl SeaOrmWorkerRepository {
             telecom,
             gender,
             worker_type,
-            birth_date: db_worker.birth_date.map(time_to_date),
+            birth_date: db_worker.birth_date,
             deceased: db_worker.deceased,
-            deceased_datetime: db_worker.deceased_datetime.map(offset_to_ts),
+            deceased_datetime: db_worker.deceased_datetime,
             addresses,
             marital_status: db_worker.marital_status,
             multiple_birth: db_worker.multiple_birth,
@@ -909,207 +1137,32 @@ impl SeaOrmWorkerRepository {
             photo: vec![],
             managing_organization: db_worker.managing_organization_id,
             links,
-            created_at: offset_to_ts(db_worker.created_at),
-            updated_at: offset_to_ts(db_worker.updated_at),
+            created_at: db_worker.created_at,
+            updated_at: db_worker.updated_at,
         })
-    }
-
-    /// Fetches the child rows (names, identifiers, addresses, contacts, links)
-    /// belonging to `worker_id` in a fixed tuple order matching
-    /// [`from_db_models`](Self::from_db_models).
-    ///
-    /// Runs one `find` per child table; the tuple order is the contract
-    /// `from_db_models` relies on, so keep them in lockstep.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any of the child-table queries fail.
-    async fn load_associations(
-        &self,
-        worker_id: &Uuid,
-    ) -> Result<(
-        Vec<worker_names::Model>,
-        Vec<worker_identifiers::Model>,
-        Vec<worker_addresses::Model>,
-        Vec<worker_contacts::Model>,
-        Vec<worker_links::Model>,
-    )> {
-        let db_names = worker_names::Entity::find()
-            .filter(worker_names::Column::WorkerId.eq(*worker_id))
-            .all(&self.db)
-            .await?;
-
-        let db_identifiers = worker_identifiers::Entity::find()
-            .filter(worker_identifiers::Column::WorkerId.eq(*worker_id))
-            .all(&self.db)
-            .await?;
-
-        let db_addresses = worker_addresses::Entity::find()
-            .filter(worker_addresses::Column::WorkerId.eq(*worker_id))
-            .all(&self.db)
-            .await?;
-
-        let db_contacts = worker_contacts::Entity::find()
-            .filter(worker_contacts::Column::WorkerId.eq(*worker_id))
-            .all(&self.db)
-            .await?;
-
-        let db_links = worker_links::Entity::find()
-            .filter(worker_links::Column::WorkerId.eq(*worker_id))
-            .all(&self.db)
-            .await?;
-
-        Ok((
-            db_names,
-            db_identifiers,
-            db_addresses,
-            db_contacts,
-            db_links,
-        ))
-    }
-
-    /// Load the normalized document / emergency-contact / photo child rows
-    /// for `worker.id` and populate them onto `worker`.
-    ///
-    /// The companion to [`insert_extra_collections`]: each collection is read
-    /// back ordered by its `position` column so list order is preserved, and
-    /// emergency-contact telecom rows are fetched per contact. String tags are
-    /// decoded with [`tag_to_enum`], falling back to the `Other` variant for an
-    /// unknown tag. An emergency-contact address is reconstructed only when at
-    /// least one flattened address column is present.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any of the child-table queries fail.
-    async fn load_extra_collections(&self, worker: &mut Worker) -> Result<()> {
-        let id = worker.id;
-
-        let doc_rows = worker_documents::Entity::find()
-            .filter(worker_documents::Column::WorkerId.eq(id))
-            .order_by_asc(worker_documents::Column::Position)
-            .all(&self.db)
-            .await?;
-        worker.documents = doc_rows
-            .into_iter()
-            .map(|r| IdentityDocument {
-                document_type: tag_to_enum(Some(r.document_type.as_str()))
-                    .unwrap_or(DocumentType::Other),
-                number: r.number,
-                issuing_country: r.issuing_country,
-                issuing_authority: r.issuing_authority,
-                issue_date: r.issue_date.map(time_to_date),
-                expiry_date: r.expiry_date.map(time_to_date),
-                verified: r.verified,
-            })
-            .collect();
-
-        let ec_rows = worker_emergency_contacts::Entity::find()
-            .filter(worker_emergency_contacts::Column::WorkerId.eq(id))
-            .order_by_asc(worker_emergency_contacts::Column::Position)
-            .all(&self.db)
-            .await?;
-        let mut emergency_contacts = Vec::with_capacity(ec_rows.len());
-        for ec in ec_rows {
-            let tel_rows = worker_emergency_contact_telecom::Entity::find()
-                .filter(worker_emergency_contact_telecom::Column::EmergencyContactId.eq(ec.id))
-                .order_by_asc(worker_emergency_contact_telecom::Column::Position)
-                .all(&self.db)
-                .await?;
-            let telecom = tel_rows
-                .into_iter()
-                .map(|t| ContactPoint {
-                    system: tag_to_enum(Some(t.system.as_str()))
-                        .unwrap_or(ContactPointSystem::Other),
-                    value: t.value,
-                    use_type: tag_to_enum(t.use_type.as_deref()),
-                })
-                .collect();
-            let has_address = ec.address_use_type.is_some()
-                || ec.address_line1.is_some()
-                || ec.address_line2.is_some()
-                || ec.address_city.is_some()
-                || ec.address_state.is_some()
-                || ec.address_postal_code.is_some()
-                || ec.address_country.is_some();
-            let address = has_address.then(|| Address {
-                use_type: tag_to_enum(ec.address_use_type.as_deref()),
-                line1: ec.address_line1,
-                line2: ec.address_line2,
-                city: ec.address_city,
-                state: ec.address_state,
-                postal_code: ec.address_postal_code,
-                country: ec.address_country,
-            });
-            emergency_contacts.push(EmergencyContact {
-                name: ec.name,
-                relationship: ec.relationship,
-                telecom,
-                address,
-                is_primary: ec.is_primary,
-            });
-        }
-        worker.emergency_contacts = emergency_contacts;
-
-        let photo_rows = worker_photos::Entity::find()
-            .filter(worker_photos::Column::WorkerId.eq(id))
-            .order_by_asc(worker_photos::Column::Position)
-            .all(&self.db)
-            .await?;
-        worker.photo = photo_rows.into_iter().map(|r| r.url).collect();
-
-        Ok(())
     }
 }
 
-// SeaORM implementation of the repository trait. Each mutation runs its
+// sqlx implementation of the repository trait. Each mutation runs its
 // multi-table writes inside a transaction, then (best-effort) publishes an
 // event and records an audit entry after the commit.
 #[async_trait::async_trait]
-impl WorkerRepository for SeaOrmWorkerRepository {
+impl WorkerRepository for PgWorkerRepository {
     async fn create(&self, worker: &Worker, ctx: &AuditContext) -> Result<Worker> {
         // All inserts share one transaction so a partial worker is never left.
-        let txn = self.db.begin().await?;
+        let mut txn = self.db.begin().await?;
 
-        let (new_worker, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            Self::to_active_models(worker)?;
-
-        // Insert worker
-        let db_worker = new_worker.insert(&txn).await?;
-
-        // Insert names
-        for name in new_names {
-            name.insert(&txn).await?;
-        }
-
-        // Insert identifiers
-        for identifier in new_identifiers {
-            identifier.insert(&txn).await?;
-        }
-
-        // Insert addresses
-        for address in new_addresses {
-            address.insert(&txn).await?;
-        }
-
-        // Insert contacts
-        for contact in new_contacts {
-            contact.insert(&txn).await?;
-        }
-
-        // Insert links
-        for link in new_links {
-            link.insert(&txn).await?;
-        }
-
-        // Insert documents / emergency contacts / photos (normalized).
-        insert_extra_collections(&txn, worker).await?;
+        insert_worker_row(&mut txn, worker).await?;
+        insert_children(&mut txn, worker).await?;
+        // Digests over the record as stored, in this transaction (INT-V1).
+        stamp_digests(&mut txn, worker.id).await?;
 
         // Durable event bus (Phase 2): under the outbox transport, write the
         // `event_outbox` row **inside this same transaction**, before the
         // commit, so the entity rows and the event commit atomically (or roll
         // back together). A no-op under the memory transport, which keeps the
         // post-commit ring-buffer publish below.
-        self.enqueue_outbox(&txn, worker, EventKind::Created)
+        self.enqueue_outbox(&mut txn, worker, EventKind::Created)
             .await?;
 
         // Commit closes the transaction boundary: everything above is now
@@ -1119,18 +1172,11 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 
         // Reload from the DB so the returned record reflects exactly what was
         // persisted (server-assigned timestamps, normalized child rows).
-        let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
-            self.load_associations(&db_worker.id).await?;
-
-        let mut result = Self::from_db_models(
-            db_worker,
-            &db_names,
-            &db_identifiers,
-            &db_addresses,
-            &db_contacts,
-            &db_links,
-        )?;
-        self.load_extra_collections(&mut result).await?;
+        let mut conn = self.db.acquire().await?;
+        let result = read_worker(&mut conn, worker.id, true)
+            .await?
+            .ok_or_else(|| crate::Error::Validation("Worker not found after create".to_string()))?;
+        drop(conn);
 
         // Publish event
         self.publish_event(crate::streaming::WorkerEvent::Created {
@@ -1148,28 +1194,8 @@ impl WorkerRepository for SeaOrmWorkerRepository {
     }
 
     async fn get_by_id(&self, id: &Uuid) -> Result<Option<Worker>> {
-        let db_worker = workers::Entity::find_by_id(*id)
-            .filter(workers::Column::DeletedAt.is_null())
-            .one(&self.db)
-            .await?;
-
-        let Some(db_worker) = db_worker else {
-            return Ok(None);
-        };
-
-        let (db_names, db_identifiers, db_addresses, db_contacts, db_links) =
-            self.load_associations(id).await?;
-
-        let mut worker = Self::from_db_models(
-            db_worker,
-            &db_names,
-            &db_identifiers,
-            &db_addresses,
-            &db_contacts,
-            &db_links,
-        )?;
-        self.load_extra_collections(&mut worker).await?;
-        Ok(Some(worker))
+        let mut conn = self.db.acquire().await?;
+        read_worker(&mut conn, *id, false).await
     }
 
     async fn update(&self, worker: &Worker, ctx: &AuditContext) -> Result<Worker> {
@@ -1177,79 +1203,12 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         let old_worker = self.get_by_id(&worker.id).await?;
 
         // Update is implemented as "update parent row + replace all child
-        // rows" within a single transaction.
-        let txn = self.db.begin().await?;
-
-        // Update worker. This duplicates `apply_worker_row_replacement`
-        // above rather than calling it — pre-existing drift, left alone
-        // here beyond adding the rehash it also needs.
-        let d = content_hash_for_update(&txn, worker).await?;
-        let update_model = worker_update_model(worker, d);
-        update_model.update(&txn).await?;
-
-        // Delete existing associated data
-        worker_names::Entity::delete_many()
-            .filter(worker_names::Column::WorkerId.eq(worker.id))
-            .exec(&txn)
-            .await?;
-
-        worker_identifiers::Entity::delete_many()
-            .filter(worker_identifiers::Column::WorkerId.eq(worker.id))
-            .exec(&txn)
-            .await?;
-
-        worker_addresses::Entity::delete_many()
-            .filter(worker_addresses::Column::WorkerId.eq(worker.id))
-            .exec(&txn)
-            .await?;
-
-        worker_contacts::Entity::delete_many()
-            .filter(worker_contacts::Column::WorkerId.eq(worker.id))
-            .exec(&txn)
-            .await?;
-
-        worker_links::Entity::delete_many()
-            .filter(worker_links::Column::WorkerId.eq(worker.id))
-            .exec(&txn)
-            .await?;
-
-        // Deleting emergency contacts cascades to their telecom rows.
-        worker_emergency_contacts::Entity::delete_many()
-            .filter(worker_emergency_contacts::Column::WorkerId.eq(worker.id))
-            .exec(&txn)
-            .await?;
-        worker_documents::Entity::delete_many()
-            .filter(worker_documents::Column::WorkerId.eq(worker.id))
-            .exec(&txn)
-            .await?;
-        worker_photos::Entity::delete_many()
-            .filter(worker_photos::Column::WorkerId.eq(worker.id))
-            .exec(&txn)
-            .await?;
-
-        // Re-insert associated data
-        let (_, new_names, new_identifiers, new_addresses, new_contacts, new_links) =
-            Self::to_active_models(worker)?;
-
-        for name in new_names {
-            name.insert(&txn).await?;
-        }
-        for identifier in new_identifiers {
-            identifier.insert(&txn).await?;
-        }
-        for address in new_addresses {
-            address.insert(&txn).await?;
-        }
-        for contact in new_contacts {
-            contact.insert(&txn).await?;
-        }
-        for link in new_links {
-            link.insert(&txn).await?;
-        }
-        insert_extra_collections(&txn, worker).await?;
+        // rows" within a single transaction, then the digest stamp.
+        let mut txn = self.db.begin().await?;
+        apply_update_rows(&mut txn, worker).await?;
 
         // Outbox row shares the update transaction (see `create`).
-        self.enqueue_outbox(&txn, worker, EventKind::Updated)
+        self.enqueue_outbox(&mut txn, worker, EventKind::Updated)
             .await?;
 
         txn.commit().await?;
@@ -1293,43 +1252,16 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 
         // The whole merge — survivor row updates + duplicate soft-delete +
         // both outbox rows — commits (or rolls back) under one transaction.
-        let txn = self.db.begin().await?;
+        let mut txn = self.db.begin().await?;
 
         // Apply the survivor's parent + child rows (parent update + wholesale
-        // child-row replacement), shared with the `update` sequence.
-        apply_worker_row_replacement(&txn, survivor).await?;
+        // child-row replacement + digest stamp), shared with `update`.
+        apply_update_rows(&mut txn, survivor).await?;
 
-        // Soft-delete the duplicate on the same transaction.
-        // A soft delete changes the lifecycle state the digest binds, so
-        // it must be rehashed or every deleted record would read as
-        // tampered. The pre-image loaded above for the audit trail doubles
-        // as the record to hash.
-        let deleted_at = OffsetDateTime::now_utc();
-        let deleted_micros = i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok();
-        let tombstone_hash = old_duplicate
-            .as_ref()
-            .map(|w| {
-                crate::compliance::record_integrity::digests_with_deleted_at(w, deleted_micros)
-            })
-            .transpose()?;
-        let dup_delete = workers::ActiveModel {
-            id: Set(*duplicate_id),
-            deleted_at: Set(Some(deleted_at)),
-            deleted_by: Set(Some("system".to_string())),
-            content_hash: tombstone_hash
-                .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| {
-                    Set(Some(h.sha256.clone()))
-                }),
-            content_hash_sha3: tombstone_hash
-                .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.sha3.clone()))),
-            content_mac: tombstone_hash
-                .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(h.mac.clone())),
-            ..Default::default()
-        };
-        dup_delete.update(&txn).await?;
+        // Soft-delete the duplicate on the same transaction, rehashed over
+        // the pre-image loaded above for the audit trail (shared with
+        // `delete`).
+        apply_soft_delete_row(&mut txn, duplicate_id, old_duplicate.as_ref()).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the survivor
         // (carrying the duplicate's pid via `merged_from`, so a merge-repointing
@@ -1338,11 +1270,11 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // memory transport.
         if self.transport.is_outbox() {
             OutboxInsert::for_merge(survivor, duplicate_id)?
-                .insert_on(&txn)
+                .insert_on(&mut txn)
                 .await?;
             if let Some(dup) = old_duplicate.as_ref() {
                 OutboxInsert::for_event(dup, EventKind::Deleted)?
-                    .insert_on(&txn)
+                    .insert_on(&mut txn)
                     .await?;
             }
         }
@@ -1390,49 +1322,23 @@ impl WorkerRepository for SeaOrmWorkerRepository {
         // Capture the pre-delete state for the audit record.
         let old_worker = self.get_by_id(id).await?;
 
-        // Soft delete: stamp deleted_at/deleted_by rather than removing rows.
-        // A soft delete changes the lifecycle state the digest binds, so
-        // it must be rehashed or every deleted record would read as
-        // tampered. The pre-image loaded above for the audit trail doubles
-        // as the record to hash.
-        let deleted_at = OffsetDateTime::now_utc();
-        let deleted_micros = i64::try_from(deleted_at.unix_timestamp_nanos() / 1_000).ok();
-        let tombstone_hash = old_worker
-            .as_ref()
-            .map(|w| {
-                crate::compliance::record_integrity::digests_with_deleted_at(w, deleted_micros)
-            })
-            .transpose()?;
-        let update_model = workers::ActiveModel {
-            id: Set(*id),
-            deleted_at: Set(Some(deleted_at)),
-            deleted_by: Set(Some("system".to_string())),
-            content_hash: tombstone_hash
-                .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| {
-                    Set(Some(h.sha256.clone()))
-                }),
-            content_hash_sha3: tombstone_hash
-                .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(Some(h.sha3.clone()))),
-            content_mac: tombstone_hash
-                .as_ref()
-                .map_or(sea_orm::ActiveValue::NotSet, |h| Set(h.mac.clone())),
-            ..Default::default()
-        };
-        // Unlike create/update, the soft-delete is a single row update with no
-        // existing transaction. Under the outbox transport we open one here so
-        // the tombstone write and the `deleted` outbox row commit atomically;
+        // Soft delete: stamp deleted_at/deleted_by rather than removing rows,
+        // rehashed over the pre-image (see `apply_soft_delete_row`). Unlike
+        // create/update, this is a single row update with no existing
+        // transaction. Under the outbox transport we open one here so the
+        // tombstone write and the `deleted` outbox row commit atomically;
         // the memory transport keeps the plain, tx-free update.
         if self.transport.is_outbox() {
-            let txn = self.db.begin().await?;
-            update_model.update(&txn).await?;
+            let mut txn = self.db.begin().await?;
+            apply_soft_delete_row(&mut txn, id, old_worker.as_ref()).await?;
             if let Some(old) = old_worker.as_ref() {
-                self.enqueue_outbox(&txn, old, EventKind::Deleted).await?;
+                self.enqueue_outbox(&mut txn, old, EventKind::Deleted)
+                    .await?;
             }
             txn.commit().await?;
         } else {
-            update_model.update(&self.db).await?;
+            let mut conn = self.db.acquire().await?;
+            apply_soft_delete_row(&mut conn, id, old_worker.as_ref()).await?;
         }
 
         // Publish event
@@ -1453,35 +1359,111 @@ impl WorkerRepository for SeaOrmWorkerRepository {
     }
 
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Worker>> {
-        // `order_by_asc(Id)` is load-bearing, not cosmetic: without an
-        // explicit ORDER BY, Postgres does not guarantee a stable row
-        // order across repeated `LIMIT`/`OFFSET` queries, so a caller
-        // paginating through every page (the link-graph suggestion job's
-        // worker enumeration, T-31) could silently skip or duplicate rows
-        // between pages. Ordering by the primary key is cheap (already
-        // indexed) and gives every page a deterministic, non-overlapping
-        // slice. Mirrors the identical fix in person-service's
-        // `list_active` (see that crate's `CHANGELOG.md`).
-        let db_workers: Vec<workers::Model> = workers::Entity::find()
-            .filter(workers::Column::DeletedAt.is_null())
-            .filter(workers::Column::Active.eq(true))
-            .order_by_asc(workers::Column::Id)
-            .limit(limit)
-            .offset(offset)
-            .all(&self.db)
-            .await?;
+        // `ORDER BY id` is load-bearing, not cosmetic: without an explicit
+        // ORDER BY, Postgres does not guarantee a stable row order across
+        // repeated `LIMIT`/`OFFSET` queries, so a caller paginating through
+        // every page (the link-graph suggestion job's worker enumeration,
+        // T-31) could silently skip or duplicate rows between pages.
+        // Ordering by the primary key is cheap (already indexed) and gives
+        // every page a deterministic, non-overlapping slice. Mirrors the
+        // identical fix in person-service's `list_active` (see that crate's
+        // `CHANGELOG.md`).
+        let ids = sqlx::query_scalar!(
+            "SELECT id FROM workers
+             WHERE deleted_at IS NULL AND active = true
+             ORDER BY id ASC
+             LIMIT $1 OFFSET $2",
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(&self.db)
+        .await?;
 
         // Page the parent rows in SQL (limit/offset), then hydrate each into a
         // full domain worker via `get_by_id`.
         let mut workers = Vec::new();
-        for db_worker in db_workers {
-            if let Some(worker) = self.get_by_id(&db_worker.id).await? {
+        for id in ids {
+            if let Some(worker) = self.get_by_id(&id).await? {
                 workers.push(worker);
             }
         }
 
         Ok(workers)
     }
+}
+
+/// One `workers` row's stored digests and soft-delete stamp, as
+/// `/api/records/verify` and `integrity_resign` read them.
+#[derive(Debug, Clone)]
+pub struct StoredDigests {
+    /// The record's id.
+    pub id: Uuid,
+    /// The stored SHA-256 content hash.
+    pub content_hash: Option<String>,
+    /// The stored SHA-3 content hash.
+    pub content_hash_sha3: Option<String>,
+    /// The stored keyed MAC.
+    pub content_mac: Option<String>,
+    /// The soft-delete stamp.
+    pub deleted_at: Option<chrono::DateTime<Utc>>,
+}
+
+/// The `limit` most recently updated `workers` rows' stored digests, for
+/// `/api/records/verify`.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn rows_for_verification(db: &PgPool, limit: i64) -> Result<Vec<StoredDigests>> {
+    let rows = sqlx::query_as!(
+        StoredDigests,
+        "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at
+         FROM workers
+         ORDER BY updated_at DESC
+         LIMIT $1",
+        limit,
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
+/// Up to `limit` `workers` rows carrying a MAC, in id order — the
+/// `integrity_resign` task's walk.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the query fails.
+pub async fn rows_with_content_mac(db: &PgPool, limit: u64) -> Result<Vec<StoredDigests>> {
+    let rows = sqlx::query_as!(
+        StoredDigests,
+        "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at
+         FROM workers
+         WHERE content_mac IS NOT NULL
+         ORDER BY id ASC
+         LIMIT $1",
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
+/// Replace one worker's MAC, the only column `integrity_resign` writes.
+/// No matching row is an error, as it was under `SeaORM`.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if the update fails or matches no
+/// row.
+pub async fn set_content_mac(db: &PgPool, id: Uuid, mac: Option<String>) -> Result<()> {
+    let done = sqlx::query!("UPDATE workers SET content_mac = $2 WHERE id = $1", id, mac)
+        .execute(db)
+        .await?;
+    if done.rows_affected() == 0 {
+        return Err(not_updated());
+    }
+    Ok(())
 }
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path. They
@@ -1491,7 +1473,7 @@ impl WorkerRepository for SeaOrmWorkerRepository {
 /// bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
-    use super::{AuditContext, SeaOrmWorkerRepository, WorkerRepository};
+    use super::{AuditContext, PgWorkerRepository, WorkerRepository, gender_tag};
     /// The `workers.gender` CHECK constraint's vocabulary, copied from
     /// `migrations/2024122800000002_create_workers/up.sql`. A value
     /// outside this set is rejected by `PostgreSQL` at insert time.
@@ -1500,8 +1482,7 @@ mod tests {
     /// Every [`Gender`] variant is persisted as a token the
     /// `workers_gender_check` CHECK constraint accepts.
     ///
-    /// Regression pin: `to_active_models` (and the two sibling write
-    /// paths) previously stored the bare `Debug` form — `"Unknown"`,
+    /// Regression pin: the write paths previously stored the bare `Debug` form — `"Unknown"`,
     /// `"Male"` — which `PostgreSQL` rejects, so **every** create and
     /// update against a constrained schema failed with
     /// `violates check constraint "workers_gender_check"`. Pure and
@@ -1520,8 +1501,7 @@ mod tests {
                 },
                 gender,
             );
-            let (row, ..) = SeaOrmWorkerRepository::to_active_models(&worker).expect("hashable");
-            let stored = row.gender.unwrap();
+            let stored = gender_tag(&worker);
             assert!(
                 DB_GENDER_TOKENS.contains(&stored.as_str()),
                 "{gender:?} persisted as {stored:?}, which the CHECK constraint \
@@ -1539,14 +1519,14 @@ mod tests {
         }
     }
 
-    use crate::db::models::event_outbox;
+    use crate::db::outbox::Model as OutboxRow;
     use crate::models::{Gender, HumanName, Worker};
     use crate::streaming::EventTransport;
-    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+    use sqlx::PgPool;
 
-    async fn connect() -> sea_orm::DatabaseConnection {
+    async fn connect() -> PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        sea_orm::Database::connect(&url)
+        PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL")
     }
@@ -1568,11 +1548,10 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_audit_rows_carry_the_callers_context() {
         use crate::db::audit::AuditLogRepository;
-        use crate::db::models::audit_log;
 
         let db = connect().await;
         let audit = std::sync::Arc::new(AuditLogRepository::new(db.clone()));
-        let repo = SeaOrmWorkerRepository::new(db.clone()).with_audit_log(audit);
+        let repo = PgWorkerRepository::new(db.clone()).with_audit_log(audit.clone());
         let system = AuditContext::default();
         let survivor = repo.create(&a_worker("Survivor"), &system).await.unwrap();
         let duplicate = repo.create(&a_worker("Duplicate"), &system).await.unwrap();
@@ -1585,12 +1564,12 @@ mod tests {
         repo.merge(&survivor, &duplicate.id, &caller).await.unwrap();
 
         for (id, action) in [(survivor.id, "UPDATE"), (duplicate.id, "DELETE")] {
-            let row = audit_log::Entity::find()
-                .filter(audit_log::Column::EntityId.eq(id))
-                .filter(audit_log::Column::Action.eq(action))
-                .one(&db)
+            let row = audit
+                .rows_for(None, id, Some(action))
                 .await
                 .unwrap()
+                .into_iter()
+                .next()
                 .expect("the merge writes an audit row");
             assert_eq!(
                 row.user_id.as_deref(),
@@ -1607,17 +1586,14 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
-        let repo = SeaOrmWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let worker = repo
             .create(&a_worker("Created"), &AuditContext::default())
             .await
             .unwrap();
 
-        let rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(worker.id))
-            .filter(event_outbox::Column::Kind.eq("created"))
-            .all(&db)
+        let rows = OutboxRow::rows_for(&db, worker.id, Some("created"))
             .await
             .unwrap();
         assert_eq!(rows.len(), 1, "one created outbox row for the new worker");
@@ -1631,7 +1607,7 @@ mod tests {
     #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
-        let repo = SeaOrmWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+        let repo = PgWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
 
         let survivor = repo
             .create(&a_worker("Survivor"), &AuditContext::default())
@@ -1649,10 +1625,7 @@ mod tests {
         assert_eq!(merged.id, survivor.id);
 
         // Survivor: exactly one `merged` row, carrying the duplicate pid.
-        let merged_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(survivor.id))
-            .filter(event_outbox::Column::Kind.eq("merged"))
-            .all(&db)
+        let merged_rows = OutboxRow::rows_for(&db, survivor.id, Some("merged"))
             .await
             .unwrap();
         assert_eq!(merged_rows.len(), 1, "one merged outbox row for survivor");
@@ -1663,10 +1636,7 @@ mod tests {
         );
 
         // Duplicate: a `deleted` row.
-        let deleted_rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(duplicate.id))
-            .filter(event_outbox::Column::Kind.eq("deleted"))
-            .all(&db)
+        let deleted_rows = OutboxRow::rows_for(&db, duplicate.id, Some("deleted"))
             .await
             .unwrap();
         assert_eq!(

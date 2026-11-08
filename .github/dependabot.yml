@@ -653,20 +653,6 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/worker/worker-service-with-axum/migration"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "rust"
-    groups:
-      routine:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "cargo"
     directory: "/workforce-planning-management/workforce-planning-management-service-with-rust"
     schedule:
       interval: "weekly"

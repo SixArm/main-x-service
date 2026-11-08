@@ -11,7 +11,7 @@ src/
 │   └── grpc/                # real Tonic server (T-6): mod.rs (serve + generated
 │                             # proto module) + service.rs (WorkerGrpcService)
 ├── models/                  # Worker, HumanName, Identifier, …
-├── db/                      # SeaORM entities + repositories + audit
+├── db/                      # all SQL: sqlx row structs, repositories, audit, outbox, erasure
 ├── matching/                # algorithms + scoring + phonetic
 ├── search/                  # Tantivy index + query
 ├── streaming/               # EventProducer trait + InMemoryEventPublisher
@@ -35,7 +35,7 @@ src/
 
 | Trait | Implementations |
 |---|---|
-| `WorkerRepository` | `SeaOrmWorkerRepository` |
+| `WorkerRepository` | `PgWorkerRepository` (sqlx) |
 | `WorkerMatcher` | `ProbabilisticMatcher`, `DeterministicMatcher` |
 | `EventProducer` | `InMemoryEventPublisher` (Fluvio planned) |
 | `EventConsumer` | stub |

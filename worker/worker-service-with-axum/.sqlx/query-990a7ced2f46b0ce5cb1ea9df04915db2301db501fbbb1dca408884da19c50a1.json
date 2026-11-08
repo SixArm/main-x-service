@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, worker_id, use_type, identifier_type, system, value, assigner\n         FROM worker_identifiers WHERE worker_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "worker_identifiers",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "worker_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "worker_identifiers",
+            "name": "worker_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "use_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "worker_identifiers",
+            "name": "use_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "identifier_type",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "worker_identifiers",
+            "name": "identifier_type"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "system",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "worker_identifiers",
+            "name": "system"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "value",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "worker_identifiers",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "assigner",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "worker_identifiers",
+            "name": "assigner"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "990a7ced2f46b0ce5cb1ea9df04915db2301db501fbbb1dca408884da19c50a1"
+}

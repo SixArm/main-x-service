@@ -57,8 +57,8 @@
 //! deserialize into a shape later code treats as impossible, so an erased
 //! record would become a landmine rather than degrading cleanly.
 
-use sea_orm::{ConnectionTrait, Statement};
 use serde::Serialize;
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::compliance::disclosure::AccessContext;
@@ -134,39 +134,13 @@ pub struct ErasureOutcome {
 /// # Errors
 ///
 /// Propagates any delete error.
-async fn destroy_child_rows<C: ConnectionTrait>(db: &C, id: Uuid) -> crate::Result<u64> {
-    // These *are* the personal data; nothing hashes or links them, so
-    // deletion breaks no integrity property.
+async fn destroy_child_rows(db: &mut PgConnection, id: Uuid) -> crate::Result<u64> {
     let mut deleted = 0;
     for table in CHILD_TABLES {
-        let result = db
-            .execute_raw(Statement::from_sql_and_values(
-                db.get_database_backend(),
-                format!("DELETE FROM {table} WHERE worker_id = $1"),
-                [id.into()],
-            ))
-            .await?;
-        deleted += result.rows_affected();
+        deleted += crate::db::erasure::delete_child_rows(db, table, id).await?;
     }
-    // Emergency-contact telecom rows hang off the emergency contacts, not
-    // off the worker, so they are swept through their parent first.
-    let telecom = db
-        .execute_raw(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "DELETE FROM worker_emergency_contact_telecom WHERE emergency_contact_id IN \
-             (SELECT id FROM worker_emergency_contacts WHERE worker_id = $1)",
-            [id.into()],
-        ))
-        .await?;
-    deleted += telecom.rows_affected();
-    let contacts = db
-        .execute_raw(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "DELETE FROM worker_emergency_contacts WHERE worker_id = $1",
-            [id.into()],
-        ))
-        .await?;
-    deleted += contacts.rows_affected();
+    let (telecom, contacts) = crate::db::erasure::delete_emergency_contacts(db, id).await?;
+    deleted += telecom + contacts;
 
     Ok(deleted)
 }
@@ -188,25 +162,16 @@ async fn destroy_child_rows<C: ConnectionTrait>(db: &C, id: Uuid) -> crate::Resu
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] if any statement fails.
-pub async fn erase<C: ConnectionTrait>(
-    db: &C,
+pub async fn erase(
+    db: &mut PgConnection,
     id: Uuid,
     actor: Option<&str>,
     ctx: &AccessContext,
     audit: &crate::db::AuditLogRepository,
 ) -> crate::Result<ErasureOutcome> {
     // Read the pre-state we report on, before destroying it.
-    let existing = db
-        .query_one_raw(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "SELECT active FROM workers WHERE id = $1",
-            [id.into()],
-        ))
-        .await?;
-    let was_active = match existing.as_ref() {
-        Some(row) => row.try_get::<bool>("", "active").unwrap_or(false),
-        None => false,
-    };
+    let existing = crate::db::erasure::worker_activity(db, id).await?;
+    let was_active = existing.unwrap_or(false);
     let found = existing.is_some();
 
     let child_rows_deleted = destroy_child_rows(db, id).await?;
@@ -220,57 +185,28 @@ pub async fn erase<C: ConnectionTrait>(
         //    verification reports as a gap rather than a mismatch, so an
         //    erased record does not masquerade as tampered.
         //    `gender` is NOT NULL, so it takes the honest `unknown`.
-        db.execute_raw(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "UPDATE workers SET \
-               gender = $2, birth_date = NULL, tax_id = NULL, \
-               worker_type = NULL, \
-               deceased = FALSE, deceased_datetime = NULL, \
-               marital_status = NULL, multiple_birth = NULL, \
-               managing_organization_id = NULL, \
-               created_by = NULL, updated_by = NULL, \
-               content_hash = NULL, content_hash_sha3 = NULL, \
-               active = FALSE, deleted_at = NOW(), deleted_by = $3, \
-               updated_at = NOW() \
-             WHERE id = $1",
-            [id.into(), TOMBSTONE_GENDER.into(), actor.into()],
-        ))
-        .await?;
+        crate::db::erasure::scrub_worker(db, id, TOMBSTONE_GENDER, actor).await?;
 
         // 3. Write back one tombstone name. Read paths assume a worker has
         //    at least one; leaving none would make an erased record a
         //    landmine rather than a clean degradation.
-        db.execute_raw(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "INSERT INTO worker_names (id, worker_id, use_type, family, given, prefix, suffix) \
-             VALUES ($1, $2, NULL, $3, ARRAY[]::text[], ARRAY[]::text[], ARRAY[]::text[])",
-            [Uuid::new_v4().into(), id.into(), TOMBSTONE_NAME.into()],
-        ))
-        .await?;
+        crate::db::erasure::insert_tombstone_name(db, id, TOMBSTONE_NAME).await?;
     }
 
     // 4. Withdraw cross-service links. A surviving `same_identity` edge
     //    would still assert that this erased record and a worker record
     //    are the same human.
-    let links = db
-        .execute_raw(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "UPDATE entity_links SET deleted_at = NOW() \
-             WHERE from_pid = $1 AND deleted_at IS NULL",
-            [id.into()],
-        ))
-        .await?;
-    let links_withdrawn = links.rows_affected();
+    let links_withdrawn = crate::db::erasure::withdraw_links(db, id).await?;
 
     // 5. Destroy the audit content, keeping the chain linkage.
-    let audit_rows_redacted = audit.redact_for_entity(db, id).await?;
+    let audit_rows_redacted = audit.redact_for_entity(&mut *db, id).await?;
 
     // 6. Append the accountability record for the erasure itself. It is
     //    chained normally and is *not* redacted — it is the controller's
     //    own record and holds no subject data.
     audit
         .log_erasure(
-            db,
+            &mut *db,
             id,
             actor,
             ctx.client,

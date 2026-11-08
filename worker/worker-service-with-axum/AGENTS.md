@@ -58,6 +58,47 @@ DATABASE_URL=… cargo test --test api_integration_test
 cargo bench
 ```
 
+## Database: sqlx, all SQL in `src/db/`
+
+Since 2026-11-08 this crate is on sqlx, not SeaORM (spec §10, §13 SQ-1;
+the repo's `spec/tech-stack/index.md` §5; person-service was the
+template). The rules that keep it reviewable:
+
+- Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`
+  literal in `src/db/`. Handlers, the gRPC server, the relay, compliance
+  and tasks call functions there; they never hold SQL. Tests may run
+  their own ground-truth SQL.
+- No `QueryBuilder`, `raw_sql` or `AssertSqlSafe`. The clippy stage
+  refuses them unless `ci/sql-allowlist.txt` names the file. Write an
+  optional filter as `($1::text IS NULL OR col = $1)` instead; a choice
+  of table is a `match` over literal statements (`db::erasure`).
+- A helper running several statements takes `&mut PgConnection` or an
+  `axa::sqlx::Db`, so the outbox, audit and child rows commit in the
+  caller's transaction. The audit chain's lock, head read and insert run
+  on one connection.
+- Every worker write stamps its digests over the record **as stored**,
+  read back in its own transaction (`stamp_digests`, INT-V1). A write
+  path that skips it is a false tamper report waiting to happen;
+  `tests/api_integration_test.rs` `a_written_record_verifies` guards it.
+  An assessment is hashed over the row it writes, in one statement.
+- Builds read `.sqlx/` with `SQLX_OFFLINE=true`. After changing a query
+  or a migration, migrate a database and run `SQLX_OFFLINE=false cargo
+  sqlx prepare -- --all-targets`, then commit `.sqlx/`. CI's `test-db`
+  stage runs `cargo sqlx prepare --check`.
+- Migrations are `migrations/<version>_<name>.up.sql` / `.down.sql`,
+  embedded by `sqlx::migrate!` as `db::MIGRATOR`. Never edit an applied
+  one: sqlx checks each file's checksum and refuses a changed one.
+- Timestamps are `chrono` in the worker rows. Do not turn on sqlx's
+  `time` feature: with both, sqlx 0.9.0's macros warn on every timestamp
+  column. The audit trail, assessments, outbox, entity links and review
+  queue keep their `time` types above `src/db/`, filled from `chrono`
+  twins (`*Raw` in `db::models`), so the chain and assessment pre-images
+  and the wire are unchanged.
+- Enum columns are written in the spellings they always had, including
+  the `Debug` ones the CHECK constraints refuse (spec §13 SQ-1, WK-D1).
+  Fixing that is a behaviour change with its own task, not part of a
+  persistence edit.
+
 ## Durable event bus relay (Fluvio)
 
 The Phase-3 outbox relay (`src/relay.rs`, default-off via

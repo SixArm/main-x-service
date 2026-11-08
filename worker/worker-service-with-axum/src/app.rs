@@ -13,7 +13,6 @@ use axa::{
     task::Tasks,
 };
 use axum::Router as AxumRouter;
-use migration::{Migrator, MigratorTrait};
 use std::sync::OnceLock;
 
 use crate::{
@@ -193,6 +192,13 @@ impl App {
     }
 }
 
+/// A failed migration, as axa's error. `MigrateError` has no `From` into
+/// it, so its message is carried instead.
+#[allow(clippy::needless_pass_by_value)]
+fn migrate_error(error: axa::sqlx::sqlx::migrate::MigrateError) -> Error {
+    Error::Message(format!("migration: {error}"))
+}
+
 /// Service defaults. The environment overrides them; see `axa::config`.
 fn defaults() -> Defaults {
     Defaults {
@@ -230,13 +236,41 @@ impl App {
         axa::middleware::apply(router, &ctx.config.http)
     }
 
-    /// Run a database command.
+    /// Apply pending migrations ([`crate::db::MIGRATOR`]).
+    ///
+    /// # Errors
+    ///
+    /// Fails when a migration fails, or an applied one no longer matches
+    /// its file.
+    pub async fn migrate(ctx: &AppContext) -> Result<()> {
+        axa::sqlx::migrate(&ctx.db, &crate::db::MIGRATOR)
+            .await
+            .map_err(migrate_error)
+    }
+
+    /// Run a database command. `down` and `reset` destroy data, so
+    /// `axa::cli::parse` has already refused them outside development and
+    /// test.
     async fn db(ctx: &AppContext, command: DbCommand) -> Result<()> {
+        let migrator = &crate::db::MIGRATOR;
         match command {
-            DbCommand::Migrate => Migrator::up(&ctx.db, None).await?,
-            DbCommand::Down { steps } => Migrator::down(&ctx.db, Some(steps)).await?,
-            DbCommand::Reset => Migrator::fresh(&ctx.db).await?,
-            DbCommand::Status => Migrator::status(&ctx.db).await?,
+            DbCommand::Migrate => Self::migrate(ctx).await?,
+            DbCommand::Down { steps } => axa::sqlx::revert(&ctx.db, migrator, steps)
+                .await
+                .map_err(migrate_error)?,
+            DbCommand::Reset => axa::sqlx::dangerously_recreate(&ctx.db, migrator)
+                .await
+                .map_err(migrate_error)?,
+            DbCommand::Status => {
+                for migration in axa::sqlx::status(&ctx.db, migrator).await? {
+                    let state = if migration.applied {
+                        "applied"
+                    } else {
+                        "pending"
+                    };
+                    println!("{}\t{state}\t{}", migration.version, migration.description);
+                }
+            }
             DbCommand::Truncate => return Err(Error::string("this service has no truncate")),
         }
         Ok(())
@@ -270,7 +304,7 @@ impl App {
             axa::logger::init(env!("CARGO_CRATE_NAME"), &ctx.config.logger);
         }
         if ctx.config.database.auto_migrate && !matches!(cli.command, Command::Db { .. }) {
-            Migrator::up(&ctx.db, None).await?;
+            Self::migrate(&ctx).await?;
         }
         match cli.command {
             Command::Check => Ok(()),
@@ -302,7 +336,7 @@ impl TestApp for App {
         let environment = Environment::Test;
         let config = ServiceConfig::from_env(&environment, &defaults())?;
         let ctx = Self::context(environment, config).await?;
-        Migrator::up(&ctx.db, None).await.map_err(Error::from)?;
+        Self::migrate(&ctx).await?;
         let router = Self::router(&ctx).await?;
         Ok(BootResult {
             app_context: ctx,

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workers SET content_hash = $2, content_hash_sha3 = $3, content_mac = $4\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "27805d954a852dc42add7729a2679dc7a173c44d6650596dee5b71b1d76ba167"
+}

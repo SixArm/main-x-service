@@ -8,11 +8,11 @@
 
 #[cfg(feature = "paseto")]
 use authentication_verifier::Verifier;
-use sea_orm::DatabaseConnection;
+use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::config::Config;
-use crate::db::{AuditLogRepository, SeaOrmWorkerRepository, WorkerRepository};
+use crate::db::{AuditLogRepository, PgWorkerRepository, WorkerRepository};
 use crate::matching::{ProbabilisticMatcher, WorkerMatcher};
 use crate::search::SearchEngine;
 use crate::streaming::{EventProducer, InMemoryEventPublisher};
@@ -20,8 +20,8 @@ use crate::streaming::{EventProducer, InMemoryEventPublisher};
 /// Shared application state
 #[derive(Clone)]
 pub struct AppState {
-    /// Database connection
-    pub db: DatabaseConnection,
+    /// Database connection pool
+    pub db: PgPool,
 
     /// Worker repository for database operations
     pub worker_repository: Arc<dyn WorkerRepository>,
@@ -47,13 +47,13 @@ impl AppState {
     /// server owns. Internally it wires the secondary services together: an
     /// [`InMemoryEventPublisher`] is created first, then an
     /// [`AuditLogRepository`] over a clone of `db`, and finally a
-    /// [`SeaOrmWorkerRepository`] configured with both so every write emits an
+    /// [`PgWorkerRepository`] configured with both so every write emits an
     /// event and an audit entry. All services are wrapped in `Arc`s (and the
     /// repository/matcher boxed as trait objects) so the returned [`AppState`]
     /// is cheap to clone into Axum's per-request state.
     #[must_use]
     pub fn new(
-        db: DatabaseConnection,
+        db: PgPool,
         search_engine: SearchEngine,
         matcher: ProbabilisticMatcher,
         config: Config,
@@ -66,7 +66,7 @@ impl AppState {
 
         // Create worker repository with event publisher and audit log
         let worker_repository = Arc::new(
-            SeaOrmWorkerRepository::new(db.clone())
+            PgWorkerRepository::new(db.clone())
                 .with_event_publisher(event_publisher.clone())
                 .with_audit_log(audit_log.clone())
                 .with_transport(crate::streaming::transport()),

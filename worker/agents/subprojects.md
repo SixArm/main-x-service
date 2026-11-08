@@ -5,7 +5,7 @@ One entity, three subprojects, one-way dependencies:
 
 | Subproject | Role | Stack | Spec shape |
 |---|---|---|---|
-| [worker-service-with-axum](../worker-service-with-axum/) | System of record: CRUD, search, dedup, merge, audit, privacy, REST/FHIR/gRPC | Rust, axa (Axum 0.8), SeaORM + PostgreSQL 18, Tantivy, utoipa | [spec §1–§18](../worker-service-with-axum/spec/index.md) |
+| [worker-service-with-axum](../worker-service-with-axum/) | System of record: CRUD, search, dedup, merge, audit, privacy, REST/FHIR/gRPC | Rust, axa (Axum 0.8), sqlx + PostgreSQL 18, Tantivy, utoipa | [spec §1–§18](../worker-service-with-axum/spec/index.md) |
 | [worker-matcher-rust-crate](../worker-matcher-rust-crate/) | Canonical pairwise matching library (published to crates.io as `worker-matcher`) | Rust, dependency-light pure library — no IO, no `unsafe`, no async | [spec §1–§25](../worker-matcher-rust-crate/spec/index.md) |
 | [worker-front-end-with-svelte](../worker-front-end-with-svelte/) | Operator UI (SPA) over the service REST API | SvelteKit 2, Svelte 5 runes, SVAR DataGrid, Lily Headless, TypeScript strict | [spec §1–§18](../worker-front-end-with-svelte/spec/index.md) |
 

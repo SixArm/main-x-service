@@ -37,9 +37,8 @@
 //! pattern instead of introducing the axa test harness for one file.
 #![cfg(feature = "fluvio")]
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use worker_service::db::models::event_outbox;
-use worker_service::db::{SeaOrmWorkerRepository, WorkerRepository};
+use worker_service::db::outbox::Model as OutboxRow;
+use worker_service::db::{PgWorkerRepository, WorkerRepository};
 use worker_service::models::{Gender, HumanName, Worker};
 use worker_service::relay::{self, FluvioSink};
 use worker_service::streaming::EventTransport;
@@ -63,13 +62,13 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
     let endpoint = std::env::var("WORKER_FLUVIO_ENDPOINT")
         .expect("set WORKER_FLUVIO_ENDPOINT to the broker's SC address (e.g. 127.0.0.1:9103)");
 
-    let db = sea_orm::Database::connect(&database_url)
+    let db = sqlx::PgPool::connect(&database_url)
         .await
         .expect("connect to DATABASE_URL");
 
     // Durable transport, so `create` writes an outbox row in the same
     // transaction as the worker insert.
-    let repo = SeaOrmWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
+    let repo = PgWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
     let worker = repo
         .create(
             &a_worker("FluvioRelayRoundTrip"),
@@ -87,12 +86,11 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
         .expect("drain_once against the real sink");
     assert!(published >= 1, "at least this row's send should succeed");
 
-    let row = event_outbox::Entity::find()
-        .filter(event_outbox::Column::EntityPid.eq(worker.id))
-        .filter(event_outbox::Column::Kind.eq("created"))
-        .one(&db)
+    let row = OutboxRow::rows_for(&db, worker.id, Some("created"))
         .await
         .expect("load the outbox row")
+        .into_iter()
+        .next()
         .expect("the row exists");
     assert!(
         row.published_at.is_some(),

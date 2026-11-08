@@ -23,7 +23,7 @@
   `Worker` resourceType; handlers implemented and mounted on the axa
   router via `fhir_routes()` — §13 T-9 done) + gRPC
   (Create/Get/List/Delete Worker — §13 T-6 done).
-- PostgreSQL persistence via SeaORM.
+- PostgreSQL persistence via sqlx, with plain-SQL migrations.
 
 ### 2.2 Out of scope (today)
 

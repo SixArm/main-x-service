@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO worker_names (id, worker_id, use_type, family, given, prefix, suffix)\n         VALUES ($1, $2, NULL, $3, ARRAY[]::text[], ARRAY[]::text[], ARRAY[]::text[])",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9d0b48446ebf6a028544cc88c538d9ba3bb7dd35a50843d06866b532aba5220e"
+}

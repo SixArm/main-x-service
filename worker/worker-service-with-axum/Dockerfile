@@ -19,7 +19,7 @@
 FROM rust:1.97-slim AS builder
 
 # Build dependencies — `libssl-dev` for openssl-sys, `libpq-dev` for
-# the PostgreSQL C client headers SeaORM links against via sqlx.
+# the PostgreSQL C client headers (sqlx itself is pure Rust).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         libssl-dev \
@@ -41,18 +41,17 @@ COPY authentication/authentication-verifier-rust-crate authentication/authentica
 COPY link/entity-ref-rust-crate link/entity-ref-rust-crate
 
 # This crate itself: manifests first (better layer caching), then the
-# nested `migration` sub-crate (loco's sea-orm-migration bridge —
-# depended on as `migration = { path = "migration" }`), the sibling
-# `migrations/` directory of raw SQL the migration crate embeds via
-# `include_str!("../../migrations/…")`, `benches/` (Cargo.toml declares
+# plain-SQL `migrations/` that `sqlx::migrate!` embeds, the `.sqlx/`
+# query data the `query!` macros check against (no database at build
+# time), `benches/` (Cargo.toml declares
 # `[[bench]]` targets — cargo refuses to parse the manifest for ANY
 # target, including `--bin`-only builds, if a declared bench file is
 # missing), the IEC 62304 §5.3.3 SOUP register (`src/compliance/soup.rs`
 # embeds `compliance/soup.tsv` via a relative `include_str!`), then
 # sources.
 COPY worker/worker-service-with-axum/Cargo.toml worker/worker-service-with-axum/Cargo.lock worker/worker-service-with-axum/
-COPY worker/worker-service-with-axum/migration worker/worker-service-with-axum/migration
 COPY worker/worker-service-with-axum/migrations worker/worker-service-with-axum/migrations
+COPY worker/worker-service-with-axum/.sqlx worker/worker-service-with-axum/.sqlx
 COPY worker/worker-service-with-axum/benches worker/worker-service-with-axum/benches
 COPY worker/worker-service-with-axum/compliance worker/worker-service-with-axum/compliance
 COPY worker/worker-service-with-axum/src worker/worker-service-with-axum/src
@@ -60,12 +59,15 @@ COPY worker/worker-service-with-axum/src worker/worker-service-with-axum/src
 WORKDIR /app/worker/worker-service-with-axum
 
 # Build the binary target declared by src/bin/main.rs.
+# `SQLX_OFFLINE=true` makes the `query!` macros read `.sqlx/` instead of
+# connecting to a database.
+ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin worker-service
 
 # Stage 2: runtime — minimal Debian 13 slim base.
 FROM debian:13-slim
 
-# Runtime libraries. libpq5 for the SeaORM PostgreSQL connector,
+# Runtime libraries. libpq5 for the PostgreSQL connector,
 # libssl3 for openssl, ca-certificates for HTTPS chains (PASETO
 # key-set fetch), curl for the HEALTHCHECK below.
 RUN apt-get update && apt-get install -y --no-install-recommends \

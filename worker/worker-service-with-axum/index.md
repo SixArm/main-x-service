@@ -14,7 +14,7 @@ The Worker Service is an identity-registry system that maintains a centralized r
 - ✅ **Full-Text Search**: Powered by Tantivy for fast, accurate worker searches
 - ✅ **RESTful API**: Modern HTTP API with OpenAPI/Swagger documentation
 - ✅ **Event Streaming**: Real-time worker event publishing with audit logging
-- ✅ **Database Integration**: PostgreSQL with SeaORM and migrations
+- ✅ **Database Integration**: PostgreSQL with sqlx (every statement a compile-time-checked literal) and plain-SQL migrations
 - ✅ **Podman Ready**: Multi-stage container builds, Podman Compose for dev/test/prod
 - ✅ **Integration Tests**: Comprehensive test coverage
 - ✅ **Production Hardened**: Security, monitoring, and compliance features
@@ -196,7 +196,7 @@ cargo run -- start            # or: cargo run -- start
 podman compose up -d
 
 # Run migrations (first time)
-podman compose exec worker-server sea-orm-cli migrate up
+podman compose exec worker-server /app/worker-service db migrate
 
 # View logs
 podman compose logs -f
@@ -243,7 +243,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 | **Web Framework**    | Axum                                 | HTTP server and routing                  |
 | **Web Framework**    | axa                                 | HTTP server and routing                  |
 | **Database**         | PostgreSQL 18+                       | Data persistence                         |
-| **ORM**              | SeaORM                               | Async database object-relational mapper  |
+| **Database access**  | sqlx (no ORM)                        | Checked SQL literals, pool, migrations   |
 | **Search Engine**    | Tantivy                              | Full-text search indexing                |
 | **Event Streaming**  | In-Memory (extendable to Kafka/NATS) | Event publishing                         |
 | **API Docs**         | Utoipa                               | OpenAPI 3.0 specification                |
@@ -286,7 +286,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
          │               │                       │
 ┌────────▼─────┐  ┌──────▼──────┐  ┌────────────▼──────┐
 │  PostgreSQL  │  │   Tantivy   │  │  Event Stream     │
-│  (SeaORM)    │  │   Search    │  │  (In-Memory)      │
+│  (sqlx)      │  │   Search    │  │  (In-Memory)      │
 │              │  │   Index     │  │                   │
 │  - workers  │  │             │  │  - WorkerEvents  │
 │  - audit_log │  │             │  │  - Subscribers    │
@@ -368,17 +368,20 @@ cargo fix --allow-dirty
 ### Database Migrations
 
 ```bash
-# Create new migration
-sea-orm-cli migrate generate migration_name
+# Create a new migration: add a pair of plain SQL files,
+#   migrations/<version>_<name>.up.sql and .down.sql
 
 # Run pending migrations
-sea-orm-cli migrate up
+cargo run -- db migrate
 
-# Revert last migration
-sea-orm-cli migrate down
+# Revert the last migration (development and test only)
+AXA_DESTROY_DATA=true cargo run -- db down 1
 
 # Check migration status
-sea-orm-cli migrate status
+cargo run -- db status
+
+# After changing a query or a migration, regenerate and commit .sqlx/
+SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets
 ```
 
 ## API Documentation
@@ -528,7 +531,7 @@ podman build -t worker-server:v1.0.0 .
 1. Build release binary: `cargo build --release`
 2. Copy binary: `cp target/release/worker-service /opt/worker-service/`
 3. Set up environment: `cp .env.production.example /opt/worker-service/.env`
-4. Run migrations: `sea-orm-cli migrate up`
+4. Run migrations: `./worker-service db migrate`
 5. Start service: `./worker-service`
 
 ### Kubernetes (Future)
@@ -591,10 +594,16 @@ worker-service-with-axum/
 │   │   ├── fhir/          # FHIR R5 endpoints (partial)
 │   │   └── grpc/          # gRPC server (stub)
 │   ├── db/
-│   │   ├── models.rs      # Database models
-│   │   ├── schema.rs      # SeaORM schema
-│   │   ├── repositories.rs # Data access layer
-│   │   └── audit.rs       # Audit log repository
+│   │   ├── mod.rs         # Pool + `MIGRATOR` (`sqlx::migrate!`); all SQL lives in db/
+│   │   ├── models.rs      # Row structs, one per table read whole
+│   │   ├── repositories.rs # Data access layer (CRUD, merge, digest stamp)
+│   │   ├── audit.rs       # Audit log repository
+│   │   ├── assessments.rs # Workforce-assessment persistence
+│   │   ├── outbox.rs      # Transactional outbox (durable event bus)
+│   │   ├── entity_links.rs # Cross-service `entity_links` persistence
+│   │   ├── review_queue.rs # Dedup review-queue persistence
+│   │   ├── erasure.rs     # The statements of a GDPR erasure
+│   │   └── convert.rs     # chrono ⇄ time at the edge of db/
 │   ├── matching/
 │   │   ├── algorithms.rs  # Matching algorithms
 │   │   ├── scoring.rs     # Match scoring logic
@@ -612,7 +621,8 @@ worker-service-with-axum/
 │   ├── config.rs          # Configuration management
 │   ├── error.rs           # Error types
 │   └── lib.rs             # Library root
-├── migrations/            # Database migrations
+├── migrations/            # Plain SQL `<version>_<name>.{up,down}.sql`, run by `sqlx::migrate!`
+├── .sqlx/                 # Committed compile-time query data (`SQLX_OFFLINE=true`)
 ├── tests/                 # Integration tests
 ├── Dockerfile             # Production container
 ├── docker-compose.yml     # Development environment
@@ -626,7 +636,7 @@ worker-service-with-axum/
 This project was developed in 11 comprehensive phases:
 
 1. **Phase 1-6**: Core infrastructure, models, configuration
-2. **Phase 7**: Database Integration (SeaORM, PostgreSQL)
+2. **Phase 7**: Database Integration (PostgreSQL; SeaORM then, sqlx since 2026-11-08)
 3. **Phase 8**: Event Streaming & Audit Logging
 4. **Phase 9**: REST API Implementation
 5. **Phase 10**: Integration Testing
@@ -673,7 +683,7 @@ Built with excellent Rust crates:
 
 - [Tokio](https://tokio.rs/) - Async runtime
 - [Axum](https://github.com/tokio-rs/axum) - Web framework
-- [SeaORM](https://www.sea-ql.org/SeaORM/) - Async ORM and query builder
+- [sqlx](https://github.com/launchbadge/sqlx) - Async PostgreSQL driver with compile-time-checked queries
 - [Loco](https://axa/) - Web framework conventions (backend-only)
 - [OpenTelemetry](https://opentelemetry.io/) - Observability framework
 - [Tantivy](https://github.com/tantivy-search/tantivy) - Search engine

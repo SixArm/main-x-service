@@ -223,7 +223,8 @@ the outbox must behave identically, and their tests are not edited to pass.
 ### 5.4 Status
 
 This list is the one place that says which crates are on sqlx; other documents
-point here rather than repeat it.
+point here rather than repeat it. Since 2026-11-08 every service is on sqlx and
+no crate depends on SeaORM.
 
 | Crate | On | Since |
 |---|---|---|
@@ -238,7 +239,7 @@ point here rather than repeat it.
 | case | sqlx | 2026-11-08 |
 | care-pathway | sqlx | 2026-11-08 |
 | person | sqlx | 2026-11-08 |
-| worker | SeaORM, last | |
+| worker | sqlx | 2026-11-08 |
 
 Each crate on sqlx proves its schema unchanged with a `pg_dump --schema-only`
 diff against a database the old code migrated, which differs only in the

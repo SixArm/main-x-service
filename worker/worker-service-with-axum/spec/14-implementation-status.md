@@ -5,12 +5,12 @@
 | Capability | Notes |
 |---|---|
 | Project chassis | Cargo, modular architecture, 40+ dependencies |
-| Database schema | 12+ tables, SeaORM entities, indexes, audit triggers |
+| Database schema | 12+ tables, plain-SQL `sqlx::migrate!` migrations, indexes |
 | Matching | Probabilistic + deterministic; Jaro-Winkler + Levenshtein + Soundex; configurable weights |
 | Search | Tantivy 11-field index; fuzzy + phonetic + bulk + blocking |
 | REST API | 15 endpoints + OpenAPI/Swagger + CORS + structured errors |
 | FHIR R5 | `Practitioner` bidirectional conversion + search parameters; routes **mounted** via `fhir_routes()` in `App::routes`; pinned by `tests/api_integration_test.rs::test_fhir_practitioner_route_is_mounted` |
-| Repository | SeaORM CRUD with transactions, soft delete |
+| Repository | sqlx CRUD (every statement a checked literal in `src/db/`, `.sqlx/` committed) with transactions, soft delete, digests stamped over the stored record (INT-V1) |
 | Event streaming | InMemoryEventPublisher (Created / Updated / Deleted / Merged / Linked / Unlinked) |
 | Audit log | AuditLogRepository with old / new JSON + user context |
 | Duplicate detection | Real-time + explicit + batch with review queue |

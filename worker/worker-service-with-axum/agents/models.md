@@ -271,18 +271,22 @@ enforces.
 
 **File:** `src/db/models.rs`
 
-SeaORM entity modules for PostgreSQL persistence:
+Row structs for PostgreSQL persistence (one per table, read by `sqlx::query_as!`):
 
-- `workers` — Core worker table
-- `worker_names` — Worker names (primary + additional)
-- `worker_identifiers` — External identifiers
-- `worker_addresses` — Physical addresses
-- `worker_contacts` — Contact points
-- `worker_links` — Worker-to-worker links
-- `organizations` — Organization records
-- `organization_addresses` — Organization addresses
-- `organization_contacts` — Organization contacts
-- `organization_identifiers` — Organization identifiers
-- `worker_match_scores` — Match score history
-- `worker_assessments` — Workforce assessments (per-scale results as JSONB)
-- `audit_log` — HIPAA-compliant audit trail
+- `WorkerRow` — `workers`, the core worker table
+- `NameRow` — `worker_names` (primary + additional)
+- `IdentifierRow` — `worker_identifiers`
+- `AddressRow` — `worker_addresses`
+- `ContactRow` — `worker_contacts`
+- `LinkRow` — `worker_links` (worker-to-worker)
+- `DocumentRow`, `EmergencyContactRow`, `EmergencyTelecomRow` — documents, emergency contacts and their telecom
+- `worker_assessments::Model` — workforce assessments (per-scale results as JSONB)
+- `audit_log::Model` — the HIPAA-compliant, hash-chained audit trail
+- `event_outbox::Model`, `entity_links::Model` — outbox, cross-service links
+
+The `organizations` tables (and the NHS ODS reference tables) and
+`worker_match_scores` are in the schema but no code reads them; erasure
+still sweeps `worker_match_scores`.
+
+Migrations live in `migrations/` as plain SQL `<version>_<name>.up.sql` /
+`.down.sql` pairs, embedded and run by `sqlx::migrate!`.

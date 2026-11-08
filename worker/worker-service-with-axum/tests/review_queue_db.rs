@@ -16,7 +16,7 @@
 //! DATABASE_URL=postgres://…/worker_service_test cargo test --test review_queue_db -- --ignored
 //! ```
 
-use sea_orm::{ConnectionTrait, Database, Statement};
+use sqlx::PgPool;
 use uuid::Uuid;
 use worker_service::db::review_queue::{self, DecideOutcome, NewReviewItem};
 
@@ -24,7 +24,7 @@ use worker_service::db::review_queue::{self, DecideOutcome, NewReviewItem};
 #[ignore = "requires DATABASE_URL to a migrated Postgres"]
 async fn review_queue_round_trip() {
     let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
-    let db = Database::connect(&url).await.expect("connect");
+    let db = PgPool::connect(&url).await.expect("connect");
 
     let a = Uuid::new_v4();
     let b = Uuid::new_v4();
@@ -32,11 +32,12 @@ async fn review_queue_round_trip() {
     // suites), but clean up defensively in case a prior run crashed
     // mid-test — scoped to these two ids, never a blanket table wipe.
     let cleanup = || async {
-        db.execute_raw(Statement::from_sql_and_values(
-            db.get_database_backend(),
+        sqlx::query(
             "DELETE FROM review_queue WHERE record_id_a IN ($1, $2) OR record_id_b IN ($1, $2)",
-            [a.into(), b.into()],
-        ))
+        )
+        .bind(a)
+        .bind(b)
+        .execute(&db)
         .await
         .expect("cleanup");
     };

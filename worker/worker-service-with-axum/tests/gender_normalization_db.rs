@@ -18,27 +18,24 @@
 
 #![allow(clippy::expect_used)]
 
-use sea_orm::{ConnectionTrait, Database, DatabaseConnection, Statement};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 /// The migration's own SQL, so the test exercises what ships.
 const NORMALIZE_SQL: &str =
-    include_str!("../migrations/2026072300000002_normalize_worker_gender_case/up.sql");
+    include_str!("../migrations/2026072300000002_normalize_worker_gender_case.up.sql");
 
-/// The constraint PostgreSQL auto-names for the inline CHECK in
-/// `migrations/2024122800000002_create_workers/up.sql`.
-const CONSTRAINT: &str = "workers_gender_check";
+// The constraint is `workers_gender_check`, the name PostgreSQL gives the
+// inline CHECK in `migrations/2024122800000002_create_workers.up.sql`, and
+// its vocabulary is `('male', 'female', 'other', 'unknown')`. Both are
+// written into the statements below, which sqlx takes only as literals.
 
-/// The vocabulary the constraint admits.
-const VOCABULARY: &str = "('male', 'female', 'other', 'unknown')";
-
-async fn exec(db: &DatabaseConnection, sql: &str) {
-    db.execute_raw(Statement::from_string(
-        db.get_database_backend(),
-        sql.to_string(),
-    ))
-    .await
-    .unwrap_or_else(|e| panic!("exec failed: {sql}\n{e}"));
+/// Run one statement, naming it if it fails.
+async fn exec(db: &PgPool, sql: &'static str) {
+    sqlx::query(sql)
+        .execute(db)
+        .await
+        .unwrap_or_else(|e| panic!("exec failed: {sql}\n{e}"));
 }
 
 /// A legacy capitalized row is normalized, and the result is provably
@@ -47,21 +44,21 @@ async fn exec(db: &DatabaseConnection, sql: &str) {
 #[ignore = "requires DATABASE_URL to a migrated Postgres"]
 async fn normalizes_legacy_capitalized_gender_rows() {
     let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
-    let db = Database::connect(&url).await.expect("connect");
+    let db = PgPool::connect(&url).await.expect("connect");
     let planted = Uuid::new_v4();
 
     // Reproduce the affected deployment: a `workers` table with no
     // gender constraint, holding a row the old writer produced.
     exec(
         &db,
-        &format!("ALTER TABLE workers DROP CONSTRAINT IF EXISTS {CONSTRAINT}"),
+        "ALTER TABLE workers DROP CONSTRAINT IF EXISTS workers_gender_check",
     )
     .await;
-    exec(
-        &db,
-        &format!("INSERT INTO workers (id, gender) VALUES ('{planted}', 'Male')"),
-    )
-    .await;
+    sqlx::query("INSERT INTO workers (id, gender) VALUES ($1, 'Male')")
+        .bind(planted)
+        .execute(&db)
+        .await
+        .expect("plant the legacy row");
 
     // Sanity: the planted row is exactly the shape the constraint rejects.
     let before = gender_of(&db, planted).await;
@@ -77,7 +74,8 @@ async fn normalizes_legacy_capitalized_gender_rows() {
     // legal now. This would fail on the pre-migration data.
     exec(
         &db,
-        &format!("ALTER TABLE workers ADD CONSTRAINT {CONSTRAINT} CHECK (gender IN {VOCABULARY})"),
+        "ALTER TABLE workers ADD CONSTRAINT workers_gender_check \
+         CHECK (gender IN ('male', 'female', 'other', 'unknown'))",
     )
     .await;
 
@@ -85,18 +83,19 @@ async fn normalizes_legacy_capitalized_gender_rows() {
     exec(&db, NORMALIZE_SQL).await;
     assert_eq!(gender_of(&db, planted).await, "male", "re-run is a no-op");
 
-    exec(&db, &format!("DELETE FROM workers WHERE id = '{planted}'")).await;
+    sqlx::query("DELETE FROM workers WHERE id = $1")
+        .bind(planted)
+        .execute(&db)
+        .await
+        .expect("remove the planted row");
 }
 
 /// Read one worker's stored gender string.
-async fn gender_of(db: &DatabaseConnection, id: Uuid) -> String {
-    let row = db
-        .query_one_raw(Statement::from_string(
-            db.get_database_backend(),
-            format!("SELECT gender FROM workers WHERE id = '{id}'"),
-        ))
+async fn gender_of(db: &PgPool, id: Uuid) -> String {
+    sqlx::query_scalar("SELECT gender FROM workers WHERE id = $1")
+        .bind(id)
+        .fetch_optional(db)
         .await
         .expect("query")
-        .expect("the planted row exists");
-    row.try_get("", "gender").expect("gender column")
+        .expect("the planted row exists")
 }

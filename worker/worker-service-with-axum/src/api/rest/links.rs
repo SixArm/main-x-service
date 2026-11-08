@@ -43,7 +43,6 @@ use uuid::Uuid;
 
 use authentication_verifier::Action;
 
-use sea_orm::TransactionTrait;
 use time::OffsetDateTime;
 
 use super::auth::{MaybeAuthUser, audit_context_of, authorize_record, worker_resource_attrs};
@@ -301,8 +300,8 @@ fn publish_in_memory(state: &AppState, link: &EntityLinkModel, kind: EventKind) 
 /// §4.2 edge `data`, **on the given transaction** so the event commits
 /// atomically with the edge mutation (the outbox guarantee). `kind` is
 /// [`EventKind::Linked`] or [`EventKind::Unlinked`].
-async fn enqueue_link_event<C: sea_orm::ConnectionTrait>(
-    txn: &C,
+async fn enqueue_link_event(
+    txn: &mut sqlx::PgConnection,
     worker: &Worker,
     link: &EntityLinkModel,
     actor: Option<&str>,
@@ -340,9 +339,9 @@ async fn upsert_and_emit(
             Ok(link)
         }
         EventTransport::Outbox => {
-            let txn = state.db.begin().await?;
-            let link = entity_links::upsert(&txn, edge).await?;
-            enqueue_link_event(&txn, worker, &link, actor, EventKind::Linked).await?;
+            let mut txn = state.db.begin().await?;
+            let link = entity_links::upsert(&mut *txn, edge).await?;
+            enqueue_link_event(&mut txn, worker, &link, actor, EventKind::Linked).await?;
             txn.commit().await?;
             Ok(link)
         }
@@ -364,10 +363,10 @@ async fn soft_delete_and_emit(
             Ok(deleted)
         }
         EventTransport::Outbox => {
-            let txn = state.db.begin().await?;
+            let mut txn = state.db.begin().await?;
             // Capture the edge detail before the row is consumed by the delete.
-            let deleted = entity_links::soft_delete(&txn, row).await?;
-            enqueue_link_event(&txn, worker, &deleted, actor, EventKind::Unlinked).await?;
+            let deleted = entity_links::soft_delete(&mut *txn, row).await?;
+            enqueue_link_event(&mut txn, worker, &deleted, actor, EventKind::Unlinked).await?;
             txn.commit().await?;
             Ok(deleted)
         }
@@ -701,7 +700,7 @@ mod tests {
     #[ignore = "requires DATABASE_URL to a migrated Postgres"]
     async fn round_trip_upsert_bulk_list_delete() {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
-        let db = sea_orm::Database::connect(&url).await.expect("connect");
+        let db = sqlx::PgPool::connect(&url).await.expect("connect");
         let from_pid = Uuid::new_v4();
         let to_ref = format!("person:{}", Uuid::new_v4());
         let (kind, to) = validate_edge("same_identity", &to_ref).expect("valid");
@@ -754,12 +753,11 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL to a migrated Postgres"]
     async fn linked_event_is_enqueued_to_the_outbox() {
-        use crate::db::models::event_outbox;
+        use crate::db::outbox::Model as OutboxRow;
         use crate::models::{Gender, HumanName};
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, TransactionTrait};
 
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
-        let db = sea_orm::Database::connect(&url).await.expect("connect");
+        let db = sqlx::PgPool::connect(&url).await.expect("connect");
         let from_pid = Uuid::new_v4();
         let to_ref = format!("person:{}", Uuid::new_v4());
         let (kind, to) = validate_edge("same_identity", &to_ref).expect("valid");
@@ -785,19 +783,18 @@ mod tests {
         );
 
         // The `outbox` path: upsert + enqueue the `linked` envelope in one txn.
-        let txn = db.begin().await.expect("begin");
-        let link = entity_links::upsert(&txn, &edge).await.expect("upsert");
-        enqueue_link_event(&txn, &worker, &link, Some("actor-1"), EventKind::Linked)
+        let mut txn = db.begin().await.expect("begin");
+        let link = entity_links::upsert(&mut *txn, &edge)
+            .await
+            .expect("upsert");
+        enqueue_link_event(&mut txn, &worker, &link, Some("actor-1"), EventKind::Linked)
             .await
             .expect("enqueue linked event");
         txn.commit().await.expect("commit");
 
         // A `linked` outbox row exists for this originating worker, carrying
         // the §4.2 edge detail in its payload `data`.
-        let rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(from_pid))
-            .filter(event_outbox::Column::Kind.eq("linked"))
-            .all(&db)
+        let rows = OutboxRow::rows_for(&db, from_pid, Some("linked"))
             .await
             .expect("query outbox");
         let row = rows.first().expect("a linked outbox row for the worker");

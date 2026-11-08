@@ -3,39 +3,34 @@
 //!
 //! [`OutboxInsert::from_envelope`] is the **pure** envelope→row mapping
 //! (unit-testable DB-free). [`OutboxInsert::insert_on`] performs the
-//! in-transaction `INSERT` — it is generic over
-//! [`ConnectionTrait`](sea_orm::ConnectionTrait) so the repository can
-//! pass its **own** `&DatabaseTransaction`, giving the entity write and
-//! the event the same commit boundary. This genericity lives on the
-//! plain `OutboxInsert` helper, **not** on the `dyn`-object-safe
-//! [`WorkerRepository`](crate::db::WorkerRepository) trait (whose methods
-//! cannot be generic and stay object-safe).
+//! in-transaction `INSERT` on a caller-supplied `&mut PgConnection` — the
+//! repository passes its **own** open transaction, giving the entity write
+//! and the event the same commit boundary. This lives on the plain
+//! `OutboxInsert` helper, **not** on the `dyn`-object-safe
+//! [`WorkerRepository`](crate::db::WorkerRepository) trait.
 //!
 //! [`Model::recent`] projects the last N rows to the frozen operator
 //! [`EventView`] shape; [`Model::unpublished`] / [`Model::mark_published`]
-//! are the Phase-3 relay worker's poll + ack (roadmap — the relay itself
-//! is not built yet).
+//! are the relay's poll + ack, and [`Model::purge_published`] its
+//! retention sweep.
 
-use sea_orm::sea_query::Expr;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set,
-};
+use sqlx::{PgConnection, PgPool};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+use super::convert::offset_to_ts;
+use super::models::{OutboxRaw, event_outbox};
+use super::to_i64;
 use crate::Result;
-use crate::db::models::event_outbox;
 use crate::streaming::{Envelope, EventKind, EventView};
 
 pub use event_outbox::Model;
 
 /// The column values for one outbox row, derived from a canonical
-/// [`Envelope`] plus the enqueue timestamp. Kept as a plain struct
-/// (separate from the `SeaORM` `ActiveModel`) so the derivation — pid
-/// parse, kind token, full-envelope JSON payload — is unit-testable
-/// without a database. [`OutboxInsert::insert_on`] turns it into the
-/// `ActiveModel` and inserts it on a caller-supplied connection.
+/// [`Envelope`] plus the enqueue timestamp. Kept as a plain struct so the
+/// derivation — pid parse, kind token, full-envelope JSON payload — is
+/// unit-testable without a database. [`OutboxInsert::insert_on`] inserts
+/// it on a caller-supplied connection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutboxInsert {
     /// Envelope dedup id.
@@ -113,41 +108,37 @@ impl OutboxInsert {
         Self::from_envelope(&env, OffsetDateTime::now_utc())
     }
 
-    /// Build the `SeaORM` `ActiveModel` for this row (`id` auto,
-    /// `published_at` starts `NULL`). Split out so [`Self::insert_on`]
-    /// can take `&self`.
-    fn active_model(&self) -> event_outbox::ActiveModel {
-        event_outbox::ActiveModel {
-            event_id: Set(self.event_id),
-            entity: Set(self.entity.clone()),
-            entity_pid: Set(self.entity_pid),
-            kind: Set(self.kind.clone()),
-            occurred_at: Set(self.occurred_at),
-            actor: Set(self.actor.clone()),
-            schema_version: Set(self.schema_version),
-            payload: Set(self.payload.clone()),
-            published_at: Set(None),
-            ..Default::default()
-        }
-    }
-
-    /// Durably enqueue this event **on the given connection** — pass a
-    /// `&DatabaseTransaction` to share the entity mutation's transaction
-    /// (the outbox guarantee: no committed change without its event, and
-    /// vice versa).
-    ///
-    /// Generic over [`ConnectionTrait`](sea_orm::ConnectionTrait), so it
-    /// accepts either the pooled connection or an open transaction. This
-    /// is the seam that lets a `dyn`-trait repository thread the outbox
-    /// insert into its own `begin()`…`commit()`.
+    /// Durably enqueue this event **on the given connection** — pass an
+    /// open transaction to share the entity mutation's transaction (the
+    /// outbox guarantee: no committed change without its event, and vice
+    /// versa). `id` is assigned by Postgres and `published_at` starts
+    /// `NULL`.
     ///
     /// # Errors
     ///
     /// Returns [`Error::Database`](crate::Error::Database) if the insert
     /// fails (e.g. a duplicate `event_id`).
-    pub async fn insert_on<C: ConnectionTrait>(&self, conn: &C) -> Result<Model> {
-        let row = self.active_model().insert(conn).await?;
-        Ok(row)
+    pub async fn insert_on(&self, conn: &mut PgConnection) -> Result<Model> {
+        let row = sqlx::query_as!(
+            OutboxRaw,
+            "INSERT INTO event_outbox
+                 (event_id, entity, entity_pid, kind, occurred_at, actor, schema_version,
+                  payload, published_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL)
+             RETURNING id, event_id, entity, entity_pid, kind, occurred_at, actor,
+                       schema_version, payload, published_at",
+            self.event_id,
+            self.entity,
+            self.entity_pid,
+            self.kind,
+            offset_to_ts(self.occurred_at),
+            self.actor,
+            self.schema_version,
+            self.payload,
+        )
+        .fetch_one(conn)
+        .await?;
+        Ok(row.into())
     }
 }
 
@@ -163,72 +154,111 @@ impl Model {
     ///
     /// Returns [`Error::Database`](crate::Error::Database) if the query
     /// fails.
-    pub async fn recent(db: &DatabaseConnection, limit: u64) -> Result<Vec<EventView>> {
-        let rows = event_outbox::Entity::find()
-            .order_by_desc(event_outbox::Column::Id)
-            .limit(limit)
-            .all(db)
-            .await?;
-        let views = rows
-            .iter()
-            .filter_map(|row| serde_json::from_value::<Envelope>(row.payload.clone()).ok())
+    pub async fn recent(db: &PgPool, limit: u64) -> Result<Vec<EventView>> {
+        let payloads = sqlx::query_scalar!(
+            "SELECT payload FROM event_outbox ORDER BY id DESC LIMIT $1",
+            to_i64(limit),
+        )
+        .fetch_all(db)
+        .await?;
+        let views = payloads
+            .into_iter()
+            .filter_map(|payload| serde_json::from_value::<Envelope>(payload).ok())
             .map(|env| EventView::from(&env))
             .collect();
         Ok(views)
     }
 
-    /// The Phase-3 relay poll: the oldest unpublished rows in id order,
-    /// capped at `limit`. Rows held by another relay are skipped, and stay
-    /// locked until the caller's transaction ends, so run this in the
-    /// transaction that marks them published.
-    /// Unused until the Fluvio relay lands (roadmap).
+    /// The relay poll: the oldest unpublished rows in id order, capped at
+    /// `limit`, **claimed** with `FOR UPDATE SKIP LOCKED` (SEC-B6). Must be
+    /// called inside a transaction (the relay's): the row lock is what
+    /// stops two parallel relay instances from both selecting and
+    /// double-shipping the same rows — the second instance skips the
+    /// locked rows.
     ///
     /// # Errors
     ///
     /// Returns [`Error::Database`](crate::Error::Database) if the query
     /// fails.
-    pub async fn unpublished<C: ConnectionTrait>(db: &C, limit: u64) -> Result<Vec<Self>> {
-        let rows = unpublished_query(limit).all(db).await?;
-        Ok(rows)
+    pub async fn unpublished(conn: &mut PgConnection, limit: u64) -> Result<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            OutboxRaw,
+            "SELECT id, event_id, entity, entity_pid, kind, occurred_at, actor,
+                    schema_version, payload, published_at
+             FROM event_outbox
+             WHERE published_at IS NULL
+             ORDER BY id ASC
+             LIMIT $1
+             FOR UPDATE SKIP LOCKED",
+            to_i64(limit),
+        )
+        .fetch_all(conn)
+        .await?;
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    /// The Phase-3 relay ack: stamp `published_at = now()` on the given
-    /// ids after a successful bus send. Returns the number of rows
-    /// updated; a no-op on an empty slice. Unused until the relay lands.
+    /// The relay ack: stamp `published_at = now()` on the given ids after a
+    /// successful bus send. Returns the number of rows updated; a no-op on
+    /// an empty slice.
     ///
     /// # Errors
     ///
     /// Returns [`Error::Database`](crate::Error::Database) if the update
     /// fails.
-    pub async fn mark_published<C: ConnectionTrait>(db: &C, ids: &[i64]) -> Result<u64> {
+    pub async fn mark_published(conn: &mut PgConnection, ids: &[i64]) -> Result<u64> {
         if ids.is_empty() {
             return Ok(0);
         }
-        let res = event_outbox::Entity::update_many()
-            .col_expr(event_outbox::Column::PublishedAt, Expr::current_timestamp())
-            .filter(event_outbox::Column::Id.is_in(ids.iter().copied()))
-            .exec(db)
-            .await?;
-        Ok(res.rows_affected)
+        let done = sqlx::query!(
+            "UPDATE event_outbox SET published_at = CURRENT_TIMESTAMP WHERE id = ANY($1)",
+            ids,
+        )
+        .execute(conn)
+        .await?;
+        Ok(done.rows_affected())
+    }
+
+    /// The relay's retention sweep: delete rows published before `cutoff`.
+    /// Unpublished rows are never touched.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Database`](crate::Error::Database) if the delete
+    /// fails.
+    pub async fn purge_published(db: &PgPool, cutoff: OffsetDateTime) -> Result<u64> {
+        let done = sqlx::query!(
+            "DELETE FROM event_outbox WHERE published_at IS NOT NULL AND published_at < $1",
+            offset_to_ts(cutoff),
+        )
+        .execute(db)
+        .await?;
+        Ok(done.rows_affected())
+    }
+
+    /// Every outbox row for one record and kind, oldest first — a
+    /// ground-truth read for tests.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Database`](crate::Error::Database) if the query
+    /// fails.
+    pub async fn rows_for(db: &PgPool, entity_pid: Uuid, kind: Option<&str>) -> Result<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            OutboxRaw,
+            "SELECT id, event_id, entity, entity_pid, kind, occurred_at, actor,
+                    schema_version, payload, published_at
+             FROM event_outbox
+             WHERE entity_pid = $1 AND ($2::text IS NULL OR kind = $2)
+             ORDER BY id ASC",
+            entity_pid,
+            kind,
+        )
+        .fetch_all(db)
+        .await?;
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 }
 
-/// The relay's poll. `FOR UPDATE SKIP LOCKED` is what stops two relays
-/// shipping one row.
-fn unpublished_query(limit: u64) -> sea_orm::Select<event_outbox::Entity> {
-    event_outbox::Entity::find()
-        .filter(event_outbox::Column::PublishedAt.is_null())
-        .order_by_asc(event_outbox::Column::Id)
-        .limit(limit)
-        .lock_with_behavior(
-            sea_orm::sea_query::LockType::Update,
-            sea_orm::sea_query::LockBehavior::SkipLocked,
-        )
-}
-
-/// DB-free pins for the pure envelope→row mapping: every field maps, the
-/// full envelope survives as the payload, a non-UUID pid is rejected, and
-/// the kind tokens match the envelope's lowercase serde form.
 #[cfg(test)]
 mod tests {
     use super::OutboxInsert;
@@ -308,15 +338,52 @@ mod tests {
     }
 }
 
+/// DB-gated (`#[ignore]`) proof of the relay poll's lock behaviour:
+/// rows one relay holds are invisible to a second relay polling at the
+/// same time (SEC-B6). Needs a migrated `PostgreSQL` via `DATABASE_URL`.
+/// It replaces a pin on the SQL text `SeaORM` generated.
 #[cfg(test)]
 mod relay_poll {
-    use sea_orm::{DbBackend, QueryTrait};
+    use super::{Model, OutboxInsert};
+    use crate::models::{Gender, HumanName, Worker};
+    use crate::streaming::EventKind;
 
-    #[test]
-    fn the_poll_skips_rows_another_relay_holds() {
-        let sql = super::unpublished_query(10)
-            .build(DbBackend::Postgres)
-            .to_string();
-        assert!(sql.ends_with("FOR UPDATE SKIP LOCKED"), "{sql}");
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn the_poll_skips_rows_another_relay_holds() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let worker = Worker::new(
+            HumanName {
+                use_type: None,
+                family: "RelayPollLockFixture".to_string(),
+                given: vec![],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Unknown,
+        );
+        let row = OutboxInsert::for_event(&worker, EventKind::Created).unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let inserted = row.insert_on(&mut conn).await.unwrap();
+        drop(conn);
+
+        // Relay one claims every unpublished row, and keeps them locked.
+        let mut first = pool.begin().await.unwrap();
+        let claimed = Model::unpublished(&mut first, 10_000).await.unwrap();
+        assert!(
+            claimed.iter().any(|r| r.id == inserted.id),
+            "relay one claims the row"
+        );
+
+        // Relay two, polling meanwhile, must not see that row.
+        let mut second = pool.begin().await.unwrap();
+        let seen = Model::unpublished(&mut second, 10_000).await.unwrap();
+        assert!(
+            seen.iter().all(|r| r.id != inserted.id),
+            "a row another relay holds is skipped"
+        );
+        second.rollback().await.unwrap();
+        first.rollback().await.unwrap();
     }
 }

@@ -5,7 +5,8 @@ entity-level invariant.
 
 ### 10.1 Service (system of record)
 
-- **PostgreSQL 18** via SeaORM with migrations: 12+ tables —
+- **PostgreSQL 18** via sqlx (no ORM; every statement a checked literal
+  in `src/db/`) with plain-SQL migrations: 12+ tables —
   `workers`, `worker_names`, `worker_identifiers`,
   `worker_addresses`, `worker_contacts`, `worker_links`,
   `worker_match_scores`, organization tables, and the
@@ -26,8 +27,9 @@ lines, 23 `CREATE TABLE`s) is a **hand-written, point-in-time
 reading aid** at the entity root: a fully-normalised PostgreSQL
 rendition of the service schema (JSONB kept only for audit snapshots
 and match-score breakdowns; word lists as `TEXT[]`). The service
-crate's migrations (`migrations/*/up.sql` + the SeaORM `migration/`
-crate) are **authoritative**; the snapshot is not executed, not
+crate's migrations (`migrations/*.up.sql`, run by `sqlx::migrate!`;
+until 2026-11-08 wrapped by a SeaORM `migration/` crate) are
+**authoritative**; the snapshot is not executed, not
 generated, and not checked by anything.
 
 **No regeneration story exists** (verified 2026-06-13: no script,

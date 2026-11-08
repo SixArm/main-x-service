@@ -11,14 +11,14 @@ mod common;
 
 use axa::testing::{TestServer, request};
 use axum::http::{HeaderName, HeaderValue};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use serial_test::serial;
+use sqlx::PgPool;
 use uuid::Uuid;
 use worker_service::app::App;
 use worker_service::compliance::{disclosure, erasure};
 use worker_service::config::Config;
-use worker_service::db::models::audit_log;
+use worker_service::db::AuditLogRepository;
 
 /// A worker the duplicate check cannot match to one from an earlier run: a
 /// matching row left by a failed run would answer `409` before any audit.
@@ -48,11 +48,9 @@ fn unique_worker() -> Value {
 }
 
 /// The addresses on the rows for `entity_id` with `action`.
-async fn addresses(db: &DatabaseConnection, entity_id: Uuid, action: &str) -> Vec<Option<String>> {
-    audit_log::Entity::find()
-        .filter(audit_log::Column::EntityId.eq(entity_id))
-        .filter(audit_log::Column::Action.eq(action))
-        .all(db)
+async fn addresses(db: &PgPool, entity_id: Uuid, action: &str) -> Vec<Option<String>> {
+    AuditLogRepository::new(db.clone())
+        .rows_for(None, entity_id, Some(action))
         .await
         .unwrap()
         .into_iter()

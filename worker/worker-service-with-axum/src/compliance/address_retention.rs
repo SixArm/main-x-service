@@ -25,7 +25,7 @@
 
 use std::time::Duration;
 
-use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, Statement, Value};
+use sqlx::PgPool;
 
 /// The setting, in whole days. `0` keeps nothing past the next sweep.
 pub const RETENTION_ENV: &str = "WORKER_AUDIT_ADDRESS_RETENTION_DAYS";
@@ -35,18 +35,6 @@ pub const DEFAULT_RETENTION_DAYS: i32 = 7;
 
 /// How often a process sweeps, so that an address goes within this of its limit.
 const SWEEP_INTERVAL: Duration = Duration::from_hours(1);
-
-/// `$1` is the retention in days.
-const SCRUB: &str = "UPDATE audit_log SET ip_address = NULL, ip_salt = NULL
-    WHERE ip_address IS NOT NULL
-      AND \"timestamp\" < now() - make_interval(days => $1)
-      AND (ip_commitment IS NOT NULL OR hash IS NULL OR redacted_at IS NOT NULL)";
-
-/// `$1` is the retention in days.
-const UNSCRUBBABLE: &str = "SELECT count(*) AS n FROM audit_log
-    WHERE ip_address IS NOT NULL
-      AND \"timestamp\" < now() - make_interval(days => $1)
-      AND ip_commitment IS NULL AND hash IS NOT NULL AND redacted_at IS NULL";
 
 /// The retention from its setting. Unset or empty is the default.
 ///
@@ -67,36 +55,27 @@ pub fn retention_days(raw: Option<&str>) -> Result<i32, String> {
     }
 }
 
-/// Remove addresses older than `days`, returning how many went.
+/// Remove addresses older than `days`, returning how many went. The
+/// statement is [`crate::db::audit::scrub_addresses`].
 ///
 /// # Errors
 ///
 /// Returns the database's error.
-pub async fn scrub<C: ConnectionTrait>(conn: &C, days: i32) -> Result<u64, DbErr> {
-    let statement = Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Postgres,
-        SCRUB,
-        [Value::from(days)],
-    );
-    Ok(conn.execute_raw(statement).await?.rows_affected())
+pub async fn scrub(conn: &PgPool, days: i32) -> crate::Result<u64> {
+    crate::db::audit::scrub_addresses(conn, days).await
 }
 
-/// How many rows past `days` still hold an address the chain binds.
+/// How many rows past `days` still hold an address the chain binds. The
+/// statement is [`crate::db::audit::count_unscrubbable_addresses`].
 ///
 /// # Errors
 ///
 /// Returns the database's error.
-pub async fn unscrubbable<C: ConnectionTrait>(conn: &C, days: i32) -> Result<i64, DbErr> {
-    let statement = Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Postgres,
-        UNSCRUBBABLE,
-        [Value::from(days)],
-    );
-    let row = conn.query_one_raw(statement).await?;
-    row.map_or(Ok(0), |row| row.try_get("", "n"))
+pub async fn unscrubbable(conn: &PgPool, days: i32) -> crate::Result<i64> {
+    crate::db::audit::count_unscrubbable_addresses(conn, days).await
 }
 
-async fn run(db: DatabaseConnection, days: i32) {
+async fn run(db: PgPool, days: i32) {
     let mut ticker = tokio::time::interval(SWEEP_INTERVAL);
     loop {
         ticker.tick().await;
@@ -121,7 +100,7 @@ async fn run(db: DatabaseConnection, days: i32) {
 /// # Errors
 ///
 /// A bad [`RETENTION_ENV`].
-pub fn spawn(db: DatabaseConnection) -> axa::Result<()> {
+pub fn spawn(db: PgPool) -> axa::Result<()> {
     let raw = std::env::var(RETENTION_ENV).ok();
     let days = retention_days(raw.as_deref()).map_err(|message| axa::Error::string(&message))?;
     tokio::spawn(run(db, days));

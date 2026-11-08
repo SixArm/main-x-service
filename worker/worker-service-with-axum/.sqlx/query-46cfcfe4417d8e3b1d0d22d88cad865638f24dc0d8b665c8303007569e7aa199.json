@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE audit_log\n               SET new_values = jsonb_set(new_values, '{family_name}', '\"Tampered\"')\n               WHERE new_values IS NOT NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "46cfcfe4417d8e3b1d0d22d88cad865638f24dc0d8b665c8303007569e7aa199"
+}

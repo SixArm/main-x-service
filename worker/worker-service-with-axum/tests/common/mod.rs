@@ -61,8 +61,8 @@ pub async fn create_test_router() -> Router {
         .expect("boot_test builds the router")
 }
 
-/// The real application router over a **disconnected** `SeaORM` connection and
-/// a throwaway search index, so no live database is required.
+/// The real application router over a **lazy** pool that never connects
+/// and a throwaway search index, so no live database is required.
 ///
 /// Suitable only for tests that assert on routing/extractor behaviour *before*
 /// any database access (e.g. a malformed path that the `Path<Uuid>` extractor
@@ -82,7 +82,10 @@ pub async fn create_test_router_no_db() -> Router {
     let environment = Environment::Test;
     let config = axa::config::Config::from_env(&environment, &Defaults::default())
         .expect("Failed to load test config");
-    let db = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
+    // Nothing connects until a query runs, and nothing here runs one.
+    let db = sqlx::postgres::PgPoolOptions::new()
+        .connect_lazy("postgres://disconnected.invalid/none")
+        .expect("a lazy pool");
     App::router(&AppContext::new(environment, db, config))
         .await
         .expect("Failed to build the router")
@@ -104,7 +107,7 @@ pub fn unique_worker_name(suffix: &str) -> String {
 /// `404` proves only that the route is unreachable, not that the rows are
 /// gone, and "the data is unreachable" is exactly the weaker claim
 /// erasure is not allowed to settle for. Ground truth needs SQL.
-pub async fn db() -> sea_orm::DatabaseConnection {
+pub async fn db() -> sqlx::PgPool {
     let config = Config::from_env().expect("Failed to load test config");
     create_connection(&config.database)
         .await
@@ -116,18 +119,12 @@ pub async fn db() -> sea_orm::DatabaseConnection {
 /// Lives here rather than nested inside a test so it is defined before
 /// use (clippy's `items_after_statements`) and is shared by every
 /// ground-truth assertion.
-pub async fn count_rows(conn: &sea_orm::DatabaseConnection, sql: &str, id: uuid::Uuid) -> i64 {
-    use sea_orm::ConnectionTrait as _;
-    conn.query_one_raw(sea_orm::Statement::from_sql_and_values(
-        sea_orm::DatabaseBackend::Postgres,
-        sql,
-        [id.into()],
-    ))
-    .await
-    .expect("count query")
-    .expect("one row")
-    .try_get::<i64>("", "n")
-    .expect("n")
+pub async fn count_rows(conn: &sqlx::PgPool, sql: &'static str, id: uuid::Uuid) -> i64 {
+    sqlx::query_scalar(sql)
+        .bind(id)
+        .fetch_one(conn)
+        .await
+        .expect("count query")
 }
 
 /// Hard-delete a record and everything hanging off it.
@@ -141,20 +138,17 @@ pub async fn count_rows(conn: &sea_orm::DatabaseConnection, sql: &str, id: uuid:
 ///
 /// A hard delete, not the API's soft delete: the point is to remove the
 /// evidence, and a soft-deleted row still carries its mismatched hash.
-pub async fn purge_record(conn: &sea_orm::DatabaseConnection, id: uuid::Uuid) {
-    use sea_orm::ConnectionTrait as _;
+pub async fn purge_record(conn: &sqlx::PgPool, id: uuid::Uuid) {
     for sql in [
         "DELETE FROM worker_assessments WHERE worker_id = $1",
         // Deleting the parent cascades to the child tables that declare
         // a foreign key; any table that does not is listed above.
         "DELETE FROM workers WHERE id = $1",
     ] {
-        conn.execute_raw(sea_orm::Statement::from_sql_and_values(
-            sea_orm::DatabaseBackend::Postgres,
-            sql,
-            [id.into()],
-        ))
-        .await
-        .expect("purge test record");
+        sqlx::query(sql)
+            .bind(id)
+            .execute(conn)
+            .await
+            .expect("purge test record");
     }
 }

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM audit_log WHERE seq = (SELECT MIN(seq) + 1 FROM audit_log)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "db50156b8c79a7227573906d19e06c179316488f727286f2f3536402e2a33461"
+}

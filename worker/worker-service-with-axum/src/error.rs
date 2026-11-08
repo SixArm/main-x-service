@@ -12,14 +12,14 @@ use thiserror::Error;
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// The crate-wide error type. Every variant carries a human-readable message
-/// (via `thiserror`'s `Display`), and [`Database`](Error::Database) also wraps
-/// the underlying `SeaORM` error for source-chain inspection.
+/// (via `thiserror`'s `Display`); [`Database`](Error::Database) carries the
+/// driver's message, and [`sqlx::Error`] converts into it with `?`.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// A database operation failed; wraps the `SeaORM` error verbatim. The
+    /// A database operation failed, carrying the driver's message. The
     /// REST layer maps this to HTTP `500 Internal Server Error`.
     #[error("Database error: {0}")]
-    Database(#[from] sea_orm::DbErr),
+    Database(String),
 
     /// A connection-pool operation failed (e.g. acquisition timeout).
     /// Maps to HTTP `500 Internal Server Error`.
@@ -74,9 +74,9 @@ pub enum Error {
 
 impl Error {
     /// Builds a [`Database`](Error::Database) error from a custom message,
-    /// wrapping it in a `DbErr::Custom` so callers need not import `SeaORM`.
+    /// worded as it was under `SeaORM` (`Custom Error: …`).
     pub fn database(msg: impl Into<String>) -> Self {
-        Error::Database(sea_orm::DbErr::Custom(msg.into()))
+        Error::Database(format!("Custom Error: {}", msg.into()))
     }
 
     /// Builds a [`Validation`](Error::Validation) error from a message.
@@ -96,5 +96,13 @@ impl Error {
     /// Builds an [`Internal`](Error::Internal) error from a message.
     pub fn internal(msg: impl Into<String>) -> Self {
         Error::Internal(msg.into())
+    }
+}
+
+/// Every sqlx failure is an [`Error::Database`], carrying sqlx's own
+/// message, so `?` on a query reads the same everywhere in `src/db/`.
+impl From<sqlx::Error> for Error {
+    fn from(e: sqlx::Error) -> Self {
+        Self::Database(e.to_string())
     }
 }

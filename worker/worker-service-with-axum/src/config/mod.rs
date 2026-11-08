@@ -58,7 +58,7 @@ pub struct ServerConfig {
 /// `DATABASE_MIN_CONNECTIONS`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
-    /// SeaORM/PostgreSQL connection URL. Env `DATABASE_URL`; default points
+    /// `PostgreSQL` connection URL. Env `DATABASE_URL`; default points
     /// at a local `worker_service` database.
     pub url: String,
     /// Maximum number of pooled connections. Env

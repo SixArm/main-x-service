@@ -8,6 +8,51 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed
+
+- **Persistence moves from SeaORM to sqlx** (spec §10, §13 SQ-1; the
+  repo's `spec/tech-stack/index.md` §5). Every statement is a
+  `query!` / `query_as!` / `query_scalar!` literal in `src/db/`, 91 of
+  them, checked against the committed `.sqlx/` data; the SQL that lived
+  in handlers, compliance, the relay and the integrity task (record
+  verification, erasure, checkpoints, the address scrub, the MAC
+  re-sign, the relay purge) moved in. Optional filters are static
+  parameters and erasure's table sweep is one literal per table, so
+  there is no `QueryBuilder` and no allowlist entry. The 24 migrations
+  move unchanged into sqlx's flat layout, names kept, and the
+  `migration/` crate is gone; `pg_dump --schema-only` of a database
+  migrated each way is identical apart from the bookkeeping table, so a
+  database the old code migrated must be recreated. The hash chain and
+  checkpoints, address retention, record and assessment digests and
+  MACs, ABAC masking, `same_identity` links, gRPC, FHIR, the outbox,
+  the review queue, merge and consent behave as before; every
+  serialized row keeps its shape. Unique normal dependencies fall from
+  389 to 350. `SeaOrmWorkerRepository` is now `PgWorkerRepository`.
+- A database error's text is sqlx's own message
+  (`Database error: error returned from database: …`) rather than
+  SeaORM's wrapping of it (`Database error: Execution Error: …`). An
+  update or soft delete that matches no row is still `None of the
+  records are updated`.
+- A new worker's `created_at` and `updated_at` are the write
+  transaction's `CURRENT_TIMESTAMP`, not this process's clock (two
+  readings of it, before), so they are equal now that the digest stamp
+  is an `UPDATE` the `updated_at` trigger sees.
+- The relay poll's `FOR UPDATE SKIP LOCKED`, pinned before on the SQL
+  text SeaORM generated, is pinned by a DB test that holds rows in one
+  transaction and polls from another.
+
+### Fixed
+
+- **INT-V1: a fresh or updated record failed `/api/records/verify`.**
+  Its digests covered the worker the caller sent, but storage does not
+  keep that exactly: an address's `use_type` is not stored and a time of
+  death is truncated to microseconds. Create, update and merge now stamp
+  all three digests over the record read back inside the write's
+  transaction (`stamp_digests`). The new DB test
+  `a_written_record_verifies` (a fresh, an assessed and an updated
+  record verify, a row edited in SQL is flagged) failed on the SeaORM
+  code and passes.
+
 ### Added
 
 - Request limits per client through `axa::ratelimit`, in

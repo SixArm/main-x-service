@@ -7,7 +7,7 @@ Each subproject owns a slice; this spec owns the seams.
 **worker-service-with-axum** owns:
 
 - Worker CRUD with soft delete and full audit trail.
-- Persistence (PostgreSQL via SeaORM, 12+ tables, migrations).
+- Persistence (PostgreSQL via sqlx, 12+ tables, plain-SQL migrations).
 - Full-text / fuzzy / phonetic search (Tantivy, 11 indexed fields).
 - Duplicate detection: real-time on create (`409`), explicit
   check-duplicates, batch deduplicate with review queue.

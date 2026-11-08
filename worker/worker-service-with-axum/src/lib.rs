@@ -17,8 +17,8 @@
 //!   that bridges service records into the canonical `worker-matcher` crate.
 //! - **Search** ([`search`]) — full-text, fuzzy, and phonetic search backed by
 //!   the embedded [Tantivy](https://github.com/quickwit-oss/tantivy) index.
-//! - **Persistence** ([`db`]) — `SeaORM` entities, repositories, and an audit
-//!   log repository for `PostgreSQL`.
+//! - **Persistence** ([`db`]) — sqlx row structs, repositories, and an audit
+//!   log repository for `PostgreSQL`, every statement a checked literal.
 //! - **API surface** ([`api`]) — REST (Axum), FHIR R5, and a gRPC stub.
 //! - **Cross-cutting concerns** — [`validation`], [`privacy`],
 //!   [`streaming`] (event publishing), [`metrics`] (Prometheus),
@@ -74,7 +74,7 @@ pub mod client_limits;
 pub mod compliance;
 /// Configuration structs and environment loading.
 pub mod config;
-/// PostgreSQL persistence: SeaORM entities, repositories, audit log.
+/// PostgreSQL persistence: row structs, repositories, audit log, outbox.
 pub mod db;
 /// Crate-wide error type and `Result` alias.
 pub mod error;

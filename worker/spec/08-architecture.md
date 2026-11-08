@@ -24,7 +24,7 @@
           |                      |               |  embeds (Cargo dep)
 +---------v---------+  +---------v--------+  +---v-------------------+
 |  PostgreSQL 18    |  |  Tantivy index   |  |  worker-matcher 0.6.1 |
-|  (SeaORM, 12+     |  |  (11 fields,     |  |  pure library: no IO, |
+|  (sqlx, 12+       |  |  (11 fields,     |  |  pure library: no IO, |
 |  tables, audit)   |  |  on disk)        |  |  no unsafe, determin. |
 +-------------------+  +------------------+  +-----------------------+
 ```
