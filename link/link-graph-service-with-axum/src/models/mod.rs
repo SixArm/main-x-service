@@ -93,9 +93,12 @@ pub(crate) fn to_i64(n: u64) -> i64 {
 /// Delete every row from the read-model tables, for `db truncate` and the
 /// test harness.
 ///
-/// `DELETE`, not `TRUNCATE`: exactly what the `SeaORM` era's
-/// `truncate_table` did, on the same five tables in the same order.
-/// `processed_events` was never in that list and is still left alone.
+/// `DELETE`, not `TRUNCATE`: what the `SeaORM` era's `truncate_table`
+/// did. `processed_events`, the consumer's dedupe table, is cleared with
+/// the rest (LG-T1): left behind, it would make a truncated database skip
+/// a replayed event whose effect it no longer holds, so a replay from
+/// offset 0 (`consumer_offsets` is cleared too) could not rebuild the
+/// graph.
 ///
 /// # Errors
 ///
@@ -111,6 +114,9 @@ pub async fn delete_all_rows(db: &sqlx::PgPool) -> Result<(), sqlx::Error> {
         .await?;
     sqlx::query!("DELETE FROM audit_log").execute(db).await?;
     sqlx::query!("DELETE FROM suggestion_runs")
+        .execute(db)
+        .await?;
+    sqlx::query!("DELETE FROM processed_events")
         .execute(db)
         .await?;
     Ok(())

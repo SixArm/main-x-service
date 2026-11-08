@@ -46,7 +46,7 @@ fn linked_env(edge_id: Uuid, from: &str, to: &str, edge_kind: &str, seq: i64) ->
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test governance -- --ignored`"]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test governance -- --ignored`"]
 async fn enforcement_blocks_unauthenticated_reads_and_audits_governed_writes() {
     // Activate enforcement BEFORE the app boots (read once into a OnceLock).
     // `set_var` is `unsafe` in edition 2024; single-threaded test setup.

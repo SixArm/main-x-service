@@ -59,7 +59,7 @@ fn presence_env_no_event_id(entity: &str, pid: Uuid, kind: &str, seq: i64) -> En
 /// second call is a no-op, not a duplicate edge and not an error.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test idempotency -- --ignored`"]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test idempotency -- --ignored`"]
 async fn redelivered_linked_event_does_not_duplicate() {
     request::<App, _, _>(|_request, ctx| async move {
         let event_id = u(500);
@@ -98,7 +98,7 @@ async fn redelivered_linked_event_does_not_duplicate() {
 /// `edge_id`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test idempotency -- --ignored`"]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test idempotency -- --ignored`"]
 async fn distinct_event_ids_are_not_deduplicated_against_each_other() {
     request::<App, _, _>(|_request, ctx| async move {
         let edge_id = u(601);
@@ -131,7 +131,7 @@ async fn distinct_event_ids_are_not_deduplicated_against_each_other() {
 /// harmless rather than corrupting.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test idempotency -- --ignored`"]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test idempotency -- --ignored`"]
 async fn envelope_with_no_event_id_applies_every_time() {
     request::<App, _, _>(|_request, ctx| async move {
         let pid = u(700);
@@ -157,6 +157,51 @@ async fn envelope_with_no_event_id_applies_every_time() {
         // The upsert advanced to the later seq — not corrupted by the
         // repeat apply.
         assert_eq!(row.last_seq, 2);
+    })
+    .await;
+}
+
+/// `db truncate` clears the dedupe table with the read-model (LG-T1).
+/// Left behind, a truncated database would skip a replayed event whose
+/// effect it no longer holds, so a replay from offset 0 could never
+/// rebuild the graph.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test idempotency -- --ignored`"]
+async fn truncate_clears_processed_events_so_a_replay_reapplies() {
+    request::<App, _, _>(|_request, ctx| async move {
+        let event_id = u(801);
+        let edge_id = u(802);
+        let from = format!("person:{}", u(803));
+        let to = format!("organization:{}", u(804));
+        apply_event_idempotent(&ctx.db, linked_env(event_id, edge_id, &from, &to, 1))
+            .await
+            .expect("first apply");
+        assert!(
+            processed_events::Model::is_processed(&ctx.db, event_id)
+                .await
+                .expect("query processed_events")
+        );
+
+        App::truncate(&ctx).await.expect("truncate");
+        assert!(
+            !processed_events::Model::is_processed(&ctx.db, event_id)
+                .await
+                .expect("query processed_events"),
+            "truncate must clear processed_events"
+        );
+
+        // The same event, replayed, rebuilds the edge.
+        apply_event_idempotent(&ctx.db, linked_env(event_id, edge_id, &from, &to, 1))
+            .await
+            .expect("replayed apply");
+        assert!(
+            edges::Model::find(&ctx.db, edge_id)
+                .await
+                .expect("query edges")
+                .is_some(),
+            "a replay after truncate must re-apply"
+        );
     })
     .await;
 }

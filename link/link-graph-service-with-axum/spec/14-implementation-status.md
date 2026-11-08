@@ -19,8 +19,10 @@ disagree, §13 wins.**
 ### 14.1 What is implemented
 
 - **Scaffold** — axa crate (`Cargo.toml`, `src/lib.rs` +
-  `src/bin/main.rs` with the family lint header, `src/app.rs` `Hooks`,
-  `config/{development,test,production}.yaml`; plain-SQL `migrations/`
+  `src/bin/main.rs` with the family lint header, `src/app.rs` boot
+  functions; configuration is environment-only through `axa::config`,
+  with defaults in `src/app.rs` and no config files (§13 LG-D1);
+  plain-SQL `migrations/`
   run by `sqlx::migrate!`, §13 T-38). Read-only to the world; no write controllers of its own
   (§1.3, §9). Depends on the sibling
   **[`entity-ref`](../../entity-ref-rust-crate)** crate for the shared

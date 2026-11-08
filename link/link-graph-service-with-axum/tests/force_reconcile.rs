@@ -120,7 +120,7 @@ async fn spawn_mock_source(edge_id: Uuid, case: Uuid, person: Uuid) -> String {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test force_reconcile -- --ignored`"]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test force_reconcile -- --ignored`"]
 async fn forced_pass_is_destructive_gated_and_updates_the_same_gauges() {
     let (keys, kid) = keys_and_kid();
     // Set all globals BEFORE the app boots (each is a OnceLock) — the

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM processed_events",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "e7ebbdc1d5d58aa691fc2effba6be8e1a4173b80f393b87bc7764ccaf5f21610"
+}

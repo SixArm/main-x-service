@@ -131,10 +131,13 @@ impl Model {
         Ok(())
     }
 
-    /// The first `limit` rows by `id` descending, for
-    /// `GET /api/compliance/audit/verify` — the order the `SeaORM` query
-    /// used. `id` is a random UUID, so this is an arbitrary sample of the
-    /// trail, not its newest rows.
+    /// The newest `limit` rows, for `GET /api/compliance/audit/verify`.
+    ///
+    /// Newest is `occurred_at` descending: the table has no sequence
+    /// column, and `id` is a random UUID, so ordering by `id` alone (as
+    /// the `SeaORM` query did) picked an arbitrary sample (LG-A1). `id`
+    /// breaks ties between rows stamped in the same microsecond, so the
+    /// sample is deterministic. `audit_log_occurred` serves the sort.
     ///
     /// # Errors
     ///
@@ -146,7 +149,7 @@ impl Model {
                       occurred_at AS "occurred_at: _", user_ip, user_agent,
                       hash, hash_sha3, mac
                FROM audit_log
-               ORDER BY id DESC
+               ORDER BY occurred_at DESC, id DESC
                LIMIT $1"#,
             to_i64(limit),
         )

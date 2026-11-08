@@ -8556,13 +8556,13 @@ All three were there before the move, on SeaORM. Fixed 2026-11-07.
 
 All three were there on SeaORM, and the move keeps them as they were.
 
-- [ ] **LG-A1 (S)** `GET /api/compliance/audit/verify` checks "the newest
+- [x] **LG-A1 (S)** `GET /api/compliance/audit/verify` checks "the newest
   1000" audit rows by `ORDER BY id DESC`, but `id` is a random UUID, so it
   checks an arbitrary 1000. Order by the row's sequence or `created_at`,
   and test that a tampered newest row is caught.
-- [ ] **LG-T1 (S)** `db truncate` leaves `processed_events`, so a truncated
+- [x] **LG-T1 (S)** `db truncate` leaves `processed_events`, so a truncated
   database still dedupes events it no longer holds. Clear it with the rest,
   or say why not.
-- [ ] **LG-D1 (S)** link-graph `spec/14` names `config/{development,test,
+- [x] **LG-D1 (S)** link-graph `spec/14` names `config/{development,test,
   production}.yaml`, which do not exist (configuration is environment
   only).

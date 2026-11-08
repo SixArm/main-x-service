@@ -14,6 +14,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **`GET /api/compliance/audit/verify` checks the newest rows** (spec
+  §13 LG-A1). It ordered by `id`, a random UUID, so "the newest 1000"
+  was an arbitrary 1000 and a tampered recent row could be missed. It
+  now orders by `occurred_at DESC, id DESC`. Digests are unchanged.
+- **`db truncate` clears `processed_events`** (spec §13 LG-T1). A
+  truncated database kept the consumer's dedupe rows and so skipped
+  replayed events it no longer held.
+- **No more `config/*.yaml` references** (spec §13 LG-D1) in spec §14,
+  the DB-gated tests' header and their `#[ignore]` reasons:
+  configuration is environment-only.
+
 ### Changed — SeaORM replaced by sqlx
 
 - **Persistence is sqlx with no ORM** (spec §10, §13 T-38;

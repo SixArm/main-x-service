@@ -764,6 +764,34 @@ unblocked.
   both unchanged. This crate has no record digests, so INT-V1 does not
   apply.
 
+- [x] **LG-A1 — audit verify examines the newest rows.** *(Done
+  2026-11-08; repo `tasks.md` "Found 2026-11-07".)*
+  `GET /api/compliance/audit/verify` was meant to check the newest
+  `limit` rows but ordered by `id DESC`, a random UUID, so it checked an
+  arbitrary sample and a tampered newest row could go unexamined.
+  `audit_log::Model::recent` now orders by `occurred_at DESC, id DESC`
+  (the table has no sequence column; `id` breaks same-microsecond ties
+  so the sample is deterministic; `audit_log_occurred` serves the sort).
+  The pre-image and digests are unchanged. `tests/audit_verify.rs`
+  records 12 rows, gives the newest the nil UUID so `id DESC` sorts it
+  last, tampers with it in SQL, and asserts `?limit=3` reports it; it
+  failed before the fix (`verified: true`, `mismatched: []`).
+- [x] **LG-T1 — `db truncate` clears `processed_events`.** *(Done
+  2026-11-08.)* `models::delete_all_rows` cleared five tables but not
+  the consumer's dedupe table, so a truncated database skipped a
+  replayed event whose effect it no longer held — and since
+  `consumer_offsets` is cleared, a replay from offset 0 could not
+  rebuild the graph. There is no reason for it to survive, so it is now
+  deleted with the rest. `tests/idempotency.rs`
+  `truncate_clears_processed_events_so_a_replay_reapplies` failed
+  before the fix and passes after.
+- [x] **LG-D1 — stale config-file paths.** *(Done 2026-11-08.)* §14
+  named `config/{development,test,production}.yaml`, which do not
+  exist; configuration is environment-only through `axa::config`, with
+  defaults in `src/app.rs`. Fixed there, in `tests/graph_endpoints.rs`'s
+  header, and in the 25 `#[ignore]` reasons that said
+  `requires PostgreSQL (config/test.yaml)`.
+
 ### Reconciliation gauge hardening
 
 - [x] T-34 (M): *(resolved 2026-09-04.)* Label `link_graph_reconciliation_divergence` per entity,

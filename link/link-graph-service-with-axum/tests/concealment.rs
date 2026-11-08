@@ -115,7 +115,7 @@ fn restrictive_policy() -> Value {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test concealment -- --ignored`"]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test concealment -- --ignored`"]
 async fn case_read_sees_governed_edges_that_others_have_concealed() {
     let (keys, kid) = keys_and_kid();
     let policy = restrictive_policy();
@@ -330,7 +330,7 @@ async fn audited_address(
 /// row. The first hop used to be believed whoever sent it.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test concealment -- --ignored`"]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test concealment -- --ignored`"]
 async fn a_forged_forwarded_header_does_not_reach_the_audit_row() {
     let address = audited_address(101, 102, None, "6.6.6.6").await;
     assert_eq!(address, "127.0.0.1", "the row names the connecting peer");
@@ -340,7 +340,7 @@ async fn a_forged_forwarded_header_does_not_reach_the_audit_row() {
 /// one the caller wrote to its left.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test concealment -- --ignored`"]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test concealment -- --ignored`"]
 async fn a_listed_proxy_is_believed_for_the_entry_it_wrote() {
     let forwarded = "6.6.6.6, 198.51.100.7";
     let address = audited_address(103, 104, Some("127.0.0.0/8"), forwarded).await;
