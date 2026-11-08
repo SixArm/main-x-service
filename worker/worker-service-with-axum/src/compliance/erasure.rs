@@ -52,10 +52,11 @@
 //! would break, and a retained-but-blanked row would still leak how many
 //! addresses or identifiers a subject had.
 //!
-//! One name row is written back as a tombstone. The service's read paths
-//! assume a worker has at least one name; a worker with none would
-//! deserialize into a shape later code treats as impossible, so an erased
-//! record would become a landmine rather than degrading cleanly.
+//! One name row is written back as a tombstone, flagged as the primary
+//! name. The service's read paths assume a worker has a primary name; a
+//! worker with none fails to assemble ("Worker has no primary name"), so
+//! an erased record would become a landmine rather than degrading
+//! cleanly (WK-E3: the tombstone used to be inserted non-primary).
 
 use serde::Serialize;
 use sqlx::PgConnection;

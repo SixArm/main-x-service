@@ -841,3 +841,25 @@ clearly described manual check confirms the acceptance criterion.
       edits the newest of twelve (after `VACUUM FULL`, so the edited row
       is last in the heap) and asks for `limit=3`; it was missed before.
   - Unit tests 373, DB suite 52 (was 47).
+- [x] **WK-E3: an erased record reassembles (2026-11-08),** as person's
+      PE-E3. `db::erasure::insert_tombstone_name` inserts the tombstone
+      with `is_primary = TRUE`; migration
+      `2026110800000002_erased_tombstone_name_primary` flags the
+      tombstones earlier erasures wrote. Hashes and MAC stay NULL (WK-E1).
+      `db::repositories::stored_record` reads a row, deleted or not, with
+      its digests. DB tests `an_erased_record_reassembles_as_its_tombstone`
+      (failed with "Worker has no primary name" before) and
+      `the_backfill_flags_an_old_non_primary_tombstone` (failed the same
+      way with the migration emptied).
+- [x] **WK-F1: FHIR link codes are the R5 `link-type` codes
+      (2026-11-08).** `fhir_link_type_code` maps each `LinkType`
+      explicitly; `ReplacedBy` goes out as `replaced-by`, not
+      `replacedby`. `from_fhir_worker` reads no links, so there is no
+      inbound side. `every_link_type_is_sent_as_its_fhir_code` covers
+      every variant through an exhaustive match, and failed before.
+- [x] **WK-V1: the worker half of `/api/records/verify` is in a total
+      order (2026-11-08),** `ORDER BY updated_at DESC, id DESC`.
+      `tests/records_verify_order_db.rs` inserts twelve rows sharing a
+      far-future `updated_at` in ascending id order and reads `limit=5`;
+      it read the wrong rows before.
+  - Unit tests 374, DB suite 55 (was 52).

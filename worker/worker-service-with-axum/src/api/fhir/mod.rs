@@ -17,7 +17,7 @@ use crate::Result;
 use crate::api::fhir::resources::{
     FhirCodeableConcept, FhirCoding, FhirHumanName, FhirIdentifier, FhirReference,
 };
-use crate::models::{Address, ContactPoint, Gender, HumanName, Identifier, Worker};
+use crate::models::{Address, ContactPoint, Gender, HumanName, Identifier, LinkType, Worker};
 
 /// FHIR `Bundle` handling for search responses.
 pub mod bundle;
@@ -87,6 +87,22 @@ fn to_fhir_telecom_points(worker: &Worker) -> Vec<resources::FhirContactPoint> {
                 .map(|u| format!("{u:?}").to_lowercase()),
         })
         .collect()
+}
+
+/// The FHIR R5 `link-type` code (`http://hl7.org/fhir/link-type`, the
+/// value set `Patient.link.type` binds, which worker's `Practitioner`
+/// link reuses) for `link_type`.
+///
+/// Spelled out per variant rather than derived from the `Debug` name
+/// (WK-F1): lowercasing `ReplacedBy` gives `replacedby`, which is not a
+/// code in the value set; the code is `replaced-by`.
+fn fhir_link_type_code(link_type: &LinkType) -> &'static str {
+    match link_type {
+        LinkType::ReplacedBy => "replaced-by",
+        LinkType::Replaces => "replaces",
+        LinkType::Refer => "refer",
+        LinkType::Seealso => "seealso",
+    }
 }
 
 /// Builds the FHIR name list (primary name first, then additional names).
@@ -210,7 +226,7 @@ pub fn to_fhir_worker(worker: &Worker) -> FhirWorker {
                         reference: Some(format!("Worker/{}", link.other_worker_id)),
                         display: None,
                     },
-                    type_: format!("{:?}", link.link_type).to_lowercase(),
+                    type_: fhir_link_type_code(&link.link_type).to_string(),
                 })
                 .collect(),
         );
@@ -628,6 +644,52 @@ mod tests {
         assert_eq!(back.marital_status, worker.marital_status);
         assert_eq!(back.multiple_birth, worker.multiple_birth);
         assert_eq!(back.managing_organization, worker.managing_organization);
+    }
+
+    /// WK-F1: every [`LinkType`] goes out as its FHIR R5 `link-type`
+    /// code. The list is built from an exhaustive `match`, so a new
+    /// variant fails to compile here until it is given its code.
+    #[test]
+    fn every_link_type_is_sent_as_its_fhir_code() {
+        use crate::models::WorkerLink;
+
+        let expected_code = |t: &LinkType| match t {
+            LinkType::ReplacedBy => "replaced-by",
+            LinkType::Replaces => "replaces",
+            LinkType::Refer => "refer",
+            LinkType::Seealso => "seealso",
+        };
+        let all = [
+            LinkType::ReplacedBy,
+            LinkType::Replaces,
+            LinkType::Refer,
+            LinkType::Seealso,
+        ];
+        let mut worker = sample_worker();
+        worker.links = all
+            .iter()
+            .map(|t| WorkerLink {
+                other_worker_id: uuid::Uuid::new_v4(),
+                link_type: t.clone(),
+            })
+            .collect();
+
+        let fhir = to_fhir_worker(&worker);
+        let sent: Vec<String> = fhir
+            .link
+            .expect("links are emitted")
+            .into_iter()
+            .map(|l| l.type_)
+            .collect();
+        let want: Vec<String> = all.iter().map(|t| expected_code(t).to_string()).collect();
+        assert_eq!(sent, want);
+        // The FHIR R5 link-type value set, in full.
+        for code in &sent {
+            assert!(
+                ["replaced-by", "replaces", "refer", "seealso"].contains(&code.as_str()),
+                "{code} is not a FHIR R5 link-type code"
+            );
+        }
     }
 
     /// An identifier type FHIR never declared this crate's vocabulary for

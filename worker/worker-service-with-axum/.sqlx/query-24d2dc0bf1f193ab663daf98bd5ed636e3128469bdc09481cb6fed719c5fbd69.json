@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at\n         FROM workers\n         ORDER BY updated_at DESC\n         LIMIT $1",
+  "query": "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at\n         FROM workers\n         ORDER BY updated_at DESC, id DESC\n         LIMIT $1",
   "describe": {
     "columns": [
       {
@@ -72,5 +72,5 @@
       true
     ]
   },
-  "hash": "8566a19e8ca10e81930ab6d8309105985024d516d2c6d25e6ff5b3d199e89df1"
+  "hash": "24d2dc0bf1f193ab663daf98bd5ed636e3128469bdc09481cb6fed719c5fbd69"
 }

@@ -8728,12 +8728,15 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
   assessments first; now `DESC NULLS LAST`, as documented.
 - [x] **WK-A2 (S)** The assessment half of `/api/records/verify` took
   `LIMIT n` with no `ORDER BY`; now the newest, `updated_at DESC, id DESC`.
-- [ ] **WK-E3 (S)** Erasure's tombstone name is inserted with `is_primary`
+- [x] **WK-E3 (S)** Erasure's tombstone name is inserted with `is_primary`
   left at its default, `false`, so an erased worker cannot be assembled
-  ("Worker has no primary name"), as person's PE-E3 was. Not fixed here.
-- [ ] **WK-F1 (S)** worker's FHIR `Practitioner` builds link codes from the
+  ("Worker has no primary name"), as person's PE-E3 was.
+- [x] **WK-F1 (S)** worker's FHIR `Practitioner` builds link codes from the
   Rust `Debug` spelling lowercased, so `ReplacedBy` goes out as
   `replacedby` rather than FHIR's `replaced-by`.
-- [ ] **WK-V1 (S)** the workers half of `/api/records/verify` orders by
+- [x] **WK-V1 (S)** the workers half of `/api/records/verify` orders by
   `updated_at DESC` with no tie-breaker, so a capped run's sample is not
   stable when rows share a timestamp.
+  **Done 2026-11-08** (with WK-E3 and WK-F1): the tombstone is inserted
+  primary, with a backfill migration; FHIR link codes are mapped per
+  variant (`replaced-by`); verify orders `updated_at DESC, id DESC`.

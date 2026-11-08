@@ -976,12 +976,13 @@ async fn assert_worker_data_destroyed(id: uuid::Uuid) {
     assert_eq!(
         common::count_rows(
             &conn,
-            "SELECT count(*) AS n FROM worker_names WHERE worker_id = $1 AND family = '(erased)'",
+            "SELECT count(*) AS n FROM worker_names \
+             WHERE worker_id = $1 AND family = '(erased)' AND is_primary",
             id
         )
         .await,
         1,
-        "the tombstone name must be present"
+        "the tombstone name must be present, and primary (WK-E3)"
     );
     assert_eq!(
         common::count_rows(

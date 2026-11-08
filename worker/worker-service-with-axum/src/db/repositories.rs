@@ -1398,8 +1398,36 @@ pub struct StoredDigests {
     pub deleted_at: Option<chrono::DateTime<Utc>>,
 }
 
+/// One record **as stored**, soft-deleted or not, with its stored
+/// digests. `None` when no row has `id`. The deleted rows the live reads
+/// skip are read through this, an erased one among them (WK-E3).
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Database`] if a query fails, or
+/// [`crate::Error::Validation`] if the row does not assemble.
+pub async fn stored_record(db: &PgPool, id: Uuid) -> Result<Option<(Worker, StoredDigests)>> {
+    let mut conn = db.acquire().await?;
+    let Some(row) = fetch_worker_row(&mut conn, id, true).await? else {
+        return Ok(None);
+    };
+    let digests = StoredDigests {
+        id: row.id,
+        content_hash: row.content_hash.clone(),
+        content_hash_sha3: row.content_hash_sha3.clone(),
+        content_mac: row.content_mac.clone(),
+        deleted_at: row.deleted_at,
+    };
+    let worker = assemble(&mut conn, row).await?;
+    Ok(Some((worker, digests)))
+}
+
 /// The `limit` most recently updated `workers` rows' stored digests, for
 /// `/api/records/verify`.
+///
+/// Ordered by `updated_at DESC, id DESC`: `id` is the primary key, so the
+/// order is total and a capped run samples the same rows every time even
+/// when rows share an `updated_at` (WK-V1).
 ///
 /// # Errors
 ///
@@ -1409,7 +1437,7 @@ pub async fn rows_for_verification(db: &PgPool, limit: i64) -> Result<Vec<Stored
         StoredDigests,
         "SELECT id, content_hash, content_hash_sha3, content_mac, deleted_at
          FROM workers
-         ORDER BY updated_at DESC
+         ORDER BY updated_at DESC, id DESC
          LIMIT $1",
         limit,
     )

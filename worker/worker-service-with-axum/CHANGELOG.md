@@ -84,6 +84,32 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   It now takes the newest, `updated_at DESC, id DESC`. The DB test edits
   the newest of twelve assessments and asks for `limit=3`; it was missed
   before and is caught now.
+- **WK-E3: an erased worker could not be reassembled.** Erasure wrote
+  its `(erased)` tombstone name with `is_primary` left at `false`, so
+  any read of the deleted row through the repository failed with
+  "Worker has no primary name". The live REST and gRPC reads skip
+  deleted rows, so they were unaffected. The tombstone is now inserted
+  primary, and the new migration
+  `2026110800000002_erased_tombstone_name_primary` flags tombstones
+  earlier erasures wrote (only a given-name-less `(erased)` name on a
+  retired, unhashed row of a worker with no primary name). The digests
+  stay NULL (WK-E1); nothing is rehashed. A new
+  `db::repositories::stored_record` reads a row deleted or not. DB tests
+  `an_erased_record_reassembles_as_its_tombstone` (failed before) and
+  `the_backfill_flags_an_old_non_primary_tombstone` (failed with the
+  migration emptied); the HTTP erasure test now also asserts the
+  tombstone is primary, and failed before.
+- **WK-F1: FHIR sent `replacedby` for a `replaced-by` link.** The
+  `Practitioner.link.type` code was the `LinkType` `Debug` name
+  lowercased. Each variant is now mapped to its FHIR R5 `link-type`
+  code (`replaced-by`, `replaces`, `refer`, `seealso`). The inbound
+  conversion reads no links, so there is nothing to accept there. Unit
+  test `every_link_type_is_sent_as_its_fhir_code` failed before.
+- **WK-V1: the worker half of a capped `/api/records/verify` was not
+  stable.** It ordered by `updated_at DESC` alone; it now orders
+  `updated_at DESC, id DESC`, a total order since `id` is the primary
+  key. DB test `tied_updated_at_rows_are_read_in_id_order` (twelve rows
+  sharing one `updated_at`, `limit` 5) read the wrong rows before.
 
 ### Added
 

@@ -145,15 +145,21 @@ pub async fn scrub_worker(
 }
 
 /// Write back one tombstone name, `family` with no given names, prefixes
-/// or suffixes.
+/// or suffixes, flagged as the worker's **primary** name.
+///
+/// Primary because assembling a stored row into a `Worker` requires one
+/// (WK-E3): with the column left at its default, `false`, an erased row
+/// failed on every read that includes deleted rows with "Worker has no
+/// primary name".
 ///
 /// # Errors
 ///
 /// When the insert fails.
 pub async fn insert_tombstone_name(conn: &mut PgConnection, id: Uuid, family: &str) -> Result<()> {
     sqlx::query!(
-        "INSERT INTO worker_names (id, worker_id, use_type, family, given, prefix, suffix)
-         VALUES ($1, $2, NULL, $3, ARRAY[]::text[], ARRAY[]::text[], ARRAY[]::text[])",
+        "INSERT INTO worker_names
+             (id, worker_id, use_type, family, given, prefix, suffix, is_primary)
+         VALUES ($1, $2, NULL, $3, ARRAY[]::text[], ARRAY[]::text[], ARRAY[]::text[], TRUE)",
         Uuid::new_v4(),
         id,
         family,
