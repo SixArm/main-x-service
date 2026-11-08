@@ -339,6 +339,43 @@ async fn an_old_address_leaves_sessions_and_events() {
     .await;
 }
 
+/// An event's `created_at` is the database's time, not this process's, so
+/// it falls between two readings of the database clock taken around it.
+/// Retention compares it with Postgres `now()`, and an application clock
+/// that drifted would move that edge. The row's digests still verify,
+/// because they were computed over the time that was stored.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn an_event_is_stamped_with_the_database_clock() {
+    use authentication_service::compliance::audit_integrity::verify;
+
+    request::<App, _, _>(|_request, ctx| async move {
+        let db_now = || async {
+            sqlx::query_scalar!(
+                r#"SELECT clock_timestamp() AS "now!: chrono::DateTime<chrono::FixedOffset>""#
+            )
+            .fetch_one(&ctx.db)
+            .await
+            .expect("read database clock")
+        };
+        let before = db_now().await;
+        let row = AuthEvent::record(&ctx.db, "clock_check", None, None, None, None)
+            .await
+            .expect("record event");
+        let after = db_now().await;
+
+        assert!(
+            before <= row.created_at && row.created_at <= after,
+            "{before} <= {} <= {after}",
+            row.created_at
+        );
+        let report = verify(std::slice::from_ref(&row));
+        assert!(report.verified && report.intact == 1, "{report:?}");
+    })
+    .await;
+}
+
 /// `source_ip` on both the issued session and every `auth_events` row
 /// the flow writes — the address `axa::client::ClientAddr` resolves from
 /// the connection the `axum-test` harness supplies, the same mechanism

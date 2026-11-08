@@ -10,6 +10,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- An `auth_events` row's `created_at` is now the database's time
+  (`clock_timestamp()`, read just before the insert so the digests still
+  cover it), not this process's `Utc::now()`. Address retention compares
+  it with Postgres `now()`, so an application clock that drifted from the
+  database's moved the retention edge by the drift: with the clock 8.6
+  hours behind, `scrub(0)` left the newest rows' addresses in place.
+  Sessions and magic-link expiry still take the application's clock.
+
 ### Changed
 
 - Persistence moved from SeaORM to sqlx (spec/tech-stack §5). Every

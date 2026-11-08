@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT clock_timestamp() AS \"now!: DateTime<FixedOffset>\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "now!: DateTime<FixedOffset>",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "def42f56499a4e91d58bd55adf26518f7c3affd1f2d1c1300887744bd9de3f96"
+}

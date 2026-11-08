@@ -106,11 +106,17 @@ impl Model {
         detail: Option<&str>,
         source_ip: Option<&str>,
     ) -> ModelResult<Self> {
-        // The timestamp is part of the MAC pre-image, so it is minted here
-        // rather than defaulted by the database: the alternative —
-        // insert, then stamp — leaves a window in which the row exists
-        // unprotected.
-        let created_at: DateTime<FixedOffset> = chrono::Utc::now().into();
+        // The timestamp is part of the MAC pre-image, so it is read before
+        // the insert rather than defaulted by it: the alternative — insert,
+        // then stamp — leaves a window in which the row exists unprotected.
+        // It is read from the database, not this process, because retention
+        // (`scrub_source_ip`) and every reviewer's query compare it with
+        // Postgres `now()`. An application clock that drifts from the
+        // database's would move the retention edge by the drift.
+        let created_at: DateTime<FixedOffset> =
+            sqlx::query_scalar!(r#"SELECT clock_timestamp() AS "now!: DateTime<FixedOffset>""#)
+                .fetch_one(db)
+                .await?;
         // The stored address is the normalised one, so the MAC covers
         // what the row actually holds rather than what was passed in.
         let email = email.map(normalise_email);
