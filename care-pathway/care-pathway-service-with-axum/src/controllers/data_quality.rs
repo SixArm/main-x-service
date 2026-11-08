@@ -12,15 +12,14 @@
 
 use axa::extract::{Path, Query};
 use axa::prelude::*;
-use sea_orm::QueryOrder;
 use uuid::Uuid;
 
 use crate::controllers::tba::{
     analyze_cohort, date_ms, load_cohort, resolve_anchor_pair_raw, to_segment,
 };
 use crate::data_quality::{self, InstanceDqInputs, StepOrder};
-use crate::models::_entities::{instance_segments, instance_steps};
 use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::{instance_segments, instance_steps};
 use crate::tba;
 
 /// `?status=` (shared with the other cohort endpoints) plus
@@ -54,11 +53,7 @@ async fn load_dq_inputs(
             std::collections::HashMap::new(),
         ));
     }
-    let segment_rows = instance_segments::Entity::find()
-        .filter(instance_segments::Column::InstancePid.is_in(pids.to_vec()))
-        .order_by_asc(instance_segments::Column::StartedAt)
-        .all(&ctx.db)
-        .await?;
+    let segment_rows = instance_segments::Model::for_instances_by_start(&ctx.db, pids).await?;
     let mut segments: std::collections::HashMap<Uuid, Vec<tba::Segment>> =
         std::collections::HashMap::new();
     for row in &segment_rows {
@@ -68,11 +63,7 @@ async fn load_dq_inputs(
             .push(to_segment(row));
     }
 
-    let step_rows = instance_steps::Entity::find()
-        .filter(instance_steps::Column::InstancePid.is_in(pids.to_vec()))
-        .order_by_asc(instance_steps::Column::Position)
-        .all(&ctx.db)
-        .await?;
+    let step_rows = instance_steps::Model::for_instances_by_position(&ctx.db, pids).await?;
     let mut steps: std::collections::HashMap<Uuid, Vec<StepOrder>> =
         std::collections::HashMap::new();
     for row in &step_rows {

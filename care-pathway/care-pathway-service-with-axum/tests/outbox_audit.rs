@@ -16,9 +16,8 @@
 use axa::testing::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
-use care_pathway_service::models::_entities::{audit_logs, care_pathways, event_outbox};
+use care_pathway_service::models::{audit_logs, care_pathways, event_outbox};
 use care_pathway_service::streaming;
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 
 #[tokio::test]
@@ -53,9 +52,7 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
 
         // Entity committed.
         assert_eq!(
-            care_pathways::Entity::find()
-                .filter(care_pathways::Column::Pid.eq(model.pid))
-                .count(&ctx.db)
+            care_pathways::Model::count_by_pid(&ctx.db, model.pid)
                 .await
                 .expect("count pathways"),
             1,
@@ -63,9 +60,7 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
         );
 
         // Exactly one outbox row, unpublished, for this record.
-        let events = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(model.pid))
-            .all(&ctx.db)
+        let events = event_outbox::Model::for_entity(&ctx.db, model.pid)
             .await
             .expect("load outbox rows");
         assert_eq!(events.len(), 1, "one event_outbox row");
@@ -74,9 +69,7 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
 
         // ...and the audit row rode the SAME transaction (§3) — not a
         // best-effort after-commit side channel.
-        let audits = audit_logs::Entity::find()
-            .filter(audit_logs::Column::EntityPid.eq(model.pid))
-            .all(&ctx.db)
+        let audits = audit_logs::Model::for_entity(&ctx.db, model.pid)
             .await
             .expect("load audit rows");
         assert_eq!(audits.len(), 1, "one audit_logs row, atomic with the event");

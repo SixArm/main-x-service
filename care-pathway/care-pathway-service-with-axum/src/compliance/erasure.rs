@@ -25,16 +25,16 @@
 //! Erasure is **irreversible**: the tombstone cannot reconstruct the
 //! payload, and no snapshot of it remains.
 
-use axa::prelude::ModelResult;
 use care_pathway_matcher::CarePathway;
 use chrono::SubsecRound as _;
-use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, IntoActiveModel};
 use serde::Serialize;
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::compliance::disclosure::AccessContext;
 use crate::models::audit_logs::Model as AuditModel;
-use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::care_pathways::{Model as PathwayModel, Tombstone};
+use crate::models::{ModelError, ModelResult};
 
 /// The audit action verb an erasure appends.
 pub const ACTION_ERASED: &str = "erased";
@@ -78,15 +78,31 @@ pub struct ErasureOutcome {
 /// Erase one care pathway: tombstone the payload, soft-delete the record,
 /// redact its audit content, and append a chained `erased` audit row.
 ///
-/// Runs on the caller's connection or transaction; pass a
-/// `&DatabaseTransaction` to make the three writes atomic.
+/// Runs on the caller's connection, which must be an open transaction
+/// (`&mut *txn`): the three steps commit or roll back together, so a
+/// failure part-way leaves the record exactly as it was rather than half
+/// erased. The controller ([`crate::controllers::care_pathways`]) is the
+/// one caller and opens it.
+///
+/// The `erased` audit row is the last statement **inside** that
+/// transaction: it is a link in the hash chain and the controller's Art.
+/// 17(3)(b) accountability record, so an erasure must not commit without
+/// it, and it must not exist for an erasure that rolled back. The chain's
+/// advisory lock is taken on this same transaction just before the
+/// redaction sweep and held to the commit, so the head the row chains
+/// onto cannot move underneath it and no other audit row about the record
+/// can land between the sweep and the `erased` row unredacted. The lock
+/// is taken *after* the entity row is updated, matching the order every
+/// other writer takes them in (entity row, then chain lock), so an
+/// erasure cannot deadlock against a concurrent mutation of the same
+/// record.
 ///
 /// # Errors
 ///
 /// When any of the payload update, the redaction sweep, or the audit
 /// append fails.
-pub async fn erase<C: ConnectionTrait>(
-    db: &C,
+pub async fn erase(
+    db: &mut PgConnection,
     model: PathwayModel,
     actor: Option<&str>,
     ctx: &AccessContext,
@@ -98,11 +114,9 @@ pub async fn erase<C: ConnectionTrait>(
     //    recomputed over the tombstone, so an erased row still verifies
     //    under `record_integrity` — erasure is a legitimate write, not a
     //    reason for the row to look tampered with.
-    let payload =
-        serde_json::to_value(tombstone()).map_err(|e| axa::model::ModelError::Any(e.into()))?;
+    let payload = serde_json::to_value(tombstone()).map_err(|e| ModelError::Any(e.into()))?;
     let deleted_at: chrono::DateTime<chrono::FixedOffset> =
         chrono::Utc::now().trunc_subsecs(6).into();
-    let mut active = model.into_active_model();
     let d = super::record_integrity::digests(&super::record_integrity::RecordInput {
         pid,
         name: TOMBSTONE_NAME,
@@ -110,23 +124,28 @@ pub async fn erase<C: ConnectionTrait>(
         active: false,
         deleted_at_micros: Some(deleted_at.timestamp_micros()),
     });
-    active.content_hash = ActiveValue::set(Some(d.sha256));
-    active.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
-    active.content_mac = ActiveValue::set(d.mac);
-    active.name = ActiveValue::set(TOMBSTONE_NAME.to_string());
-    active.data = ActiveValue::set(payload);
-    active.active = ActiveValue::set(false);
-    active.deleted_at = ActiveValue::set(Some(deleted_at));
-    active.update(db).await?;
+    model
+        .erase_payload(
+            &mut *db,
+            &Tombstone {
+                name: TOMBSTONE_NAME,
+                data: &payload,
+                deleted_at,
+                digests: &d,
+            },
+        )
+        .await?;
 
-    // 2. Destroy the audit content, keeping the chain linkage.
-    let audit_rows_redacted = AuditModel::redact_for_entity(db, pid).await?;
+    // 2. Destroy the audit content, keeping the chain linkage. The chain
+    //    lock is taken first and held to the commit (see above).
+    AuditModel::lock_chain(&mut *db).await?;
+    let audit_rows_redacted = AuditModel::redact_for_entity(&mut *db, pid).await?;
 
     // 3. Append the accountability record for the erasure itself. It is
     //    chained normally and is *not* redacted — it is the controller's
     //    own record and holds no subject data.
     AuditModel::record_with_context(
-        db,
+        &mut *db,
         pid,
         ACTION_ERASED,
         actor,
@@ -166,18 +185,21 @@ fn erasure_context(ctx: &AccessContext, redacted: u64) -> serde_json::Value {
 /// once the record is soft-deleted: the audit content is still personal
 /// data, and re-running an erasure must be safe.
 ///
+/// Runs on an open transaction, under the same rules as [`erase`].
+///
 /// # Errors
 ///
 /// When the redaction sweep or the audit append fails.
-pub async fn erase_audit_only<C: ConnectionTrait>(
-    db: &C,
+pub async fn erase_audit_only(
+    db: &mut PgConnection,
     pid: Uuid,
     actor: Option<&str>,
     ctx: &AccessContext,
 ) -> ModelResult<ErasureOutcome> {
-    let audit_rows_redacted = AuditModel::redact_for_entity(db, pid).await?;
+    AuditModel::lock_chain(&mut *db).await?;
+    let audit_rows_redacted = AuditModel::redact_for_entity(&mut *db, pid).await?;
     AuditModel::record_with_context(
-        db,
+        &mut *db,
         pid,
         ACTION_ERASED,
         actor,

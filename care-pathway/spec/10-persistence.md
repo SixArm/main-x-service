@@ -1,47 +1,52 @@
 ## 10. Persistence
 
-PostgreSQL via SeaORM 1.1 + `sea-orm-migration`, owned entirely by
-the service crate. Family conventions:
-[`agents/share/postgresql.md`](../../agents/share/postgresql.md).
+PostgreSQL via **sqlx**, with no ORM, owned entirely by the service
+crate. Every statement is a compile-time-checked `query!` /
+`query_as!` / `query_scalar!` literal in the crate's `src/models/`,
+verified against the committed `.sqlx/` data; the schema is the plain
+SQL under `migrations/` (one reversible `<version>_<name>.up.sql` /
+`.down.sql` pair per migration), run by `sqlx::migrate!`. Family
+conventions: [`agents/share/postgresql.md`](../../agents/share/postgresql.md)
+and `spec/tech-stack/index.md` §5.
 
 ### 10.1 Tables
 
 The `care_pathways` table, created by migration
-[`m20220101_000001_care_pathways`](../care-pathway-service-with-axum/migration/src/m20220101_000001_care_pathways.rs):
+[`2022010100000001_care_pathways`](../care-pathway-service-with-axum/migrations/2022010100000001_care_pathways.up.sql):
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `PkAuto` | Internal row id |
-| `pid` | `UuidUniq` | Public id |
-| `name` | `String` | Denormalised `data.name` for listing |
-| `data` | `JsonBinary` (JSONB) | Full `CarePathway` payload |
-| `active` | `BooleanWithDefault(true)` | Registry flag |
-| `deleted_at` | `TimestampWithTimeZoneNull` | Soft delete |
+| `id` | `bigint` identity | Internal row id |
+| `pid` | `uuid`, unique | Public id |
+| `name` | `varchar` | Denormalised `data.name` for listing |
+| `data` | `jsonb` | Full `CarePathway` payload |
+| `active` | `boolean`, default `true` | Registry flag |
+| `deleted_at` | `timestamptz`, nullable | Soft delete |
 
 The `audit_logs` table, created by migration
-[`m20220101_000002_audit_logs`](../care-pathway-service-with-axum/migration/src/m20220101_000002_audit_logs.rs)
+[`2022010100000002_audit_logs`](../care-pathway-service-with-axum/migrations/2022010100000002_audit_logs.up.sql)
 — one row per CRUD action (T-3):
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `PkAuto` | Internal row id |
-| `entity_pid` | `Uuid` | The care pathway the entry concerns |
-| `action` | `String` | `created` / `updated` / `deleted` |
-| `actor` | `StringNull` | User / system id — `NULL` until token auth (T-7) |
-| `snapshot` | `JsonBinaryNull` | The record's `data` at the time of the action |
+| `id` | `bigint` identity | Internal row id |
+| `entity_pid` | `uuid` | The care pathway the entry concerns |
+| `action` | `varchar` | `created` / `updated` / `deleted` |
+| `actor` | `varchar`, nullable | User / system id — `NULL` until token auth (T-7) |
+| `snapshot` | `jsonb`, nullable | The record's `data` at the time of the action |
 
 The `merge_records` table, created by migration
-[`m20220101_000003_merge_records`](../care-pathway-service-with-axum/migration/src/m20220101_000003_merge_records.rs)
+[`2022010100000003_merge_records`](../care-pathway-service-with-axum/migrations/2022010100000003_merge_records.up.sql)
 — one row per record-merge (T-8):
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `PkAuto` | Internal row id |
-| `main_pid` | `Uuid` | The surviving pathway |
-| `duplicate_pid` | `Uuid` | The merged-away (now soft-deleted) pathway |
-| `reason` | `StringNull` | Optional operator-supplied reason |
-| `actor` | `StringNull` | Caller `sub` from the bearer token, else `NULL` |
-| `transferred` | `JsonBinaryNull` | Snapshot of the duplicate's payload at merge time |
+| `id` | `bigint` identity | Internal row id |
+| `main_pid` | `uuid` | The surviving pathway |
+| `duplicate_pid` | `uuid` | The merged-away (now soft-deleted) pathway |
+| `reason` | `varchar`, nullable | Optional operator-supplied reason |
+| `actor` | `varchar`, nullable | Caller `sub` from the bearer token, else `NULL` |
+| `transferred` | `jsonb`, nullable | Snapshot of the duplicate's payload at merge time |
 
 ### 10.2 JSONB rationale
 

@@ -19,14 +19,16 @@
 //! does.
 
 use axa::prelude::*;
-use sea_orm::ActiveValue;
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::data::journeys::{self, SeedParams};
-use crate::models::_entities::{
+use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::instance_segments::NewSegment;
+use crate::models::pathway_instances::NewInstance;
+use crate::models::{
     instance_events, instance_segments, instance_steps, instance_team, pathway_instances,
 };
-use crate::models::care_pathways::Model as PathwayModel;
 
 /// Parse one `key:value` CLI argument, falling back to `default` when
 /// absent.
@@ -64,86 +66,74 @@ fn parse_defects(vars: &task::Vars) -> Vec<String> {
 }
 
 /// Persist one generated instance and its child rows, returning the new
-/// instance's `pid`. Generic over `ConnectionTrait` so the caller
+/// instance's `pid`. Takes the caller's connection, so the caller
 /// controls the transaction boundary.
-async fn insert_instance<C: sea_orm::ConnectionTrait>(
-    db: &C,
+async fn insert_instance(
+    db: &mut PgConnection,
     pathway_pid: Uuid,
     generated: &journeys::GeneratedInstance,
 ) -> Result<Uuid> {
-    let instance = pathway_instances::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        pathway_pid: ActiveValue::set(pathway_pid),
-        subject_ref: ActiveValue::set(generated.subject_ref.clone()),
-        status: ActiveValue::set(generated.status.clone()),
-        urgency: ActiveValue::set(generated.urgency.clone()),
-        enrolled_on: ActiveValue::set(generated.enrolled_on),
-        next_review_on: ActiveValue::set(None),
-        closed_on: ActiveValue::set(generated.closed_on),
-        closure_reason: ActiveValue::set(None),
-        outcome: ActiveValue::set(generated.outcome.clone()),
-        clock_start_at: ActiveValue::set(generated.clock_start_at.map(Into::into)),
-        clock_stop_at: ActiveValue::set(generated.clock_stop_at.map(Into::into)),
-        deleted_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(db)
+    let instance = pathway_instances::Model::insert(
+        &mut *db,
+        &NewInstance {
+            pathway_pid,
+            subject_ref: &generated.subject_ref,
+            status: &generated.status,
+            urgency: &generated.urgency,
+            enrolled_on: generated.enrolled_on,
+            next_review_on: None,
+            closed_on: generated.closed_on,
+            closure_reason: None,
+            outcome: generated.outcome.as_deref(),
+            clock_start_at: generated.clock_start_at.map(Into::into),
+            clock_stop_at: generated.clock_stop_at.map(Into::into),
+        },
+    )
     .await?;
 
     for member in &generated.team {
-        instance_team::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
-            instance_pid: ActiveValue::set(instance.pid),
-            member_ref: ActiveValue::set(member.member_ref.clone()),
-            role: ActiveValue::set(member.role.clone()),
-            ..Default::default()
-        }
-        .insert(db)
-        .await?;
+        instance_team::Model::insert(&mut *db, instance.pid, &member.member_ref, &member.role)
+            .await?;
     }
     for (position, segment) in generated.segments.iter().enumerate() {
-        instance_segments::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
-            instance_pid: ActiveValue::set(instance.pid),
-            label: ActiveValue::set(segment.label.clone()),
-            stage: ActiveValue::set(segment.stage.clone()),
-            category: ActiveValue::set(segment.category.clone()),
-            waste: ActiveValue::set(segment.waste.clone()),
-            started_at: ActiveValue::set(segment.started_at.into()),
-            ended_at: ActiveValue::set(segment.ended_at.map(Into::into)),
-            actor_ref: ActiveValue::set(segment.actor_ref.clone()),
-            location_ref: ActiveValue::set(segment.location_ref.clone()),
-            note: ActiveValue::set(None),
-            position: ActiveValue::set(i32::try_from(position).unwrap_or(i32::MAX)),
-            ..Default::default()
-        }
-        .insert(db)
+        instance_segments::Model::insert(
+            &mut *db,
+            &NewSegment {
+                instance_pid: instance.pid,
+                label: &segment.label,
+                stage: &segment.stage,
+                category: &segment.category,
+                waste: segment.waste.as_deref(),
+                started_at: segment.started_at.into(),
+                ended_at: segment.ended_at.map(Into::into),
+                actor_ref: segment.actor_ref.as_deref(),
+                location_ref: segment.location_ref.as_deref(),
+                note: None,
+                position: i32::try_from(position).unwrap_or(i32::MAX),
+            },
+        )
         .await?;
     }
     for (position, step) in generated.steps.iter().enumerate() {
-        instance_steps::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
-            instance_pid: ActiveValue::set(instance.pid),
-            label: ActiveValue::set(step.label.clone()),
-            done: ActiveValue::set(step.done),
-            done_on: ActiveValue::set(step.done_on),
-            position: ActiveValue::set(i32::try_from(position).unwrap_or(i32::MAX)),
-            ..Default::default()
-        }
-        .insert(db)
+        instance_steps::Model::insert(
+            &mut *db,
+            instance.pid,
+            &step.label,
+            step.done,
+            step.done_on,
+            i32::try_from(position).unwrap_or(i32::MAX),
+        )
         .await?;
     }
     for event in &generated.events {
-        instance_events::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
-            instance_pid: ActiveValue::set(instance.pid),
-            kind: ActiveValue::set(event.kind.clone()),
-            occurred_at: ActiveValue::set(event.occurred_at.into()),
-            note: ActiveValue::set(None),
-            actor: ActiveValue::set(Some("journeys:seed".to_string())),
-            ..Default::default()
-        }
-        .insert(db)
+        instance_events::Model::insert(
+            &mut *db,
+            instance.pid,
+            &event.kind,
+            event.occurred_at.into(),
+            None,
+            Some("journeys:seed"),
+        )
         .await?;
     }
     Ok(instance.pid)
@@ -193,10 +183,10 @@ impl Task for JourneysSeed {
         };
         let cohort = journeys::generate_cohort(&params).map_err(|e| Error::string(&e))?;
 
-        let txn = ctx.db.begin().await?;
+        let mut txn = ctx.db.begin().await?;
         let mut defect_pids: Vec<(String, Uuid)> = Vec::new();
         for generated in &cohort.instances {
-            let instance_pid = insert_instance(&txn, template.pid, generated).await?;
+            let instance_pid = insert_instance(&mut txn, template.pid, generated).await?;
             if let Some(code) = &generated.defect {
                 defect_pids.push((code.clone(), instance_pid));
             }

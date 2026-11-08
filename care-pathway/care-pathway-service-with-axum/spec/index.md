@@ -783,11 +783,18 @@ built-in default rather than leaving the service unprotected.
 
 ## 10. Persistence
 
-PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
-`m20220101_000001_care_pathways` (the `care_pathways` table),
-`m20220101_000002_audit_logs` (the CRUD `audit_logs` trail),
-`m20220101_000003_merge_records` (record-merge history), and
-`m20260725_000007_compliance` (the `audit_logs` compliance columns —
+PostgreSQL via **sqlx**, no ORM (`spec/tech-stack/index.md` §5). Every
+statement is a compile-time-checked `query!` / `query_as!` /
+`query_scalar!` literal in `src/models/`, verified against the
+committed `.sqlx/` data (`SQLX_OFFLINE=true` builds); there is no
+`QueryBuilder` and no text-built SQL. The schema is plain SQL under
+`migrations/`, one reversible `.up.sql` / `.down.sql` pair per
+migration, run by `sqlx::migrate!` (`db migrate | down | reset |
+status` through `axa::sqlx`). Migrations
+`2022010100000001_care_pathways` (the `care_pathways` table),
+`2022010100000002_audit_logs` (the CRUD `audit_logs` trail),
+`2022010100000003_merge_records` (record-merge history), and
+`2026072500000007_compliance` (the `audit_logs` compliance columns —
 `prev_hash` / `hash` for the tamper-evident chain, `context` for the
 per-access purpose-of-use and standing declarations, `disclosure` for
 the §164.528 access/disclosure split, `redacted_at` for GDPR Art. 17,
@@ -1016,9 +1023,14 @@ building anything further. Landed 2026-07-27.
   `POST /api/care-pathways/{pid}/erase` tombstones the payload (a valid,
   data-free `CarePathway`, so read paths degrade cleanly), soft-deletes
   the record, redacts every audit `snapshot` about it, and appends a
-  chained `erased` row. Redaction preserves each row's `hash` and
-  `prev_hash`, so the chain still verifies and still proves the events
-  occurred. `actor` and `action` survive on purpose — the controller's own
+  chained `erased` row, **in one transaction**: a failure at any step
+  leaves the record exactly as it was, and the `erased` row commits only
+  with the erasure it records (the chain's advisory lock is held from
+  before the redaction sweep to the commit). After the commit the record
+  is removed from the full-text index, as on soft delete, so the erased
+  name and payload do not survive there. Redaction preserves each row's
+  `hash` and `prev_hash`, so the chain still verifies and still proves
+  the events occurred. `actor` and `action` survive on purpose — the controller's own
   accountability record under Art. 17(3)(b). Irreversible and idempotent:
   re-erasing, or erasing an already-soft-deleted `pid`, still sweeps any
   audit content held about it, because the subject's right does not lapse
@@ -1136,6 +1148,37 @@ the evidence bundle.
   supplies the technical controls they cite.
 
 ## 13. Tasks (live work queue)
+
+- [x] **SQLX-1: SeaORM to sqlx (2026-11-08).** Persistence moved off
+  SeaORM onto sqlx directly (`spec/tech-stack/index.md` §5). Every
+  statement is a `query!` / `query_as!` / `query_scalar!` literal in
+  `src/models/` — the instance layer's six tables gained row modules of
+  their own, and the SQL that lived in the instance/TBA/export/
+  data-quality/link controllers, the seed task, the relay purge, the
+  bulk stable-key lookups, the lost-job reconcile, the MAC re-sign walks
+  and `db truncate` moved there. Optional filters are static parameters
+  (`$n IS NULL OR …`, `= ANY($n)`), so there is no `QueryBuilder` and no
+  SQL allowlist entry. The 16 migrations are plain SQL under
+  `migrations/`, written from a `pg_dump` of the old schema; a
+  `pg_dump --schema-only` of an old-code and a new-code database is
+  identical outside the bookkeeping tables. Hash chain, checkpoints,
+  record digests and MACs, the outbox, soft delete, merge, the review
+  queue, bulk, cursor paging, `continues_as` links, ABAC and every
+  serialized row behave as before. INT-V1 does not apply here: the new
+  DB test `a_written_record_verifies` passed on the old code and stays
+  as a guard. The relay's `SKIP LOCKED` pin is now a DB test.
+- [x] **ER-1: erasure is atomic and leaves the search index
+  (2026-11-08).** Found during SQLX-1 (the case service's CS-G1 and
+  CS-E1). `POST /api/care-pathways/{pid}/erase` ran the tombstone, the
+  audit redaction and the chained `erased` row with no transaction, so a
+  failure part-way left the record half erased; they now commit together
+  on one transaction, with the chain's advisory lock taken before the
+  redaction sweep (`AuditModel::lock_chain`). The erased name and payload
+  also stayed in the Tantivy index; they are now removed after the
+  commit, as soft delete does. DB tests
+  `erasure_failing_late_leaves_nothing_changed` and
+  `erasure_removes_the_pathway_from_the_search_index` failed before the
+  fix.
 
 - [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
   (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
@@ -1959,7 +2002,9 @@ the evidence bundle.
 
 ## 14. Implementation status
 
-Done: axa boot; care_pathways table + migration; CRUD with `422`
+Done: axa boot; persistence on sqlx (every statement a checked
+`query!` literal in `src/models/`, plain-SQL `migrations/`, committed
+`.sqlx/`); care_pathways table + migration; CRUD with `422`
 validation on create/update (blank `name`; ICD-10 / ICD-11 / SNOMED CT
 `condition_codes` format checks; UUID / DOI `identifiers` shapes; BCP-47
 `in_language` syntax — all problems reported together); paginated
@@ -1990,7 +2035,7 @@ team, outcomes — §13 2026-07-20) and the registry insight views
 (directory/coverage/variants/providers/languages); the full compliance
 surface (§12) — tamper-evident audit hash chain, keyed MAC + external-
 witness checkpoints, row-level record integrity, read/disclosure
-auditing, GDPR Art. 17 erasure, SOUP register + CycloneDX SBOM,
+auditing, GDPR Art. 17 erasure (one transaction, and de-indexed), SOUP register + CycloneDX SBOM,
 machine-checked requirement→test traceability; the FHIR R5
 `PlanDefinition` surface (§12.3) with `$validate`, conditional SMART
 discovery, and Bulk Data `$export` (durable, on the `bg_pg` worker);

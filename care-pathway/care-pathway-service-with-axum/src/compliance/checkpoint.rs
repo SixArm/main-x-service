@@ -46,7 +46,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::models::_entities::audit_logs;
+use crate::models::audit_logs;
 
 /// Format version, bound into the MAC so a later change to the
 /// checkpoint's shape cannot be mistaken for a forged value.
@@ -143,26 +143,16 @@ impl Checkpoint {
     ///
     /// When the queries fail.
     pub async fn take(
-        db: &sea_orm::DatabaseConnection,
+        db: &sqlx::PgPool,
         taken_at_micros: i64,
-    ) -> axa::prelude::ModelResult<Option<Self>> {
-        use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
-
-        let Some(anchor) = audit_logs::Entity::find()
-            .filter(audit_logs::Column::Hash.is_not_null())
-            .order_by_desc(audit_logs::Column::Id)
-            .one(db)
-            .await?
-        else {
+    ) -> crate::models::ModelResult<Option<Self>> {
+        let Some(anchor) = audit_logs::Model::newest_hashed(db).await? else {
             return Ok(None);
         };
         let Some(head) = anchor.hash.clone() else {
             return Ok(None);
         };
-        let rows_at_or_before = audit_logs::Entity::find()
-            .filter(audit_logs::Column::Id.lte(anchor.id))
-            .count(db)
-            .await?;
+        let rows_at_or_before = audit_logs::Model::count_at_or_before(db, anchor.id).await?;
 
         let mut checkpoint = Self {
             version: CHECKPOINT_VERSION.to_string(),
@@ -187,10 +177,8 @@ impl Checkpoint {
     /// When the queries fail.
     pub async fn verify_against(
         &self,
-        db: &sea_orm::DatabaseConnection,
-    ) -> axa::prelude::ModelResult<CheckpointVerdict> {
-        use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
-
+        db: &sqlx::PgPool,
+    ) -> crate::models::ModelResult<CheckpointVerdict> {
         match super::mac::verify(
             super::mac::Domain::Checkpoint,
             self.mac.as_deref(),
@@ -211,10 +199,7 @@ impl Checkpoint {
             }
         }
 
-        let Some(anchor) = audit_logs::Entity::find_by_id(self.anchor_id)
-            .one(db)
-            .await?
-        else {
+        let Some(anchor) = audit_logs::Model::find_by_id(db, self.anchor_id).await? else {
             return Ok(CheckpointVerdict::AnchorMissing {
                 anchor_id: self.anchor_id,
             });
@@ -226,10 +211,7 @@ impl Checkpoint {
                 found,
             });
         }
-        let now = audit_logs::Entity::find()
-            .filter(audit_logs::Column::Id.lte(self.anchor_id))
-            .count(db)
-            .await?;
+        let now = audit_logs::Model::count_at_or_before(db, self.anchor_id).await?;
         if now < self.rows_at_or_before {
             return Ok(CheckpointVerdict::RowsDeleted {
                 expected: self.rows_at_or_before,

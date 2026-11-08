@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn lockfile_contains_known_dependencies() {
         let packages = locked_packages();
-        for expected in ["axa", "sea-orm", "axum", "sha2", "care-pathway-matcher"] {
+        for expected in ["axa", "sqlx", "axum", "sha2", "care-pathway-matcher"] {
             assert!(
                 packages.iter().any(|(n, _)| n == expected),
                 "{expected} missing from the parsed lockfile"

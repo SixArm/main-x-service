@@ -20,7 +20,7 @@
 +--------------+-------------------------------+----------------+
                |  path dependency (Cargo)      |
 +--------------v---------------+  +------------v---------------+
-|  care-pathway-matcher        |  |  PostgreSQL (SeaORM 1.1)   |
+|  care-pathway-matcher        |  |  PostgreSQL (sqlx)          |
 |  pure library, no IO         |  |  care_pathways table        |
 |  MatchingEngine ·            |  |  pid · name · data JSONB ·  |
 |  MatchConfig · CarePathway   |  |  active · deleted_at        |
@@ -42,10 +42,10 @@ care-pathway-service-with-axum/
 │   ├── app.rs                       `App` functions (routes, truncate)
 │   ├── bin/main.rs                  axa CLI entrypoint
 │   ├── controllers/care_pathways.rs CRUD + match + check-duplicates
-│   └── models/
-│       ├── care_pathways.rs         CRUD helpers over the payload
-│       └── _entities/care_pathways.rs  SeaORM entity
-├── migration/src/m20220101_000001_care_pathways.rs
+│   └── models/                      every SQL statement (sqlx `query!` literals)
+│       └── care_pathways.rs         row type + CRUD helpers over the payload
+├── migrations/2022010100000001_care_pathways.up.sql   plain-SQL migrations
+├── .sqlx/                           compile-time query data (`SQLX_OFFLINE=true`)
 ├── config/{development,production,test}.yaml
 └── tests/matching.rs                DB-free matcher-embedding tests
 ```

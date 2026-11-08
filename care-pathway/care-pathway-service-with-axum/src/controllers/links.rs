@@ -65,15 +65,14 @@ use axa::error::ErrorDetail;
 use axa::prelude::*;
 use axum::http::StatusCode;
 use entity_ref::{EdgeKind, EntityRef, EntityType};
-use sea_orm::ColumnTrait;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::auth::MaybeAuthUser;
 use crate::journey::{self, Leg};
-use crate::models::_entities::pathway_instances;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::models::entity_links::{Model as EntityLinkModel, NewEdge};
+use crate::models::pathway_instances;
 use crate::streaming;
 
 /// Cap on one reconciliation pull, so a full replay cannot become an
@@ -236,10 +235,7 @@ fn record_rejection((status, reason): (StatusCode, String)) -> Error {
 /// Find one live instance, or `404`.
 async fn find_instance(ctx: &AppContext, raw: &str) -> Result<pathway_instances::Model> {
     let pid = Uuid::parse_str(raw).map_err(|_| Error::NotFound)?;
-    pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::Pid.eq(pid))
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .one(&ctx.db)
+    pathway_instances::Model::find_live(&ctx.db, pid)
         .await?
         .ok_or(Error::NotFound)
 }

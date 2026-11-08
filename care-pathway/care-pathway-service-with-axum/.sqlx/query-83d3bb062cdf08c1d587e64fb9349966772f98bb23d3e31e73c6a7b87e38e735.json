@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE care_pathways\n             SET name = $2, data = $3, active = false, deleted_at = $4,\n                 content_hash = $5, content_hash_sha3 = $6, content_mac = $7\n             WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar",
+        "Jsonb",
+        "Timestamptz",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "83d3bb062cdf08c1d587e64fb9349966772f98bb23d3e31e73c6a7b87e38e735"
+}

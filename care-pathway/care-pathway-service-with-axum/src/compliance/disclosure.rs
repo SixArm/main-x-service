@@ -44,9 +44,9 @@
 //! - **on** — refuse the read with `503`, disclosing nothing the service
 //!   cannot account for. Recommended for a HIPAA-facing deployment.
 
+use axa::sqlx::Db;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 
 use crate::compliance::DataProtection;
@@ -292,8 +292,8 @@ pub fn fail_closed() -> bool {
 /// [`fail_closed`] is on — the caller must then refuse the read. With
 /// fail-closed off (the default) a failure is logged and `Ok` is
 /// returned, preserving the previous best-effort behaviour.
-pub async fn record_access<C: ConnectionTrait>(
-    db: &C,
+pub async fn record_access(
+    db: impl Into<Db<'_>>,
     entity_pid: Uuid,
     action: &str,
     actor: Option<&str>,
@@ -486,11 +486,13 @@ mod tests {
         if super::super::audit_reads() {
             return; // env opted in; the DB-gated suite covers that path
         }
-        // A connection that would fail if touched: proves the no-op path
-        // never reaches the database. sea-orm 2.0 dropped the old
-        // `DatabaseConnection::Disconnected` marker variant; a `MockDatabase`
-        // with no queued results errors on the first real query instead.
-        let db = sea_orm::MockDatabase::new(sea_orm::DatabaseBackend::Postgres).into_connection();
+        // A pool that would fail if touched: proves the no-op path never
+        // reaches the database. Lazy, so nothing connects until a query,
+        // and pointed at a port nothing listens on, so a query errors.
+        let db = sqlx::postgres::PgPoolOptions::new()
+            .acquire_timeout(std::time::Duration::from_millis(200))
+            .connect_lazy("postgres://nobody@127.0.0.1:1/none")
+            .expect("a lazy pool builds without connecting");
         let ctx = AccessContext::internal();
         assert!(
             record_access(&db, Uuid::nil(), action::READ, None, &ctx)

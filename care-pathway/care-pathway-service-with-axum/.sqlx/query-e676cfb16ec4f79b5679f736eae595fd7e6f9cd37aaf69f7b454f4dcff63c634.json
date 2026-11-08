@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE audit_logs SET snapshot = jsonb_set(snapshot, '{name}', '\"Tampered\"')\n               WHERE snapshot IS NOT NULL AND redacted_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "e676cfb16ec4f79b5679f736eae595fd7e6f9cd37aaf69f7b454f4dcff63c634"
+}

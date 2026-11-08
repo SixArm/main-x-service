@@ -19,7 +19,7 @@
 FROM rust:1.97-slim AS builder
 
 # Build dependencies — `libssl-dev` for openssl-sys, `libpq-dev` for
-# the PostgreSQL C client headers SeaORM links against via sqlx.
+# the PostgreSQL C client headers (sqlx itself is pure Rust).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         libssl-dev \
@@ -47,11 +47,12 @@ COPY care-pathway/care-pathway-matcher-rust-crate care-pathway/care-pathway-matc
 COPY link/entity-ref-rust-crate link/entity-ref-rust-crate
 
 # This crate itself: manifests first (better layer caching), then the
-# nested `migration` sub-crate (loco's sea-orm-migration bridge — a
-# same-directory path dependency, so it travels with the COPY below
-# regardless), then sources.
+# plain-SQL migrations `sqlx::migrate!` embeds, then the `.sqlx/` query
+# data the `query!` macros check against (no database at build time),
+# then sources.
 COPY care-pathway/care-pathway-service-with-axum/Cargo.toml care-pathway/care-pathway-service-with-axum/Cargo.lock care-pathway/care-pathway-service-with-axum/
-COPY care-pathway/care-pathway-service-with-axum/migration care-pathway/care-pathway-service-with-axum/migration
+COPY care-pathway/care-pathway-service-with-axum/migrations care-pathway/care-pathway-service-with-axum/migrations
+COPY care-pathway/care-pathway-service-with-axum/.sqlx care-pathway/care-pathway-service-with-axum/.sqlx
 # The IEC 62304 §5.3.3 SOUP register (src/compliance/soup.rs embeds it
 # via a relative include_str! from src/compliance/../../compliance/).
 COPY care-pathway/care-pathway-service-with-axum/compliance care-pathway/care-pathway-service-with-axum/compliance
@@ -67,18 +68,20 @@ COPY care-pathway/care-pathway-service-with-axum/benches care-pathway/care-pathw
 WORKDIR /app/care-pathway/care-pathway-service-with-axum
 
 # Build the binary target declared by src/bin/main.rs. Migration SQL
-# is embedded into the binary at compile time via `include_str!`
-# (agents/share/architecture.md), so the runtime stage below needs no
-# loose migration files. Default features only — this crate's optional
+# is embedded into the binary at compile time by `sqlx::migrate!`, so
+# the runtime stage below needs no loose migration files.
+# `SQLX_OFFLINE=true` makes the `query!` macros read `.sqlx/` instead of
+# connecting to a database. Default features only — this crate's optional
 # `s3` (bulk artifacts) and `fluvio` (BUS-3 relay sink) features stay
 # off in the reference image; enable at build time if a deployment
 # needs them.
+ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin care-pathway-service
 
 # Stage 2: runtime — minimal Debian 13 slim base.
 FROM debian:13-slim
 
-# Runtime libraries. libpq5 for the SeaORM PostgreSQL connector,
+# Runtime libraries. libpq5 for the PostgreSQL connector,
 # libssl3 for openssl, ca-certificates for HTTPS chains (PASETO
 # key-set fetch), curl for the HEALTHCHECK below.
 RUN apt-get update && apt-get install -y --no-install-recommends \

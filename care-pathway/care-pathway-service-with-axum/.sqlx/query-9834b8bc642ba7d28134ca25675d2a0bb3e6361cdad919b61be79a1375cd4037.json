@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE instance_steps SET done = true, done_on = $2 WHERE pid = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9834b8bc642ba7d28134ca25675d2a0bb3e6361cdad919b61be79a1375cd4037"
+}

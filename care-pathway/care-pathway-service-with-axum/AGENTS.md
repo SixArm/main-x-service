@@ -15,7 +15,8 @@ adapter to drift.
 
 | Question | Answer |
 |---|---|
-| Framework | axa (`Hooks`/`AppContext`/CLI, axa config, `sea-orm-migration` 2.0). |
+| Framework | axa (`AppContext`/CLI, axa config) on Axum; **sqlx** for persistence, no ORM. |
+| SQL | Every statement is a `query!` / `query_as!` / `query_scalar!` literal in `src/models/`, checked against the committed `.sqlx/` (build with `SQLX_OFFLINE=true`; regenerate with `cargo sqlx prepare -- --all-targets` against a migrated database). No `QueryBuilder`, `AssertSqlSafe` or `raw_sql`. |
 | Build / test | `cargo build` · `cargo test` (DB-free: `tests/matching.rs` + controller 422 pin) · `cargo test -- --ignored` (request tests, need Postgres). |
 | Run | `cargo run -- start` (needs Postgres). |
 | Persistence | One `care_pathways` table: `pid`, `name`, `data` (JSONB CarePathway), `active`, soft-delete. |
@@ -401,7 +402,8 @@ only the credential changed. See
 
 1. **Spec-first.** Update `spec/index.md` with behavioural changes.
 2. **Controller-style.** Endpoints are axa controllers in `app.rs`; new
-   tables are `sea-orm-migration` migrations.
+   tables are plain-SQL `migrations/<version>_<name>.up.sql` / `.down.sql`
+   pairs, run by `sqlx::migrate!`; every statement lives in `src/models/`.
 3. **Reuse the matcher type.** Do not fork a `CarePathway` DTO.
 4. **Auth** comes from the central
    [authentication-service](../../authentication/authentication-service-with-axum):
@@ -495,9 +497,13 @@ src/
 │   ├── merge_records.rs   merge-history record/query helpers
 │   ├── event_outbox.rs    durable-bus Phase 2: OutboxInsert::from_envelope mapping + enqueue (tx-generic) + relay poll/ack
 │   ├── bulk_jobs.rs        queued→running→terminal job lifecycle, shared by FHIR $export and native bulk import/export (submit/submit_with_ttl, set_input_url, finish_import, complete, fail)
-│   ├── review_queue.rs      T-10: the duplicate-review queue (raw SQL, no SeaORM entity) — upsert/list/decide
-│   └── _entities/{care_pathways,audit_logs,merge_records,event_outbox,bulk_jobs,pathway_instances,instance_steps,instance_team,instance_events,instance_measures,instance_segments}.rs  SeaORM entities
-migration/src/            …care_pathways, …audit_logs, …merge_records, …event_outbox, …instances (m20260720_…), …outcomes, …compliance (m20260725_000007), …record_integrity, …bulk_jobs, …review_queue (m20260912_000016)
+│   ├── review_queue.rs      T-10: the duplicate-review queue — upsert/list/decide
+│   ├── entity_links.rs      continues_as outbound edges (upsert/list/withdraw/reconcile pull)
+│   ├── pathway_instances.rs the instance layer's root (enrol, lifecycle, clock, cohorts)
+│   ├── instance_{steps,team,events,measures,segments}.rs  the per-instance tables
+│   └── mod.rs               ModelError/ModelResult, MIGRATOR, delete_all_rows (db truncate)
+migrations/               16 plain-SQL up/down pairs, 2022010100000001_care_pathways … 2026091200000016_review_queue
+.sqlx/                    compile-time query data for the `query!` macros (committed)
 config/                   development/production/test yaml
 compose.fluvio.yaml        opt-in local Fluvio broker (`fluvio` feature, BUS-3; not part of CI)
 Dockerfile.fluvio-cli       support image for compose.fluvio.yaml's sc-setup step

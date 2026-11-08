@@ -236,7 +236,8 @@ point here rather than repeat it.
 | patient-flow | sqlx | 2026-11-08 |
 | authentication | sqlx | 2026-11-08 |
 | case | sqlx | 2026-11-08 |
-| care-pathway, person, worker | SeaORM, last | |
+| care-pathway | sqlx | 2026-11-08 |
+| person, worker | SeaORM, last | |
 
 Each crate on sqlx proves its schema unchanged with a `pg_dump --schema-only`
 diff against a database the old code migrated, which differs only in the

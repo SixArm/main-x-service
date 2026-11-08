@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT content_hash, content_hash_sha3 FROM care_pathways WHERE pid = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "content_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "content_hash_sha3",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "content_hash_sha3"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "9bbeb8078b009b0dea65ab3e9c94c0dbfdaf67b0457f980c05f2fe6cebb1d26b"
+}

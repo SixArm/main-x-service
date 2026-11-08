@@ -7,20 +7,54 @@
 //! withdraws one. Validation of the edge — that `to_ref` parses and the
 //! `kind`/endpoint pair is permitted — lives in `controllers/links.rs`
 //! and is DB-free; this layer is pure persistence.
+//!
+//! One persisted row is one **outbound** edge this service originates
+//! from a **pathway instance** (v1: `continues_as`).
 
-use axa::prelude::*;
-use sea_orm::sea_query::OnConflict;
-use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect, prelude::Date};
+use axa::sqlx::Db;
+use chrono::{DateTime, FixedOffset, NaiveDate};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-pub use super::_entities::entity_links::{self, ActiveModel, Entity, Model};
+use super::{ModelError, ModelResult};
 
-impl ActiveModelBehavior for super::_entities::entity_links::ActiveModel {}
+/// One persisted outbound cross-service edge.
+///
+/// `Eq` is intentionally not derived: `confidence` is an `f64` (not `Eq`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row creation timestamp.
+    pub created_at: DateTime<FixedOffset>,
+    /// Row last-update timestamp: the column default, never bumped by a
+    /// statement here, exactly as under `SeaORM`.
+    pub updated_at: DateTime<FixedOffset>,
+    /// The edge id (also the `linked`/`unlinked` event's `edge_id`).
+    pub id: Uuid,
+    /// The originating pathway instance (`pid`).
+    pub from_pid: Uuid,
+    /// The edge kind token (§9 registry), e.g. `continues_as`.
+    pub kind: String,
+    /// The far record's `EntityRef` URN, e.g. `person:<uuid>`.
+    pub to_ref: String,
+    /// Optional role label.
+    pub role: Option<String>,
+    /// Optional confidence: `1.0` operator-asserted, `<1` suggested.
+    pub confidence: Option<f64>,
+    /// How the edge arose: `operator` | `import` | `matcher_suggested`.
+    pub provenance: String,
+    /// When the continuation began.
+    pub valid_from: Option<NaiveDate>,
+    /// When it ended.
+    pub valid_to: Option<NaiveDate>,
+    /// Soft-delete timestamp (a withdrawn edge); `None` while live.
+    pub deleted_at: Option<DateTime<FixedOffset>>,
+}
 
 /// The column values for a new (or re-asserted) outbound edge — the
 /// validated, ready-to-persist shape the controller hands to
-/// [`Model::upsert`]. Kept separate from the `SeaORM` `ActiveModel` so
-/// the controller never constructs entity internals directly.
+/// [`Model::upsert`]. Kept separate from the row type so the controller
+/// does not construct row internals directly.
 #[derive(Debug, Clone)]
 pub struct NewEdge {
     /// The originating **pathway instance** pid.
@@ -35,63 +69,56 @@ pub struct NewEdge {
     pub confidence: Option<f64>,
     /// Provenance (`operator` by default).
     pub provenance: String,
-    /// When the continuation began.
-    pub valid_from: Option<Date>,
-    /// When it ended.
-    pub valid_to: Option<Date>,
+    /// Optional validity start.
+    pub valid_from: Option<NaiveDate>,
+    /// Optional validity end.
+    pub valid_to: Option<NaiveDate>,
 }
 
 impl Model {
     /// Idempotently create or update an outbound edge on the
-    /// `(from_pid, kind, to_ref, valid_from)` key.
+    /// `(from_pid, kind, to_ref, valid_from)` unique key: a re-assertion of
+    /// the same edge updates its mutable columns (role / confidence /
+    /// provenance / `valid_to`) and **revives** a previously soft-deleted
+    /// edge (clears `deleted_at`) rather than inserting a duplicate, so the
+    /// edge id is stable across re-asserts.
     ///
-    /// A re-assertion of the same edge updates its mutable columns and
-    /// **revives** a previously withdrawn one (clears `deleted_at`)
-    /// rather than inserting a duplicate — so the edge id is stable
-    /// across re-asserts, and the aggregator's dedup on `edge_id` keeps
-    /// working.
-    ///
-    /// Generic over [`ConnectionTrait`] so the caller can pass either
-    /// the pooled connection (memory transport) or its own transaction
-    /// (outbox transport — the row and its `event_outbox` row then share
-    /// one commit boundary).
+    /// Takes a [`Db`], so the caller can pass either the pool (memory
+    /// transport) or its own open transaction (outbox transport — the row
+    /// and its `event_outbox` row share one commit boundary).
     ///
     /// # Errors
     ///
     /// When the insert/upsert fails.
-    pub async fn upsert<C: ConnectionTrait>(db: &C, edge: &NewEdge) -> ModelResult<Self> {
-        let am = entity_links::ActiveModel {
-            id: ActiveValue::set(Uuid::new_v4()),
-            from_pid: ActiveValue::set(edge.from_pid),
-            kind: ActiveValue::set(edge.kind.clone()),
-            to_ref: ActiveValue::set(edge.to_ref.clone()),
-            role: ActiveValue::set(edge.role.clone()),
-            confidence: ActiveValue::set(edge.confidence),
-            provenance: ActiveValue::set(edge.provenance.clone()),
-            valid_from: ActiveValue::set(edge.valid_from),
-            valid_to: ActiveValue::set(edge.valid_to),
-            deleted_at: ActiveValue::set(None),
-            ..Default::default()
-        };
-        let row = entity_links::Entity::insert(am)
-            .on_conflict(
-                OnConflict::columns([
-                    entity_links::Column::FromPid,
-                    entity_links::Column::Kind,
-                    entity_links::Column::ToRef,
-                    entity_links::Column::ValidFrom,
-                ])
-                .update_columns([
-                    entity_links::Column::Role,
-                    entity_links::Column::Confidence,
-                    entity_links::Column::Provenance,
-                    entity_links::Column::ValidTo,
-                    entity_links::Column::DeletedAt,
-                ])
-                .to_owned(),
-            )
-            .exec_with_returning(db)
-            .await?;
+    pub async fn upsert(db: impl Into<Db<'_>>, edge: &NewEdge) -> ModelResult<Self> {
+        let mut conn = db.into().acquire().await?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"INSERT INTO entity_links
+                   (id, from_pid, kind, to_ref, role, confidence, provenance,
+                    valid_from, valid_to, deleted_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)
+               ON CONFLICT (from_pid, kind, to_ref, valid_from) DO UPDATE SET
+                   role = EXCLUDED.role,
+                   confidence = EXCLUDED.confidence,
+                   provenance = EXCLUDED.provenance,
+                   valid_to = EXCLUDED.valid_to,
+                   deleted_at = EXCLUDED.deleted_at
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, from_pid, kind, to_ref, role, confidence, provenance,
+                         valid_from, valid_to, deleted_at AS "deleted_at: _""#,
+            Uuid::new_v4(),
+            edge.from_pid,
+            edge.kind,
+            edge.to_ref,
+            edge.role,
+            edge.confidence,
+            edge.provenance,
+            edge.valid_from,
+            edge.valid_to,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
         Ok(row)
     }
 
@@ -100,13 +127,19 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn list_active(db: &DatabaseConnection, from_pid: Uuid) -> ModelResult<Vec<Self>> {
-        let rows = entity_links::Entity::find()
-            .filter(entity_links::Column::FromPid.eq(from_pid))
-            .filter(entity_links::Column::DeletedAt.is_null())
-            .order_by_desc(entity_links::Column::CreatedAt)
-            .all(db)
-            .await?;
+    pub async fn list_active(db: &PgPool, from_pid: Uuid) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, from_pid, kind, to_ref, role, confidence, provenance,
+                      valid_from, valid_to, deleted_at AS "deleted_at: _"
+               FROM entity_links
+               WHERE from_pid = $1 AND deleted_at IS NULL
+               ORDER BY created_at DESC"#,
+            from_pid,
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 
@@ -115,20 +148,23 @@ impl Model {
     ///
     /// # Errors
     ///
-    /// When not found (unknown, already withdrawn, or another
-    /// instance's), or the query fails.
-    pub async fn find_active(
-        db: &DatabaseConnection,
-        from_pid: Uuid,
-        id: Uuid,
-    ) -> ModelResult<Self> {
-        entity_links::Entity::find()
-            .filter(entity_links::Column::Id.eq(id))
-            .filter(entity_links::Column::FromPid.eq(from_pid))
-            .filter(entity_links::Column::DeletedAt.is_null())
-            .one(db)
-            .await?
-            .ok_or(ModelError::EntityNotFound)
+    /// When not found (unknown / already withdrawn / another instance's) or the
+    /// query fails.
+    pub async fn find_active(db: &PgPool, from_pid: Uuid, id: Uuid) -> ModelResult<Self> {
+        let row = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, from_pid, kind, to_ref, role, confidence, provenance,
+                      valid_from, valid_to, deleted_at AS "deleted_at: _"
+               FROM entity_links
+               WHERE id = $1 AND from_pid = $2 AND deleted_at IS NULL
+               LIMIT 1"#,
+            id,
+            from_pid,
+        )
+        .fetch_optional(db)
+        .await?;
+        row.ok_or(ModelError::EntityNotFound)
     }
 
     /// Every active outbound edge across all instances, oldest first, for
@@ -139,33 +175,47 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn all_active(
-        db: &DatabaseConnection,
-        since: Option<chrono::DateTime<chrono::FixedOffset>>,
+        db: &PgPool,
+        since: Option<DateTime<FixedOffset>>,
         limit: u64,
     ) -> ModelResult<Vec<Self>> {
-        let mut query =
-            entity_links::Entity::find().filter(entity_links::Column::DeletedAt.is_null());
-        if let Some(since) = since {
-            query = query.filter(entity_links::Column::CreatedAt.gte(since));
-        }
-        let rows = query
-            .order_by_asc(entity_links::Column::CreatedAt)
-            .limit(limit)
-            .all(db)
-            .await?;
+        // One static statement: an absent bound is a NULL `$1`, which
+        // matches every row.
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, from_pid, kind, to_ref, role, confidence, provenance,
+                      valid_from, valid_to, deleted_at AS "deleted_at: _"
+               FROM entity_links
+               WHERE deleted_at IS NULL
+                 AND ($1::timestamptz IS NULL OR created_at >= $1)
+               ORDER BY created_at ASC
+               LIMIT $2"#,
+            since,
+            i64::try_from(limit).unwrap_or(i64::MAX),
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 
-    /// Withdraw this edge (soft delete). Generic over the connection so
-    /// it shares the caller's transaction under the outbox transport.
+    /// Withdraw this edge (soft delete). Takes a [`Db`], so it shares the
+    /// caller's transaction under the outbox transport.
     ///
     /// # Errors
     ///
-    /// When the update fails.
-    pub async fn soft_delete<C: ConnectionTrait>(self, db: &C) -> ModelResult<()> {
-        let mut am: entity_links::ActiveModel = self.into();
-        am.deleted_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-        am.update(db).await?;
-        Ok(())
+    /// When the update fails, including when the row is gone
+    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    pub async fn soft_delete(self, db: impl Into<Db<'_>>) -> ModelResult<()> {
+        let stamp: DateTime<FixedOffset> = chrono::Utc::now().into();
+        let mut conn = db.into().acquire().await?;
+        let done = sqlx::query!(
+            "UPDATE entity_links SET deleted_at = $2 WHERE id = $1",
+            self.id,
+            stamp,
+        )
+        .execute(&mut *conn)
+        .await?;
+        super::updated(done.rows_affected())
     }
 }

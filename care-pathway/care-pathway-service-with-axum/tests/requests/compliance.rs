@@ -119,14 +119,13 @@ async fn tampering_with_a_row_breaks_verification() {
 
         // Rewrite a snapshot directly in the database, exactly as an
         // attacker (or a careless operator) with SQL access would.
-        use sea_orm::ConnectionTrait as _;
-        ctx.db
-            .execute_unprepared(
-                r#"UPDATE audit_logs SET snapshot = jsonb_set(snapshot, '{name}', '"Tampered"')
-                   WHERE snapshot IS NOT NULL AND redacted_at IS NULL"#,
-            )
-            .await
-            .expect("tamper");
+        sqlx::query!(
+            r#"UPDATE audit_logs SET snapshot = jsonb_set(snapshot, '{name}', '"Tampered"')
+               WHERE snapshot IS NOT NULL AND redacted_at IS NULL"#,
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("tamper");
 
         let report = verify(&request).await;
         assert_eq!(
@@ -339,14 +338,14 @@ async fn out_of_band_record_edit_is_detected() {
         assert_eq!(report["unhashed"], 0, "every write must set a hash");
 
         // Now edit a stored payload behind the service's back.
-        use sea_orm::ConnectionTrait as _;
-        ctx.db
-            .execute_unprepared(&format!(
-                "UPDATE care_pathways SET data = jsonb_set(data, '{{name}}', '\"Tampered\"') \
-                 WHERE pid = '{pid}'"
-            ))
-            .await
-            .expect("tamper");
+        sqlx::query!(
+            r#"UPDATE care_pathways SET data = jsonb_set(data, '{name}', '"Tampered"')
+               WHERE pid = $1"#,
+            uuid::Uuid::parse_str(&pid).expect("uuid"),
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("tamper");
 
         let report = verify_records(&request).await;
         assert_eq!(
@@ -841,8 +840,6 @@ async fn export_state_is_durable_not_in_process() {
 async fn a_recorded_checkpoint_detects_wholesale_deletion() {
     super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
-        use sea_orm::ConnectionTrait as _;
-
         // Some history to witness.
         for i in 0..3 {
             let mut body = rich_pathway();
@@ -868,11 +865,8 @@ async fn a_recorded_checkpoint_detects_wholesale_deletion() {
 
         // Now delete the trail wholesale, as an attacker with SQL access
         // would. No audit row is written; nothing in-band records it.
-        ctx.db
-            .execute_raw(sea_orm::Statement::from_string(
-                sea_orm::DatabaseBackend::Postgres,
-                "DELETE FROM audit_logs".to_string(),
-            ))
+        sqlx::query!("DELETE FROM audit_logs")
+            .execute(&ctx.db)
             .await
             .expect("delete the trail");
 
@@ -944,6 +938,261 @@ async fn an_altered_checkpoint_accuses_itself_not_the_chain() {
         assert_eq!(
             report["verdict"]["verdict"], "checkpoint_not_authentic",
             "the witness is what failed, not the chain: {report}"
+        );
+    })
+    .await;
+}
+
+/// The `pid`s the record-integrity report flags.
+async fn mismatched_pids(request: &TestServer) -> Vec<String> {
+    let response = request
+        .get("/api/compliance/records/verify?limit=1000")
+        .await;
+    assert_eq!(response.status_code(), 200, "records verify should answer");
+    let report: Value = response.json();
+    report["mismatched"]
+        .as_array()
+        .expect("mismatched array")
+        .iter()
+        .map(|m| m["pid"].as_str().expect("mismatch pid").to_string())
+        .collect()
+}
+
+/// INT-V1: a record the service wrote must verify. The digests are
+/// computed from the payload the service serialized, while verification
+/// recomputes them from the row Postgres hands back — so the JSONB
+/// round-trip must not change the pre-image. A fresh record verifies, an
+/// updated one verifies, and a row edited behind the service's back
+/// through a raw pool is flagged.
+///
+/// Care pathway is not affected by INT-V1 (this test passed on the
+/// `SeaORM` code before the move): the payload holds no floats, and its
+/// canonical JSON is key-sorted, so the stored `jsonb` reproduces it
+/// byte for byte. The test stays as a guard.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn a_written_record_verifies() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        // Every nested collection the payload carries, so the digest is
+        // exercised over the whole stored record, not just `name`.
+        let mut body = rich_pathway();
+        body["care_setting"] = json!("Inpatient");
+        body["same_as"] = json!(["https://www.wikidata.org/wiki/Q12202"]);
+        body["keywords"] = json!(["stroke", "Zürich", "日本", "tab\there"]);
+        body["relationships"] = json!([{"relation": "FollowedBy", "pathway_id": "rehab-1"}]);
+        body["tags"] = json!(["tier-1", "acute"]);
+        let pid = create(&request, &body).await;
+        let uuid = uuid::Uuid::parse_str(&pid).expect("uuid");
+
+        // Not vacuous: an unhashed row is never a mismatch, so the record
+        // must actually carry both digests for the checks below to mean
+        // anything.
+        let digests = sqlx::query!(
+            "SELECT content_hash, content_hash_sha3 FROM care_pathways WHERE pid = $1",
+            uuid,
+        )
+        .fetch_one(&ctx.db)
+        .await
+        .expect("read digests");
+        assert!(
+            digests.content_hash.is_some() && digests.content_hash_sha3.is_some(),
+            "a new record carries its digests"
+        );
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            !mismatched.contains(&pid),
+            "a freshly created record must verify; mismatched: {mismatched:?}"
+        );
+
+        let mut changed = body.clone();
+        changed["keywords"] = json!(["stroke", "thrombolysis", "Ünïcode"]);
+        changed["tags"] = json!(["tier-2"]);
+        let response = request
+            .put(&format!("/api/care-pathways/{pid}"))
+            .json(&changed)
+            .await;
+        assert_eq!(response.status_code(), 200, "update should succeed");
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            !mismatched.contains(&pid),
+            "an updated record must verify; mismatched: {mismatched:?}"
+        );
+
+        // An edit made behind the service's back, through a raw pool of
+        // its own, must still be caught.
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+        let raw = sqlx::PgPool::connect(&url).await.expect("raw pool");
+        sqlx::query!(
+            "UPDATE care_pathways SET name = name || ' (edited in SQL)' WHERE pid = $1",
+            uuid,
+        )
+        .execute(&raw)
+        .await
+        .expect("raw SQL edit");
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            mismatched.contains(&pid),
+            "a row edited in SQL must be reported; mismatched: {mismatched:?}"
+        );
+    })
+    .await;
+}
+
+/// `(rows, redacted rows, erased rows)` in the audit trail for `pid`.
+async fn audit_counts(db: &sqlx::PgPool, pid: &str) -> (i64, i64, i64) {
+    let row = sqlx::query!(
+        r#"SELECT count(*) AS "rows!",
+                  count(*) FILTER (WHERE redacted_at IS NOT NULL) AS "redacted!",
+                  count(*) FILTER (WHERE action = 'erased') AS "erased!"
+           FROM audit_logs WHERE entity_pid = $1::text::uuid"#,
+        pid,
+    )
+    .fetch_one(db)
+    .await
+    .expect("audit counts");
+    (row.rows, row.redacted, row.erased)
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// CS-G1 (as found in case): GDPR erasure is all or nothing. A trigger
+// makes the **last** step — appending the chained `erased` audit row —
+// fail for this one pathway, and every earlier step must then be undone
+// too: the payload not tombstoned, the audit content not redacted, and
+// the chain still verifying with no `erased` row. Before the fix the
+// tombstone and the redaction each committed on their own, leaving the
+// record half erased with no accountability row recording it.
+//
+// The trigger fires only on an `erased` insert, which only an erasure
+// writes. It is installed and dropped around the one request, before any
+// assertion, and the suite is `#[serial]`, so it cannot reach another
+// test.
+async fn erasure_failing_late_leaves_nothing_changed() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        let pid = create(&request, &rich_pathway()).await;
+        let (rows_before, redacted_before, _) = audit_counts(&ctx.db, &pid).await;
+        assert!(rows_before >= 1, "the create must leave audit content");
+        assert_eq!(redacted_before, 0);
+
+        sqlx::query!(
+            "CREATE OR REPLACE FUNCTION cp_g1_fail_erased() RETURNS trigger
+                 LANGUAGE plpgsql AS $$
+                 BEGIN RAISE EXCEPTION 'erasure test: erased audit row refused'; END $$"
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("install the failing function");
+        sqlx::query!("DROP TRIGGER IF EXISTS cp_g1_fail_erased ON audit_logs")
+            .execute(&ctx.db)
+            .await
+            .expect("clear any stale trigger");
+        sqlx::query!(
+            "CREATE TRIGGER cp_g1_fail_erased BEFORE INSERT ON audit_logs
+                 FOR EACH ROW WHEN (NEW.action = 'erased')
+                 EXECUTE FUNCTION cp_g1_fail_erased()"
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("install the failing trigger");
+
+        let erase = request
+            .post(&format!("/api/care-pathways/{pid}/erase"))
+            .await;
+
+        sqlx::query!("DROP TRIGGER cp_g1_fail_erased ON audit_logs")
+            .execute(&ctx.db)
+            .await
+            .expect("drop the failing trigger");
+        sqlx::query!("DROP FUNCTION cp_g1_fail_erased()")
+            .execute(&ctx.db)
+            .await
+            .expect("drop the failing function");
+
+        assert_eq!(
+            erase.status_code(),
+            500,
+            "a failed audit append must fail the erasure: {}",
+            erase.text()
+        );
+
+        // Step 1 undone: the pathway is live and still holds its payload.
+        let live = request.get(&format!("/api/care-pathways/{pid}")).await;
+        assert_eq!(live.status_code(), 200, "the pathway must still be live");
+        let live: Value = live.json();
+        assert_eq!(live["name"], "Acute Stroke Care Pathway");
+        // Step 2 undone, and step 3 absent: nothing redacted, no `erased`.
+        let (_, redacted, erased) = audit_counts(&ctx.db, &pid).await;
+        assert_eq!(redacted, 0, "the redaction must be rolled back");
+        assert_eq!(
+            erased, 0,
+            "no erased row for an erasure that did not happen"
+        );
+        // The chain still verifies: the rolled-back append left no row.
+        let report = verify(&request).await;
+        assert_eq!(
+            report["verified"], true,
+            "the chain must verify after a failed erasure: {report}"
+        );
+
+        // A retry with the fault gone erases fully.
+        let retry = request
+            .post(&format!("/api/care-pathways/{pid}/erase"))
+            .await;
+        assert_eq!(retry.status_code(), 200, "the retry should succeed");
+        let (rows, redacted, erased) = audit_counts(&ctx.db, &pid).await;
+        assert_eq!(erased, 1, "exactly one erased row");
+        assert_eq!(redacted, rows - 1, "every row but the erased one redacted");
+        let name = sqlx::query_scalar!(
+            "SELECT name FROM care_pathways WHERE pid = $1::text::uuid",
+            pid
+        )
+        .fetch_one(&ctx.db)
+        .await
+        .expect("the row survives erasure");
+        assert_eq!(name, "(erased)");
+        let report = verify(&request).await;
+        assert_eq!(
+            report["verified"], true,
+            "the chain must verify after the retry: {report}"
+        );
+    })
+    .await;
+}
+
+/// Erasure removes the pathway from the full-text index (CS-E1 as found
+/// in case). The index keeps its own copy of the name and the searchable
+/// payload, so an erasure that left it there would keep the erased
+/// content at rest after Art. 17 said it was gone, even though search
+/// answers resolve against the tombstoned row and so never return it.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn erasure_removes_the_pathway_from_the_search_index() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let mut body = rich_pathway();
+        let name = format!("Erasable pathway {}", uuid::Uuid::new_v4().simple());
+        body["name"] = json!(name);
+        let pid = create(&request, &body).await;
+        let engine = care_pathway_service::search::engine().expect("the search index");
+        engine.reload().ok();
+        assert!(
+            engine.search(&name, 10).unwrap().contains(&pid),
+            "the new pathway must be indexed"
+        );
+
+        let erase = request
+            .post(&format!("/api/care-pathways/{pid}/erase"))
+            .await;
+        assert_eq!(erase.status_code(), 200, "erase: {}", erase.text());
+        engine.reload().ok();
+        assert!(
+            !engine.search(&name, 10).unwrap().contains(&pid),
+            "an erased pathway must leave the index"
         );
     })
     .await;

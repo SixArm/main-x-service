@@ -107,20 +107,6 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/care-pathway/care-pathway-service-with-axum/migration"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "rust"
-    groups:
-      routine:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "cargo"
     directory: "/case-folder/case-folder-service-with-rust"
     schedule:
       interval: "weekly"

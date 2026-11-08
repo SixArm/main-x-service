@@ -11,6 +11,58 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- **Persistence is sqlx, not SeaORM** (`spec/tech-stack/index.md` §5;
+  spec §13 SQLX-1). Every statement is a `query!` / `query_as!` /
+  `query_scalar!` literal in `src/models/`, checked at compile time
+  against the committed `.sqlx/` data (`SQLX_OFFLINE=true` builds). The
+  instance layer's tables (`pathway_instances` and the five `instance_*`
+  tables) have row modules of their own, and the SQL that lived in the
+  instance, time-based-analysis, export, data-quality and link
+  controllers, the journeys seed task, the relay purge, the bulk
+  stable-key lookups, the lost-job reconcile, the MAC re-sign walks and
+  `db truncate` moved into `src/models/`. Optional filters are static
+  parameters, so there is no `QueryBuilder` and no SQL allowlist entry.
+  Hash chain, checkpoints, record digests and MACs, the outbox, soft
+  delete, merge, the review queue, bulk import/export, cursor paging,
+  `continues_as` links, ABAC and every serialized row behave as before.
+- **Migrations are plain SQL** under `migrations/` (16 reversible
+  pairs, one per old migration, in the same order), run by
+  `sqlx::migrate!`; the `migration/` crate is gone. The schema is
+  unchanged (`pg_dump --schema-only` of an old and a new database is
+  identical outside the bookkeeping tables), but the bookkeeping table is
+  now `_sqlx_migrations`, so a database an old build migrated must be
+  recreated. `db migrate | down | reset | status` run through
+  `axa::sqlx`.
+- The audit chain's advisory lock, head read and insert run on one
+  connection. Under a transaction the lock covers both, as before; on
+  the pool each is still its own implicit transaction.
+- A bulk job's `start` / `complete` / `fail` update writes the columns
+  it leaves alone back with their stored values (`COALESCE`), where the
+  `SeaORM` update left them out; the stored row is the same.
+- The SOUP register lists `sqlx` in place of `sea-orm` and `migration`.
+
+### Fixed
+
+- **GDPR erasure is one transaction** (spec §13 ER-1). The tombstone,
+  the audit redaction and the chained `erased` row ran with no
+  transaction, so a failure part-way left a record half erased with no
+  `erased` row; they now commit or roll back together, with the chain's
+  advisory lock (`AuditModel::lock_chain`) held from before the
+  redaction sweep.
+- **Erasure removes the record from the full-text index.** The erased
+  name and payload stayed in the Tantivy index; they are removed after
+  the commit, as soft delete does.
+
+### Added
+
+- DB tests `a_written_record_verifies` (INT-V1 guard; passed on the old
+  code too), `erasure_failing_late_leaves_nothing_changed`,
+  `erasure_removes_the_pathway_from_the_search_index`, and the relay
+  poll's `the_poll_skips_rows_another_relay_holds`, which replaces a
+  unit test that read the SQL text `SeaORM` generated.
+
+### Changed
+
 - **`GET /api/care-pathways` and `GET /api/care-pathways/search` page by
   cursor** (`axa::cursor_pagination`, spec §6.2). `?limit=` sizes a page
   (default 100 / 50, at most 500) and a signed `?cursor=` names the next

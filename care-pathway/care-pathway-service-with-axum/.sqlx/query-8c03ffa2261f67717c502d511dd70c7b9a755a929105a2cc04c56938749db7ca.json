@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"n!\"\n               FROM pathway_instances\n               WHERE pathway_pid = $1 AND deleted_at IS NULL\n                 AND ($2::text[] IS NULL OR status = ANY($2))",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8c03ffa2261f67717c502d511dd70c7b9a755a929105a2cc04c56938749db7ca"
+}

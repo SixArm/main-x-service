@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, instance_pid, name, value_numeric, value_text, unit,\n                      recorded_on\n               FROM instance_measures\n               WHERE instance_pid = ANY($1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "instance_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "instance_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "value_numeric",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "value_numeric"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "value_text",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "value_text"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "unit",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "unit"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "recorded_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "recorded_on"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "5049f63f0b5dfdecf386f29202ef1b59d74d388df6f140736fa43d1fe31761d7"
+}

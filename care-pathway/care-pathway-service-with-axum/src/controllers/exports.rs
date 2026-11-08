@@ -36,7 +36,6 @@ use axa::error::ErrorDetail;
 use axa::prelude::*;
 use axum::body::Body;
 use axum::http::header::CONTENT_TYPE;
-use sea_orm::QueryOrder;
 use uuid::Uuid;
 
 use crate::analytics::{self, CaseContext, EventInput, SegmentInput, StepInput};
@@ -44,8 +43,8 @@ use crate::auth::MaybeAuthUser;
 use crate::compliance::disclosure::{self, AccessContext};
 use crate::conformance;
 use crate::controllers::tba::{analyze_cohort, load_cohort, load_conformance_inputs};
-use crate::models::_entities::{instance_events, instance_segments, instance_steps, instance_team};
 use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::{instance_events, instance_segments, instance_steps, instance_team};
 
 /// `422` with a reason.
 fn refuse(reason: &str) -> Error {
@@ -180,11 +179,7 @@ async fn load_event_log_inputs(
         ));
     }
 
-    let segment_rows = instance_segments::Entity::find()
-        .filter(instance_segments::Column::InstancePid.is_in(pids.to_vec()))
-        .order_by_asc(instance_segments::Column::StartedAt)
-        .all(&ctx.db)
-        .await?;
+    let segment_rows = instance_segments::Model::for_instances_by_start(&ctx.db, pids).await?;
     let mut segments: HashMap<Uuid, Vec<SegmentInput>> = HashMap::new();
     for row in &segment_rows {
         segments
@@ -201,11 +196,7 @@ async fn load_event_log_inputs(
             });
     }
 
-    let step_rows = instance_steps::Entity::find()
-        .filter(instance_steps::Column::InstancePid.is_in(pids.to_vec()))
-        .order_by_asc(instance_steps::Column::Position)
-        .all(&ctx.db)
-        .await?;
+    let step_rows = instance_steps::Model::for_instances_by_position(&ctx.db, pids).await?;
     let mut steps: HashMap<Uuid, Vec<StepInput>> = HashMap::new();
     for row in &step_rows {
         steps.entry(row.instance_pid).or_default().push(StepInput {
@@ -214,11 +205,7 @@ async fn load_event_log_inputs(
         });
     }
 
-    let event_rows = instance_events::Entity::find()
-        .filter(instance_events::Column::InstancePid.is_in(pids.to_vec()))
-        .order_by_asc(instance_events::Column::OccurredAt)
-        .all(&ctx.db)
-        .await?;
+    let event_rows = instance_events::Model::for_instances_oldest_first(&ctx.db, pids).await?;
     let mut events: HashMap<Uuid, Vec<EventInput>> = HashMap::new();
     for row in &event_rows {
         events
@@ -230,10 +217,7 @@ async fn load_event_log_inputs(
             });
     }
 
-    let team_rows = instance_team::Entity::find()
-        .filter(instance_team::Column::InstancePid.is_in(pids.to_vec()))
-        .all(&ctx.db)
-        .await?;
+    let team_rows = instance_team::Model::for_instances(&ctx.db, pids).await?;
     let mut team: HashMap<Uuid, BTreeMap<String, String>> = HashMap::new();
     for row in &team_rows {
         team.entry(row.instance_pid)

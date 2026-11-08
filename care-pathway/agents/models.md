@@ -42,7 +42,7 @@ provider-scoped schemes never do (see [matching.md](matching.md)).
 
 **Files:**
 [`src/models/care_pathways.rs`](../care-pathway-service-with-axum/src/models/care_pathways.rs),
-[`migration/src/m20220101_000001_care_pathways.rs`](../care-pathway-service-with-axum/migration/src/m20220101_000001_care_pathways.rs)
+[`migrations/2022010100000001_care_pathways.up.sql`](../care-pathway-service-with-axum/migrations/2022010100000001_care_pathways.up.sql)
 
 One `care_pathways` table: `id` (PK), `pid` (public UUID), `name`
 (denormalised from `data.name`), `data` (JSONB `CarePathway`),

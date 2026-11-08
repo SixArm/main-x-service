@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM audit_logs",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "79067a2c7f55f8a1211a46b70384691fa7a547e2d9fe3d66794aeb808f1ccedc"
+}

@@ -16,6 +16,7 @@
 use axa::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::bulk::pipeline::{
@@ -97,11 +98,7 @@ pub async fn run_bulk_job(ctx: &AppContext, job_id: Uuid) -> Result<()> {
 
 /// Run an import job: read the input artifact, run the pipeline, persist
 /// the error report (if any), and record the counts.
-async fn run_import(
-    db: &DatabaseConnection,
-    store: &dyn ArtifactStore,
-    job: &bulk_jobs::Model,
-) -> Result<()> {
+async fn run_import(db: &PgPool, store: &dyn ArtifactStore, job: &bulk_jobs::Model) -> Result<()> {
     let input_ref = job
         .input_url
         .as_deref()
@@ -180,11 +177,7 @@ async fn run_import(
 /// Run an export job: run the pipeline (applying the masking profile),
 /// write the output artifact, record the row count, and write an export
 /// audit row (§8).
-async fn run_export(
-    db: &DatabaseConnection,
-    store: &dyn ArtifactStore,
-    job: &bulk_jobs::Model,
-) -> Result<()> {
+async fn run_export(db: &PgPool, store: &dyn ArtifactStore, job: &bulk_jobs::Model) -> Result<()> {
     let params = export_params_from_json(&job.params, &job.format);
     let (bytes, rows_total) = process_export_job(db, &params).await?;
 
@@ -259,8 +252,8 @@ fn export_params_from_json(params: &Value, job_format: &str) -> ExportParams {
 
 /// Build the job-level **import** audit summary (SEC-B8): the reconciled
 /// counts, the dry-run flag, and the actor. Takes primitives (not the
-/// whole row) so it is unit-testable without constructing a `SeaORM`
-/// model.
+/// whole row) so it is unit-testable without constructing a job
+/// row.
 fn import_audit_summary(
     format: &str,
     actor: Option<&str>,
@@ -283,7 +276,7 @@ fn import_audit_summary(
 /// Build the job-level **export** audit summary (§8): actor, the filter
 /// (query/limit/offset), format, masking profile,
 /// `include_soft_deleted`, and the row count. Takes primitives so it is
-/// unit-testable without constructing a `SeaORM` model.
+/// unit-testable without constructing a job row.
 fn export_audit_summary(
     format: &str,
     actor: Option<&str>,

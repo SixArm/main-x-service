@@ -879,11 +879,25 @@ async fn erase(
     let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
         return bad_request("invalid pid");
     };
-    let outcome = match PathwayModel::find_by_pid(&ctx.db, &pid).await {
-        Ok(model) => erasure::erase(&ctx.db, model, caller.actor(), &access).await?,
+    let found = PathwayModel::find_by_pid(&ctx.db, &pid).await;
+    // One transaction for every step, so a failure part-way leaves the
+    // record exactly as it was rather than half erased (tombstoned, or
+    // redacted with no `erased` row saying why). On an early return the
+    // transaction drops and rolls back; the chained `erased` row is
+    // inside it, so it commits only with the erasure it records.
+    let mut txn = ctx.db.begin().await?;
+    let outcome = match found {
+        Ok(model) => erasure::erase(&mut txn, model, caller.actor(), &access).await?,
         // No live record: still sweep the audit content held about it.
-        Err(_) => erasure::erase_audit_only(&ctx.db, uuid, caller.actor(), &access).await?,
+        Err(_) => erasure::erase_audit_only(&mut txn, uuid, caller.actor(), &access).await?,
     };
+    txn.commit().await?;
+    // The index holds its own copy of the name and the searchable
+    // payload, so the erased content must leave it too. After the commit,
+    // as for soft delete: the database is the source of truth, and a
+    // failed removal is logged and repaired by `search_reindex`, which
+    // indexes only live rows.
+    streaming::deindex_best_effort(uuid);
     Metrics::global().care_pathway_deleted_total.inc();
     format::json(outcome)
 }

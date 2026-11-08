@@ -12,7 +12,7 @@ Aspirational items live in §15, not here.
 | matcher | Probabilistic matching | Name (Jaro-Winkler + Soundex bonus), condition-code Jaccard, pathway code, care setting, interventions/keywords Jaccard; renormalised weights; presets strict/default/lenient |
 | matcher | Quality bar | No `unsafe`/`unwrap`/`panic`; deterministic; diacritic-preserving; unit + public-API tests + doctests; demo binary |
 | matcher | Docs | `spec/index.md` (§1–§25, single file), `AGENTS.md` + 4 AGENTS guides, README, CHANGELOG |
-| service | axa chassis | axa, Axum 0.8, SeaORM 1.1; `cargo run -- start`; config yamls; port 5150 |
+| service | axa chassis | axa, Axum 0.8, sqlx (no ORM; `query!` literals in `src/models/`, plain-SQL `migrations/`); `cargo run -- start`; port 5150 |
 | service | Persistence | `care_pathways` table (pid, name, JSONB `data`, active, `deleted_at`); migration; auto-migrate in dev |
 | service | CRUD | Create / list (cap 100) / read / replace / soft-delete; `404` unknown pid; blank-name rejection (`422`, create + update) |
 | service | Validation | `condition_codes` format-checked per `system` — ICD-10, ICD-11, SNOMED CT (SCTID Verhoeff); all problems reported in one `422` (`src/validation.rs`) |

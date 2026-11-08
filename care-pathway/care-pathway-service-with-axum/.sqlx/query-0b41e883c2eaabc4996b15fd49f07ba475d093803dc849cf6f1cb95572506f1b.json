@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM care_pathways",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "0b41e883c2eaabc4996b15fd49f07ba475d093803dc849cf6f1cb95572506f1b"
+}

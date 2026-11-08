@@ -50,7 +50,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::models::_entities::audit_logs;
+use crate::models::audit_logs;
 
 /// Chain-format version, bound into every digest so a future change to the
 /// hashed field set cannot be confused with tampering.

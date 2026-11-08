@@ -18,8 +18,6 @@
 use axa::TestServer;
 use axa::prelude::*;
 use care_pathway_service::app::App;
-use care_pathway_service::models::_entities::{instance_steps, pathway_instances};
-use sea_orm::{ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use serial_test::serial;
 use uuid::Uuid;
@@ -80,33 +78,29 @@ async fn enroll_with_steps(
 /// Directly stamp one step's completion date, bypassing the
 /// always-`now` HTTP endpoint (see this file's own module doc).
 async fn stamp_step_done(ctx: &AppContext, step_pid: &str, done_on: chrono::NaiveDate) {
-    let row = instance_steps::Entity::find()
-        .filter(instance_steps::Column::Pid.eq(Uuid::parse_str(step_pid).expect("step pid")))
-        .one(&ctx.db)
-        .await
-        .expect("query")
-        .expect("step exists");
-    let mut active: instance_steps::ActiveModel = row.into();
-    active.done = ActiveValue::set(true);
-    active.done_on = ActiveValue::set(Some(done_on));
-    active.update(&ctx.db).await.expect("update step");
+    let done = sqlx::query!(
+        "UPDATE instance_steps SET done = true, done_on = $2 WHERE pid = $1",
+        Uuid::parse_str(step_pid).expect("step pid"),
+        done_on,
+    )
+    .execute(&ctx.db)
+    .await
+    .expect("update step");
+    assert_eq!(done.rows_affected(), 1, "step exists");
 }
 
 /// Directly stamp an instance's `closed_on`, bypassing the
 /// always-`today` HTTP status transition.
 async fn stamp_closed_on(ctx: &AppContext, instance_pid: &str, closed_on: chrono::NaiveDate) {
-    let row = pathway_instances::Entity::find()
-        .filter(
-            pathway_instances::Column::Pid.eq(Uuid::parse_str(instance_pid).expect("instance pid")),
-        )
-        .one(&ctx.db)
-        .await
-        .expect("query")
-        .expect("instance exists");
-    let mut active: pathway_instances::ActiveModel = row.into();
-    active.status = ActiveValue::set("completed".to_string());
-    active.closed_on = ActiveValue::set(Some(closed_on));
-    active.update(&ctx.db).await.expect("update instance");
+    let done = sqlx::query!(
+        "UPDATE pathway_instances SET status = 'completed', closed_on = $2 WHERE pid = $1",
+        Uuid::parse_str(instance_pid).expect("instance pid"),
+        closed_on,
+    )
+    .execute(&ctx.db)
+    .await
+    .expect("update instance");
+    assert_eq!(done.rows_affected(), 1, "instance exists");
 }
 
 fn day(offset: i64) -> chrono::NaiveDate {

@@ -9,17 +9,18 @@
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
-use sea_orm::{ActiveValue, QueryOrder};
 use uuid::Uuid;
 
 use crate::auth::MaybeAuthUser;
 use crate::instances as rules;
-use crate::models::_entities::{
+use crate::models::audit_logs::Model as Audit;
+use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::instance_measures::NewMeasure;
+use crate::models::pathway_instances::NewInstance;
+use crate::models::{
     instance_events, instance_measures, instance_segments, instance_steps, instance_team,
     pathway_instances,
 };
-use crate::models::audit_logs::Model as Audit;
-use crate::models::care_pathways::Model as PathwayModel;
 
 /// `422` with a reason.
 fn refuse(reason: &str) -> Error {
@@ -63,10 +64,7 @@ fn valid_member(value: &str) -> bool {
 
 /// Find one live instance, or 404.
 async fn find_instance(ctx: &AppContext, raw: &str) -> Result<pathway_instances::Model> {
-    pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::Pid.eq(pid(raw)?))
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .one(&ctx.db)
+    pathway_instances::Model::find_live(&ctx.db, pid(raw)?)
         .await?
         .ok_or(Error::NotFound)
 }
@@ -111,52 +109,49 @@ async fn enroll(
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
-    let txn = ctx.db.begin().await?;
-    let instance = pathway_instances::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        pathway_pid: ActiveValue::set(template.pid),
-        subject_ref: ActiveValue::set(payload.subject_ref.clone()),
-        status: ActiveValue::set("active".to_string()),
-        urgency: ActiveValue::set(urgency.clone()),
-        enrolled_on: ActiveValue::set(chrono::Utc::now().date_naive()),
-        // The time-based-analysis clock starts at enrolment, at real
-        // resolution rather than the day resolution `enrolled_on`
-        // carries — see `spec/time-based-analysis.md` §5.2.
-        clock_start_at: ActiveValue::set(Some(chrono::Utc::now().into())),
-        clock_stop_at: ActiveValue::set(None),
-        next_review_on: ActiveValue::set(payload.next_review_on),
-        closed_on: ActiveValue::set(None),
-        closure_reason: ActiveValue::set(None),
-        deleted_at: ActiveValue::set(None),
-        ..Default::default()
-    }
-    .insert(&txn)
+    let mut txn = ctx.db.begin().await?;
+    let instance = pathway_instances::Model::insert(
+        &mut *txn,
+        &NewInstance {
+            pathway_pid: template.pid,
+            subject_ref: &payload.subject_ref,
+            status: "active",
+            urgency: &urgency,
+            enrolled_on: chrono::Utc::now().date_naive(),
+            next_review_on: payload.next_review_on,
+            closed_on: None,
+            closure_reason: None,
+            outcome: None,
+            // The time-based-analysis clock starts at enrolment, at real
+            // resolution rather than the day resolution `enrolled_on`
+            // carries — see `spec/time-based-analysis.md` §5.2.
+            clock_start_at: Some(chrono::Utc::now().into()),
+            clock_stop_at: None,
+        },
+    )
     .await?;
     for (index, label) in payload.steps.iter().enumerate() {
         if label.trim().is_empty() {
             continue;
         }
-        instance_steps::ActiveModel {
-            pid: ActiveValue::set(Uuid::new_v4()),
-            instance_pid: ActiveValue::set(instance.pid),
-            label: ActiveValue::set(label.clone()),
-            done: ActiveValue::set(false),
-            done_on: ActiveValue::set(None),
-            position: ActiveValue::set(i32::try_from(index).unwrap_or(i32::MAX)),
-            ..Default::default()
-        }
-        .insert(&txn)
+        instance_steps::Model::insert(
+            &mut *txn,
+            instance.pid,
+            label,
+            false,
+            None,
+            i32::try_from(index).unwrap_or(i32::MAX),
+        )
         .await?;
     }
     Audit::record(
-        &txn,
+        &mut *txn,
         instance.pid,
         "instance_enrolled",
         caller.actor(),
         Some(serde_json::json!({ "pathway_pid": template.pid, "urgency": urgency })),
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     txn.commit().await?;
     format::json(instance)
 }
@@ -171,12 +166,7 @@ async fn list_for_pathway(
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
-    let rows = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::PathwayPid.eq(template.pid))
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .order_by_desc(pathway_instances::Column::Id)
-        .all(&ctx.db)
-        .await?;
+    let rows = pathway_instances::Model::for_pathway_newest_first(&ctx.db, template.pid).await?;
     format::json(rows)
 }
 
@@ -185,25 +175,12 @@ async fn list_for_pathway(
 #[debug_handler]
 async fn get_instance(State(ctx): State<AppContext>, Path(raw): Path<String>) -> Result<Response> {
     let instance = find_instance(&ctx, &raw).await?;
-    let mut steps = instance_steps::Entity::find()
-        .filter(instance_steps::Column::InstancePid.eq(instance.pid))
-        .all(&ctx.db)
-        .await?;
+    let mut steps = instance_steps::Model::for_instance(&ctx.db, instance.pid).await?;
     steps.sort_by_key(|s| s.position);
-    let team = instance_team::Entity::find()
-        .filter(instance_team::Column::InstancePid.eq(instance.pid))
-        .all(&ctx.db)
-        .await?;
-    let events = instance_events::Entity::find()
-        .filter(instance_events::Column::InstancePid.eq(instance.pid))
-        .order_by_desc(instance_events::Column::OccurredAt)
-        .all(&ctx.db)
-        .await?;
-    let measures = instance_measures::Entity::find()
-        .filter(instance_measures::Column::InstancePid.eq(instance.pid))
-        .order_by_desc(instance_measures::Column::RecordedOn)
-        .all(&ctx.db)
-        .await?;
+    let team = instance_team::Model::for_instance(&ctx.db, instance.pid).await?;
+    let events = instance_events::Model::for_instance_newest_first(&ctx.db, instance.pid).await?;
+    let measures =
+        instance_measures::Model::for_instance_newest_first(&ctx.db, instance.pid).await?;
     format::json(serde_json::json!({
         "instance": instance, "steps": steps, "team": team,
         "events": events, "measures": measures,
@@ -249,20 +226,24 @@ async fn set_status(
     let from = instance.status.clone();
     let instance_pid = instance.pid;
     let today = chrono::Utc::now().date_naive();
-    let mut active: pathway_instances::ActiveModel = instance.into();
-    active.status = ActiveValue::set(payload.to.clone());
-    if rules::is_terminal(&payload.to) {
-        active.closed_on = ActiveValue::set(Some(today));
+    let updated = if rules::is_terminal(&payload.to) {
         // Closing the instance stops its time-based-analysis clock. The
         // clock stops on a recorded lifecycle transition with its own
         // audit row, never on a metric-only milestone — see
         // `spec/time-based-analysis.md` §12.3.
-        active.clock_stop_at = ActiveValue::set(Some(chrono::Utc::now().into()));
-        active.closure_reason = ActiveValue::set(payload.reason.clone());
-        active.outcome = ActiveValue::set(payload.outcome.clone());
-        active.next_review_on = ActiveValue::set(None);
-    }
-    let updated = active.update(&ctx.db).await?;
+        instance
+            .close(
+                &ctx.db,
+                &payload.to,
+                today,
+                chrono::Utc::now().into(),
+                payload.reason.as_deref(),
+                payload.outcome.as_deref(),
+            )
+            .await?
+    } else {
+        instance.set_status(&ctx.db, &payload.to).await?
+    };
     Audit::record(
         &ctx.db,
         instance_pid,
@@ -270,8 +251,7 @@ async fn set_status(
         caller.actor(),
         Some(serde_json::json!({ "from": from, "to": payload.to })),
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(updated)
 }
 
@@ -298,19 +278,17 @@ async fn record_review(
         return Err(refuse("a closed instance is not reviewed"));
     }
     let instance_pid = instance.pid;
-    let mut active: pathway_instances::ActiveModel = instance.into();
-    active.next_review_on = ActiveValue::set(Some(payload.next_review_on));
-    let updated = active.update(&ctx.db).await?;
-    instance_events::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        instance_pid: ActiveValue::set(instance_pid),
-        kind: ActiveValue::set("review".to_string()),
-        occurred_at: ActiveValue::set(chrono::Utc::now().into()),
-        note: ActiveValue::set(payload.note.clone()),
-        actor: ActiveValue::set(caller.actor().map(ToString::to_string)),
-        ..Default::default()
-    }
-    .insert(&ctx.db)
+    let updated = instance
+        .set_next_review(&ctx.db, payload.next_review_on)
+        .await?;
+    instance_events::Model::insert(
+        &ctx.db,
+        instance_pid,
+        "review",
+        chrono::Utc::now().into(),
+        payload.note.as_deref(),
+        caller.actor(),
+    )
     .await?;
     Audit::record(
         &ctx.db,
@@ -319,8 +297,7 @@ async fn record_review(
         caller.actor(),
         None,
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(updated)
 }
 
@@ -359,19 +336,15 @@ async fn set_urgency(
     };
     let from = instance.urgency.clone();
     let instance_pid = instance.pid;
-    let mut active: pathway_instances::ActiveModel = instance.into();
-    active.urgency = ActiveValue::set(payload.to.clone());
-    let updated = active.update(&ctx.db).await?;
-    instance_events::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        instance_pid: ActiveValue::set(instance_pid),
-        kind: ActiveValue::set(kind.to_string()),
-        occurred_at: ActiveValue::set(chrono::Utc::now().into()),
-        note: ActiveValue::set(payload.note.clone()),
-        actor: ActiveValue::set(caller.actor().map(ToString::to_string)),
-        ..Default::default()
-    }
-    .insert(&ctx.db)
+    let updated = instance.set_urgency(&ctx.db, &payload.to).await?;
+    instance_events::Model::insert(
+        &ctx.db,
+        instance_pid,
+        kind,
+        chrono::Utc::now().into(),
+        payload.note.as_deref(),
+        caller.actor(),
+    )
     .await?;
     Audit::record(
         &ctx.db,
@@ -380,8 +353,7 @@ async fn set_urgency(
         caller.actor(),
         Some(serde_json::json!({ "from": from, "to": payload.to })),
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(updated)
 }
 
@@ -394,9 +366,7 @@ async fn complete_step(
     Path((raw, step_raw)): Path<(String, String)>,
 ) -> Result<Response> {
     let instance = find_instance(&ctx, &raw).await?;
-    let step = instance_steps::Entity::find()
-        .filter(instance_steps::Column::Pid.eq(pid(&step_raw)?))
-        .one(&ctx.db)
+    let step = instance_steps::Model::find_by_pid(&ctx.db, pid(&step_raw)?)
         .await?
         .filter(|s| s.instance_pid == instance.pid)
         .ok_or(Error::NotFound)?;
@@ -404,10 +374,9 @@ async fn complete_step(
         return format::json(step);
     }
     let step_pid = step.pid;
-    let mut active: instance_steps::ActiveModel = step.into();
-    active.done = ActiveValue::set(true);
-    active.done_on = ActiveValue::set(Some(chrono::Utc::now().date_naive()));
-    let updated = active.update(&ctx.db).await?;
+    let updated = step
+        .complete(&ctx.db, chrono::Utc::now().date_naive())
+        .await?;
     Audit::record(
         &ctx.db,
         step_pid,
@@ -415,8 +384,7 @@ async fn complete_step(
         caller.actor(),
         None,
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(updated)
 }
 
@@ -448,26 +416,17 @@ async fn add_team_member(
         )));
     }
     let instance = find_instance(&ctx, &raw).await?;
-    let existing = instance_team::Entity::find()
-        .filter(instance_team::Column::InstancePid.eq(instance.pid))
-        .filter(instance_team::Column::MemberRef.eq(payload.member_ref.clone()))
-        .filter(instance_team::Column::Role.eq(payload.role.clone()))
-        .one(&ctx.db)
-        .await?;
+    let existing =
+        instance_team::Model::find(&ctx.db, instance.pid, &payload.member_ref, &payload.role)
+            .await?;
     if existing.is_some() {
         return Err(refuse(
             "that member already holds that role on this instance",
         ));
     }
-    let row = instance_team::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        instance_pid: ActiveValue::set(instance.pid),
-        member_ref: ActiveValue::set(payload.member_ref.clone()),
-        role: ActiveValue::set(payload.role.clone()),
-        ..Default::default()
-    }
-    .insert(&ctx.db)
-    .await?;
+    let row =
+        instance_team::Model::insert(&ctx.db, instance.pid, &payload.member_ref, &payload.role)
+            .await?;
     Audit::record(
         &ctx.db,
         instance.pid,
@@ -475,8 +434,7 @@ async fn add_team_member(
         caller.actor(),
         Some(serde_json::json!({ "member_ref": payload.member_ref, "role": payload.role })),
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(row)
 }
 
@@ -504,16 +462,14 @@ async fn add_event(
         )));
     }
     let instance = find_instance(&ctx, &raw).await?;
-    let row = instance_events::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        instance_pid: ActiveValue::set(instance.pid),
-        kind: ActiveValue::set(payload.kind.clone()),
-        occurred_at: ActiveValue::set(chrono::Utc::now().into()),
-        note: ActiveValue::set(payload.note.clone()),
-        actor: ActiveValue::set(caller.actor().map(ToString::to_string)),
-        ..Default::default()
-    }
-    .insert(&ctx.db)
+    let row = instance_events::Model::insert(
+        &ctx.db,
+        instance.pid,
+        &payload.kind,
+        chrono::Utc::now().into(),
+        payload.note.as_deref(),
+        caller.actor(),
+    )
     .await?;
     format::json(row)
 }
@@ -525,11 +481,7 @@ async fn add_event(
 /// the emergency/urgent count.
 #[debug_handler]
 async fn caseload(State(ctx): State<AppContext>) -> Result<Response> {
-    let instances = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .filter(pathway_instances::Column::Status.is_in(["active", "on_hold"]))
-        .all(&ctx.db)
-        .await?;
+    let instances = pathway_instances::Model::open(&ctx.db).await?;
     let templates = PathwayModel::list(&ctx.db, 1000).await?;
     let mut setting_of: std::collections::BTreeMap<Uuid, String> =
         std::collections::BTreeMap::new();
@@ -573,11 +525,7 @@ async fn caseload(State(ctx): State<AppContext>) -> Result<Response> {
 #[debug_handler]
 async fn overdue_reviews(State(ctx): State<AppContext>) -> Result<Response> {
     let today = chrono::Utc::now().date_naive();
-    let instances = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .filter(pathway_instances::Column::Status.is_in(["active", "on_hold"]))
-        .all(&ctx.db)
-        .await?;
+    let instances = pathway_instances::Model::open(&ctx.db).await?;
     let mut rows: Vec<(i64, serde_json::Value)> = instances
         .iter()
         .filter_map(|instance| {
@@ -649,10 +597,7 @@ async fn load_last_activity_inputs(
         return Ok(std::collections::HashMap::new());
     }
 
-    let segment_rows = instance_segments::Entity::find()
-        .filter(instance_segments::Column::InstancePid.is_in(pids.to_vec()))
-        .all(&ctx.db)
-        .await?;
+    let segment_rows = instance_segments::Model::for_instances(&ctx.db, pids).await?;
     for row in &segment_rows {
         let entry = latest.entry(row.instance_pid).or_default();
         entry.segment_start = Some(
@@ -666,10 +611,7 @@ async fn load_last_activity_inputs(
         }
     }
 
-    let step_rows = instance_steps::Entity::find()
-        .filter(instance_steps::Column::InstancePid.is_in(pids.to_vec()))
-        .all(&ctx.db)
-        .await?;
+    let step_rows = instance_steps::Model::for_instances(&ctx.db, pids).await?;
     for row in &step_rows {
         if let Some(done_on) = row.done_on {
             let entry = latest.entry(row.instance_pid).or_default();
@@ -677,10 +619,7 @@ async fn load_last_activity_inputs(
         }
     }
 
-    let event_rows = instance_events::Entity::find()
-        .filter(instance_events::Column::InstancePid.is_in(pids.to_vec()))
-        .all(&ctx.db)
-        .await?;
+    let event_rows = instance_events::Model::for_instances(&ctx.db, pids).await?;
     for row in &event_rows {
         let entry = latest.entry(row.instance_pid).or_default();
         entry.event = Some(entry.event.unwrap_or(i64::MIN).max(ms(row.occurred_at)));
@@ -722,11 +661,7 @@ async fn stalled(
     let as_of = chrono::Utc::now();
     let as_of_ms = as_of.timestamp_millis();
 
-    let instances = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .filter(pathway_instances::Column::Status.is_in(["active", "on_hold"]))
-        .all(&ctx.db)
-        .await?;
+    let instances = pathway_instances::Model::open(&ctx.db).await?;
     let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
     let by_pid = load_last_activity_inputs(&ctx, &pids).await?;
 
@@ -774,11 +709,7 @@ async fn cohort(State(ctx): State<AppContext>, Path(pathway): Path<String>) -> R
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
-    let instances = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::PathwayPid.eq(template.pid))
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .all(&ctx.db)
-        .await?;
+    let instances = pathway_instances::Model::cohort(&ctx.db, template.pid, None, None).await?;
     let mut by_status: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     let mut by_urgency: std::collections::BTreeMap<String, usize> =
@@ -790,10 +721,7 @@ async fn cohort(State(ctx): State<AppContext>, Path(pathway): Path<String>) -> R
     let instance_pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
     let (mut steps_done, mut steps_total) = (0usize, 0usize);
     if !instance_pids.is_empty() {
-        let steps = instance_steps::Entity::find()
-            .filter(instance_steps::Column::InstancePid.is_in(instance_pids))
-            .all(&ctx.db)
-            .await?;
+        let steps = instance_steps::Model::for_instances(&ctx.db, &instance_pids).await?;
         steps_total = steps.len();
         steps_done = steps.iter().filter(|s| s.done).count();
     }
@@ -811,15 +739,12 @@ async fn cohort(State(ctx): State<AppContext>, Path(pathway): Path<String>) -> R
 /// team member (with their roles), the per-provider caseload lens.
 #[debug_handler]
 async fn care_team_load(State(ctx): State<AppContext>) -> Result<Response> {
-    let open: std::collections::HashSet<Uuid> = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .filter(pathway_instances::Column::Status.is_in(["active", "on_hold"]))
-        .all(&ctx.db)
+    let open: std::collections::HashSet<Uuid> = pathway_instances::Model::open(&ctx.db)
         .await?
         .into_iter()
         .map(|i| i.pid)
         .collect();
-    let team = instance_team::Entity::find().all(&ctx.db).await?;
+    let team = instance_team::Model::all(&ctx.db).await?;
     // member → (open instance set, roles)
     let mut per_member: std::collections::BTreeMap<
         String,
@@ -884,21 +809,19 @@ async fn record_measure(
         return Err(refuse("a value_numeric or value_text is required"));
     }
     let instance = find_instance(&ctx, &raw).await?;
-    let row = instance_measures::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        instance_pid: ActiveValue::set(instance.pid),
-        name: ActiveValue::set(payload.name.clone()),
-        value_numeric: ActiveValue::set(payload.value_numeric),
-        value_text: ActiveValue::set(payload.value_text.clone()),
-        unit: ActiveValue::set(payload.unit.clone()),
-        recorded_on: ActiveValue::set(
-            payload
+    let row = instance_measures::Model::insert(
+        &ctx.db,
+        &NewMeasure {
+            instance_pid: instance.pid,
+            name: &payload.name,
+            value_numeric: payload.value_numeric,
+            value_text: payload.value_text.as_deref(),
+            unit: payload.unit.as_deref(),
+            recorded_on: payload
                 .recorded_on
                 .unwrap_or_else(|| chrono::Utc::now().date_naive()),
-        ),
-        ..Default::default()
-    }
-    .insert(&ctx.db)
+        },
+    )
     .await?;
     Audit::record(
         &ctx.db,
@@ -907,8 +830,7 @@ async fn record_measure(
         caller.actor(),
         None,
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(row)
 }
 
@@ -922,11 +844,7 @@ async fn outcomes(State(ctx): State<AppContext>, Path(pathway): Path<String>) ->
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
-    let instances = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::PathwayPid.eq(template.pid))
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .all(&ctx.db)
-        .await?;
+    let instances = pathway_instances::Model::cohort(&ctx.db, template.pid, None, None).await?;
     let mut outcome_dist: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     let mut closed = 0usize;
@@ -944,10 +862,7 @@ async fn outcomes(State(ctx): State<AppContext>, Path(pathway): Path<String>) ->
     let instance_pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
     let mut measure_summary: Vec<serde_json::Value> = Vec::new();
     if !instance_pids.is_empty() {
-        let measures = instance_measures::Entity::find()
-            .filter(instance_measures::Column::InstancePid.is_in(instance_pids))
-            .all(&ctx.db)
-            .await?;
+        let measures = instance_measures::Model::for_instances(&ctx.db, &instance_pids).await?;
         // (name) → per-instance latest (recorded_on, value)
         let mut latest: std::collections::BTreeMap<
             (String, Uuid),

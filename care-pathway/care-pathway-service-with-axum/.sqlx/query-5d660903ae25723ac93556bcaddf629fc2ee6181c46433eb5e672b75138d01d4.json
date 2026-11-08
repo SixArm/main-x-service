@@ -1,0 +1,209 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, pathway_pid, subject_ref, status, urgency, enrolled_on,\n                      next_review_on, closed_on, closure_reason, outcome,\n                      clock_start_at AS \"clock_start_at: _\",\n                      clock_stop_at AS \"clock_stop_at: _\",\n                      deleted_at AS \"deleted_at: _\"\n               FROM pathway_instances\n               WHERE deleted_at IS NULL\n                 AND ($1::uuid IS NULL OR pathway_pid = $1)\n               LIMIT $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "pathway_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "pathway_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "subject_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "subject_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "status",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "urgency",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "urgency"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "enrolled_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "enrolled_on"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "next_review_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "next_review_on"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "closed_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "closed_on"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "closure_reason",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "closure_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "outcome",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "clock_start_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "clock_start_at"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "clock_stop_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "clock_stop_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "pathway_instances",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5d660903ae25723ac93556bcaddf629fc2ee6181c46433eb5e672b75138d01d4"
+}

@@ -8551,8 +8551,10 @@ All three were there before the move, on SeaORM. Fixed 2026-11-07.
     timestamps and its payload has no numbers); the test guards it.
   - [x] case: not affected, like organization (the test passed on the old
     SeaORM code); it guards it from 2026-11-08.
-  - [ ] care-pathway, person, worker: still on SeaORM; each lands the
-    test, passing, with its sqlx move.
+  - [x] care-pathway: not affected (the test passed on the old code); it
+    guards it from 2026-11-08.
+  - [ ] person, worker: still on SeaORM; each lands the test, passing,
+    with its sqlx move.
 
 ## Found 2026-11-07 (moving link-graph to sqlx)
 
@@ -8631,3 +8633,21 @@ Both were there on SeaORM, and the move keeps them as they were.
   Fixed 2026-11-08: removed after the erasure commits, with a DB test that
   searches the index directly. care-pathway, person and worker must be
   checked for the same in their sqlx moves.
+
+## Found 2026-11-08 (moving care-pathway to sqlx)
+
+The erasure gaps (case's CS-G1 and CS-E1) were present here too and are
+fixed in the move (crate spec §13 ER-1). These three were there on SeaORM
+and are kept as they were.
+
+- [ ] **CP-T1 (S)** `db truncate` clears only `merge_records`,
+  `audit_logs` and `care_pathways`, leaving `entity_links`, `event_outbox`,
+  `bulk_jobs`, `review_queue` and the six instance tables (case's CS-T1).
+- [ ] **CP-M1 (S)** merge takes no SEC-B5 row lock on the survivor and the
+  duplicate, as case's does; only the self-merge guard exists, so two
+  concurrent merges can interleave.
+- [ ] **SEC-B3 (M)** the bulk import upsert in organization, case and
+  care-pathway takes no stable-key advisory lock, so two imports of one
+  key can both insert. Every model helper now takes `axa::sqlx::Db`, so
+  `create_and_emit` / `update_and_emit` can join a caller's transaction
+  and take `pg_advisory_xact_lock` on it.

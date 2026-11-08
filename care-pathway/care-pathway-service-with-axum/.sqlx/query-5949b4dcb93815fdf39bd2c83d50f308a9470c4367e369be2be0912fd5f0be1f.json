@@ -1,0 +1,153 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE care_pathways\n               SET name = $2, data = $3,\n                   content_hash = $4, content_hash_sha3 = $5, content_mac = $6\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, name, data, active,\n                         deleted_at AS \"deleted_at: _\",\n                         content_hash, content_hash_sha3, content_mac",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "data",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "data"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "active",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "active"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "deleted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "content_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "content_hash_sha3",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "content_hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "content_mac",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "care_pathways",
+            "name": "content_mac"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Varchar",
+        "Jsonb",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "5949b4dcb93815fdf39bd2c83d50f308a9470c4367e369be2be0912fd5f0be1f"
+}

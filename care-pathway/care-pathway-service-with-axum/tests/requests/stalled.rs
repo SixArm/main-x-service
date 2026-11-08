@@ -19,8 +19,6 @@
 use axa::TestServer;
 use axa::prelude::*;
 use care_pathway_service::app::App;
-use care_pathway_service::models::_entities::pathway_instances;
-use sea_orm::{ActiveValue, ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use serial_test::serial;
 use uuid::Uuid;
@@ -65,22 +63,21 @@ async fn backdate_enrolled_on(
     instance_pid: &str,
     enrolled_on: chrono::NaiveDate,
 ) {
-    let row = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::Pid.eq(Uuid::parse_str(instance_pid).expect("pid")))
-        .one(&ctx.db)
-        .await
-        .expect("query")
-        .expect("instance exists");
-    let mut active: pathway_instances::ActiveModel = row.into();
-    active.enrolled_on = ActiveValue::set(enrolled_on);
-    active.clock_start_at = ActiveValue::set(Some(
-        enrolled_on
-            .and_hms_opt(0, 0, 0)
-            .expect("valid time")
-            .and_utc()
-            .into(),
-    ));
-    active.update(&ctx.db).await.expect("update instance");
+    let clock_start_at: chrono::DateTime<chrono::FixedOffset> = enrolled_on
+        .and_hms_opt(0, 0, 0)
+        .expect("valid time")
+        .and_utc()
+        .into();
+    let done = sqlx::query!(
+        "UPDATE pathway_instances SET enrolled_on = $2, clock_start_at = $3 WHERE pid = $1",
+        Uuid::parse_str(instance_pid).expect("pid"),
+        enrolled_on,
+        clock_start_at,
+    )
+    .execute(&ctx.db)
+    .await
+    .expect("update instance");
+    assert_eq!(done.rows_affected(), 1, "instance exists");
 }
 
 #[tokio::test]

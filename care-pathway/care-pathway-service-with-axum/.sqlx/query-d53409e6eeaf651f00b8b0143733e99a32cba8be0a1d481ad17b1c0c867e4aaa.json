@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE care_pathways SET data = jsonb_set(data, '{name}', '\"Tampered\"')\n               WHERE pid = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d53409e6eeaf651f00b8b0143733e99a32cba8be0a1d481ad17b1c0c867e4aaa"
+}

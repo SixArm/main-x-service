@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT hash, hash_sha3 FROM audit_logs ORDER BY id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "hash"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "hash_sha3",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "hash_sha3"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "b55e59a3110e5bb5d676b6a75cd4b8a01cd844ffa79320af8e22734c541becf4"
+}

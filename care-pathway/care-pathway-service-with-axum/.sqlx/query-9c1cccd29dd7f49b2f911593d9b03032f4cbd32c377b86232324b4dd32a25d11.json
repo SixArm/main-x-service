@@ -1,0 +1,168 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO entity_links\n                   (id, from_pid, kind, to_ref, role, confidence, provenance,\n                    valid_from, valid_to, deleted_at)\n               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)\n               ON CONFLICT (from_pid, kind, to_ref, valid_from) DO UPDATE SET\n                   role = EXCLUDED.role,\n                   confidence = EXCLUDED.confidence,\n                   provenance = EXCLUDED.provenance,\n                   valid_to = EXCLUDED.valid_to,\n                   deleted_at = EXCLUDED.deleted_at\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, from_pid, kind, to_ref, role, confidence, provenance,\n                         valid_from, valid_to, deleted_at AS \"deleted_at: _\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "from_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "from_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "kind",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "to_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "to_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "role",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "confidence",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "confidence"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "provenance",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "valid_from",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "valid_from"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "valid_to",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "valid_to"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Float8",
+        "Varchar",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "9c1cccd29dd7f49b2f911593d9b03032f4cbd32c377b86232324b4dd32a25d11"
+}

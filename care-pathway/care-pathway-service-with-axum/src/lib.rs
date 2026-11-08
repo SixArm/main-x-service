@@ -12,7 +12,8 @@
 //! - [`controllers`] — Axum controllers: CRUD, `match`, `check-duplicates`,
 //!   plus the root `/metrics.prom` Prometheus endpoint.
 //! - [`metrics`] — process-wide Prometheus registry + text rendering.
-//! - [`models`] — `SeaORM` entity + CRUD helpers over the stored payload.
+//! - [`models`] — the table rows and every SQL statement the service runs
+//!   (sqlx `query!` literals), plus the migrator.
 //! - [`workers`] — background workers (axa `BackgroundWorker`).
 //! - [`tasks`], [`initializers`], [`data`] — axa extension points.
 //!

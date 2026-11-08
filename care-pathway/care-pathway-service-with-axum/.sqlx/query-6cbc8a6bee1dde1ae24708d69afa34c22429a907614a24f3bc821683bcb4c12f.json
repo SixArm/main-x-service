@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, instance_pid, kind,\n                      occurred_at AS \"occurred_at: _\", note, actor\n               FROM instance_events\n               WHERE instance_pid = ANY($1)\n               ORDER BY occurred_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "instance_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "instance_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "kind",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "occurred_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "occurred_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "note",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "actor",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_events",
+            "name": "actor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "6cbc8a6bee1dde1ae24708d69afa34c22429a907614a24f3bc821683bcb4c12f"
+}

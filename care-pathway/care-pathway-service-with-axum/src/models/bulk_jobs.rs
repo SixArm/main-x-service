@@ -30,16 +30,73 @@
 //! two, per the family contract; the `format` column is what
 //! distinguishes an FHIR job from a native one when listing.
 
-use axa::prelude::*;
-use chrono::SubsecRound as _;
-use sea_orm::{ColumnTrait, ConnectionTrait, QueryFilter, QueryOrder, QuerySelect};
+use chrono::{DateTime, FixedOffset, SubsecRound as _};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-/// Re-export the generated `bulk_jobs` entity.
-pub use super::_entities::bulk_jobs::{self, ActiveModel, Entity, Model};
+use super::{ModelError, ModelResult, to_i64};
 
-/// Default `SeaORM` active-model behaviour — no custom hooks.
-impl ActiveModelBehavior for super::_entities::bulk_jobs::ActiveModel {}
+/// One bulk job row.
+///
+/// Timestamps are `DateTime<FixedOffset>`, the type the `SeaORM` entity
+/// used, so anything that serializes a row keeps its exact wire form.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Job id (application-assigned).
+    pub id: Uuid,
+    /// `import` | `export`.
+    pub kind: String,
+    /// The entity the job operates on.
+    pub entity: String,
+    /// Input/output format.
+    pub format: String,
+    /// Lifecycle status (see [`status`]).
+    pub status: String,
+    /// Request parameters.
+    pub params: serde_json::Value,
+    /// Total rows, once known.
+    pub rows_total: Option<i64>,
+    /// Rows processed so far.
+    pub rows_processed: i64,
+    /// Rows created (import).
+    pub rows_created: i64,
+    /// Rows upserted in place (import).
+    pub rows_upserted: i64,
+    /// Rows routed to the review queue (import).
+    pub rows_to_review: i64,
+    /// Rows that failed (import).
+    pub rows_errored: i64,
+    /// The submitting caller's `sub`.
+    pub actor: Option<String>,
+    /// Client-supplied key that makes a retried submit return the same job.
+    pub idempotency_key: Option<String>,
+    /// The uploaded input artifact.
+    pub input_url: Option<String>,
+    /// The output artifact.
+    pub result_url: Option<String>,
+    /// The per-row error report artifact.
+    pub error_report_url: Option<String>,
+    /// Why the job failed.
+    pub error: Option<String>,
+    /// Submission time.
+    pub created_at: DateTime<FixedOffset>,
+    /// Last transition time.
+    pub updated_at: DateTime<FixedOffset>,
+    /// When the job and its artifacts may be swept.
+    pub expires_at: Option<DateTime<FixedOffset>>,
+}
+
+/// The current time, truncated to microseconds (what Postgres stores).
+fn now() -> DateTime<FixedOffset> {
+    chrono::Utc::now().trunc_subsecs(6).into()
+}
+
+/// A whole-row `RETURNING` that matched no row: `RowNotFound`, as
+/// `SeaORM`'s `RecordNotUpdated` was.
+fn gone(row: Option<Model>) -> ModelResult<Model> {
+    row.ok_or(ModelError::Sqlx(sqlx::Error::RowNotFound))
+}
 
 /// Job kinds.
 pub mod kind {
@@ -113,8 +170,8 @@ impl Model {
     /// # Errors
     ///
     /// When the lookup or insert fails.
-    pub async fn submit<C: ConnectionTrait>(
-        db: &C,
+    pub async fn submit(
+        db: &PgPool,
         entity: &str,
         job_kind: &str,
         format: &str,
@@ -151,8 +208,8 @@ impl Model {
     /// When the lookup fails, or the insert fails for a reason other than
     /// a losing idempotency race.
     #[allow(clippy::too_many_arguments)]
-    pub async fn submit_with_ttl<C: ConnectionTrait>(
-        db: &C,
+    pub async fn submit_with_ttl(
+        db: &PgPool,
         entity: &str,
         job_kind: &str,
         format: &str,
@@ -166,35 +223,39 @@ impl Model {
         {
             return Ok((existing, true));
         }
-        let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().trunc_subsecs(6).into();
-        let inserted = bulk_jobs::ActiveModel {
-            id: ActiveValue::set(Uuid::new_v4()),
-            kind: ActiveValue::set(job_kind.to_string()),
-            entity: ActiveValue::set(entity.to_string()),
-            format: ActiveValue::set(format.to_string()),
-            status: ActiveValue::set(status::QUEUED.to_string()),
-            params: ActiveValue::set(params),
-            rows_total: ActiveValue::set(None),
-            rows_processed: ActiveValue::set(0),
-            rows_created: ActiveValue::set(0),
-            rows_upserted: ActiveValue::set(0),
-            rows_to_review: ActiveValue::set(0),
-            rows_errored: ActiveValue::set(0),
-            actor: ActiveValue::set(actor.map(ToString::to_string)),
-            idempotency_key: ActiveValue::set(idempotency_key.map(ToString::to_string)),
-            input_url: ActiveValue::set(None),
-            result_url: ActiveValue::set(None),
-            error_report_url: ActiveValue::set(None),
-            error: ActiveValue::set(None),
-            created_at: ActiveValue::set(now),
-            updated_at: ActiveValue::set(now),
-            expires_at: ActiveValue::set(Some(now + chrono::Duration::seconds(ttl_secs))),
-        }
-        .insert(db)
+        let now = now();
+        let inserted = sqlx::query_as!(
+            Self,
+            r#"INSERT INTO bulk_jobs
+                   (id, kind, entity, format, status, params, rows_total, rows_processed,
+                    rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                    idempotency_key, input_url, result_url, error_report_url, error,
+                    created_at, updated_at, expires_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NULL, 0, 0, 0, 0, 0, $7, $8,
+                       NULL, NULL, NULL, NULL, $9, $9, $10)
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         expires_at AS "expires_at: _",
+                         id, kind, entity, format, status, params, rows_total, rows_processed,
+                         rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                         idempotency_key, input_url, result_url, error_report_url, error"#,
+            Uuid::new_v4(),
+            job_kind,
+            entity,
+            format,
+            status::QUEUED,
+            params,
+            actor,
+            idempotency_key,
+            now,
+            now + chrono::Duration::seconds(ttl_secs),
+        )
+        .fetch_one(db)
         .await;
         match inserted {
             Ok(job) => Ok((job, false)),
             Err(insert_err) => {
+                // Lost the race to a concurrent submit with the same key:
+                // return the winner instead of the constraint violation.
                 if let Some(key) = idempotency_key
                     && let Some(existing) =
                         Self::find_by_idempotency_key(db, entity, job_kind, key).await?
@@ -214,18 +275,29 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    async fn find_by_idempotency_key<C: ConnectionTrait>(
-        db: &C,
+    async fn find_by_idempotency_key(
+        db: &PgPool,
         entity: &str,
         job_kind: &str,
         key: &str,
     ) -> ModelResult<Option<Self>> {
-        Ok(bulk_jobs::Entity::find()
-            .filter(bulk_jobs::Column::Entity.eq(entity))
-            .filter(bulk_jobs::Column::Kind.eq(job_kind))
-            .filter(bulk_jobs::Column::IdempotencyKey.eq(key))
-            .one(db)
-            .await?)
+        let row = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         expires_at AS "expires_at: _",
+                         id, kind, entity, format, status, params, rows_total, rows_processed,
+                         rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                         idempotency_key, input_url, result_url, error_report_url, error
+               FROM bulk_jobs
+               WHERE entity = $1 AND kind = $2 AND idempotency_key = $3
+               LIMIT 1"#,
+            entity,
+            job_kind,
+            key,
+        )
+        .fetch_optional(db)
+        .await?;
+        Ok(row)
     }
 
     /// Attach the uploaded input artifact reference to an import job.
@@ -233,15 +305,22 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn set_input_url<C: ConnectionTrait>(
-        self,
-        db: &C,
-        input_url: String,
-    ) -> ModelResult<Self> {
-        let mut active = self.into_active_model();
-        active.input_url = ActiveValue::set(Some(input_url));
-        active.updated_at = ActiveValue::set(chrono::Utc::now().trunc_subsecs(6).into());
-        Ok(active.update(db).await?)
+    pub async fn set_input_url(self, db: &PgPool, input_url: String) -> ModelResult<Self> {
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE bulk_jobs SET input_url = $2, updated_at = $3 WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         expires_at AS "expires_at: _",
+                         id, kind, entity, format, status, params, rows_total, rows_processed,
+                         rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                         idempotency_key, input_url, result_url, error_report_url, error"#,
+            self.id,
+            input_url,
+            now(),
+        )
+        .fetch_optional(db)
+        .await?;
+        gone(row)
     }
 
     /// Record the reconciled outcome of an **import** run (§7):
@@ -256,9 +335,9 @@ impl Model {
     ///
     /// When the update fails.
     #[allow(clippy::too_many_arguments)]
-    pub async fn finish_import<C: ConnectionTrait>(
+    pub async fn finish_import(
         self,
-        db: &C,
+        db: &PgPool,
         rows_total: u64,
         rows_created: u64,
         rows_upserted: u64,
@@ -271,17 +350,31 @@ impl Model {
         } else {
             status::COMPLETED
         };
-        let mut active = self.into_active_model();
-        active.status = ActiveValue::set(final_status.to_string());
-        active.rows_total = ActiveValue::set(Some(i64_of(rows_total)));
-        active.rows_processed = ActiveValue::set(i64_of(rows_total));
-        active.rows_created = ActiveValue::set(i64_of(rows_created));
-        active.rows_upserted = ActiveValue::set(i64_of(rows_upserted));
-        active.rows_to_review = ActiveValue::set(i64_of(rows_to_review));
-        active.rows_errored = ActiveValue::set(i64_of(rows_errored));
-        active.error_report_url = ActiveValue::set(error_report_url);
-        active.updated_at = ActiveValue::set(chrono::Utc::now().trunc_subsecs(6).into());
-        Ok(active.update(db).await?)
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE bulk_jobs
+               SET status = $2, rows_total = $3, rows_processed = $3, rows_created = $4,
+                   rows_upserted = $5, rows_to_review = $6, rows_errored = $7,
+                   error_report_url = $8, updated_at = $9
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         expires_at AS "expires_at: _",
+                         id, kind, entity, format, status, params, rows_total, rows_processed,
+                         rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                         idempotency_key, input_url, result_url, error_report_url, error"#,
+            self.id,
+            final_status,
+            i64_of(rows_total),
+            i64_of(rows_created),
+            i64_of(rows_upserted),
+            i64_of(rows_to_review),
+            i64_of(rows_errored),
+            error_report_url,
+            now(),
+        )
+        .fetch_optional(db)
+        .await?;
+        gone(row)
     }
 
     /// Fetch a job by id.
@@ -289,8 +382,22 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn find_by_id<C: ConnectionTrait>(db: &C, id: Uuid) -> ModelResult<Option<Self>> {
-        Ok(bulk_jobs::Entity::find_by_id(id).one(db).await?)
+    pub async fn find_by_id(db: &PgPool, id: Uuid) -> ModelResult<Option<Self>> {
+        let row = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         expires_at AS "expires_at: _",
+                         id, kind, entity, format, status, params, rows_total, rows_processed,
+                         rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                         idempotency_key, input_url, result_url, error_report_url, error
+               FROM bulk_jobs
+               WHERE id = $1
+               LIMIT 1"#,
+            id,
+        )
+        .fetch_optional(db)
+        .await?;
+        Ok(row)
     }
 
     /// Claim a queued job for a worker, moving it to `running`.
@@ -298,7 +405,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn start<C: ConnectionTrait>(self, db: &C) -> ModelResult<Self> {
+    pub async fn start(self, db: &PgPool) -> ModelResult<Self> {
         self.transition(db, status::RUNNING, None, None, None).await
     }
 
@@ -307,12 +414,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn complete<C: ConnectionTrait>(
-        self,
-        db: &C,
-        result_url: &str,
-        rows: i64,
-    ) -> ModelResult<Self> {
+    pub async fn complete(self, db: &PgPool, result_url: &str, rows: i64) -> ModelResult<Self> {
         self.transition(db, status::COMPLETED, Some(result_url), None, Some(rows))
             .await
     }
@@ -322,7 +424,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn fail<C: ConnectionTrait>(self, db: &C, reason: &str) -> ModelResult<Self> {
+    pub async fn fail(self, db: &PgPool, reason: &str) -> ModelResult<Self> {
         self.transition(db, status::FAILED, None, Some(reason), None)
             .await
     }
@@ -336,37 +438,62 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn cancel<C: ConnectionTrait>(self, db: &C) -> ModelResult<Self> {
-        let mut active = self.into_active_model();
-        active.status = ActiveValue::set(status::CANCELLED.to_string());
-        active.result_url = ActiveValue::set(None);
-        active.updated_at = ActiveValue::set(chrono::Utc::now().trunc_subsecs(6).into());
-        Ok(active.update(db).await?)
+    pub async fn cancel(self, db: &PgPool) -> ModelResult<Self> {
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE bulk_jobs SET status = $2, result_url = NULL, updated_at = $3
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         expires_at AS "expires_at: _",
+                         id, kind, entity, format, status, params, rows_total, rows_processed,
+                         rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                         idempotency_key, input_url, result_url, error_report_url, error"#,
+            self.id,
+            status::CANCELLED,
+            now(),
+        )
+        .fetch_optional(db)
+        .await?;
+        gone(row)
     }
 
     /// The shared status transition.
-    async fn transition<C: ConnectionTrait>(
+    async fn transition(
         self,
-        db: &C,
+        db: &PgPool,
         to: &str,
         result_url: Option<&str>,
         error: Option<&str>,
         rows: Option<i64>,
     ) -> ModelResult<Self> {
-        let mut active = self.into_active_model();
-        active.status = ActiveValue::set(to.to_string());
-        if let Some(url) = result_url {
-            active.result_url = ActiveValue::set(Some(url.to_string()));
-        }
-        if let Some(reason) = error {
-            active.error = ActiveValue::set(Some(reason.to_string()));
-        }
-        if let Some(n) = rows {
-            active.rows_processed = ActiveValue::set(n);
-            active.rows_total = ActiveValue::set(Some(n));
-        }
-        active.updated_at = ActiveValue::set(chrono::Utc::now().trunc_subsecs(6).into());
-        Ok(active.update(db).await?)
+        // An absent value keeps the column as it is: `COALESCE` writes
+        // back the stored value, which is what leaving the column out of
+        // the `SeaORM` update did.
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE bulk_jobs
+               SET status = $2,
+                   result_url = COALESCE($3, result_url),
+                   error = COALESCE($4, error),
+                   rows_processed = COALESCE($5, rows_processed),
+                   rows_total = COALESCE($5, rows_total),
+                   updated_at = $6
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         expires_at AS "expires_at: _",
+                         id, kind, entity, format, status, params, rows_total, rows_processed,
+                         rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                         idempotency_key, input_url, result_url, error_report_url, error"#,
+            self.id,
+            to,
+            result_url,
+            error,
+            rows,
+            now(),
+        )
+        .fetch_optional(db)
+        .await?;
+        gone(row)
     }
 
     /// Whether the job has outlived its retention window.
@@ -382,26 +509,78 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn recent<C: ConnectionTrait>(
-        db: &C,
+    pub async fn recent(
+        db: &PgPool,
         entity: &str,
         kind: Option<&str>,
         status: Option<&str>,
         limit: u64,
     ) -> ModelResult<Vec<Self>> {
-        let mut query = bulk_jobs::Entity::find().filter(bulk_jobs::Column::Entity.eq(entity));
-        if let Some(k) = kind {
-            query = query.filter(bulk_jobs::Column::Kind.eq(k));
-        }
-        if let Some(s) = status {
-            query = query.filter(bulk_jobs::Column::Status.eq(s));
-        }
-        Ok(query
-            .order_by_desc(bulk_jobs::Column::CreatedAt)
-            .limit(limit)
-            .all(db)
-            .await?)
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         expires_at AS "expires_at: _",
+                         id, kind, entity, format, status, params, rows_total, rows_processed,
+                         rows_created, rows_upserted, rows_to_review, rows_errored, actor,
+                         idempotency_key, input_url, result_url, error_report_url, error
+               FROM bulk_jobs
+               WHERE entity = $1
+                 AND ($2::text IS NULL OR kind = $2)
+                 AND ($3::text IS NULL OR status = $3)
+               ORDER BY created_at DESC
+               LIMIT $4"#,
+            entity,
+            kind,
+            status,
+            to_i64(limit),
+        )
+        .fetch_all(db)
+        .await?;
+        Ok(rows)
     }
+}
+
+/// Move every lost job to `failed`, returning the ids moved (see
+/// [`crate::bulk::reconcile`] for what "lost" means). One statement, so a
+/// job cannot finish between the check and the write. `job_worker` and
+/// `export_worker` are the native bulk and FHIR `$export` workers' queue
+/// class names, `grace_minutes` how long a job may sit with no queue row.
+///
+/// # Errors
+///
+/// When the statement fails, including when `axa_queue` does not exist.
+///
+/// Two names, because this table serves two consumers: a FHIR `$export`
+/// row is run by `BulkExportWorker`, and matching only `BulkJobWorker`
+/// would see every one of them as having no queue row, and fail them all.
+pub async fn mark_lost(
+    db: &PgPool,
+    job_worker: &str,
+    export_worker: &str,
+    grace_minutes: i32,
+) -> Result<Vec<Uuid>, sqlx::Error> {
+    sqlx::query_scalar!(
+        "UPDATE bulk_jobs b
+         SET status = 'failed', error = 'lost by the job queue', updated_at = now()
+         WHERE b.status IN ('queued', 'running')
+           AND NOT EXISTS (
+               SELECT 1 FROM axa_queue q
+               WHERE q.name IN ($1, $2) AND q.args->>'job_id' = b.id::text AND q.status <> 'failed'
+           )
+           AND (
+               EXISTS (
+                   SELECT 1 FROM axa_queue q
+                   WHERE q.name IN ($1, $2) AND q.args->>'job_id' = b.id::text AND q.status = 'failed'
+               )
+               OR b.updated_at < now() - make_interval(mins => $3)
+           )
+         RETURNING b.id",
+        job_worker,
+        export_worker,
+        grace_minutes,
+    )
+    .fetch_all(db)
+    .await
 }
 
 #[cfg(test)]

@@ -30,10 +30,9 @@
 use axa::testing::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
-use care_pathway_service::models::_entities::event_outbox;
+use care_pathway_service::models::event_outbox;
 use care_pathway_service::relay::{self, FluvioSink};
 use care_pathway_service::streaming;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serial_test::serial;
 
 #[tokio::test]
@@ -74,11 +73,11 @@ async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
             .expect("drain_once against the real sink");
         assert!(published >= 1, "at least this row's send should succeed");
 
-        let row = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(model.pid))
-            .one(&ctx.db)
+        let row = event_outbox::Model::for_entity(&ctx.db, model.pid)
             .await
             .expect("load the outbox row")
+            .into_iter()
+            .next()
             .expect("the row exists");
         assert!(
             row.published_at.is_some(),

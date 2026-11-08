@@ -8,11 +8,8 @@ use axa::TestServer;
 use axa::prelude::*;
 use care_pathway_service::app::App;
 use care_pathway_service::data::journeys::DEFECT_CODES;
-use care_pathway_service::models::_entities::{
-    instance_segments, instance_team, pathway_instances,
-};
+use care_pathway_service::models::{instance_segments, instance_team, pathway_instances};
 use care_pathway_service::tasks::journeys_seed::JourneysSeed;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use serial_test::serial;
 
@@ -60,9 +57,7 @@ async fn journeys_seed_persists_exactly_what_it_generates() {
             .expect("journeys:seed succeeds against a real pathway");
 
         let pathway_pid = uuid::Uuid::parse_str(&pathway).expect("valid pid");
-        let instances = pathway_instances::Entity::find()
-            .filter(pathway_instances::Column::PathwayPid.eq(pathway_pid))
-            .all(&ctx.db)
+        let instances = pathway_instances::Model::for_pathway_any(&ctx.db, pathway_pid)
             .await
             .expect("query instances");
         // 6 clean + 2 defect instances.
@@ -80,9 +75,7 @@ async fn journeys_seed_persists_exactly_what_it_generates() {
         // The `no_segments` defect instance really has none.
         let mut found_no_segments = false;
         for instance in &instances {
-            let segments = instance_segments::Entity::find()
-                .filter(instance_segments::Column::InstancePid.eq(instance.pid))
-                .all(&ctx.db)
+            let segments = instance_segments::Model::for_instance_any_order(&ctx.db, instance.pid)
                 .await
                 .expect("query segments");
             if segments.is_empty() {
@@ -95,8 +88,7 @@ async fn journeys_seed_persists_exactly_what_it_generates() {
         );
 
         // Every generated team member is also recognizably synthetic.
-        let team_rows = instance_team::Entity::find()
-            .all(&ctx.db)
+        let team_rows = instance_team::Model::all(&ctx.db)
             .await
             .expect("query team");
         for member in &team_rows {

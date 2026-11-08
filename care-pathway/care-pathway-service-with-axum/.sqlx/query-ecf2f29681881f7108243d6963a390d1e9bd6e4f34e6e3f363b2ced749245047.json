@@ -1,0 +1,207 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO instance_segments\n                   (pid, instance_pid, label, stage, category, waste, started_at,\n                    ended_at, actor_ref, location_ref, note, position)\n               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, instance_pid, label, stage, category, waste,\n                         started_at AS \"started_at: _\", ended_at AS \"ended_at: _\",\n                         actor_ref, location_ref, note, position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "instance_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "instance_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "label",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "label"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "stage",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "stage"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "category",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "category"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "waste",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "waste"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "started_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "ended_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "ended_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "actor_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "actor_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "location_ref",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "location_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "note",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "position",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "instance_segments",
+            "name": "position"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "ecf2f29681881f7108243d6963a390d1e9bd6e4f34e6e3f363b2ced749245047"
+}

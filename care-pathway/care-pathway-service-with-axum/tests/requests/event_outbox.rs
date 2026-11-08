@@ -14,11 +14,9 @@
 use axa::testing::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
-use care_pathway_service::models::_entities::{care_pathways, event_outbox};
 use care_pathway_service::models::care_pathways::Model as PathwayModel;
-use care_pathway_service::models::event_outbox::OutboxInsert;
+use care_pathway_service::models::event_outbox::{self, OutboxInsert};
 use care_pathway_service::streaming::{ENTITY, Envelope, EventKind, SCHEMA_VERSION};
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, TransactionTrait};
 use serial_test::serial;
 use uuid::Uuid;
 
@@ -49,29 +47,26 @@ async fn outbox_create_writes_pathway_and_one_event_atomically() {
         let pathway = CarePathway::new("Outbox Stroke Pathway");
 
         // One transaction spanning the entity insert and the outbox insert.
-        let txn = ctx.db.begin().await.expect("begin tx");
-        let model = PathwayModel::create(&txn, &pathway)
+        let mut txn = ctx.db.begin().await.expect("begin tx");
+        let model = PathwayModel::create(&mut *txn, &pathway)
             .await
             .expect("create pathway");
         let env = created_envelope(&model);
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
             .expect("map envelope")
-            .insert_on(&txn)
+            .insert_on(&mut *txn)
             .await
             .expect("enqueue outbox row");
         txn.commit().await.expect("commit tx");
 
         // The pathway row persisted...
-        let pathway_count = care_pathways::Entity::find()
-            .count(&ctx.db)
+        let pathway_count = PathwayModel::count_all(&ctx.db)
             .await
             .expect("count pathways");
         assert_eq!(pathway_count, 1, "the care pathway row committed");
 
         // ...and exactly one outbox row for it, unpublished, correctly mapped.
-        let rows = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(model.pid))
-            .all(&ctx.db)
+        let rows = event_outbox::Model::for_entity(&ctx.db, model.pid)
             .await
             .expect("load outbox rows");
         assert_eq!(
@@ -102,14 +97,14 @@ async fn outbox_failure_rolls_back_both_writes() {
     request::<App, _, _>(|_request, ctx| async move {
         let pathway = CarePathway::new("Rollback Sepsis Pathway");
 
-        let txn = ctx.db.begin().await.expect("begin tx");
-        let model = PathwayModel::create(&txn, &pathway)
+        let mut txn = ctx.db.begin().await.expect("begin tx");
+        let model = PathwayModel::create(&mut *txn, &pathway)
             .await
             .expect("create pathway");
         let env = created_envelope(&model);
         OutboxInsert::from_envelope(&env, chrono::Utc::now().into())
             .expect("map envelope")
-            .insert_on(&txn)
+            .insert_on(&mut *txn)
             .await
             .expect("enqueue outbox row");
         // Simulate a handler error after both writes but before commit:
@@ -117,13 +112,11 @@ async fn outbox_failure_rolls_back_both_writes() {
         txn.rollback().await.expect("rollback tx");
 
         // Neither write survived — the two are all-or-nothing.
-        let pathway_count = care_pathways::Entity::find()
-            .count(&ctx.db)
+        let pathway_count = PathwayModel::count_all(&ctx.db)
             .await
             .expect("count pathways");
         assert_eq!(pathway_count, 0, "the care pathway insert rolled back");
-        let event_count = event_outbox::Entity::find()
-            .count(&ctx.db)
+        let event_count = event_outbox::Model::count_all(&ctx.db)
             .await
             .expect("count outbox rows");
         assert_eq!(event_count, 0, "the event insert rolled back with it");

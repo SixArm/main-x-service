@@ -12,18 +12,16 @@
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
-use sea_orm::{ActiveValue, PaginatorTrait, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
 use crate::analytics;
 use crate::auth::MaybeAuthUser;
 use crate::conformance;
 use crate::instances as rules;
-use crate::models::_entities::{
-    instance_events, instance_segments, instance_steps, pathway_instances,
-};
 use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
+use crate::models::instance_segments::NewSegment;
+use crate::models::{instance_events, instance_segments, instance_steps, pathway_instances};
 use crate::split;
 use crate::suppression;
 use crate::tba;
@@ -55,10 +53,7 @@ fn pid(raw: &str) -> Result<Uuid> {
 
 /// Find one live instance, or `404`.
 async fn find_instance(ctx: &AppContext, raw: &str) -> Result<pathway_instances::Model> {
-    pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::Pid.eq(pid(raw)?))
-        .filter(pathway_instances::Column::DeletedAt.is_null())
-        .one(&ctx.db)
+    pathway_instances::Model::find_live(&ctx.db, pid(raw)?)
         .await?
         .ok_or(Error::NotFound)
 }
@@ -105,13 +100,7 @@ async fn load_segments(
     ctx: &AppContext,
     instance_pid: Uuid,
 ) -> Result<Vec<instance_segments::Model>> {
-    Ok(instance_segments::Entity::find()
-        .filter(instance_segments::Column::InstancePid.eq(instance_pid))
-        .order_by_asc(instance_segments::Column::StartedAt)
-        .order_by_asc(instance_segments::Column::Position)
-        .limit(MAX_SEGMENTS)
-        .all(&ctx.db)
-        .await?)
+    Ok(instance_segments::Model::for_instance(&ctx.db, instance_pid, MAX_SEGMENTS).await?)
 }
 
 /// Load one instance's declared steps as [`conformance::StepRecord`]s,
@@ -120,11 +109,7 @@ async fn load_step_records(
     ctx: &AppContext,
     instance_pid: Uuid,
 ) -> Result<Vec<conformance::StepRecord>> {
-    let rows = instance_steps::Entity::find()
-        .filter(instance_steps::Column::InstancePid.eq(instance_pid))
-        .order_by_asc(instance_steps::Column::Position)
-        .all(&ctx.db)
-        .await?;
+    let rows = instance_steps::Model::for_instance_by_position(&ctx.db, instance_pid).await?;
     Ok(rows
         .iter()
         .map(|row| conformance::StepRecord {
@@ -137,11 +122,7 @@ async fn load_step_records(
 /// Count one instance's `escalation`-kind events (spec T-14i) —
 /// carried alongside the conformance ratio, never folded into it.
 async fn count_escalation_events(ctx: &AppContext, instance_pid: Uuid) -> Result<usize> {
-    let count = instance_events::Entity::find()
-        .filter(instance_events::Column::InstancePid.eq(instance_pid))
-        .filter(instance_events::Column::Kind.eq("escalation"))
-        .count(&ctx.db)
-        .await?;
+    let count = instance_events::Model::count_of_kind(&ctx.db, instance_pid, "escalation").await?;
     Ok(usize::try_from(count).unwrap_or(usize::MAX))
 }
 
@@ -165,11 +146,7 @@ pub(crate) async fn load_conformance_inputs(
             std::collections::HashMap::new(),
         ));
     }
-    let step_rows = instance_steps::Entity::find()
-        .filter(instance_steps::Column::InstancePid.is_in(pids.to_vec()))
-        .order_by_asc(instance_steps::Column::Position)
-        .all(&ctx.db)
-        .await?;
+    let step_rows = instance_steps::Model::for_instances_by_position(&ctx.db, pids).await?;
     let mut steps: std::collections::HashMap<Uuid, Vec<conformance::StepRecord>> =
         std::collections::HashMap::new();
     for row in &step_rows {
@@ -182,11 +159,8 @@ pub(crate) async fn load_conformance_inputs(
             });
     }
 
-    let event_rows = instance_events::Entity::find()
-        .filter(instance_events::Column::InstancePid.is_in(pids.to_vec()))
-        .filter(instance_events::Column::Kind.eq("escalation"))
-        .all(&ctx.db)
-        .await?;
+    let event_rows =
+        instance_events::Model::for_instances_of_kind(&ctx.db, pids, "escalation").await?;
     let mut escalations: std::collections::HashMap<Uuid, usize> = std::collections::HashMap::new();
     for row in &event_rows {
         *escalations.entry(row.instance_pid).or_insert(0) += 1;
@@ -262,11 +236,7 @@ async fn record_segment(
     // too (a partial unique index), so a concurrent double-POST cannot
     // slip past; this check is what turns that into a readable 422.
     if payload.ended_at.is_none() {
-        let open = instance_segments::Entity::find()
-            .filter(instance_segments::Column::InstancePid.eq(instance.pid))
-            .filter(instance_segments::Column::EndedAt.is_null())
-            .one(&ctx.db)
-            .await?;
+        let open = instance_segments::Model::open_for_instance(&ctx.db, instance.pid).await?;
         if let Some(open) = open {
             return Err(refuse(&format!(
                 "segment `{}` is still open; close it before opening another \
@@ -276,30 +246,26 @@ async fn record_segment(
         }
     }
 
-    let position = i32::try_from(
-        instance_segments::Entity::find()
-            .filter(instance_segments::Column::InstancePid.eq(instance.pid))
-            .count(&ctx.db)
-            .await?,
-    )
-    .unwrap_or(i32::MAX);
+    let position =
+        i32::try_from(instance_segments::Model::count_for_instance(&ctx.db, instance.pid).await?)
+            .unwrap_or(i32::MAX);
 
-    let row = instance_segments::ActiveModel {
-        pid: ActiveValue::set(Uuid::new_v4()),
-        instance_pid: ActiveValue::set(instance.pid),
-        label: ActiveValue::set(payload.label.trim().to_string()),
-        stage: ActiveValue::set(payload.stage.clone()),
-        category: ActiveValue::set(payload.category.clone()),
-        waste: ActiveValue::set(payload.waste.clone()),
-        started_at: ActiveValue::set(payload.started_at.into()),
-        ended_at: ActiveValue::set(payload.ended_at.map(Into::into)),
-        actor_ref: ActiveValue::set(payload.actor_ref.clone()),
-        location_ref: ActiveValue::set(payload.location_ref.clone()),
-        note: ActiveValue::set(payload.note.clone()),
-        position: ActiveValue::set(position),
-        ..Default::default()
-    }
-    .insert(&ctx.db)
+    let row = instance_segments::Model::insert(
+        &ctx.db,
+        &NewSegment {
+            instance_pid: instance.pid,
+            label: payload.label.trim(),
+            stage: &payload.stage,
+            category: &payload.category,
+            waste: payload.waste.as_deref(),
+            started_at: payload.started_at.into(),
+            ended_at: payload.ended_at.map(Into::into),
+            actor_ref: payload.actor_ref.as_deref(),
+            location_ref: payload.location_ref.as_deref(),
+            note: payload.note.as_deref(),
+            position,
+        },
+    )
     .await?;
 
     Audit::record(
@@ -312,8 +278,7 @@ async fn record_segment(
             "waste": payload.waste, "open": payload.ended_at.is_none(),
         })),
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(row)
 }
 
@@ -343,10 +308,7 @@ async fn close_segment(
     Json(payload): Json<CloseSegmentPayload>,
 ) -> Result<Response> {
     let instance = find_instance(&ctx, &raw).await?;
-    let row = instance_segments::Entity::find()
-        .filter(instance_segments::Column::Pid.eq(pid(&seg)?))
-        .filter(instance_segments::Column::InstancePid.eq(instance.pid))
-        .one(&ctx.db)
+    let row = instance_segments::Model::find_in_instance(&ctx.db, pid(&seg)?, instance.pid)
         .await?
         .ok_or(Error::NotFound)?;
     if row.ended_at.is_some() {
@@ -356,9 +318,7 @@ async fn close_segment(
     tba::validate_interval(ms(row.started_at), Some(ended_at.timestamp_millis()))
         .map_err(|reason| refuse(&reason))?;
     let instance_pid = instance.pid;
-    let mut active: instance_segments::ActiveModel = row.into();
-    active.ended_at = ActiveValue::set(Some(ended_at.into()));
-    let updated = active.update(&ctx.db).await?;
+    let updated = row.close(&ctx.db, ended_at.into()).await?;
     Audit::record(
         &ctx.db,
         instance_pid,
@@ -366,8 +326,7 @@ async fn close_segment(
         caller.actor(),
         Some(serde_json::json!({ "segment": updated.pid, "ended_at": ended_at })),
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(updated)
 }
 
@@ -402,14 +361,13 @@ async fn set_clock(
     let existing_start = instance
         .clock_start_at
         .map_or_else(|| date_ms(instance.enrolled_on), ms);
-    let mut active: pathway_instances::ActiveModel = instance.into();
-    match payload.event.as_str() {
-        "start" => active.clock_start_at = ActiveValue::set(Some(at.into())),
+    let updated = match payload.event.as_str() {
+        "start" => instance.set_clock_start(&ctx.db, at.into()).await?,
         "stop" => {
             if at.timestamp_millis() <= existing_start {
                 return Err(refuse("clock stop must be strictly after clock start"));
             }
-            active.clock_stop_at = ActiveValue::set(Some(at.into()));
+            instance.set_clock_stop(&ctx.db, at.into()).await?
         }
         other => {
             return Err(refuse(&format!(
@@ -417,8 +375,7 @@ async fn set_clock(
                  there is no pause — see spec §12.3)"
             )));
         }
-    }
-    let updated = active.update(&ctx.db).await?;
+    };
     Audit::record(
         &ctx.db,
         instance_pid,
@@ -426,8 +383,7 @@ async fn set_clock(
         caller.actor(),
         Some(serde_json::json!({ "event": payload.event, "at": at })),
     )
-    .await
-    .map_err(Error::Model)?;
+    .await?;
     format::json(updated)
 }
 
@@ -622,38 +578,21 @@ pub(crate) struct CohortQuery {
     compare: Option<bool>,
 }
 
-/// The `pathway_instances` filter [`load_cohort`] and the attrition
-/// record's own counts (spec T-14g) both build from, so a query used
-/// to *load* the cohort and a query used to *count* it (unbounded by
-/// [`MAX_COHORT_INSTANCES`]) can never silently diverge.
-fn cohort_query(
-    pathway_pid: Uuid,
-    status: Option<&str>,
-) -> sea_orm::Select<pathway_instances::Entity> {
-    let query = pathway_instances::Entity::find()
-        .filter(pathway_instances::Column::PathwayPid.eq(pathway_pid))
-        .filter(pathway_instances::Column::DeletedAt.is_null());
-    match status {
-        Some("open") => {
-            query.filter(pathway_instances::Column::Status.is_in(["active", "on_hold"]))
-        }
-        Some("closed") => {
-            query.filter(pathway_instances::Column::Status.is_in(["completed", "discontinued"]))
-        }
-        _ => query,
-    }
-}
-
+/// [`load_cohort`] and the attrition record's own counts (spec T-14g)
+/// both run the one cohort filter in
+/// [`pathway_instances::Model::cohort`] / [`pathway_instances::Model::count_cohort`],
+/// so a query used to *load* the cohort and a query used to *count* it
+/// (unbounded by [`MAX_COHORT_INSTANCES`]) can never silently diverge.
 /// Load a pathway's instances, filtered by the query's status lens.
 pub(crate) async fn load_cohort(
     ctx: &AppContext,
     pathway_pid: Uuid,
     status: Option<&str>,
 ) -> Result<Vec<pathway_instances::Model>> {
-    Ok(cohort_query(pathway_pid, status)
-        .limit(MAX_COHORT_INSTANCES)
-        .all(&ctx.db)
-        .await?)
+    Ok(
+        pathway_instances::Model::cohort(&ctx.db, pathway_pid, status, Some(MAX_COHORT_INSTANCES))
+            .await?,
+    )
 }
 
 /// Build the full attrition array for one cohort response (spec
@@ -699,8 +638,8 @@ async fn attrition_counts(
     pathway_pid: Uuid,
     status: Option<&str>,
 ) -> Result<(usize, usize)> {
-    let enrolled = cohort_query(pathway_pid, None).count(&ctx.db).await?;
-    let after_status = cohort_query(pathway_pid, status).count(&ctx.db).await?;
+    let enrolled = pathway_instances::Model::count_cohort(&ctx.db, pathway_pid, None).await?;
+    let after_status = pathway_instances::Model::count_cohort(&ctx.db, pathway_pid, status).await?;
     Ok((
         usize::try_from(enrolled).unwrap_or(usize::MAX),
         usize::try_from(after_status).unwrap_or(usize::MAX),
@@ -718,11 +657,7 @@ pub(crate) async fn analyze_cohort(
         return Ok(Vec::new());
     }
     let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
-    let rows = instance_segments::Entity::find()
-        .filter(instance_segments::Column::InstancePid.is_in(pids))
-        .order_by_asc(instance_segments::Column::StartedAt)
-        .all(&ctx.db)
-        .await?;
+    let rows = instance_segments::Model::for_instances_by_start(&ctx.db, &pids).await?;
     let mut per_instance: std::collections::HashMap<Uuid, Vec<tba::Segment>> =
         std::collections::HashMap::new();
     for row in &rows {
@@ -758,10 +693,7 @@ async fn load_features(
     }
     let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
 
-    let segment_rows = instance_segments::Entity::find()
-        .filter(instance_segments::Column::InstancePid.is_in(pids.clone()))
-        .all(&ctx.db)
-        .await?;
+    let segment_rows = instance_segments::Model::for_instances(&ctx.db, &pids).await?;
     let mut segments: std::collections::HashMap<Uuid, Vec<analytics::SegmentInput>> =
         std::collections::HashMap::new();
     for row in &segment_rows {
@@ -779,10 +711,7 @@ async fn load_features(
             });
     }
 
-    let step_rows = instance_steps::Entity::find()
-        .filter(instance_steps::Column::InstancePid.is_in(pids.clone()))
-        .all(&ctx.db)
-        .await?;
+    let step_rows = instance_steps::Model::for_instances(&ctx.db, &pids).await?;
     let mut steps: std::collections::HashMap<Uuid, Vec<analytics::StepInput>> =
         std::collections::HashMap::new();
     for row in &step_rows {
@@ -795,10 +724,7 @@ async fn load_features(
             });
     }
 
-    let event_rows = instance_events::Entity::find()
-        .filter(instance_events::Column::InstancePid.is_in(pids))
-        .all(&ctx.db)
-        .await?;
+    let event_rows = instance_events::Model::for_instances(&ctx.db, &pids).await?;
     let mut events: std::collections::HashMap<Uuid, Vec<analytics::EventInput>> =
         std::collections::HashMap::new();
     for row in &event_rows {
@@ -1564,11 +1490,7 @@ async fn load_segment_inputs(
     if pids.is_empty() {
         return Ok(map);
     }
-    let rows = instance_segments::Entity::find()
-        .filter(instance_segments::Column::InstancePid.is_in(pids.to_vec()))
-        .order_by_asc(instance_segments::Column::StartedAt)
-        .all(&ctx.db)
-        .await?;
+    let rows = instance_segments::Model::for_instances_by_start(&ctx.db, pids).await?;
     for row in &rows {
         map.entry(row.instance_pid)
             .or_insert_with(Vec::new)
@@ -1596,11 +1518,7 @@ async fn load_step_inputs(
     if pids.is_empty() {
         return Ok(map);
     }
-    let rows = instance_steps::Entity::find()
-        .filter(instance_steps::Column::InstancePid.is_in(pids.to_vec()))
-        .order_by_asc(instance_steps::Column::Position)
-        .all(&ctx.db)
-        .await?;
+    let rows = instance_steps::Model::for_instances_by_position(&ctx.db, pids).await?;
     for row in &rows {
         map.entry(row.instance_pid)
             .or_insert_with(Vec::new)
@@ -1881,15 +1799,15 @@ async fn flow(State(ctx): State<AppContext>, Query(query): Query<FlowQuery>) -> 
     }
     let since = now.date_naive() - chrono::Duration::days(window_days);
 
-    let mut find =
-        pathway_instances::Entity::find().filter(pathway_instances::Column::DeletedAt.is_null());
+    let mut pathway_pid = None;
     if let Some(raw) = query.pathway.as_deref() {
         let template = PathwayModel::find_by_pid(&ctx.db, raw)
             .await
             .map_err(|_| Error::NotFound)?;
-        find = find.filter(pathway_instances::Column::PathwayPid.eq(template.pid));
+        pathway_pid = Some(template.pid);
     }
-    let instances = find.limit(MAX_COHORT_INSTANCES).all(&ctx.db).await?;
+    let instances =
+        pathway_instances::Model::live(&ctx.db, pathway_pid, MAX_COHORT_INSTANCES).await?;
 
     let arrivals = instances.iter().filter(|i| i.enrolled_on >= since).count();
     let closed_in_window: Vec<&pathway_instances::Model> = instances

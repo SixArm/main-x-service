@@ -761,8 +761,8 @@ TBA-1 … TBA-7 are **implemented** in `care-pathway-service-with-axum`:
 
 | Piece | Location |
 |---|---|
-| Migration | `migration/src/m20260823_000014_time_based_analysis.rs` |
-| Entity | `src/models/_entities/instance_segments.rs` |
+| Migration | `migrations/2026082300000014_time_based_analysis.up.sql` |
+| Row type + statements | `src/models/instance_segments.rs` |
 | Pure analysis + vocabularies + tests | `src/tba.rs` |
 | HTTP surface | `src/controllers/tba.rs` |
 | Routes | `src/app.rs` (`tba::routes()`, `tba::pathway_routes()`) |

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE pathway_instances SET status = 'completed', closed_on = $2 WHERE pid = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2dc4e59c5a4ef2838d72e93aea3f6eeca7faface01d2e0b20193882e0291c1c0"
+}

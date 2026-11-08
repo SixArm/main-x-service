@@ -3,7 +3,7 @@
 //! §13 T-10).
 //!
 //! [`process_import_job`] and [`process_export_job`] carry the whole
-//! per-row / per-job logic and take a plain `&DatabaseConnection`, so the
+//! per-row / per-job logic and take a plain `&PgPool`, so the
 //! axa background worker ([`crate::bulk::worker`]) is a thin adapter
 //! and the logic is exercised directly by request-level tests without
 //! going through the multipart/JSON handler layer.
@@ -49,7 +49,7 @@
 //! job is even created — as not-yet-supported rather than leaking or
 //! ignoring it).
 
-use sea_orm::{DatabaseBackend, DatabaseConnection, FromQueryResult, Statement};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use axa::Error;
@@ -180,14 +180,11 @@ pub fn apply_masking(
 
 /// Resolve the existing record (if any) that `key` points at, so the
 /// caller can decide create-vs-upsert.
-async fn find_existing(
-    db: &DatabaseConnection,
-    key: &StableKey,
-) -> axa::Result<Option<PathwayModel>> {
+async fn find_existing(db: &PgPool, key: &StableKey) -> axa::Result<Option<PathwayModel>> {
     match key {
         StableKey::Pid(pid) => match PathwayModel::find_by_pid(db, &pid.to_string()).await {
             Ok(model) => Ok(Some(model)),
-            Err(axa::model::ModelError::EntityNotFound) => Ok(None),
+            Err(crate::models::ModelError::EntityNotFound) => Ok(None),
             Err(e) => Err(e.into()),
         },
         StableKey::Identifier { scheme, value } => find_by_identifier(db, scheme, value)
@@ -213,41 +210,25 @@ async fn find_existing(
 /// this crate stores that the needle object could accidentally
 /// under-match.
 async fn find_by_identifier(
-    db: &DatabaseConnection,
+    db: &PgPool,
     scheme: &care_pathway_matcher::IdentifierScheme,
     value: &str,
-) -> axa::model::ModelResult<Option<PathwayModel>> {
+) -> crate::models::ModelResult<Option<PathwayModel>> {
     let scheme_json =
-        serde_json::to_value(scheme).map_err(|e| axa::model::ModelError::Any(e.into()))?;
+        serde_json::to_value(scheme).map_err(|e| crate::models::ModelError::Any(e.into()))?;
     let needle = serde_json::json!([{ "scheme": scheme_json, "value": value }]);
-    let stmt = Statement::from_sql_and_values(
-        DatabaseBackend::Postgres,
-        "SELECT * FROM care_pathways \
-         WHERE deleted_at IS NULL AND data -> 'identifiers' @> $1::jsonb \
-         LIMIT 1",
-        [sea_orm::Value::Json(Some(Box::new(needle)))],
-    );
-    Ok(PathwayModel::find_by_statement(stmt).one(db).await?)
+    PathwayModel::find_by_identifier_needle(db, &needle).await
 }
 
 /// Look up the non-deleted care pathway owning a `(provider_id,
 /// pathway_code)` pair, if any, via a Postgres JSONB scalar-equality
 /// query. Returns the first match.
 async fn find_by_provider_and_code(
-    db: &DatabaseConnection,
+    db: &PgPool,
     provider_id: &str,
     pathway_code: &str,
-) -> axa::model::ModelResult<Option<PathwayModel>> {
-    let stmt = Statement::from_sql_and_values(
-        DatabaseBackend::Postgres,
-        "SELECT * FROM care_pathways \
-         WHERE deleted_at IS NULL \
-           AND data ->> 'provider_id' = $1 \
-           AND data ->> 'pathway_code' = $2 \
-         LIMIT 1",
-        [provider_id.into(), pathway_code.into()],
-    );
-    Ok(PathwayModel::find_by_statement(stmt).one(db).await?)
+) -> crate::models::ModelResult<Option<PathwayModel>> {
+    PathwayModel::find_by_provider_and_code(db, provider_id, pathway_code).await
 }
 
 /// The idempotent per-row upsert for a **keyed** row: find the existing
@@ -261,7 +242,7 @@ async fn find_by_provider_and_code(
 /// find-then-write, not wrapped in a stable-key advisory lock — matching
 /// organization's own BLK-5 gap and for the identical reason:
 /// `streaming::create_and_emit`/`update_and_emit` are hard-coded to
-/// `&DatabaseConnection` (they open their *own* transaction internally
+/// `&PgPool` (they open their *own* transaction internally
 /// under the `outbox` transport), so a lock held on a separate guard
 /// transaction would hold one pooled connection while these need a
 /// second — under a small pool this deadlocks every single import, not
@@ -269,11 +250,12 @@ async fn find_by_provider_and_code(
 /// the same instant can therefore both miss in [`find_existing`] and
 /// both create a row. Judged an acceptable, documented gap (operator-driven
 /// bulk loads are not typically run concurrently against the same
-/// file/key); closing it properly needs a `ConnectionTrait`-generic
-/// `streaming::create_and_emit`/`update_and_emit`, a `src/streaming.rs`-wide
-/// change out of this task's scope.
+/// file/key); closing it properly needs a `streaming::create_and_emit`/
+/// `update_and_emit` that take the caller's transaction (an
+/// [`axa::sqlx::Db`]), a `src/streaming.rs`-wide change out of this
+/// task's scope.
 async fn import_upsert(
-    db: &DatabaseConnection,
+    db: &PgPool,
     key: &StableKey,
     pathway: &CarePathway,
     actor: Option<&str>,
@@ -365,7 +347,7 @@ fn match_quality_label(confidence: Confidence) -> String {
 /// index is degraded), the blocking search finds nothing, or nothing
 /// clears the threshold.
 async fn find_keyless_duplicate(
-    db: &DatabaseConnection,
+    db: &PgPool,
     pathway: &CarePathway,
 ) -> Option<(PathwayModel, MatchResult)> {
     let Some(engine) = crate::search::engine() else {
@@ -418,7 +400,7 @@ async fn find_keyless_duplicate(
 /// of [`process_import_job`] to keep its per-row dispatch readable; only
 /// called on the non-dry-run path (dry-run classifies without this).
 async fn create_and_queue_for_review(
-    db: &DatabaseConnection,
+    db: &PgPool,
     pathway: &CarePathway,
     duplicate: &PathwayModel,
     result: &MatchResult,
@@ -462,7 +444,7 @@ async fn create_and_queue_for_review(
 /// an unreadable CSV header, or the SEC-B2 row cap); per-row failures
 /// are captured in [`ImportOutcome::errors`], not returned.
 pub async fn process_import_job(
-    db: &DatabaseConnection,
+    db: &PgPool,
     input: &[u8],
     format: BulkFormat,
     params: &ImportParams,
@@ -591,10 +573,7 @@ pub async fn process_import_job(
 /// check for a direct pipeline caller or a hand-edited job row). Also
 /// returns an error if the underlying query, search, or format encode
 /// fails.
-pub async fn process_export_job(
-    db: &DatabaseConnection,
-    params: &ExportParams,
-) -> axa::Result<(Vec<u8>, u64)> {
+pub async fn process_export_job(db: &PgPool, params: &ExportParams) -> axa::Result<(Vec<u8>, u64)> {
     if params.include_soft_deleted {
         return Err(Error::Message(
             "include_soft_deleted=true is not yet supported for export".to_string(),

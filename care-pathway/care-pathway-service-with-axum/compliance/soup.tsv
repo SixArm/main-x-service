@@ -18,14 +18,13 @@ axa	Shared Axum service library: routes, middleware, configuration, CLI, backgro
 serde	Serialization framework for every wire type and the stored JSONB payload.	Safety-relevant. A mis-serialized payload could corrupt a stored pathway or an audit snapshot. De facto Rust standard; extremely widely exercised.
 serde_json	JSON encoding/decoding, and the canonical form the audit hash chain digests.	Safety-relevant. Key ordering (BTreeMap, preserve_order disabled) is load-bearing for chain verification across a JSONB round-trip.
 tokio	Async runtime.	Safety-relevant. Runtime failure means service unavailability, not data corruption. Industry standard.
-async-trait	Async methods in traits (loco Hooks, SeaORM migrations).	Not safety-relevant. Compile-time macro only, no runtime behaviour of its own.
+async-trait	Async methods in traits (the relay's EventSink seam).	Not safety-relevant. Compile-time macro only, no runtime behaviour of its own.
 axum	HTTP server, extractors, and response types underneath loco.	Safety-relevant. Header and path extraction feed the auth guard and the purpose-of-use audit context.
 tracing	Structured logging and spans.	Security-relevant. The no-secrets-in-logs invariant is enforced at call sites, not by this crate.
 tracing-subscriber	Log formatting, filtering, and the JSON layer.	Security-relevant. Misconfiguration could emit more detail than intended; log level is deployment-controlled.
 getrandom	The OS random source for the per-process cursor-signing key when CURSOR_KEY is unset outside production.	Security-relevant. A weak key would let a caller forge page cursors; production requires CURSOR_KEY instead.
 regex	Pattern matching in payload validation.	Safety-relevant. Used only on length-capped input (validation::MAX_TEXT_LEN), which bounds the catastrophic-backtracking risk.
-migration	This crate's own sea-orm-migration migrator (path dependency).	Safety-relevant. Owns the schema, including the audit_logs compliance columns. First-party code, not third-party SOUP.
-sea-orm	Async ORM and query builder over PostgreSQL.	Safety-relevant. All persistence, including the audit trail and the redaction sweep, goes through it. Query construction uses its typed builders, not string concatenation.
+sqlx	PostgreSQL driver, pool, transactions and migrator, used directly with no ORM. Every statement is a compile-time-checked `query!` / `query_as!` / `query_scalar!` literal in src/models/, verified against the committed .sqlx/ data; the schema is the plain SQL in migrations/.	Safety-relevant. All persistence, including the audit trail, the hash chain head read under its advisory lock, the redaction sweep, the outbox and the record-level ABAC reads, goes through it. Values are always bound parameters; no statement is assembled from text.
 chrono	Timestamps, durations, and the microsecond truncation the audit chain depends on.	Safety-relevant. Chain digests bind created_at as epoch microseconds; a precision change would break verification.
 validator	Declarative validation attributes.	Not safety-relevant today: the substantive rules live in src/validation.rs, which does not use it.
 uuid	Public record identifiers (pid) and audit/export job ids.	Safety-relevant. v4 generation uses the OS RNG; a weak id would make records guessable.
