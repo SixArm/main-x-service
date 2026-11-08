@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM bulk_jobs",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "81d41568f85bb65c3fd80aa5c1de7c60d4388f169648b34b6aee03d87c7c914c"
+}

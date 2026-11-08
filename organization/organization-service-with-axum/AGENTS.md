@@ -123,13 +123,11 @@ and is queued in the review queue with `provenance = "import"` (the
 `migrations/2026080300000001_review_queue_provenance`). Every written row goes through
 `streaming::create_and_emit`/`update_and_emit`, so a bulk-imported
 organization gets the same event/audit/search-index side effects as one
-created interactively. **Known limitation:** the per-row upsert is not
-SEC-B3 advisory-lock-protected (see spec §10.7 "Concurrency" for why —
-a locked guard transaction deadlocked under this crate's own
-`max_connections: 1` test config, since `streaming::create_and_emit`/
-`update_and_emit` open their own transaction rather than joining the
-caller's); two
-importers racing the identical stable key can both create a row.
+created interactively. The per-row upsert takes a SEC-B3 stable-key
+advisory lock on its own transaction and writes through
+`streaming::create_on`/`update_on` on that transaction, so two
+importers racing one stable key leave one row (spec §10.7
+"Concurrency").
 
 **Durable event bus Phase 3** (`src/relay.rs`) is implemented: a
 background relay drains the `event_outbox` table to an `EventSink`,

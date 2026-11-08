@@ -348,13 +348,11 @@ adds one section + a §13 task declaring only what differs:
    matcher type stored verbatim as JSONB — no separate model to convert.
    **Organization**: stable key LEI → DUNS → explicit `pid`; keyless rows
    route through the existing `check-duplicates` path into the review
-   queue (`provenance` column added). **Known gap:** the per-row upsert
-   is not SEC-B3 advisory-lock-protected — a locked guard transaction
-   deadlocked under this crate's `max_connections: 1` test config because
-   `streaming::create_and_emit`/`update_and_emit` open their own internal
-   transaction and are not generic over `ConnectionTrait`; closing it
-   needs a `src/streaming.rs`-wide change, tracked as a follow-up rather
-   than half-built. **Case**: stable key is the **pair** `(agency_id,
+   queue (`provenance` column added). The per-row upsert shipped without
+   the SEC-B3 lock (a locked guard transaction deadlocked under a
+   one-connection test pool, because `streaming::create_and_emit`/
+   `update_and_emit` opened their own transaction); that gap is closed,
+   see 7 below. **Case**: stable key is the **pair** `(agency_id,
    case_number)` (case has no single scheme-scoped identifier the way
    organization's LEI/DUNS are) → explicit `pid` → keyless; case had no
    `review_queue` table at all, so one was added fresh (with `provenance`
@@ -378,10 +376,32 @@ adds one section + a §13 task declaring only what differs:
    → `pid`), one tier more than organization's or case's two; like case,
    it had no `review_queue` table and added one fresh with `provenance`
    from day one. JSONL + **CSV + TSV** (the family's other TSV adopter is
-   organization; case is CSV-only). Carries the identical documented
-   SEC-B3 per-row-upsert gap organization's and case's rollouts do, for
-   the same structural reason (`streaming::create_and_emit`/
-   `update_and_emit` are not `ConnectionTrait`-generic).
+   organization; case is CSV-only). It shipped with the same SEC-B3
+   per-row-upsert gap as organization's and case's rollouts, closed in 7.
+7. **Serialize the per-row upsert (SEC-B3).** ✅ *(done 2026-11-08,
+   organization + case + care-pathway)* The gap all three rollouts
+   carried is closed: two importers of one stable key could both miss in
+   the lookup and both insert. Each crate's `bulk::pipeline::import_upsert`
+   now opens one transaction, takes
+   `pg_advisory_xact_lock(hashtext('<entity>' || ':' || <key>))` on it
+   (`<key>` a JSON rendering of the stable key, which keeps the parts'
+   boundaries unambiguous and cannot carry a NUL), looks the key up, and
+   writes through `streaming::create_on` / `update_on`, which run on the
+   caller's transaction. Under the `outbox` transport the outbox and
+   audit rows are on that transaction too, so row, event and audit
+   commit together with the lock held; the memory-transport event, the
+   best-effort audit row and the search-index update follow the commit
+   (`streaming::AfterCommit`). `create_and_emit` / `update_and_emit` are
+   now those two functions on a transaction of their own, so the bulk
+   and interactive paths share one write path. This differs from
+   person's reference shape in one way worth copying: the lock rides the
+   write's own transaction rather than a separate guard transaction, so
+   an upsert needs one pooled connection, not two, and the
+   one-connection deadlock that kept the gap open does not arise. Each
+   crate has a DB test that holds the first upsert's transaction open,
+   waits until Postgres reports the second blocked on the advisory lock,
+   commits, and checks one row; each fails with two rows when the lock
+   call is removed.
 
 ## 12. Open questions
 

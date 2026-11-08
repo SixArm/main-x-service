@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM instance_steps",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "340a1f4d47196abf0004bee81cb064dbbc8c627805204b8c27f2d8c6759521eb"
+}

@@ -326,10 +326,9 @@ operation; **(2)** `in_language` (`Vec<String>`) is JSON-encoded like
 every other array column even though crate spec §9.4's prose groups it
 with the "one column each" scalars — read as "one column, whose cell
 happens to hold JSON" rather than a contradiction; **(3)** the per-row
-upsert is not SEC-B3 advisory-lock-protected, matching
-organization's/case's own documented BLK-5 gap for the identical
-reason (`streaming::create_and_emit`/`update_and_emit` open their own
-internal transaction, hard-coded to `&DatabaseConnection`). Scope is
+upsert takes a SEC-B3 stable-key advisory lock on its own transaction
+and writes through `streaming::create_on`/`update_on` on it, so
+concurrent imports of one key make one row (closed 2026-11-08). Scope is
 **JSONL + CSV + TSV** (no Parquet) — this crate's existing
 `ArtifactStore` already supports S3 (unlike organization's/case's
 local-only BLK-5 rollout), so native bulk inherits that for free. DB-gated

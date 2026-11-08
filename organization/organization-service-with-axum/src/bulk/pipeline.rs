@@ -46,7 +46,8 @@
 //! job is even created — as not-yet-supported rather than leaking or
 //! ignoring it).
 
-use sqlx::PgPool;
+use axa::sqlx::Db;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use axa::Error;
@@ -176,8 +177,9 @@ pub fn apply_masking(
 }
 
 /// Resolve the existing record (if any) that `key` points at, so the
-/// caller can decide create-vs-upsert.
-async fn find_existing(db: &PgPool, key: &StableKey) -> axa::Result<Option<OrgModel>> {
+/// caller can decide create-vs-upsert. Takes a [`Db`], so the locked
+/// upsert ([`import_upsert_on`]) can look up on its own transaction.
+async fn find_existing(db: impl Into<Db<'_>>, key: &StableKey) -> axa::Result<Option<OrgModel>> {
     match key {
         StableKey::Pid(pid) => match OrgModel::find_by_pid(db, &pid.to_string()).await {
             Ok(model) => Ok(Some(model)),
@@ -201,7 +203,7 @@ async fn find_existing(db: &PgPool, key: &StableKey) -> axa::Result<Option<OrgMo
 /// this crate stores that the needle object could accidentally
 /// under-match.
 async fn find_by_identifier(
-    db: &PgPool,
+    db: impl Into<Db<'_>>,
     scheme: &organization_matcher::IdentifierScheme,
     value: &str,
 ) -> crate::models::ModelResult<Option<OrgModel>> {
@@ -211,45 +213,103 @@ async fn find_by_identifier(
     OrgModel::find_by_identifiers_containing(db, &needle).await
 }
 
-/// The idempotent per-row upsert for a **keyed** row: find the existing
-/// record by stable key, then update or create it via
-/// [`streaming::update_and_emit`] / [`streaming::create_and_emit`] —
-/// exactly the interactive handlers' own write path, so a bulk-imported
-/// row gets the same event/audit/index side effects as one created
+/// The entity half of the SEC-B3 advisory-lock key.
+const LOCK_ENTITY: &str = "organization";
+
+/// The stable-key half of the SEC-B3 advisory-lock key: a rendering of
+/// `key` that is distinct for distinct keys.
+///
+/// A JSON array, tagged by the key's kind: JSON quoting makes the
+/// boundary between scheme and value unambiguous whatever characters the
+/// value contains, and escapes a NUL, which Postgres `text` cannot hold
+/// (the defect person's first rendering had).
+fn stable_key_lock_string(key: &StableKey) -> String {
+    let parts = match key {
+        StableKey::Identifier { scheme, value } => {
+            serde_json::json!(["identifier", scheme, value])
+        }
+        StableKey::Pid(pid) => serde_json::json!(["pid", pid]),
+    };
+    parts.to_string()
+}
+
+/// Take the SEC-B3 stable-key lock on `conn`, an open transaction:
+/// `pg_advisory_xact_lock(hashtext('organization' || ':' || key))`, held
+/// until that transaction ends. A second importer of the same key blocks
+/// here until the first commits, then sees its row.
+///
+/// Distinct keys can share a 32-bit hash, which costs only a needless
+/// wait; it cannot let two importers of one key through together.
+async fn lock_stable_key(conn: &mut PgConnection, key: &StableKey) -> axa::Result<()> {
+    let key = stable_key_lock_string(key);
+    sqlx::query!(
+        "SELECT pg_advisory_xact_lock(hashtext($1::text || ':' || $2::text))",
+        LOCK_ENTITY,
+        key,
+    )
+    .execute(conn)
+    .await
+    .map_err(crate::models::ModelError::from)?;
+    Ok(())
+}
+
+/// The idempotent per-row upsert for a **keyed** row, serialized per
+/// stable key (SEC-B3): on its own transaction, take the stable-key
+/// advisory lock, find the existing record by stable key, then update or
+/// create it through [`streaming::update_on`] / [`streaming::create_on`]
+/// — exactly the interactive handlers' write path, so a bulk-imported row
+/// gets the same event, audit and index side effects as one written
 /// interactively. Returns `(saved, was_upsert)`.
 ///
-/// **Known limitation (not SEC-B3-hardened).** This is a plain
-/// find-then-write, not wrapped in a stable-key advisory lock the way
-/// person's bulk pipeline is: `streaming::create_and_emit` /
-/// `update_and_emit` take the pool (they open their *own*
-/// transaction internally under the `outbox` transport), so
-/// a lock held on a separate guard transaction would hold one pooled
-/// connection while these need a second — under a small pool (this
-/// crate's own `config/test.yaml` runs `max_connections: 1`) that
-/// deadlocks every single import, not just a concurrent one. Two
-/// importers racing the *same* stable key in the same instant can
-/// therefore both miss in [`find_existing`] and both create a row. This
-/// is judged an acceptable, documented gap for BLK-5 (operator-driven
-/// bulk loads are not typically run concurrently against the same
-/// file/key). The model helpers underneath already take an
-/// [`axa::sqlx::Db`] (pool or open transaction), so closing it now needs
-/// only `streaming::create_and_emit`/`update_and_emit` to accept the
-/// caller's transaction instead of opening their own, with the advisory
-/// lock taken first on that same transaction.
+/// Without the lock, two importers of one stable key could both miss in
+/// [`find_existing`] and both create a row. The lock is held on the
+/// write's own transaction, not a separate guard transaction, so the
+/// upsert needs one pooled connection, not two: the reason this was once
+/// left open (a guard transaction deadlocks a one-connection pool) does
+/// not arise.
+///
+/// # Errors
+///
+/// When the lock, the lookup, the write or the commit fails; the
+/// transaction rolls back and the lock is released.
 async fn import_upsert(
     db: &PgPool,
     key: &StableKey,
     org: &Organization,
     actor: Option<&str>,
 ) -> axa::Result<(OrgModel, bool)> {
-    let existing = find_existing(db, key).await?;
-    if let Some(existing) = existing {
-        Ok((
-            streaming::update_and_emit(db, existing, org, actor).await?,
-            true,
-        ))
+    let mut txn = db.begin().await.map_err(crate::models::ModelError::from)?;
+    let (saved, was_upsert, after) = import_upsert_on(&mut txn, key, org, actor).await?;
+    txn.commit()
+        .await
+        .map_err(crate::models::ModelError::from)?;
+    after.run(db).await;
+    Ok((saved, was_upsert))
+}
+
+/// [`import_upsert`]'s body, on the caller's open transaction `conn`: the
+/// stable-key lock, the lookup and the write all run on it, and under the
+/// `outbox` transport so do the event and audit rows, so they commit
+/// together with the lock still held. The caller commits, then runs the
+/// returned [`streaming::AfterCommit`]. Returns `(saved, was_upsert,
+/// after_commit)`.
+///
+/// # Errors
+///
+/// When the lock, the lookup or the write fails.
+async fn import_upsert_on(
+    conn: &mut PgConnection,
+    key: &StableKey,
+    org: &Organization,
+    actor: Option<&str>,
+) -> axa::Result<(OrgModel, bool, streaming::AfterCommit)> {
+    lock_stable_key(&mut *conn, key).await?;
+    if let Some(existing) = find_existing(&mut *conn, key).await? {
+        let (saved, after) = streaming::update_on(&mut *conn, existing, org, actor).await?;
+        Ok((saved, true, after))
     } else {
-        Ok((streaming::create_and_emit(db, org, actor).await?, false))
+        let (saved, after) = streaming::create_on(&mut *conn, org, actor).await?;
+        Ok((saved, false, after))
     }
 }
 
@@ -515,8 +575,8 @@ pub async fn process_import_job(
             continue;
         }
 
-        // Find + create/update by stable key (see `import_upsert`'s docs
-        // for the known non-concurrent-safe limitation).
+        // Find + create/update by stable key, serialized per key by the
+        // SEC-B3 advisory lock (see `import_upsert`).
         match import_upsert(db, &key, &org, actor).await {
             Ok((_saved, was_upsert)) => {
                 if was_upsert {
@@ -672,6 +732,126 @@ mod tests {
             clamp_export_limit(u64::MAX),
             MAX_EXPORT_ROWS,
             "an absurd limit is clamped to the ceiling"
+        );
+    }
+}
+
+/// SEC-B3: the stable-key advisory lock, against a real Postgres.
+#[cfg(test)]
+mod stable_key_lock_tests {
+    use super::{import_upsert, import_upsert_on, stable_key_lock_string};
+    use crate::bulk::stable_key::{StableKey, resolve_stable_key};
+    use organization_matcher::{IdentifierScheme, OrgIdentifier, Organization};
+    use sqlx::{Connection as _, PgConnection, PgPool};
+    use std::time::{Duration, Instant};
+    use uuid::Uuid;
+
+    /// A pool on `DATABASE_URL`, migrated.
+    async fn connect() -> PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let db = PgPool::connect(&url)
+            .await
+            .expect("connect to DATABASE_URL");
+        crate::models::MIGRATOR
+            .run(&db)
+            .await
+            .expect("run migrations");
+        db
+    }
+
+    /// Distinct keys render distinctly, and a NUL cannot reach Postgres.
+    #[test]
+    fn lock_strings_are_distinct_per_key() {
+        let lei = stable_key_lock_string(&StableKey::Identifier {
+            scheme: IdentifierScheme::Lei,
+            value: "X".into(),
+        });
+        let duns = stable_key_lock_string(&StableKey::Identifier {
+            scheme: IdentifierScheme::Duns,
+            value: "X".into(),
+        });
+        assert_ne!(lei, duns);
+        assert_ne!(stable_key_lock_string(&StableKey::Pid(Uuid::nil())), lei);
+        let nul = stable_key_lock_string(&StableKey::Identifier {
+            scheme: IdentifierScheme::Lei,
+            value: "a\0b".into(),
+        });
+        assert!(!nul.contains('\0'));
+    }
+
+    /// Two upserts of one stable key give one row. The first runs in an
+    /// open transaction that has written its row and holds the lock; the
+    /// second starts while it is open. The test waits until Postgres
+    /// reports the second blocked on the advisory lock before letting the
+    /// first commit, so the outcome does not depend on timing: without
+    /// the lock the second finishes at once, misses the uncommitted row,
+    /// and creates a second one.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn two_upserts_of_one_stable_key_give_one_row() {
+        let db = connect().await;
+        let duns = format!("sec-b3-{}", Uuid::new_v4());
+        let org = Organization {
+            identifiers: vec![OrgIdentifier {
+                scheme: IdentifierScheme::Duns,
+                value: duns.clone(),
+            }],
+            ..Organization::new("Concurrent Import Organization")
+        };
+        let key = resolve_stable_key(None, &org).expect("a DUNS key");
+        let needle = serde_json::json!([{ "scheme": "Duns", "value": duns }]);
+
+        let opts = db.connect_options();
+        let mut first_conn = PgConnection::connect_with(&opts).await.unwrap();
+        let mut first = first_conn.begin().await.unwrap();
+        let (_, first_was_upsert, first_after) = import_upsert_on(&mut first, &key, &org, None)
+            .await
+            .expect("first upsert");
+        assert!(!first_was_upsert, "the first import creates the row");
+
+        let second = tokio::spawn({
+            let (db, key, org) = (db.clone(), key.clone(), org.clone());
+            async move { import_upsert(&db, &key, &org, None).await.map(|(_, up)| up) }
+        });
+
+        let mut watcher = PgConnection::connect_with(&opts).await.unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        loop {
+            let waiting: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_stat_activity \
+                 WHERE datname = current_database() \
+                   AND wait_event_type = 'Lock' AND wait_event = 'advisory' \
+                   AND query ILIKE '%pg_advisory_xact_lock(hashtext%'",
+            )
+            .fetch_one(&mut watcher)
+            .await
+            .unwrap();
+            if waiting > 0 || second.is_finished() {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the second import neither blocked nor finished"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+
+        first.commit().await.unwrap();
+        first_after.run(&db).await;
+        let second_was_upsert = second.await.unwrap().expect("second upsert");
+
+        let rows: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM organizations \
+             WHERE deleted_at IS NULL AND data -> 'identifiers' @> $1",
+        )
+        .bind(&needle)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(rows, 1, "two imports of one stable key must leave one row");
+        assert!(
+            second_was_upsert,
+            "the second import upserts the first's row"
         );
     }
 }

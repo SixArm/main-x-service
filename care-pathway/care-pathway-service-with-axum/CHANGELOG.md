@@ -52,6 +52,41 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - **Erasure removes the record from the full-text index.** The erased
   name and payload stayed in the Tantivy index; they are removed after
   the commit, as soft delete does.
+- **`db truncate` clears every service table** (spec §13 CP-T1). It
+  cleared only `merge_records`, `audit_logs` and `care_pathways`, leaving
+  `entity_links`, `event_outbox`, `bulk_jobs`, `review_queue` and the six
+  instance tables, so a truncated database still held instances, links,
+  unsent events, jobs and review pairs for pathways it no longer had.
+  The thirteen tables are cleared children first. DB test
+  `truncate_clears_every_service_table` seeds a row in each; it failed
+  before, listing the ten tables left.
+- **Merge locks both rows** (spec §13 CP-M1, SEC-B5). The handler reads
+  the survivor and the duplicate unlocked, and the merge wrote them with
+  no lock or re-check, so two concurrent merges could fold one duplicate
+  into two survivors, or write into a survivor already merged away.
+  `streaming::merge_and_emit` now locks both rows `FOR UPDATE` in pid
+  order inside its transaction, under both transports, and re-checks
+  that both are still active; a merge that lost the race fails closed
+  with `404` and writes nothing. DB tests
+  `merge_refuses_a_duplicate_retired_after_it_was_read` and
+  `merge_waits_for_a_concurrent_lock_then_fails_closed` (a second
+  connection holds the duplicate's lock; the test waits until Postgres
+  reports the merge blocked) both failed before, the merge succeeding.
+- **Concurrent bulk imports of one stable key make one row** (spec §13
+  SEC-B3). The per-row upsert took no lock, so two imports of the same
+  key could both miss in the lookup and both insert. It now takes
+  `pg_advisory_xact_lock(hashtext('care_pathway' || ':' || key))` on its
+  own transaction before the lookup and writes on that transaction
+  through the new `streaming::create_on` / `update_on`; under the
+  `outbox` transport the outbox and audit rows commit with it, under the
+  lock. `create_and_emit` / `update_and_emit` are now those two on a
+  transaction of their own; the memory-transport event, best-effort
+  audit row and index update follow the commit
+  (`streaming::AfterCommit`). DB test
+  `two_upserts_of_one_stable_key_give_one_row` holds the first upsert
+  open, waits until Postgres shows the second blocked on the lock, then
+  checks one row; with the lock removed it fails with two. DB-gated
+  suite 100 → 104.
 
 ### Added
 

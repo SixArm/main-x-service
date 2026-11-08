@@ -9,6 +9,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — SEC-B3: concurrent bulk imports of one stable key make one row
+
+- **The bulk import's per-row upsert took no lock**, so two imports of
+  the same stable key (LEI, DUNS or `pid`) could both miss in the
+  lookup and both insert, leaving two records. It now takes
+  `pg_advisory_xact_lock(hashtext('organization' || ':' || key))` on its
+  own transaction before the lookup, and writes on that transaction
+  through the new `streaming::create_on` / `update_on`; under the
+  `outbox` transport the outbox and audit rows commit with it, under
+  the lock. `create_and_emit` / `update_and_emit` are now those two on a
+  transaction of their own, and the memory-transport event, best-effort
+  audit row and index update follow the commit
+  (`streaming::AfterCommit`). `models::organizations::find_by_pid` and
+  `find_by_identifiers_containing` take an `axa::sqlx::Db`. A new
+  DB-gated test holds the first upsert open, waits until Postgres shows
+  the second blocked on the lock, then checks one row; with the lock
+  removed it fails with two. DB-gated suite 50 → 51, unit tests 206.
+
 ### Added — INT-V1: a written record verifies (test only, no defect)
 
 - **`a_written_record_verifies`** (`tests/requests/organizations.rs`,

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM instance_events",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "afac58656bf2d9f73b9ce524cf89461fc407ef323eb9f22f0bc0f48dce89fc9f"
+}

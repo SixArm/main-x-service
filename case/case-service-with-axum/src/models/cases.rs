@@ -118,8 +118,9 @@ impl Model {
     /// [`ModelError::EntityNotFound`] when no active row has that id;
     /// [`ModelError::Any`] when `pid` is not a UUID; a database error
     /// when the query fails.
-    pub async fn find_by_pid(db: &PgPool, pid: &str) -> ModelResult<Self> {
+    pub async fn find_by_pid(db: impl Into<Db<'_>>, pid: &str) -> ModelResult<Self> {
         let uuid = Uuid::parse_str(pid).map_err(|e| ModelError::Any(e.into()))?;
+        let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
             r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
@@ -131,7 +132,7 @@ impl Model {
                LIMIT 1"#,
             uuid,
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         row.ok_or(ModelError::EntityNotFound)
     }

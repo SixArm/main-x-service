@@ -12,7 +12,7 @@ use axa::sqlx::Db;
 use care_pathway_matcher::CarePathway as MatchPathway;
 use chrono::{DateTime, FixedOffset, SubsecRound as _};
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use super::{ModelError, ModelResult, to_i64, updated};
@@ -118,8 +118,9 @@ impl Model {
     /// [`ModelError::EntityNotFound`] when no active row has that id;
     /// [`ModelError::Any`] when `pid` is not a UUID; a database error
     /// when the query fails.
-    pub async fn find_by_pid(db: &PgPool, pid: &str) -> ModelResult<Self> {
+    pub async fn find_by_pid(db: impl Into<Db<'_>>, pid: &str) -> ModelResult<Self> {
         let uuid = Uuid::parse_str(pid).map_err(|e| ModelError::Any(e.into()))?;
+        let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
             r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
@@ -131,7 +132,7 @@ impl Model {
                LIMIT 1"#,
             uuid,
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         row.ok_or(ModelError::EntityNotFound)
     }
@@ -185,9 +186,10 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn find_by_identifier_needle(
-        db: &PgPool,
+        db: impl Into<Db<'_>>,
         needle: &serde_json::Value,
     ) -> ModelResult<Option<Self>> {
+        let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
             r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
@@ -199,7 +201,7 @@ impl Model {
                LIMIT 1"#,
             needle,
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         Ok(row)
     }
@@ -212,10 +214,11 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn find_by_provider_and_code(
-        db: &PgPool,
+        db: impl Into<Db<'_>>,
         provider_id: &str,
         pathway_code: &str,
     ) -> ModelResult<Option<Self>> {
+        let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
             r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
@@ -230,7 +233,7 @@ impl Model {
             provider_id,
             pathway_code,
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         Ok(row)
     }
@@ -462,6 +465,39 @@ impl Model {
         .execute(db)
         .await?;
         updated(done.rows_affected())
+    }
+
+    /// Lock one row `FOR UPDATE` until the caller's transaction ends: the
+    /// SEC-B5 merge guard (CP-M1, as case's). A missing row locks nothing
+    /// and is not an error; the caller re-checks liveness with
+    /// [`Self::is_active`].
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn lock_for_update(conn: &mut PgConnection, pid: Uuid) -> ModelResult<()> {
+        sqlx::query_scalar!(
+            "SELECT id FROM care_pathways WHERE pid = $1 LIMIT 1 FOR UPDATE",
+            pid
+        )
+        .fetch_optional(conn)
+        .await?;
+        Ok(())
+    }
+
+    /// Whether an active (not soft-deleted) row carries `pid`.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn is_active(conn: &mut PgConnection, pid: Uuid) -> ModelResult<bool> {
+        let hit = sqlx::query_scalar!(
+            "SELECT id FROM care_pathways WHERE pid = $1 AND deleted_at IS NULL LIMIT 1",
+            pid
+        )
+        .fetch_optional(conn)
+        .await?;
+        Ok(hit.is_some())
     }
 
     /// Replace the payload of this care pathway, returning the updated

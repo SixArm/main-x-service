@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM instance_segments",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "fb71fcb0bc3b13353ffecb07a843827ea1f861c64dc7698bb8fb3a78d5e173e2"
+}

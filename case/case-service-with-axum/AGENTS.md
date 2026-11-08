@@ -111,8 +111,8 @@ async job-based JSONL/CSV import + export via `src/bulk/` and an axa
 `(agency_id, case_number)` pair then `pid`, reusing `mask_case` as the
 default export redaction and gating every export's audit write ahead of
 job completion (SEC-B8). No Parquet, no S3 in this rollout; see
-`spec/index.md` §8.7 for the documented SEC-B3 concurrency and
-per-row-ABAC scope limitations. Deferred (spec §13): a front-end merge
+`spec/index.md` §8.7 for the SEC-B3 stable-key lock (closed
+2026-11-08) and the per-row-ABAC scope limitation. Deferred (spec §13): a front-end merge
 action (BUS-2/BUS-3 — the link-graph Fluvio consumer and rolling
 `FluvioSink` to the other nine services — have both since landed
 2026-08-03; no deployment yet points `CASE_FLUVIO_ENDPOINT` at a live

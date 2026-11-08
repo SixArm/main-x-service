@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM instance_team",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "dfdb7a85496d5be5d18bb9f0332a235bf2f57ecc9559a4caf7a419bd4c56cce4"
+}

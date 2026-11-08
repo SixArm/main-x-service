@@ -568,8 +568,8 @@ the row. Export defaults to the masked view
 destructive under ABAC. Every export is audited, gating delivery.
 Known, disclosed limits: `active` (soft-delete state) round-trips on
 export but is never applied on import; `include_soft_deleted=true` is
-rejected as not-yet-supported; the per-row upsert is not SEC-B3
-advisory-lock-protected (matching organization's/case's own BLK-5 gap).
+rejected as not-yet-supported. The per-row upsert takes a SEC-B3
+stable-key advisory lock, so concurrent imports of one key make one row.
 
 Deferred (see [spec §13](./spec/index.md)): instance-layer
 privacy/authz for `pathway_instances.subject_ref`, terminology-server

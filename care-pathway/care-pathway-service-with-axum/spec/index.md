@@ -1179,6 +1179,39 @@ the evidence bundle.
   `erasure_failing_late_leaves_nothing_changed` and
   `erasure_removes_the_pathway_from_the_search_index` failed before the
   fix.
+- [x] **CP-T1: `db truncate` clears every service table (2026-11-08).**
+  Found during SQLX-1 (case's CS-T1). `models::delete_all_rows` cleared
+  only `merge_records`, `audit_logs` and `care_pathways`; it now also
+  clears `event_outbox`, `bulk_jobs`, `review_queue`, `entity_links` and
+  the six instance tables, children before parents. No table declares a
+  foreign key, so the order is safe either way and stays safe if one is
+  added. axa's `axa_queue` is left to axa.
+  `truncate_clears_every_service_table` seeds a row in each of the
+  thirteen and checks all are empty; it failed before.
+- [x] **CP-M1: merge takes the SEC-B5 row locks (2026-11-08).** Found
+  during SQLX-1. `streaming::merge_and_emit` wrote the survivor and the
+  duplicate the handler had read unlocked, with only the self-merge
+  guard. It now locks both rows `FOR UPDATE` in pid order inside its
+  transaction, as case's merge does, then re-checks both are active and
+  fails closed (`404`, nothing written) if either is gone. Unlike
+  case's, it locks under both transports (the memory transport's two
+  writes now share a transaction too, with the events and audit rows
+  after the commit) and re-checks the survivor as well as the
+  duplicate. `merge_refuses_a_duplicate_retired_after_it_was_read` and
+  `merge_waits_for_a_concurrent_lock_then_fails_closed` failed before.
+- [x] **SEC-B3: the bulk upsert is serialized per stable key
+  (2026-11-08).** The per-row upsert was a plain find-then-write, so two
+  importers of one stable key could both create a row. `import_upsert`
+  now takes `pg_advisory_xact_lock(hashtext('care_pathway' || ':' ||
+  key))` on its own transaction before the lookup and writes through
+  `streaming::create_on` / `update_on` on that transaction; under
+  `outbox` the event and audit rows commit with it. `create_and_emit` /
+  `update_and_emit` are those two on a transaction of their own.
+  `bulk::pipeline::stable_key_lock_tests::
+  two_upserts_of_one_stable_key_give_one_row` holds the first upsert's
+  transaction open, waits until Postgres reports the second blocked on
+  the lock, and checks one row; with the lock call removed it fails with
+  two. DB-gated suite 100 → 104.
 
 - [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
   (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
@@ -1588,9 +1621,9 @@ the evidence bundle.
   applied on import; `in_language` is JSON-encoded like every other
   array column, read against entity spec §9.4's grouping it with
   "scalars" as "still one column, whose cell holds JSON" rather than a
-  contradiction; the per-row upsert is not SEC-B3 advisory-lock-protected
-  (matching organization's/case's own documented gap, same underlying
-  reason). Tests (`tests/requests/bulk.rs`, 9, DB-gated): idempotent
+  contradiction; the per-row upsert was not SEC-B3 advisory-lock-protected
+  at the time (matching organization's/case's gap); it is since
+  SEC-B3 (§13, above). Tests (`tests/requests/bulk.rs`, 9, DB-gated): idempotent
   re-import (both stable-key tiers), CSV/JSONL round-trip, per-row error
   report, keyless dedupe-to-review, masked vs full export, zero-row
   export still audited, `include_soft_deleted` rejection,

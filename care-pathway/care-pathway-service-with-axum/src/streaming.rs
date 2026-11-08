@@ -32,14 +32,14 @@ use std::sync::{Mutex, OnceLock};
 use axa::sqlx::Db;
 use care_pathway_matcher::CarePathway;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-use crate::models::ModelResult;
 use crate::models::audit_logs::Model as AuditModel;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::models::entity_links::{Model as EntityLinkModel, NewEdge};
 use crate::models::event_outbox::{Model as OutboxRow, OutboxInsert};
+use crate::models::{ModelError, ModelResult};
 
 /// Current envelope schema version. Bumped only on a breaking change to
 /// the [`Envelope`] shape; additive fields do not bump it.
@@ -412,60 +412,159 @@ pub fn deindex_best_effort(pid: Uuid) {
     }
 }
 
-/// Create a care pathway and emit its `Created` event, atomically under
-/// the active transport. `memory`: insert on `db`, then push to the ring
-/// buffer (today's behaviour). `outbox`: open one transaction, insert the
-/// row, the `event_outbox` row, **and** the audit row on it, then commit —
-/// so a crash can never persist one without the others.
+/// What a write made on a caller's transaction still owes once that
+/// transaction commits: under `memory`, the event and the best-effort
+/// audit row; under both transports, the search index. Returned by
+/// [`create_on`] and [`update_on`].
+///
+/// None of it may happen before the commit. An event or an index entry
+/// for a row a rolled-back transaction never wrote would advertise a
+/// record that does not exist; under `outbox` the event and audit rows
+/// are already on the transaction, so only the index is left.
+#[must_use = "run it once the caller's transaction has committed"]
+pub struct AfterCommit {
+    /// The event to publish under `memory`.
+    kind: EventKind,
+    /// The audit action to record under `memory`.
+    action: &'static str,
+    /// The written row's pid.
+    pid: Uuid,
+    /// The written row's name, the envelope's label.
+    name: String,
+    /// The written row's payload, the audit snapshot.
+    snapshot: serde_json::Value,
+    /// The acting user, if any.
+    actor: Option<String>,
+    /// The pathway as written, for the search index.
+    pathway: CarePathway,
+}
+
+impl AfterCommit {
+    /// Run the side effects. Call only after the transaction the write
+    /// was made on has committed; dropping it on a rollback is correct.
+    pub async fn run(self, db: &PgPool) {
+        if !transport().is_outbox() {
+            let actor = self.actor.as_deref();
+            publish_with_actor(self.kind, &self.pid.to_string(), &self.name, actor);
+            audit_best_effort(db, self.pid, self.action, actor, Some(self.snapshot)).await;
+        }
+        index_best_effort(self.pid, &self.pathway);
+    }
+}
+
+/// Insert a care pathway on the caller's open transaction `conn`, with
+/// its `Created` outbox and audit rows on the same transaction under
+/// `outbox`. The caller commits, then runs the returned [`AfterCommit`].
+///
+/// This is what lets a caller hold a lock across the write: the bulk
+/// import takes its stable-key advisory lock (SEC-B3) on `conn` before
+/// its lookup, and the row, the event and the audit row then commit with
+/// the lock still held.
 ///
 /// # Errors
 ///
-/// When the insert (or, for `outbox`, the transaction / outbox / audit
-/// insert) fails; the transaction rolls back all writes on any error.
+/// When the insert, or (for `outbox`) the outbox or audit insert, fails.
+pub async fn create_on(
+    conn: &mut PgConnection,
+    pathway: &CarePathway,
+    actor: Option<&str>,
+) -> ModelResult<(PathwayModel, AfterCommit)> {
+    let model = PathwayModel::create(&mut *conn, pathway).await?;
+    if transport().is_outbox() {
+        let env = envelope(
+            EventKind::Created,
+            &model.pid.to_string(),
+            &model.name,
+            actor,
+        );
+        OutboxPublisher.publish(&mut *conn, &env).await?;
+        AuditModel::record(
+            &mut *conn,
+            model.pid,
+            "created",
+            actor,
+            Some(model.data.clone()),
+        )
+        .await?;
+    }
+    let after = AfterCommit {
+        kind: EventKind::Created,
+        action: "created",
+        pid: model.pid,
+        name: model.name.clone(),
+        snapshot: model.data.clone(),
+        actor: actor.map(str::to_string),
+        pathway: pathway.clone(),
+    };
+    Ok((model, after))
+}
+
+/// Replace a care pathway's payload on the caller's open transaction
+/// `conn`, with its `Updated` outbox and audit rows on the same
+/// transaction under `outbox` (see [`create_on`]). Consumes the fetched
+/// `model`.
+///
+/// # Errors
+///
+/// When the update, or (for `outbox`) the outbox or audit insert, fails.
+pub async fn update_on(
+    conn: &mut PgConnection,
+    model: PathwayModel,
+    pathway: &CarePathway,
+    actor: Option<&str>,
+) -> ModelResult<(PathwayModel, AfterCommit)> {
+    let updated = model.update_data(&mut *conn, pathway).await?;
+    if transport().is_outbox() {
+        let env = envelope(
+            EventKind::Updated,
+            &updated.pid.to_string(),
+            &updated.name,
+            actor,
+        );
+        OutboxPublisher.publish(&mut *conn, &env).await?;
+        AuditModel::record(
+            &mut *conn,
+            updated.pid,
+            "updated",
+            actor,
+            Some(updated.data.clone()),
+        )
+        .await?;
+    }
+    let after = AfterCommit {
+        kind: EventKind::Updated,
+        action: "updated",
+        pid: updated.pid,
+        name: updated.name.clone(),
+        snapshot: updated.data.clone(),
+        actor: actor.map(str::to_string),
+        pathway: pathway.clone(),
+    };
+    Ok((updated, after))
+}
+
+/// Create a care pathway and emit its `Created` event, atomically under
+/// the active transport: [`create_on`] on a transaction of its own, then
+/// the [`AfterCommit`] side effects. `memory`: the row commits, then the
+/// event goes to the ring buffer and the audit row is written
+/// best-effort. `outbox`: the row, the `event_outbox` row **and** the
+/// audit row commit together, so a crash can never persist one without
+/// the others. The index follows the commit either way.
+///
+/// # Errors
+///
+/// When the insert (or, for `outbox`, the outbox / audit insert) fails;
+/// the transaction rolls back all writes on any error.
 pub async fn create_and_emit(
     db: &PgPool,
     pathway: &CarePathway,
     actor: Option<&str>,
 ) -> ModelResult<PathwayModel> {
-    let outcome = match transport() {
-        EventTransport::Memory => {
-            let model = PathwayModel::create(db, pathway).await?;
-            publish_with_actor(
-                EventKind::Created,
-                &model.pid.to_string(),
-                &model.name,
-                actor,
-            );
-            audit_best_effort(db, model.pid, "created", actor, Some(model.data.clone())).await;
-            model
-        }
-        EventTransport::Outbox => {
-            let mut txn = db.begin().await?;
-            let model = PathwayModel::create(&mut *txn, pathway).await?;
-            let env = envelope(
-                EventKind::Created,
-                &model.pid.to_string(),
-                &model.name,
-                actor,
-            );
-            OutboxPublisher.publish(&mut *txn, &env).await?;
-            // Audit joins the same transaction — atomic with entity + event.
-            AuditModel::record(
-                &mut *txn,
-                model.pid,
-                "created",
-                actor,
-                Some(model.data.clone()),
-            )
-            .await?;
-            txn.commit().await?;
-            model
-        }
-    };
-    // Index only after the write is durable, so the index never
-    // advertises a record a rolled-back transaction never created.
-    index_best_effort(outcome.pid, pathway);
-    Ok(outcome)
+    let mut txn = db.begin().await?;
+    let (model, after) = create_on(&mut txn, pathway, actor).await?;
+    txn.commit().await?;
+    after.run(db).await;
+    Ok(model)
 }
 
 /// Replace a care pathway's payload and emit its `Updated` event,
@@ -474,58 +573,18 @@ pub async fn create_and_emit(
 ///
 /// # Errors
 ///
-/// When the update (or, for `outbox`, the transaction / outbox insert)
-/// fails.
+/// When the update (or, for `outbox`, the outbox / audit insert) fails.
 pub async fn update_and_emit(
     db: &PgPool,
     model: PathwayModel,
     pathway: &CarePathway,
     actor: Option<&str>,
 ) -> ModelResult<PathwayModel> {
-    let outcome = match transport() {
-        EventTransport::Memory => {
-            let updated = model.update_data(db, pathway).await?;
-            publish_with_actor(
-                EventKind::Updated,
-                &updated.pid.to_string(),
-                &updated.name,
-                actor,
-            );
-            audit_best_effort(
-                db,
-                updated.pid,
-                "updated",
-                actor,
-                Some(updated.data.clone()),
-            )
-            .await;
-            updated
-        }
-        EventTransport::Outbox => {
-            let mut txn = db.begin().await?;
-            let updated = model.update_data(&mut *txn, pathway).await?;
-            let env = envelope(
-                EventKind::Updated,
-                &updated.pid.to_string(),
-                &updated.name,
-                actor,
-            );
-            OutboxPublisher.publish(&mut *txn, &env).await?;
-            AuditModel::record(
-                &mut *txn,
-                updated.pid,
-                "updated",
-                actor,
-                Some(updated.data.clone()),
-            )
-            .await?;
-            txn.commit().await?;
-            updated
-        }
-    };
-    // Replaces the prior document, so a superseded title stops matching.
-    index_best_effort(outcome.pid, pathway);
-    Ok(outcome)
+    let mut txn = db.begin().await?;
+    let (updated, after) = update_on(&mut txn, model, pathway, actor).await?;
+    txn.commit().await?;
+    after.run(db).await;
+    Ok(updated)
 }
 
 /// Soft-delete a care pathway and emit its `Deleted` event, atomically
@@ -690,14 +749,29 @@ pub async fn unlink_and_emit(
 
 /// Fold a duplicate into a survivor and emit the pair of events (`Merged`
 /// on the survivor, `Deleted` on the duplicate), atomically under the
-/// active transport. Under `outbox`, both writes and both outbox rows
-/// share one transaction. Returns `(merged_survivor, duplicate_pid,
-/// duplicate_name)` for the caller's merge-record / audit follow-up.
+/// active transport. Under `outbox`, both writes, both outbox rows and
+/// both audit rows share one transaction; under `memory`, the two writes
+/// share one and the events and audit follow the commit, best-effort.
+/// Returns `(merged_survivor, duplicate_pid, duplicate_name)` for the
+/// caller's merge-record follow-up.
+///
+/// SEC-B5 (CP-M1): `main` and `duplicate` were read, unlocked, by the
+/// handler before this runs, so a second merge could retire either in
+/// between. Under both transports the transaction first locks both rows
+/// `FOR UPDATE`, in pid order so two opposing merges cannot deadlock,
+/// then re-checks that both are still active. A merge that lost the race
+/// fails closed with [`ModelError::EntityNotFound`] (`404`) and writes
+/// nothing, rather than folding a retired duplicate's data into a second
+/// survivor or writing the merge into a survivor that is itself gone.
+/// Case's merge checks only the duplicate; the survivor is checked too
+/// here, since it can be merged away just as easily.
 ///
 /// # Errors
 ///
-/// When either write (or, for `outbox`, the transaction / outbox inserts)
-/// fails; the transaction rolls back the whole merge on any error.
+/// [`ModelError::EntityNotFound`] when either row is no longer active
+/// once locked; otherwise when either write (or, for `outbox`, the
+/// outbox or audit insert) fails. The transaction rolls back the whole
+/// merge on any error.
 pub async fn merge_and_emit(
     db: &PgPool,
     main: PathwayModel,
@@ -706,55 +780,62 @@ pub async fn merge_and_emit(
     actor: Option<&str>,
 ) -> ModelResult<(PathwayModel, Uuid, String)> {
     let (dup_pid, dup_name) = (duplicate.pid, duplicate.name.clone());
-    let outcome = match transport() {
-        EventTransport::Memory => {
-            let merged = main.update_data(db, merged_pathway).await?;
-            duplicate.soft_delete(db).await?;
-            publish_with_actor(
-                EventKind::Merged,
-                &merged.pid.to_string(),
-                &merged.name,
-                actor,
-            );
-            publish_with_actor(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
-            audit_best_effort(db, merged.pid, "merged", actor, Some(merged.data.clone())).await;
-            audit_best_effort(db, dup_pid, "merged_into", actor, None).await;
-            (merged, dup_pid, dup_name)
-        }
-        EventTransport::Outbox => {
-            let mut txn = db.begin().await?;
-            let merged = main.update_data(&mut *txn, merged_pathway).await?;
-            duplicate.soft_delete(&mut *txn).await?;
-            let merged_env = envelope(
-                EventKind::Merged,
-                &merged.pid.to_string(),
-                &merged.name,
-                actor,
-            );
-            OutboxPublisher.publish(&mut *txn, &merged_env).await?;
-            let deleted_env = envelope(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
-            OutboxPublisher.publish(&mut *txn, &deleted_env).await?;
-            // Both audit rows join the same transaction as the merge.
-            AuditModel::record(
-                &mut *txn,
-                merged.pid,
-                "merged",
-                actor,
-                Some(merged.data.clone()),
-            )
-            .await?;
-            AuditModel::record(&mut *txn, dup_pid, "merged_into", actor, None).await?;
-            txn.commit().await?;
-            (merged, dup_pid, dup_name)
-        }
-    };
+    let main_pid = main.pid;
+    let outbox = transport().is_outbox();
+    let mut txn = db.begin().await?;
+    let mut lock_pids = [main_pid, dup_pid];
+    lock_pids.sort();
+    for pid in lock_pids {
+        PathwayModel::lock_for_update(&mut txn, pid).await?;
+    }
+    if !PathwayModel::is_active(&mut txn, main_pid).await?
+        || !PathwayModel::is_active(&mut txn, dup_pid).await?
+    {
+        txn.rollback().await?;
+        return Err(ModelError::EntityNotFound);
+    }
+    let merged = main.update_data(&mut *txn, merged_pathway).await?;
+    duplicate.soft_delete(&mut *txn).await?;
+    if outbox {
+        let merged_env = envelope(
+            EventKind::Merged,
+            &merged.pid.to_string(),
+            &merged.name,
+            actor,
+        );
+        OutboxPublisher.publish(&mut *txn, &merged_env).await?;
+        let deleted_env = envelope(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
+        OutboxPublisher.publish(&mut *txn, &deleted_env).await?;
+        // Both audit rows join the same transaction as the merge.
+        AuditModel::record(
+            &mut *txn,
+            merged.pid,
+            "merged",
+            actor,
+            Some(merged.data.clone()),
+        )
+        .await?;
+        AuditModel::record(&mut *txn, dup_pid, "merged_into", actor, None).await?;
+    }
+    txn.commit().await?;
+    if !outbox {
+        publish_with_actor(
+            EventKind::Merged,
+            &merged.pid.to_string(),
+            &merged.name,
+            actor,
+        );
+        publish_with_actor(EventKind::Deleted, &dup_pid.to_string(), &dup_name, actor);
+        audit_best_effort(db, merged.pid, "merged", actor, Some(merged.data.clone())).await;
+        audit_best_effort(db, dup_pid, "merged_into", actor, None).await;
+    }
     // The survivor absorbed the duplicate's names and identifiers, so it
     // is re-indexed with the merged payload; the duplicate is
     // soft-deleted and leaves the index. Doing only one of the two would
     // let a merged pair keep matching as two records.
-    index_best_effort(outcome.0.pid, merged_pathway);
-    deindex_best_effort(outcome.1);
-    Ok(outcome)
+    index_best_effort(merged.pid, merged_pathway);
+    deindex_best_effort(dup_pid);
+    Ok((merged, dup_pid, dup_name))
 }
 
 /// Tests for the Phase-1 in-memory event path: publish/read-back,

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM pathway_instances",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "67988693abe2df210db5495c57b34871b6c4ba62bf05b4fdfe07e305a7cb63a3"
+}

@@ -160,9 +160,9 @@ durable-outbox service defaults to `<ENTITY>_EVENT_TRANSPORT=memory`,
 so none of this changes default behaviour. ³ Organization and case landed
 2026-08-03 (BLK-5), scoped to **JSONL + CSV only** (no Parquet) and a
 **local-filesystem-only** artifact store (no S3 backend yet — unlike
-person's BLK-3/BLK-4). Organization's per-row upsert is not yet
-SEC-B3 advisory-lock-protected (a documented, narrow TOCTOU gap — see
-its own spec §10.7); case's bulk export reuses its existing inline
+person's BLK-3/BLK-4). Organization's per-row upsert takes the SEC-B3
+stable-key advisory lock on its own write transaction since 2026-11-08
+(see its spec §10.7); case's bulk export reuses its existing inline
 `mask_case` redaction rather than a dedicated privacy module, so the
 case ✗ in the privacy-masking row above does not mean its bulk export
 is unmasked. **Care-pathway landed third** (2026-09-12, §13 T-10),
@@ -173,9 +173,10 @@ family's local+S3 reference (see the shared doc's §12). Scoped to
 **JSONL + CSV + TSV** (still no Parquet); stable key is a three-tier
 chain (a deterministic identifier → provider-scoped `(provider_id,
 pathway_code)` → `pid`); it too had no `review_queue` table and added
-one fresh (`provenance` from day one, case's precedent); it carries the
-same documented SEC-B3 per-row-upsert gap organization's and case's
-rollouts do, for the identical structural reason. ⁴ `FluvioSink` — the durable
+one fresh (`provenance` from day one, case's precedent). Its per-row
+upsert, like organization's and case's, takes the SEC-B3 advisory lock
+since 2026-11-08, once the move to sqlx let the write join the lock's
+transaction. ⁴ `FluvioSink` — the durable
 bus's real-broker relay sink,
 alongside the always-available no-broker `LoggingSink` — is behind each
 crate's own `fluvio` Cargo feature (off by default) and gated further

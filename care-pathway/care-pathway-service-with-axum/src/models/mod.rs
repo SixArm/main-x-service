@@ -134,20 +134,54 @@ pub(crate) fn to_i64(n: u64) -> i64 {
     i64::try_from(n).unwrap_or(i64::MAX)
 }
 
-/// Delete every row from the service's merge, audit and care-pathway
-/// tables, for `db truncate` and the request-suite setup.
+/// Delete every row from the service's tables, for `db truncate` and the
+/// request-suite setup.
 ///
-/// `DELETE`, not `TRUNCATE`, and identities are not restarted: exactly
-/// what the `SeaORM` era's `truncate_table` did, on exactly the tables it
-/// named, in the same order. The instance tables, `entity_links`,
-/// `event_outbox`, `bulk_jobs` and `review_queue` are left alone, as they
-/// always were.
+/// `DELETE`, not `TRUNCATE`, and identities are not restarted: what the
+/// `SeaORM` era's `truncate_table` did on `merge_records`, `audit_logs`
+/// and `care_pathways`. CP-T1 (case's CS-T1): the other ten tables are
+/// cleared too. They were not before, so a truncated database still held
+/// the instances with their steps, team, events, measures and segments,
+/// the `continues_as` links, unsent outbox events the relay would go on
+/// shipping, bulk jobs and duplicate-review pairs, all for pathways it no
+/// longer had.
+///
+/// None of the thirteen tables declares a foreign key, so any order is
+/// safe today. The order is still children before parents (an
+/// instance's sub-resources, then the instance, then the pathway; the
+/// rows that describe a record before the record), so it stays safe if
+/// a key is ever added. axa's own `axa_queue` is axa's to manage and is
+/// left alone; a bulk-job queue row whose `bulk_jobs` row is gone fails
+/// on its first attempt, before doing any work. Bulk artifacts in the
+/// artifact store are files, not rows, and are not touched.
 ///
 /// # Errors
 ///
 /// When a delete fails. The deletes are separate statements, so the
 /// tables before the failing one are already empty.
 pub async fn delete_all_rows(db: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    sqlx::query!("DELETE FROM event_outbox").execute(db).await?;
+    sqlx::query!("DELETE FROM bulk_jobs").execute(db).await?;
+    sqlx::query!("DELETE FROM review_queue").execute(db).await?;
+    sqlx::query!("DELETE FROM entity_links").execute(db).await?;
+    sqlx::query!("DELETE FROM instance_segments")
+        .execute(db)
+        .await?;
+    sqlx::query!("DELETE FROM instance_measures")
+        .execute(db)
+        .await?;
+    sqlx::query!("DELETE FROM instance_events")
+        .execute(db)
+        .await?;
+    sqlx::query!("DELETE FROM instance_team")
+        .execute(db)
+        .await?;
+    sqlx::query!("DELETE FROM instance_steps")
+        .execute(db)
+        .await?;
+    sqlx::query!("DELETE FROM pathway_instances")
+        .execute(db)
+        .await?;
     sqlx::query!("DELETE FROM merge_records")
         .execute(db)
         .await?;

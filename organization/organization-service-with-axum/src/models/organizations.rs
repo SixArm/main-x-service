@@ -140,9 +140,10 @@ impl Model {
     /// [`ModelError::EntityNotFound`] when no active row has that id;
     /// [`ModelError::Any`] when `pid` is not a UUID; a database error
     /// when the query fails.
-    pub async fn find_by_pid(db: &PgPool, pid: &str) -> ModelResult<Self> {
+    pub async fn find_by_pid(db: impl Into<Db<'_>>, pid: &str) -> ModelResult<Self> {
         let uuid = Uuid::parse_str(pid).map_err(|e| ModelError::Any(e.into()))?;
         // Soft-deleted rows are invisible to lookups.
+        let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
             r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
@@ -153,7 +154,7 @@ impl Model {
                WHERE pid = $1 AND deleted_at IS NULL"#,
             uuid,
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         row.ok_or(ModelError::EntityNotFound)
     }
@@ -207,9 +208,10 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn find_by_identifiers_containing(
-        db: &PgPool,
+        db: impl Into<Db<'_>>,
         needle: &serde_json::Value,
     ) -> ModelResult<Option<Self>> {
+        let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
             r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
@@ -221,7 +223,7 @@ impl Model {
                LIMIT 1"#,
             needle,
         )
-        .fetch_optional(db)
+        .fetch_optional(&mut *conn)
         .await?;
         Ok(row)
     }

@@ -8640,14 +8640,33 @@ The erasure gaps (case's CS-G1 and CS-E1) were present here too and are
 fixed in the move (crate spec §13 ER-1). These three were there on SeaORM
 and are kept as they were.
 
-- [ ] **CP-T1 (S)** `db truncate` clears only `merge_records`,
+- [x] **CP-T1 (S)** `db truncate` clears only `merge_records`,
   `audit_logs` and `care_pathways`, leaving `entity_links`, `event_outbox`,
   `bulk_jobs`, `review_queue` and the six instance tables (case's CS-T1).
-- [ ] **CP-M1 (S)** merge takes no SEC-B5 row lock on the survivor and the
+- [x] **CP-M1 (S)** merge takes no SEC-B5 row lock on the survivor and the
   duplicate, as case's does; only the self-merge guard exists, so two
   concurrent merges can interleave.
-- [ ] **SEC-B3 (M)** the bulk import upsert in organization, case and
+- [x] **SEC-B3 (M)** the bulk import upsert in organization, case and
   care-pathway takes no stable-key advisory lock, so two imports of one
   key can both insert. Every model helper now takes `axa::sqlx::Db`, so
   `create_and_emit` / `update_and_emit` can join a caller's transaction
   and take `pg_advisory_xact_lock` on it.
+
+*Done 2026-11-08.* CP-T1: `delete_all_rows` clears all thirteen tables,
+children first (`truncate_clears_every_service_table`). CP-M1:
+`merge_and_emit` locks both rows `FOR UPDATE` in pid order under both
+transports and re-checks both are active, failing closed with `404`
+(`merge_refuses_a_duplicate_retired_after_it_was_read`,
+`merge_waits_for_a_concurrent_lock_then_fails_closed`). SEC-B3: in all
+three crates `import_upsert` takes
+`pg_advisory_xact_lock(hashtext('<entity>' || ':' || key))` on its own
+transaction and writes through new `streaming::create_on` / `update_on`
+on it (`two_upserts_of_one_stable_key_give_one_row` in each). Every new
+test failed before its fix. DB suites: care-pathway 100 → 104, case
+69 → 70, organization 50 → 51. Case's own merge (CS, SEC-B5) still
+locks only under the `outbox` transport; care-pathway's now locks under
+both.
+- [ ] **CS-M1 (S)** case's merge takes its SEC-B5 row lock only under the
+  `outbox` transport and re-checks only the duplicate. Care-pathway's
+  CP-M1 fix locks under both transports and re-checks both rows; make
+  case's match, with the same two DB tests.

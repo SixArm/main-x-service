@@ -406,22 +406,22 @@ whole export job before the artifact is stored or `result_url` is set.
 Import audit (`"bulk_imported"`) is best-effort (the rows are already
 individually audited via `streaming::create_and_emit`/`update_and_emit`).
 
-**Concurrency (known limitation).** Unlike the family's SEC-B3
-reference pattern (an advisory-lock guard transaction wrapping
-find-then-write), this crate's per-row upsert (`bulk::pipeline::import_upsert`)
-is a **plain** find-then-write with no lock. `streaming::create_and_emit`
-/ `update_and_emit` take the pool (they open
-their own transaction internally under the `outbox` transport), so a
-lock held on a separate guard transaction would occupy one pooled
-connection while these need a second — under a small pool (this
-crate's own `config/test.yaml` runs `max_connections: 1`) that
-deadlocked every single import, not only a concurrent one, when first
-tried. Two importers racing the *same* stable key in the same instant
-can therefore both create a row. Closing this properly needs
-`streaming::create_and_emit`/`update_and_emit` to run on the caller's
-transaction; since the sqlx move (§10) every model helper underneath
-already takes an `axa::sqlx::Db`, so that is now a change to those two
-functions only. Tracked as a follow-up in §13.
+**Concurrency (SEC-B3, closed 2026-11-08).** The per-row upsert
+(`bulk::pipeline::import_upsert`) runs on one transaction that first
+takes `pg_advisory_xact_lock(hashtext('organization' || ':' || key))`,
+`key` being a JSON rendering of the stable key (LEI → DUNS → explicit
+`pid`), then looks the key up and writes through
+`streaming::create_on` / `update_on`, which run on that same
+transaction. Under the `outbox` transport the outbox and audit rows
+are on it too, so the row, its event and its audit row commit with the
+lock still held; the memory-transport event, the best-effort audit row
+and the search index follow the commit (`streaming::AfterCommit`). A
+second importer of the same key waits for the first to commit, then
+finds its row and updates it in place, so two concurrent imports of
+one key leave one record. The lock is held on the write's own
+transaction rather than on a separate guard transaction as person's
+is, so an upsert needs one pooled connection, and the one-connection
+pool deadlock that kept this open does not arise.
 
 **Artifact store** (`src/bulk/store.rs`) — **local-filesystem only**
 this rollout step (`ORGANIZATION_BULK_ARTIFACT_DIR`, default a system-temp
@@ -564,8 +564,8 @@ organization is not a data subject.
   DB-gated test proving a second relay skips rows the first holds.
   DB-gated suite 48 → 49, all passing; unit tests 206 → 205 (that same
   test moving). The SEC-B3 bulk-upsert lock is **not** added here (see
-  the SEC-B3 item below); the new connection shape makes it a change to
-  `streaming::create_and_emit` / `update_and_emit` only.
+  the SEC-B3 item below, since closed); the new connection shape made
+  it a change to `streaming::create_and_emit` / `update_and_emit` only.
 
 - [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
       (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
@@ -659,36 +659,33 @@ organization is not a data subject.
   existing `streaming::create_and_emit`/`update_and_emit`, so a
   bulk-imported organization gets the same event/audit/search-index
   side effects as one created interactively — no bypass of the audit
-  trail. **Follow-up (not this task):** a `ConnectionTrait`-generic
+  trail. **Follow-up (not this task):** a transaction-joining
   `streaming::create_and_emit`/`update_and_emit` so the per-row upsert
   can be wrapped in a SEC-B3 stable-key advisory lock without a pool
-  deadlock (§10.7 "Concurrency"); an S3 `ArtifactStore` backend behind a
-  cargo feature (the trait is already async, so this is additive).
+  deadlock (§10.7 "Concurrency"; since done, see SEC-B3 below); an S3
+  `ArtifactStore` backend behind a cargo feature (the trait is already async, so this is additive).
 
-- [ ] **SEC-B3: advisory-lock-protect the BLK-5 per-row bulk upsert.**
-  `bulk::pipeline::import_upsert` (§10.7 "Concurrency") is a **plain**
-  find-then-write with no lock — unlike the family's SEC-B3 reference
-  pattern (person; an advisory-lock guard transaction wrapping
-  find-then-write). Two importers racing the identical stable key
-  (LEI → DUNS → explicit `pid`) in the same instant can both pass the
-  "does it exist" check and both `INSERT`, producing a duplicate row.
-  **Why it isn't already fixed:** `streaming::create_and_emit` /
-  `update_and_emit` are hard-coded to `&DatabaseConnection` and open
-  their *own* internal transaction under the `outbox` transport, so they
-  are not generic over `ConnectionTrait`. A stable-key advisory lock
-  taken on a separate guard transaction would hold one pooled connection
-  while these helpers need a second — under a small pool (this crate's
-  own `config/test.yaml` runs `max_connections: 1`) that was tried and
-  deadlocked **every** import, not only a concurrent one. **Scope of the
-  real fix** (not part of this task item — this item only tracks it):
-  make `streaming::create_and_emit`/`update_and_emit` generic over
-  `ConnectionTrait` (a `src/streaming.rs`-wide change, since every
-  caller passes `&DatabaseConnection` today), then have
-  `bulk::pipeline::import_upsert` take a stable-key `pg_advisory_xact_lock`
-  inside the *same* transaction it upserts in, matching the SEC-B3
-  reference shape with no separate connection needed. See §10.7 and the
-  repo [`tasks.md`](../../../tasks.md) SEC-B3 entry (closed there for
-  person; open here).
+- [x] **SEC-B3: advisory-lock-protect the BLK-5 per-row bulk upsert
+      (2026-11-08).** `bulk::pipeline::import_upsert` was a plain
+  find-then-write with no lock, so two importers racing the identical
+  stable key (LEI → DUNS → explicit `pid`) could both miss and both
+  `INSERT`. It now takes
+  `pg_advisory_xact_lock(hashtext('organization' || ':' || key))` on
+  its own transaction before the lookup, and writes through the new
+  `streaming::create_on` / `update_on`, which run on the caller's
+  transaction; `create_and_emit` / `update_and_emit` are now those two
+  on a transaction of their own, so the interactive and bulk paths
+  share one write path. Outbox and audit rows stay on the same
+  transaction; the memory-transport event, best-effort audit row and
+  index update follow the commit (`streaming::AfterCommit`). The lock
+  rides the write's own transaction, so it needs no second pooled
+  connection — what deadlocked the guard-transaction attempt. A
+  DB-gated test, `bulk::pipeline::stable_key_lock_tests::
+  two_upserts_of_one_stable_key_give_one_row`, runs one upsert in an
+  open transaction, waits until Postgres reports the second blocked on
+  the advisory lock, commits, and checks one row and an in-place
+  update; with the lock call removed it fails with two rows. §10.7
+  "Concurrency" describes the shape. DB-gated suite 50 → 51.
 
 - [x] **SEC-M5 (security): check-digit / format validation of deterministic
   identifiers.** `validation::problems` now validates LEI (ISO 17442 + ISO
@@ -1378,10 +1375,7 @@ router-construction surface; off unless `OTLP_ENDPOINT` is set); green
 build + clippy.
 
 Still open (§13): an `S3`
-`ArtifactStore` backend for BLK-5; letting
-`streaming::create_and_emit`/`update_and_emit` run on a caller's
-transaction so the BLK-5 per-row upsert can be advisory-lock-protected
-(SEC-B3) without a pool deadlock; moving the FHIR structured search onto the
+`ArtifactStore` backend for BLK-5; moving the FHIR structured search onto the
 Tantivy index; cross-service link **target** readiness confirmation
 (§8, §13). (Richer validation beyond identifier check-digits and the
 real-time duplicate check on create, both formerly listed here, are

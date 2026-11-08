@@ -33,6 +33,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   holds unsent events, jobs and review pairs for records it does not
   have. A DB test seeds each and checks every table is empty; it failed
   before.
+- **Concurrent bulk imports of one stable key make one row** (repo
+  `tasks.md` SEC-B3). The per-row upsert took no lock, so two imports of
+  the same `(agency_id, case_number)` or `pid` could both miss in the
+  lookup and both insert. It now takes
+  `pg_advisory_xact_lock(hashtext('case' || ':' || key))` on its own
+  transaction before the lookup, and writes on that transaction through
+  the new `streaming::create_on` / `update_on`; under the `outbox`
+  transport the outbox and audit rows commit with it, under the lock.
+  `create_and_emit` / `update_and_emit` are now those two on a
+  transaction of their own; the memory-transport event, best-effort
+  audit row and index update follow the commit
+  (`streaming::AfterCommit`). `models::cases::find_by_pid` takes an
+  `axa::sqlx::Db`. A DB test holds the first upsert open, waits until
+  Postgres shows the second blocked on the lock, then checks one row;
+  with the lock removed it fails with two. DB-gated suite 69 → 70.
 
 ### Changed — SeaORM replaced by sqlx
 

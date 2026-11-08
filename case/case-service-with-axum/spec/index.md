@@ -400,24 +400,26 @@ is governed more strictly than for non-personal entities:
   case (filter = one `pid`) is the per-case GDPR export
   (`GET /{pid}/export`), unchanged by this work.
 
-**Concurrency — documented, not half-built.** The family contract's
-SEC-B3 concern (two concurrent importers of the same stable key must
-produce exactly one record) is **not** implemented here as a true
-cross-request lock: `streaming::create_and_emit`/`update_and_emit` each
-own their transaction internally (for the `outbox` event transport) and
-offer no hook to nest an externally-held Postgres advisory lock around
-that write without duplicating their event/audit/index logic in
-`src/bulk/`. A lock that only wrapped the read-then-decide step would
-not actually close the create-vs-update race it exists to prevent, so
-rather than ship that (worse than no lock — it *looks* safe), this
-rollout implements and tests **sequential idempotency only**:
-re-running the same file twice upserts in place, which is what
-`import_is_idempotent_on_the_agency_case_number_key` (§11) pins. True
-concurrent-importer race safety is a follow-up needing either
-`create_and_emit`/`update_and_emit` to run on a caller's transaction or
-a dedicated transaction-scoped bulk write path. Since the sqlx move
-(§10) every model helper underneath already takes an `axa::sqlx::Db`,
-so the first is now a change to those two functions only.
+**Concurrency (SEC-B3, closed 2026-11-08).** Two concurrent importers
+of the same stable key produce exactly one record. The per-row upsert
+(`bulk::pipeline::import_upsert`) runs on one transaction that first
+takes `pg_advisory_xact_lock(hashtext('case' || ':' || key))`, `key`
+being a JSON rendering of the stable key (`(agency_id, case_number)`,
+then `pid`), then looks the key up and writes through
+`streaming::create_on` / `update_on`, which run on that same
+transaction. Under the `outbox` transport the outbox and audit rows are
+on it too, so the row, its event and its audit row commit with the
+lock still held; the memory-transport event, the best-effort audit row
+and the search index follow the commit (`streaming::AfterCommit`). A
+second importer of the key waits for the first to commit, then finds
+its row and updates it in place. The lock spans the whole
+find-then-write, which is what a lock around the read alone would not
+have done. Person's bulk path is the reference; this one holds the lock
+on the write's own transaction rather than a separate guard
+transaction. Sequential idempotency is still pinned by
+`import_is_idempotent_on_the_agency_case_number_key` (§11), and the
+concurrent case by `bulk::pipeline::stable_key_lock_tests::
+two_upserts_of_one_stable_key_give_one_row`.
 
 **New tables.** `bulk_jobs` (modelled on care-pathway's own `bulk_jobs`
 migration, which is closer to this crate's layout than person's) and —
@@ -887,6 +889,22 @@ the other v1 edge kinds even though it shares the same edge shape.
   `axa_queue` is left to axa. `truncate_clears_outbox_bulk_jobs_and_review_queue`
   seeds a row in each, truncates, and checks all seven tables are empty;
   it failed before.
+- [x] **SEC-B3 — concurrent bulk imports of one stable key make one
+      row.** *(Done 2026-11-08.)* The bulk import's per-row upsert was
+  a plain find-then-write, so two importers of one stable key could
+  both miss and both insert. `bulk::pipeline::import_upsert` now takes
+  `pg_advisory_xact_lock(hashtext('case' || ':' || key))` on its own
+  transaction before the lookup and writes through the new
+  `streaming::create_on` / `update_on` on that transaction, with the
+  outbox and audit rows on it under `outbox`; `create_and_emit` /
+  `update_and_emit` are those two on a transaction of their own, so
+  the bulk and interactive paths share one write path (§8.7
+  "Concurrency"). `stable_key_lock_tests::
+  two_upserts_of_one_stable_key_give_one_row` holds the first upsert's
+  transaction open, waits until Postgres reports the second blocked on
+  the advisory lock, commits, and checks one row and an in-place update;
+  with the lock call removed it fails with two rows. DB-gated suite
+  69 → 70, unit tests 272.
 
 - [x] **CASE-SQLX — SeaORM → sqlx.** *(Done 2026-11-08;
   [`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5,
@@ -940,7 +958,8 @@ the other v1 edge kinds even though it shares the same edge shape.
   `query!` literals, keeping every assertion; the disclosure no-op test
   swaps SeaORM's mock connection for a lazy pool that cannot connect.
   DB-gated suite 65 → 66 (the INT-V1 test), unit tests 271, all passing.
-  The SEC-B3 bulk-upsert lock is **not** added (§8.7).
+  The SEC-B3 bulk-upsert lock is **not** added (§8.7; since closed,
+  see SEC-B3 below).
 
 - [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
       (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
@@ -1516,7 +1535,8 @@ the other v1 edge kinds even though it shares the same edge shape.
     duplicate detection → review queue with `provenance = import`;
     events + audit not bypassed (`streaming::create_and_emit`/
     `update_and_emit`); `dry_run` supported. Sequential idempotency only
-    — see §8.7 "Concurrency" for the documented SEC-B3 follow-up.
+    at the time; concurrent importers are serialized since SEC-B3
+    (2026-11-08, §8.7 "Concurrency").
   - [x] Per-row error report (`src/bulk/error_report.rs`, CSV) with
     `row_number, field, code, message`; one bad row never aborts the
     load; counts reconcile (`rows_total = created + upserted + errored`,
@@ -1691,17 +1711,6 @@ checkpoints, keyed MAC, SBOM (§12.0/§12.0.1, 2026-07-25..27), FHIR R5
 - Key-set refresh: the boot-time paseto-keys fetch is once-only — add a
   rotation-triggered refetch (e.g. on `UnknownKid`) or a periodic
   refresh loop?
-- **Bulk import (§8.7): true concurrent-importer race safety
-  (SEC-B3).** Today's `src/bulk/pipeline.rs` gives sequential
-  idempotency only (re-running a file is safe; two importers of the same
-  stable key racing each other is not). Closing this needs either
-  `streaming::create_and_emit`/`update_and_emit` to run on a caller's
-  transaction (so a caller-held Postgres advisory lock can span
-  find-then-write; every model helper underneath already takes an
-  `axa::sqlx::Db`) or a dedicated transaction-scoped bulk write
-  path — a decision that likely belongs at the family level
-  (`agents/share/bulk-import-export.md`) rather than being invented
-  per-crate.
 - **Bulk export (§8.7): per-row record-level ABAC inside the async
   worker.** The worker has no live bearer token to evaluate a
   record-level (`resource.case_type`/`status`/`priority`) decision

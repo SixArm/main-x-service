@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM instance_measures",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "2ef75e7f3b8add6a28341c7cca494f5eee1f5700004df1b07f6388991bb8f8a1"
+}

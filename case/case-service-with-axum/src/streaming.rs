@@ -31,7 +31,7 @@ use std::sync::{Mutex, OnceLock};
 use axa::sqlx::Db;
 use case_matcher::Case;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::models::audit_logs::Model as AuditModel;
@@ -406,119 +406,177 @@ pub(crate) fn deindex_best_effort(pid: Uuid) {
     }
 }
 
-/// Create a case and emit its `Created` event, atomically under the active
-/// transport. `memory`: insert on `db`, then push to the ring buffer
-/// (today's behaviour). `outbox`: open one transaction, insert the row,
-/// the `event_outbox` row, **and** the audit row on it, then commit — so a
-/// crash can never persist one without the others.
+/// What a write made on a caller's transaction still owes once that
+/// transaction commits: under `memory`, the event and the best-effort
+/// audit row; under both transports, the search index. Returned by
+/// [`create_on`] and [`update_on`].
+///
+/// None of it may happen before the commit. An event or an index entry
+/// for a row a rolled-back transaction never wrote would advertise a
+/// record that does not exist; under `outbox` the event and audit rows
+/// are already on the transaction, so only the index is left.
+#[must_use = "run it once the caller's transaction has committed"]
+pub struct AfterCommit {
+    /// The event to publish under `memory`.
+    kind: EventKind,
+    /// The audit action to record under `memory`.
+    action: &'static str,
+    /// The written row's pid.
+    pid: Uuid,
+    /// The written row's title, the envelope's label.
+    title: String,
+    /// The written row's payload, the audit snapshot.
+    snapshot: serde_json::Value,
+    /// The acting user, if any.
+    actor: Option<String>,
+    /// The case as written, for the search index.
+    case: Case,
+}
+
+impl AfterCommit {
+    /// Run the side effects. Call only after the transaction the write
+    /// was made on has committed; dropping it on a rollback is correct.
+    pub async fn run(self, db: &PgPool) {
+        if !transport().is_outbox() {
+            let actor = self.actor.as_deref();
+            publish_with_actor(self.kind, &self.pid.to_string(), &self.title, actor);
+            audit_best_effort(db, self.pid, self.action, actor, Some(self.snapshot)).await;
+        }
+        index_best_effort(self.pid, &self.case);
+    }
+}
+
+/// Insert a case on the caller's open transaction `conn`, with its
+/// `Created` outbox and audit rows on the same transaction under
+/// `outbox`. The caller commits, then runs the returned [`AfterCommit`].
+///
+/// This is what lets a caller hold a lock across the write: the bulk
+/// import takes its stable-key advisory lock (SEC-B3) on `conn` before
+/// its lookup, and the row, the event and the audit row then commit with
+/// the lock still held.
 ///
 /// # Errors
 ///
-/// When the insert (or, for `outbox`, the transaction / outbox / audit
-/// insert) fails; the transaction rolls back all writes on any error.
+/// When the insert, or (for `outbox`) the outbox or audit insert, fails.
+pub async fn create_on(
+    conn: &mut PgConnection,
+    case: &Case,
+    actor: Option<&str>,
+) -> ModelResult<(CaseModel, AfterCommit)> {
+    let model = CaseModel::create(&mut *conn, case).await?;
+    if transport().is_outbox() {
+        let env = envelope(
+            EventKind::Created,
+            &model.pid.to_string(),
+            &model.title,
+            actor,
+        );
+        OutboxPublisher.publish(&mut *conn, &env).await?;
+        AuditModel::record(
+            &mut *conn,
+            model.pid,
+            "created",
+            actor,
+            Some(model.data.clone()),
+        )
+        .await?;
+    }
+    let after = AfterCommit {
+        kind: EventKind::Created,
+        action: "created",
+        pid: model.pid,
+        title: model.title.clone(),
+        snapshot: model.data.clone(),
+        actor: actor.map(str::to_string),
+        case: case.clone(),
+    };
+    Ok((model, after))
+}
+
+/// Replace a case's payload on the caller's open transaction `conn`,
+/// with its `Updated` outbox and audit rows on the same transaction under
+/// `outbox` (see [`create_on`]). Consumes the fetched `model`.
+///
+/// # Errors
+///
+/// When the update, or (for `outbox`) the outbox or audit insert, fails.
+pub async fn update_on(
+    conn: &mut PgConnection,
+    model: CaseModel,
+    case: &Case,
+    actor: Option<&str>,
+) -> ModelResult<(CaseModel, AfterCommit)> {
+    let updated = model.update_data(&mut *conn, case).await?;
+    if transport().is_outbox() {
+        let env = envelope(
+            EventKind::Updated,
+            &updated.pid.to_string(),
+            &updated.title,
+            actor,
+        );
+        OutboxPublisher.publish(&mut *conn, &env).await?;
+        AuditModel::record(
+            &mut *conn,
+            updated.pid,
+            "updated",
+            actor,
+            Some(updated.data.clone()),
+        )
+        .await?;
+    }
+    let after = AfterCommit {
+        kind: EventKind::Updated,
+        action: "updated",
+        pid: updated.pid,
+        title: updated.title.clone(),
+        snapshot: updated.data.clone(),
+        actor: actor.map(str::to_string),
+        case: case.clone(),
+    };
+    Ok((updated, after))
+}
+
+/// Create a case and emit its `Created` event, atomically under the
+/// active transport: [`create_on`] on a transaction of its own, then the
+/// [`AfterCommit`] side effects. `memory`: the row commits, then the
+/// event goes to the ring buffer and the audit row is written
+/// best-effort. `outbox`: the row, the `event_outbox` row **and** the
+/// audit row commit together, so a crash can never persist one without
+/// the others. The index follows the commit either way.
+///
+/// # Errors
+///
+/// When the insert (or, for `outbox`, the outbox / audit insert) fails;
+/// the transaction rolls back all writes on any error.
 pub async fn create_and_emit(
     db: &PgPool,
     case: &Case,
     actor: Option<&str>,
 ) -> ModelResult<CaseModel> {
-    let model = match transport() {
-        EventTransport::Memory => {
-            let model = CaseModel::create(db, case).await?;
-            publish_with_actor(
-                EventKind::Created,
-                &model.pid.to_string(),
-                &model.title,
-                actor,
-            );
-            audit_best_effort(db, model.pid, "created", actor, Some(model.data.clone())).await;
-            model
-        }
-        EventTransport::Outbox => {
-            let mut txn = db.begin().await?;
-            let model = CaseModel::create(&mut *txn, case).await?;
-            let env = envelope(
-                EventKind::Created,
-                &model.pid.to_string(),
-                &model.title,
-                actor,
-            );
-            OutboxPublisher.publish(&mut *txn, &env).await?;
-            // Audit joins the same transaction — atomic with entity + event.
-            AuditModel::record(
-                &mut *txn,
-                model.pid,
-                "created",
-                actor,
-                Some(model.data.clone()),
-            )
-            .await?;
-            txn.commit().await?;
-            model
-        }
-    };
-    // Index only after the write is durable, so the index never
-    // advertises a record a rolled-back transaction never created.
-    index_best_effort(model.pid, case);
+    let mut txn = db.begin().await?;
+    let (model, after) = create_on(&mut txn, case, actor).await?;
+    txn.commit().await?;
+    after.run(db).await;
     Ok(model)
 }
 
-/// Replace a case's payload and emit its `Updated` event, atomically under
-/// the active transport (see [`create_and_emit`] for the two paths).
-/// Consumes the fetched `model`.
+/// Replace a case's payload and emit its `Updated` event, atomically
+/// under the active transport (see [`create_and_emit`] for the two
+/// paths). Consumes the fetched `model`.
 ///
 /// # Errors
 ///
-/// When the update (or, for `outbox`, the transaction / outbox insert)
-/// fails.
+/// When the update (or, for `outbox`, the outbox / audit insert) fails.
 pub async fn update_and_emit(
     db: &PgPool,
     model: CaseModel,
     case: &Case,
     actor: Option<&str>,
 ) -> ModelResult<CaseModel> {
-    let updated = match transport() {
-        EventTransport::Memory => {
-            let updated = model.update_data(db, case).await?;
-            publish_with_actor(
-                EventKind::Updated,
-                &updated.pid.to_string(),
-                &updated.title,
-                actor,
-            );
-            audit_best_effort(
-                db,
-                updated.pid,
-                "updated",
-                actor,
-                Some(updated.data.clone()),
-            )
-            .await;
-            updated
-        }
-        EventTransport::Outbox => {
-            let mut txn = db.begin().await?;
-            let updated = model.update_data(&mut *txn, case).await?;
-            let env = envelope(
-                EventKind::Updated,
-                &updated.pid.to_string(),
-                &updated.title,
-                actor,
-            );
-            OutboxPublisher.publish(&mut *txn, &env).await?;
-            AuditModel::record(
-                &mut *txn,
-                updated.pid,
-                "updated",
-                actor,
-                Some(updated.data.clone()),
-            )
-            .await?;
-            txn.commit().await?;
-            updated
-        }
-    };
-    // Replaces the prior document, so a superseded title stops matching.
-    index_best_effort(updated.pid, case);
+    let mut txn = db.begin().await?;
+    let (updated, after) = update_on(&mut txn, model, case, actor).await?;
+    txn.commit().await?;
+    after.run(db).await;
     Ok(updated)
 }
 

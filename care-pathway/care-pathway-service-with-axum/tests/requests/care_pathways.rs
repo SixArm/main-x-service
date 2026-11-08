@@ -836,3 +836,270 @@ async fn masked_view_and_export_are_404_for_unknown_pid() {
     })
     .await;
 }
+
+/// The thirteen tables `db truncate` must empty (every table the
+/// service's migrations create), each with its row-count query.
+const SERVICE_TABLES: [(&str, &str); 13] = [
+    ("care_pathways", "SELECT count(*) FROM care_pathways"),
+    ("audit_logs", "SELECT count(*) FROM audit_logs"),
+    ("merge_records", "SELECT count(*) FROM merge_records"),
+    ("entity_links", "SELECT count(*) FROM entity_links"),
+    ("event_outbox", "SELECT count(*) FROM event_outbox"),
+    ("bulk_jobs", "SELECT count(*) FROM bulk_jobs"),
+    ("review_queue", "SELECT count(*) FROM review_queue"),
+    (
+        "pathway_instances",
+        "SELECT count(*) FROM pathway_instances",
+    ),
+    ("instance_steps", "SELECT count(*) FROM instance_steps"),
+    ("instance_team", "SELECT count(*) FROM instance_team"),
+    ("instance_events", "SELECT count(*) FROM instance_events"),
+    (
+        "instance_measures",
+        "SELECT count(*) FROM instance_measures",
+    ),
+    (
+        "instance_segments",
+        "SELECT count(*) FROM instance_segments",
+    ),
+];
+
+// CP-T1: `db truncate` empties every table the service owns. It used to
+// clear only `merge_records`, `audit_logs` and `care_pathways`, so a
+// truncated database still held the instances, their steps, team,
+// events, measures and segments, the links, unsent outbox events, bulk
+// jobs and review pairs, all for pathways it no longer had.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn truncate_clears_every_service_table() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&stroke_pathway())
+            .await;
+        assert_eq!(created.status_code(), 200);
+        let pathway =
+            uuid::Uuid::parse_str(created.json::<Value>()["pid"].as_str().unwrap()).unwrap();
+        let instance = uuid::Uuid::new_v4();
+
+        // One row in every table the API above did not already write.
+        // Plain statements rather than the model helpers, so the seed
+        // does not depend on each sub-resource's own validation rules.
+        let seeds: [&str; 11] = [
+            "INSERT INTO pathway_instances (pid, pathway_pid, subject_ref) \
+             VALUES ($1, $2, 'person:0c4f1e2a-0000-4000-8000-000000000001')",
+            "INSERT INTO instance_steps (pid, instance_pid, label, position) \
+             VALUES (gen_random_uuid(), $1, 'Assess', 0)",
+            "INSERT INTO instance_team (pid, instance_pid, member_ref, role) \
+             VALUES (gen_random_uuid(), $1, 'worker:x', 'lead')",
+            "INSERT INTO instance_events (pid, instance_pid, kind) \
+             VALUES (gen_random_uuid(), $1, 'note')",
+            "INSERT INTO instance_measures (pid, instance_pid, name) \
+             VALUES (gen_random_uuid(), $1, 'nihss')",
+            "INSERT INTO instance_segments (pid, instance_pid, label, stage, category, started_at) \
+             VALUES (gen_random_uuid(), $1, 'Triage', 'arrival', 'value_adding', now())",
+            "INSERT INTO entity_links (id, from_pid, kind, to_ref, provenance) \
+             VALUES (gen_random_uuid(), $1, 'continues_as', 'case:x', 'operator')",
+            "INSERT INTO event_outbox (event_id, entity, entity_pid, kind, occurred_at, \
+             schema_version, payload) \
+             VALUES (gen_random_uuid(), 'care_pathway', $1, 'created', now(), 1, '{}')",
+            "INSERT INTO bulk_jobs (id, kind, entity, format, status, params, created_at, updated_at) \
+             VALUES (gen_random_uuid(), 'import', 'care_pathway', 'jsonl', 'queued', '{}', now(), now())",
+            "INSERT INTO review_queue (id, record_id_a, record_id_b, match_score, match_quality, \
+             detection_method) VALUES (gen_random_uuid(), $1, gen_random_uuid(), 0.9, 'probable', 'test')",
+            "INSERT INTO merge_records (main_pid, duplicate_pid) VALUES ($1, gen_random_uuid())",
+        ];
+        for (i, sql) in seeds.into_iter().enumerate() {
+            let q = sqlx::query(sql);
+            let q = match i {
+                0 => q.bind(instance).bind(pathway),
+                1..=5 => q.bind(instance),
+                8 => q,
+                _ => q.bind(pathway),
+            };
+            q.execute(&ctx.db).await.unwrap_or_else(|e| panic!("seed {i}: {e}"));
+        }
+        for (table, count) in SERVICE_TABLES {
+            let n: i64 = sqlx::query_scalar(count)
+                .fetch_one(&ctx.db)
+                .await
+                .expect("count rows");
+            assert!(n > 0, "the seed must leave a row in {table}");
+        }
+
+        App::truncate(&ctx).await.expect("truncate");
+
+        let mut left = Vec::new();
+        for (table, count) in SERVICE_TABLES {
+            let n: i64 = sqlx::query_scalar(count)
+                .fetch_one(&ctx.db)
+                .await
+                .expect("count rows");
+            if n > 0 {
+                left.push((table, n));
+            }
+        }
+        assert!(
+            left.is_empty(),
+            "every service table must be empty after truncate; left: {left:?}"
+        );
+    })
+    .await;
+}
+
+/// Create two distinct pathways through the API and load both rows.
+async fn two_pathways(
+    request: &axa::TestServer,
+    db: &sqlx::PgPool,
+) -> (
+    care_pathway_service::models::care_pathways::Model,
+    care_pathway_service::models::care_pathways::Model,
+) {
+    use care_pathway_service::models::care_pathways::Model as PathwayModel;
+    let mut pids = Vec::new();
+    for name in ["Merge Lock Survivor", "Merge Lock Duplicate"] {
+        let created = request
+            .post("/api/care-pathways")
+            .json(&json!({ "name": format!("{name} {}", uuid::Uuid::new_v4()) }))
+            .await;
+        assert_eq!(created.status_code(), 200);
+        pids.push(created.json::<Value>()["pid"].as_str().unwrap().to_string());
+    }
+    let main = PathwayModel::find_by_pid(db, &pids[0]).await.unwrap();
+    let duplicate = PathwayModel::find_by_pid(db, &pids[1]).await.unwrap();
+    (main, duplicate)
+}
+
+/// Retire `pid` the way a concurrent merge or delete would, on `conn`.
+async fn retire(conn: &mut sqlx::PgConnection, pid: uuid::Uuid) {
+    sqlx::query("UPDATE care_pathways SET active = false, deleted_at = now() WHERE pid = $1")
+        .bind(pid)
+        .execute(conn)
+        .await
+        .expect("retire the row");
+}
+
+// CP-M1 (SEC-B5): the handler reads both rows unlocked, so by the time
+// the merge writes, the duplicate may already have been merged away. The
+// merge must re-check liveness under its lock and fail closed, rather
+// than fold a retired duplicate's data into the survivor.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merge_refuses_a_duplicate_retired_after_it_was_read() {
+    use care_pathway_service::models::{ModelError, care_pathways::Model as PathwayModel};
+    use care_pathway_service::streaming;
+
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        let (main, duplicate) = two_pathways(&request, &ctx.db).await;
+        let (main_pid, dup_pid) = (main.pid, duplicate.pid);
+        let before = main.data.clone();
+        let mut folded = main.to_pathway().unwrap();
+        folded
+            .keywords
+            .push("folded-from-a-retired-duplicate".to_string());
+
+        // Retired after the read, before the merge runs.
+        let mut conn = ctx.db.acquire().await.unwrap();
+        retire(&mut conn, dup_pid).await;
+        drop(conn);
+
+        let outcome = streaming::merge_and_emit(&ctx.db, main, duplicate, &folded, None).await;
+        assert!(
+            matches!(outcome, Err(ModelError::EntityNotFound)),
+            "a merge whose duplicate is gone must fail closed, got {:?}",
+            outcome.map(|(m, _, _)| m.pid)
+        );
+        let survivor = PathwayModel::find_by_pid(&ctx.db, &main_pid.to_string())
+            .await
+            .unwrap();
+        assert_eq!(survivor.data, before, "the survivor must be untouched");
+    })
+    .await;
+}
+
+// CP-M1 (SEC-B5), concurrently: a second connection holds the
+// duplicate's row lock, as a concurrent merge would. The merge must wait
+// for it, and once the holder retires the duplicate and commits, fail
+// closed. Deterministic: the test waits until Postgres reports the merge
+// blocked on a lock before it lets the holder commit.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn merge_waits_for_a_concurrent_lock_then_fails_closed() {
+    use care_pathway_service::models::{ModelError, care_pathways::Model as PathwayModel};
+    use care_pathway_service::streaming;
+    use sqlx::Connection as _;
+
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        let (main, duplicate) = two_pathways(&request, &ctx.db).await;
+        let (main_pid, dup_pid) = (main.pid, duplicate.pid);
+        let before = main.data.clone();
+        let folded = main.to_pathway().unwrap();
+
+        // The holder: its own connection, outside the pool.
+        let mut holder = sqlx::PgConnection::connect_with(&ctx.db.connect_options())
+            .await
+            .unwrap();
+        let mut held = holder.begin().await.unwrap();
+        sqlx::query("SELECT id FROM care_pathways WHERE pid = $1 FOR UPDATE")
+            .bind(dup_pid)
+            .fetch_one(&mut *held)
+            .await
+            .unwrap();
+
+        let merging = tokio::spawn({
+            let db = ctx.db.clone();
+            async move {
+                streaming::merge_and_emit(&db, main, duplicate, &folded, None)
+                    .await
+                    .map(|(m, _, _)| m.pid)
+            }
+        });
+
+        // Wait until the merge is blocked on a row lock (or, wrongly,
+        // already done). Watched from a third connection outside the
+        // pool: the merge holds the pool's connection while it waits.
+        let mut watcher = sqlx::PgConnection::connect_with(&ctx.db.connect_options())
+            .await
+            .unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            let waiting: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_stat_activity \
+                 WHERE datname = current_database() AND wait_event_type = 'Lock' \
+                   AND query ILIKE '%care_pathways%'",
+            )
+            .fetch_one(&mut watcher)
+            .await
+            .unwrap();
+            if waiting > 0 || merging.is_finished() {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the merge neither blocked nor finished"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert!(!merging.is_finished(), "the merge must wait for the lock");
+
+        retire(&mut held, dup_pid).await;
+        held.commit().await.unwrap();
+
+        let outcome = merging.await.unwrap();
+        assert!(
+            matches!(outcome, Err(ModelError::EntityNotFound)),
+            "the merge that lost the race must fail closed, got {outcome:?}"
+        );
+        let survivor = PathwayModel::find_by_pid(&ctx.db, &main_pid.to_string())
+            .await
+            .unwrap();
+        assert_eq!(survivor.data, before, "the survivor must be untouched");
+    })
+    .await;
+}
