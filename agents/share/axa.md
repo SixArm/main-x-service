@@ -12,7 +12,7 @@ axa is a library, not a framework. Each service's `src/app.rs` holds ordinary
 functions, and its `main.rs` calls them. axa's own specification is
 [`spec/index.md`](https://github.com/publicprojects-io/axa/blob/main/spec/index.md).
 
-Services take it from crates.io, as `axa = "0.8"`.
+Services take it from crates.io, as `axa = "0.9"`.
 
 ## Errors
 

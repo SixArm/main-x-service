@@ -262,7 +262,7 @@ because macOS cannot load a stripped `sqlx-macros`.
 |---|---|
 | Rust edition (target) | 2024 |
 | MSRV | **Rust 1.97** — current stable minus two, declared per crate and enforced in CI ([`../rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md)) |
-| axa | 0.8, from crates.io |
+| axa | 0.9, from crates.io |
 | Axum | 0.8 |
 | sqlx | 0.9 |
 | PostgreSQL | 18+ |

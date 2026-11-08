@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — axa 0.9
+
+- axa 0.9.0 and its `axa-worker` 0.2.0. On boot `Queue::connect` now also
+  creates `axa_job_acts`, an insert-only record of a person cancelling,
+  retrying or releasing a job, with triggers that refuse `UPDATE`, `DELETE`
+  and `TRUNCATE`. This service never cancels or retries a queue job, so
+  nothing writes to it yet. A test that empties the queue's tables must drop
+  `axa_job_acts` rather than truncate it.
+
 ### Fixed
 
 - **Merge locks both cases under both transports** (repo `tasks.md`
