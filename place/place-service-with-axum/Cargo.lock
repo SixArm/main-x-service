@@ -360,9 +360,9 @@ dependencies = [
 
 [[package]]
 name = "axa"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7f321d0968f2ca45ddc6d0a6f2d48f2682f9d680ba2a50c3b7a69f28444a41f"
+checksum = "84ec47dc547cc23e1b1c52047d9c6c377fc82df1da2431e5031496e5688175a5"
 dependencies = [
  "async-trait",
  "axa-cursor-pagination",
@@ -391,12 +391,12 @@ dependencies = [
 
 [[package]]
 name = "axa-cursor-pagination"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "254bae98d29dc977a0a3d4ba4e4d776fe94931923b70f476b7020aea15e60d98"
+checksum = "b8e27de6945fe8ee4ca8e537b92b35ca79d731f12d4a5a59c4c3deef0e601c15"
 dependencies = [
  "axum 0.8.9",
- "base64 0.22.1",
+ "base64 0.23.1",
  "hmac",
  "serde",
  "sha2 0.11.1",
