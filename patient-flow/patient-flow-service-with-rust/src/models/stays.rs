@@ -268,7 +268,7 @@ impl Model {
         let row = sqlx::query_as!(
             Self,
             r#"UPDATE stays
-               SET display_name = COALESCE($2, display_name),
+               SET updated_at = now(), display_name = COALESCE($2, display_name),
                    named_nurse_ref = COALESCE($3, named_nurse_ref),
                    consultant_ref = COALESCE($4, consultant_ref),
                    edd = COALESCE($5, edd),
@@ -316,7 +316,7 @@ impl Model {
         let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
-            r#"UPDATE stays SET ward_pid = $2, bed_pid = $3
+            r#"UPDATE stays SET updated_at = now(), ward_pid = $2, bed_pid = $3
                WHERE id = $1
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
                          id, pid, person_ref, display_name, status,
@@ -351,7 +351,7 @@ impl Model {
         let row = sqlx::query_as!(
             Self,
             r#"UPDATE stays
-               SET status = 'discharge_ready', discharge_ready_at = $2, discharge_pathway = $3
+               SET updated_at = now(), status = 'discharge_ready', discharge_ready_at = $2, discharge_pathway = $3
                WHERE id = $1
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
                          id, pid, person_ref, display_name, status,
@@ -386,7 +386,7 @@ impl Model {
         let row = sqlx::query_as!(
             Self,
             r#"UPDATE stays
-               SET status = 'discharged', discharged_at = $2, discharge_destination = $3,
+               SET updated_at = now(), status = 'discharged', discharged_at = $2, discharge_destination = $3,
                    bed_pid = NULL
                WHERE id = $1
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",

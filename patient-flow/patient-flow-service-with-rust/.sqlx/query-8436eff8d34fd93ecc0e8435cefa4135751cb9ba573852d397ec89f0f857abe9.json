@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, stay_pid, day, classification, delay_reasons, note\n               FROM red_green_days\n               WHERE stay_pid = $1 AND day = $2\n               LIMIT 1",
+  "query": "INSERT INTO red_green_days (stay_pid, day, classification, delay_reasons, note)\n               VALUES ($1, $2, $3, $4, $5)\n               ON CONFLICT (stay_pid, day) DO UPDATE\n               SET updated_at = now(),\n                   classification = EXCLUDED.classification,\n                   delay_reasons = EXCLUDED.delay_reasons,\n                   note = EXCLUDED.note\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, stay_pid, day, classification, delay_reasons, note",
   "describe": {
     "columns": [
       {
@@ -95,7 +95,10 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Date"
+        "Date",
+        "Varchar",
+        "Jsonb",
+        "Varchar"
       ]
     },
     "nullable": [
@@ -109,5 +112,5 @@
       true
     ]
   },
-  "hash": "ff7da7808eabb0f076b0cda75fb95cb1c890917d5fa2a6340ccbc972fef91abc"
+  "hash": "8436eff8d34fd93ecc0e8435cefa4135751cb9ba573852d397ec89f0f857abe9"
 }

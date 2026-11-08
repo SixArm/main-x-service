@@ -160,7 +160,7 @@ impl Model {
         let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
-            r#"UPDATE bed_requests SET status = 'allocated', allocated_bed_pid = $2
+            r#"UPDATE bed_requests SET updated_at = now(), status = 'allocated', allocated_bed_pid = $2
                WHERE id = $1
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
                          id, pid, person_ref, origin, target_ward_pid, specialty, priority,
@@ -190,7 +190,7 @@ impl Model {
         let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,
-            r#"UPDATE bed_requests SET status = $2, resolved_at = $3
+            r#"UPDATE bed_requests SET updated_at = now(), status = $2, resolved_at = $3
                WHERE id = $1
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
                          id, pid, person_ref, origin, target_ward_pid, specialty, priority,

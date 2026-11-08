@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE wards\n               SET name = COALESCE($2, name),\n                   specialty = COALESCE($3, specialty),\n                   open = COALESCE($4, open),\n                   escalation = COALESCE($5, escalation),\n                   closed_to_admissions = COALESCE($6, closed_to_admissions)\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, site_pid, name, code, kind, specialty, open,\n                         escalation, closed_to_admissions, place_ref,\n                         deleted_at AS \"deleted_at: _\"",
+  "query": "UPDATE beds\n               SET updated_at = now(), state = $2, state_since = $3, deep_clean_required = $4,\n                   closure_reason = $5\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, bay_pid, number, state, state_since AS \"state_since: _\",\n                         closure_reason, deep_clean_required, isolation_capable, oxygen,\n                         bariatric, virtual AS is_virtual, deleted_at AS \"deleted_at: _\"",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "wards",
+            "table": "beds",
             "name": "created_at"
           }
         }
@@ -20,7 +20,7 @@
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "wards",
+            "table": "beds",
             "name": "updated_at"
           }
         }
@@ -31,7 +31,7 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "wards",
+            "table": "beds",
             "name": "id"
           }
         }
@@ -42,117 +42,128 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "wards",
+            "table": "beds",
             "name": "pid"
           }
         }
       },
       {
         "ordinal": 4,
-        "name": "site_pid",
+        "name": "bay_pid",
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "site_pid"
+            "table": "beds",
+            "name": "bay_pid"
           }
         }
       },
       {
         "ordinal": 5,
-        "name": "name",
+        "name": "number",
         "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "name"
+            "table": "beds",
+            "name": "number"
           }
         }
       },
       {
         "ordinal": 6,
-        "name": "code",
+        "name": "state",
         "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "code"
+            "table": "beds",
+            "name": "state"
           }
         }
       },
       {
         "ordinal": 7,
-        "name": "kind",
-        "type_info": "Varchar",
+        "name": "state_since: _",
+        "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "kind"
+            "table": "beds",
+            "name": "state_since"
           }
         }
       },
       {
         "ordinal": 8,
-        "name": "specialty",
+        "name": "closure_reason",
         "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "specialty"
+            "table": "beds",
+            "name": "closure_reason"
           }
         }
       },
       {
         "ordinal": 9,
-        "name": "open",
+        "name": "deep_clean_required",
         "type_info": "Bool",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "open"
+            "table": "beds",
+            "name": "deep_clean_required"
           }
         }
       },
       {
         "ordinal": 10,
-        "name": "escalation",
+        "name": "isolation_capable",
         "type_info": "Bool",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "escalation"
+            "table": "beds",
+            "name": "isolation_capable"
           }
         }
       },
       {
         "ordinal": 11,
-        "name": "closed_to_admissions",
+        "name": "oxygen",
         "type_info": "Bool",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "closed_to_admissions"
+            "table": "beds",
+            "name": "oxygen"
           }
         }
       },
       {
         "ordinal": 12,
-        "name": "place_ref",
-        "type_info": "Varchar",
+        "name": "bariatric",
+        "type_info": "Bool",
         "origin": {
           "Table": {
-            "table": "wards",
-            "name": "place_ref"
+            "table": "beds",
+            "name": "bariatric"
           }
         }
       },
       {
         "ordinal": 13,
+        "name": "is_virtual",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "beds",
+            "name": "virtual"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
         "name": "deleted_at: _",
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "wards",
+            "table": "beds",
             "name": "deleted_at"
           }
         }
@@ -162,10 +173,9 @@
       "Left": [
         "Int8",
         "Varchar",
-        "Varchar",
+        "Timestamptz",
         "Bool",
-        "Bool",
-        "Bool"
+        "Varchar"
       ]
     },
     "nullable": [
@@ -181,9 +191,10 @@
       false,
       false,
       false,
-      true,
+      false,
+      false,
       true
     ]
   },
-  "hash": "e5430819917739674b3633753bc491fc1eceb4eac065897e2f65eaff0210596f"
+  "hash": "84ff2cf3926eb209bd19df943991ecb03570e6a1b4e99de4ba10973eb024c8fa"
 }

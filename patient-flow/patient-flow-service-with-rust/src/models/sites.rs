@@ -137,9 +137,13 @@ impl Model {
         at: DateTime<FixedOffset>,
     ) -> ModelResult<()> {
         let mut conn = db.into().acquire().await?;
-        let done = sqlx::query!("UPDATE sites SET deleted_at = $2 WHERE id = $1", id, at)
-            .execute(&mut *conn)
-            .await?;
+        let done = sqlx::query!(
+            "UPDATE sites SET updated_at = now(), deleted_at = $2 WHERE id = $1",
+            id,
+            at
+        )
+        .execute(&mut *conn)
+        .await?;
         super::updated_one(done.rows_affected())
     }
 }

@@ -10,7 +10,7 @@ use super::seed_ward;
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
 // Site → ward → bay → bed create round-trip; the ward lists and
 // fetches back; the bed starts `available`.
 async fn topology_creates_and_reads_back() {
@@ -65,7 +65,7 @@ async fn topology_creates_and_reads_back() {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
 // The validation contract is 422 (not 400): unknown ward kind, blank
 // name, and unknown bay sex designation are each refused.
 async fn topology_validation_is_422() {
@@ -91,7 +91,7 @@ async fn topology_validation_is_422() {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
 // Bed state machine over the live route: close → reopen → an illegal
 // transition names the current state and returns 422.
 async fn bed_transitions_and_illegal_moves() {

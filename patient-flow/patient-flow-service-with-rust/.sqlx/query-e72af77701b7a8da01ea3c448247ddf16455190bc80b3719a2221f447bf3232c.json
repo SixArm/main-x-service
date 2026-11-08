@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE stays\n               SET status = 'discharged', discharged_at = $2, discharge_destination = $3,\n                   bed_pid = NULL\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
+  "query": "UPDATE stays SET updated_at = now(), ward_pid = $2, bed_pid = $3\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
   "describe": {
     "columns": [
       {
@@ -271,8 +271,8 @@
     "parameters": {
       "Left": [
         "Int8",
-        "Timestamptz",
-        "Varchar"
+        "Uuid",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -302,5 +302,5 @@
       true
     ]
   },
-  "hash": "2ad3d212f0f49f300c303d1c114909c56fecf9096200f05c9bfd296eb51e3f4c"
+  "hash": "e72af77701b7a8da01ea3c448247ddf16455190bc80b3719a2221f447bf3232c"
 }

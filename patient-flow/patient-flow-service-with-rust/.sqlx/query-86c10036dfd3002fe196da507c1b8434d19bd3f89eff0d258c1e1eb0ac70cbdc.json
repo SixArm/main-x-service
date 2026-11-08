@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE stays\n               SET status = 'discharge_ready', discharge_ready_at = $2, discharge_pathway = $3\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
+  "query": "UPDATE stays\n               SET updated_at = now(), status = 'discharged', discharged_at = $2, discharge_destination = $3,\n                   bed_pid = NULL\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
   "describe": {
     "columns": [
       {
@@ -302,5 +302,5 @@
       true
     ]
   },
-  "hash": "afd0cf97f112de74dea364d37dddfcdbffd979e38905167d4f53992222d9b33b"
+  "hash": "86c10036dfd3002fe196da507c1b8434d19bd3f89eff0d258c1e1eb0ac70cbdc"
 }

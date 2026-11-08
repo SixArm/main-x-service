@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE bed_requests SET status = $2, resolved_at = $3\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, origin, target_ward_pid, specialty, priority,\n                         requirements, status, allocated_bed_pid,\n                         requested_at AS \"requested_at: _\", resolved_at AS \"resolved_at: _\",\n                         deleted_at AS \"deleted_at: _\"",
+  "query": "UPDATE bed_requests SET updated_at = now(), status = $2, resolved_at = $3\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, origin, target_ward_pid, specialty, priority,\n                         requirements, status, allocated_bed_pid,\n                         requested_at AS \"requested_at: _\", resolved_at AS \"resolved_at: _\",\n                         deleted_at AS \"deleted_at: _\"",
   "describe": {
     "columns": [
       {
@@ -194,5 +194,5 @@
       true
     ]
   },
-  "hash": "f5d0d4367b93dbf5c9f56773a82e5517a722aee0e38a98424de9445eccc66b3b"
+  "hash": "4e1547fa64996e37c4b6da1afee2c5a31cfc5aa69464d72007b0e1adb633a52f"
 }

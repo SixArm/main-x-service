@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE beds\n               SET state = $2, state_since = $3, deep_clean_required = $4,\n                   closure_reason = $5\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, bay_pid, number, state, state_since AS \"state_since: _\",\n                         closure_reason, deep_clean_required, isolation_capable, oxygen,\n                         bariatric, virtual AS is_virtual, deleted_at AS \"deleted_at: _\"",
+  "query": "UPDATE bed_requests SET updated_at = now(), status = 'allocated', allocated_bed_pid = $2\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, origin, target_ward_pid, specialty, priority,\n                         requirements, status, allocated_bed_pid,\n                         requested_at AS \"requested_at: _\", resolved_at AS \"resolved_at: _\",\n                         deleted_at AS \"deleted_at: _\"",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "beds",
+            "table": "bed_requests",
             "name": "created_at"
           }
         }
@@ -20,7 +20,7 @@
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "beds",
+            "table": "bed_requests",
             "name": "updated_at"
           }
         }
@@ -31,7 +31,7 @@
         "type_info": "Int8",
         "origin": {
           "Table": {
-            "table": "beds",
+            "table": "bed_requests",
             "name": "id"
           }
         }
@@ -42,118 +42,118 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "beds",
+            "table": "bed_requests",
             "name": "pid"
           }
         }
       },
       {
         "ordinal": 4,
-        "name": "bay_pid",
-        "type_info": "Uuid",
+        "name": "person_ref",
+        "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "bay_pid"
+            "table": "bed_requests",
+            "name": "person_ref"
           }
         }
       },
       {
         "ordinal": 5,
-        "name": "number",
+        "name": "origin",
         "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "number"
+            "table": "bed_requests",
+            "name": "origin"
           }
         }
       },
       {
         "ordinal": 6,
-        "name": "state",
-        "type_info": "Varchar",
+        "name": "target_ward_pid",
+        "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "state"
+            "table": "bed_requests",
+            "name": "target_ward_pid"
           }
         }
       },
       {
         "ordinal": 7,
-        "name": "state_since: _",
-        "type_info": "Timestamptz",
+        "name": "specialty",
+        "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "state_since"
+            "table": "bed_requests",
+            "name": "specialty"
           }
         }
       },
       {
         "ordinal": 8,
-        "name": "closure_reason",
+        "name": "priority",
         "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "closure_reason"
+            "table": "bed_requests",
+            "name": "priority"
           }
         }
       },
       {
         "ordinal": 9,
-        "name": "deep_clean_required",
-        "type_info": "Bool",
+        "name": "requirements",
+        "type_info": "Jsonb",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "deep_clean_required"
+            "table": "bed_requests",
+            "name": "requirements"
           }
         }
       },
       {
         "ordinal": 10,
-        "name": "isolation_capable",
-        "type_info": "Bool",
+        "name": "status",
+        "type_info": "Varchar",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "isolation_capable"
+            "table": "bed_requests",
+            "name": "status"
           }
         }
       },
       {
         "ordinal": 11,
-        "name": "oxygen",
-        "type_info": "Bool",
+        "name": "allocated_bed_pid",
+        "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "oxygen"
+            "table": "bed_requests",
+            "name": "allocated_bed_pid"
           }
         }
       },
       {
         "ordinal": 12,
-        "name": "bariatric",
-        "type_info": "Bool",
+        "name": "requested_at: _",
+        "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "bariatric"
+            "table": "bed_requests",
+            "name": "requested_at"
           }
         }
       },
       {
         "ordinal": 13,
-        "name": "is_virtual",
-        "type_info": "Bool",
+        "name": "resolved_at: _",
+        "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "beds",
-            "name": "virtual"
+            "table": "bed_requests",
+            "name": "resolved_at"
           }
         }
       },
@@ -163,7 +163,7 @@
         "type_info": "Timestamptz",
         "origin": {
           "Table": {
-            "table": "beds",
+            "table": "bed_requests",
             "name": "deleted_at"
           }
         }
@@ -172,10 +172,7 @@
     "parameters": {
       "Left": [
         "Int8",
-        "Varchar",
-        "Timestamptz",
-        "Bool",
-        "Varchar"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -185,16 +182,16 @@
       false,
       false,
       false,
-      false,
-      false,
+      true,
       true,
       false,
       false,
       false,
+      true,
       false,
-      false,
+      true,
       true
     ]
   },
-  "hash": "5388d28de5916b425a24a22ee602b55a3eb911523a268f96df2481bbf66eca5b"
+  "hash": "4f3135a939bed5e0ffd0636ac2bf2def15b9ab724d8354bab4e31660d88ae0f6"
 }

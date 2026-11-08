@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE stays SET ward_pid = $2, bed_pid = $3\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
+  "query": "UPDATE stays\n               SET updated_at = now(), status = 'discharge_ready', discharge_ready_at = $2, discharge_pathway = $3\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
   "describe": {
     "columns": [
       {
@@ -271,8 +271,8 @@
     "parameters": {
       "Left": [
         "Int8",
-        "Uuid",
-        "Uuid"
+        "Timestamptz",
+        "Varchar"
       ]
     },
     "nullable": [
@@ -302,5 +302,5 @@
       true
     ]
   },
-  "hash": "f24d2a7317b795b8bd9650d35a5202fcc670b0a77ec6ac6f58774df731bb0d50"
+  "hash": "21f857bb0e6a1bd48062eb13182ea6d401d600b4e0a03b7e146b44c6d34c85b2"
 }

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`updated_at` now moves on every update** (PF-U1). No statement set
+  it and there is no trigger, so it always equalled `created_at`. Every
+  `UPDATE` in `src/models/` sets `updated_at = now()` in the SQL,
+  soft deletes and the outbox ack included.
+- **Concurrent same-day `Red2Green` POSTs no longer answer `409`**
+  (PF-R1). `POST /api/stays/{pid}/red-green` read today's row and then
+  inserted it, so a second POST that had also read nothing broke the
+  `red_green_stay_day` index. It is one
+  `INSERT … ON CONFLICT (stay_pid, day) DO UPDATE` now, in the same
+  transaction as its audit and outbox rows; the response is still the
+  day's row, and the later write wins. `red_green_days::Model::insert`,
+  `reclassify` and `for_stay_on` are replaced by `upsert`.
+- **`config/production.yaml` is gone** (PF-C1): loco-era YAML that axa
+  never read. The edition spec and the tests' `#[ignore]` notes no longer
+  describe `config/*.yaml`.
+- **README and `deny.toml` brought up to date** (PF-D1): 75 unit tests
+  (not 64) and 12 DB tests; the 12 advisory ignores, none of which
+  matched anything on this tree, are removed.
+- **The outbox relay poll is pinned** (PF-O1). `unpublished` /
+  `mark_published` stay, for the outbox → Fluvio relay the spec
+  describes; no relay runs yet. A DB test proves a second relay does not
+  see rows the first holds (`FOR UPDATE SKIP LOCKED`).
+
 ### Changed — SeaORM replaced by sqlx
 
 - **Persistence is sqlx with no ORM** (`../spec/tasks.md` PF-T26;

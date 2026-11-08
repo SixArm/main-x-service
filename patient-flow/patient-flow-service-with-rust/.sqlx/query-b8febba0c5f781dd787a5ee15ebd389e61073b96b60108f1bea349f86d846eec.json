@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE stays\n               SET display_name = COALESCE($2, display_name),\n                   named_nurse_ref = COALESCE($3, named_nurse_ref),\n                   consultant_ref = COALESCE($4, consultant_ref),\n                   edd = COALESCE($5, edd),\n                   ccd = COALESCE($6, ccd),\n                   ccd_met = COALESCE($7, ccd_met),\n                   senior_review_at = COALESCE($8, senior_review_at),\n                   alerts = COALESCE($9, alerts),\n                   home_location_note = COALESCE($10, home_location_note)\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
+  "query": "UPDATE stays\n               SET updated_at = now(), display_name = COALESCE($2, display_name),\n                   named_nurse_ref = COALESCE($3, named_nurse_ref),\n                   consultant_ref = COALESCE($4, consultant_ref),\n                   edd = COALESCE($5, edd),\n                   ccd = COALESCE($6, ccd),\n                   ccd_met = COALESCE($7, ccd_met),\n                   senior_review_at = COALESCE($8, senior_review_at),\n                   alerts = COALESCE($9, alerts),\n                   home_location_note = COALESCE($10, home_location_note)\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, person_ref, display_name, status,\n                         admitted_at AS \"admitted_at: _\", source, ward_pid, bed_pid,\n                         home_location_note, named_nurse_ref, consultant_ref,\n                         senior_review_at AS \"senior_review_at: _\", edd, ccd, ccd_met,\n                         discharge_pathway, discharge_ready_at AS \"discharge_ready_at: _\",\n                         discharged_at AS \"discharged_at: _\", discharge_destination, alerts,\n                         deleted_at AS \"deleted_at: _\"",
   "describe": {
     "columns": [
       {
@@ -309,5 +309,5 @@
       true
     ]
   },
-  "hash": "3f9b50e810cdecb4c483bd0e49b736639d5d89ca47e3a0c218b79ffe6ac6dba8"
+  "hash": "b8febba0c5f781dd787a5ee15ebd389e61073b96b60108f1bea349f86d846eec"
 }

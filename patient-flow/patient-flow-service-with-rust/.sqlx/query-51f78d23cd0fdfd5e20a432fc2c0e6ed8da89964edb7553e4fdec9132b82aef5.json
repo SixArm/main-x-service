@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE infection_flags SET updated_at = now(), status = 'cleared', cleared_at = $2 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "51f78d23cd0fdfd5e20a432fc2c0e6ed8da89964edb7553e4fdec9132b82aef5"
+}

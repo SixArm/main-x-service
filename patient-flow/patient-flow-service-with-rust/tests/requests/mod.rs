@@ -1,10 +1,13 @@
 //! Request-level test suites: topology CRUD in [`topology`], the
 //! admission→discharge journey + the double-placement race in
 //! [`flows`], and the board reads (whiteboard shape, ETag conditional
-//! GET, locate audit) in [`boards`].
+//! GET, locate audit) in [`boards`], and the persistence contracts
+//! (`updated_at`, the same-day `Red2Green` upsert, the relay poll's
+//! lock) in [`persistence`].
 
 mod boards;
 mod flows;
+mod persistence;
 mod topology;
 
 /// Build the demo topology one test needs: a site, one ward (kind /

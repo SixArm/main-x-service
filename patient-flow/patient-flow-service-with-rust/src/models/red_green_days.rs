@@ -45,32 +45,6 @@ impl Model {
         Ok(rows)
     }
 
-    /// One stay's entry for `day`, if recorded.
-    ///
-    /// # Errors
-    ///
-    /// When the query fails.
-    pub async fn for_stay_on(
-        db: impl Into<Db<'_>>,
-        stay_pid: Uuid,
-        day: NaiveDate,
-    ) -> ModelResult<Option<Self>> {
-        let mut conn = db.into().acquire().await?;
-        let row = sqlx::query_as!(
-            Self,
-            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
-                      id, stay_pid, day, classification, delay_reasons, note
-               FROM red_green_days
-               WHERE stay_pid = $1 AND day = $2
-               LIMIT 1"#,
-            stay_pid,
-            day,
-        )
-        .fetch_optional(&mut *conn)
-        .await?;
-        Ok(row)
-    }
-
     /// The entries for `day` of any of these stays (the whiteboard).
     ///
     /// # Errors
@@ -96,13 +70,20 @@ impl Model {
         Ok(rows)
     }
 
-    /// Record a new day, returning the row.
+    /// Record `day` for this stay, or rewrite it if the stay already has
+    /// an entry for that day, returning the row (PF-R1).
+    ///
+    /// One statement on the `red_green_stay_day` key, not a read then an
+    /// insert: two concurrent same-day POSTs each saw no row, and the
+    /// second insert then broke the unique index and answered `409`.
+    /// Here the second writer waits for the first to commit and updates
+    /// the day instead, so the later write wins, as a same-day edit does.
+    /// `created_at` keeps the first write's time; `updated_at` moves.
     ///
     /// # Errors
     ///
-    /// When the insert fails (a second row for the same stay and day is
-    /// a unique violation).
-    pub async fn insert(
+    /// When the statement fails.
+    pub async fn upsert(
         db: impl Into<Db<'_>>,
         stay_pid: Uuid,
         day: NaiveDate,
@@ -115,39 +96,15 @@ impl Model {
             Self,
             r#"INSERT INTO red_green_days (stay_pid, day, classification, delay_reasons, note)
                VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (stay_pid, day) DO UPDATE
+               SET updated_at = now(),
+                   classification = EXCLUDED.classification,
+                   delay_reasons = EXCLUDED.delay_reasons,
+                   note = EXCLUDED.note
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
                          id, stay_pid, day, classification, delay_reasons, note"#,
             stay_pid,
             day,
-            classification,
-            delay_reasons,
-            note,
-        )
-        .fetch_one(&mut *conn)
-        .await?;
-        Ok(row)
-    }
-
-    /// Rewrite the same-day entry with this `id`, returning it.
-    ///
-    /// # Errors
-    ///
-    /// When the update fails, or no row has this `id`.
-    pub async fn reclassify(
-        db: impl Into<Db<'_>>,
-        id: i64,
-        classification: &str,
-        delay_reasons: serde_json::Value,
-        note: Option<&str>,
-    ) -> ModelResult<Self> {
-        let mut conn = db.into().acquire().await?;
-        let row = sqlx::query_as!(
-            Self,
-            r#"UPDATE red_green_days SET classification = $2, delay_reasons = $3, note = $4
-               WHERE id = $1
-               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
-                         id, stay_pid, day, classification, delay_reasons, note"#,
-            id,
             classification,
             delay_reasons,
             note,

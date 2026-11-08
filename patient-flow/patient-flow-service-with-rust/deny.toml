@@ -6,27 +6,13 @@
 [advisories]
 version = 2
 yanked = "warn"
-# Transitive advisories carried by the shared Rust/axa dependency tree
-# (mostly via axa -> opendal / sqlx / async deps). They are not
-# fixable at the service/library level without an upstream axa bump,
-# so they are accepted here WITH this note and revisited on the next
-# axa upgrade. Matcher / library crates with small trees do not pull
-# these (an unused ignore is a harmless warning). Real, actionable
-# advisories NOT on this list still fail the build.
-ignore = [
-    "RUSTSEC-2024-0370", # proc-macro-error (unmaintained), transitive
-    "RUSTSEC-2024-0384", # instant (unmaintained), transitive
-    "RUSTSEC-2024-0436", # paste (unmaintained), transitive
-    "RUSTSEC-2024-0437", # protobuf recursion, transitive
-    "RUSTSEC-2024-0449", # unsafe-libyaml (unmaintained, no patch), transitive via axa -> serde_yaml
-    "RUSTSEC-2025-0052", # transitive advisory (loco tree)
-    "RUSTSEC-2026-0173", # transitive advisory (loco tree)
-    "RUSTSEC-2026-0190", # transitive advisory (loco tree)
-    "RUSTSEC-2026-0194", # transitive advisory (loco tree)
-    "RUSTSEC-2026-0195", # quick-xml namespace-declaration DoS, transitive (opendal)
-    "RUSTSEC-2026-0204", # transitive advisory (loco tree)
-    "RUSTSEC-2025-0057", # transitive advisory (loco tree)
-]
+# No advisory is ignored. The twelve this list used to carry came from
+# the loco-era dependency tree; on axa + sqlx none of them is reached,
+# and cargo-deny reported every one as `advisory-not-detected` (PF-D1).
+# An ignore that matches nothing hides the next real advisory with the
+# same id, so add one back only for an advisory this tree actually hits,
+# with its reason.
+ignore = []
 
 [licenses]
 version = 2

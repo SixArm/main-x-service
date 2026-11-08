@@ -12,7 +12,7 @@ use super::{a_person, seed_ward};
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
 async fn whiteboard_cards_and_etag_cycle() {
     request::<App, _, _>(|request, _ctx| async move {
         let (ward_pid, bed_pids) = seed_ward!(&request, "inpatient", None, 2).await;
@@ -81,7 +81,7 @@ async fn whiteboard_cards_and_etag_cycle() {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
 // At-a-glance counts the seeded topology and is itself conditional.
 async fn at_a_glance_counts_and_is_conditional() {
     request::<App, _, _>(|request, _ctx| async move {
@@ -123,7 +123,7 @@ async fn at_a_glance_counts_and_is_conditional() {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
 // Locate answers "where is patient X" and — because location is
 // personal data — writes a `locate_read` audit row (spec `audit.md`).
 async fn locate_finds_and_audits_the_read() {

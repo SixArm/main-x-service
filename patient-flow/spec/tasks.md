@@ -333,6 +333,46 @@ code + tests in one PR.
   suite 9, both as before. No record-integrity module, so INT-V1 does
   not apply. (PF-D3, PF-D9, PF-D12)
 
+## Found moving to sqlx (2026-11-08)
+
+All five were true under SeaORM too; the move kept them, and they are
+fixed here. Repo `tasks.md` carries the same IDs.
+
+- [x] PF-U1 **`updated_at` never changed.** No write set it and there is
+  no trigger, so it always equalled `created_at`. Every `UPDATE` in
+  `src/models/` (16, soft deletes and the relay ack included) now sets
+  `updated_at = now()` in the SQL. DB test
+  `an_update_moves_updated_at_forward` (ward `PUT`, bed transition, bay
+  `PUT`) failed before, passes after.
+- [x] PF-R1 **Concurrent same-day `Red2Green` POSTs answered `409`.** The
+  handler read today's row, then inserted or updated it, so two POSTs
+  that both read nothing both inserted and the second broke
+  `red_green_stay_day`. It is now one
+  `INSERT … ON CONFLICT (stay_pid, day) DO UPDATE`
+  (`red_green_days::Model::upsert`), in the same transaction as its
+  audit and outbox rows, returning the day's row as before; `insert`,
+  `reclassify` and the now-unused `for_stay_on` are gone. DB test
+  `two_same_day_red_green_writes_give_one_row` holds two transactions
+  open before either writes and commits them in order: before, the
+  second failed with `23505`; after, one row with the later write.
+- [x] PF-C1 **Loco-era `config/production.yaml`.** axa reads no config
+  file; the (git-ignored) file is deleted, and the edition spec's
+  "Config" line now describes the environment and `src/app.rs`
+  defaults. The tests' `#[ignore]` reasons and doc comments that named
+  `config/test.yaml` now name `DATABASE_URL`.
+- [x] PF-D1 **Stale counts and ignores.** README: 75 unit tests (was
+  64), 12 DB tests. `deny.toml`: all 12 advisory ignores were
+  `advisory-not-detected` on the axa + sqlx tree and are removed
+  (`ignore = []`); `cargo deny check` is clean.
+- [x] PF-O1 **Relay poll unused and unpinned.** No relay or drain loop
+  exists in this crate, but `spec/integrations.md` and `spec/audit.md`
+  specify the outbox → Fluvio relay (Phase 3), so
+  `event_outbox::Model::unpublished` / `mark_published` are kept for it
+  rather than removed. DB test
+  `a_second_relay_does_not_see_rows_the_first_holds` pins the
+  `FOR UPDATE SKIP LOCKED` (it fails with the clause removed) and the
+  ack. DB suite 9 → 12; unit tests 75, unchanged.
+
 ## Production gates (P0 — design-only until a real deployment)
 
 - [ ] PF-T-G1 Clinical safety case (DCB0129/0160) + named CSO.

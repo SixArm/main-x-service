@@ -20,8 +20,11 @@ tracing + OTLP, Podman.
 
 ## Edition-specific decisions (so far)
 
-- **Config**: `config/{development,test,production}.yaml`;
-  development and test default all upstream clients to `stub` and
+- **Config**: the environment only — there are no config files (axa
+  reads none). `APP_ENV`, `PORT`, `DATABASE_URL` and the rest of
+  `axa::config`, over the defaults in `src/app.rs` (`defaults()`). In
+  every environment the upstream clients default to `stub`
+  (`PATIENT_FLOW_UPSTREAM_MODE`) and events to
   `PATIENT_FLOW_EVENT_TRANSPORT=memory`.
 - **Env vars**: `PATIENT_FLOW_REQUIRE_AUTH`,
   `PATIENT_FLOW_PASETO_KEYS[_URL]`, `PATIENT_FLOW_ABAC_POLICY[_FILE]`,
@@ -60,10 +63,26 @@ tracing + OTLP, Podman.
   table (`_sqlx_migrations` for `seaql_migrations`), so a database the
   old build migrated must be recreated. `event_outbox` keeps its
   `SERIAL` (`integer`) id; every other table has a `bigint` identity.
-- **No `updated_at` maintenance**: no statement sets `updated_at`, and
-  there is no trigger, so it always equals `created_at`. That was true
-  under `SeaORM` too (its `ActiveModel` updates wrote only the fields
-  set), and is kept rather than fixed in the move.
+- **`updated_at` is stamped in the SQL** (PF-U1): every `UPDATE` that
+  changes a row — partial `PUT`s, transitions, soft deletes, the relay
+  ack — sets `updated_at = now()` itself, and the `Red2Green` upsert
+  does the same on its conflict branch. There is no trigger, so a
+  statement that leaves it out leaves it unchanged; under `SeaORM` (and
+  the first sqlx cut) none set it and it always equalled `created_at`.
+- **`Red2Green` is one upsert** (PF-R1): `POST /api/stays/{pid}/red-green`
+  writes `INSERT … ON CONFLICT (stay_pid, day) DO UPDATE` on the
+  `red_green_stay_day` key, inside the handler's transaction with its
+  audit and outbox rows, and answers the day's row as before. Two
+  concurrent same-day POSTs both succeed and leave one row, holding the
+  later write; the old read-then-insert let the second one break the
+  unique index and answer `409`.
+- **Outbox relay poll** (PF-O1): `event_outbox::Model::unpublished`
+  (oldest unpublished rows, `FOR UPDATE SKIP LOCKED`) and
+  `mark_published` are the poll and ack of the relay
+  [`../../spec/integrations.md`](../../spec/integrations.md) and
+  [`../../spec/audit.md`](../../spec/audit.md) specify (outbox → Fluvio,
+  Phase 3). No relay runs in this crate yet; they are kept for it, and a
+  DB test pins that a second relay does not see rows the first holds.
 - **Clients**: one `src/clients.rs` module (mode-switched `stub` /
   `http` via `PATIENT_FLOW_UPSTREAM_MODE`, default `stub`) rather
   than per-service trait modules — patient-flow needs only

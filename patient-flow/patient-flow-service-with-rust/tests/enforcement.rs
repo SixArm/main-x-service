@@ -7,7 +7,7 @@
 //! tokens + the matching key set in-process (no auth service needed).
 //!
 //! `#[ignore]`d: boots the app (needs PostgreSQL via
-//! `config/test.yaml` / `DATABASE_URL`). Run with
+//! `DATABASE_URL`). Run with
 //! `cargo test --test enforcement -- --ignored`.
 
 #![cfg(feature = "paseto")]
@@ -83,7 +83,7 @@ fn test_policy() -> String {
 /// read returns the **redacted** whiteboard.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test enforcement -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test --test enforcement -- --ignored`"]
 async fn enforcement_on_gates_and_masks_the_real_stack() {
     let (keys, kid) = keys_and_kid();
     // The auth OnceLocks read these on first use — set before boot.

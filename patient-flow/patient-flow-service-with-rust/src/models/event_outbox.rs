@@ -189,7 +189,7 @@ impl Model {
         }
         let mut conn = db.into().acquire().await?;
         let done = sqlx::query!(
-            "UPDATE event_outbox SET published_at = CURRENT_TIMESTAMP WHERE id = ANY($1)",
+            "UPDATE event_outbox SET updated_at = now(), published_at = CURRENT_TIMESTAMP WHERE id = ANY($1)",
             ids,
         )
         .execute(&mut *conn)

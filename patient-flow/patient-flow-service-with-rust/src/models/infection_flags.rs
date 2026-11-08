@@ -179,7 +179,7 @@ impl Model {
     ) -> ModelResult<()> {
         let mut conn = db.into().acquire().await?;
         let done = sqlx::query!(
-            "UPDATE infection_flags SET status = 'cleared', cleared_at = $2 WHERE id = $1",
+            "UPDATE infection_flags SET updated_at = now(), status = 'cleared', cleared_at = $2 WHERE id = $1",
             id,
             at,
         )

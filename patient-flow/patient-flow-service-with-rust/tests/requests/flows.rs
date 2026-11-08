@@ -13,7 +13,7 @@ use super::{a_person, seed_ward};
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
 #[allow(clippy::too_many_lines)] // the full journey is one narrative
 async fn full_journey_request_to_deep_clean() {
     request::<App, _, _>(|request, _ctx| async move {
@@ -223,7 +223,7 @@ async fn full_journey_request_to_deep_clean() {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
 // The double-placement race (PF-D9): two concurrent admits to the same
 // available bed produce exactly one 200 and one 422 — the `FOR UPDATE`
 // row lock serialises the placement check.

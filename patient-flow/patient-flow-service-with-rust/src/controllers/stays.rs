@@ -834,27 +834,17 @@ async fn red_green(
     }
     let today = chrono::Utc::now().date_naive();
     let mut txn = ctx.db.begin().await?;
-    let existing = red_green_days::Model::for_stay_on(&mut *txn, stay.pid, today).await?;
-    let row = if let Some(existing) = existing {
-        red_green_days::Model::reclassify(
-            &mut *txn,
-            existing.id,
-            &payload.classification,
-            serde_json::json!(payload.delay_reasons),
-            payload.note.as_deref(),
-        )
-        .await?
-    } else {
-        red_green_days::Model::insert(
-            &mut *txn,
-            stay.pid,
-            today,
-            &payload.classification,
-            serde_json::json!(payload.delay_reasons),
-            payload.note.as_deref(),
-        )
-        .await?
-    };
+    // One upsert on (stay, day), so a concurrent same-day POST updates
+    // the day rather than breaking the unique index (PF-R1).
+    let row = red_green_days::Model::upsert(
+        &mut *txn,
+        stay.pid,
+        today,
+        &payload.classification,
+        serde_json::json!(payload.delay_reasons),
+        payload.note.as_deref(),
+    )
+    .await?;
     let snapshot = serde_json::json!({
         "day": today.to_string(),
         "classification": payload.classification,

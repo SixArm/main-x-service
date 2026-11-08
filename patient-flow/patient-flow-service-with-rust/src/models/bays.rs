@@ -145,7 +145,7 @@ impl Model {
         let row = sqlx::query_as!(
             Self,
             r#"UPDATE bays
-               SET sex_designation = COALESCE($2, sex_designation),
+               SET updated_at = now(), sex_designation = COALESCE($2, sex_designation),
                    closed_to_admissions = COALESCE($3, closed_to_admissions)
                WHERE id = $1
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
@@ -171,9 +171,13 @@ impl Model {
         at: DateTime<FixedOffset>,
     ) -> ModelResult<()> {
         let mut conn = db.into().acquire().await?;
-        let done = sqlx::query!("UPDATE bays SET deleted_at = $2 WHERE id = $1", id, at)
-            .execute(&mut *conn)
-            .await?;
+        let done = sqlx::query!(
+            "UPDATE bays SET updated_at = now(), deleted_at = $2 WHERE id = $1",
+            id,
+            at
+        )
+        .execute(&mut *conn)
+        .await?;
         super::updated_one(done.rows_affected())
     }
 }
