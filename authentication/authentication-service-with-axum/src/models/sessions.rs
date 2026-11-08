@@ -1,13 +1,53 @@
-//! `sessions` model — issuance and revocation of access tokens.
+//! `sessions` model — issuance and revocation of cookie sessions.
 
 use std::collections::BTreeMap;
 
-use axa::prelude::*;
-use chrono::offset::Local;
-use sea_orm::QueryOrder;
+use chrono::{DateTime, FixedOffset, offset::Local};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-pub use super::_entities::sessions::{self, ActiveModel, Entity, Model};
+use super::{ModelError, ModelResult};
+
+/// A `sessions` row: one server-side cookie session, keyed by `jid` (the
+/// hash of the opaque session id the client presents) so the auth service
+/// can revoke it on signout.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row creation time.
+    pub created_at: DateTime<FixedOffset>,
+    /// Last update time.
+    pub updated_at: DateTime<FixedOffset>,
+    /// Internal autoincrement primary key.
+    pub id: i64,
+    /// SHA-256 of the opaque session id (SEC-A9); unique.
+    pub jid: String,
+    /// Owning user's `pid`.
+    pub user_pid: Uuid,
+    /// Token expiry.
+    pub expires_at: DateTime<FixedOffset>,
+    /// Set when the session is revoked via signout.
+    pub revoked_at: Option<DateTime<FixedOffset>>,
+    /// Best-effort user agent captured at issuance.
+    pub user_agent: Option<String>,
+    /// Session payload JSONB (shared authentication-sessions design §3).
+    /// Holds the user's ABAC attributes under `attrs`, copied at session
+    /// establishment so token minting reads only the session.
+    pub data: serde_json::Value,
+    /// When the session was last used (bumped on each `/me`). Nullable
+    /// for rows predating the TTL reshape.
+    pub last_seen_at: Option<DateTime<FixedOffset>>,
+    /// Sliding **idle** expiry: `now + idle TTL`, bumped on each use. A
+    /// session is expired once `now >= idle_expires_at`. Nullable (legacy
+    /// rows ⇒ no idle bound).
+    pub idle_expires_at: Option<DateTime<FixedOffset>>,
+    /// Hard **absolute** expiry: `now + absolute TTL` at issuance, never
+    /// extended. Nullable (legacy rows ⇒ no absolute bound).
+    pub absolute_expires_at: Option<DateTime<FixedOffset>>,
+    /// Best-effort connecting-peer address captured at issuance (T-14).
+    /// Nullable for rows predating this column.
+    pub source_ip: Option<String>,
+}
 
 /// Build the `sessions.data` JSONB payload for a new session: the user's
 /// ABAC `attributes` under the `attrs` member (shared
@@ -26,8 +66,6 @@ pub use super::_entities::sessions::{self, ActiveModel, Entity, Model};
 pub fn session_data(attributes: &serde_json::Value, csrf: &str) -> serde_json::Value {
     serde_json::json!({ "attrs": attributes, "csrf": crate::secret_hash::hash(csrf) })
 }
-
-impl ActiveModelBehavior for super::_entities::sessions::ActiveModel {}
 
 /// Default **idle** session TTL (seconds): 30 min. The idle window slides
 /// on each use (`/me`); a session expires once idle. Override with
@@ -86,7 +124,7 @@ impl Model {
     ///
     /// When the insert fails.
     pub async fn issue(
-        db: &DatabaseConnection,
+        db: &PgPool,
         jid: &str,
         user_pid: Uuid,
         user_agent: Option<String>,
@@ -104,24 +142,33 @@ impl Model {
                 "AUTH_SESSION_ABSOLUTE_TTL_SECS",
                 DEFAULT_ABSOLUTE_TTL_SECS,
             ));
-        let session = sessions::ActiveModel {
-            // SEC-A9: `jid` is the opaque session id the client presents (the
-            // cookie value + PASETO `sid` claim); the DB stores only its hash,
-            // so a read at rest yields nothing replayable. Lookups hash the
-            // presented id the same way (`find_by_jid`).
-            jid: ActiveValue::set(crate::secret_hash::hash(jid)),
-            user_pid: ActiveValue::set(user_pid),
-            expires_at: ActiveValue::set(absolute),
-            revoked_at: ActiveValue::set(None),
-            user_agent: ActiveValue::set(user_agent),
-            source_ip: ActiveValue::set(source_ip),
-            data: ActiveValue::set(data),
-            last_seen_at: ActiveValue::set(Some(now)),
-            idle_expires_at: ActiveValue::set(Some(idle)),
-            absolute_expires_at: ActiveValue::set(Some(absolute)),
-            ..Default::default()
-        }
-        .insert(db)
+        // SEC-A9: `jid` is the opaque session id the client presents (the
+        // cookie value + PASETO `sid` claim); the DB stores only its hash,
+        // so a read at rest yields nothing replayable. Lookups hash the
+        // presented id the same way (`find_by_jid`).
+        let session = sqlx::query_as!(
+            Self,
+            r#"INSERT INTO sessions
+                   (jid, user_pid, expires_at, revoked_at, user_agent, source_ip, data,
+                    last_seen_at, idle_expires_at, absolute_expires_at)
+               VALUES ($1, $2, $3, NULL, $4, $5, $6, $7, $8, $9)
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, jid, user_pid, expires_at AS "expires_at: _",
+                         revoked_at AS "revoked_at: _", user_agent, data,
+                         last_seen_at AS "last_seen_at: _",
+                         idle_expires_at AS "idle_expires_at: _",
+                         absolute_expires_at AS "absolute_expires_at: _", source_ip"#,
+            crate::secret_hash::hash(jid),
+            user_pid,
+            absolute,
+            user_agent,
+            source_ip,
+            data,
+            now,
+            idle,
+            absolute,
+        )
+        .fetch_one(db)
         .await?;
         Ok(session)
     }
@@ -134,8 +181,8 @@ impl Model {
     ///
     /// # Errors
     ///
-    /// When the update fails.
-    pub async fn touch(self, db: &DatabaseConnection) -> ModelResult<Model> {
+    /// When the update fails, or matches no row.
+    pub async fn touch(self, db: &PgPool) -> ModelResult<Model> {
         let now = Local::now().fixed_offset();
         let mut idle = now
             + chrono::Duration::seconds(ttl_secs(
@@ -147,25 +194,50 @@ impl Model {
         {
             idle = absolute;
         }
-        let mut active = self.into_active_model();
-        active.last_seen_at = ActiveValue::set(Some(now));
-        active.idle_expires_at = ActiveValue::set(Some(idle));
-        active.update(db).await.map_err(ModelError::from)
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE sessions
+               SET last_seen_at = $2, idle_expires_at = $3
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, jid, user_pid, expires_at AS "expires_at: _",
+                         revoked_at AS "revoked_at: _", user_agent, data,
+                         last_seen_at AS "last_seen_at: _",
+                         idle_expires_at AS "idle_expires_at: _",
+                         absolute_expires_at AS "absolute_expires_at: _", source_ip"#,
+            self.id,
+            now,
+            idle,
+        )
+        .fetch_optional(db)
+        .await?;
+        row.ok_or(ModelError::RecordNotUpdated)
     }
 
-    /// Find a session by its JWT id.
+    /// Find a session by its opaque id.
     ///
     /// # Errors
     ///
     /// When the session does not exist or the query fails.
-    pub async fn find_by_jid(db: &DatabaseConnection, jid: &str) -> ModelResult<Self> {
+    pub async fn find_by_jid(db: &PgPool, jid: &str) -> ModelResult<Self> {
         // SEC-A9: the DB stores the hash of the session id, so match on the
         // hash of the presented (cookie / `sid`-claim) value.
-        let session = sessions::Entity::find()
-            .filter(sessions::Column::Jid.eq(crate::secret_hash::hash(jid)))
-            .one(db)
-            .await?;
-        session.ok_or_else(|| ModelError::EntityNotFound)
+        let session = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, jid, user_pid, expires_at AS "expires_at: _",
+                      revoked_at AS "revoked_at: _", user_agent, data,
+                      last_seen_at AS "last_seen_at: _",
+                      idle_expires_at AS "idle_expires_at: _",
+                      absolute_expires_at AS "absolute_expires_at: _", source_ip
+               FROM sessions
+               WHERE jid = $1
+               LIMIT 1"#,
+            crate::secret_hash::hash(jid),
+        )
+        .fetch_optional(db)
+        .await?;
+        session.ok_or(ModelError::EntityNotFound)
     }
 
     /// All sessions for a user, newest first. Used by the GDPR account
@@ -176,14 +248,25 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn find_all_by_user_pid(
-        db: &DatabaseConnection,
+        db: impl Into<axa::sqlx::Db<'_>>,
         user_pid: Uuid,
     ) -> ModelResult<Vec<Self>> {
-        let rows = sessions::Entity::find()
-            .filter(sessions::Column::UserPid.eq(user_pid))
-            .order_by_desc(sessions::Column::Id)
-            .all(db)
-            .await?;
+        let mut conn = db.into().acquire().await?;
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, jid, user_pid, expires_at AS "expires_at: _",
+                      revoked_at AS "revoked_at: _", user_agent, data,
+                      last_seen_at AS "last_seen_at: _",
+                      idle_expires_at AS "idle_expires_at: _",
+                      absolute_expires_at AS "absolute_expires_at: _", source_ip
+               FROM sessions
+               WHERE user_pid = $1
+               ORDER BY id DESC"#,
+            user_pid,
+        )
+        .fetch_all(&mut *conn)
+        .await?;
         Ok(rows)
     }
 
@@ -192,18 +275,22 @@ impl Model {
     /// their original revocation timestamp survives. Returns the number
     /// of sessions newly revoked.
     ///
+    /// Separate statements on one connection, not a transaction, as
+    /// before: each revocation commits on its own.
+    ///
     /// # Errors
     ///
     /// When a query or update fails.
     pub async fn revoke_all_for_user(
-        db: &DatabaseConnection,
+        db: impl Into<axa::sqlx::Db<'_>>,
         user_pid: Uuid,
     ) -> ModelResult<usize> {
-        let sessions = Self::find_all_by_user_pid(db, user_pid).await?;
+        let mut conn = db.into().acquire().await?;
+        let sessions = Self::find_all_by_user_pid(&mut *conn, user_pid).await?;
         let mut revoked = 0;
         for session in sessions {
             if session.is_active() {
-                session.into_active_model().revoke(db).await?;
+                session.revoke(&mut *conn).await?;
                 revoked += 1;
             }
         }
@@ -218,19 +305,32 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn scrub_user_agent_for_user(
-        db: &DatabaseConnection,
-        user_pid: Uuid,
-    ) -> ModelResult<u64> {
-        let res = sessions::Entity::update_many()
-            .col_expr(
-                sessions::Column::UserAgent,
-                sea_orm::sea_query::Expr::value(Option::<String>::None),
-            )
-            .filter(sessions::Column::UserPid.eq(user_pid))
-            .exec(db)
-            .await?;
-        Ok(res.rows_affected)
+    pub async fn scrub_user_agent_for_user(db: &PgPool, user_pid: Uuid) -> ModelResult<u64> {
+        let res = sqlx::query!(
+            "UPDATE sessions SET user_agent = NULL WHERE user_pid = $1",
+            user_pid,
+        )
+        .execute(db)
+        .await?;
+        Ok(res.rows_affected())
+    }
+
+    /// Empty `source_ip` on every session older than `days` (the address
+    /// retention sweep, `crate::compliance::address_retention`). Returns
+    /// the number of rows emptied.
+    ///
+    /// # Errors
+    ///
+    /// When the update fails.
+    pub async fn scrub_source_ip_older_than(db: &PgPool, days: i32) -> Result<u64, sqlx::Error> {
+        let res = sqlx::query!(
+            "UPDATE sessions SET source_ip = NULL
+             WHERE source_ip IS NOT NULL AND created_at < now() - make_interval(days => $1)",
+            days,
+        )
+        .execute(db)
+        .await?;
+        Ok(res.rows_affected())
     }
 
     /// True when the session is valid: not revoked, and `now` is before
@@ -268,17 +368,31 @@ impl Model {
     pub fn csrf(&self) -> Option<&str> {
         self.data.get("csrf").and_then(serde_json::Value::as_str)
     }
-}
 
-impl ActiveModel {
     /// Mark this session revoked (signout).
     ///
     /// # Errors
     ///
-    /// When the update fails.
-    pub async fn revoke(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
-        self.revoked_at = ActiveValue::set(Some(Local::now().into()));
-        self.update(db).await.map_err(ModelError::from)
+    /// When the update fails, or matches no row.
+    pub async fn revoke(self, db: impl Into<axa::sqlx::Db<'_>>) -> ModelResult<Model> {
+        let mut conn = db.into().acquire().await?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE sessions
+               SET revoked_at = $2
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, jid, user_pid, expires_at AS "expires_at: _",
+                         revoked_at AS "revoked_at: _", user_agent, data,
+                         last_seen_at AS "last_seen_at: _",
+                         idle_expires_at AS "idle_expires_at: _",
+                         absolute_expires_at AS "absolute_expires_at: _", source_ip"#,
+            self.id,
+            Local::now().fixed_offset(),
+        )
+        .fetch_optional(&mut *conn)
+        .await?;
+        row.ok_or(ModelError::RecordNotUpdated)
     }
 }
 

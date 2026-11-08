@@ -5,12 +5,11 @@
 
 use authentication_service::{
     app::App,
-    models::users::{self, Model, RegisterParams},
+    models::users::{self, Model, NewUser, RegisterParams},
 };
 use axa::testing::prelude::*;
 use chrono::{Duration, offset::Local};
 use insta::assert_debug_snapshot;
-use sea_orm::{ActiveModelTrait, ActiveValue, IntoActiveModel};
 use serial_test::serial;
 
 macro_rules! configure_insta {
@@ -34,13 +33,13 @@ async fn test_can_validate_model() {
         .await
         .expect("Failed to boot test application");
 
-    let invalid_user = users::ActiveModel {
-        name: ActiveValue::set("1".to_string()),
-        email: ActiveValue::set("invalid-email".to_string()),
-        ..Default::default()
+    let invalid_user = NewUser {
+        name: "1",
+        email: "invalid-email",
+        password: "",
     };
 
-    let res = invalid_user.insert(&boot.app_context.db).await;
+    let res = Model::insert(&boot.app_context.db, invalid_user).await;
 
     assert_debug_snapshot!(res);
 }
@@ -175,10 +174,7 @@ async fn can_verification_token() {
         "Expected no email verification token"
     );
 
-    let result = user
-        .into_active_model()
-        .set_email_verification_sent(&boot.app_context.db)
-        .await;
+    let result = user.set_email_verification_sent(&boot.app_context.db).await;
 
     assert!(result.is_ok(), "Failed to set email verification sent");
 
@@ -220,10 +216,7 @@ async fn can_verified() {
         "Expected email to be unverified"
     );
 
-    let result = user
-        .into_active_model()
-        .verified(&boot.app_context.db)
-        .await;
+    let result = user.verified(&boot.app_context.db).await;
 
     assert!(result.is_ok(), "Failed to mark email as verified");
 
@@ -263,7 +256,6 @@ async fn can_reset_password() {
 
     let result = user
         .clone()
-        .into_active_model()
         .reset_password(&boot.app_context.db, "new-password")
         .await;
 
@@ -302,10 +294,7 @@ async fn magic_link() {
         "Magic link expiration should be initially unset"
     );
 
-    let create_result = user
-        .into_active_model()
-        .create_magic_link(&boot.app_context.db)
-        .await;
+    let create_result = user.create_magic_link(&boot.app_context.db).await;
 
     assert!(
         create_result.is_ok(),

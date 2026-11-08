@@ -17,8 +17,8 @@ attributes live in the person entity).
 
 **Files:**
 [`src/models/users.rs`](../authentication-service-with-axum/src/models/users.rs),
-entity in `src/models/_entities/users.rs`, migration
-[`m20220101_000001_users.rs`](../authentication-service-with-axum/src/migration/m20220101_000001_users.rs).
+migration
+[`2022010100000001_users.up.sql`](../authentication-service-with-axum/migrations/2022010100000001_users.up.sql).
 
 | Field | Type | Description |
 |---|---|---|
@@ -38,9 +38,9 @@ entity in `src/models/_entities/users.rs`, migration
 **Key methods:** `create_passwordless(db, email, name)`,
 `find_by_email`, `find_by_pid`, `find_active_by_pid` (excludes
 GDPR-erased accounts), `is_deleted()`, `find_by_magic_token` (enforces
-expiry), `ActiveModel::create_magic_link`,
-`ActiveModel::clear_magic_link`, `ActiveModel::verified`,
-`ActiveModel::erase` (GDPR soft-delete + anonymise). The pure
+expiry), `consume_magic_token` (SEC-A4 atomic single-use),
+`create_magic_link`, `clear_magic_link`, `verified`,
+`erase` (GDPR soft-delete + anonymise). The pure
 `tombstone_email(pid)` + `TOMBSTONE_NAME` shape the anonymised values.
 
 ## Session
@@ -56,7 +56,7 @@ tracked in the service spec §13.
 **Files:**
 [`src/models/sessions.rs`](../authentication-service-with-axum/src/models/sessions.rs),
 migration
-[`m20220101_000002_sessions.rs`](../authentication-service-with-axum/src/migration/m20220101_000002_sessions.rs).
+[`2022010100000002_sessions.up.sql`](../authentication-service-with-axum/migrations/2022010100000002_sessions.up.sql).
 
 | Field | Type | Description |
 |---|---|---|
@@ -70,7 +70,7 @@ migration
 **Key methods:** `issue(db, jid, user_pid, expires_at, user_agent)`,
 `find_by_jid`, `find_all_by_user_pid` (export), `is_active()` (=
 `revoked_at.is_none()`), `revoke_all_for_user` (GDPR erasure),
-`ActiveModel::revoke`.
+`revoke`.
 
 ## Claims (cross-crate contract)
 

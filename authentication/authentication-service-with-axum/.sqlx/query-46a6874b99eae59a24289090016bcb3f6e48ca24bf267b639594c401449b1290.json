@@ -1,0 +1,174 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sessions\n               SET last_seen_at = $2, idle_expires_at = $3\n               WHERE id = $1\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, jid, user_pid, expires_at AS \"expires_at: _\",\n                         revoked_at AS \"revoked_at: _\", user_agent, data,\n                         last_seen_at AS \"last_seen_at: _\",\n                         idle_expires_at AS \"idle_expires_at: _\",\n                         absolute_expires_at AS \"absolute_expires_at: _\", source_ip",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "jid",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "jid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "user_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "user_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "expires_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "revoked_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "revoked_at"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "user_agent",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "user_agent"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "data",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "data"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "last_seen_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "last_seen_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "idle_expires_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "idle_expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "absolute_expires_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "absolute_expires_at"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "source_ip",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "sessions",
+            "name": "source_ip"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "46a6874b99eae59a24289090016bcb3f6e48ca24bf267b639594c401449b1290"
+}

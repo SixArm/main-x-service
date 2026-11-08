@@ -7,7 +7,6 @@ use authentication_service::{
     secret_hash,
 };
 use axa::testing::prelude::*;
-use sea_orm::EntityTrait;
 use serial_test::serial;
 use uuid::Uuid;
 
@@ -41,8 +40,8 @@ async fn session_secrets_are_hashed_at_rest() {
     .expect("issue session");
 
     // Read the raw row straight from the table (no lookup helper in the way).
-    let row = sessions::Entity::find_by_id(issued.id)
-        .one(&boot.app_context.db)
+    let row = sqlx::query!("SELECT jid, data FROM sessions WHERE id = $1", issued.id)
+        .fetch_optional(&boot.app_context.db)
         .await
         .expect("query session")
         .expect("session row exists");

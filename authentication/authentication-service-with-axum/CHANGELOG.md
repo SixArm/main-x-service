@@ -10,6 +10,37 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed
+
+- Persistence moved from SeaORM to sqlx (spec/tech-stack §5). Every
+  statement is a `query!` / `query_as!` / `query_scalar!` literal in
+  `src/models/`, checked against the committed `.sqlx/`; the rate
+  limiter's, the address-retention sweep's and the audit-verify read's
+  SQL moved there, into the new `models::auth_rate_limits` and the
+  `auth_events` / `sessions` models. The twelve migrations under
+  `src/migration/` are now plain SQL under `migrations/`, run by
+  `sqlx::migrate!` through `axa::sqlx`; `pg_dump --schema-only` of old
+  and new is identical apart from `seaql_migrations` → `_sqlx_migrations`,
+  so a database the old build migrated must be recreated.
+- `models::_entities` and `ActiveModel` are gone. Updates are `Model`
+  methods (`user.create_magic_link(&db)`, `session.revoke(&db)`, …) that
+  write only the columns they change, keyed by `id`, after validating
+  name and email as `before_save` did. `models::ModelError` replaces
+  `axa::prelude::ModelError` with the same variant names and HTTP
+  answers; a SeaORM `DbErr::Custom` validation failure is now
+  `ModelError::Custom`, and `RecordNotUpdated` is `ModelError::RecordNotUpdated`.
+- `rate_limit::reset` and `compliance::address_retention::scrub` return
+  `sqlx::Error` instead of `DbErr`.
+- `database.enable_logging` no longer reaches the driver: sqlx logs
+  statement summaries at DEBUG and slow statements at WARN. `db status`
+  prints one `version  applied|pending  description` line per migration
+  to stdout.
+
+### Removed
+
+- `sea-orm`, `sea-orm-migration`, and the unused direct `async-trait`
+  dependency. Unique normal dependencies fall from 310 to 271.
+
 ### Added
 
 - Request limits per client through `axa::ratelimit`, in

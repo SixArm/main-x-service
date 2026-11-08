@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT source_ip FROM auth_events WHERE email = $1 LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "source_ip",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "source_ip"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "cf65bc5a28c446a777d360a4bd02d56191a22578f8d25fd4a8321458a35b133c"
+}

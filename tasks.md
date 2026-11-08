@@ -8591,3 +8591,18 @@ All five fixed 2026-11-08; see `patient-flow/spec/tasks.md`.
 - [x] **PF-O1 (S)** The relay helpers `unpublished` / `mark_published` are
   unused and nothing pins their `FOR UPDATE SKIP LOCKED`; wire or remove
   them, and add the two-relay DB test the other crates have.
+
+## Found 2026-11-08 (moving authentication to sqlx)
+
+All were there on SeaORM, and the move keeps them as they were.
+
+- [ ] **AU-G1 (S)** GDPR erasure in `delete_account` is four statements
+  with no transaction (revoke sessions, erase the user, scrub
+  `auth_events.email`, scrub session user agents), though the model docs
+  say the controller owns that boundary. A failure part-way leaves a user
+  half erased. Run them in one transaction, with a DB test that a failure
+  in the last step leaves nothing changed.
+- [ ] **AU-T1 (S)** `db truncate` never clears `auth_rate_limits`, so a
+  truncated database still rate-limits addresses it no longer knows.
+- [ ] **AU-D1 (S)** `authentication/spec/10-persistence.md` describes a
+  `sid`-primary-key sessions table that never shipped.

@@ -20,7 +20,7 @@
 FROM rust:1.97-slim AS builder
 
 # Build dependencies — `libssl-dev` for openssl-sys, `libpq-dev` for
-# the PostgreSQL C client headers SeaORM links against via sqlx.
+# the PostgreSQL C client headers (sqlx itself is pure Rust).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         libssl-dev \
@@ -40,27 +40,30 @@ COPY integrity/integrity-mac-rust-crate integrity/integrity-mac-rust-crate
 COPY authentication/authentication-verifier-rust-crate authentication/authentication-verifier-rust-crate
 
 # This crate itself: manifests first (better layer caching), then the
-# in-crate `migration` module (unlike the entity services, this
-# crate's migrator lives at src/migration/ per its own AGENTS.md, not
-# a separate sibling `migration` package — it travels with `src` below
-# regardless), then sources.
+# plain-SQL migrations `sqlx::migrate!` embeds, then the `.sqlx/` query
+# data the `query!` macros check against (no database at build time),
+# then sources.
 COPY authentication/authentication-service-with-axum/Cargo.toml authentication/authentication-service-with-axum/Cargo.lock authentication/authentication-service-with-axum/
+COPY authentication/authentication-service-with-axum/migrations authentication/authentication-service-with-axum/migrations
+COPY authentication/authentication-service-with-axum/.sqlx authentication/authentication-service-with-axum/.sqlx
 COPY authentication/authentication-service-with-axum/src authentication/authentication-service-with-axum/src
 
 WORKDIR /app/authentication/authentication-service-with-axum
 
+# The `query!` macros read `.sqlx/` instead of a live database.
+ENV SQLX_OFFLINE=true
+
 # Build the binary target declared by src/bin/main.rs (Cargo package
 # name authentication-service-cli — this crate names its binary
-# differently from its package/directory name). Migration SQL is
-# embedded into the binary at compile time via `include_str!`
-# (agents/share/architecture.md), so the runtime stage below needs no
-# loose migration files.
+# differently from its package/directory name). The migration SQL is
+# embedded into the binary at compile time by `sqlx::migrate!`, so the
+# runtime stage below needs no loose migration files.
 RUN cargo build --release --bin authentication-service-cli
 
 # Stage 2: runtime — minimal Debian 13 slim base.
 FROM debian:13-slim
 
-# Runtime libraries. libpq5 for the SeaORM PostgreSQL connector,
+# Runtime libraries. libpq5 for the PostgreSQL client,
 # libssl3 for openssl, ca-certificates for HTTPS chains, curl for the
 # HEALTHCHECK below.
 RUN apt-get update && apt-get install -y --no-install-recommends \

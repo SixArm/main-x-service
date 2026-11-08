@@ -42,9 +42,7 @@ pub mod initializers;
 pub mod mailers;
 /// Prometheus metrics registry + `/metrics.prom` rendering.
 pub mod metrics;
-/// Database migrations (`SeaORM` / axa migrator).
-pub mod migration;
-/// Domain models and generated `SeaORM` entities.
+/// The row types and every SQL statement the service runs.
 pub mod models;
 /// OIDC identity federation (EV-2): config + claim mapping. Compiled
 /// only under the `oidc` Cargo feature — a deployment that never

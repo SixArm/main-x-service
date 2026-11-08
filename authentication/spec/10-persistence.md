@@ -1,14 +1,18 @@
 ## 10. Persistence
 
-### 10.1 Service — PostgreSQL via SeaORM
+### 10.1 Service — PostgreSQL via sqlx
 
-Migrations (`sea-orm-migration`, registered in
-[`src/migration/mod.rs`](../authentication-service-with-axum/src/migration/mod.rs)):
-`m20220101_000001_users`, `m20220101_000002_sessions` (replaced by the
-cookie-session schema below — see the pivot note), `m20220101_000003_auth_events`,
-and the pivot's new `m2026..._sessions_cookie` (the
-`sid`/`data`/idle+absolute-TTL schema). `auto_migrate` is on in
-development, off in production.
+sqlx, no ORM (2026-11-08): every statement is a compile-checked
+`query!` / `query_as!` / `query_scalar!` literal in
+[`src/models/`](../authentication-service-with-axum/src/models/), and the
+schema is plain SQL under
+[`migrations/`](../authentication-service-with-axum/migrations/), run by
+`sqlx::migrate!` — `2022010100000001_users`, `…02_sessions`,
+`…03_auth_events`, and the later column migrations through
+`2026090600000002_auth_events_source_ip` (the service spec §10 lists
+them all). The cookie-session reshape landed as added columns on the
+existing `sessions` table rather than a new one (see the pivot note).
+`auto_migrate` is on in development, off in production.
 
 > **Pivot (2026-06-17).** The old `sessions` table (one row per issued
 > JWT, keyed by `jid` = `jti`) is replaced by the server-side
@@ -17,7 +21,7 @@ development, off in production.
 > §3. The migration is a §13 T-12 follow-up.
 
 **`users`** (from
-[`m20220101_000001_users.rs`](../authentication-service-with-axum/src/migration/m20220101_000001_users.rs)):
+[`2022010100000001_users.up.sql`](../authentication-service-with-axum/migrations/2022010100000001_users.up.sql)):
 
 | Column | Type | Notes |
 |---|---|---|
@@ -51,7 +55,7 @@ Partial index `sessions_user ON (user_pid) WHERE revoked_at IS NULL`.
 Valid iff `revoked_at IS NULL AND now() < idle_expires_at AND now() < absolute_expires_at`.
 
 **`auth_events`** (from
-[`m20220101_000003_auth_events.rs`](../authentication-service-with-axum/src/migration/m20220101_000003_auth_events.rs)) —
+[`2022010100000003_auth_events.up.sql`](../authentication-service-with-axum/migrations/2022010100000003_auth_events.up.sql)) —
 the durable authentication audit trail (T-10, §12):
 
 | Column | Type | Notes |

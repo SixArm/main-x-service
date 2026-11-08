@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM auth_rate_limits",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "8c9e688510208ac04afbbed63b1e0a5188a8c8974b0faaa563e0ae91c266aa9a"
+}

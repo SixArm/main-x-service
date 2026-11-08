@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sessions SET user_agent = NULL WHERE user_pid = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "029c2de9f36df805a984a630efb63087a2c1d9a8f04d45fd395e84598a055ae7"
+}

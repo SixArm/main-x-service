@@ -1,12 +1,12 @@
 //! `users` model — passwordless magic-link accounts.
 //!
-//! Layers the magic-link domain logic over the generated `users` entity.
+//! The `users` row type and every statement that reads or writes it.
 //! This is a **passwordless** service: no login path ever checks a
 //! password. The `password` column exists only to satisfy `NOT NULL`,
 //! and `Model::create_passwordless` fills it with the hash of an
 //! unguessable random value. The loco-scaffold password/reset helpers
 //! (`RegisterParams`, `Model::create_with_password`,
-//! `ActiveModel::reset_password`, …) are kept for parity with the axa
+//! `Model::reset_password`, …) are kept for parity with the axa
 //! template but are not wired into any route.
 //!
 //! `Model::generate_jwt` was removed on 2026-08-21. It was the only
@@ -16,28 +16,94 @@
 //! (`agents/share/jwt.md`), so scaffold parity was costing a standing
 //! security advisory for a function nothing called.
 //!
-//! The magic-link surface (`ActiveModel::create_magic_link` /
-//! `Model::find_by_magic_token` / `ActiveModel::clear_magic_link`)
-//! and the GDPR erasure surface (`ActiveModel::erase` +
-//! `Model::find_active_by_pid`) are the parts that matter here. Tokens
-//! are short-lived (`MAGIC_LINK_EXPIRATION_MIN`) and single-use (cleared
-//! on redemption).
+//! The magic-link surface (`Model::create_magic_link` /
+//! `Model::consume_magic_token` / `Model::clear_magic_link`) and the
+//! GDPR erasure surface (`Model::erase` + `Model::find_active_by_pid`)
+//! are the parts that matter here. Tokens are short-lived
+//! (`MAGIC_LINK_EXPIRATION_MIN`) and single-use (cleared on redemption).
+//!
+//! Every write validates the row's name and email first, on insert and on
+//! every update, as the `SeaORM` era's `before_save` hook did; an insert
+//! also assigns the `pid` and `api_key` there, never the caller. An update
+//! writes only the columns it changes, keyed by `id`, and a write that
+//! matches no row is [`ModelError::RecordNotUpdated`].
 
 use std::collections::BTreeMap;
 
-use axa::prelude::*;
-use chrono::{Duration, offset::Local};
-use sea_orm::FromQueryResult;
-use sea_orm::sea_query::{Expr, ExprTrait, Func};
+use chrono::{DateTime, Duration, FixedOffset, offset::Local};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
+use sqlx::PgPool;
 use uuid::Uuid;
 use validator::Validate;
 
-/// Re-export the generated `users` entity (module + `ActiveModel` /
-/// `Entity` / `Model`) so callers use `users::Model` etc. through this
-/// domain module rather than reaching into `_entities`.
-pub use super::_entities::users::{self, ActiveModel, Entity, Model};
+use super::{ModelError, ModelResult};
+
+/// A `users` row. Holds the magic-link credentials plus the loco-scaffold
+/// password/reset fields (unused by the passwordless flow). Note that
+/// `password`/`api_key`/`*_token` are **secrets**: views never serialise
+/// them (see [`crate::views::auth`]).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row creation time.
+    pub created_at: DateTime<FixedOffset>,
+    /// Last update time.
+    pub updated_at: DateTime<FixedOffset>,
+    /// Internal autoincrement primary key (never exposed externally).
+    pub id: i64,
+    /// Public id — the stable external UUID used in tokens (`sub`) and
+    /// URLs; assigned on insert, not by the caller.
+    pub pid: Uuid,
+    /// Account email (unique). Anonymised to a tombstone on GDPR erasure.
+    pub email: String,
+    /// Password hash. **Unusable** in the passwordless flow — holds the
+    /// hash of a random value no login path checks. Never serialised.
+    pub password: String,
+    /// Per-user api key (unique), assigned on insert. Secret.
+    pub api_key: String,
+    /// Display name. Anonymised to a tombstone on GDPR erasure.
+    pub name: String,
+    /// Password-reset token (Loco scaffold; unused by passwordless flow).
+    pub reset_token: Option<String>,
+    /// When the reset token was sent (Loco scaffold; unused).
+    pub reset_sent_at: Option<DateTime<FixedOffset>>,
+    /// Email-verification token (Loco scaffold; unused — magic-link
+    /// redemption verifies the email instead).
+    pub email_verification_token: Option<String>,
+    /// When the verification email was sent (Loco scaffold; unused).
+    pub email_verification_sent_at: Option<DateTime<FixedOffset>>,
+    /// When the email was verified, if ever (set on first magic-link
+    /// redemption).
+    pub email_verified_at: Option<DateTime<FixedOffset>>,
+    /// Live, single-use magic-link token. Secret; cleared on redemption
+    /// and on erasure; never serialised into a response.
+    pub magic_link_token: Option<String>,
+    /// Expiry of the live magic-link token (a few minutes after issue).
+    pub magic_link_expiration: Option<DateTime<FixedOffset>>,
+    /// Set by GDPR Art. 17 erasure: when present the account is
+    /// soft-deleted (and its `email`/`name` anonymised to a tombstone),
+    /// and every read path must treat the user as gone.
+    pub deleted_at: Option<DateTime<FixedOffset>>,
+    /// ABAC subject attributes — a JSONB string→strings map (e.g.
+    /// `{"access": ["write"]}`) minted into the PASETO `attrs` claim.
+    /// Defaults to `{}` (read-only under the family's default policy)
+    /// until an operator assigns attributes. See
+    /// `agents/share/authorization-attributes.md` §6.
+    pub attributes: serde_json::Value,
+}
+
+/// The columns a new row is inserted with; every other column takes its
+/// default. `pid` and `api_key` are not here: [`Model::insert`] assigns
+/// them, so they can never be spoofed via the API.
+#[derive(Debug, Clone, Copy)]
+pub struct NewUser<'a> {
+    /// Account email.
+    pub email: &'a str,
+    /// Password hash.
+    pub password: &'a str,
+    /// Display name.
+    pub name: &'a str,
+}
 
 /// SEC-A6 — canonicalise an email for **account identity**: trim + lowercase.
 ///
@@ -50,21 +116,6 @@ pub use super::_entities::users::{self, ActiveModel, Entity, Model};
 #[must_use]
 pub fn normalize_email(email: &str) -> String {
     email.trim().to_lowercase()
-}
-
-/// SEC-A6 — the case-insensitive account-identity predicate:
-/// `LOWER(email) = <normalised>`.
-///
-/// Built from sea-query's typed `LOWER()` rather than
-/// `Expr::cust_with_values("LOWER(email) = ?", …)`. The custom form emits
-/// the `?` **verbatim**, which is the `MySQL` placeholder where Postgres
-/// wants `$n` — so the driver sent `... WHERE LOWER(email) = ? LIMIT $1` and
-/// Postgres rejected it with `syntax error at or near "LIMIT"`. That
-/// broke every email lookup: signup, magic-link request, and the
-/// duplicate-account guard. Nothing caught it because the failure needs a
-/// real Postgres to appear at all.
-fn lower_email_eq(normalised: &str) -> sea_orm::sea_query::SimpleExpr {
-    Expr::expr(Func::lower(Expr::col(users::Column::Email))).eq(normalised)
 }
 
 /// Length (chars) of a generated magic-link token.
@@ -161,7 +212,7 @@ pub struct RegisterParams {
     pub name: String,
 }
 
-/// Field validator for the user `ActiveModel` (name length + email).
+/// Field validator for a `users` row (name length + email).
 #[derive(Debug, Validate, Deserialize)]
 pub struct Validator {
     /// Display name — at least two characters.
@@ -172,18 +223,17 @@ pub struct Validator {
     pub email: String,
 }
 
-impl ActiveModel {
-    /// Check the name and email, reporting failures as a `DbErr` whose text
-    /// is a JSON map of field name to error list.
-    fn validate(&self) -> Result<(), DbErr> {
-        let fields = Validator {
-            name: self.name.as_ref().to_owned(),
-            email: self.email.as_ref().to_owned(),
-        };
-        fields
-            .validate()
-            .map_err(|errors| DbErr::Custom(validation_json(&errors)))
-    }
+/// Check a row's name and email before it is written, reporting failures
+/// as [`ModelError::Custom`] whose text is a JSON map of field name to
+/// error list.
+fn validate(name: &str, email: &str) -> ModelResult<()> {
+    let fields = Validator {
+        name: name.to_owned(),
+        email: email.to_owned(),
+    };
+    fields
+        .validate()
+        .map_err(|errors| ModelError::Custom(validation_json(&errors)))
 }
 
 /// Render validation errors as `{"field":[{"code":..,"message":..}]}`.
@@ -202,51 +252,78 @@ fn validation_json(errors: &validator::ValidationErrors) -> String {
     serde_json::to_string(&fields).unwrap_or_default()
 }
 
-#[async_trait::async_trait]
-impl ActiveModelBehavior for super::_entities::users::ActiveModel {
-    /// `SeaORM` hook run before every insert/update. Always validates the
-    /// fields; on **insert** it also assigns the public id (`pid`, a fresh
-    /// UUID v4 — the stable external identifier, distinct from the
-    /// internal autoincrement `id`) and a random `api_key`. Both are set
-    /// here, not by the caller, so they can never be spoofed via the API.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `DbErr` when validation fails.
-    async fn before_save<C>(self, _db: &C, insert: bool) -> Result<Self, DbErr>
-    where
-        C: ConnectionTrait,
-    {
-        self.validate()?;
-        if insert {
-            let mut this = self;
-            this.pid = ActiveValue::Set(Uuid::new_v4());
-            this.api_key = ActiveValue::Set(format!("lo-{}", Uuid::new_v4()));
-            Ok(this)
-        } else {
-            Ok(self)
-        }
-    }
+/// An update by `id` that returned no row matched none.
+fn updated(row: Option<Model>) -> ModelResult<Model> {
+    row.ok_or(ModelError::RecordNotUpdated)
 }
 
 impl Model {
+    /// Insert a new row, validated first. Assigns the public id (`pid`, a
+    /// fresh UUID v4 — the stable external identifier, distinct from the
+    /// internal autoincrement `id`) and a random `api_key`, so neither can
+    /// be spoofed via the API.
+    ///
+    /// # Errors
+    ///
+    /// [`ModelError::Custom`] when validation fails, before anything is
+    /// written; otherwise when the insert fails (a taken email or api key
+    /// is a unique violation).
+    pub async fn insert(db: impl Into<axa::sqlx::Db<'_>>, new: NewUser<'_>) -> ModelResult<Self> {
+        validate(new.name, new.email)?;
+        let mut conn = db.into().acquire().await?;
+        let user = sqlx::query_as!(
+            Self,
+            r#"INSERT INTO users (pid, email, password, api_key, name)
+               VALUES ($1, $2, $3, $4, $5)
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            Uuid::new_v4(),
+            new.email,
+            new.password,
+            format!("lo-{}", Uuid::new_v4()),
+            new.name,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
+        Ok(user)
+    }
+
     /// finds a user by the provided email
     ///
     /// # Errors
     ///
     /// When could not find user by the given token or DB query error
-    pub async fn find_by_email(db: &DatabaseConnection, email: &str) -> ModelResult<Self> {
+    pub async fn find_by_email(db: &PgPool, email: &str) -> ModelResult<Self> {
         // SEC-A6: email is case-insensitive — look up `LOWER(email)` against
         // the normalised (trimmed + lowercased) input, so `Victim@x` and
         // `victim@x` resolve to the **same** account and no case variant can
         // spawn a duplicate. (Account identity is case-only: `+tag` / Gmail
         // dot folding is deliberately NOT applied here — those are the
         // throttle bucket's concern, not identity; see `rate_limit`.)
-        let user = users::Entity::find()
-            .filter(lower_email_eq(&normalize_email(email)))
-            .one(db)
-            .await?;
-        user.ok_or_else(|| ModelError::EntityNotFound)
+        let user = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, email, password, api_key, name,
+                      reset_token, reset_sent_at AS "reset_sent_at: _",
+                      email_verification_token,
+                      email_verification_sent_at AS "email_verification_sent_at: _",
+                      email_verified_at AS "email_verified_at: _",
+                      magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                      deleted_at AS "deleted_at: _", attributes
+               FROM users
+               WHERE LOWER(email) = $1
+               LIMIT 1"#,
+            normalize_email(email),
+        )
+        .fetch_optional(db)
+        .await?;
+        user.ok_or(ModelError::EntityNotFound)
     }
 
     /// finds a user by the provided verification token
@@ -254,15 +331,25 @@ impl Model {
     /// # Errors
     ///
     /// When could not find user by the given token or DB query error
-    pub async fn find_by_verification_token(
-        db: &DatabaseConnection,
-        token: &str,
-    ) -> ModelResult<Self> {
-        let user = users::Entity::find()
-            .filter(users::Column::EmailVerificationToken.eq(token))
-            .one(db)
-            .await?;
-        user.ok_or_else(|| ModelError::EntityNotFound)
+    pub async fn find_by_verification_token(db: &PgPool, token: &str) -> ModelResult<Self> {
+        let user = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, email, password, api_key, name,
+                      reset_token, reset_sent_at AS "reset_sent_at: _",
+                      email_verification_token,
+                      email_verification_sent_at AS "email_verification_sent_at: _",
+                      email_verified_at AS "email_verified_at: _",
+                      magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                      deleted_at AS "deleted_at: _", attributes
+               FROM users
+               WHERE email_verification_token = $1
+               LIMIT 1"#,
+            token,
+        )
+        .fetch_optional(db)
+        .await?;
+        user.ok_or(ModelError::EntityNotFound)
     }
 
     /// Atomically **consume** a magic-link token (SEC-A4): a single `UPDATE`
@@ -278,22 +365,28 @@ impl Model {
     ///
     /// [`ModelError::EntityNotFound`] when the token is unknown, expired, or
     /// already consumed (all map to the same `401` at the controller).
-    pub async fn consume_magic_token(db: &DatabaseConnection, token: &str) -> ModelResult<Self> {
+    pub async fn consume_magic_token(db: &PgPool, token: &str) -> ModelResult<Self> {
         // SEC-A9: the DB stores the token's hash, so match on the hash of the
         // presented plaintext.
         let hashed = crate::secret_hash::hash(token);
-        let stmt = sea_orm::Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "UPDATE users \
-             SET magic_link_token = NULL, magic_link_expiration = NULL, updated_at = now() \
-             WHERE magic_link_token = $1 AND magic_link_expiration >= now() \
-             RETURNING *",
-            [hashed.into()],
-        );
-        match db.query_one_raw(stmt).await? {
-            Some(row) => Model::from_query_result(&row, "").map_err(ModelError::from),
-            None => Err(ModelError::EntityNotFound),
-        }
+        let user = sqlx::query_as!(
+            Self,
+            r#"UPDATE users
+               SET magic_link_token = NULL, magic_link_expiration = NULL, updated_at = now()
+               WHERE magic_link_token = $1 AND magic_link_expiration >= now()
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            hashed,
+        )
+        .fetch_optional(db)
+        .await?;
+        user.ok_or(ModelError::EntityNotFound)
     }
 
     /// finds a user by the magic token and verify and token expiration
@@ -301,15 +394,28 @@ impl Model {
     /// # Errors
     ///
     /// When could not find user by the given token or DB query error ot token expired
-    pub async fn find_by_magic_token(db: &DatabaseConnection, token: &str) -> ModelResult<Self> {
+    pub async fn find_by_magic_token(db: &PgPool, token: &str) -> ModelResult<Self> {
         // SEC-A9: the DB stores the token's hash; match on the hash of the
         // presented plaintext.
-        let user = users::Entity::find()
-            .filter(users::Column::MagicLinkToken.eq(crate::secret_hash::hash(token)))
-            .one(db)
-            .await?;
+        let user = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, email, password, api_key, name,
+                      reset_token, reset_sent_at AS "reset_sent_at: _",
+                      email_verification_token,
+                      email_verification_sent_at AS "email_verification_sent_at: _",
+                      email_verified_at AS "email_verified_at: _",
+                      magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                      deleted_at AS "deleted_at: _", attributes
+               FROM users
+               WHERE magic_link_token = $1
+               LIMIT 1"#,
+            crate::secret_hash::hash(token),
+        )
+        .fetch_optional(db)
+        .await?;
 
-        let user = user.ok_or_else(|| ModelError::EntityNotFound)?;
+        let user = user.ok_or(ModelError::EntityNotFound)?;
         if let Some(expired_at) = user.magic_link_expiration {
             if expired_at >= Local::now() {
                 Ok(user)
@@ -335,12 +441,25 @@ impl Model {
     /// # Errors
     ///
     /// When could not find user by the given token or DB query error
-    pub async fn find_by_reset_token(db: &DatabaseConnection, token: &str) -> ModelResult<Self> {
-        let user = users::Entity::find()
-            .filter(users::Column::ResetToken.eq(token))
-            .one(db)
-            .await?;
-        user.ok_or_else(|| ModelError::EntityNotFound)
+    pub async fn find_by_reset_token(db: &PgPool, token: &str) -> ModelResult<Self> {
+        let user = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, email, password, api_key, name,
+                      reset_token, reset_sent_at AS "reset_sent_at: _",
+                      email_verification_token,
+                      email_verification_sent_at AS "email_verification_sent_at: _",
+                      email_verified_at AS "email_verified_at: _",
+                      magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                      deleted_at AS "deleted_at: _", attributes
+               FROM users
+               WHERE reset_token = $1
+               LIMIT 1"#,
+            token,
+        )
+        .fetch_optional(db)
+        .await?;
+        user.ok_or(ModelError::EntityNotFound)
     }
 
     /// finds a user by the provided pid
@@ -348,13 +467,26 @@ impl Model {
     /// # Errors
     ///
     /// When could not find user  or DB query error
-    pub async fn find_by_pid(db: &DatabaseConnection, pid: &str) -> ModelResult<Self> {
+    pub async fn find_by_pid(db: &PgPool, pid: &str) -> ModelResult<Self> {
         let parse_uuid = Uuid::parse_str(pid).map_err(|e| ModelError::Any(e.into()))?;
-        let user = users::Entity::find()
-            .filter(users::Column::Pid.eq(parse_uuid))
-            .one(db)
-            .await?;
-        user.ok_or_else(|| ModelError::EntityNotFound)
+        let user = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, email, password, api_key, name,
+                      reset_token, reset_sent_at AS "reset_sent_at: _",
+                      email_verification_token,
+                      email_verification_sent_at AS "email_verification_sent_at: _",
+                      email_verified_at AS "email_verified_at: _",
+                      magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                      deleted_at AS "deleted_at: _", attributes
+               FROM users
+               WHERE pid = $1
+               LIMIT 1"#,
+            parse_uuid,
+        )
+        .fetch_optional(db)
+        .await?;
+        user.ok_or(ModelError::EntityNotFound)
     }
 
     /// Finds a *non-erased* user by `pid`. A GDPR-erased account
@@ -366,7 +498,7 @@ impl Model {
     ///
     /// [`ModelError::EntityNotFound`] when no live user matches, plus
     /// the usual parse / DB errors.
-    pub async fn find_active_by_pid(db: &DatabaseConnection, pid: &str) -> ModelResult<Self> {
+    pub async fn find_active_by_pid(db: &PgPool, pid: &str) -> ModelResult<Self> {
         let user = Self::find_by_pid(db, pid).await?;
         if user.deleted_at.is_some() {
             return Err(ModelError::EntityNotFound);
@@ -394,12 +526,25 @@ impl Model {
     /// # Errors
     ///
     /// When could not find user by the given token or DB query error
-    pub async fn find_by_api_key(db: &DatabaseConnection, api_key: &str) -> ModelResult<Self> {
-        let user = users::Entity::find()
-            .filter(users::Column::ApiKey.eq(api_key))
-            .one(db)
-            .await?;
-        user.ok_or_else(|| ModelError::EntityNotFound)
+    pub async fn find_by_api_key(db: &PgPool, api_key: &str) -> ModelResult<Self> {
+        let user = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, email, password, api_key, name,
+                      reset_token, reset_sent_at AS "reset_sent_at: _",
+                      email_verification_token,
+                      email_verification_sent_at AS "email_verification_sent_at: _",
+                      email_verified_at AS "email_verified_at: _",
+                      magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                      deleted_at AS "deleted_at: _", attributes
+               FROM users
+               WHERE api_key = $1
+               LIMIT 1"#,
+            api_key,
+        )
+        .fetch_optional(db)
+        .await?;
+        user.ok_or(ModelError::EntityNotFound)
     }
 
     /// Verifies whether the provided plain password matches the hashed password
@@ -418,30 +563,29 @@ impl Model {
     /// # Errors
     ///
     /// When could not save the user into the DB
-    pub async fn create_with_password(
-        db: &DatabaseConnection,
-        params: &RegisterParams,
-    ) -> ModelResult<Self> {
-        let txn = db.begin().await?;
+    pub async fn create_with_password(db: &PgPool, params: &RegisterParams) -> ModelResult<Self> {
+        let mut txn = db.begin().await?;
 
-        if users::Entity::find()
-            .filter(users::Column::Email.eq(&params.email))
-            .one(&txn)
-            .await?
-            .is_some()
-        {
-            return Err(ModelError::EntityAlreadyExists {});
+        let taken = sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM users WHERE email = $1) AS "taken!""#,
+            params.email,
+        )
+        .fetch_one(&mut *txn)
+        .await?;
+        if taken {
+            return Err(ModelError::EntityAlreadyExists);
         }
 
         let password_hash =
             crate::hash::hash_password(&params.password).map_err(|e| ModelError::Any(e.into()))?;
-        let user = users::ActiveModel {
-            email: ActiveValue::set(params.email.clone()),
-            password: ActiveValue::set(password_hash),
-            name: ActiveValue::set(params.name.clone()),
-            ..Default::default()
-        }
-        .insert(&txn)
+        let user = Self::insert(
+            &mut *txn,
+            NewUser {
+                email: &params.email,
+                password: &password_hash,
+                name: &params.name,
+            },
+        )
         .await?;
 
         txn.commit().await?;
@@ -456,43 +600,39 @@ impl Model {
     /// # Errors
     ///
     /// When the email already exists or the insert fails.
-    pub async fn create_passwordless(
-        db: &DatabaseConnection,
-        email: &str,
-        name: &str,
-    ) -> ModelResult<Self> {
-        let txn = db.begin().await?;
+    pub async fn create_passwordless(db: &PgPool, email: &str, name: &str) -> ModelResult<Self> {
+        let mut txn = db.begin().await?;
 
         // SEC-A6: store and match the email case-insensitively so a case
         // variant of an existing address is treated as the same account
         // (routed to the existing-email path), never inserted as a duplicate.
         let email = normalize_email(email);
-        if users::Entity::find()
-            .filter(lower_email_eq(&email))
-            .one(&txn)
-            .await?
-            .is_some()
-        {
-            return Err(ModelError::EntityAlreadyExists {});
+        let taken = sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM users WHERE LOWER(email) = $1) AS "taken!""#,
+            email,
+        )
+        .fetch_one(&mut *txn)
+        .await?;
+        if taken {
+            return Err(ModelError::EntityAlreadyExists);
         }
 
         let unusable = crate::hash::hash_password(&Uuid::new_v4().to_string())
             .map_err(|e| ModelError::Any(e.into()))?;
-        let user = users::ActiveModel {
-            email: ActiveValue::set(email),
-            password: ActiveValue::set(unusable),
-            name: ActiveValue::set(name.to_string()),
-            ..Default::default()
-        }
-        .insert(&txn)
+        let user = Self::insert(
+            &mut *txn,
+            NewUser {
+                email: &email,
+                password: &unusable,
+                name,
+            },
+        )
         .await?;
 
         txn.commit().await?;
         Ok(user)
     }
-}
 
-impl ActiveModel {
     /// Sets the email verification information for the user and
     /// updates it in the database.
     ///
@@ -502,13 +642,28 @@ impl ActiveModel {
     /// # Errors
     ///
     /// when has DB query error
-    pub async fn set_email_verification_sent(
-        mut self,
-        db: &DatabaseConnection,
-    ) -> ModelResult<Model> {
-        self.email_verification_sent_at = ActiveValue::set(Some(Local::now().into()));
-        self.email_verification_token = ActiveValue::Set(Some(Uuid::new_v4().to_string()));
-        self.update(db).await.map_err(ModelError::from)
+    pub async fn set_email_verification_sent(self, db: &PgPool) -> ModelResult<Model> {
+        validate(&self.name, &self.email)?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE users
+               SET email_verification_sent_at = $2, email_verification_token = $3
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            self.id,
+            Local::now().fixed_offset(),
+            Uuid::new_v4().to_string(),
+        )
+        .fetch_optional(db)
+        .await?;
+        updated(row)
     }
 
     /// Records the verification time when a user verifies their
@@ -520,9 +675,27 @@ impl ActiveModel {
     /// # Errors
     ///
     /// when has DB query error
-    pub async fn verified(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
-        self.email_verified_at = ActiveValue::set(Some(Local::now().into()));
-        self.update(db).await.map_err(ModelError::from)
+    pub async fn verified(self, db: &PgPool) -> ModelResult<Model> {
+        validate(&self.name, &self.email)?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE users
+               SET email_verified_at = $2
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            self.id,
+            Local::now().fixed_offset(),
+        )
+        .fetch_optional(db)
+        .await?;
+        updated(row)
     }
 
     /// Resets the current user password with a new password and
@@ -534,17 +707,29 @@ impl ActiveModel {
     /// # Errors
     ///
     /// when has DB query error or could not hashed the given password
-    pub async fn reset_password(
-        mut self,
-        db: &DatabaseConnection,
-        password: &str,
-    ) -> ModelResult<Model> {
-        self.password = ActiveValue::set(
-            crate::hash::hash_password(password).map_err(|e| ModelError::Any(e.into()))?,
-        );
-        self.reset_token = ActiveValue::Set(None);
-        self.reset_sent_at = ActiveValue::Set(None);
-        self.update(db).await.map_err(ModelError::from)
+    pub async fn reset_password(self, db: &PgPool, password: &str) -> ModelResult<Model> {
+        let password =
+            crate::hash::hash_password(password).map_err(|e| ModelError::Any(e.into()))?;
+        validate(&self.name, &self.email)?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE users
+               SET password = $2, reset_token = NULL, reset_sent_at = NULL
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            self.id,
+            password,
+        )
+        .fetch_optional(db)
+        .await?;
+        updated(row)
     }
 
     /// Creates a magic link token for passwordless authentication.
@@ -554,7 +739,7 @@ impl ActiveModel {
     ///
     /// # Errors
     /// - Returns an error if database update fails
-    pub async fn create_magic_link(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
+    pub async fn create_magic_link(self, db: &PgPool) -> ModelResult<Model> {
         // SEC-A9: the plaintext token is what gets emailed to the user; the
         // database stores only its hash. Generate the plaintext, persist
         // `hash(plaintext)`, then hand the caller back a model carrying the
@@ -563,9 +748,27 @@ impl ActiveModel {
         let plaintext = crate::hash::random_string(MAGIC_LINK_LENGTH as usize);
         let expired = Local::now() + Duration::minutes(MAGIC_LINK_EXPIRATION_MIN.into());
 
-        self.magic_link_token = ActiveValue::set(Some(crate::secret_hash::hash(&plaintext)));
-        self.magic_link_expiration = ActiveValue::set(Some(expired.into()));
-        let mut model = self.update(db).await.map_err(ModelError::from)?;
+        validate(&self.name, &self.email)?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE users
+               SET magic_link_token = $2, magic_link_expiration = $3
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            self.id,
+            crate::secret_hash::hash(&plaintext),
+            expired.fixed_offset(),
+        )
+        .fetch_optional(db)
+        .await?;
+        let mut model = updated(row)?;
         model.magic_link_token = Some(plaintext);
         Ok(model)
     }
@@ -577,10 +780,26 @@ impl ActiveModel {
     ///
     /// # Errors
     /// - Returns an error if database update fails
-    pub async fn clear_magic_link(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
-        self.magic_link_token = ActiveValue::set(None);
-        self.magic_link_expiration = ActiveValue::set(None);
-        self.update(db).await.map_err(ModelError::from)
+    pub async fn clear_magic_link(self, db: &PgPool) -> ModelResult<Model> {
+        validate(&self.name, &self.email)?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE users
+               SET magic_link_token = NULL, magic_link_expiration = NULL
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            self.id,
+        )
+        .fetch_optional(db)
+        .await?;
+        updated(row)
     }
 
     /// Replace this user's ABAC subject attributes (`users.attributes`)
@@ -593,12 +812,30 @@ impl ActiveModel {
     /// # Errors
     /// - Returns an error if the database update fails.
     pub async fn set_attributes(
-        mut self,
-        db: &DatabaseConnection,
+        self,
+        db: &PgPool,
         attributes: serde_json::Value,
     ) -> ModelResult<Model> {
-        self.attributes = ActiveValue::set(attributes);
-        self.update(db).await.map_err(ModelError::from)
+        validate(&self.name, &self.email)?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE users
+               SET attributes = $2
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            self.id,
+            attributes,
+        )
+        .fetch_optional(db)
+        .await?;
+        updated(row)
     }
 
     /// GDPR Art. 17 erasure. **Soft-delete + anonymise**: stamp
@@ -614,14 +851,31 @@ impl ActiveModel {
     ///
     /// # Errors
     /// - Returns an error if the database update fails.
-    pub async fn erase(mut self, db: &DatabaseConnection) -> ModelResult<Model> {
-        let pid = self.pid.as_ref();
-        self.email = ActiveValue::set(tombstone_email(pid));
-        self.name = ActiveValue::set(TOMBSTONE_NAME.to_string());
-        self.magic_link_token = ActiveValue::set(None);
-        self.magic_link_expiration = ActiveValue::set(None);
-        self.deleted_at = ActiveValue::set(Some(Local::now().into()));
-        self.update(db).await.map_err(ModelError::from)
+    pub async fn erase(self, db: &PgPool) -> ModelResult<Model> {
+        let email = tombstone_email(&self.pid);
+        validate(TOMBSTONE_NAME, &email)?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE users
+               SET email = $2, name = $3, magic_link_token = NULL,
+                   magic_link_expiration = NULL, deleted_at = $4
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, email, password, api_key, name,
+                         reset_token, reset_sent_at AS "reset_sent_at: _",
+                         email_verification_token,
+                         email_verification_sent_at AS "email_verification_sent_at: _",
+                         email_verified_at AS "email_verified_at: _",
+                         magic_link_token, magic_link_expiration AS "magic_link_expiration: _",
+                         deleted_at AS "deleted_at: _", attributes"#,
+            self.id,
+            email,
+            TOMBSTONE_NAME,
+            Local::now().fixed_offset(),
+        )
+        .fetch_optional(db)
+        .await?;
+        updated(row)
     }
 }
 

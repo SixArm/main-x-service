@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE sessions SET source_ip = NULL\n             WHERE source_ip IS NOT NULL AND created_at < now() - make_interval(days => $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fafd5e4a8d8b1c89f6e273a3d4b1b25e9baf3d8ab573e10d6ce200e4de93c5b7"
+}

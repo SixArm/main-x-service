@@ -234,7 +234,8 @@ point here rather than repeat it.
 | course | sqlx | 2026-11-07 |
 | link-graph | sqlx | 2026-11-07 |
 | patient-flow | sqlx | 2026-11-08 |
-| authentication, case | SeaORM, next | |
+| authentication | sqlx | 2026-11-08 |
+| case | SeaORM, next | |
 | care-pathway, person, worker | SeaORM, last | |
 
 Each crate on sqlx proves its schema unchanged with a `pg_dump --schema-only`
@@ -258,7 +259,7 @@ because macOS cannot load a stripped `sqlx-macros`.
 |---|---|
 | Rust edition (target) | 2024 |
 | MSRV | **Rust 1.96** — current stable minus two, declared per crate and enforced in CI ([`../rust-msrv-n-minus-2/index.md`](../rust-msrv-n-minus-2/index.md)) |
-| axa | 0.6, from crates.io |
+| axa | 0.8, from crates.io |
 | Axum | 0.8 |
 | SeaORM | 2.0 |
 | PostgreSQL | 18+ |

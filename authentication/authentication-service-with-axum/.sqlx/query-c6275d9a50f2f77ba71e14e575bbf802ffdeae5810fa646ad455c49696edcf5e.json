@@ -1,0 +1,149 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, event, email, user_pid, detail, hash, hash_sha3, mac, source_ip\n               FROM auth_events\n               WHERE user_pid = $1 OR email = $2\n               ORDER BY id DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "event",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "event"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "email",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "user_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "user_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "detail",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "detail"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "hash"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "hash_sha3",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "mac",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "mac"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "source_ip",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_events",
+            "name": "source_ip"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "c6275d9a50f2f77ba71e14e575bbf802ffdeae5810fa646ad455c49696edcf5e"
+}

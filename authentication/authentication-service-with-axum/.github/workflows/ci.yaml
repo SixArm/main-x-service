@@ -92,4 +92,8 @@ jobs:
           args: --all-features --all -- --include-ignored
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/authentication_service_test
+          # The `query!` macros read `.sqlx/`. With DATABASE_URL set they
+          # would otherwise check against this database before the tests
+          # have migrated it.
+          SQLX_OFFLINE: "true"
           

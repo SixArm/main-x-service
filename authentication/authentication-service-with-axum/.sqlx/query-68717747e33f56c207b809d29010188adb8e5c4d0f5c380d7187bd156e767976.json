@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM auth_rate_limits WHERE email_key = $1 AND requested_at < $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "68717747e33f56c207b809d29010188adb8e5c4d0f5c380d7187bd156e767976"
+}

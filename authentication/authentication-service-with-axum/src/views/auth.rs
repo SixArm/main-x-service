@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::models::_entities::{auth_events, sessions, users};
+use crate::models::{auth_events, sessions, users};
 
 /// Response returned after a redeemed magic link: the access token plus
 /// the authenticated user's public fields.
@@ -219,7 +219,7 @@ impl AccountExport {
 #[cfg(test)]
 mod tests {
     use super::{AccountExport, CurrentResponse};
-    use crate::models::_entities::{auth_events, sessions, users};
+    use crate::models::{auth_events, sessions, users};
     use chrono::{FixedOffset, TimeZone};
     use uuid::Uuid;
 

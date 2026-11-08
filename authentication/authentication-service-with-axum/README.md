@@ -73,6 +73,12 @@ curl -s localhost:5150/api/auth/magic-link/<TOKEN>
   [config/keys/README.md](./config/keys/README.md) and
   [AGENTS.md](./AGENTS.md) for all env vars).
 - **Queue**: Postgres-backed background jobs (repo convention).
+- **Database**: sqlx, no ORM. Every statement is a compile-checked
+  `query!` literal in `src/models/`, against the committed `.sqlx/`
+  data, so a build needs no database (`SQLX_OFFLINE=true`). The schema is
+  the plain SQL under `migrations/`. After changing a statement, run
+  `cargo sqlx prepare -- --all-targets --features oidc` against a
+  migrated database and commit `.sqlx/`.
 
 ## Cargo features
 

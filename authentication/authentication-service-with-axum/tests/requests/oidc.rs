@@ -365,7 +365,6 @@ async fn callback_reports_an_idp_error_without_touching_the_token_endpoint() {
 // correctly end to end, not just that each piece type-checks.
 async fn callback_establishes_a_session_from_a_real_signed_id_token() {
     use authentication_service::models::users;
-    use sea_orm::IntoActiveModel;
 
     let (issuer, stub) = serve_stub_idp().await;
     let redirect_url = "http://localhost:3000/api/auth/oidc/callback";
@@ -478,7 +477,6 @@ async fn callback_establishes_a_session_from_a_real_signed_id_token() {
             Some(&vec!["cardiology".to_string()]),
             "the mapped claim landed in users.attributes"
         );
-        let _ = updated.into_active_model();
     })
     .await;
     clear_oidc_env();

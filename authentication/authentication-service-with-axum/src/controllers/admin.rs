@@ -174,7 +174,6 @@ async fn replace_attributes(
     let target_pid = user.pid;
     let target_email = user.email.clone();
     let updated = user
-        .into_active_model()
         .set_attributes(&ctx.db, users::attributes_to_value(&body.attributes))
         .await?;
     // SEC-A8: a live session snapshotted the OLD attributes (per

@@ -32,7 +32,7 @@
 //! The parsing / validation / map-mutation core (`AttrCommand`,
 //! [`parse_values`], [`validate_key`], [`validate_value`], [`apply`]) is
 //! pure and unit-tested here; the [`Task`] impl only adds the DB lookup,
-//! the write via [`users::ActiveModel::set_attributes`], and the printed
+//! the write via [`users::Model::set_attributes`], and the printed
 //! report.
 //!
 //! [`agents/share/authorization-attributes.md`]:
@@ -423,8 +423,7 @@ impl Task for UserAttributes {
         let after = apply(before.clone(), &command);
         let pid = user.pid;
         let email = user.email.clone();
-        user.into_active_model()
-            .set_attributes(&ctx.db, users::attributes_to_value(&after))
+        user.set_attributes(&ctx.db, users::attributes_to_value(&after))
             .await?;
         // SEC-A8: revoke the user's sessions so an attribute change takes
         // effect immediately (a live session would otherwise keep minting
@@ -473,7 +472,7 @@ fn parse_selector(vars: &task::Vars) -> std::result::Result<Selector, String> {
 
 /// Look up the target user by the [`Selector`], mapping a not-found into
 /// a clear operator-facing message.
-async fn find_target(db: &DatabaseConnection, selector: &Selector) -> Result<users::Model> {
+async fn find_target(db: &sqlx::PgPool, selector: &Selector) -> Result<users::Model> {
     let found = match selector {
         Selector::Email(email) => users::Model::find_by_email(db, email).await,
         Selector::Pid(pid) => users::Model::find_by_pid(db, pid).await,

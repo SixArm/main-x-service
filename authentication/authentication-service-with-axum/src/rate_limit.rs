@@ -36,7 +36,9 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use sea_orm::{ConnectionTrait, DatabaseConnection, DbBackend, Statement, TransactionTrait};
+use sqlx::PgPool;
+
+use crate::models::auth_rate_limits;
 
 /// Maximum number of issuance requests allowed per key within [`WINDOW`].
 /// The N+1th request inside the window is rejected. Typed `i64` to compare
@@ -99,7 +101,7 @@ pub fn normalize_key(email: &str) -> String {
 /// Returns [`RetryAfter`] when `key` has already reached [`MAX_REQUESTS`]
 /// within the current [`WINDOW`]. Database failures fail open (the request is
 /// allowed) and are never returned as an error.
-pub async fn check(db: &DatabaseConnection, key: &str) -> Result<(), RetryAfter> {
+pub async fn check(db: &PgPool, key: &str) -> Result<(), RetryAfter> {
     check_at(db, key, Utc::now()).await
 }
 
@@ -115,11 +117,7 @@ pub async fn check(db: &DatabaseConnection, key: &str) -> Result<(), RetryAfter>
 /// Returns [`RetryAfter`] when `key` has already reached [`MAX_REQUESTS`]
 /// within the [`WINDOW`] ending at `now`. Database failures fail open and are
 /// never returned as an error.
-pub async fn check_at(
-    db: &DatabaseConnection,
-    key: &str,
-    now: DateTime<Utc>,
-) -> Result<(), RetryAfter> {
+pub async fn check_at(db: &PgPool, key: &str, now: DateTime<Utc>) -> Result<(), RetryAfter> {
     match check_at_inner(db, key, now).await {
         Ok(decision) => decision,
         Err(error) => {
@@ -136,54 +134,29 @@ pub async fn check_at(
 /// same-key checks serialise, prune rows older than the window, count what
 /// remains, then insert iff under the cap.
 async fn check_at_inner(
-    db: &DatabaseConnection,
+    db: &PgPool,
     key: &str,
     now: DateTime<Utc>,
-) -> Result<Result<(), RetryAfter>, sea_orm::DbErr> {
+) -> Result<Result<(), RetryAfter>, sqlx::Error> {
     let key = normalize_key(key);
     // Window start: rows older than this have aged out.
     let cutoff =
         now - chrono::Duration::seconds(i64::try_from(WINDOW.as_secs()).unwrap_or(i64::MAX));
 
-    let txn = db.begin().await?;
+    let mut txn = db.begin().await?;
 
     // Serialise concurrent checks for this exact key (different keys hash to
     // different lock slots, so unrelated emails never block each other). The
     // lock is held until the transaction commits.
-    txn.execute_raw(Statement::from_sql_and_values(
-        DbBackend::Postgres,
-        "SELECT pg_advisory_xact_lock(hashtext($1))",
-        [key.clone().into()],
-    ))
-    .await?;
+    auth_rate_limits::lock_key(&mut txn, &key).await?;
 
     // Drop this key's requests that have aged out of the window — keeps the
     // table bounded and makes the count below a pure in-window count.
-    txn.execute_raw(Statement::from_sql_and_values(
-        DbBackend::Postgres,
-        "DELETE FROM auth_rate_limits WHERE email_key = $1 AND requested_at < $2",
-        [key.clone().into(), cutoff.into()],
-    ))
-    .await?;
+    auth_rate_limits::prune(&mut txn, &key, cutoff).await?;
 
     // Count what remains (all in-window) and find the oldest, used to tell a
     // throttled caller when a slot will free.
-    let row = txn
-        .query_one_raw(Statement::from_sql_and_values(
-            DbBackend::Postgres,
-            "SELECT count(*) AS cnt, min(requested_at) AS oldest FROM auth_rate_limits WHERE email_key = $1",
-            [key.clone().into()],
-        ))
-        .await?;
-    // `count(*)` always returns exactly one row (cnt = 0, oldest = NULL when
-    // empty), so `row` is `Some`.
-    let (count, oldest) = match row {
-        Some(r) => (
-            r.try_get::<i64>("", "cnt")?,
-            r.try_get::<Option<DateTime<Utc>>>("", "oldest")?,
-        ),
-        None => (0, None),
-    };
+    let (count, oldest) = auth_rate_limits::count_and_oldest(&mut txn, &key).await?;
 
     if count >= MAX_REQUESTS {
         // Over quota: do not record this request. Releasing the lock (commit)
@@ -197,12 +170,7 @@ async fn check_at_inner(
     }
 
     // Under quota: record this request and allow it.
-    txn.execute_raw(Statement::from_sql_and_values(
-        DbBackend::Postgres,
-        "INSERT INTO auth_rate_limits (email_key, requested_at) VALUES ($1, $2)",
-        [key.into(), now.into()],
-    ))
-    .await?;
+    auth_rate_limits::insert(&mut txn, &key, now).await?;
     txn.commit().await?;
     Ok(Ok(()))
 }
@@ -214,13 +182,8 @@ async fn check_at_inner(
 /// # Errors
 ///
 /// Propagates any database error from the `DELETE`.
-pub async fn reset(db: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
-    db.execute_raw(Statement::from_string(
-        DbBackend::Postgres,
-        "DELETE FROM auth_rate_limits",
-    ))
-    .await?;
-    Ok(())
+pub async fn reset(db: &PgPool) -> Result<(), sqlx::Error> {
+    auth_rate_limits::delete_all(db).await
 }
 
 #[cfg(test)]

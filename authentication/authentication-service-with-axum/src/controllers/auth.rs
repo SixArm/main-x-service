@@ -284,7 +284,7 @@ async fn signup(
     let (user, existing) =
         match users::Model::create_passwordless(&ctx.db, &params.email, &name).await {
             Ok(user) => (user, false),
-            Err(ModelError::EntityAlreadyExists) => {
+            Err(crate::models::ModelError::EntityAlreadyExists) => {
                 // SEC-A5: the new-account path just paid for one Argon2 hash
                 // in `create_passwordless`; run an equivalent hash here so
                 // the already-registered branch is not measurably faster (a
@@ -320,7 +320,7 @@ async fn signup(
             }
         };
 
-    let user = user.into_active_model().create_magic_link(&ctx.db).await?;
+    let user = user.create_magic_link(&ctx.db).await?;
     // The audit row distinguishes a fresh account from an existing one
     // for security review, but the 200 response above does not — the
     // anti-enumeration contract holds at the wire.
@@ -386,7 +386,7 @@ async fn request_magic_link(
         .await;
         return format::empty_json();
     };
-    let user = user.into_active_model().create_magic_link(&ctx.db).await?;
+    let user = user.create_magic_link(&ctx.db).await?;
     AuthEvent::record_best_effort(
         &ctx.db,
         "magic_link_requested",
@@ -437,7 +437,7 @@ async fn verify(
 
     // The token is already cleared by `consume_magic_token`.
     let user = if user.email_verified_at.is_none() {
-        user.into_active_model().verified(&ctx.db).await?
+        user.verified(&ctx.db).await?
     } else {
         user
     };
@@ -646,7 +646,7 @@ async fn signout(
 ) -> Result<Response> {
     let AuthUser(claims) = auth;
     if let Ok(session) = sessions::Model::find_by_jid(&ctx.db, &claims.sid).await {
-        session.into_active_model().revoke(&ctx.db).await?;
+        session.revoke(&ctx.db).await?;
     }
     AuthEvent::record_best_effort(
         &ctx.db,
@@ -777,7 +777,7 @@ async fn delete_account(
     // Revoke every live session first so a concurrent request cannot use
     // a session that outlives the anonymisation.
     sessions::Model::revoke_all_for_user(&ctx.db, pid).await?;
-    user.into_active_model().erase(&ctx.db).await?;
+    user.erase(&ctx.db).await?;
     // SEC-A7: erasing the `users` row is not enough — the subject's email
     // also survives in the audit trail (`auth_events.email`, incl. pre-account
     // `unknown_email` rows) and in `sessions.user_agent`. Scrub both so the

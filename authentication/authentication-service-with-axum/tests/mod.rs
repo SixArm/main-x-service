@@ -11,11 +11,8 @@ mod requests;
 mod tasks;
 mod workers;
 
-use authentication_service::models::_entities::users;
-use sea_orm::{EntityTrait, Set};
-
 /// Insert the two fixture users the model tests look up.
-pub async fn seed_users(ctx: &axa::AppContext) -> Result<(), sea_orm::DbErr> {
+pub async fn seed_users(ctx: &axa::AppContext) -> Result<(), sqlx::Error> {
     let password = "$argon2id$v=19$m=19456,t=2,p=1$ETQBx4rTgNAZhSaeYZKOZg$eYTdH26CRT6nUJtacLDEboP0li6xUwUF/q5nSlQ8uuc";
     let fixtures = [
         (
@@ -33,22 +30,25 @@ pub async fn seed_users(ctx: &axa::AppContext) -> Result<(), sea_orm::DbErr> {
     ];
     let created = chrono::DateTime::parse_from_rfc3339("2023-11-12T12:34:56.789Z")
         .expect("fixture timestamp");
-    for (id, (pid, email, api_key, name)) in (1..).zip(fixtures) {
-        // `Entity::insert` skips `before_save`, which would replace these
-        // fixed `pid`s with random ones.
-        let user = users::ActiveModel {
-            id: Set(id),
-            pid: Set(pid.parse().expect("fixture pid")),
-            email: Set(email.to_string()),
-            password: Set(password.to_string()),
-            api_key: Set(api_key.to_string()),
-            name: Set(name.to_string()),
-            attributes: Set(serde_json::json!({})),
-            created_at: Set(created),
-            updated_at: Set(created),
-            ..Default::default()
-        };
-        users::Entity::insert(user).exec(&ctx.db).await?;
+    for (id, (pid, email, api_key, name)) in (1_i64..).zip(fixtures) {
+        // A plain INSERT, not `users::Model::insert`, which would replace
+        // these fixed `pid`s with random ones.
+        sqlx::query!(
+            "INSERT INTO users
+                 (id, pid, email, password, api_key, name, attributes, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            id,
+            pid.parse::<uuid::Uuid>().expect("fixture pid"),
+            email,
+            password,
+            api_key,
+            name,
+            serde_json::json!({}),
+            created,
+            created,
+        )
+        .execute(&ctx.db)
+        .await?;
     }
     Ok(())
 }

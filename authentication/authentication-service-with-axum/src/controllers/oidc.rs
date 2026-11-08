@@ -336,7 +336,6 @@ async fn bridge_to_frontend(
 ) -> Result<axum::response::Response> {
     let bridged = user
         .clone()
-        .into_active_model()
         .create_magic_link(&ctx.db)
         .await
         .map_err(|e| Error::string(&e.to_string()))?;
@@ -424,7 +423,6 @@ async fn callback(
 
     let user = find_or_provision_user(&ctx, &email, &config, source_ip.as_deref()).await?;
     let updated = user
-        .into_active_model()
         .set_attributes(&ctx.db, users::attributes_to_value(&attrs))
         .await
         .map_err(|e| Error::string(&e.to_string()))?;

@@ -122,7 +122,7 @@ pub fn tag(input: &AuditInput<'_>) -> Option<String> {
 
 /// Borrow a stored row as an [`AuditInput`].
 #[must_use]
-pub fn input_for(row: &crate::models::_entities::auth_events::Model) -> AuditInput<'_> {
+pub fn input_for(row: &crate::models::auth_events::Model) -> AuditInput<'_> {
     AuditInput {
         event: row.event.as_str(),
         email: row.email.as_deref(),
@@ -175,7 +175,7 @@ const CAVEAT: &str = "A verified result attests that no examined row's content w
 /// rows have, and checking only the MAC would report such a deployment as
 /// entirely unverified when it is not.
 #[must_use]
-pub fn verify(rows: &[crate::models::_entities::auth_events::Model]) -> AuditIntegrityReport {
+pub fn verify(rows: &[crate::models::auth_events::Model]) -> AuditIntegrityReport {
     let mut report = AuditIntegrityReport {
         rows: rows.len(),
         intact: 0,

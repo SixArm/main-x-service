@@ -39,10 +39,7 @@ async fn sign_in_with_attributes(
     // Grant the attributes, then request a fresh link and redeem it — the
     // new session/token now carries them.
     let user = users::Model::find_by_email(&ctx.db, email).await.unwrap();
-    users::ActiveModel::from(user)
-        .set_attributes(&ctx.db, attributes)
-        .await
-        .unwrap();
+    user.set_attributes(&ctx.db, attributes).await.unwrap();
     let link = request
         .post("/api/auth/magic-link")
         .json(&serde_json::json!({ "email": email }))

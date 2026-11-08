@@ -46,12 +46,11 @@
 
 use axa::extract::Query;
 use axa::prelude::*;
-use sea_orm::{EntityTrait, QueryOrder, QuerySelect};
 use serde::Deserialize;
 
 use crate::auth::AuthUser;
 use crate::compliance::audit_integrity;
-use crate::models::_entities::auth_events;
+use crate::models::auth_events;
 
 /// Default rows examined in one call.
 pub const VERIFY_DEFAULT_LIMIT: u64 = 1000;
@@ -91,11 +90,7 @@ async fn verify_audit(
     State(ctx): State<AppContext>,
     Query(params): Query<VerifyParams>,
 ) -> Result<Response> {
-    let rows = auth_events::Entity::find()
-        .order_by_desc(auth_events::Column::Id)
-        .limit(params.limit())
-        .all(&ctx.db)
-        .await?;
+    let rows = auth_events::Model::recent(&ctx.db, params.limit()).await?;
     format::json(audit_integrity::verify(&rows))
 }
 

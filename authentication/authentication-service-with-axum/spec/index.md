@@ -403,20 +403,41 @@ loco-JSON envelope above.
 
 ## 10. Persistence
 
-PostgreSQL via SeaORM + `sea-orm-migration`. Migrations, in order:
-`m20220101_000001_users`, `m20220101_000002_sessions`,
-`m20220101_000003_auth_events`, `m20220101_000004_users_deleted_at` (the
-GDPR-erasure soft-delete column), `m20220101_000005_auth_rate_limits`
-(the magic-link rate-limiter window log),
-`m20220101_000006_users_attributes` (the ABAC subject-attribute map,
-JSONB `NOT NULL DEFAULT '{}'`), `m20220101_000007_sessions_data`
-(the session payload JSONB holding the copied `attrs`),
-`m20220101_000008_sessions_ttls` (the `last_seen_at`/idle/absolute TTL
-columns + `sessions_active_user` partial index, §13),
-`m20220101_000009_hash_credentials_at_rest` (SEC-A9: hashes the
-magic-link token / session `jid` / CSRF token at rest), and
-`m20260728_000001_add_auth_event_mac` (adds `auth_events.hash` /
-`hash_sha3` / `mac` — the keyed-integrity columns §6.13 verifies).
+PostgreSQL via **sqlx**, no ORM (spec/tech-stack §5, 2026-11-08). Every
+statement is a `query!` / `query_as!` / `query_scalar!` literal in
+`src/models/`, the crate's one SQL area — including the rate limiter's
+(`models::auth_rate_limits`), the address-retention sweep's, and the
+audit-verify read that used to live in `controllers/compliance.rs`. The
+literals are checked at compile time against the committed `.sqlx/`
+data (`SQLX_OFFLINE=true` builds need no database), and
+`scripts/ci-check.sh test-db` runs `cargo sqlx prepare --check` against
+the migrated schema. Nothing builds SQL from text.
+
+The schema is the plain SQL under `migrations/`, run by
+`sqlx::migrate!` through `axa::sqlx` (`db migrate | down | reset |
+status`, and the test boot). One reversible
+`<version>_<name>.up.sql` / `.down.sql` pair per former `SeaORM`
+migration, in the same order: `2022010100000001_users`,
+`2022010100000002_sessions`, `2022010100000003_auth_events`,
+`2022010100000004_users_deleted_at` (the GDPR-erasure soft-delete
+column), `2022010100000005_auth_rate_limits` (the magic-link
+rate-limiter window log), `2022010100000006_users_attributes` (the ABAC
+subject-attribute map, JSONB `NOT NULL DEFAULT '{}'`),
+`2022010100000007_sessions_data` (the session payload JSONB holding the
+copied `attrs`), `2022010100000008_sessions_ttls` (the
+`last_seen_at`/idle/absolute TTL columns + `sessions_active_user`
+partial index, §13), `2022010100000009_hash_credentials_at_rest`
+(SEC-A9: hashes the magic-link token / session `jid` / CSRF token at
+rest; its down is a no-op), `2026072800000001_add_auth_event_mac`
+(adds `auth_events.hash` / `hash_sha3` / `mac` — the keyed-integrity
+columns §6.13 verifies), and the two T-14 `source_ip` columns
+(`2026090600000001_sessions_source_ip`,
+`2026090600000002_auth_events_source_ip`). A `pg_dump --schema-only`
+of a database the old `SeaORM` migrator built and one these files built
+is identical apart from the bookkeeping table (`seaql_migrations` →
+`_sqlx_migrations`), so a database the old build migrated must be
+recreated, not upgraded in place.
+
 `auto_migrate` is on in development, off in production.
 
 **Cookie sessions.** The cookie session reuses the existing `sessions`
@@ -573,6 +594,28 @@ per-subject `GET /api/auth/account/audit` — a subject's own trail reachable
 only by that subject.
 
 ## 13. Tasks (live work queue)
+
+- [x] **2026-11-08 — Move from SeaORM to sqlx** (spec/tech-stack §5).
+      Every statement is a `query!` / `query_as!` / `query_scalar!`
+      literal in `src/models/` (38 there; the SQL from `rate_limit.rs`,
+      `compliance/address_retention.rs`, `controllers/compliance.rs`
+      and the `app.rs` truncate moved in), with `.sqlx/` committed. No
+      `QueryBuilder`, `raw_sql` or `AssertSqlSafe`, so no
+      `ci/sql-allowlist.txt` entry. The twelve schema-builder migrations
+      under `src/migration/` are written out as plain SQL under
+      `migrations/` from a `pg_dump` of the old schema, in the same
+      order; the dump of old and new is identical. `_entities/` and
+      `ActiveModel` are gone: updates are `Model` methods that write only
+      the columns they change, keyed by `id`, validate name and email
+      first exactly as `before_save` did, and report a write that
+      matches no row as `ModelError::RecordNotUpdated`. The security
+      controls are unchanged and their tests untouched apart from
+      dropping `into_active_model()`: SEC-A4's consume is still one
+      `UPDATE … WHERE magic_link_token = $1 AND magic_link_expiration >=
+      now() RETURNING`, the rate limiter still takes
+      `pg_advisory_xact_lock` and prunes, counts and inserts in one
+      transaction, and the `auth_events` pre-image, MAC and digests are
+      unchanged. Unit tests 123, DB suite 52, both as before.
 
 - [x] **2026-07-28 — Keyed integrity verification (MAC + digests) over
       `auth_events`.** *Landed but never recorded here until this doc
@@ -1316,7 +1359,8 @@ only by that subject.
 > landed (§13, 2026-07-05); remaining refinements are Mailpit and an
 > auto-rotation scheduler (§15).
 
-Done: real Loco scaffold; passwordless magic-link flow; PASETO
+Done: real Loco scaffold, now plain Axum on axa with **sqlx** and
+plain-SQL migrations (§10, 2026-11-08); passwordless magic-link flow; PASETO
 v4.public signing (Ed25519); `/.well-known/paseto-keys` key set;
 cookie sessions (`__Host-mxi_session`) + `POST /token` session→PASETO
 exchange + signout; console magic links; Postgres queue;

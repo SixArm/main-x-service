@@ -4,7 +4,6 @@
 use authentication_service::{models::users, views::auth::LoginResponse};
 use axa::{AppContext, TestServer};
 use axum::http::{HeaderName, HeaderValue};
-use sea_orm::IntoActiveModel;
 
 const USER_EMAIL: &str = "test@loco.com";
 const USER_NAME: &str = "loco";
@@ -23,13 +22,12 @@ pub struct LoggedInUser {
 /// The token cannot be read back out of the database: SEC-A9 stores only
 /// `hash(token)`, and redemption hashes what the caller presents. The
 /// plaintext exists in exactly one place — the model
-/// [`create_magic_link`](users::ActiveModel::create_magic_link) returns,
+/// [`create_magic_link`](users::Model::create_magic_link) returns,
 /// which is where production takes it from to build the email. Tests
 /// therefore take it from the same place; reading `users.magic_link_token`
 /// yields the hash, and redeeming *that* is a `401`.
 pub async fn issue_magic_link(ctx: &AppContext, user: users::Model) -> String {
-    user.into_active_model()
-        .create_magic_link(&ctx.db)
+    user.create_magic_link(&ctx.db)
         .await
         .expect("issuing a magic link should succeed")
         .magic_link_token

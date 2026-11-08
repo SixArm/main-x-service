@@ -21,11 +21,9 @@
 
 use authentication_service::{
     app::App,
-    models::_entities::{auth_events, sessions},
-    models::{auth_events::Model as AuthEvent, users},
+    models::{auth_events::Model as AuthEvent, sessions, users},
 };
 use axa::testing::prelude::*;
-use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serial_test::serial;
 
 #[cfg(feature = "paseto")]
@@ -205,7 +203,6 @@ async fn can_redeem_magic_link_for_access_token() {
             .expect("seeded user should exist");
         let user_pid = user.pid;
         let token = user
-            .into_active_model()
             .create_magic_link(&ctx.db)
             .await
             .expect("mint magic link")
@@ -256,12 +253,14 @@ async fn signup_source_ip(trusted: Option<&str>, forwarded: &'static str) -> Opt
             .json(&serde_json::json!({ "email": email }))
             .await;
         assert_eq!(response.status_code(), 200);
-        let event = auth_events::Entity::find()
-            .filter(auth_events::Column::Email.eq(email.as_str()))
-            .one(&ctx.db)
-            .await
-            .unwrap()
-            .expect("signup writes an audit row");
+        let event = sqlx::query!(
+            "SELECT source_ip FROM auth_events WHERE email = $1 LIMIT 1",
+            email.as_str()
+        )
+        .fetch_optional(&ctx.db)
+        .await
+        .unwrap()
+        .expect("signup writes an audit row");
         *seen.lock().unwrap() = event.source_ip;
     })
     .await;
@@ -309,7 +308,6 @@ async fn an_old_address_leaves_sessions_and_events() {
             .expect("signup should have created the user");
         let user_pid = user.pid;
         let token = user
-            .into_active_model()
             .create_magic_link(&ctx.db)
             .await
             .expect("mint magic link")
@@ -318,9 +316,7 @@ async fn an_old_address_leaves_sessions_and_events() {
         request.get(&format!("/api/auth/magic-link/{token}")).await;
 
         let held = || async {
-            let sessions = sessions::Entity::find()
-                .filter(sessions::Column::UserPid.eq(user_pid))
-                .all(&ctx.db)
+            let sessions = sessions::Model::find_all_by_user_pid(&ctx.db, user_pid)
                 .await
                 .expect("query sessions");
             let events = AuthEvent::for_subject(&ctx.db, user_pid, email)
@@ -366,7 +362,6 @@ async fn source_ip_is_captured_on_signup_and_redeem() {
             .expect("signup should have created the user");
         let user_pid = user.pid;
         let token = user
-            .into_active_model()
             .create_magic_link(&ctx.db)
             .await
             .expect("mint magic link")
@@ -379,9 +374,7 @@ async fn source_ip_is_captured_on_signup_and_redeem() {
         // The session `verify` issued carries a non-null, non-empty
         // source_ip (and, incidentally, the user_agent axum-test sends —
         // previously hardcoded `None` regardless of the request).
-        let issued_sessions = sessions::Entity::find()
-            .filter(sessions::Column::UserPid.eq(user_pid))
-            .all(&ctx.db)
+        let issued_sessions = sessions::Model::find_all_by_user_pid(&ctx.db, user_pid)
             .await
             .expect("query sessions");
         assert_eq!(issued_sessions.len(), 1, "one session from the redemption");
@@ -436,7 +429,6 @@ async fn concurrent_magic_link_redemptions_only_one_wins() {
         let token = users::Model::find_by_email(&ctx.db, "user1@example.com")
             .await
             .expect("seeded user should exist")
-            .into_active_model()
             .create_magic_link(&ctx.db)
             .await
             .expect("mint magic link")
@@ -520,8 +512,7 @@ async fn current_user_carries_live_abac_attrs() {
         let user = users::Model::find_by_email(&ctx.db, &logged_in.user.email)
             .await
             .expect("user exists");
-        user.into_active_model()
-            .set_attributes(&ctx.db, serde_json::json!({ "view": ["executive"] }))
+        user.set_attributes(&ctx.db, serde_json::json!({ "view": ["executive"] }))
             .await
             .expect("attrs update should succeed");
 

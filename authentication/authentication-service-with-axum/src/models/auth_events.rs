@@ -9,13 +9,60 @@
 //! internally, but it must not let a reader of the HTTP response infer
 //! account existence (anti-enumeration is preserved at the wire).
 
-use axa::prelude::*;
-use sea_orm::{ColumnTrait, Condition, QueryOrder, QuerySelect};
+use chrono::{DateTime, FixedOffset};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-pub use super::_entities::auth_events::{self, ActiveModel, Entity, Model};
+use super::{ModelResult, to_i64};
 
-impl ActiveModelBehavior for super::_entities::auth_events::ActiveModel {}
+/// An `auth_events` row. One row per authentication event (signup /
+/// magic-link request / redemption / signout / me) for the security +
+/// compliance audit trail. Never stores tokens or secrets. Serialized as
+/// is by `GET /api/auth/audit/recent`, so the field order and names are
+/// the wire shape.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row creation time; part of the integrity pre-image.
+    pub created_at: DateTime<FixedOffset>,
+    /// Last update time.
+    pub updated_at: DateTime<FixedOffset>,
+    /// Internal autoincrement primary key.
+    pub id: i64,
+    /// What happened.
+    pub event: String,
+    /// Normalised email when applicable.
+    pub email: Option<String>,
+    /// Subject user pid when known.
+    pub user_pid: Option<Uuid>,
+    /// Outcome detail. Never a token or secret.
+    pub detail: Option<String>,
+    /// SHA-256 (FIPS 180-4) over this audit row's pre-image.
+    ///
+    /// Unkeyed, so anyone holding the database can recompute it — what it
+    /// catches is careless or unaware modification. Written
+    /// unconditionally, unlike the MAC, which needs a key: with no key
+    /// configured these two digests are the row's only integrity.
+    pub hash: Option<String>,
+    /// SHA3-256 (FIPS 202) over the same pre-image. A sponge, unrelated
+    /// to SHA-256's Merkle-Damgard chaining, so a cryptanalytic advance
+    /// against one design family does not transfer.
+    pub hash_sha3: Option<String>,
+    /// HMAC-SHA256 over this row's pre-image, as
+    /// `"<scheme>.<key id>:<hex>"`.
+    ///
+    /// Detects a row whose content was altered — notably an
+    /// `attributes_assigned` row rewritten to hide a privilege grant. It
+    /// does **not** detect a row deleted wholesale (see
+    /// `crate::compliance`).
+    pub mac: Option<String>,
+    /// Best-effort connecting-peer address captured when the row was
+    /// written (T-14). Nullable for rows predating this column.
+    /// Deliberately **not** part of the MAC/hash pre-image (see
+    /// `crate::compliance::audit_integrity`) — widening that fixed-format
+    /// pre-image would break verification of every pre-existing row.
+    pub source_ip: Option<String>,
+}
 
 /// The `event` value for an ABAC attribute-assignment audit row, written
 /// whenever an operator changes a user's `users.attributes` (via the
@@ -52,7 +99,7 @@ impl Model {
     ///
     /// When the insert fails.
     pub async fn record(
-        db: &DatabaseConnection,
+        db: &PgPool,
         event: &str,
         email: Option<&str>,
         user_pid: Option<Uuid>,
@@ -63,7 +110,7 @@ impl Model {
         // rather than defaulted by the database: the alternative —
         // insert, then stamp — leaves a window in which the row exists
         // unprotected.
-        let created_at: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
+        let created_at: DateTime<FixedOffset> = chrono::Utc::now().into();
         // The stored address is the normalised one, so the MAC covers
         // what the row actually holds rather than what was passed in.
         let email = email.map(normalise_email);
@@ -80,19 +127,25 @@ impl Model {
                 created_at_micros: created_at.timestamp_micros(),
             },
         );
-        let entry = auth_events::ActiveModel {
-            event: ActiveValue::set(event.to_string()),
-            email: ActiveValue::set(email),
-            user_pid: ActiveValue::set(user_pid),
-            detail: ActiveValue::set(detail),
-            created_at: ActiveValue::set(created_at),
-            hash: ActiveValue::set(Some(digests.sha256)),
-            hash_sha3: ActiveValue::set(Some(digests.sha3)),
-            mac: ActiveValue::set(digests.mac),
-            source_ip: ActiveValue::set(source_ip.map(ToString::to_string)),
-            ..Default::default()
-        }
-        .insert(db)
+        let entry = sqlx::query_as!(
+            Self,
+            r#"INSERT INTO auth_events
+                   (event, email, user_pid, detail, created_at, hash, hash_sha3, mac, source_ip)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, event, email, user_pid, detail, hash, hash_sha3, mac,
+                         source_ip"#,
+            event,
+            email,
+            user_pid,
+            detail,
+            created_at,
+            digests.sha256,
+            digests.sha3,
+            digests.mac,
+            source_ip,
+        )
+        .fetch_one(db)
         .await?;
         Ok(entry)
     }
@@ -101,7 +154,7 @@ impl Model {
     /// logging it. Auditing must never break the request path, so
     /// handlers call this rather than `record` + `?`.
     pub async fn record_best_effort(
-        db: &DatabaseConnection,
+        db: &PgPool,
         event: &str,
         email: Option<&str>,
         user_pid: Option<Uuid>,
@@ -123,7 +176,7 @@ impl Model {
     /// (a value like a department can itself be sensitive; the value set
     /// lives in `users.attributes`, not the audit trail).
     pub async fn record_attribute_assignment_best_effort(
-        db: &DatabaseConnection,
+        db: &PgPool,
         target_email: Option<&str>,
         target_pid: Uuid,
         op: &str,
@@ -153,7 +206,7 @@ impl Model {
     /// attribute **values** stay out of the audit detail here too, same
     /// reasoning as the assignment row.
     pub async fn record_attribute_view_best_effort(
-        db: &DatabaseConnection,
+        db: &PgPool,
         target_email: Option<&str>,
         target_pid: Uuid,
         actor: &str,
@@ -180,20 +233,19 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn for_subject(
-        db: &DatabaseConnection,
-        user_pid: Uuid,
-        email: &str,
-    ) -> ModelResult<Vec<Self>> {
-        let rows = auth_events::Entity::find()
-            .filter(
-                Condition::any()
-                    .add(auth_events::Column::UserPid.eq(user_pid))
-                    .add(auth_events::Column::Email.eq(normalise_email(email))),
-            )
-            .order_by_desc(auth_events::Column::Id)
-            .all(db)
-            .await?;
+    pub async fn for_subject(db: &PgPool, user_pid: Uuid, email: &str) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, event, email, user_pid, detail, hash, hash_sha3, mac, source_ip
+               FROM auth_events
+               WHERE user_pid = $1 OR email = $2
+               ORDER BY id DESC"#,
+            user_pid,
+            normalise_email(email),
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 
@@ -207,37 +259,54 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn scrub_subject_email(
-        db: &DatabaseConnection,
-        user_pid: Uuid,
-        email: &str,
-    ) -> ModelResult<u64> {
-        let res = auth_events::Entity::update_many()
-            .col_expr(
-                auth_events::Column::Email,
-                sea_orm::sea_query::Expr::value(Option::<String>::None),
-            )
-            .filter(
-                Condition::any()
-                    .add(auth_events::Column::UserPid.eq(user_pid))
-                    .add(auth_events::Column::Email.eq(normalise_email(email))),
-            )
-            .exec(db)
-            .await?;
-        Ok(res.rows_affected)
+    pub async fn scrub_subject_email(db: &PgPool, user_pid: Uuid, email: &str) -> ModelResult<u64> {
+        let res = sqlx::query!(
+            "UPDATE auth_events SET email = NULL WHERE user_pid = $1 OR email = $2",
+            user_pid,
+            normalise_email(email),
+        )
+        .execute(db)
+        .await?;
+        Ok(res.rows_affected())
+    }
+
+    /// Empty `source_ip` on every row older than `days` (the address
+    /// retention sweep, `crate::compliance::address_retention`). The
+    /// column is outside the integrity pre-image, so the rows still
+    /// verify. Returns the number of rows emptied.
+    ///
+    /// # Errors
+    ///
+    /// When the update fails.
+    pub async fn scrub_source_ip_older_than(db: &PgPool, days: i32) -> Result<u64, sqlx::Error> {
+        let res = sqlx::query!(
+            "UPDATE auth_events SET source_ip = NULL
+             WHERE source_ip IS NOT NULL AND created_at < now() - make_interval(days => $1)",
+            days,
+        )
+        .execute(db)
+        .await?;
+        Ok(res.rows_affected())
     }
 
     /// Most-recent authentication events, newest first, capped at `limit`.
+    /// Also the sample `GET /api/compliance/audit/verify` checks.
     ///
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn recent(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
-        let rows = auth_events::Entity::find()
-            .order_by_desc(auth_events::Column::Id)
-            .limit(limit)
-            .all(db)
-            .await?;
+    pub async fn recent(db: &PgPool, limit: u64) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, event, email, user_pid, detail, hash, hash_sha3, mac, source_ip
+               FROM auth_events
+               ORDER BY id DESC
+               LIMIT $1"#,
+            to_i64(limit),
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 }

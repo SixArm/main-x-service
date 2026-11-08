@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE auth_events SET email = NULL WHERE user_pid = $1 OR email = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dd61bd5f5553c3b3360ce9c420f6dab6791ecd2b977402894406f5ab6477616e"
+}

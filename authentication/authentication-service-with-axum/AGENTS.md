@@ -65,7 +65,8 @@ alongside OIDC in the same pass.
 
 | Question | Answer |
 |---|---|
-| Framework | axa (real `Hooks`/`AppContext` boot, axa controllers, axa config, `sea-orm-migration` 2.0). |
+| Framework | axa (real `Hooks`/`AppContext` boot, axa controllers, axa config). |
+| Database | sqlx, no ORM: every statement a `query!`/`query_as!`/`query_scalar!` literal in `src/models/`, `.sqlx/` committed; plain-SQL migrations under `migrations/` run by `sqlx::migrate!`. |
 | Auth model | Passwordless magic link → server-side cookie session. No passwords are ever checked. |
 | Tokens | Cross-service: short-lived PASETO v4.public (Ed25519); public key(s) published at `/.well-known/paseto-keys` for offline verification. |
 | Build | `cargo build` |
@@ -132,9 +133,13 @@ to add a locale. See spec §6.11 / §12.
 ## Golden rules
 
 1. **Controller-style.** New endpoints are axa controllers registered in
-   `app.rs`; new tables are `sea-orm-migration` migrations registered in
-   `src/migration/mod.rs` with a matching entity under
-   `src/models/_entities/`.
+   `app.rs`; new tables are a plain-SQL `migrations/<version>_<name>.up.sql`
+   / `.down.sql` pair with a row struct and its statements under
+   `src/models/`. **All SQL lives in `src/models/`** and is a
+   `query!`/`query_as!`/`query_scalar!` literal; after changing one, run
+   `cargo sqlx prepare -- --all-targets --features oidc` against a
+   migrated database and commit `.sqlx/` (builds use `SQLX_OFFLINE=true`).
+   No `QueryBuilder`, `raw_sql` or `AssertSqlSafe`.
 2. **Asymmetric public-key tokens only.** Cross-service token
    signing/verification lives in `src/auth`: PASETO v4.public
    (Ed25519). Do not reintroduce axa's symmetric HS256 helper
@@ -190,11 +195,14 @@ src/
 ├── models/
 │   ├── users.rs           magic-link user model (+ create_passwordless, GDPR erase + find_active_by_pid, ABAC attributes_map/attrs)
 │   ├── sessions.rs        opaque cookie session issue/revoke; session_data copies ABAC attrs at establishment; revoke_all_for_user for erasure (per the auth-sessions design)
-│   └── _entities/         generated SeaORM entities
+│   ├── auth_events.rs     the audit trail's row type, insert (with digests + MAC), subject reads, GDPR scrub
+│   ├── auth_rate_limits.rs the rate limiter's statements (advisory lock, prune, count, insert)
+│   └── mod.rs             MIGRATOR, ModelError/ModelResult, delete_all_rows (truncate)
 ├── mailers/auth.rs        magic-link mailer (prod)
 ├── tasks/attributes.rs    `user_attributes` CLI task — operator ABAC attribute assignment (set/show/unset/clear users.attributes)
-├── migration/             in-crate migrator: m20220101_000001_users, _000002_sessions, _000003_auth_events, _000004_users_deleted_at, _000005_auth_rate_limits, _000006_users_attributes, _000007_sessions_data, _000008_sessions_ttls, _000009_hash_credentials_at_rest, m20260728_000001_add_auth_event_mac, m20260906_000001_sessions_source_ip, m20260906_000002_auth_events_source_ip
 └── views/auth.rs          LoginResponse / CurrentResponse
+migrations/                plain SQL, sqlx's flat reversible layout: 2022010100000001_users … 2022010100000009_hash_credentials_at_rest, 2026072800000001_add_auth_event_mac, 2026090600000001_sessions_source_ip, 2026090600000002_auth_events_source_ip
+.sqlx/                     compile-time query data for the `query!` macros (regenerate with `cargo sqlx prepare`)
 config/                    development/production/test yaml (keys/ holds only a README — no committed key files)
 ```
 
