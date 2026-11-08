@@ -9,14 +9,14 @@ importers:
   .:
     dependencies:
       '@lilydesignsystem/svelte-headless':
-        specifier: ^0.6.1
-        version: 0.6.1(svelte@5.57.3)
+        specifier: ^0.6.2
+        version: 0.6.2(svelte@5.57.3)
       '@lilydesignsystem/svelte-locale-picker':
         specifier: ^0.3.1
-        version: 0.3.1(@lilydesignsystem/svelte-headless@0.6.1(svelte@5.57.3))(svelte@5.57.3)
+        version: 0.3.1(@lilydesignsystem/svelte-headless@0.6.2(svelte@5.57.3))(svelte@5.57.3)
       '@lilydesignsystem/svelte-picker-bar':
         specifier: ^0.5.1
-        version: 0.5.1(@lilydesignsystem/svelte-headless@0.6.1(svelte@5.57.3))(svelte@5.57.3)
+        version: 0.5.1(@lilydesignsystem/svelte-headless@0.6.2(svelte@5.57.3))(svelte@5.57.3)
       '@lilydesignsystem/svelte-share-picker':
         specifier: ^0.3.0
         version: 0.3.0(svelte@5.57.3)
@@ -187,8 +187,8 @@ packages:
     peerDependencies:
       svelte: ^5.0.0
 
-  '@lilydesignsystem/svelte-headless@0.6.1':
-    resolution: {integrity: sha512-gQ3G9tXrEu1VyOM9is21L97J1lGdxPCrHPj5nM8zDOFSpv2uLnzCU19Sj/7K4hqxcpxbUdc71M9KaxUddr9MEQ==}
+  '@lilydesignsystem/svelte-headless@0.6.2':
+    resolution: {integrity: sha512-WKzqgorO9N6HuP7913da/ArcVyaM7dC0feqXS+H4qnccyNfujeR1Kc8QEL7nb5fvITpQ0QlOqPwxT6YdrE+lJA==}
     engines: {node: '>=26'}
     peerDependencies:
       svelte: ^5.0.0
@@ -1226,7 +1226,7 @@ snapshots:
       aria-query: 5.3.2
       svelte: 5.57.3
 
-  '@lilydesignsystem/svelte-headless@0.6.1(svelte@5.57.3)':
+  '@lilydesignsystem/svelte-headless@0.6.2(svelte@5.57.3)':
     dependencies:
       aria-query: 5.3.2
       svelte: 5.57.3
@@ -1236,21 +1236,21 @@ snapshots:
       '@lilydesignsystem/svelte-headless': 0.4.0(svelte@5.57.3)
       svelte: 5.57.3
 
-  '@lilydesignsystem/svelte-locale-picker@0.3.1(@lilydesignsystem/svelte-headless@0.6.1(svelte@5.57.3))(svelte@5.57.3)':
+  '@lilydesignsystem/svelte-locale-picker@0.3.1(@lilydesignsystem/svelte-headless@0.6.2(svelte@5.57.3))(svelte@5.57.3)':
     dependencies:
-      '@lilydesignsystem/svelte-headless': 0.6.1(svelte@5.57.3)
+      '@lilydesignsystem/svelte-headless': 0.6.2(svelte@5.57.3)
       svelte: 5.57.3
 
-  '@lilydesignsystem/svelte-picker-bar@0.5.1(@lilydesignsystem/svelte-headless@0.6.1(svelte@5.57.3))(svelte@5.57.3)':
+  '@lilydesignsystem/svelte-picker-bar@0.5.1(@lilydesignsystem/svelte-headless@0.6.2(svelte@5.57.3))(svelte@5.57.3)':
     dependencies:
-      '@lilydesignsystem/svelte-headless': 0.6.1(svelte@5.57.3)
+      '@lilydesignsystem/svelte-headless': 0.6.2(svelte@5.57.3)
       '@lilydesignsystem/svelte-link-picker': 0.2.0(svelte@5.57.3)
-      '@lilydesignsystem/svelte-locale-picker': 0.3.1(@lilydesignsystem/svelte-headless@0.6.1(svelte@5.57.3))(svelte@5.57.3)
+      '@lilydesignsystem/svelte-locale-picker': 0.3.1(@lilydesignsystem/svelte-headless@0.6.2(svelte@5.57.3))(svelte@5.57.3)
       '@lilydesignsystem/svelte-search-picker': 0.2.0(svelte@5.57.3)
       '@lilydesignsystem/svelte-share-picker': 0.3.0(svelte@5.57.3)
       '@lilydesignsystem/svelte-text-size-picker': 0.3.0(svelte@5.57.3)
       '@lilydesignsystem/svelte-theme-picker': 0.3.0(svelte@5.57.3)
-      '@lilydesignsystem/svelte-time-zone-picker': 0.2.0(@lilydesignsystem/svelte-headless@0.6.1(svelte@5.57.3))(svelte@5.57.3)
+      '@lilydesignsystem/svelte-time-zone-picker': 0.2.0(@lilydesignsystem/svelte-headless@0.6.2(svelte@5.57.3))(svelte@5.57.3)
       svelte: 5.57.3
 
   '@lilydesignsystem/svelte-search-picker@0.2.0(svelte@5.57.3)':
@@ -1273,9 +1273,9 @@ snapshots:
       '@lilydesignsystem/svelte-headless': 0.4.0(svelte@5.57.3)
       svelte: 5.57.3
 
-  '@lilydesignsystem/svelte-time-zone-picker@0.2.0(@lilydesignsystem/svelte-headless@0.6.1(svelte@5.57.3))(svelte@5.57.3)':
+  '@lilydesignsystem/svelte-time-zone-picker@0.2.0(@lilydesignsystem/svelte-headless@0.6.2(svelte@5.57.3))(svelte@5.57.3)':
     dependencies:
-      '@lilydesignsystem/svelte-headless': 0.6.1(svelte@5.57.3)
+      '@lilydesignsystem/svelte-headless': 0.6.2(svelte@5.57.3)
       svelte: 5.57.3
 
   '@lilydesignsystem/themes@0.6.0': {}
