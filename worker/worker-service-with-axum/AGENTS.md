@@ -94,10 +94,11 @@ template). The rules that keep it reviewable:
   queue keep their `time` types above `src/db/`, filled from `chrono`
   twins (`*Raw` in `db::models`), so the chain and assessment pre-images
   and the wire are unchanged.
-- Enum columns are written in the spellings they always had, including
-  the `Debug` ones the CHECK constraints refuse (spec §13 SQ-1, WK-D1).
-  Fixing that is a behaviour change with its own task, not part of a
-  persistence edit.
+- Enum columns hold the spellings their CHECK constraints take: the serde
+  wire token (`enum_to_tag`), except a link type, which has its own map
+  (`link_type_tag`: the column's `replaced_by` is the wire's
+  `replacedby`). Never `format!("{:?}")`: that spelling is refused, and
+  every write carrying it answered `500` until WK-D1 (spec §13).
 
 ## Durable event bus relay (Fluvio)
 

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, worker_id, category, instrument, provider, status, administered_on,\n                expires_on, administered_by, notes, results, created_at, updated_at,\n                deleted_at, content_hash, content_hash_sha3, content_mac\n         FROM worker_assessments\n         LIMIT $1",
+  "query": "SELECT id, worker_id, category, instrument, provider, status, administered_on,\n                expires_on, administered_by, notes, results, created_at, updated_at,\n                deleted_at, content_hash, content_hash_sha3, content_mac\n         FROM worker_assessments\n         WHERE worker_id = $1 AND deleted_at IS NULL\n         ORDER BY administered_on DESC NULLS LAST, created_at DESC",
   "describe": {
     "columns": [
       {
@@ -193,7 +193,7 @@
     ],
     "parameters": {
       "Left": [
-        "Int8"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -216,5 +216,5 @@
       true
     ]
   },
-  "hash": "af388f31b031e2404849b0ebf21cd172f751a97af75c7fccc91a88906d9313da"
+  "hash": "368988c8a4109f77df6a2e42dfcec59c1761e7994291f311964118f4431a5195"
 }

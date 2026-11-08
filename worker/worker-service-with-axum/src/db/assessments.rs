@@ -232,6 +232,10 @@ async fn write_hashed(
 /// One worker's **live** assessments, most recently administered first
 /// (rows with no administration date sort last, then by creation).
 ///
+/// `NULLS LAST` is spelled out because Postgres sorts `NULL` *first* under
+/// `DESC` (WK-A1): without it an undated, scheduled assessment came before
+/// every dated one.
+///
 /// # Errors
 ///
 /// Returns [`crate::Error::Database`] when the query fails.
@@ -244,7 +248,7 @@ pub async fn list_for_worker(db: impl Into<Db<'_>>, worker_id: Uuid) -> Result<V
                 deleted_at, content_hash, content_hash_sha3, content_mac
          FROM worker_assessments
          WHERE worker_id = $1 AND deleted_at IS NULL
-         ORDER BY administered_on DESC, created_at DESC",
+         ORDER BY administered_on DESC NULLS LAST, created_at DESC",
         worker_id,
     )
     .fetch_all(&mut *conn)
@@ -277,9 +281,13 @@ pub async fn find(db: impl Into<Db<'_>>, worker_id: Uuid, id: Uuid) -> Result<Op
     Ok(found.map(Into::into))
 }
 
-/// Up to `limit` assessment rows, deleted or not, in no particular order
-/// (the query has no `ORDER BY`, as before) — the assessment half of
-/// `/api/records/verify`.
+/// The `limit` most recently updated assessment rows, deleted or not —
+/// the assessment half of `/api/records/verify`.
+///
+/// Newest is `updated_at` descending, as the `workers` half orders, and
+/// `id` breaks ties so the window is deterministic. With no `ORDER BY` a
+/// capped run checked whichever rows the heap scan reached first, so a
+/// recent edit could go unchecked (WK-A2, as LG-A1 was for audit rows).
 ///
 /// # Errors
 ///
@@ -292,6 +300,7 @@ pub async fn rows_for_verification(db: impl Into<Db<'_>>, limit: i64) -> Result<
                 expires_on, administered_by, notes, results, created_at, updated_at,
                 deleted_at, content_hash, content_hash_sha3, content_mac
          FROM worker_assessments
+         ORDER BY updated_at DESC, id DESC
          LIMIT $1",
         limit,
     )

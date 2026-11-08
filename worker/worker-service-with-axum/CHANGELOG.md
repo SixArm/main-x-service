@@ -52,6 +52,38 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `a_written_record_verifies` (a fresh, an assessed and an updated
   record verify, a row edited in SQL is flagged) failed on the SeaORM
   code and passes.
+- **WK-D1: telecom, links, name and identifier uses, and `OTHER`/`ODS`
+  identifiers could not be stored.** The name and identifier uses, the
+  identifier type, a contact's system and use, and a link's type were
+  written in their Rust `Debug` spelling (`Official`, `Other`, `Phone`,
+  `Seealso`), which the tables' lowercase CHECK constraints refuse, so
+  any create or update carrying one answered `500`. They are now
+  written as their serde wire tokens (`official`, `OTHER`, `phone`), and
+  a link type as the column spells it (`replaced_by` for the wire's
+  `replacedby`), and read back case-insensitively. The JSON API is
+  unchanged. A new migration, `2026110800000001_identifier_type_ods`,
+  adds `ODS` to the identifier-type CHECK, which never listed it. The DB
+  test `enum_columns_round_trip` answered `500` before and passes;
+  `a_written_record_verifies` now carries telecom, links and every use.
+- **WK-E1: erasure kept `content_mac`.** It nulled the two digests but
+  left the MAC, a keyed digest of the erased content. It is nulled with
+  them (`tests/erasure_db.rs`, `erasure_nulls_the_mac_with_the_hashes`).
+- **WK-E2: erasure redacted audit rows before taking the chain lock,**
+  so a row about the subject appended in between committed unredacted.
+  `db::audit::lock_chain` now takes it first, on the erasure's
+  transaction, as person and case do. The DB test holds the lock in a
+  second session until `pg_locks` shows the erasure waiting, appends a
+  row, and checks it was redacted; it redacted one row instead of two
+  before the fix. `AuditLogRepository::log_access_on` writes an access
+  row on the caller's connection.
+- **WK-A1: undated assessments listed first.** `list_for_worker` orders
+  `administered_on DESC NULLS LAST`, as its doc and the API spec say;
+  Postgres sorts `NULL` first under `DESC`.
+- **WK-A2: a capped `/api/records/verify` checked arbitrary
+  assessments.** The assessment half read `LIMIT n` with no `ORDER BY`.
+  It now takes the newest, `updated_at DESC, id DESC`. The DB test edits
+  the newest of twelve assessments and asks for `limit=3`; it was missed
+  before and is caught now.
 
 ### Added
 

@@ -23,7 +23,28 @@ use crate::Result;
 use crate::compliance::audit_chain;
 
 /// Postgres advisory-lock key serialising chain appends.
-const CHAIN_LOCK_KEY: i64 = 0x6D78_695F_776B_7272; // "mxi_wkrr"
+pub const CHAIN_LOCK_KEY: i64 = 0x6D78_695F_776B_7272; // "mxi_wkrr"
+
+/// Take the chain's append lock ([`CHAIN_LOCK_KEY`]) on `conn`, held to
+/// the end of the enclosing transaction.
+///
+/// Every chained append takes it itself; this is for a caller that needs
+/// it *earlier* in the same transaction. The GDPR erasure takes it before
+/// its redaction sweep (WK-E2), as case's and person's do, so no audit
+/// row about the subject can commit between the sweep and the erasure's
+/// own `erased` row and survive unredacted. Taking it again in the same
+/// transaction is a no-op, since advisory locks are re-entrant per
+/// session.
+///
+/// # Errors
+///
+/// When the lock query fails.
+pub async fn lock_chain(conn: &mut sqlx::PgConnection) -> Result<()> {
+    sqlx::query!("SELECT pg_advisory_xact_lock($1)", CHAIN_LOCK_KEY)
+        .execute(conn)
+        .await?;
+    Ok(())
+}
 
 /// Actor metadata recorded alongside an audit entry, borrowed for the duration
 /// of the write. Groups the user/IP/user-agent triple so the `log_*` helpers
@@ -241,7 +262,26 @@ impl AuditLogRepository {
         actor: &AuditActor<'_>,
         access: &crate::compliance::disclosure::AccessContext,
     ) -> Result<()> {
-        self.log_chained(
+        self.log_access_on(&self.db, entity_type, entity_id, action, actor, access)
+            .await
+    }
+
+    /// [`Self::log_access`] on the caller's connection or transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Database`] if the audit row insert fails.
+    pub async fn log_access_on(
+        &self,
+        conn: impl Into<Db<'_>>,
+        entity_type: &str,
+        entity_id: Uuid,
+        action: &str,
+        actor: &AuditActor<'_>,
+        access: &crate::compliance::disclosure::AccessContext,
+    ) -> Result<()> {
+        self.log_chained_on(
+            conn,
             action,
             entity_type,
             entity_id,

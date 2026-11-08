@@ -110,7 +110,9 @@ pub async fn delete_emergency_contacts(conn: &mut PgConnection, id: Uuid) -> Res
 }
 
 /// Scrub the parent row's own personal fields and retire it: `gender`,
-/// which is `NOT NULL`, takes `gender`; the two digests become `NULL`.
+/// which is `NOT NULL`, takes `gender`; the two digests and the MAC
+/// become `NULL` (WK-E1: the MAC is a keyed digest of the same erased
+/// content, so it goes with them).
 ///
 /// # Errors
 ///
@@ -129,7 +131,7 @@ pub async fn scrub_worker(
            marital_status = NULL, multiple_birth = NULL,
            managing_organization_id = NULL,
            created_by = NULL, updated_by = NULL,
-           content_hash = NULL, content_hash_sha3 = NULL,
+           content_hash = NULL, content_hash_sha3 = NULL, content_mac = NULL,
            active = FALSE, deleted_at = NOW(), deleted_by = $3,
            updated_at = NOW()
          WHERE id = $1",

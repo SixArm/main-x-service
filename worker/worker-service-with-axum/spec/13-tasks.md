@@ -804,3 +804,40 @@ clearly described manual check confirms the acceptance criterion.
           capped window covers is arbitrary.
       - Unit tests 373 (was 374; the SQL-text pin became a DB test), DB
         suite 47 (was 45). Unique normal dependencies 389 → 350.
+
+- [x] **WK-D1: write enum columns in their CHECK spellings
+      (2026-11-08).** The name and identifier uses, the identifier type, a
+      contact's system and use, and a link's type are written with
+      `enum_to_tag` (the serde wire token: `official`, `OTHER`, `phone`)
+      and a link type with `link_type_tag` (`replaced_by` for the wire's
+      `replacedby`, so the JSON API does not change), and read back with
+      `tag_to_enum`, ignoring case, as person did in PERSON-CONTACT-CASE.
+      The identifier-type CHECK never listed `ODS`, so migration
+      `2026110800000001_identifier_type_ods` adds it. The DB test
+      `enum_columns_round_trip` creates and reads back every name and
+      identifier use, `OTHER` and `ODS` identifiers, every contact system
+      and use, and every link type; it answered `500` before. The
+      `a_written_record_verifies` payload now carries telecom, links and
+      those uses, and failed with `500` on the old code.
+- [x] **WK-E1: erasure nulls `content_mac` (2026-11-08),** with the two
+      digests, as person's PE-E1. `tests/erasure_db.rs`
+      `erasure_nulls_the_mac_with_the_hashes` (a binary of its own, with
+      a MAC key) found the MAC still set before.
+- [x] **WK-E2: erasure takes the chain lock before redacting
+      (2026-11-08)** (`db::audit::lock_chain`, as person's PE-E2 and
+      case's CS-G1). `erasure_redacts_an_audit_row_appended_while_it_waits`
+      holds the lock in a second session until `pg_locks` shows the
+      erasure waiting, appends an access row about the subject
+      (`log_access_on`), and releases it. Before, the erasure redacted one
+      row and the late one survived.
+- [x] **WK-A1: undated assessments list last (2026-11-08).**
+      `list_for_worker` orders `administered_on DESC NULLS LAST,
+      created_at DESC`, matching its doc and §9's "most recently
+      administered". `undated_assessments_list_last` read `Undated,
+      Newer, Older` before.
+- [x] **WK-A2: the assessment half of `/api/records/verify` checks the
+      newest rows (2026-11-08)**, `ORDER BY updated_at DESC, id DESC`, as
+      LG-A1 did for audit rows. `records_verify_checks_the_newest_assessments`
+      edits the newest of twelve (after `VACUUM FULL`, so the edited row
+      is last in the heap) and asks for `limit=3`; it was missed before.
+  - Unit tests 373, DB suite 52 (was 47).

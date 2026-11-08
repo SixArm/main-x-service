@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workers SET\n           gender = $2, birth_date = NULL, tax_id = NULL,\n           worker_type = NULL,\n           deceased = FALSE, deceased_datetime = NULL,\n           marital_status = NULL, multiple_birth = NULL,\n           managing_organization_id = NULL,\n           created_by = NULL, updated_by = NULL,\n           content_hash = NULL, content_hash_sha3 = NULL, content_mac = NULL,\n           active = FALSE, deleted_at = NOW(), deleted_by = $3,\n           updated_at = NOW()\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b7ad4d2e6477420768d7a8cf84325838667796c8b82df5dd854ad54842f66be9"
+}

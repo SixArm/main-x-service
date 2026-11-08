@@ -8709,3 +8709,31 @@ kept as they were (crate spec §13 SQ-1).
   **Done 2026-11-08** (with PE-E3): the test lists the page starting at
   each fixture's position, and seeds 120 rows ahead to keep it honest;
   the tombstone is inserted primary, with a backfill migration.
+
+## Found 2026-11-08 (moving worker to sqlx)
+
+Kept as they were by worker's SQ-1, then fixed (crate spec §13).
+
+- [x] **WK-D1 (M)** The name and identifier uses, the identifier type, a
+  contact's system and use, and a link's type were written in their Rust
+  `Debug` spelling, which the lowercase CHECK constraints refuse, so any
+  write carrying telecom, a link, a use, or an `OTHER`/`ODS` identifier
+  answered `500`; telecom and links had never been storable. Now written
+  as the CHECK spellings and read back, as person's PERSON-CONTACT-CASE;
+  `ODS` added to the identifier-type CHECK by migration. JSON unchanged.
+- [x] **WK-E1 (S)** Erasure nulled the two digests but not `content_mac`.
+- [x] **WK-E2 (S)** Erasure redacted audit rows before taking the chain's
+  advisory lock; it now takes it first (`lock_chain`), as person and case.
+- [x] **WK-A1 (S)** `assessments::list_for_worker` sorted undated
+  assessments first; now `DESC NULLS LAST`, as documented.
+- [x] **WK-A2 (S)** The assessment half of `/api/records/verify` took
+  `LIMIT n` with no `ORDER BY`; now the newest, `updated_at DESC, id DESC`.
+- [ ] **WK-E3 (S)** Erasure's tombstone name is inserted with `is_primary`
+  left at its default, `false`, so an erased worker cannot be assembled
+  ("Worker has no primary name"), as person's PE-E3 was. Not fixed here.
+- [ ] **WK-F1 (S)** worker's FHIR `Practitioner` builds link codes from the
+  Rust `Debug` spelling lowercased, so `ReplacedBy` goes out as
+  `replacedby` rather than FHIR's `replaced-by`.
+- [ ] **WK-V1 (S)** the workers half of `/api/records/verify` orders by
+  `updated_at DESC` with no tie-breaker, so a capped run's sample is not
+  stable when rows share a timestamp.

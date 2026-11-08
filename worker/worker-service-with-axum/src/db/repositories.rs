@@ -62,6 +62,44 @@ fn tag_to_enum<T: serde::de::DeserializeOwned>(tag: Option<&str>) -> Option<T> {
     serde_json::from_value(serde_json::Value::String(t.to_string())).ok()
 }
 
+/// The `worker_links.link_type` token for `link_type`, as the column's
+/// CHECK constraint spells it (`replaced_by`, `replaces`, `refer`,
+/// `seealso`).
+///
+/// Not [`enum_to_tag`]: the wire token for [`LinkType::ReplacedBy`] is
+/// `replacedby` (`rename_all = "lowercase"`), and changing it would change
+/// the JSON API. The column has its own spelling, so it gets its own map.
+fn link_type_tag(link_type: &crate::models::LinkType) -> &'static str {
+    use crate::models::LinkType;
+    match link_type {
+        LinkType::ReplacedBy => "replaced_by",
+        LinkType::Replaces => "replaces",
+        LinkType::Refer => "refer",
+        LinkType::Seealso => "seealso",
+    }
+}
+
+/// Inverse of [`link_type_tag`]. Case-insensitive, and takes the wire
+/// spelling `replacedby` too, so a row from a schema without the CHECK
+/// constraint still reads back.
+fn link_type_from_tag(tag: &str) -> Option<crate::models::LinkType> {
+    use crate::models::LinkType;
+    match tag.to_ascii_lowercase().as_str() {
+        "replaced_by" | "replacedby" => Some(LinkType::ReplacedBy),
+        "replaces" => Some(LinkType::Replaces),
+        "refer" => Some(LinkType::Refer),
+        "seealso" => Some(LinkType::Seealso),
+        _ => None,
+    }
+}
+
+/// A stored lowercase tag parsed into its enum, ignoring case, so a row
+/// written in the old `Debug` spelling (`Official`) by a schema without
+/// the CHECK constraint still reads back.
+fn lowercase_tag_to_enum<T: serde::de::DeserializeOwned>(tag: Option<&str>) -> Option<T> {
+    tag_to_enum(tag.map(str::to_ascii_lowercase).as_deref())
+}
+
 /// A list position as the `INTEGER` column takes it.
 fn position(i: usize) -> i32 {
     i32::try_from(i).unwrap_or(i32::MAX)
@@ -115,8 +153,8 @@ async fn insert_worker_row(conn: &mut PgConnection, worker: &Worker) -> Result<(
     Ok(())
 }
 
-/// Insert one `worker_names` row. The name use goes in its `Debug` form,
-/// as it always has (see [`insert_children`]).
+/// Insert one `worker_names` row. The name use goes in its lowercase wire
+/// token (see [`insert_children`]).
 async fn insert_name(
     conn: &mut PgConnection,
     worker_id: Uuid,
@@ -130,7 +168,7 @@ async fn insert_name(
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
         Uuid::new_v4(),
         worker_id,
-        name.use_type.as_ref().map(|u| format!("{u:?}")),
+        name.use_type.as_ref().and_then(enum_to_tag),
         name.family,
         &name.given,
         &name.prefix,
@@ -150,14 +188,15 @@ async fn insert_name(
 /// position), links, documents, emergency contacts with their telecom
 /// rows, and photos.
 ///
-/// The name, identifier and contact uses, the identifier type, the contact
-/// system and the link type are stored in their `Debug` form
-/// (`format!("{:?}", …)`), exactly as the `SeaORM` code stored them, and
-/// [`PgWorkerRepository::from_db_models`] parses those forms back. Several
-/// of them (`Official`, `Phone`, `Seealso`, `Other`) fall outside the
-/// tables' lowercase CHECK constraints, so a write carrying one is refused
-/// by Postgres; that defect is kept as it was, not fixed here. An
-/// address's `use_type` is not stored (it is written `NULL`).
+/// The name, identifier and contact uses, the identifier type and the
+/// contact system are stored as their serde wire tokens ([`enum_to_tag`]:
+/// `official`, `OTHER`, `phone`), which are the spellings the tables'
+/// CHECK constraints take, and the link type as [`link_type_tag`] spells
+/// it. [`PgWorkerRepository::from_db_models`] parses them back. They used
+/// to be written in their Rust `Debug` form (`Official`, `Other`,
+/// `Phone`, `Seealso`), which the constraints refuse, so any write
+/// carrying one answered `500` (WK-D1). An address's `use_type` is not
+/// stored (it is written `NULL`).
 async fn insert_children(conn: &mut PgConnection, worker: &Worker) -> Result<()> {
     insert_name(conn, worker.id, &worker.name, true).await?;
     for name in &worker.additional_names {
@@ -171,8 +210,8 @@ async fn insert_children(conn: &mut PgConnection, worker: &Worker) -> Result<()>
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
             Uuid::new_v4(),
             worker.id,
-            id.use_type.as_ref().map(|u| format!("{u:?}")),
-            format!("{:?}", id.identifier_type),
+            id.use_type.as_ref().and_then(enum_to_tag),
+            enum_to_tag(&id.identifier_type).unwrap_or_default(),
             id.system,
             id.value,
             id.assigner,
@@ -210,9 +249,9 @@ async fn insert_children(conn: &mut PgConnection, worker: &Worker) -> Result<()>
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             Uuid::new_v4(),
             worker.id,
-            format!("{:?}", cp.system),
+            enum_to_tag(&cp.system).unwrap_or_default(),
             cp.value,
-            cp.use_type.as_ref().map(|u| format!("{u:?}")),
+            cp.use_type.as_ref().and_then(enum_to_tag),
             idx == 0,
             Utc::now(),
             Utc::now(),
@@ -228,7 +267,7 @@ async fn insert_children(conn: &mut PgConnection, worker: &Worker) -> Result<()>
             Uuid::new_v4(),
             worker.id,
             link.other_worker_id,
-            format!("{:?}", link.link_type),
+            link_type_tag(&link.link_type),
             Utc::now(),
         )
         .execute(&mut *conn)
@@ -919,19 +958,8 @@ impl PgWorkerRepository {
     /// Maps one `worker_names` row back into a domain [`HumanName`], parsing
     /// the string-stored name-use tag.
     fn human_name_from_db(n: &NameRow) -> HumanName {
-        use crate::models::NameUse;
-
         HumanName {
-            use_type: n.use_type.as_ref().and_then(|u| match u.as_str() {
-                "Usual" => Some(NameUse::Usual),
-                "Official" => Some(NameUse::Official),
-                "Temp" => Some(NameUse::Temp),
-                "Nickname" => Some(NameUse::Nickname),
-                "Anonymous" => Some(NameUse::Anonymous),
-                "Old" => Some(NameUse::Old),
-                "Maiden" => Some(NameUse::Maiden),
-                _ => None,
-            }),
+            use_type: lowercase_tag_to_enum(n.use_type.as_deref()),
             family: n.family.clone(),
             given: n.given.clone(),
             prefix: n.prefix.clone(),
@@ -942,30 +970,17 @@ impl PgWorkerRepository {
     /// Maps the `worker_identifiers` rows back into domain [`Identifier`]s,
     /// parsing the string-stored type / use-type tags.
     fn identifiers_from_db(db_identifiers: &[IdentifierRow]) -> Vec<Identifier> {
-        use crate::models::{IdentifierType, IdentifierUse};
+        use crate::models::IdentifierType;
 
         db_identifiers
             .iter()
             .map(|id| {
-                let identifier_type = match id.identifier_type.as_str() {
-                    "MRN" => IdentifierType::MRN,
-                    "SSN" => IdentifierType::SSN,
-                    "DL" => IdentifierType::DL,
-                    "NPI" => IdentifierType::NPI,
-                    "PPN" => IdentifierType::PPN,
-                    "TAX" => IdentifierType::TAX,
-                    "ODS" => IdentifierType::ODS,
-                    _ => IdentifierType::Other,
-                };
-
-                let use_type = id.use_type.as_ref().and_then(|u| match u.as_str() {
-                    "Usual" => Some(IdentifierUse::Usual),
-                    "Official" => Some(IdentifierUse::Official),
-                    "Temp" => Some(IdentifierUse::Temp),
-                    "Secondary" => Some(IdentifierUse::Secondary),
-                    "Old" => Some(IdentifierUse::Old),
-                    _ => None,
-                });
+                // UPPERCASE on the wire and in the column; an unknown
+                // token is `Other`, as `#[serde(other)]` makes it.
+                let identifier_type =
+                    tag_to_enum(Some(id.identifier_type.to_ascii_uppercase().as_str()))
+                        .unwrap_or(IdentifierType::Other);
+                let use_type = lowercase_tag_to_enum(id.use_type.as_deref());
 
                 Identifier {
                     identifier_type,
@@ -981,30 +996,11 @@ impl PgWorkerRepository {
     /// Maps the `worker_contacts` rows back into domain [`ContactPoint`]s,
     /// dropping any row whose system tag is unrecognized.
     fn telecom_from_db(db_contacts: &[ContactRow]) -> Vec<ContactPoint> {
-        use crate::models::{ContactPointSystem, ContactPointUse};
-
         db_contacts
             .iter()
             .filter_map(|cp| {
-                let system = match cp.system.as_str() {
-                    "Phone" => ContactPointSystem::Phone,
-                    "Fax" => ContactPointSystem::Fax,
-                    "Email" => ContactPointSystem::Email,
-                    "Pager" => ContactPointSystem::Pager,
-                    "Url" => ContactPointSystem::Url,
-                    "Sms" => ContactPointSystem::Sms,
-                    "Other" => ContactPointSystem::Other,
-                    _ => return None,
-                };
-
-                let use_type = cp.use_type.as_ref().and_then(|u| match u.as_str() {
-                    "Home" => Some(ContactPointUse::Home),
-                    "Work" => Some(ContactPointUse::Work),
-                    "Temp" => Some(ContactPointUse::Temp),
-                    "Old" => Some(ContactPointUse::Old),
-                    "Mobile" => Some(ContactPointUse::Mobile),
-                    _ => None,
-                });
+                let system = lowercase_tag_to_enum(Some(cp.system.as_str()))?;
+                let use_type = lowercase_tag_to_enum(cp.use_type.as_deref());
 
                 Some(ContactPoint {
                     system,
@@ -1035,7 +1031,7 @@ impl PgWorkerRepository {
         db_contacts: &[ContactRow],
         db_links: &[LinkRow],
     ) -> Result<Worker> {
-        use crate::models::{Gender, LinkType};
+        use crate::models::Gender;
 
         // Parse gender. The DB stores lowercase per the CHECK constraint
         // ('male'/'female'/'other'/'unknown'); accept PascalCase too, so
@@ -1100,13 +1096,7 @@ impl PgWorkerRepository {
         let links = db_links
             .iter()
             .filter_map(|link| {
-                let link_type = match link.link_type.as_str() {
-                    "ReplacedBy" => LinkType::ReplacedBy,
-                    "Replaces" => LinkType::Replaces,
-                    "Refer" => LinkType::Refer,
-                    "Seealso" => LinkType::Seealso,
-                    _ => return None,
-                };
+                let link_type = link_type_from_tag(&link.link_type)?;
 
                 Some(WorkerLink {
                     other_worker_id: link.other_worker_id,

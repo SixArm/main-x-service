@@ -178,9 +178,12 @@ pub async fn erase(
 
     if found {
         // 2. Scrub the parent row's own personal fields and retire it.
-        //    `content_hash` is set to NULL rather than recomputed: the
-        //    hash covers the *assembled* record and the child rows are
-        //    deleted in step 1, so there is no longer a record to hash.
+        //    The digests (`content_hash`, `content_hash_sha3`) and the
+        //    keyed `content_mac` are set to NULL rather than recomputed
+        //    (WK-E1: the MAC used to survive, a keyed digest of content
+        //    that no longer exists): the digests cover the *assembled*
+        //    record and the child rows are deleted in step 1, so there is
+        //    no longer a record to hash.
         //    NULL is the column's existing "not hashed" value, which
         //    verification reports as a gap rather than a mismatch, so an
         //    erased record does not masquerade as tampered.
@@ -198,7 +201,16 @@ pub async fn erase(
     //    are the same human.
     let links_withdrawn = crate::db::erasure::withdraw_links(db, id).await?;
 
-    // 5. Destroy the audit content, keeping the chain linkage.
+    // 5. Destroy the audit content, keeping the chain linkage. WK-E2: the
+    //    chain's append lock is taken first, on this transaction, and held
+    //    to the commit, so no audit row about the subject can be appended
+    //    between the sweep and the `erased` row below and survive
+    //    unredacted: every chained writer needs this lock, and one that
+    //    already holds it commits before the sweep's statement begins, so
+    //    the sweep sees its row. Taken after the entity rows above, the
+    //    order every other writer takes them in, so it cannot deadlock
+    //    against a concurrent write to this worker.
+    crate::db::audit::lock_chain(&mut *db).await?;
     let audit_rows_redacted = audit.redact_for_entity(&mut *db, id).await?;
 
     // 6. Append the accountability record for the erasure itself. It is
