@@ -229,8 +229,8 @@ fn export_params_from_json(params: &serde_json::Value, job_format: &str) -> Expo
 
 /// Build the job-level **import** audit summary (SEC-B8): the reconciled
 /// counts, the dry-run flag, and the actor. Takes primitives (not the
-/// whole row) so it is unit-testable without constructing a `SeaORM`
-/// model.
+/// whole row) so it is unit-testable without constructing a job
+/// row.
 fn import_audit_summary(
     format: &str,
     actor: Option<&str>,
@@ -253,7 +253,7 @@ fn import_audit_summary(
 /// Build the job-level **export** audit summary (§8): actor, the filter
 /// (query / limit / offset), format, masking profile,
 /// `include_soft_deleted`, and the row count. Takes primitives so it is
-/// unit-testable without constructing a `SeaORM` model.
+/// unit-testable without constructing a job row.
 fn export_audit_summary(
     format: &str,
     actor: Option<&str>,

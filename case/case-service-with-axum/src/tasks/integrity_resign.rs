@@ -46,7 +46,6 @@
 //! supports — re-run to finish.
 
 use axa::prelude::*;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use crate::compliance::mac::{self, MacVerdict};
 
@@ -258,16 +257,9 @@ async fn resign_audit(
     report: &mut ResignReport,
 ) -> Result<()> {
     use crate::compliance::audit_chain;
-    use crate::models::_entities::audit_logs;
-    use sea_orm::ActiveModelTrait as _;
-    use sea_orm::ActiveValue::Set;
+    use crate::models::audit_logs;
 
-    let rows = audit_logs::Entity::find()
-        .filter(audit_logs::Column::Mac.is_not_null())
-        .order_by_asc(audit_logs::Column::Id)
-        .limit(limit)
-        .all(&ctx.db)
-        .await?;
+    let rows = audit_logs::Model::with_mac_oldest_first(&ctx.db, limit).await?;
 
     for row in rows {
         let preimage =
@@ -278,9 +270,7 @@ async fn resign_audit(
 
         if apply && decision == Decision::Resign {
             let fresh = mac::tag(mac::Domain::AuditChain, &preimage);
-            let mut active: audit_logs::ActiveModel = row.into();
-            active.mac = Set(fresh);
-            active.update(&ctx.db).await?;
+            audit_logs::Model::set_mac(&ctx.db, row.id, fresh.as_deref()).await?;
         }
     }
     Ok(())
@@ -295,16 +285,9 @@ async fn resign_records(
     report: &mut ResignReport,
 ) -> Result<()> {
     use crate::compliance::record_integrity;
-    use crate::models::_entities::cases;
-    use sea_orm::ActiveModelTrait as _;
-    use sea_orm::ActiveValue::Set;
+    use crate::models::cases;
 
-    let rows = cases::Entity::find()
-        .filter(cases::Column::ContentMac.is_not_null())
-        .order_by_asc(cases::Column::Id)
-        .limit(limit)
-        .all(&ctx.db)
-        .await?;
+    let rows = cases::Model::with_mac_oldest_first(&ctx.db, limit).await?;
 
     for row in rows {
         let preimage = record_integrity::preimage(&record_integrity::input_for(&row));
@@ -314,9 +297,7 @@ async fn resign_records(
 
         if apply && decision == Decision::Resign {
             let fresh = mac::tag(mac::Domain::Record, &preimage);
-            let mut active: cases::ActiveModel = row.into();
-            active.content_mac = Set(fresh);
-            active.update(&ctx.db).await?;
+            cases::Model::set_content_mac(&ctx.db, row.id, fresh.as_deref()).await?;
         }
     }
     Ok(())

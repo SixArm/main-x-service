@@ -1,0 +1,12 @@
+-- `cases.content_hash`: SHA-256 for row-level record integrity.
+--
+-- The audit chain proves the trail was not rewritten. It says nothing
+-- about the case rows themselves: an attacker with SQL access could edit
+-- a stored case and, writing no audit row, leave the chain verifying.
+--
+-- Nullable, and existing rows stay NULL on purpose. Back-filling would
+-- compute each hash from the current content, asserting that the current
+-- content is authentic, which is exactly the claim this column exists to
+-- test. Rows are hashed on their next write; until then verification
+-- reports them as `unhashed`.
+ALTER TABLE cases ADD COLUMN IF NOT EXISTS content_hash character varying NULL;

@@ -49,10 +49,31 @@ Requires PostgreSQL.
 
 ```bash
 export DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_development
+export SQLX_OFFLINE=true  # the query! macros read .sqlx/, not the database
 cargo run -- start        # migrations auto-run in development
 
 curl -s localhost:5150/api/cases -H 'content-type: application/json' \
   -d '{"title":"Housing benefit appeal","agency_id":"dwp","case_number":"HB-2024-0007","identifiers":[{"scheme":"Docket","value":"CV-2024-001234"}]}'
+```
+
+## Database
+
+Persistence is sqlx with no ORM; every statement is a `query!` literal
+in `src/models/`, and spec §10 has the rules. The macros check queries
+against the committed `.sqlx/` data, so build with `SQLX_OFFLINE=true`
+(CI and the image do) unless `DATABASE_URL` points at a **migrated**
+database: with it set and the schema missing, the build fails with
+"relation does not exist".
+
+```bash
+cargo run -- db migrate             # apply migrations/*.up.sql
+cargo run -- db status              # each migration, applied or pending
+AXA_DESTROY_DATA=true cargo run -- db down 1   # development / test only
+AXA_DESTROY_DATA=true cargo run -- db reset    # drop everything, migrate
+
+# After changing a query or a migration, regenerate .sqlx/ against a
+# migrated database, and commit it:
+SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets
 ```
 
 ## Testing

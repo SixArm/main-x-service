@@ -235,7 +235,7 @@ point here rather than repeat it.
 | link-graph | sqlx | 2026-11-07 |
 | patient-flow | sqlx | 2026-11-08 |
 | authentication | sqlx | 2026-11-08 |
-| case | SeaORM, next | |
+| case | sqlx | 2026-11-08 |
 | care-pathway, person, worker | SeaORM, last | |
 
 Each crate on sqlx proves its schema unchanged with a `pg_dump --schema-only`

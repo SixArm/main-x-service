@@ -1,47 +1,60 @@
 ## 10. Persistence
 
-PostgreSQL via SeaORM 1.1 + `sea-orm-migration`, owned entirely by the
-service crate. Family conventions:
-[`agents/share/postgresql.md`](../../agents/share/postgresql.md).
+PostgreSQL via sqlx with no ORM (since 2026-11-08), owned entirely by
+the service crate: every statement is a `query!` literal in
+[`src/models/`](../case-service-with-axum/src/models/), and the schema
+is the plain SQL under
+[`migrations/`](../case-service-with-axum/migrations/), run by
+`sqlx::migrate!` (crate spec §10). Family conventions:
+[`agents/share/postgresql.md`](../../agents/share/postgresql.md) and
+[`spec/tech-stack/index.md`](../../spec/tech-stack/index.md) §5.
+
+The tables below show each one as first created; later migrations add
+the audit chain, disclosure and redaction columns to `audit_logs`, the
+digest and MAC columns to `cases`, and the `event_outbox`,
+`entity_links`, `review_queue` and `bulk_jobs` tables.
 
 ### 10.1 Tables
 
 The `cases` table, created by migration
-[`m20220101_000001_cases`](../case-service-with-axum/migration/src/m20220101_000001_cases.rs):
+[`2022010100000001_cases`](../case-service-with-axum/migrations/2022010100000001_cases.up.sql):
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `PkAuto` | Internal row id |
-| `pid` | `UuidUniq` | Public id |
-| `title` | `String` | Denormalised `data.title` for listing |
-| `data` | `JsonBinary` (JSONB) | Full `Case` payload |
-| `active` | `BooleanWithDefault(true)` | Registry flag |
-| `deleted_at` | `TimestampWithTimeZoneNull` | Soft delete |
+| `id` | `bigint` identity | Internal row id |
+| `pid` | `uuid`, unique | Public id |
+| `title` | `character varying` | Denormalised `data.title` for listing |
+| `data` | `jsonb` | Full `Case` payload |
+| `active` | `boolean`, default `true` | Registry flag |
+| `deleted_at` | `timestamptz`, nullable | Soft delete |
 
 The `audit_logs` table, created by migration
-[`m20220101_000002_audit_logs`](../case-service-with-axum/migration/src/m20220101_000002_audit_logs.rs)
+[`2022010100000002_audit_logs`](../case-service-with-axum/migrations/2022010100000002_audit_logs.up.sql)
 — one row per CRUD / merge action:
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `PkAuto` | Internal row id |
-| `entity_pid` | `Uuid` | The case the entry concerns |
-| `action` | `String` | `created` / `updated` / `deleted` / `merged` |
-| `actor` | `StringNull` | Caller `sub` from the bearer token, else `NULL` |
-| `snapshot` | `JsonBinaryNull` | The record's `data` at the time of the action |
+| `id` | `bigint` identity | Internal row id |
+| `entity_pid` | `uuid` | The case the entry concerns |
+| `action` | `character varying` | `created` / `updated` / `deleted` / `merged` |
+| `actor` | `character varying`, nullable | Caller `sub` from the bearer token, else `NULL` |
+| `snapshot` | `jsonb`, nullable | The record's `data` at the time of the action |
 
 The `merge_records` table, created by migration
-[`m20220101_000003_merge_records`](../case-service-with-axum/migration/src/m20220101_000003_merge_records.rs)
+[`2022010100000003_merge_records`](../case-service-with-axum/migrations/2022010100000003_merge_records.up.sql)
 — one row per record-merge:
 
 | Column | Type | Notes |
 |---|---|---|
-| `id` | `PkAuto` | Internal row id |
-| `main_pid` | `Uuid` | The surviving case |
-| `duplicate_pid` | `Uuid` | The merged-away (now soft-deleted) case |
-| `reason` | `StringNull` | Optional operator-supplied reason |
-| `actor` | `StringNull` | Caller `sub` from the bearer token, else `NULL` |
-| `transferred` | `JsonBinaryNull` | Snapshot of the duplicate's payload at merge time |
+| `id` | `bigint` identity | Internal row id |
+| `main_pid` | `uuid` | The surviving case |
+| `duplicate_pid` | `uuid` | The merged-away (now soft-deleted) case |
+| `reason` | `character varying`, nullable | Optional operator-supplied reason |
+| `actor` | `character varying`, nullable | Caller `sub` from the bearer token, else `NULL` |
+| `transferred` | `jsonb`, nullable | Snapshot of the duplicate's payload at merge time |
+
+Every table also carries `created_at` / `updated_at` (`timestamptz`,
+default `CURRENT_TIMESTAMP`), except `review_queue` and `bulk_jobs`.
 
 ### 10.2 JSONB rationale
 

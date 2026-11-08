@@ -4,22 +4,21 @@
 //!
 //! Every row written through [`Model::record_with_context`] binds its own
 //! content and the current chain head, so the trail can prove it was not
-//! rewritten (HIPAA §164.312(c)). The trail stays **append-only**: the one
-//! statement that ever modifies an existing row is
-//! [`Model::redact_for_entity`], the GDPR Art. 17 erasure path, and it
+//! rewritten (HIPAA §164.312(c)). The trail stays **append-only**: the
+//! statements that ever modify an existing row are
+//! [`Model::redact_for_entity`], the GDPR Art. 17 erasure path, which
 //! destroys content while preserving the `hash` / `prev_hash` linkage so
-//! verification still succeeds.
+//! verification still succeeds, and [`Model::set_mac`], the
+//! `integrity_resign` task's re-MAC of a row whose MAC verified.
 
-use axa::prelude::*;
-use chrono::SubsecRound as _;
-use sea_orm::{ConnectionTrait, DatabaseBackend, QueryOrder, QuerySelect, Statement};
+use axa::sqlx::Db;
+use chrono::{DateTime, FixedOffset, SubsecRound as _};
+use serde::{Deserialize, Serialize};
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
+use super::{ModelResult, to_i64, updated};
 use crate::compliance::audit_chain::{self, ChainInput, ChainReport};
-
-/// Re-export the generated `audit_logs` entity so callers use
-/// `models::audit_logs::…` rather than reaching into `_entities`.
-pub use super::_entities::audit_logs::{self, ActiveModel, Entity, Model};
 
 /// Postgres advisory-lock key serialising chain appends.
 ///
@@ -39,19 +38,61 @@ pub use super::_entities::audit_logs::{self, ActiveModel, Entity, Model};
 /// spec's honest limits rather than papered over.
 const CHAIN_LOCK_KEY: i64 = 0x6D78_695F_6175_6469; // "mxi_audi"
 
-/// Default `SeaORM` active-model behaviour — no custom hooks.
-impl ActiveModelBehavior for super::_entities::audit_logs::ActiveModel {}
+/// One persisted audit row: one CRUD/read action on a case (who / what /
+/// when + a snapshot), chained onto its predecessor.
+///
+/// Timestamps are `DateTime<FixedOffset>`, the type the `SeaORM` entity
+/// used, so the audit endpoints serialize them exactly as before.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row creation timestamp: stamped by the writer, truncated to
+    /// microseconds, and bound into the chain digest.
+    pub created_at: DateTime<FixedOffset>,
+    /// Equal to `created_at`; rows are never updated except by redaction
+    /// and re-MACing, which leave it alone.
+    pub updated_at: DateTime<FixedOffset>,
+    /// Internal auto-increment primary key; the chain order.
+    pub id: i64,
+    /// The case pid the entry concerns (`Uuid::nil` for a collection
+    /// access).
+    pub entity_pid: Uuid,
+    /// The action verb (`created`, `updated`, `read`, `erased`, …).
+    pub action: String,
+    /// The caller's `sub`, when a verified token was presented.
+    pub actor: Option<String>,
+    /// Snapshot of the record at the time of the action; `None` once
+    /// redacted.
+    pub snapshot: Option<serde_json::Value>,
+    /// Hash of the preceding chain row; `None` for the genesis row and for
+    /// rows written before the chain existed.
+    pub prev_hash: Option<String>,
+    /// SHA-3 digest of the preceding chain row.
+    pub prev_hash_sha3: Option<String>,
+    /// This row's content hash — the link every successor binds to.
+    pub hash: Option<String>,
+    /// This row's SHA-3 digest — the parallel chain's link.
+    pub hash_sha3: Option<String>,
+    /// HMAC over this row's pre-image, as `"<key id>:<hex>"`.
+    pub mac: Option<String>,
+    /// Request/processing context (purpose-of-use, disclosure recipient).
+    pub context: Option<serde_json::Value>,
+    /// Whether this access was an outward **disclosure** rather than an
+    /// internal access — the HIPAA §164.528 accounting distinction.
+    pub disclosure: bool,
+    /// When the row's content was destroyed under GDPR Art. 17.
+    pub redacted_at: Option<DateTime<FixedOffset>>,
+}
 
 impl Model {
     /// Record one audit entry. `actor` is the caller's `sub` (user `pid`)
     /// when a verified token was presented, else `None`.
     ///
-    /// Generic over [`ConnectionTrait`] so it runs either on the pooled
-    /// `&DatabaseConnection` (the best-effort side-channel path, `memory`
-    /// transport) **or** on a `&DatabaseTransaction` — under the `outbox`
-    /// transport the audit row is written in the *same* transaction as the
-    /// entity mutation and its `event_outbox` row, so the three can never
-    /// disagree (`agents/share/event-bus.md` §3).
+    /// Takes a [`Db`], so it runs either on the pool (the best-effort
+    /// side-channel path, `memory` transport) **or** on an open
+    /// transaction — under the `outbox` transport the audit row is written
+    /// in the *same* transaction as the entity mutation and its
+    /// `event_outbox` row, so the three can never disagree
+    /// (`agents/share/event-bus.md` §3).
     ///
     /// This is the mutation-path entry point: no request context and never
     /// a disclosure. Read paths use
@@ -60,8 +101,8 @@ impl Model {
     /// # Errors
     ///
     /// When the insert fails.
-    pub async fn record<C: ConnectionTrait>(
-        db: &C,
+    pub async fn record(
+        db: impl Into<Db<'_>>,
         entity_pid: Uuid,
         action: &str,
         actor: Option<&str>,
@@ -78,11 +119,14 @@ impl Model {
     /// write is byte-identical to the value Postgres returns on read (see
     /// [`crate::compliance::audit_chain`]).
     ///
+    /// The advisory lock, the head read and the insert all run on one
+    /// connection, so under a transaction the lock covers both.
+    ///
     /// # Errors
     ///
-    /// When reading the chain head or the insert fails.
-    pub async fn record_with_context<C: ConnectionTrait>(
-        db: &C,
+    /// When taking the lock, reading the chain head or the insert fails.
+    pub async fn record_with_context(
+        db: impl Into<Db<'_>>,
         entity_pid: Uuid,
         action: &str,
         actor: Option<&str>,
@@ -90,17 +134,13 @@ impl Model {
         context: Option<serde_json::Value>,
         disclosure: bool,
     ) -> ModelResult<Self> {
+        let mut conn = db.into().acquire().await?;
         // Serialise the read-head/append pair (see `CHAIN_LOCK_KEY`).
-        if db.get_database_backend() == DatabaseBackend::Postgres {
-            db.execute_raw(Statement::from_string(
-                DatabaseBackend::Postgres,
-                format!("SELECT pg_advisory_xact_lock({CHAIN_LOCK_KEY})"),
-            ))
+        sqlx::query!("SELECT pg_advisory_xact_lock($1)", CHAIN_LOCK_KEY)
+            .execute(&mut *conn)
             .await?;
-        }
-        let (prev_hash, prev_hash_sha3) = Self::heads(db).await?;
-        let created_at: chrono::DateTime<chrono::FixedOffset> =
-            chrono::Utc::now().trunc_subsecs(6).into();
+        let (prev_hash, prev_hash_sha3) = Self::heads(&mut conn).await?;
+        let created_at: DateTime<FixedOffset> = chrono::Utc::now().trunc_subsecs(6).into();
         // One input, re-pointed at each algorithm's own predecessor:
         // the digests cover byte-identical content while the chains stay
         // independent.
@@ -124,26 +164,33 @@ impl Model {
             crate::compliance::mac::Domain::AuditChain,
             &audit_chain::preimage(&input),
         );
-        let entry = audit_logs::ActiveModel {
-            created_at: ActiveValue::set(created_at),
-            updated_at: ActiveValue::set(created_at),
-            entity_pid: ActiveValue::set(entity_pid),
-            action: ActiveValue::set(action.to_string()),
-            actor: ActiveValue::set(actor.map(ToString::to_string)),
-            snapshot: ActiveValue::set(snapshot),
-            prev_hash: ActiveValue::set(prev_hash),
-            hash: ActiveValue::set(Some(hash)),
-            prev_hash_sha3: ActiveValue::set(prev_hash_sha3),
-            hash_sha3: ActiveValue::set(Some(hash_sha3)),
-            mac: ActiveValue::set(mac),
-            context: ActiveValue::set(context),
-            disclosure: ActiveValue::set(disclosure),
-            redacted_at: ActiveValue::set(None),
-            ..Default::default()
-        }
-        .insert(db)
+        let row = sqlx::query_as!(
+            Self,
+            r#"INSERT INTO audit_logs
+                   (created_at, updated_at, entity_pid, action, actor, snapshot,
+                    prev_hash, hash, prev_hash_sha3, hash_sha3, mac,
+                    context, disclosure, redacted_at)
+               VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NULL)
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, entity_pid, action, actor, snapshot,
+                         prev_hash, prev_hash_sha3, hash, hash_sha3, mac,
+                         context, disclosure, redacted_at AS "redacted_at: _""#,
+            created_at,
+            entity_pid,
+            action,
+            actor,
+            snapshot,
+            prev_hash,
+            Some(hash),
+            prev_hash_sha3,
+            Some(hash_sha3),
+            mac,
+            context,
+            disclosure,
+        )
+        .fetch_one(&mut *conn)
         .await?;
-        Ok(entry)
+        Ok(row)
     }
 
     /// Both chain heads — `(SHA-256, SHA-3)` — from the same row.
@@ -157,17 +204,11 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn heads<C: ConnectionTrait>(
-        db: &C,
-    ) -> ModelResult<(Option<String>, Option<String>)> {
-        let last = audit_logs::Entity::find()
-            .order_by_desc(audit_logs::Column::Id)
-            .one(db)
+    pub async fn heads(conn: &mut PgConnection) -> ModelResult<(Option<String>, Option<String>)> {
+        let last = sqlx::query!("SELECT hash, hash_sha3 FROM audit_logs ORDER BY id DESC LIMIT 1")
+            .fetch_optional(conn)
             .await?;
-        Ok(match last {
-            Some(row) => (row.hash, row.hash_sha3),
-            None => (None, None),
-        })
+        Ok(last.map_or((None, None), |row| (row.hash, row.hash_sha3)))
     }
 
     /// The current chain head: the most recent row's `hash`, or `None`
@@ -178,12 +219,9 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn head<C: ConnectionTrait>(db: &C) -> ModelResult<Option<String>> {
-        let last = audit_logs::Entity::find()
-            .order_by_desc(audit_logs::Column::Id)
-            .one(db)
-            .await?;
-        Ok(last.and_then(|row| row.hash))
+    pub async fn head(db: impl Into<Db<'_>>) -> ModelResult<Option<String>> {
+        let mut conn = db.into().acquire().await?;
+        Ok(Self::heads(&mut conn).await?.0)
     }
 
     /// Most-recent audit entries, capped at `limit`.
@@ -191,12 +229,20 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn recent(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
-        let rows = audit_logs::Entity::find()
-            .order_by_desc(audit_logs::Column::Id)
-            .limit(limit)
-            .all(db)
-            .await?;
+    pub async fn recent(db: &PgPool, limit: u64) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, entity_pid, action, actor, snapshot,
+                      prev_hash, prev_hash_sha3, hash, hash_sha3, mac,
+                      context, disclosure, redacted_at AS "redacted_at: _"
+               FROM audit_logs
+               ORDER BY id DESC
+               LIMIT $1"#,
+            to_i64(limit),
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 
@@ -205,12 +251,20 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn for_entity(db: &DatabaseConnection, entity_pid: Uuid) -> ModelResult<Vec<Self>> {
-        let rows = audit_logs::Entity::find()
-            .filter(audit_logs::Column::EntityPid.eq(entity_pid))
-            .order_by_desc(audit_logs::Column::Id)
-            .all(db)
-            .await?;
+    pub async fn for_entity(db: &PgPool, entity_pid: Uuid) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, entity_pid, action, actor, snapshot,
+                      prev_hash, prev_hash_sha3, hash, hash_sha3, mac,
+                      context, disclosure, redacted_at AS "redacted_at: _"
+               FROM audit_logs
+               WHERE entity_pid = $1
+               ORDER BY id DESC"#,
+            entity_pid,
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 
@@ -225,16 +279,20 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn disclosures_for_entity(
-        db: &DatabaseConnection,
-        entity_pid: Uuid,
-    ) -> ModelResult<Vec<Self>> {
-        let rows = audit_logs::Entity::find()
-            .filter(audit_logs::Column::EntityPid.eq(entity_pid))
-            .filter(audit_logs::Column::Disclosure.eq(true))
-            .order_by_desc(audit_logs::Column::Id)
-            .all(db)
-            .await?;
+    pub async fn disclosures_for_entity(db: &PgPool, entity_pid: Uuid) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, entity_pid, action, actor, snapshot,
+                      prev_hash, prev_hash_sha3, hash, hash_sha3, mac,
+                      context, disclosure, redacted_at AS "redacted_at: _"
+               FROM audit_logs
+               WHERE entity_pid = $1 AND disclosure = true
+               ORDER BY id DESC"#,
+            entity_pid,
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 
@@ -248,12 +306,8 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn tail(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
-        let mut rows = audit_logs::Entity::find()
-            .order_by_desc(audit_logs::Column::Id)
-            .limit(limit)
-            .all(db)
-            .await?;
+    pub async fn tail(db: &PgPool, limit: u64) -> ModelResult<Vec<Self>> {
+        let mut rows = Self::recent(db, limit).await?;
         rows.reverse();
         Ok(rows)
     }
@@ -263,12 +317,110 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn verify_chain(db: &DatabaseConnection, limit: u64) -> ModelResult<ChainReport> {
+    pub async fn verify_chain(db: &PgPool, limit: u64) -> ModelResult<ChainReport> {
         Ok(audit_chain::verify(&Self::tail(db, limit).await?))
     }
 
-    /// GDPR Art. 17: destroy the audit **content** held about one care
-    /// pathway while preserving the chain.
+    /// One row by its primary key, or `None`.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn find_by_id(db: &PgPool, id: i64) -> ModelResult<Option<Self>> {
+        let row = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, entity_pid, action, actor, snapshot,
+                      prev_hash, prev_hash_sha3, hash, hash_sha3, mac,
+                      context, disclosure, redacted_at AS "redacted_at: _"
+               FROM audit_logs
+               WHERE id = $1"#,
+            id,
+        )
+        .fetch_optional(db)
+        .await?;
+        Ok(row)
+    }
+
+    /// The newest row carrying a chain `hash` — the anchor a checkpoint
+    /// witnesses — or `None` when no row is chained yet.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn newest_hashed(db: &PgPool) -> ModelResult<Option<Self>> {
+        let row = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, entity_pid, action, actor, snapshot,
+                      prev_hash, prev_hash_sha3, hash, hash_sha3, mac,
+                      context, disclosure, redacted_at AS "redacted_at: _"
+               FROM audit_logs
+               WHERE hash IS NOT NULL
+               ORDER BY id DESC
+               LIMIT 1"#,
+        )
+        .fetch_optional(db)
+        .await?;
+        Ok(row)
+    }
+
+    /// How many rows have an `id` at or before `id` — the count a
+    /// checkpoint records, so a later deletion below the anchor shows.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn count_at_or_before(db: &PgPool, id: i64) -> ModelResult<u64> {
+        let n = sqlx::query_scalar!(
+            r#"SELECT count(*) AS "n!" FROM audit_logs WHERE id <= $1"#,
+            id
+        )
+        .fetch_one(db)
+        .await?;
+        Ok(u64::try_from(n).unwrap_or(0))
+    }
+
+    /// The rows carrying a MAC, oldest first, capped at `limit` — the
+    /// `integrity_resign` task's walk.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn with_mac_oldest_first(db: &PgPool, limit: u64) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, entity_pid, action, actor, snapshot,
+                      prev_hash, prev_hash_sha3, hash, hash_sha3, mac,
+                      context, disclosure, redacted_at AS "redacted_at: _"
+               FROM audit_logs
+               WHERE mac IS NOT NULL
+               ORDER BY id ASC
+               LIMIT $1"#,
+            to_i64(limit),
+        )
+        .fetch_all(db)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Replace one row's MAC, and nothing else — the MAC is not part of
+    /// the chain, so this cannot break linkage.
+    ///
+    /// # Errors
+    ///
+    /// When the update fails, including when the row is gone
+    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    pub async fn set_mac(db: &PgPool, id: i64, mac: Option<&str>) -> ModelResult<()> {
+        let done = sqlx::query!("UPDATE audit_logs SET mac = $2 WHERE id = $1", id, mac)
+            .execute(db)
+            .await?;
+        updated(done.rows_affected())
+    }
+
+    /// GDPR Art. 17: destroy the audit **content** held about one case
+    /// while preserving the chain.
     ///
     /// Sets `snapshot = NULL` and stamps `redacted_at` on every not-yet
     /// redacted row for `entity_pid`. The row's `hash` and `prev_hash` are
@@ -287,24 +439,17 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails.
-    pub async fn redact_for_entity<C: ConnectionTrait>(
-        db: &C,
-        entity_pid: Uuid,
-    ) -> ModelResult<u64> {
-        let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().trunc_subsecs(6).into();
-        let result = audit_logs::Entity::update_many()
-            .col_expr(
-                audit_logs::Column::Snapshot,
-                sea_orm::sea_query::Expr::value(sea_orm::Value::Json(None)),
-            )
-            .col_expr(
-                audit_logs::Column::RedactedAt,
-                sea_orm::sea_query::Expr::value(now),
-            )
-            .filter(audit_logs::Column::EntityPid.eq(entity_pid))
-            .filter(audit_logs::Column::RedactedAt.is_null())
-            .exec(db)
-            .await?;
-        Ok(result.rows_affected)
+    pub async fn redact_for_entity(db: impl Into<Db<'_>>, entity_pid: Uuid) -> ModelResult<u64> {
+        let now: DateTime<FixedOffset> = chrono::Utc::now().trunc_subsecs(6).into();
+        let mut conn = db.into().acquire().await?;
+        let done = sqlx::query!(
+            "UPDATE audit_logs SET snapshot = NULL, redacted_at = $2
+             WHERE entity_pid = $1 AND redacted_at IS NULL",
+            entity_pid,
+            now,
+        )
+        .execute(&mut *conn)
+        .await?;
+        Ok(done.rows_affected())
     }
 }

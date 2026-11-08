@@ -11,6 +11,8 @@ embedding the canonical case-matcher.
 | [AGENTS.md](./AGENTS.md) | How to work here; API surface; MVP scope. |
 | [README.md](./README.md) | User-facing intro + quick start. |
 | [CHANGELOG.md](./CHANGELOG.md) | Release history. |
+| [`src/models/`](./src/models/) | Every SQL statement the service runs (sqlx `query!` literals; spec §10). |
+| [`migrations/`](./migrations/) | The schema, as plain SQL `.up.sql` / `.down.sql` pairs (`db migrate | down | reset | status`). |
 
 ## Worked flow
 

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE audit_logs SET snapshot = NULL, redacted_at = $2\n             WHERE entity_pid = $1 AND redacted_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9649da556071fbb04d2ffb14a95daad00106fa7aa8c851ae10684bb1ba2d956c"
+}

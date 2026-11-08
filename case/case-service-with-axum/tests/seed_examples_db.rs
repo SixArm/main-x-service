@@ -14,9 +14,8 @@ use std::path::Path;
 
 use axa::testing::prelude::*;
 use case_service::app::App;
-use case_service::models::_entities::cases;
+use case_service::models::cases;
 use case_service::tasks::seed_examples::{FIXTURE_PATH, parse_fixture, seed};
-use sea_orm::{ConnectionTrait, EntityTrait, PaginatorTrait};
 use serial_test::serial;
 
 #[tokio::test]
@@ -41,8 +40,8 @@ async fn seed_examples_seeds_the_fixture_and_is_idempotent() {
         // Clean slate: this test asserts on the whole table's row
         // count, so it needs sole ownership of the starting state
         // regardless of what ran before it in the shared test database.
-        ctx.db
-            .execute_unprepared("TRUNCATE cases CASCADE")
+        sqlx::query!("TRUNCATE cases CASCADE")
+            .execute(&ctx.db)
             .await
             .expect("truncate cases");
 
@@ -61,10 +60,7 @@ async fn seed_examples_seeds_the_fixture_and_is_idempotent() {
         assert_eq!(first.existing, 0);
         assert!(!first.skipped);
 
-        let count = cases::Entity::find()
-            .count(&ctx.db)
-            .await
-            .expect("count cases");
+        let count = cases::Model::count_all(&ctx.db).await.expect("count cases");
         assert_eq!(count, 10);
 
         // Second run: the table is no longer empty, so the idempotency
@@ -74,8 +70,7 @@ async fn seed_examples_seeds_the_fixture_and_is_idempotent() {
         assert_eq!(second.existing, 10);
         assert!(second.skipped);
 
-        let count_after = cases::Entity::find()
-            .count(&ctx.db)
+        let count_after = cases::Model::count_all(&ctx.db)
             .await
             .expect("count cases after second run");
         assert_eq!(count_after, 10, "a re-run must not double the table");

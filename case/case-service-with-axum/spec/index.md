@@ -413,14 +413,15 @@ rather than ship that (worse than no lock — it *looks* safe), this
 rollout implements and tests **sequential idempotency only**:
 re-running the same file twice upserts in place, which is what
 `import_is_idempotent_on_the_agency_case_number_key` (§11) pins. True
-concurrent-importer race safety is a follow-up needing either a
-`ConnectionTrait`-generic `create_and_emit`/`update_and_emit` variant or
-a dedicated transaction-scoped bulk write path.
+concurrent-importer race safety is a follow-up needing either
+`create_and_emit`/`update_and_emit` to run on a caller's transaction or
+a dedicated transaction-scoped bulk write path. Since the sqlx move
+(§10) every model helper underneath already takes an `axa::sqlx::Db`,
+so the first is now a change to those two functions only.
 
-**New tables.** `bulk_jobs` (controller-style `sea-orm-migration`, one
-`SeaORM` entity — modelled on care-pathway's own `bulk_jobs` migration,
-which is closer to this crate's layout than person's) and — new to this
-crate — `review_queue` (raw-SQL migration, modelled on
+**New tables.** `bulk_jobs` (modelled on care-pathway's own `bulk_jobs`
+migration, which is closer to this crate's layout than person's) and —
+new to this crate — `review_queue` (modelled on
 organization's, with `provenance` in the initial schema rather than a
 follow-up migration, since there was no pre-existing table to keep
 backward-compatible).
@@ -558,12 +559,40 @@ gated only by the coarse blanket guard when it is on.
 
 ## 10. Persistence
 
-PostgreSQL via SeaORM + `sea-orm-migration`. Migrations
-`m20220101_000001_cases` (the `cases` table),
-`m20220101_000002_audit_logs` (the CRUD `audit_logs` trail),
-`m20220101_000003_merge_records` (record-merge history), and
-`m20220101_000004_entity_links` (the cross-service link write side, §8.6).
-`auto_migrate` on in development.
+PostgreSQL via **sqlx**, with no ORM (since 2026-11-08, §13 CASE-SQLX;
+[`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5).
+**Every statement the service runs is in `src/models/`**, one module
+per table, as a `sqlx::query!` / `query_as!` / `query_scalar!` literal
+compile-checked against the committed `.sqlx/` (`SQLX_OFFLINE=true` in
+CI and the image; `scripts/ci-check.sh test-db` runs `cargo sqlx
+prepare --check` against the migrated schema). There is no dynamic
+SQL: no `QueryBuilder`, `raw_sql` or `AssertSqlSafe`, so this crate has
+no `ci/sql-allowlist.txt` entry. Optional filters are static, as
+`($1::text IS NULL OR status = $1)` (review queue) and
+`($1::timestamptz IS NULL OR created_at >= $1)` (the `links?since=`
+reconciliation pull). `ctx.db` is axa's `sqlx::PgPool` (axa's `sqlx`
+feature). A helper that writes takes an `axa::sqlx::Db` (the pool, or
+the caller's open transaction), which is how a `cases` row, its
+`event_outbox` row and its chained `audit_logs` row commit in one
+transaction under the `outbox` transport. The chain append's
+`pg_advisory_xact_lock`, head read and insert run on one connection.
+
+The schema is the plain SQL under `migrations/`, thirteen reversible
+`<version>_<name>.up.sql` / `.down.sql` pairs (`2022010100000001_cases`,
+`…02_audit_logs`, `…03_merge_records`, `…04_event_outbox`,
+`…05_entity_links`, `2026072600000006_compliance`,
+`2026072700000007_case_content_hash`, `…08_blake3_digests`,
+`…09_sha3_digests`, `…10_drop_blake3`, `…11_integrity_mac`,
+`2026080300000012_review_queue`, `…13_bulk_jobs`), embedded by
+`sqlx::migrate!` and recorded in `_sqlx_migrations`. `db migrate | down
+[steps] | reset | status` run through `axa::sqlx`; `auto_migrate` is on
+in development. They replace the SeaORM `migration/` crate one for one,
+in the same order (including the BLAKE3 columns added and then
+dropped), and produce the same schema: a `pg_dump --schema-only` of a
+database migrated by each differs only in the bookkeeping table
+(`seaql_migrations` vs `_sqlx_migrations`). A database migrated by the
+old code has no `_sqlx_migrations`, so it must be recreated rather than
+migrated in place (there is no deployed data).
 
 The `entity_links` table is **separate** from the within-entity `Case`
 payload (the partition rule, §5) and is the **outbound** edges only — the
@@ -590,12 +619,12 @@ CREATE TABLE entity_links (
 
 This table is never read by the matcher (the partition rule, §5).
 
-**Bulk import/export tables (§8.7, BLK-5).** `m20260803_000012_review_queue`
-(raw SQL; `id`, `record_id_a`/`record_id_b` UUID pair normalized and
+**Bulk import/export tables (§8.7, BLK-5).** `2026080300000012_review_queue`
+( `id`, `record_id_a`/`record_id_b` UUID pair normalized and
 UNIQUE, `match_score`, `match_quality`, `detection_method`,
 `score_breakdown` JSONB, `status` default `pending`, `provenance`
 default `operator`, `reviewed_by`, `created_at`, `reviewed_at`) and
-`m20260803_000013_bulk_jobs` (controller-style `sea-orm-migration`; `id`,
+`2026080300000013_bulk_jobs` (`id`,
 `kind`, `entity`, `format`, `status`, `params` JSONB, the `rows_*`
 counters, `actor`, `idempotency_key` with a `UNIQUE (entity, kind,
 idempotency_key)` index, `input_url`/`result_url`/`error_report_url`,
@@ -808,6 +837,60 @@ These obligations are why `case ↔ person` is governed more strictly than
 the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
+
+- [x] **CASE-SQLX — SeaORM → sqlx.** *(Done 2026-11-08;
+  [`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5,
+  following organization's ORG-SQLX and authentication's move.)*
+  Replaced SeaORM with direct sqlx so a reviewer can read every
+  statement the service runs (§10). `src/models/` is the one SQL area:
+  the `_entities/` SeaORM entities became plain row structs, and the SQL
+  that lived elsewhere (the merge's SEC-B5 `FOR UPDATE` lock and liveness
+  re-check in `streaming.rs`, the erasure's tombstone write and link
+  sweep in `compliance/erasure.rs`, the checkpoint anchor and row counts
+  in `compliance/checkpoint.rs`, the relay's retention purge, the
+  lost-job `UPDATE` in `bulk/reconcile.rs`, the MAC re-sign walks in
+  `tasks/integrity_resign.rs`, the reindex and seed counts, and
+  `App::truncate`) moved into it. 63 `query!` / `query_as!` /
+  `query_scalar!` literals in `src/models/`, plus 11 that only tests run
+  (the lost-job DB tests and four integration tests), all
+  compile-checked against the committed `.sqlx/`; no `QueryBuilder`,
+  `raw_sql` or `AssertSqlSafe`, so no `ci/sql-allowlist.txt` entry.
+  `axa`'s `sea-orm` feature is now `sqlx`; `sea-orm`,
+  `sea-orm-migration` and the `migration/` crate are gone (386 → 349
+  unique normal dependencies). The thirteen migrations, SeaORM
+  schema-builder Rust with some `execute_unprepared` SQL, were written
+  out from a `pg_dump` of the old schema as plain SQL in sqlx's flat
+  reversible layout, one per old migration in the same order, and proved
+  identical: `pg_dump --schema-only` of a database migrated by the old
+  code and one migrated by the new differ only in `seaql_migrations` vs
+  `_sqlx_migrations`. `db migrate | down | reset | status` run through
+  `axa::sqlx` and were each exercised against a real database.
+  Compliance behaviour is statement for statement what it was: the audit
+  chain still takes `pg_advisory_xact_lock`, reads both heads and
+  appends with a writer-stamped, microsecond-truncated `created_at`;
+  redaction still nulls `snapshot` and stamps `redacted_at` without
+  touching `hash`/`prev_hash`; the record digests, MACs and checkpoints
+  are computed exactly as before; the merge still locks both rows `FOR
+  UPDATE` in pid order and fails closed on a retired duplicate; the
+  relay still claims with `FOR UPDATE SKIP LOCKED` and acks in the same
+  transaction; the `entity_links` upsert is still `ON CONFLICT … DO
+  UPDATE` on the `NULLS NOT DISTINCT` key, reviving a withdrawn edge.
+  A crate-local `models::ModelError` replaces axa's SeaORM-only one and
+  converts into the same `axa::Error` answers. Timestamps stay
+  `DateTime<FixedOffset>` and `entity_links` dates `NaiveDate`, so every
+  serialized row is unchanged. **INT-V1:** the DB test
+  `a_written_record_verifies` (create, update, merge survivor and
+  duplicate all verify; a title edited in SQL is flagged) passes on the
+  old code as on the new: case is **not affected**, as organization was
+  not. Its pre-image binds no server-set column, the soft-delete and
+  erasure stamps are truncated to microseconds before they are hashed,
+  the payload has no numbers, and `serde_json`'s sorted map re-orders
+  whatever key order JSONB returns. No test edited to pass: test edits
+  only replace SeaORM queries and connections with model helpers or
+  `query!` literals, keeping every assertion; the disclosure no-op test
+  swaps SeaORM's mock connection for a lazy pool that cannot connect.
+  DB-gated suite 65 → 66 (the INT-V1 test), unit tests 271, all passing.
+  The SEC-B3 bulk-upsert lock is **not** added (§8.7).
 
 - [x] **KC-1: optional Keycloak bearer acceptance; PASETO as a feature
       (2026-09-29).** `paseto` (default) and `keycloak` (off) cargo
@@ -1503,7 +1586,9 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 14. Implementation status
 
-Done: axa boot; cases table + migration; CRUD with `422` validation on
+Done: axa boot; persistence on sqlx with every statement a
+compile-checked `query!` literal in `src/models/` and plain-SQL
+`sqlx::migrate!` migrations (§10, CASE-SQLX); CRUD with `422` validation on
 create/update (blank `title`, `opened_date` format, non-blank
 identifier / subject / keyword, all problems reported together);
 Tantivy full-text/fuzzy/phonetic search; `/match`, `/check-duplicates`, and `/merge`
@@ -1559,10 +1644,11 @@ checkpoints, keyed MAC, SBOM (§12.0/§12.0.1, 2026-07-25..27), FHIR R5
 - **Bulk import (§8.7): true concurrent-importer race safety
   (SEC-B3).** Today's `src/bulk/pipeline.rs` gives sequential
   idempotency only (re-running a file is safe; two importers of the same
-  stable key racing each other is not). Closing this needs either a
-  `ConnectionTrait`-generic `streaming::create_and_emit`/
-  `update_and_emit` variant (so a caller-held Postgres advisory lock can
-  span find-then-write) or a dedicated transaction-scoped bulk write
+  stable key racing each other is not). Closing this needs either
+  `streaming::create_and_emit`/`update_and_emit` to run on a caller's
+  transaction (so a caller-held Postgres advisory lock can span
+  find-then-write; every model helper underneath already takes an
+  `axa::sqlx::Db`) or a dedicated transaction-scoped bulk write
   path — a decision that likely belongs at the family level
   (`agents/share/bulk-import-export.md`) rather than being invented
   per-crate.

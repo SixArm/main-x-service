@@ -1,19 +1,59 @@
 //! `cases` model — CRUD over the stored `case_matcher::Case` payload.
+//!
+//! The full payload is stored verbatim in the `data` JSONB column; `pid`
+//! and `title` are denormalised for lookup and listing. Every statement
+//! that touches `cases` is here, including the record-integrity, erasure,
+//! merge-lock and MAC re-signing writes the compliance modules and tasks
+//! drive.
 
 use axa::cursor_pagination::escape_like;
-use axa::prelude::*;
+use axa::sqlx::Db;
 use case_matcher::Case as MatchCase;
-use chrono::SubsecRound as _;
-
-use crate::compliance::record_integrity;
-use sea_orm::sea_query::Expr;
-use sea_orm::sea_query::extension::postgres::PgExpr;
-use sea_orm::{ConnectionTrait, QueryOrder, QuerySelect};
+use chrono::{DateTime, FixedOffset, SubsecRound as _};
+use serde::{Deserialize, Serialize};
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
-pub use super::_entities::cases::{self, ActiveModel, Entity, Model};
+use super::{ModelError, ModelResult, to_i64, updated};
+use crate::compliance::record_integrity;
 
-impl ActiveModelBehavior for super::_entities::cases::ActiveModel {}
+/// A persisted case row. Mirrors the `cases` table; the canonical payload
+/// lives in `data` while `pid`/`title` are denormalised for lookup.
+///
+/// Timestamps are `DateTime<FixedOffset>` (always `+00:00` from
+/// Postgres), the type the `SeaORM` entity used, so anything that
+/// serializes a row keeps its exact wire form.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row creation timestamp.
+    pub created_at: DateTime<FixedOffset>,
+    /// Row last-update timestamp: the column default, never bumped by a
+    /// statement here, exactly as under `SeaORM`.
+    pub updated_at: DateTime<FixedOffset>,
+    /// Internal auto-increment primary key.
+    pub id: i64,
+    /// Public, externally exposed identifier (UUID v4).
+    pub pid: Uuid,
+    /// Denormalised case title, for lookup and listing.
+    pub title: String,
+    /// The full `case_matcher::Case` payload (JSONB).
+    pub data: serde_json::Value,
+    /// Whether the row is active (cleared on soft-delete).
+    pub active: bool,
+    /// Soft-delete timestamp; `None` while active.
+    pub deleted_at: Option<DateTime<FixedOffset>>,
+    /// SHA-256 over the record's content and lifecycle state, for
+    /// out-of-band tamper detection (`crate::compliance::record_integrity`).
+    /// `None` on rows written before the column existed; never
+    /// back-filled, because a back-fill would certify whatever the current
+    /// content happens to be — the claim the hash exists to test.
+    pub content_hash: Option<String>,
+    /// SHA-3 digest over the same pre-image as `content_hash`.
+    pub content_hash_sha3: Option<String>,
+    /// HMAC over the same pre-image, as `"<key id>:<hex>"`. Unlike the
+    /// digests, not recomputable from the database alone.
+    pub content_mac: Option<String>,
+}
 
 impl Model {
     /// Deserialize the stored payload into a matcher `Case`.
@@ -27,19 +67,19 @@ impl Model {
 
     /// Insert a new case, returning the created row.
     ///
-    /// Generic over [`ConnectionTrait`] so the caller can pass either the
-    /// pooled `&DatabaseConnection` (memory transport) or its own
-    /// `&DatabaseTransaction` (outbox transport — so the row and its
-    /// `event_outbox` row share one commit boundary).
+    /// Takes a [`Db`], so the caller can pass either the pool (memory
+    /// transport) or its own open transaction (outbox transport — so the
+    /// row and its `event_outbox` row share one commit boundary).
     ///
     /// # Errors
     ///
     /// When serialization or the insert fails.
-    pub async fn create<C: ConnectionTrait>(db: &C, case: &MatchCase) -> ModelResult<Self> {
+    pub async fn create(db: impl Into<Db<'_>>, case: &MatchCase) -> ModelResult<Self> {
         let data = serde_json::to_value(case).map_err(|e| ModelError::Any(e.into()))?;
         let pid = Uuid::new_v4();
         // Both digests from one call, so neither can be stamped without
-        // the other (see `record_integrity::digests`).
+        // the other (see `record_integrity::digests`). A new record is
+        // live, so the digest binds `deleted_at` as `None`.
         let digests = record_integrity::digests(&record_integrity::RecordInput {
             pid,
             title: &case.title,
@@ -47,37 +87,53 @@ impl Model {
             active: true,
             deleted_at_micros: None,
         });
-        let model = cases::ActiveModel {
-            pid: ActiveValue::set(pid),
-            title: ActiveValue::set(case.title.clone()),
-            // A new record is live, so the digest binds `deleted_at` as
-            // `None`.
-            content_hash: ActiveValue::set(Some(digests.sha256.clone())),
-            content_hash_sha3: ActiveValue::set(Some(digests.sha3.clone())),
-            content_mac: ActiveValue::set(digests.mac.clone()),
-            data: ActiveValue::set(data),
-            active: ActiveValue::set(true),
-            deleted_at: ActiveValue::set(None),
-            ..Default::default()
-        }
-        .insert(db)
+        let mut conn = db.into().acquire().await?;
+        // `id`, `created_at` and `updated_at` are column defaults.
+        let row = sqlx::query_as!(
+            Self,
+            r#"INSERT INTO cases
+                   (pid, title, data, active, deleted_at,
+                    content_hash, content_hash_sha3, content_mac)
+               VALUES ($1, $2, $3, true, NULL, $4, $5, $6)
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, title, data, active,
+                         deleted_at AS "deleted_at: _",
+                         content_hash, content_hash_sha3, content_mac"#,
+            pid,
+            case.title,
+            data,
+            digests.sha256,
+            digests.sha3,
+            digests.mac,
+        )
+        .fetch_one(&mut *conn)
         .await?;
-        Ok(model)
+        Ok(row)
     }
 
     /// Find an active case by its public id.
     ///
     /// # Errors
     ///
-    /// When not found or the query fails.
-    pub async fn find_by_pid(db: &DatabaseConnection, pid: &str) -> ModelResult<Self> {
+    /// [`ModelError::EntityNotFound`] when no active row has that id;
+    /// [`ModelError::Any`] when `pid` is not a UUID; a database error
+    /// when the query fails.
+    pub async fn find_by_pid(db: &PgPool, pid: &str) -> ModelResult<Self> {
         let uuid = Uuid::parse_str(pid).map_err(|e| ModelError::Any(e.into()))?;
-        let row = cases::Entity::find()
-            .filter(cases::Column::Pid.eq(uuid))
-            .filter(cases::Column::DeletedAt.is_null())
-            .one(db)
-            .await?;
-        row.ok_or_else(|| ModelError::EntityNotFound)
+        let row = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, title, data, active,
+                      deleted_at AS "deleted_at: _",
+                      content_hash, content_hash_sha3, content_mac
+               FROM cases
+               WHERE pid = $1 AND deleted_at IS NULL
+               LIMIT 1"#,
+            uuid,
+        )
+        .fetch_optional(db)
+        .await?;
+        row.ok_or(ModelError::EntityNotFound)
     }
 
     /// Find an active case by its **agency-scoped case number** — the
@@ -94,30 +150,28 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn find_by_agency_case_number<C: ConnectionTrait>(
-        db: &C,
+    pub async fn find_by_agency_case_number(
+        db: impl Into<Db<'_>>,
         agency_id: &str,
         case_number: &str,
     ) -> ModelResult<Option<Self>> {
-        // Both conditions live in **one** `cust_with_values` call, bound
-        // with explicit Postgres `$1`/`$2` placeholders (not the generic
-        // `?` token `cust_with_values` uses for MySQL/SQLite — see its
-        // own doc examples, "Postgres only"). Splitting this into two
-        // separate `.filter(Expr::cust_with_values(...))` calls, each
-        // privately numbered `$1`, produced two competing `$1`s in the
-        // same rendered query — `data->>'agency_id' = $1 AND
-        // data->>'case_number' = $1` binding only the first value —
-        // which is silently wrong, not merely a syntax error, so this
-        // shape is deliberate rather than a style preference.
-        let row = cases::Entity::find()
-            .filter(cases::Column::DeletedAt.is_null())
-            .filter(Expr::cust_with_values(
-                "data->>'agency_id' = $1 AND data->>'case_number' = $2",
-                [agency_id, case_number],
-            ))
-            .order_by_desc(cases::Column::Id)
-            .one(db)
-            .await?;
+        let mut conn = db.into().acquire().await?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, title, data, active,
+                      deleted_at AS "deleted_at: _",
+                      content_hash, content_hash_sha3, content_mac
+               FROM cases
+               WHERE deleted_at IS NULL
+                 AND data->>'agency_id' = $1 AND data->>'case_number' = $2
+               ORDER BY id DESC
+               LIMIT 1"#,
+            agency_id,
+            case_number,
+        )
+        .fetch_optional(&mut *conn)
+        .await?;
         Ok(row)
     }
 
@@ -133,18 +187,25 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn find_by_pids(db: &DatabaseConnection, pids: &[Uuid]) -> ModelResult<Vec<Self>> {
+    pub async fn find_by_pids(db: &PgPool, pids: &[Uuid]) -> ModelResult<Vec<Self>> {
         if pids.is_empty() {
             return Ok(Vec::new());
         }
-        let rows = cases::Entity::find()
-            .filter(cases::Column::Pid.is_in(pids.iter().copied()))
-            .filter(cases::Column::DeletedAt.is_null())
-            .all(db)
-            .await?;
-        // Re-order to match `pids` (the SQL `IN` result order is
-        // unspecified). Linear in `pids` × `rows`, both bounded by the
-        // caller's result limit.
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, title, data, active,
+                      deleted_at AS "deleted_at: _",
+                      content_hash, content_hash_sha3, content_mac
+               FROM cases
+               WHERE pid = ANY($1) AND deleted_at IS NULL"#,
+            pids,
+        )
+        .fetch_all(db)
+        .await?;
+        // Re-order to match `pids` (the SQL result order is unspecified).
+        // Linear in `pids` × `rows`, both bounded by the caller's result
+        // limit.
         let mut ordered = Vec::with_capacity(rows.len());
         for pid in pids {
             if let Some(row) = rows.iter().find(|r| r.pid == *pid) {
@@ -159,7 +220,7 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn list(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
+    pub async fn list(db: &PgPool, limit: u64) -> ModelResult<Vec<Self>> {
         Self::list_paged(db, limit, 0).await
     }
 
@@ -168,31 +229,100 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn list_paged(
-        db: &DatabaseConnection,
-        limit: u64,
-        offset: u64,
-    ) -> ModelResult<Vec<Self>> {
-        let rows = cases::Entity::find()
-            .filter(cases::Column::DeletedAt.is_null())
-            .order_by_desc(cases::Column::Id)
-            .offset(offset)
-            .limit(limit)
-            .all(db)
-            .await?;
+    pub async fn list_paged(db: &PgPool, limit: u64, offset: u64) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, title, data, active,
+                      deleted_at AS "deleted_at: _",
+                      content_hash, content_hash_sha3, content_mac
+               FROM cases
+               WHERE deleted_at IS NULL
+               ORDER BY id DESC
+               LIMIT $1 OFFSET $2"#,
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 
-    /// Case-insensitive substring search on the denormalised `title`, over
-    /// active rows (Postgres `ILIKE '%q%'`). This is the pragmatic title
-    /// search; full-text / fuzzy search over the JSONB payload via Tantivy
-    /// is deferred (spec §13 T-6). `q` is matched literally — `%` and `_`
-    /// in the query are escaped so they are not treated as wildcards.
+    /// One page of active cases **oldest first** — the search reindex's
+    /// replay order.
     ///
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
+    pub async fn list_active_oldest_first(
+        db: &PgPool,
+        limit: u64,
+        offset: u64,
+    ) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, title, data, active,
+                      deleted_at AS "deleted_at: _",
+                      content_hash, content_hash_sha3, content_mac
+               FROM cases
+               WHERE deleted_at IS NULL
+               ORDER BY id ASC
+               LIMIT $1 OFFSET $2"#,
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(db)
+        .await?;
+        Ok(rows)
+    }
+
+    /// How many rows the table holds, soft-deleted ones included.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn count_all(db: &PgPool) -> ModelResult<u64> {
+        let n = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM cases"#)
+            .fetch_one(db)
+            .await?;
+        Ok(u64::try_from(n).unwrap_or(0))
+    }
+
+    /// How many active (not soft-deleted) rows the table holds.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn count_active(db: &PgPool) -> ModelResult<u64> {
+        let n =
+            sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM cases WHERE deleted_at IS NULL"#)
+                .fetch_one(db)
+                .await?;
+        Ok(u64::try_from(n).unwrap_or(0))
+    }
+
+    /// How many rows carry `pid`, soft-deleted ones included.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn count_by_pid(db: &PgPool, pid: Uuid) -> ModelResult<u64> {
+        let n = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM cases WHERE pid = $1"#, pid)
+            .fetch_one(db)
+            .await?;
+        Ok(u64::try_from(n).unwrap_or(0))
+    }
+
+    /// Case-insensitive substring search on the denormalised `title`, over
+    /// active rows (Postgres `ILIKE '%q%'`). `q` is matched literally —
+    /// `%` and `_` in the query are escaped so they are not treated as
+    /// wildcards.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn search(db: &PgPool, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
         Self::search_paged(db, q, limit, 0).await
     }
 
@@ -202,20 +332,28 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn search_paged(
-        db: &DatabaseConnection,
+        db: &PgPool,
         q: &str,
         limit: u64,
         offset: u64,
     ) -> ModelResult<Vec<Self>> {
         let pattern = format!("%{}%", escape_like(q));
-        let rows = cases::Entity::find()
-            .filter(cases::Column::DeletedAt.is_null())
-            .filter(Expr::col(cases::Column::Title).ilike(pattern))
-            .order_by_desc(cases::Column::Id)
-            .offset(offset)
-            .limit(limit)
-            .all(db)
-            .await?;
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, title, data, active,
+                      deleted_at AS "deleted_at: _",
+                      content_hash, content_hash_sha3, content_mac
+               FROM cases
+               WHERE deleted_at IS NULL AND title ILIKE $1
+               ORDER BY id DESC
+               LIMIT $2 OFFSET $3"#,
+            pattern,
+            to_i64(limit),
+            to_i64(offset),
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 
@@ -229,15 +367,22 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn recent_for_integrity<C: ConnectionTrait>(
-        db: &C,
-        limit: u64,
-    ) -> ModelResult<Vec<Model>> {
-        Ok(cases::Entity::find()
-            .order_by_desc(cases::Column::UpdatedAt)
-            .limit(limit)
-            .all(db)
-            .await?)
+    pub async fn recent_for_integrity(db: impl Into<Db<'_>>, limit: u64) -> ModelResult<Vec<Self>> {
+        let mut conn = db.into().acquire().await?;
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, title, data, active,
+                      deleted_at AS "deleted_at: _",
+                      content_hash, content_hash_sha3, content_mac
+               FROM cases
+               ORDER BY updated_at DESC
+               LIMIT $1"#,
+            to_i64(limit),
+        )
+        .fetch_all(&mut *conn)
+        .await?;
+        Ok(rows)
     }
 
     /// Recompute every recent record's content hash and report mismatches.
@@ -246,80 +391,217 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn verify_records(
-        db: &DatabaseConnection,
+        db: &PgPool,
         limit: u64,
     ) -> ModelResult<record_integrity::RecordIntegrityReport> {
         Ok(record_integrity::verify(
             &Self::recent_for_integrity(db, limit).await?,
         ))
     }
-}
 
-impl ActiveModel {
-    /// Replace the payload of an existing case.
-    ///
-    /// Generic over [`ConnectionTrait`] so the update can run on a
-    /// transaction alongside the outbox insert (see [`Model::create`]).
+    /// The rows carrying a MAC, oldest first, capped at `limit` — the
+    /// `integrity_resign` task's walk.
     ///
     /// # Errors
     ///
-    /// When serialization or the update fails.
-    pub async fn update_data<C: ConnectionTrait>(
-        mut self,
-        db: &C,
-        case: &MatchCase,
-    ) -> ModelResult<Model> {
+    /// When the query fails.
+    pub async fn with_mac_oldest_first(db: &PgPool, limit: u64) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, pid, title, data, active,
+                      deleted_at AS "deleted_at: _",
+                      content_hash, content_hash_sha3, content_mac
+               FROM cases
+               WHERE content_mac IS NOT NULL
+               ORDER BY id ASC
+               LIMIT $1"#,
+            to_i64(limit),
+        )
+        .fetch_all(db)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Replace one row's MAC, and nothing else: the `integrity_resign`
+    /// task's write, after the existing MAC verified.
+    ///
+    /// # Errors
+    ///
+    /// When the update fails, including when the row is gone
+    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    pub async fn set_content_mac(db: &PgPool, id: i64, mac: Option<&str>) -> ModelResult<()> {
+        let done = sqlx::query!("UPDATE cases SET content_mac = $2 WHERE id = $1", id, mac)
+            .execute(db)
+            .await?;
+        updated(done.rows_affected())
+    }
+
+    /// Lock one row `FOR UPDATE` until the caller's transaction ends — the
+    /// SEC-B5 merge guard. A missing row locks nothing and is not an
+    /// error; the caller re-checks liveness with [`Self::is_active`].
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn lock_for_update(conn: &mut PgConnection, pid: Uuid) -> ModelResult<()> {
+        sqlx::query_scalar!(
+            "SELECT id FROM cases WHERE pid = $1 LIMIT 1 FOR UPDATE",
+            pid
+        )
+        .fetch_optional(conn)
+        .await?;
+        Ok(())
+    }
+
+    /// Whether an active (not soft-deleted) row carries `pid`.
+    ///
+    /// # Errors
+    ///
+    /// When the query fails.
+    pub async fn is_active(conn: &mut PgConnection, pid: Uuid) -> ModelResult<bool> {
+        let hit = sqlx::query_scalar!(
+            "SELECT id FROM cases WHERE pid = $1 AND deleted_at IS NULL LIMIT 1",
+            pid
+        )
+        .fetch_optional(conn)
+        .await?;
+        Ok(hit.is_some())
+    }
+
+    /// Replace the payload of this case, returning the updated row.
+    ///
+    /// Takes a [`Db`], so the update can run on a transaction alongside
+    /// the outbox insert (see [`Model::create`]).
+    ///
+    /// # Errors
+    ///
+    /// When serialization or the update fails, including when the row is
+    /// gone (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    pub async fn update_data(self, db: impl Into<Db<'_>>, case: &MatchCase) -> ModelResult<Self> {
         let data = serde_json::to_value(case).map_err(|e| ModelError::Any(e.into()))?;
         // The lifecycle fields are untouched by an update, so read them
-        // back off the active model to hash the row as it will land.
-        let pid = *self.pid.as_ref();
-        let active = *self.active.as_ref();
-        let deleted_at_micros = self.deleted_at.as_ref().map(|d| d.timestamp_micros());
+        // off the loaded row to hash the row as it will land.
         let d = record_integrity::digests(&record_integrity::RecordInput {
-            pid,
+            pid: self.pid,
             title: &case.title,
             data: &data,
-            active,
-            deleted_at_micros,
+            active: self.active,
+            deleted_at_micros: self.deleted_at.map(|d| d.timestamp_micros()),
         });
-        self.content_hash = ActiveValue::set(Some(d.sha256));
-        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
-        self.content_mac = ActiveValue::set(d.mac);
-        self.title = ActiveValue::set(case.title.clone());
-        self.data = ActiveValue::set(data);
-        self.update(db).await.map_err(ModelError::from)
+        let mut conn = db.into().acquire().await?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE cases
+               SET title = $2, data = $3,
+                   content_hash = $4, content_hash_sha3 = $5, content_mac = $6
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, title, data, active,
+                         deleted_at AS "deleted_at: _",
+                         content_hash, content_hash_sha3, content_mac"#,
+            self.id,
+            case.title,
+            data,
+            d.sha256,
+            d.sha3,
+            d.mac,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
+        Ok(row)
     }
 
     /// Soft-delete: mark inactive and stamp `deleted_at`.
     ///
-    /// Generic over [`ConnectionTrait`] so the soft-delete can run on a
-    /// transaction alongside the outbox insert (see [`Model::create`]).
+    /// Takes a [`Db`], so the soft-delete can run on a transaction
+    /// alongside the outbox insert (see [`Model::create`]).
     ///
     /// # Errors
     ///
-    /// When the update fails.
-    pub async fn soft_delete<C: ConnectionTrait>(mut self, db: &C) -> ModelResult<Model> {
+    /// When the update fails, including when the row is gone
+    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    pub async fn soft_delete(self, db: impl Into<Db<'_>>) -> ModelResult<Self> {
         // Truncated to microseconds so the value hashed here is the value
         // Postgres returns (see `compliance::record_integrity`).
-        let deleted_at: chrono::DateTime<chrono::FixedOffset> =
-            chrono::Utc::now().trunc_subsecs(6).into();
+        let deleted_at: DateTime<FixedOffset> = chrono::Utc::now().trunc_subsecs(6).into();
         // A soft delete changes the lifecycle state the digest binds, so
         // the row rehashes — otherwise every deleted case would read as
         // tampered.
         let d = record_integrity::digests(&record_integrity::RecordInput {
-            pid: *self.pid.as_ref(),
-            title: self.title.as_ref(),
-            data: self.data.as_ref(),
+            pid: self.pid,
+            title: &self.title,
+            data: &self.data,
             active: false,
             deleted_at_micros: Some(deleted_at.timestamp_micros()),
         });
-        self.content_hash = ActiveValue::set(Some(d.sha256));
-        self.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
-        self.content_mac = ActiveValue::set(d.mac);
-        self.active = ActiveValue::set(false);
-        self.deleted_at = ActiveValue::set(Some(deleted_at));
-        self.update(db).await.map_err(ModelError::from)
+        let mut conn = db.into().acquire().await?;
+        let row = sqlx::query_as!(
+            Self,
+            r#"UPDATE cases
+               SET active = false, deleted_at = $2,
+                   content_hash = $3, content_hash_sha3 = $4, content_mac = $5
+               WHERE id = $1
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, pid, title, data, active,
+                         deleted_at AS "deleted_at: _",
+                         content_hash, content_hash_sha3, content_mac"#,
+            self.id,
+            deleted_at,
+            d.sha256,
+            d.sha3,
+            d.mac,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
+        Ok(row)
     }
+
+    /// GDPR Art. 17: replace this row's title and payload with the
+    /// tombstone, retire it, and stamp the digests over the tombstoned
+    /// record ([`crate::compliance::erasure`] computes them).
+    ///
+    /// # Errors
+    ///
+    /// When the update fails, including when the row is gone
+    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    pub async fn erase_payload(
+        self,
+        db: impl Into<Db<'_>>,
+        tombstone: &Tombstone<'_>,
+    ) -> ModelResult<()> {
+        let mut conn = db.into().acquire().await?;
+        let done = sqlx::query!(
+            "UPDATE cases
+             SET title = $2, data = $3, active = false, deleted_at = $4,
+                 content_hash = $5, content_hash_sha3 = $6, content_mac = $7
+             WHERE id = $1",
+            self.id,
+            tombstone.title,
+            tombstone.data,
+            tombstone.deleted_at,
+            tombstone.digests.sha256,
+            tombstone.digests.sha3,
+            tombstone.digests.mac,
+        )
+        .execute(&mut *conn)
+        .await?;
+        updated(done.rows_affected())
+    }
+}
+
+/// What an erased row is left holding: the tombstone title and payload,
+/// the soft-delete stamp, and the digests over exactly those values.
+#[derive(Debug, Clone, Copy)]
+pub struct Tombstone<'a> {
+    /// The tombstone title.
+    pub title: &'a str,
+    /// The tombstone payload.
+    pub data: &'a serde_json::Value,
+    /// The soft-delete stamp, truncated to microseconds.
+    pub deleted_at: DateTime<FixedOffset>,
+    /// The digests over the tombstoned record.
+    pub digests: &'a record_integrity::Digests,
 }
 
 #[cfg(test)]

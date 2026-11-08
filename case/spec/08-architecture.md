@@ -22,7 +22,7 @@
 +--------------+-------------------------------+---------------+
                |  path dependency (Cargo)      |
 +--------------v---------------+  +------------v---------------+
-|  case-matcher                |  |  PostgreSQL (SeaORM 1.1)   |
+|  case-matcher                |  |  PostgreSQL (sqlx)         |
 |  pure library, no IO         |  |  cases · audit_logs ·      |
 |  MatchingEngine ·            |  |  merge_records             |
 |  MatchConfig · Case          |  |  pid · title · data JSONB  |
@@ -51,15 +51,17 @@ case-service-with-axum/
 │   ├── controllers/
 │   │   ├── cases.rs            CRUD + search + match + check-duplicates + merge + audit + events + whoami
 │   │   └── docs.rs             /api-docs/openapi.json + /swagger-ui
-│   └── models/
+│   └── models/                 every SQL statement (sqlx `query!` literals) + MIGRATOR
 │       ├── cases.rs            CRUD helpers over the payload
-│       ├── audit_logs.rs       record / recent / for_entity
+│       ├── audit_logs.rs       hash-chained record / recent / for_entity
 │       ├── merge_records.rs    merge history
-│       └── _entities/…         SeaORM entities
-├── migration/src/
-│   ├── m20220101_000001_cases.rs
-│   ├── m20220101_000002_audit_logs.rs
-│   └── m20220101_000003_merge_records.rs
+│       └── …                   entity_links, event_outbox, review_queue, bulk_jobs
+├── migrations/                 plain SQL, `<version>_<name>.up.sql` / `.down.sql`
+│   ├── 2022010100000001_cases.up.sql
+│   ├── 2022010100000002_audit_logs.up.sql
+│   ├── 2022010100000003_merge_records.up.sql
+│   └── …                       through 2026080300000013_bulk_jobs
+├── .sqlx/                      offline query data for the `query!` macros
 ├── config/{development,production,test}.yaml
 └── tests/{matching.rs, requests/cases.rs}
 ```

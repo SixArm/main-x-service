@@ -16,9 +16,8 @@
 use axa::testing::prelude::*;
 use case_matcher::Case;
 use case_service::app::App;
-use case_service::models::_entities::{audit_logs, cases, event_outbox};
+use case_service::models::{audit_logs, cases, event_outbox};
 use case_service::streaming;
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 
 #[tokio::test]
@@ -50,9 +49,7 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
 
         // Entity committed.
         assert_eq!(
-            cases::Entity::find()
-                .filter(cases::Column::Pid.eq(model.pid))
-                .count(&ctx.db)
+            cases::Model::count_by_pid(&ctx.db, model.pid)
                 .await
                 .expect("count cases"),
             1,
@@ -60,9 +57,7 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
         );
 
         // Exactly one outbox row, unpublished, for this record.
-        let events = event_outbox::Entity::find()
-            .filter(event_outbox::Column::EntityPid.eq(model.pid))
-            .all(&ctx.db)
+        let events = event_outbox::Model::for_entity(&ctx.db, model.pid)
             .await
             .expect("load outbox rows");
         assert_eq!(events.len(), 1, "one event_outbox row");
@@ -71,9 +66,7 @@ async fn outbox_create_and_emit_writes_entity_event_and_audit_atomically() {
 
         // ...and the audit row rode the SAME transaction (§3) — not a
         // best-effort after-commit side channel.
-        let audits = audit_logs::Entity::find()
-            .filter(audit_logs::Column::EntityPid.eq(model.pid))
-            .all(&ctx.db)
+        let audits = audit_logs::Model::for_entity(&ctx.db, model.pid)
             .await
             .expect("load audit rows");
         assert_eq!(audits.len(), 1, "one audit_logs row, atomic with the event");

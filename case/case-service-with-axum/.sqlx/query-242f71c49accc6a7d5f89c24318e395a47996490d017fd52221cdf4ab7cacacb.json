@@ -1,0 +1,207 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO audit_logs\n                   (created_at, updated_at, entity_pid, action, actor, snapshot,\n                    prev_hash, hash, prev_hash_sha3, hash_sha3, mac,\n                    context, disclosure, redacted_at)\n               VALUES ($1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NULL)\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, entity_pid, action, actor, snapshot,\n                         prev_hash, prev_hash_sha3, hash, hash_sha3, mac,\n                         context, disclosure, redacted_at AS \"redacted_at: _\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "entity_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "entity_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "action",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "action"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "actor",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "actor"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "snapshot",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "snapshot"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "prev_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "prev_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "prev_hash_sha3",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "prev_hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "hash"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "hash_sha3",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "hash_sha3"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "mac",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "mac"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "context",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "context"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "disclosure",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "disclosure"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "redacted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "audit_logs",
+            "name": "redacted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "242f71c49accc6a7d5f89c24318e395a47996490d017fd52221cdf4ab7cacacb"
+}

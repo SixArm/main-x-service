@@ -9,6 +9,69 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — SeaORM replaced by sqlx
+
+- **Persistence is sqlx with no ORM** (spec §10, §13 CASE-SQLX;
+  `spec/tech-stack/index.md` §5). All SQL is in `src/models/`, as 63
+  `query!` / `query_as!` / `query_scalar!` literals checked at compile
+  time against the committed `.sqlx/`; there is no dynamic SQL and no
+  `ci/sql-allowlist.txt` entry. The SeaORM `_entities/` are plain row
+  structs. SQL that lived outside `src/models/` (the merge lock in
+  `streaming.rs`, the erasure writes, the checkpoint reads, the relay's
+  retention purge, the lost-job reconcile `UPDATE`, the MAC re-sign
+  walks, the reindex and seed counts, `App::truncate`) moved into it.
+- **The `migration/` crate is removed.** Its thirteen migrations were
+  SeaORM schema-builder Rust; they are now plain SQL in sqlx's flat
+  `migrations/<version>_<name>.up.sql` / `.down.sql` layout (versions
+  `2022010100000001` … `2026080300000013`, same order), embedded by
+  `sqlx::migrate!` and recorded in `_sqlx_migrations` instead of
+  `seaql_migrations`. The resulting schema is identical (`pg_dump
+  --schema-only` diff). A database migrated by the old code has no
+  `_sqlx_migrations`, so sqlx would try to re-create its tables; there
+  is no deployed data, so recreate it.
+- `axa` takes its `sqlx` feature instead of `sea-orm`, so `ctx.db` is a
+  `sqlx::PgPool`; `sea-orm` and `sea-orm-migration` are gone from the
+  tree (386 → 349 unique normal dependencies). `chrono` now names its
+  own `serde` feature, which SeaORM used to turn on. The SOUP register
+  lists `sqlx` in place of `sea-orm` and `migration`.
+- Compliance controls are unchanged statement for statement: the audit
+  chain append still takes `pg_advisory_xact_lock`, reads both heads and
+  inserts with a writer-stamped microsecond `created_at` (now all on one
+  connection); redaction, record digests, MACs, checkpoints, the merge's
+  `FOR UPDATE` lock, the relay's `FOR UPDATE SKIP LOCKED`, and the
+  `entity_links` `ON CONFLICT` upsert behave as before.
+- Library API: `models::ModelError` / `ModelResult` replace axa's
+  SeaORM-only ones and convert into the same `axa::Error` (missing row
+  `404`, unique violation `409`, other database errors `500`). Write
+  helpers take an `axa::sqlx::Db` (pool or `&mut *txn`) instead of a
+  `ConnectionTrait`; `update_data` and `soft_delete` are methods on the
+  row types rather than on a SeaORM `ActiveModel`; `erasure::erase` and
+  `erase_audit_only` take a `&mut PgConnection`. An update or soft delete
+  that hits no row is still a `500` (sqlx `RowNotFound` where SeaORM said
+  `RecordNotUpdated`). Row timestamps stay `DateTime<FixedOffset>`, so
+  every endpoint that serializes a row is unchanged.
+- `db status` prints one tab-separated line per migration to stdout
+  (SeaORM logged it). `db reset` and the test boot recreate the schema
+  with `axa::sqlx::dangerously_recreate` in place of SeaORM's `fresh`.
+- `database.enable_logging` no longer reaches the driver: SeaORM passed
+  it to `sqlx_logging`, while a plain sqlx pool logs each statement at
+  `DEBUG` (target `sqlx::query`) and a slow one at `WARN`. A database
+  error's text is sqlx's rather than SeaORM's wrapper (it is logged,
+  never sent).
+- `[profile.release.build-override] strip = false`: with stripping
+  reaching proc macros, macOS refuses to load the stripped
+  `sqlx-macros` dylib and a release build fails. The Dockerfile copies
+  `migrations/` and `.sqlx/` and builds with `SQLX_OFFLINE=true`; the
+  crate-local CI drops its `migration` clippy job.
+
+### Added
+
+- **INT-V1 test `a_written_record_verifies`** (DB-gated): a created,
+  updated and merged record (survivor and soft-deleted duplicate) all
+  verify at `/api/cases/records/verify`, and a title edited in SQL is
+  flagged. It passes on the SeaORM code too: case was not affected by
+  the INT-V1 defect (spec §13 CASE-SQLX). DB suite 65 → 66.
+
 ### Changed
 
 - **`GET /api/cases` and `GET /api/cases/search` page by signed cursor**

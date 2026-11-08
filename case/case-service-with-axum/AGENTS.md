@@ -14,10 +14,10 @@ type, so there is no separate model or adapter to drift.
 
 | Question | Answer |
 |---|---|
-| Framework | axa (`Hooks`/`AppContext`/CLI, axa config, `sea-orm-migration` 2.0). |
-| Build / test | `cargo build` · `cargo test` (DB-free unit + `tests/matching.rs`) · `cargo test -- --ignored` (request tests, need Postgres). |
+| Framework | axa (`Hooks`/`AppContext`/CLI, axa config); persistence is sqlx with no ORM (`spec/tech-stack/index.md` §5). |
+| Build / test | `SQLX_OFFLINE=true cargo build` · `cargo test` (DB-free unit + `tests/matching.rs`) · `cargo test -- --ignored` (request tests, need Postgres). |
 | Run | `cargo run -- start` (needs Postgres). |
-| Persistence | One `cases` table: `pid`, `title`, `data` (JSONB Case), `active`, soft-delete. |
+| Persistence | One `cases` table: `pid`, `title`, `data` (JSONB Case), `active`, soft-delete, record digests + MAC. Every SQL statement is a `query!` literal in `src/models/`; the schema is the plain SQL in `migrations/`. |
 
 ## API surface
 
@@ -155,9 +155,16 @@ person records — see `examples/data/case-subject-links.md`.
 
 1. **Spec-first.** Update `spec/index.md` with behavioural changes.
 2. **Controller-style.** Endpoints are axa controllers in `app.rs`; new
-   tables are `sea-orm-migration` migrations.
-3. **Reuse the matcher type.** Do not fork a `Case` DTO.
-4. **Auth credentials** come from the central
+   tables are plain-SQL `migrations/<version>_<name>.up.sql` / `.down.sql`
+   pairs.
+3. **All SQL in `src/models/`.** Every statement is a `sqlx::query!` /
+   `query_as!` / `query_scalar!` literal; after changing one, run `cargo
+   sqlx prepare -- --all-targets` against a migrated database and commit
+   `.sqlx/`. No `QueryBuilder`, `raw_sql` or `AssertSqlSafe`. Writes take
+   an `axa::sqlx::Db` so the outbox path keeps entity, outbox and audit
+   rows in one transaction.
+4. **Reuse the matcher type.** Do not fork a `Case` DTO.
+5. **Auth credentials** come from the central
    [authentication-service](../../authentication/authentication-service-with-axum).
 
 ## Layout
@@ -191,17 +198,16 @@ src/
 ├── bulk/                  bulk import/export (BLK-5): mod · row (BulkCaseRow) · stable_key ·
 │                          columns · csv · jsonl · error_report · store (async ArtifactStore) ·
 │                          pipeline (process_import_job/process_export_job) · worker · handlers
-├── models/
-│   ├── cases.rs           CRUD helpers over the stored payload (+ find_by_agency_case_number)
-│   ├── audit_logs.rs      audit-trail record/query helpers
+├── models/                every SQL statement the service runs (sqlx `query!` literals) + MIGRATOR + ModelError
+│   ├── cases.rs           CRUD over the stored payload (+ find_by_agency_case_number, merge lock, erasure, MAC re-sign)
+│   ├── audit_logs.rs      hash-chained audit append (advisory lock), queries, redaction, checkpoint reads
 │   ├── merge_records.rs   merge-history record/query helpers
 │   ├── entity_links.rs    `subject_of` edge upsert/list/soft-delete (§8.6)
 │   ├── event_outbox.rs    transactional outbox row helpers (Phase 2)
 │   ├── bulk_jobs.rs       bulk-job CRUD + idempotency helpers (BLK-5)
-│   ├── review_queue.rs    duplicate-review-queue CRUD (BLK-5; raw SQL, provenance from the start)
-│   └── _entities/         SeaORM entities (cases, audit_logs, merge_records, entity_links, event_outbox, bulk_jobs)
-migration/src/            …_000001_cases … _000005_entity_links, …_000006_compliance …
-                          _000011_integrity_mac, …_000012_review_queue, …_000013_bulk_jobs
+│   └── review_queue.rs    duplicate-review-queue CRUD (BLK-5; provenance from the start)
+migrations/               plain SQL, `2022010100000001_cases` … `2026080300000013_bulk_jobs` (.up/.down)
+.sqlx/                    offline query data for the `query!` macros (regenerate with `cargo sqlx prepare`)
 config/                   development/production/test yaml
 tests/otlp_export.rs       the OTLP wiring proved over a real HTTP request, in-process collector, no database
 tests/otlp_collector/      the in-process OTLP/gRPC collector otlp_export uses

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE axa_queue SET status = 'failed' WHERE name = 'SomeOtherWorker'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "cb36384e10d1cb6f44bf764d6f29967978b9e1a63acb1d817d35119d9331938c"
+}

@@ -1,40 +1,79 @@
 //! `merge_records` model — record and query the record-merge history.
 
-use axa::prelude::*;
-use sea_orm::{QueryOrder, QuerySelect};
+use chrono::{DateTime, FixedOffset};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-pub use super::_entities::merge_records::{self, ActiveModel, Entity, Model};
+use super::ModelResult;
 
-impl ActiveModelBehavior for super::_entities::merge_records::ActiveModel {}
+/// One merge-history row: which duplicate folded into which survivor,
+/// with a snapshot of the transferred payload. One row is written per
+/// successful merge for auditability.
+///
+/// Serialized as-is by the merges endpoint, so the
+/// field order and the `DateTime<FixedOffset>` timestamps are the wire
+/// shape the `SeaORM` entity had.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Model {
+    /// Row insert time (UTC) — when the merge happened.
+    pub created_at: DateTime<FixedOffset>,
+    /// Row last-modification time (UTC); merge rows are append-only.
+    pub updated_at: DateTime<FixedOffset>,
+    /// Auto-increment surrogate primary key; also the recency order key.
+    pub id: i64,
+    /// The surviving (main) case's `pid` — the record kept.
+    pub main_pid: Uuid,
+    /// The merged-away duplicate's `pid` — now soft-deleted.
+    pub duplicate_pid: Uuid,
+    /// Optional operator-supplied free-text reason for the merge.
+    pub reason: Option<String>,
+    /// The actor that performed the merge (bearer `sub`), else `None`.
+    pub actor: Option<String>,
+    /// JSON snapshot of the duplicate's payload at merge time, so the
+    /// merged-away data is recoverable from the history.
+    pub transferred: Option<serde_json::Value>,
+}
 
+/// Recording and query helpers for the merge history.
 impl Model {
-    /// Record one merge. `actor` is the caller's `sub` when a verified
-    /// token was presented; `transferred` is a snapshot of the merged-away
-    /// duplicate's payload.
+    /// Record one merge. `transferred` is a snapshot of the merged-away
+    /// duplicate's payload. `actor` is the caller's `sub` when a verified
+    /// token was presented, else `None`.
+    ///
+    /// - `main_pid`: the surviving case (kept).
+    /// - `duplicate_pid`: the merged-away case (now soft-deleted).
+    /// - `reason`: optional operator-supplied free text.
+    /// - `actor`: verified caller `sub`, or `None` when unauthenticated.
+    /// - `transferred`: the duplicate's payload snapshot for recovery.
     ///
     /// # Errors
     ///
     /// When the insert fails.
     pub async fn record(
-        db: &DatabaseConnection,
+        db: &PgPool,
         main_pid: Uuid,
         duplicate_pid: Uuid,
         reason: Option<&str>,
         actor: Option<&str>,
         transferred: Option<serde_json::Value>,
     ) -> ModelResult<Self> {
-        let entry = merge_records::ActiveModel {
-            main_pid: ActiveValue::set(main_pid),
-            duplicate_pid: ActiveValue::set(duplicate_pid),
-            reason: ActiveValue::set(reason.map(ToString::to_string)),
-            actor: ActiveValue::set(actor.map(ToString::to_string)),
-            transferred: ActiveValue::set(transferred),
-            ..Default::default()
-        }
-        .insert(db)
+        // `id`, `created_at` and `updated_at` are column defaults.
+        let row = sqlx::query_as!(
+            Self,
+            r#"INSERT INTO merge_records (main_pid, duplicate_pid, reason, actor, transferred)
+               VALUES ($1, $2, $3, $4, $5)
+               RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
+                         id, main_pid, duplicate_pid, reason, actor, transferred"#,
+            main_pid,
+            duplicate_pid,
+            reason,
+            actor,
+            transferred,
+        )
+        .fetch_one(db)
         .await?;
-        Ok(entry)
+        Ok(row)
     }
 
     /// Most-recent merge records, capped at `limit`.
@@ -42,12 +81,18 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn recent(db: &DatabaseConnection, limit: u64) -> ModelResult<Vec<Self>> {
-        let rows = merge_records::Entity::find()
-            .order_by_desc(merge_records::Column::Id)
-            .limit(limit)
-            .all(db)
-            .await?;
+    pub async fn recent(db: &PgPool, limit: u64) -> ModelResult<Vec<Self>> {
+        let rows = sqlx::query_as!(
+            Self,
+            r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
+                      id, main_pid, duplicate_pid, reason, actor, transferred
+               FROM merge_records
+               ORDER BY id DESC
+               LIMIT $1"#,
+            i64::try_from(limit).unwrap_or(i64::MAX),
+        )
+        .fetch_all(db)
+        .await?;
         Ok(rows)
     }
 }

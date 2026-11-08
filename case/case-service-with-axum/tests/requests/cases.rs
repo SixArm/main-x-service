@@ -718,14 +718,13 @@ async fn tampering_with_an_audit_row_breaks_verification() {
         let report: Value = request.get("/api/cases/audit/verify").await.json();
         assert_eq!(report["verified"], true, "{report}");
 
-        use sea_orm::ConnectionTrait as _;
-        ctx.db
-            .execute_unprepared(
-                r#"UPDATE audit_logs SET snapshot = jsonb_set(snapshot, '{title}', '"Tampered"')
-                   WHERE snapshot IS NOT NULL AND redacted_at IS NULL"#,
-            )
-            .await
-            .expect("tamper");
+        sqlx::query!(
+            r#"UPDATE audit_logs SET snapshot = jsonb_set(snapshot, '{title}', '"Tampered"')
+               WHERE snapshot IS NOT NULL AND redacted_at IS NULL"#,
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("tamper");
 
         let report: Value = request.get("/api/cases/audit/verify").await.json();
         assert_eq!(
@@ -898,13 +897,11 @@ async fn erasure_is_idempotent_and_answers_for_an_unknown_pid() {
 // forgets to rehash flags an *untouched* record as tampered — a false
 // accusation, which is worse than no control at all — and `create` is the
 // only path the compiler helps with, since `update_data`, `soft_delete`
-// and the erasure all build their `ActiveModel` from `..Default` or an
-// existing row and compile happily with a stale digest.
+// and the erasure each write the digest columns in their own `UPDATE`
+// and would compile happily with a stale digest.
 async fn record_integrity_covers_every_write_path_and_catches_tampering() {
     super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
-        use sea_orm::ConnectionTrait as _;
-
         async fn verify(request: &axa::TestServer) -> Value {
             let response = request.get("/api/cases/records/verify?limit=500").await;
             assert_eq!(response.status_code(), 200);
@@ -963,15 +960,14 @@ async fn record_integrity_covers_every_write_path_and_catches_tampering() {
         // Now tamper: edit a stored case directly, writing no audit row.
         let victim = request.post("/api/cases").json(&housing_case()).await;
         let victim_pid = victim.json::<Value>()["pid"].as_str().unwrap().to_string();
-        ctx.db
-            .execute_raw(sea_orm::Statement::from_sql_and_values(
-                sea_orm::DatabaseBackend::Postgres,
-                "UPDATE cases SET data = jsonb_set(data, '{case_number}', '\"HB-9999-9999\"') \
-                 WHERE pid = $1::uuid",
-                [victim_pid.clone().into()],
-            ))
-            .await
-            .expect("tamper");
+        sqlx::query!(
+            r#"UPDATE cases SET data = jsonb_set(data, '{case_number}', '"HB-9999-9999"')
+               WHERE pid = $1::text::uuid"#,
+            victim_pid,
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("tamper");
 
         // The audit chain cannot see it — which is why this control exists.
         let chain = request.get("/api/cases/audit/verify?limit=1000").await;
@@ -999,12 +995,8 @@ async fn record_integrity_covers_every_write_path_and_catches_tampering() {
 
         // Leave no corrupted record behind: the database is shared with
         // every other DB-gated target in this crate.
-        ctx.db
-            .execute_raw(sea_orm::Statement::from_sql_and_values(
-                sea_orm::DatabaseBackend::Postgres,
-                "DELETE FROM cases WHERE pid = $1::uuid",
-                [victim_pid.into()],
-            ))
+        sqlx::query!("DELETE FROM cases WHERE pid = $1::text::uuid", victim_pid)
+            .execute(&ctx.db)
             .await
             .expect("purge");
     })
@@ -1297,6 +1289,136 @@ async fn sbom_needs_a_caller_with_enforcement_off() {
     super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {
         assert_eq!(request.get("/api/compliance/sbom").await.status_code(), 401);
+    })
+    .await;
+}
+
+/// `pid`s listed under `mismatched` by `GET /api/cases/records/verify`.
+async fn mismatched_pids(request: &axa::TestServer) -> Vec<String> {
+    let response = request.get("/api/cases/records/verify?limit=1000").await;
+    assert_eq!(response.status_code(), 200, "records verify should answer");
+    let report: Value = response.json();
+    report["mismatched"]
+        .as_array()
+        .expect("mismatched array")
+        .iter()
+        .map(|m| m["pid"].as_str().expect("mismatch pid").to_string())
+        .collect()
+}
+
+/// INT-V1: a record the service wrote must verify. The digests are
+/// computed from the payload the caller sent, while verification
+/// recomputes them from the row as read back from Postgres, so any
+/// normalisation in between (JSONB key order or number form, a server-set
+/// column, timestamp precision) would flag every fresh record as tampered.
+/// Create, update, merge (survivor and soft-deleted duplicate) all have to
+/// verify, and a row edited in SQL must still be flagged.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn a_written_record_verifies() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        // Every field the payload carries, including non-ASCII text and
+        // the nested identifiers, so the digest is exercised over the
+        // whole stored record, not just `title`.
+        let created: Value = request
+            .post("/api/cases")
+            .json(&json!({
+                "title": "Verifiable appeal — Zürich 日本",
+                "alternate_titles": ["VA-1", "Appeal (verifiable)"],
+                "case_number": "VA-2026-0001",
+                "agency_id": "dwp",
+                "agency_name": "Department for Work and Pensions",
+                "case_type": "Appeal",
+                "status": "Open",
+                "priority": "High",
+                "opened_date": "2026-01-02",
+                "subjects": ["person:verifiable"],
+                "keywords": ["ledger", "Zürich", "日本"],
+                "identifiers": [
+                    {"scheme": "Docket", "value": "CV-2026-000999"},
+                    {"scheme": "ExternalCaseId", "value": "EXT-VA-1"}
+                ],
+                "same_as": ["https://example.org/cases/va-1"],
+                "in_language": ["en", "de"]
+            }))
+            .await
+            .json();
+        let pid = created["pid"].as_str().expect("pid").to_string();
+        // Not vacuous: an unhashed row is never a mismatch, so the record
+        // must actually carry both digests for the checks below to mean
+        // anything.
+        let digests = sqlx::query!(
+            "SELECT content_hash, content_hash_sha3 FROM cases WHERE pid = $1::text::uuid",
+            pid,
+        )
+        .fetch_one(&ctx.db)
+        .await
+        .expect("read digests");
+        assert!(
+            digests.content_hash.is_some() && digests.content_hash_sha3.is_some(),
+            "a new record carries its digests"
+        );
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            !mismatched.contains(&pid),
+            "a freshly created record must verify; mismatched: {mismatched:?}"
+        );
+
+        let response = request
+            .put(&format!("/api/cases/{pid}"))
+            .json(&json!({
+                "title": "Verifiable appeal (amended)",
+                "agency_id": "dwp",
+                "case_number": "VA-2026-0001",
+                "keywords": ["ledger"],
+                "identifiers": [{"scheme": "Docket", "value": "CV-2026-000999"}]
+            }))
+            .await;
+        assert_eq!(response.status_code(), 200, "update should succeed");
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            !mismatched.contains(&pid),
+            "an updated record must verify; mismatched: {mismatched:?}"
+        );
+
+        // Merge: the survivor is rewritten and the duplicate soft-deleted,
+        // and both rows are in the verified set.
+        let dup: Value = request
+            .post("/api/cases")
+            .json(&json!({
+                "title": "Unrelated tax credit review",
+                "keywords": ["review"],
+                "identifiers": [{"scheme": "ExternalCaseId", "value": "EXT-VA-2"}]
+            }))
+            .await
+            .json();
+        let dup_pid = dup["pid"].as_str().expect("dup pid").to_string();
+        let response = request
+            .post("/api/cases/merge")
+            .json(&json!({"main_pid": pid, "duplicate_pid": dup_pid, "reason": "confirmed"}))
+            .await;
+        assert_eq!(response.status_code(), 200, "merge should succeed");
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            !mismatched.contains(&pid) && !mismatched.contains(&dup_pid),
+            "a merge survivor and its soft-deleted duplicate must verify; mismatched: {mismatched:?}"
+        );
+
+        // An edit made behind the service's back must still be caught.
+        sqlx::query!(
+            "UPDATE cases SET title = title || ' (edited in SQL)' WHERE pid = $1::text::uuid",
+            pid,
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("raw SQL edit");
+        let mismatched = mismatched_pids(&request).await;
+        assert!(
+            mismatched.contains(&pid),
+            "a row edited in SQL must be reported; mismatched: {mismatched:?}"
+        );
     })
     .await;
 }

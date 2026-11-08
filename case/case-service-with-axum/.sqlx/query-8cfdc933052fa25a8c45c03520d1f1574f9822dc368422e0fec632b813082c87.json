@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, main_pid, duplicate_pid, reason, actor, transferred\n               FROM merge_records\n               ORDER BY id DESC\n               LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "merge_records",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "merge_records",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "merge_records",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "main_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "merge_records",
+            "name": "main_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "duplicate_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "merge_records",
+            "name": "duplicate_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "reason",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "merge_records",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "actor",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "merge_records",
+            "name": "actor"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "transferred",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "merge_records",
+            "name": "transferred"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "8cfdc933052fa25a8c45c03520d1f1574f9822dc368422e0fec632b813082c87"
+}

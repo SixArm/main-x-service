@@ -6,7 +6,7 @@ case-management registry with explainable duplicate matching.
 | Subproject | Kind | Responsibility |
 |---|---|---|
 | [case-matcher-rust-crate](../case-matcher-rust-crate/) | Rust library (edition 2024, dependency-light) | Pairwise `Case` comparison: deterministic short-circuits + weighted probabilistic scoring with per-component breakdown. Owns the canonical `Case` domain type. |
-| [case-service-with-axum](../case-service-with-axum/) | axa service (Axum 0.8, SeaORM 1.1, PostgreSQL) | Registry: CRUD with soft delete + `/search` + `/match` + `/check-duplicates` + `/merge`, audit log, event stream, offline PASETO v4.public verification, OpenAPI. Stores the matcher type verbatim as JSONB. |
+| [case-service-with-axum](../case-service-with-axum/) | axa service (Axum 0.8, sqlx, PostgreSQL) | Registry: CRUD with soft delete + `/search` + `/match` + `/check-duplicates` + `/merge`, audit log, event stream, offline PASETO v4.public verification, OpenAPI. Stores the matcher type verbatim as JSONB. |
 | [case-front-end-with-svelte](../case-front-end-with-svelte/) | SvelteKit 2 SPA (Svelte 5 runes, TS strict, dependency-light — no data grid) | Operator UI: list / create / detail / edit / delete / check-duplicates over the service REST API. |
 
 ## Dependency direction

@@ -37,16 +37,17 @@
 //! a `subject_of` edge behind would preserve exactly the assertion the
 //! subject asked to have erased, even with the case payload gone.
 
-use axa::prelude::ModelResult;
 use case_matcher::Case;
 use chrono::SubsecRound as _;
-use sea_orm::{ActiveModelTrait, ActiveValue, ConnectionTrait, IntoActiveModel};
 use serde::Serialize;
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::compliance::disclosure::AccessContext;
-use crate::models::_entities::cases::Model as CaseModel;
 use crate::models::audit_logs::Model as AuditModel;
+use crate::models::cases::{Model as CaseModel, Tombstone};
+use crate::models::entity_links::Model as EntityLinkModel;
+use crate::models::{ModelError, ModelResult};
 
 /// The audit action verb an erasure appends.
 pub const ACTION_ERASED: &str = "erased";
@@ -95,15 +96,15 @@ pub struct ErasureOutcome {
 /// its cross-service links, redact its audit content, and append a chained
 /// `erased` audit row.
 ///
-/// Runs on the caller's connection or transaction; pass a
-/// `&DatabaseTransaction` to make the writes atomic.
+/// Runs on the caller's connection or transaction; pass the open
+/// transaction (`&mut *txn`) to make the writes atomic.
 ///
 /// # Errors
 ///
 /// When any of the payload update, the link withdrawal, the redaction
 /// sweep, or the audit append fails.
-pub async fn erase<C: ConnectionTrait>(
-    db: &C,
+pub async fn erase(
+    db: &mut PgConnection,
     model: CaseModel,
     actor: Option<&str>,
     ctx: &AccessContext,
@@ -112,11 +113,9 @@ pub async fn erase<C: ConnectionTrait>(
     let was_active = model.active;
 
     // 1. Tombstone the payload and retire the record.
-    let payload =
-        serde_json::to_value(tombstone()).map_err(|e| axa::model::ModelError::Any(e.into()))?;
+    let payload = serde_json::to_value(tombstone()).map_err(|e| ModelError::Any(e.into()))?;
     let deleted_at: chrono::DateTime<chrono::FixedOffset> =
         chrono::Utc::now().trunc_subsecs(6).into();
-    let mut active = model.into_active_model();
     // The tombstone is recomputed into the digest, not cleared. This
     // service stores its whole payload in one JSONB column, so an erased
     // record is still a *complete* record and can be hashed — an erased
@@ -132,29 +131,32 @@ pub async fn erase<C: ConnectionTrait>(
         active: false,
         deleted_at_micros: Some(deleted_at.timestamp_micros()),
     });
-    active.content_hash = ActiveValue::set(Some(d.sha256));
-    active.content_hash_sha3 = ActiveValue::set(Some(d.sha3));
-    active.content_mac = ActiveValue::set(d.mac);
-    active.title = ActiveValue::set(TOMBSTONE_TITLE.to_string());
-    active.data = ActiveValue::set(payload);
-    active.active = ActiveValue::set(false);
-    active.deleted_at = ActiveValue::set(Some(deleted_at));
-    active.update(db).await?;
+    model
+        .erase_payload(
+            &mut *db,
+            &Tombstone {
+                title: TOMBSTONE_TITLE,
+                data: &payload,
+                deleted_at,
+                digests: &d,
+            },
+        )
+        .await?;
 
     // 2. Withdraw the cross-service links. A `subject_of` edge asserts
     //    that a named person is the subject of this case — the assertion
     //    the erasure exists to remove — so tombstoning the payload while
     //    leaving the edge would erase the details and keep the accusation.
-    let links_withdrawn = withdraw_links(db, pid).await?;
+    let links_withdrawn = withdraw_links(&mut *db, pid).await?;
 
     // 3. Destroy the audit content, keeping the chain linkage.
-    let audit_rows_redacted = AuditModel::redact_for_entity(db, pid).await?;
+    let audit_rows_redacted = AuditModel::redact_for_entity(&mut *db, pid).await?;
 
     // 4. Append the accountability record for the erasure itself. It is
     //    chained normally and is *not* redacted — it is the controller's
     //    own record and holds no subject data.
     AuditModel::record_with_context(
-        db,
+        &mut *db,
         pid,
         ACTION_ERASED,
         actor,
@@ -181,16 +183,8 @@ pub async fn erase<C: ConnectionTrait>(
 /// against this table (`agents/share/cross-service-linking.md` §8), and a
 /// row that vanishes without trace is indistinguishable from one that was
 /// never written, which would let a dropped event resurrect the edge.
-async fn withdraw_links<C: ConnectionTrait>(db: &C, pid: Uuid) -> ModelResult<u64> {
-    let result = db
-        .execute_raw(sea_orm::Statement::from_sql_and_values(
-            db.get_database_backend(),
-            "UPDATE entity_links SET deleted_at = NOW() \
-             WHERE from_pid = $1 AND deleted_at IS NULL",
-            [pid.into()],
-        ))
-        .await?;
-    Ok(result.rows_affected())
+async fn withdraw_links(db: &mut PgConnection, pid: Uuid) -> ModelResult<u64> {
+    EntityLinkModel::withdraw_all(db, pid).await
 }
 
 /// The context JSON recorded on the `erased` row: the caller's declared
@@ -219,16 +213,16 @@ fn erasure_context(ctx: &AccessContext, redacted: u64, links: u64) -> serde_json
 ///
 /// When the link withdrawal, the redaction sweep, or the audit append
 /// fails.
-pub async fn erase_audit_only<C: ConnectionTrait>(
-    db: &C,
+pub async fn erase_audit_only(
+    db: &mut PgConnection,
     pid: Uuid,
     actor: Option<&str>,
     ctx: &AccessContext,
 ) -> ModelResult<ErasureOutcome> {
-    let links_withdrawn = withdraw_links(db, pid).await?;
-    let audit_rows_redacted = AuditModel::redact_for_entity(db, pid).await?;
+    let links_withdrawn = withdraw_links(&mut *db, pid).await?;
+    let audit_rows_redacted = AuditModel::redact_for_entity(&mut *db, pid).await?;
     AuditModel::record_with_context(
-        db,
+        &mut *db,
         pid,
         ACTION_ERASED,
         actor,

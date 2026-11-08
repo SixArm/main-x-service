@@ -33,7 +33,7 @@ use std::time::Duration;
 
 use axa::AppContext;
 use axa::worker::BackgroundWorker;
-use sea_orm::{ConnectionTrait, DatabaseConnection, DbErr, Statement};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::bulk::worker::{BulkJobArgs, BulkJobWorker};
@@ -47,24 +47,6 @@ const RECONCILE_INTERVAL: Duration = Duration::from_mins(5);
 /// ten minutes, in `src/app.rs`).
 pub const ENQUEUE_GRACE_MINUTES: i32 = 15;
 
-/// One statement, so a job cannot finish between the check and the write. `$1`
-/// is the worker's class name, `$2` the grace in minutes.
-const MARK_LOST: &str = "UPDATE bulk_jobs b
-    SET status = 'failed', updated_at = now()
-    WHERE b.status IN ('queued', 'running')
-      AND NOT EXISTS (
-          SELECT 1 FROM axa_queue q
-          WHERE q.name = $1 AND q.args->>'job_id' = b.id::text AND q.status <> 'failed'
-      )
-      AND (
-          EXISTS (
-              SELECT 1 FROM axa_queue q
-              WHERE q.name = $1 AND q.args->>'job_id' = b.id::text AND q.status = 'failed'
-          )
-          OR b.updated_at < now() - make_interval(mins => $2)
-      )
-    RETURNING b.id";
-
 /// The class name `perform_later` records on a bulk job's queue row.
 fn job_worker_name() -> String {
     <BulkJobWorker as BackgroundWorker<BulkJobArgs>>::class_name()
@@ -77,24 +59,21 @@ fn job_worker_name() -> String {
 /// When the statement fails, including when `axa_queue` does not exist. It
 /// always does in a process that connected the queue, the only one that runs
 /// this.
-pub async fn reconcile_lost(db: &DatabaseConnection) -> Result<Vec<Uuid>, DbErr> {
-    let statement = Statement::from_sql_and_values(
-        db.get_database_backend(),
-        MARK_LOST,
-        [job_worker_name().into(), ENQUEUE_GRACE_MINUTES.into()],
-    );
-    let mut moved = Vec::new();
-    for row in db.query_all_raw(statement).await? {
-        let id: Uuid = row.try_get("", "id")?;
+pub async fn reconcile_lost(db: &PgPool) -> Result<Vec<Uuid>, sqlx::Error> {
+    // The statement is `models::bulk_jobs::mark_lost`: one
+    // `UPDATE … RETURNING`, so a job cannot finish between the check and
+    // the write.
+    let moved =
+        crate::models::bulk_jobs::mark_lost(db, &job_worker_name(), ENQUEUE_GRACE_MINUTES).await?;
+    for id in &moved {
         tracing::error!(job_id = %id, "bulk job lost by the job queue; marked failed");
-        moved.push(id);
     }
     Ok(moved)
 }
 
 /// Reconcile straight away, to recover anything a previous process left
 /// behind, and then on a timer.
-async fn run(db: DatabaseConnection) {
+async fn run(db: PgPool) {
     loop {
         if let Err(error) = reconcile_lost(&db).await {
             tracing::error!(%error, "could not reconcile bulk jobs");
@@ -115,7 +94,6 @@ pub fn spawn(ctx: &AppContext, serving_queue: bool) {
 mod db_tests {
     use super::*;
     use axa::queue::{Queue, QueueOptions};
-    use sea_orm::Value;
     use serial_test::serial;
 
     use crate::bulk::BulkFormat;
@@ -126,12 +104,12 @@ mod db_tests {
     }
 
     /// The real queue, so these tests pin the table axa actually writes.
-    async fn connect() -> (DatabaseConnection, Queue) {
-        use migration::MigratorTrait as _;
-        let db = sea_orm::Database::connect(&url())
+    async fn connect() -> (PgPool, Queue) {
+        let db = PgPool::connect(&url())
             .await
             .expect("connect to DATABASE_URL");
-        migration::Migrator::up(&db, None)
+        crate::models::MIGRATOR
+            .run(&db)
             .await
             .expect("run migrations");
         let queue = Queue::connect(&url(), QueueOptions::default())
@@ -140,44 +118,32 @@ mod db_tests {
         (db, queue)
     }
 
-    async fn sql(db: &DatabaseConnection, sql: &str, values: Vec<Value>) {
-        db.execute_raw(Statement::from_sql_and_values(
-            db.get_database_backend(),
-            sql,
-            values,
-        ))
-        .await
-        .expect("statement runs");
-    }
-
     /// A fresh `queued` job.
-    async fn new_job(db: &DatabaseConnection) -> Uuid {
+    async fn new_job(db: &PgPool) -> Uuid {
         let job = NewBulkJob::export(BulkFormat::Jsonl, serde_json::json!({}), None);
         bulk_jobs::create(db, job).await.expect("create job").id
     }
 
     /// Put a job in `status`, last changed `minutes` ago.
-    async fn age_job(db: &DatabaseConnection, id: Uuid, status: &str, minutes: i32) {
-        sql(
-            db,
+    async fn age_job(db: &PgPool, id: Uuid, status: &str, minutes: i32) {
+        sqlx::query!(
             "UPDATE bulk_jobs SET status = $1, updated_at = now() - make_interval(mins => $2)
              WHERE id = $3",
-            vec![status.into(), minutes.into(), id.into()],
+            status,
+            minutes,
+            id,
         )
-        .await;
+        .execute(db)
+        .await
+        .expect("statement runs");
     }
 
-    async fn status_of(db: &DatabaseConnection, id: Uuid) -> String {
-        let row = db
-            .query_one_raw(Statement::from_sql_and_values(
-                db.get_database_backend(),
-                "SELECT status FROM bulk_jobs WHERE id = $1",
-                [id.into()],
-            ))
+    async fn status_of(db: &PgPool, id: Uuid) -> String {
+        bulk_jobs::find_by_id(db, id)
             .await
             .expect("query runs")
-            .expect("job exists");
-        row.try_get("", "status").expect("status column")
+            .expect("job exists")
+            .status
     }
 
     /// Queue `id` as `perform_later` would, with `max_attempts`.
@@ -191,15 +157,16 @@ mod db_tests {
 
     /// Claim the job as a worker would, then lose that worker: the row is left
     /// `running`, with no heartbeat for two hours.
-    async fn lose_worker(db: &DatabaseConnection, id: Uuid) {
-        sql(
-            db,
+    async fn lose_worker(db: &PgPool, id: Uuid) {
+        sqlx::query!(
             "UPDATE axa_queue SET status = 'running', attempts = attempts + 1,
                  started_at = now(), updated_at = now() - interval '2 hours'
              WHERE args->>'job_id' = $1",
-            vec![id.to_string().into()],
+            id.to_string(),
         )
-        .await;
+        .execute(db)
+        .await
+        .expect("statement runs");
     }
 
     /// The bug: axa gives up on a job, and `bulk_jobs` must follow it.
@@ -275,12 +242,13 @@ mod db_tests {
         age_job(&db, waiting, "queued", 600).await;
         let long = new_job(&db).await;
         enqueue(&queue, long, None).await;
-        sql(
-            &db,
+        sqlx::query!(
             "UPDATE axa_queue SET status = 'running', attempts = 1 WHERE args->>'job_id' = $1",
-            vec![long.to_string().into()],
+            long.to_string(),
         )
-        .await;
+        .execute(&db)
+        .await
+        .expect("statement runs");
         age_job(&db, long, "running", 600).await;
 
         let moved = reconcile_lost(&db).await.unwrap();
@@ -296,12 +264,13 @@ mod db_tests {
         let (db, queue) = connect().await;
         let id = new_job(&db).await;
         enqueue(&queue, id, None).await;
-        sql(
-            &db,
+        sqlx::query!(
             "UPDATE axa_queue SET status = 'failed' WHERE args->>'job_id' = $1",
-            vec![id.to_string().into()],
+            id.to_string(),
         )
-        .await;
+        .execute(&db)
+        .await
+        .expect("statement runs");
         age_job(&db, id, "completed", 120).await;
 
         assert!(!reconcile_lost(&db).await.unwrap().contains(&id));
@@ -319,12 +288,10 @@ mod db_tests {
             .enqueue("SomeOtherWorker", serde_json::json!({ "job_id": id }))
             .await
             .expect("enqueue");
-        sql(
-            &db,
-            "UPDATE axa_queue SET status = 'failed' WHERE name = 'SomeOtherWorker'",
-            vec![],
-        )
-        .await;
+        sqlx::query!("UPDATE axa_queue SET status = 'failed' WHERE name = 'SomeOtherWorker'")
+            .execute(&db)
+            .await
+            .expect("statement runs");
 
         assert!(!reconcile_lost(&db).await.unwrap().contains(&id));
         assert_eq!(status_of(&db, id).await, "queued");

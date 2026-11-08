@@ -1117,13 +1117,17 @@ async fn erase(
     let Ok(uuid) = uuid::Uuid::parse_str(&pid) else {
         return bad_request("invalid pid");
     };
-    let outcome = match CaseModel::find_by_pid(&ctx.db, &pid).await {
+    let found = CaseModel::find_by_pid(&ctx.db, &pid).await;
+    // One pooled connection for the erasure's statements, which run
+    // outside a transaction exactly as they did on the `SeaORM` pool.
+    let mut conn = ctx.db.acquire().await?;
+    let outcome = match found {
         Ok(model) => {
-            crate::compliance::erasure::erase(&ctx.db, model, caller.actor(), &access).await?
+            crate::compliance::erasure::erase(&mut conn, model, caller.actor(), &access).await?
         }
         // No live record: still sweep the audit content held about it.
         Err(_) => {
-            crate::compliance::erasure::erase_audit_only(&ctx.db, uuid, caller.actor(), &access)
+            crate::compliance::erasure::erase_audit_only(&mut conn, uuid, caller.actor(), &access)
                 .await?
         }
     };

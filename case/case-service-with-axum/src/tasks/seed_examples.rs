@@ -35,9 +35,9 @@ use std::path::Path;
 
 use axa::prelude::*;
 use case_matcher::Case;
-use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait};
+use sqlx::PgPool;
 
-use crate::models::cases::{self, Model as CaseModel};
+use crate::models::cases::Model as CaseModel;
 
 /// The fixture's location, relative to this crate's manifest directory
 /// (two levels below the repository root: `case/case-service-with-axum`).
@@ -96,8 +96,8 @@ pub struct SeedReport {
 /// # Errors
 ///
 /// When the row count query or an insert fails.
-pub async fn seed(db: &DatabaseConnection, fixture: &[Case]) -> Result<SeedReport> {
-    let existing = cases::Entity::find().count(db).await?;
+pub async fn seed(db: &PgPool, fixture: &[Case]) -> Result<SeedReport> {
+    let existing = CaseModel::count_all(db).await?;
     if existing > 0 {
         println!(
             "cases table is not empty ({existing} rows) — skipping seed; reset the database first if you want to reseed"

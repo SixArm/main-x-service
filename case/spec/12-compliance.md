@@ -735,9 +735,9 @@ what the record says is.
 **The failure mode is a false accusation, not a missed one.** A write path
 that forgets to rehash flags an *untouched* record as tampered, which is
 worse than having no control. Only `create` gets compiler help — the other
-three (`update_data`, `soft_delete`, and the Art. 17 erasure) build their
-`ActiveModel` from `..Default::default()` or an existing row and compile
-happily with a stale digest. A DB-gated test therefore drives all four and
+three (`update_data`, `soft_delete`, and the Art. 17 erasure) each write
+the digest columns in their own `UPDATE` and would compile happily with a
+stale digest. A DB-gated test therefore drives all four and
 asserts every record still verifies, and was **confirmed to fail** when
 the rehash is removed from the update path.
 

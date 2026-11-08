@@ -40,7 +40,7 @@
 //! implements and tests sequential idempotency only** (re-running the
 //! same file twice upserts in place; this is what the task's required
 //! test covers). True concurrent-importer race safety is left as a
-//! follow-up (crate spec §13), needing either a `ConnectionTrait`-generic
+//! follow-up (crate spec §13), needing either a transaction-taking
 //! `create_and_emit`/`update_and_emit` variant or a dedicated
 //! transaction-scoped bulk write path.
 //!
@@ -57,10 +57,11 @@
 //! The privileged [`MaskingProfile::Full`] profile leaves records
 //! unmasked and is gated at the handler.
 
-use axa::model::{ModelError, ModelResult};
 use case_matcher::{Case, MatchConfig, MatchingEngine};
-use sea_orm::DatabaseConnection;
+use sqlx::PgPool;
 use uuid::Uuid;
+
+use crate::models::{ModelError, ModelResult};
 
 use crate::controllers::cases::mask_case;
 use crate::models::cases::Model as CaseModel;
@@ -180,7 +181,7 @@ pub fn apply_masking(records: Vec<Case>, masking_profile: MaskingProfile) -> Vec
 }
 
 /// Resolve the existing record (if any) `key` points at.
-async fn find_existing(db: &DatabaseConnection, key: &StableKey) -> ModelResult<Option<CaseModel>> {
+async fn find_existing(db: &PgPool, key: &StableKey) -> ModelResult<Option<CaseModel>> {
     match key {
         StableKey::Pid(pid) => match CaseModel::find_by_pid(db, &pid.to_string()).await {
             Ok(model) => Ok(Some(model)),
@@ -201,7 +202,7 @@ async fn find_existing(db: &DatabaseConnection, key: &StableKey) -> ModelResult<
 /// path's. See this module's docs for the deferred SEC-B3 concurrent-race
 /// guarantee. Returns `(saved, was_upsert)`.
 async fn import_upsert(
-    db: &DatabaseConnection,
+    db: &PgPool,
     key: &StableKey,
     row: &BulkCaseRow,
     actor: Option<&str>,
@@ -292,7 +293,7 @@ struct KeylessDuplicate {
 ///
 /// `None` when the search index is unavailable, the blocking search
 /// finds nothing, or nothing clears the threshold.
-async fn find_keyless_duplicate(db: &DatabaseConnection, case: &Case) -> Option<KeylessDuplicate> {
+async fn find_keyless_duplicate(db: &PgPool, case: &Case) -> Option<KeylessDuplicate> {
     let engine = crate::search::engine()?;
     let candidate_pids = engine
         .candidates(
@@ -331,7 +332,7 @@ async fn find_keyless_duplicate(db: &DatabaseConnection, case: &Case) -> Option<
 /// of [`process_import_job`] to keep its per-row dispatch readable; only
 /// called on the non-dry-run path (dry-run classifies without this).
 async fn create_and_queue_for_review(
-    db: &DatabaseConnection,
+    db: &PgPool,
     case: &Case,
     actor: Option<&str>,
     duplicate: KeylessDuplicate,
@@ -380,7 +381,7 @@ enum RowOutcome {
 /// keyless-vs-keyed dispatch (§6), and the stable-key upsert each live
 /// here rather than inline in the loop.
 async fn process_row(
-    db: &DatabaseConnection,
+    db: &PgPool,
     row_number: usize,
     row: BulkCaseRow,
     params: &ImportParams,
@@ -442,7 +443,7 @@ async fn process_row(
 /// it for an operator's attention; no duplicate found is a plain create,
 /// exactly like a keyed row with no match.
 async fn process_keyless_row(
-    db: &DatabaseConnection,
+    db: &PgPool,
     row_number: usize,
     row: BulkCaseRow,
     params: &ImportParams,
@@ -485,7 +486,7 @@ async fn process_keyless_row(
 /// an unreadable CSV header, or the SEC-B2 row cap); per-row failures are
 /// captured in [`ImportOutcome::errors`], not returned.
 pub async fn process_import_job(
-    db: &DatabaseConnection,
+    db: &PgPool,
     input: &[u8],
     format: BulkFormat,
     params: &ImportParams,
@@ -539,10 +540,7 @@ pub async fn process_import_job(
 /// is `true` — not yet supported, so rather than silently leaking or
 /// ignoring the flag the export is rejected. Also returns an error if
 /// the underlying query or the format encode fails.
-pub async fn process_export_job(
-    db: &DatabaseConnection,
-    params: &ExportParams,
-) -> axa::Result<(Vec<u8>, u64)> {
+pub async fn process_export_job(db: &PgPool, params: &ExportParams) -> axa::Result<(Vec<u8>, u64)> {
     if params.include_soft_deleted {
         return Err(axa::Error::Message(
             "include_soft_deleted=true is not yet supported for export".to_string(),
@@ -651,21 +649,21 @@ mod db_tests {
     use crate::bulk::{csv, jsonl};
     use crate::models::cases::Model as CaseModel;
     use case_matcher::Case;
-    use sea_orm::DatabaseConnection;
+    use sqlx::PgPool;
     use uuid::Uuid;
 
-    async fn connect() -> DatabaseConnection {
-        use migration::MigratorTrait as _;
+    async fn connect() -> PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        let db = sea_orm::Database::connect(&url)
+        let db = PgPool::connect(&url)
             .await
             .expect("connect to DATABASE_URL");
         // Unlike the request-level suites under `tests/requests/`, which
         // boot the axa `App` (auto-migrating), these tests connect
         // directly — so migrations are applied here explicitly. Idempotent:
-        // `sea-orm-migration` tracks applied migrations and skips them on
-        // a later call, so running this per test function is safe.
-        migration::Migrator::up(&db, None)
+        // sqlx tracks applied migrations and skips them on a later call, so
+        // running this per test function is safe.
+        crate::models::MIGRATOR
+            .run(&db)
             .await
             .expect("run migrations");
         db

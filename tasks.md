@@ -8549,8 +8549,10 @@ All three were there before the move, on SeaORM. Fixed 2026-11-07.
     test failing before and passing after.
   - [x] organization: not affected (its pre-image leaves out server
     timestamps and its payload has no numbers); the test guards it.
-  - [ ] care-pathway, case, person, worker: still on SeaORM; each lands
-    the test, passing, with its sqlx move.
+  - [x] case: not affected, like organization (the test passed on the old
+    SeaORM code); it guards it from 2026-11-08.
+  - [ ] care-pathway, person, worker: still on SeaORM; each lands the
+    test, passing, with its sqlx move.
 
 ## Found 2026-11-07 (moving link-graph to sqlx)
 
@@ -8609,3 +8611,15 @@ All were there on SeaORM, and the move keeps them as they were.
 - [x] **AU-D1 (S)** `authentication/spec/10-persistence.md` describes a
   `sid`-primary-key sessions table that never shipped. *Done 2026-11-08:
   it now gives the shipped schema (bigint `id`, opaque id in `jid`).*
+
+## Found 2026-11-08 (moving case to sqlx)
+
+Both were there on SeaORM, and the move keeps them as they were.
+
+- [ ] **CS-G1 (S)** case's GDPR erasure runs on the pool with no
+  transaction, so a failure part-way leaves a subject half erased: the
+  same defect as authentication's AU-G1, fixed in `2fddcf91`. Make it one
+  transaction, with the same kind of failing-late DB test.
+- [ ] **CS-T1 (S)** `db truncate` leaves `event_outbox`, `bulk_jobs` and
+  `review_queue`, so a truncated database still holds unsent events, jobs
+  and review items for records it no longer has.

@@ -8,7 +8,6 @@ use axa::{
     boot::{BootResult, TestApp},
     cli::{Cli, Command, DbCommand, parse_vars},
     config::{Config as ServiceConfig, Defaults, MB, TimeoutOverride},
-    db::truncate_table,
     queue::{Queue, QueueOptions, warn_if_unserved},
     routes::AppRoutes,
     server,
@@ -21,15 +20,10 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use migration::{Migrator, MigratorTrait};
 use std::sync::OnceLock;
 
 #[allow(unused_imports)]
-use crate::{
-    auth, controllers,
-    models::_entities::{audit_logs, cases, entity_links, merge_records},
-    tasks,
-};
+use crate::{auth, controllers, tasks};
 
 /// OTLP export, started by [`App::init_logger`] when `OTLP_ENDPOINT` is
 /// set, so that `after_routes` can measure requests and `on_shutdown` can
@@ -216,10 +210,7 @@ impl App {
     ///
     /// Propagates the database error.
     pub async fn truncate(ctx: &AppContext) -> Result<()> {
-        truncate_table(&ctx.db, entity_links::Entity).await?;
-        truncate_table(&ctx.db, merge_records::Entity).await?;
-        truncate_table(&ctx.db, audit_logs::Entity).await?;
-        truncate_table(&ctx.db, cases::Entity).await?;
+        crate::models::delete_all_rows(&ctx.db).await?;
         Ok(())
     }
 }
@@ -237,6 +228,13 @@ fn service_config(environment: &Environment) -> Result<ServiceConfig> {
         seconds: IMPORT_TIMEOUT_SECONDS,
     });
     Ok(config)
+}
+
+/// A failed migration, as axa's error. `MigrateError` has no `From` into
+/// it, so its message is carried instead.
+#[allow(clippy::needless_pass_by_value)]
+fn migrate_error(error: axa::sqlx::sqlx::migrate::MigrateError) -> Error {
+    Error::Message(format!("migration: {error}"))
 }
 
 /// Service defaults. The environment overrides them; see `axa::config`.
@@ -283,13 +281,41 @@ impl App {
         axa::middleware::apply(router, &ctx.config.http)
     }
 
-    /// Run a database command.
+    /// Apply pending migrations ([`crate::models::MIGRATOR`]).
+    ///
+    /// # Errors
+    ///
+    /// Fails when a migration fails, or an applied one no longer matches
+    /// its file.
+    pub async fn migrate(ctx: &AppContext) -> Result<()> {
+        axa::sqlx::migrate(&ctx.db, &crate::models::MIGRATOR)
+            .await
+            .map_err(migrate_error)
+    }
+
+    /// Run a database command. `down`, `reset` and `truncate` destroy
+    /// data, so `axa::cli::parse` has already refused them outside
+    /// development and test.
     async fn db(ctx: &AppContext, command: DbCommand) -> Result<()> {
+        let migrator = &crate::models::MIGRATOR;
         match command {
-            DbCommand::Migrate => Migrator::up(&ctx.db, None).await?,
-            DbCommand::Down { steps } => Migrator::down(&ctx.db, Some(steps)).await?,
-            DbCommand::Reset => Migrator::fresh(&ctx.db).await?,
-            DbCommand::Status => Migrator::status(&ctx.db).await?,
+            DbCommand::Migrate => Self::migrate(ctx).await?,
+            DbCommand::Down { steps } => axa::sqlx::revert(&ctx.db, migrator, steps)
+                .await
+                .map_err(migrate_error)?,
+            DbCommand::Reset => axa::sqlx::dangerously_recreate(&ctx.db, migrator)
+                .await
+                .map_err(migrate_error)?,
+            DbCommand::Status => {
+                for migration in axa::sqlx::status(&ctx.db, migrator).await? {
+                    let state = if migration.applied {
+                        "applied"
+                    } else {
+                        "pending"
+                    };
+                    println!("{}\t{state}\t{}", migration.version, migration.description);
+                }
+            }
             DbCommand::Truncate => Self::truncate(ctx).await?,
         }
         Ok(())
@@ -323,7 +349,7 @@ impl App {
             axa::logger::init(env!("CARGO_CRATE_NAME"), &ctx.config.logger);
         }
         if ctx.config.database.auto_migrate && !matches!(cli.command, Command::Db { .. }) {
-            Migrator::up(&ctx.db, None).await?;
+            Self::migrate(&ctx).await?;
         }
         match cli.command {
             Command::Check => Ok(()),
@@ -371,7 +397,9 @@ impl TestApp for App {
         let ctx = Self::context(environment, config).await?;
         // Every boot starts from an empty, freshly migrated schema, so no
         // table can carry rows from an earlier test.
-        Migrator::fresh(&ctx.db).await.map_err(Error::from)?;
+        axa::sqlx::dangerously_recreate(&ctx.db, &crate::models::MIGRATOR)
+            .await
+            .map_err(migrate_error)?;
         let router = Self::router(&ctx).await?;
         Ok(BootResult {
             app_context: ctx,

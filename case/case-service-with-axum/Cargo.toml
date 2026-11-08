@@ -19,7 +19,7 @@ include = ["src/**/*", "README.md"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { version = "0.8", features = ["sea-orm", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
+axa = { version = "0.8", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 # CSV codec for the bulk import/export operator/spreadsheet format
@@ -39,14 +39,16 @@ regex = { version = "1.13" }
 # Embedded full-text search index (see src/search/). Same version as the
 # rest of the family, so one index format.
 tantivy = { version = "0.27" }
-migration = { path = "migration" }
-sea-orm = { version = "2.0", features = [
-  "sqlx-sqlite",
-  "sqlx-postgres",
-  "runtime-tokio-rustls",
-  "macros",
-] }
-chrono = { version = "0.4" }
+# Database: sqlx directly, no ORM. Every statement is a `query!` /
+# `query_as!` / `query_scalar!` literal in `src/models/`, checked at
+# compile time against the committed `.sqlx/` data (spec/tech-stack §5).
+# The same driver axa's `sqlx` feature already pulls in, so this adds no
+# new database stack. Timestamps map to `chrono`: with sqlx's `time`
+# feature on as well, sqlx 0.9.0's macros warn on every timestamp column.
+sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "macros", "migrate", "uuid", "chrono", "json"] }
+# `serde` for the timestamps the audit, merge and link endpoints
+# serialize; `SeaORM` used to turn it on.
+chrono = { version = "0.4", features = ["serde"] }
 validator = { version = "0.21" }
 uuid = { version = "1.29", features = ["v4", "serde"] }
 include_dir = { version = "0.7" }
@@ -120,11 +122,7 @@ axum-test = "21"
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
-axa = { version = "0.8", features = ["sea-orm", "queue", "testing", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
-# `mock`: a `DatabaseConnection` that errors on any query, standing in
-# for sea-orm 1.1's removed `DatabaseConnection::Disconnected` — used to
-# prove a code path never touches the database (src/compliance/disclosure.rs).
-sea-orm = { version = "2.0", features = ["mock"] }
+axa = { version = "0.8", features = ["sqlx", "queue", "testing", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 # `#[tokio::test]` + a local ephemeral-port HTTP listener for the boot-time key-set fetch tests.
 # `time` also lets tests/otlp_collector's `wait_for` poll with
 # `tokio::time::sleep` instead of busy-waiting.
@@ -173,3 +171,10 @@ reqwest = { version = "0.13", default-features = false, features = [
 [[bench]]
 name = "service_bench"
 harness = false
+
+# Proc macros and build scripts are not stripped. When stripping reaches
+# them, macOS refuses to load the stripped `sqlx-macros` dylib
+# ("mis-aligned LINKEDIT string pool") and a release build fails. Only
+# host-side build tools are affected; the shipped binary is unchanged.
+[profile.release.build-override]
+strip = false

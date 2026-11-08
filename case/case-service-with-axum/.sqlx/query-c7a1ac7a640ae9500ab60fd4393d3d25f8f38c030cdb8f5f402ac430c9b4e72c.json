@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, from_pid, kind, to_ref, role, confidence, provenance,\n                      valid_from, valid_to, deleted_at AS \"deleted_at: _\"\n               FROM entity_links\n               WHERE from_pid = $1 AND deleted_at IS NULL\n               ORDER BY created_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "updated_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "updated_at"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "from_pid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "from_pid"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "to_ref",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "to_ref"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "confidence",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "confidence"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "provenance",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "provenance"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "valid_from",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "valid_from"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "valid_to",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "valid_to"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "deleted_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "entity_links",
+            "name": "deleted_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "c7a1ac7a640ae9500ab60fd4393d3d25f8f38c030cdb8f5f402ac430c9b4e72c"
+}

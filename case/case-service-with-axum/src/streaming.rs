@@ -28,19 +28,17 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
-use axa::prelude::{ModelError, ModelResult};
+use axa::sqlx::Db;
 use case_matcher::Case;
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
-    QuerySelect, TransactionTrait,
-};
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::models::audit_logs::Model as AuditModel;
-use crate::models::cases::{Model as CaseModel, cases};
+use crate::models::cases::Model as CaseModel;
 use crate::models::entity_links::{Model as EntityLinkModel, NewEdge};
 use crate::models::event_outbox::{Model as OutboxRow, OutboxInsert};
+use crate::models::{ModelError, ModelResult};
 
 /// Envelope schema version (§4). Bumped only on a breaking change to the
 /// envelope shape; additive fields do not bump it.
@@ -319,17 +317,17 @@ pub fn transport() -> EventTransport {
 pub struct OutboxPublisher;
 
 impl OutboxPublisher {
-    /// Insert one `event_outbox` row for `env` **on `conn`**. Pass a
-    /// `&DatabaseTransaction` to share the entity mutation's commit
+    /// Insert one `event_outbox` row for `env` **on `db`**. Pass the open
+    /// transaction (`&mut *txn`) to share the entity mutation's commit
     /// boundary. `occurred_at` is stamped now (the Phase-1 envelope has no
     /// wall-clock time).
     ///
     /// # Errors
     ///
     /// When the envelope pid is not a UUID, or the insert fails.
-    pub async fn publish<C: ConnectionTrait>(self, conn: &C, env: &Envelope) -> ModelResult<()> {
+    pub async fn publish(self, db: impl Into<Db<'_>>, env: &Envelope) -> ModelResult<()> {
         let insert = OutboxInsert::from_envelope(env, chrono::Utc::now().into())?;
-        insert.insert_on(conn).await?;
+        insert.insert_on(db).await?;
         Ok(())
     }
 
@@ -340,11 +338,7 @@ impl OutboxPublisher {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn recent(
-        self,
-        db: &DatabaseConnection,
-        limit: usize,
-    ) -> ModelResult<Vec<EventView>> {
+    pub async fn recent(self, db: &PgPool, limit: usize) -> ModelResult<Vec<EventView>> {
         OutboxRow::recent(db, u64::try_from(limit).unwrap_or(u64::MAX)).await
     }
 }
@@ -356,7 +350,7 @@ impl OutboxPublisher {
 /// # Errors
 ///
 /// When the outbox query fails (`memory` never errors).
-pub async fn recent_events(db: &DatabaseConnection, limit: usize) -> ModelResult<Vec<EventView>> {
+pub async fn recent_events(db: &PgPool, limit: usize) -> ModelResult<Vec<EventView>> {
     match transport() {
         EventTransport::Memory => Ok(recent(limit)),
         EventTransport::Outbox => OutboxPublisher.recent(db, limit).await,
@@ -366,11 +360,11 @@ pub async fn recent_events(db: &DatabaseConnection, limit: usize) -> ModelResult
 /// Best-effort audit on the pooled connection — the `memory`-transport
 /// side channel. A failure is logged, never fatal: the request already
 /// succeeded and audit is secondary here. (Under `outbox` the audit row
-/// is written *inside* the transaction instead — `AuditModel::record(&txn,
+/// is written *inside* the transaction instead — `AuditModel::record(&mut *txn,
 /// …)?` — so entity + event + audit commit or roll back together, per
 /// `event-bus.md` §3.)
 async fn audit_best_effort(
-    db: &DatabaseConnection,
+    db: &PgPool,
     entity_pid: Uuid,
     action: &str,
     actor: Option<&str>,
@@ -422,7 +416,7 @@ fn deindex_best_effort(pid: Uuid) {
 /// When the insert (or, for `outbox`, the transaction / outbox / audit
 /// insert) fails; the transaction rolls back all writes on any error.
 pub async fn create_and_emit(
-    db: &DatabaseConnection,
+    db: &PgPool,
     case: &Case,
     actor: Option<&str>,
 ) -> ModelResult<CaseModel> {
@@ -439,17 +433,24 @@ pub async fn create_and_emit(
             model
         }
         EventTransport::Outbox => {
-            let txn = db.begin().await?;
-            let model = CaseModel::create(&txn, case).await?;
+            let mut txn = db.begin().await?;
+            let model = CaseModel::create(&mut *txn, case).await?;
             let env = envelope(
                 EventKind::Created,
                 &model.pid.to_string(),
                 &model.title,
                 actor,
             );
-            OutboxPublisher.publish(&txn, &env).await?;
+            OutboxPublisher.publish(&mut *txn, &env).await?;
             // Audit joins the same transaction — atomic with entity + event.
-            AuditModel::record(&txn, model.pid, "created", actor, Some(model.data.clone())).await?;
+            AuditModel::record(
+                &mut *txn,
+                model.pid,
+                "created",
+                actor,
+                Some(model.data.clone()),
+            )
+            .await?;
             txn.commit().await?;
             model
         }
@@ -469,14 +470,14 @@ pub async fn create_and_emit(
 /// When the update (or, for `outbox`, the transaction / outbox insert)
 /// fails.
 pub async fn update_and_emit(
-    db: &DatabaseConnection,
+    db: &PgPool,
     model: CaseModel,
     case: &Case,
     actor: Option<&str>,
 ) -> ModelResult<CaseModel> {
     let updated = match transport() {
         EventTransport::Memory => {
-            let updated = model.into_active_model().update_data(db, case).await?;
+            let updated = model.update_data(db, case).await?;
             publish_with_actor(
                 EventKind::Updated,
                 &updated.pid.to_string(),
@@ -494,17 +495,17 @@ pub async fn update_and_emit(
             updated
         }
         EventTransport::Outbox => {
-            let txn = db.begin().await?;
-            let updated = model.into_active_model().update_data(&txn, case).await?;
+            let mut txn = db.begin().await?;
+            let updated = model.update_data(&mut *txn, case).await?;
             let env = envelope(
                 EventKind::Updated,
                 &updated.pid.to_string(),
                 &updated.title,
                 actor,
             );
-            OutboxPublisher.publish(&txn, &env).await?;
+            OutboxPublisher.publish(&mut *txn, &env).await?;
             AuditModel::record(
-                &txn,
+                &mut *txn,
                 updated.pid,
                 "updated",
                 actor,
@@ -529,23 +530,23 @@ pub async fn update_and_emit(
 /// When the soft-delete (or, for `outbox`, the transaction / outbox
 /// insert) fails.
 pub async fn delete_and_emit(
-    db: &DatabaseConnection,
+    db: &PgPool,
     model: CaseModel,
     actor: Option<&str>,
 ) -> ModelResult<(Uuid, String)> {
     let (pid, title) = (model.pid, model.title.clone());
     match transport() {
         EventTransport::Memory => {
-            model.into_active_model().soft_delete(db).await?;
+            model.soft_delete(db).await?;
             publish_with_actor(EventKind::Deleted, &pid.to_string(), &title, actor);
             audit_best_effort(db, pid, "deleted", actor, None).await;
         }
         EventTransport::Outbox => {
-            let txn = db.begin().await?;
-            model.into_active_model().soft_delete(&txn).await?;
+            let mut txn = db.begin().await?;
+            model.soft_delete(&mut *txn).await?;
             let env = envelope(EventKind::Deleted, &pid.to_string(), &title, actor);
-            OutboxPublisher.publish(&txn, &env).await?;
-            AuditModel::record(&txn, pid, "deleted", actor, None).await?;
+            OutboxPublisher.publish(&mut *txn, &env).await?;
+            AuditModel::record(&mut *txn, pid, "deleted", actor, None).await?;
             txn.commit().await?;
         }
     }
@@ -566,7 +567,7 @@ pub async fn delete_and_emit(
 /// When either write (or, for `outbox`, the transaction / outbox inserts)
 /// fails; the transaction rolls back the whole merge on any error.
 pub async fn merge_and_emit(
-    db: &DatabaseConnection,
+    db: &PgPool,
     main: CaseModel,
     duplicate: CaseModel,
     merged_case: &Case,
@@ -575,11 +576,8 @@ pub async fn merge_and_emit(
     let (dup_pid, dup_title) = (duplicate.pid, duplicate.title.clone());
     let outcome = match transport() {
         EventTransport::Memory => {
-            let merged = main
-                .into_active_model()
-                .update_data(db, merged_case)
-                .await?;
-            duplicate.into_active_model().soft_delete(db).await?;
+            let merged = main.update_data(db, merged_case).await?;
+            duplicate.soft_delete(db).await?;
             publish_with_actor(
                 EventKind::Merged,
                 &merged.pid.to_string(),
@@ -592,7 +590,7 @@ pub async fn merge_and_emit(
             (merged, dup_pid, dup_title)
         }
         EventTransport::Outbox => {
-            let txn = db.begin().await?;
+            let mut txn = db.begin().await?;
             // SEC-B5 (TOCTOU): `main`/`duplicate` were read (unlocked) in the
             // handler before this transaction. Lock both rows `FOR UPDATE`
             // (pid order, so opposing merges cannot deadlock) and re-check
@@ -602,40 +600,34 @@ pub async fn merge_and_emit(
             let mut lock_pids = [main.pid, dup_pid];
             lock_pids.sort();
             for pid in lock_pids {
-                cases::Entity::find()
-                    .filter(cases::Column::Pid.eq(pid))
-                    .lock_exclusive()
-                    .one(&txn)
-                    .await?;
+                CaseModel::lock_for_update(&mut txn, pid).await?;
             }
-            let duplicate_active = cases::Entity::find()
-                .filter(cases::Column::Pid.eq(dup_pid))
-                .filter(cases::Column::DeletedAt.is_null())
-                .one(&txn)
-                .await?
-                .is_some();
+            let duplicate_active = CaseModel::is_active(&mut txn, dup_pid).await?;
             if !duplicate_active {
                 txn.rollback().await?;
                 return Err(ModelError::EntityNotFound);
             }
-            let merged = main
-                .into_active_model()
-                .update_data(&txn, merged_case)
-                .await?;
-            duplicate.into_active_model().soft_delete(&txn).await?;
+            let merged = main.update_data(&mut *txn, merged_case).await?;
+            duplicate.soft_delete(&mut *txn).await?;
             let merged_env = envelope(
                 EventKind::Merged,
                 &merged.pid.to_string(),
                 &merged.title,
                 actor,
             );
-            OutboxPublisher.publish(&txn, &merged_env).await?;
+            OutboxPublisher.publish(&mut *txn, &merged_env).await?;
             let deleted_env = envelope(EventKind::Deleted, &dup_pid.to_string(), &dup_title, actor);
-            OutboxPublisher.publish(&txn, &deleted_env).await?;
+            OutboxPublisher.publish(&mut *txn, &deleted_env).await?;
             // Both audit rows join the same transaction as the merge.
-            AuditModel::record(&txn, merged.pid, "merged", actor, Some(merged.data.clone()))
-                .await?;
-            AuditModel::record(&txn, dup_pid, "merged_into", actor, None).await?;
+            AuditModel::record(
+                &mut *txn,
+                merged.pid,
+                "merged",
+                actor,
+                Some(merged.data.clone()),
+            )
+            .await?;
+            AuditModel::record(&mut *txn, dup_pid, "merged_into", actor, None).await?;
             txn.commit().await?;
             (merged, dup_pid, dup_title)
         }
@@ -689,7 +681,7 @@ fn unlink_data(link: &EntityLinkModel) -> serde_json::Value {
 /// When the upsert (or, for `outbox`, the transaction / outbox / audit
 /// insert) fails; the transaction rolls back all writes on any error.
 pub async fn link_and_emit(
-    db: &DatabaseConnection,
+    db: &PgPool,
     edge: &NewEdge,
     name: &str,
     actor: Option<&str>,
@@ -710,12 +702,12 @@ pub async fn link_and_emit(
             Ok(link)
         }
         EventTransport::Outbox => {
-            let txn = db.begin().await?;
-            let link = EntityLinkModel::upsert(&txn, edge).await?;
+            let mut txn = db.begin().await?;
+            let link = EntityLinkModel::upsert(&mut *txn, edge).await?;
             let data = edge_data(&link);
             let env = envelope_with_data(EventKind::Linked, &from_pid, name, actor, data.clone());
-            OutboxPublisher.publish(&txn, &env).await?;
-            AuditModel::record(&txn, edge.from_pid, "linked", actor, Some(data)).await?;
+            OutboxPublisher.publish(&mut *txn, &env).await?;
+            AuditModel::record(&mut *txn, edge.from_pid, "linked", actor, Some(data)).await?;
             txn.commit().await?;
             Ok(link)
         }
@@ -732,7 +724,7 @@ pub async fn link_and_emit(
 /// When the soft-delete (or, for `outbox`, the transaction / outbox /
 /// audit insert) fails.
 pub async fn unlink_and_emit(
-    db: &DatabaseConnection,
+    db: &PgPool,
     link: EntityLinkModel,
     name: &str,
     actor: Option<&str>,
@@ -742,7 +734,7 @@ pub async fn unlink_and_emit(
     let data = unlink_data(&link);
     match transport() {
         EventTransport::Memory => {
-            link.into_active_model().soft_delete(db).await?;
+            link.soft_delete(db).await?;
             publisher().publish(envelope_with_data(
                 EventKind::Unlinked,
                 &from_pid_str,
@@ -753,8 +745,8 @@ pub async fn unlink_and_emit(
             audit_best_effort(db, from_pid, "unlinked", actor, Some(data)).await;
         }
         EventTransport::Outbox => {
-            let txn = db.begin().await?;
-            link.into_active_model().soft_delete(&txn).await?;
+            let mut txn = db.begin().await?;
+            link.soft_delete(&mut *txn).await?;
             let env = envelope_with_data(
                 EventKind::Unlinked,
                 &from_pid_str,
@@ -762,8 +754,8 @@ pub async fn unlink_and_emit(
                 actor,
                 data.clone(),
             );
-            OutboxPublisher.publish(&txn, &env).await?;
-            AuditModel::record(&txn, from_pid, "unlinked", actor, Some(data)).await?;
+            OutboxPublisher.publish(&mut *txn, &env).await?;
+            AuditModel::record(&mut *txn, from_pid, "unlinked", actor, Some(data)).await?;
             txn.commit().await?;
         }
     }

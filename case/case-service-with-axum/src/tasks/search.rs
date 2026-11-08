@@ -13,9 +13,9 @@
 //! ```
 
 use axa::prelude::*;
-use sea_orm::{DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use sqlx::PgPool;
 
-use crate::models::_entities::cases;
+use crate::models::cases::Model as CaseModel;
 
 /// Rows fetched per page when replaying the table. Bounds peak memory:
 /// a reindex must not need the whole table resident.
@@ -45,20 +45,23 @@ pub struct ReindexReport {
 /// # Errors
 ///
 /// When the index is unavailable or a database page cannot be read.
-pub async fn reindex(db: &DatabaseConnection, batch: u64) -> Result<ReindexReport> {
+pub async fn reindex(db: &PgPool, batch: u64) -> Result<ReindexReport> {
     let engine = crate::search::engine()
         .ok_or_else(|| Error::string("search index unavailable; check CASE_SEARCH_INDEX_PATH"))?;
     engine.clear()?;
 
     let mut report = ReindexReport::default();
-    // Paginate rather than `all()`: the table can be far larger than the
-    // process's memory budget.
-    let mut pages = cases::Entity::find()
-        .filter(cases::Column::DeletedAt.is_null())
-        .order_by_asc(cases::Column::Id)
-        .paginate(db, batch.max(1));
-
-    while let Some(rows) = pages.fetch_and_next().await? {
+    // Paginate rather than read everything: the table can be far larger
+    // than the process's memory budget. Offset pages in id order, as the
+    // `SeaORM` paginator did, until a page comes back empty.
+    let batch = batch.max(1);
+    let mut offset = 0u64;
+    loop {
+        let rows = CaseModel::list_active_oldest_first(db, batch, offset).await?;
+        if rows.is_empty() {
+            break;
+        }
+        offset = offset.saturating_add(batch);
         for row in rows {
             report.scanned += 1;
             match row.to_case() {
@@ -117,7 +120,7 @@ fn boot_reindex_enabled_for(value: Option<&str>) -> bool {
 /// # Errors
 ///
 /// When the row count fails, or the rebuild itself does.
-pub async fn reindex_if_empty(db: &DatabaseConnection) -> Result<Option<ReindexReport>> {
+pub async fn reindex_if_empty(db: &PgPool) -> Result<Option<ReindexReport>> {
     let Some(engine) = crate::search::engine() else {
         // The error was already logged at engine init; nothing to rebuild
         // into.
@@ -126,10 +129,7 @@ pub async fn reindex_if_empty(db: &DatabaseConnection) -> Result<Option<ReindexR
     if engine.stats()?.num_docs > 0 {
         return Ok(None);
     }
-    let rows = cases::Entity::find()
-        .filter(cases::Column::DeletedAt.is_null())
-        .count(db)
-        .await?;
+    let rows = CaseModel::count_active(db).await?;
     // An empty index over an empty table is the normal fresh-install
     // case, not a rebuild.
     if rows == 0 {
@@ -143,7 +143,7 @@ pub async fn reindex_if_empty(db: &DatabaseConnection) -> Result<Option<ReindexR
 /// a rebuild proportional to table size. Failures are logged, never
 /// fatal — a service that cannot rebuild its index should still serve
 /// everything else.
-pub fn spawn_reindex_if_empty(db: DatabaseConnection) {
+pub fn spawn_reindex_if_empty(db: PgPool) {
     if !boot_reindex_enabled() {
         tracing::debug!("boot reindex disabled by {BOOT_REINDEX_ENV}");
         return;

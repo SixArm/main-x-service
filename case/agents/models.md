@@ -51,7 +51,7 @@ substantive case content in free-text fields.
 
 **Files:**
 [`src/models/cases.rs`](../case-service-with-axum/src/models/cases.rs),
-[`migration/src/m20220101_000001_cases.rs`](../case-service-with-axum/migration/src/m20220101_000001_cases.rs)
+[`migrations/2022010100000001_cases.up.sql`](../case-service-with-axum/migrations/2022010100000001_cases.up.sql)
 
 One `cases` table: `id` (PK), `pid` (public UUID), `title`
 (denormalised from `data.title`), `data` (JSONB `Case`), `active`,

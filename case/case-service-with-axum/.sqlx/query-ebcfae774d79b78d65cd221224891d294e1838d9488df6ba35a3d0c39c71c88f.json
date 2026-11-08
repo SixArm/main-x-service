@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT content_hash, content_hash_sha3 FROM cases WHERE pid = $1::text::uuid",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "content_hash",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "cases",
+            "name": "content_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "content_hash_sha3",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "cases",
+            "name": "content_hash_sha3"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "ebcfae774d79b78d65cd221224891d294e1838d9488df6ba35a3d0c39c71c88f"
+}

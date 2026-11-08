@@ -205,20 +205,6 @@ updates:
           - "minor"
           - "patch"
   - package-ecosystem: "cargo"
-    directory: "/case/case-service-with-axum/migration"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "rust"
-    groups:
-      routine:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "cargo"
     directory: "/contact-relationship-management/contact-relationship-management-service-with-rust"
     schedule:
       interval: "weekly"

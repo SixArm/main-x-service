@@ -9,14 +9,11 @@ pub mod links;
 pub mod metrics;
 
 /// Map a model-layer error to its HTTP shape: a missing record is
-/// `404 Not Found`; anything else stays a model error (500-class).
-/// axa stopped mapping `ModelError::EntityNotFound` itself (its
-/// `IntoResponse` catch-all turns it into a 500), so every controller
-/// lookup routes through this instead of a bare `?`.
+/// `404 Not Found`; a database error keeps axa's own mapping, and
+/// anything else is a `500`. This is `From<ModelError> for axa::Error`
+/// ([`crate::models::ModelError`]), kept as a named function because
+/// every controller lookup already routes through it.
 #[must_use]
-pub fn model_not_found(err: axa::model::ModelError) -> axa::Error {
-    match err {
-        axa::model::ModelError::EntityNotFound => axa::Error::NotFound,
-        other => axa::Error::Model(other),
-    }
+pub fn model_not_found(err: crate::models::ModelError) -> axa::Error {
+    err.into()
 }
