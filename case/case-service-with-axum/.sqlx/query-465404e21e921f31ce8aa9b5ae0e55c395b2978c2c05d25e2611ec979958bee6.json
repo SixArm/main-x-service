@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DROP FUNCTION cs_g1_fail_erased()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "465404e21e921f31ce8aa9b5ae0e55c395b2978c2c05d25e2611ec979958bee6"
+}

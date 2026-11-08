@@ -395,8 +395,9 @@ fn index_best_effort(pid: Uuid, case: &Case) {
 
 /// Remove a record from the full-text index, best-effort (same posture
 /// as [`index_best_effort`]). Called on soft-delete and on the duplicate
-/// side of a merge, so a retired case stops being a search hit.
-fn deindex_best_effort(pid: Uuid) {
+/// side of a merge, so a retired case stops being a search hit, and after
+/// an erasure (CS-E1), so the erased content leaves the index too.
+pub(crate) fn deindex_best_effort(pid: Uuid) {
     let Some(engine) = crate::search::engine() else {
         return;
     };

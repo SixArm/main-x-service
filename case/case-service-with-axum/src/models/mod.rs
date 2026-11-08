@@ -128,19 +128,32 @@ pub(crate) fn to_i64(n: u64) -> i64 {
     i64::try_from(n).unwrap_or(i64::MAX)
 }
 
-/// Delete every row from the service's link, merge, audit and case
-/// tables, for `db truncate` and the request-suite setup.
+/// Delete every row from the service's tables, for `db truncate` and the
+/// request-suite setup.
 ///
-/// `DELETE`, not `TRUNCATE`, and identities are not restarted: exactly
-/// what the `SeaORM` era's `truncate_table` did, on exactly the tables it
-/// named, in the same order. `event_outbox`, `bulk_jobs` and
-/// `review_queue` are left alone, as they always were.
+/// `DELETE`, not `TRUNCATE`, and identities are not restarted: what the
+/// `SeaORM` era's `truncate_table` did on `entity_links`,
+/// `merge_records`, `audit_logs` and `cases`, in that order. CS-T1:
+/// `event_outbox`, `bulk_jobs` and `review_queue` are cleared too. They
+/// were not before, so a truncated database still held unsent events the
+/// relay would go on shipping, bulk jobs, and duplicate-review pairs, all
+/// for records it no longer had. None of the seven tables declares a
+/// foreign key, so any order is safe; the three are cleared before the
+/// tables whose records they describe, so that order would stay safe if
+/// one were added. axa's own `axa_queue` is axa's to manage and is left
+/// alone; a bulk-job queue row whose `bulk_jobs` row is gone fails on
+/// its first attempt with `bulk job … not found`, before doing any work.
+/// Bulk artifacts in the artifact store are files, not rows, and are not
+/// touched.
 ///
 /// # Errors
 ///
 /// When a delete fails. The deletes are separate statements, so the
 /// tables before the failing one are already empty.
 pub async fn delete_all_rows(db: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    sqlx::query!("DELETE FROM event_outbox").execute(db).await?;
+    sqlx::query!("DELETE FROM bulk_jobs").execute(db).await?;
+    sqlx::query!("DELETE FROM review_queue").execute(db).await?;
     sqlx::query!("DELETE FROM entity_links").execute(db).await?;
     sqlx::query!("DELETE FROM merge_records")
         .execute(db)

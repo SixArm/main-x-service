@@ -883,6 +883,158 @@ async fn erasure_is_idempotent_and_answers_for_an_unknown_pid() {
     .await;
 }
 
+/// `(rows, redacted rows, erased rows)` in the audit trail for `pid`.
+async fn audit_counts(db: &sqlx::PgPool, pid: &str) -> (i64, i64, i64) {
+    let row = sqlx::query!(
+        r#"SELECT count(*) AS "rows!",
+                  count(*) FILTER (WHERE redacted_at IS NOT NULL) AS "redacted!",
+                  count(*) FILTER (WHERE action = 'erased') AS "erased!"
+           FROM audit_logs WHERE entity_pid = $1::text::uuid"#,
+        pid,
+    )
+    .fetch_one(db)
+    .await
+    .expect("audit counts");
+    (row.rows, row.redacted, row.erased)
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// CS-G1: GDPR erasure is all or nothing. A trigger makes the **last**
+// step — appending the chained `erased` audit row — fail for this one
+// case, and every earlier step must then be undone too: the payload not
+// tombstoned, the `subject_of` link still active, the audit content not
+// redacted, and the chain still verifying with no `erased` row. Before
+// the fix the tombstone, the link sweep and the redaction had each
+// committed on their own, leaving the subject half erased with no
+// accountability row recording that anything happened.
+//
+// The trigger fires only on an `erased` insert, which only an erasure
+// writes. It is installed and dropped around the one request, before any
+// assertion, and the suite is `#[serial]`, so it cannot reach another
+// test.
+async fn erasure_failing_late_leaves_nothing_changed() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        let created = request.post("/api/cases").json(&housing_case()).await;
+        let pid = created.json::<Value>()["pid"]
+            .as_str()
+            .expect("pid")
+            .to_string();
+        let link = request
+            .post(&format!("/api/cases/{pid}/links"))
+            .json(&json!({
+                "kind": "subject_of",
+                "to_ref": "person:0c4f1e2a-0000-4000-8000-000000000000"
+            }))
+            .await;
+        assert_eq!(link.status_code(), 200, "link create should succeed");
+        let (rows_before, redacted_before, _) = audit_counts(&ctx.db, &pid).await;
+        assert!(rows_before >= 1, "the create must leave audit content");
+        assert_eq!(redacted_before, 0);
+
+        sqlx::query!(
+            "CREATE OR REPLACE FUNCTION cs_g1_fail_erased() RETURNS trigger
+                 LANGUAGE plpgsql AS $$
+                 BEGIN RAISE EXCEPTION 'CS-G1 test: erased audit row refused'; END $$"
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("install the failing function");
+        sqlx::query!("DROP TRIGGER IF EXISTS cs_g1_fail_erased ON audit_logs")
+            .execute(&ctx.db)
+            .await
+            .expect("clear any stale trigger");
+        sqlx::query!(
+            "CREATE TRIGGER cs_g1_fail_erased BEFORE INSERT ON audit_logs
+                 FOR EACH ROW WHEN (NEW.action = 'erased')
+                 EXECUTE FUNCTION cs_g1_fail_erased()"
+        )
+        .execute(&ctx.db)
+        .await
+        .expect("install the failing trigger");
+
+        let erase = request.post(&format!("/api/cases/{pid}/erase")).await;
+
+        sqlx::query!("DROP TRIGGER cs_g1_fail_erased ON audit_logs")
+            .execute(&ctx.db)
+            .await
+            .expect("drop the failing trigger");
+        sqlx::query!("DROP FUNCTION cs_g1_fail_erased()")
+            .execute(&ctx.db)
+            .await
+            .expect("drop the failing function");
+
+        assert_eq!(
+            erase.status_code(),
+            500,
+            "a failed audit append must fail the erasure: {}",
+            erase.text()
+        );
+
+        // Step 1 undone: the case is live and still holds its payload.
+        let case = request.get(&format!("/api/cases/{pid}")).await;
+        assert_eq!(case.status_code(), 200, "the case must still be live");
+        let case: Value = case.json();
+        assert_eq!(case["title"], "Housing benefit appeal");
+        assert_eq!(case["case_number"], "HB-2024-0007");
+        // Step 2 undone: the `subject_of` link is still active.
+        let links: Vec<Value> = request.get(&format!("/api/cases/{pid}/links")).await.json();
+        assert_eq!(links.len(), 1, "the link sweep must be rolled back");
+        // Step 3 undone, and step 4 absent: nothing redacted, no `erased`.
+        let (_, redacted, erased) = audit_counts(&ctx.db, &pid).await;
+        assert_eq!(redacted, 0, "the redaction must be rolled back");
+        assert_eq!(
+            erased, 0,
+            "no erased row for an erasure that did not happen"
+        );
+        // The chain still verifies: the rolled-back append left no row.
+        let verify: Value = request
+            .get("/api/cases/audit/verify?limit=1000")
+            .await
+            .json();
+        assert!(
+            verify["verified"].as_bool().unwrap(),
+            "the chain must verify after a failed erasure: {verify}"
+        );
+
+        // A retry with the fault gone erases fully.
+        let retry = request.post(&format!("/api/cases/{pid}/erase")).await;
+        assert_eq!(retry.status_code(), 200, "the retry should succeed");
+        let outcome: Value = retry.json();
+        assert_eq!(outcome["links_withdrawn"], 1);
+        // The links endpoint answers `404` for an erased case, so read the
+        // table directly.
+        let live_links = sqlx::query_scalar!(
+            r#"SELECT count(*) AS "n!" FROM entity_links
+               WHERE from_pid = $1::text::uuid AND deleted_at IS NULL"#,
+            pid,
+        )
+        .fetch_one(&ctx.db)
+        .await
+        .expect("count links");
+        assert_eq!(live_links, 0, "the retry must withdraw the link");
+        let (rows, redacted, erased) = audit_counts(&ctx.db, &pid).await;
+        assert_eq!(erased, 1, "exactly one erased row");
+        assert_eq!(redacted, rows - 1, "every row but the erased one redacted");
+        let title = sqlx::query_scalar!("SELECT title FROM cases WHERE pid = $1::text::uuid", pid)
+            .fetch_one(&ctx.db)
+            .await
+            .expect("the row survives erasure");
+        assert_eq!(title, "(erased)");
+        let verify: Value = request
+            .get("/api/cases/audit/verify?limit=1000")
+            .await
+            .json();
+        assert!(
+            verify["verified"].as_bool().unwrap(),
+            "the chain must verify after the retry: {verify}"
+        );
+    })
+    .await;
+}
+
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -1418,6 +1570,127 @@ async fn a_written_record_verifies() {
         assert!(
             mismatched.contains(&pid),
             "a row edited in SQL must be reported; mismatched: {mismatched:?}"
+        );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+// CS-T1: `db truncate` empties every table the service owns. It used to
+// leave `event_outbox`, `bulk_jobs` and `review_queue`, so a truncated
+// database still held unsent events, jobs and review pairs for records it
+// no longer had — and the relay would go on shipping `created` events for
+// cases that were gone.
+async fn truncate_clears_outbox_bulk_jobs_and_review_queue() {
+    use case_service::bulk::BulkFormat;
+    use case_service::models::{bulk_jobs, event_outbox::OutboxInsert, review_queue};
+
+    super::isolate_search_index();
+    request::<App, _, _>(|request, ctx| async move {
+        let created = request.post("/api/cases").json(&housing_case()).await;
+        assert_eq!(created.status_code(), 200);
+        let pid = uuid::Uuid::parse_str(created.json::<Value>()["pid"].as_str().unwrap()).unwrap();
+
+        let now: chrono::DateTime<chrono::FixedOffset> = chrono::Utc::now().into();
+        OutboxInsert {
+            event_id: uuid::Uuid::new_v4(),
+            entity: "case".to_string(),
+            entity_pid: pid,
+            kind: "created".to_string(),
+            occurred_at: now,
+            actor: None,
+            schema_version: 1,
+            payload: json!({}),
+        }
+        .insert_on(&ctx.db)
+        .await
+        .expect("seed the outbox");
+        bulk_jobs::create(
+            &ctx.db,
+            bulk_jobs::NewBulkJob::import(BulkFormat::Jsonl, json!({}), None),
+        )
+        .await
+        .expect("seed a bulk job");
+        review_queue::upsert(
+            &ctx.db,
+            &[review_queue::NewReviewItem {
+                record_id_a: pid,
+                record_id_b: uuid::Uuid::new_v4(),
+                match_score: 0.9,
+                match_quality: "probable".to_string(),
+                detection_method: "test".to_string(),
+                score_breakdown: None,
+                status: "pending".to_string(),
+                provenance: "operator".to_string(),
+            }],
+        )
+        .await
+        .expect("seed the review queue");
+
+        App::truncate(&ctx).await.expect("truncate");
+
+        let left = sqlx::query!(
+            r#"SELECT (SELECT count(*) FROM cases) AS "cases!",
+                      (SELECT count(*) FROM audit_logs) AS "audit_logs!",
+                      (SELECT count(*) FROM entity_links) AS "entity_links!",
+                      (SELECT count(*) FROM merge_records) AS "merge_records!",
+                      (SELECT count(*) FROM event_outbox) AS "event_outbox!",
+                      (SELECT count(*) FROM bulk_jobs) AS "bulk_jobs!",
+                      (SELECT count(*) FROM review_queue) AS "review_queue!""#
+        )
+        .fetch_one(&ctx.db)
+        .await
+        .expect("count rows");
+        assert_eq!(
+            [
+                left.cases,
+                left.audit_logs,
+                left.entity_links,
+                left.merge_records,
+                left.event_outbox,
+                left.bulk_jobs,
+                left.review_queue,
+            ],
+            [0; 7],
+            "every service table must be empty after truncate"
+        );
+    })
+    .await;
+}
+
+/// Erasure removes the case from the full-text index (CS-E1). The index
+/// keeps its own copy of the title and subjects, so an erasure that left
+/// it there would keep the subject's data at rest after Art. 17 said it
+/// was gone, even though search answers resolve against the tombstoned
+/// row and so never return it.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with: cargo test -- --ignored"]
+async fn erasure_removes_the_case_from_the_search_index() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let mut body = housing_case();
+        let title = format!("Erasable title {}", uuid::Uuid::new_v4().simple());
+        body["title"] = json!(title);
+        let created = request.post("/api/cases").json(&body).await;
+        let pid = created.json::<Value>()["pid"]
+            .as_str()
+            .expect("pid")
+            .to_string();
+        let engine = case_service::search::engine().expect("the search index");
+        assert!(
+            engine.search(&title, 10).unwrap().contains(&pid),
+            "the new case must be indexed"
+        );
+
+        let erase = request.post(&format!("/api/cases/{pid}/erase")).await;
+        assert_eq!(erase.status_code(), 200, "erase: {}", erase.text());
+        engine.reload().ok();
+        assert!(
+            !engine.search(&title, 10).unwrap().contains(&pid),
+            "an erased case must leave the index"
         );
     })
     .await;

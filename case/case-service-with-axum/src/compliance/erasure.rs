@@ -96,8 +96,28 @@ pub struct ErasureOutcome {
 /// its cross-service links, redact its audit content, and append a chained
 /// `erased` audit row.
 ///
-/// Runs on the caller's connection or transaction; pass the open
-/// transaction (`&mut *txn`) to make the writes atomic.
+/// Runs on the caller's connection, which must be an open transaction
+/// (`&mut *txn`): CS-G1, the four steps commit or roll back together, so
+/// a failure part-way leaves the case exactly as it was rather than half
+/// erased. The controller ([`crate::controllers::cases`]) is the one
+/// caller and opens it.
+///
+/// The `erased` audit row is the last statement **inside** that
+/// transaction, not a best-effort write after the commit (as
+/// authentication's `account_erased` row is): it is a link in the hash
+/// chain and the controller's Art. 17(3)(b) accountability record, so an
+/// erasure must not commit without it, and it must not exist for an
+/// erasure that rolled back. The chain's advisory lock is taken on this
+/// same transaction just before the redaction sweep and held to the
+/// commit, so the head the row chains onto cannot move underneath it and
+/// no other audit row about the case can land between the sweep and the
+/// `erased` row unredacted. On a rollback the row is never written and
+/// the head stays where it was, so the chain verifies on both paths.
+///
+/// The lock is taken *after* the case row and the link rows are updated,
+/// matching the order every other writer takes them in (entity row, then
+/// chain lock), so an erasure cannot deadlock against a concurrent
+/// mutation of the same case or its links.
 ///
 /// # Errors
 ///
@@ -149,7 +169,9 @@ pub async fn erase(
     //    leaving the edge would erase the details and keep the accusation.
     let links_withdrawn = withdraw_links(&mut *db, pid).await?;
 
-    // 3. Destroy the audit content, keeping the chain linkage.
+    // 3. Destroy the audit content, keeping the chain linkage. The chain
+    //    lock is taken first and held to the commit (see above).
+    AuditModel::lock_chain(&mut *db).await?;
     let audit_rows_redacted = AuditModel::redact_for_entity(&mut *db, pid).await?;
 
     // 4. Append the accountability record for the erasure itself. It is
@@ -209,6 +231,8 @@ fn erasure_context(ctx: &AccessContext, redacted: u64, links: u64) -> serde_json
 /// once the record is soft-deleted: the audit content is still personal
 /// data, and re-running an erasure must be safe.
 ///
+/// Runs on an open transaction, under the same rules as [`erase`].
+///
 /// # Errors
 ///
 /// When the link withdrawal, the redaction sweep, or the audit append
@@ -220,6 +244,7 @@ pub async fn erase_audit_only(
     ctx: &AccessContext,
 ) -> ModelResult<ErasureOutcome> {
     let links_withdrawn = withdraw_links(&mut *db, pid).await?;
+    AuditModel::lock_chain(&mut *db).await?;
     let audit_rows_redacted = AuditModel::redact_for_entity(&mut *db, pid).await?;
     AuditModel::record_with_context(
         &mut *db,

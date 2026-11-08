@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "CREATE OR REPLACE FUNCTION cs_g1_fail_erased() RETURNS trigger\n                 LANGUAGE plpgsql AS $$\n                 BEGIN RAISE EXCEPTION 'CS-G1 test: erased audit row refused'; END $$",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "5b12165f798c178890f8c72d0f5a4712e22a8e2b4f879b3c64288c77fad2606b"
+}

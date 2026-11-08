@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DROP TRIGGER IF EXISTS cs_g1_fail_erased ON audit_logs",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "c1bf97d0b60ffb7c37f01d9f1f43e74610ea5e4722321499c9bd491fbbb66b69"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "CREATE TRIGGER cs_g1_fail_erased BEFORE INSERT ON audit_logs\n                 FOR EACH ROW WHEN (NEW.action = 'erased')\n                 EXECUTE FUNCTION cs_g1_fail_erased()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "1bfe2118131f21eda04dd1ea17c228f6e71237d058062ba7231fdc7dffec28de"
+}

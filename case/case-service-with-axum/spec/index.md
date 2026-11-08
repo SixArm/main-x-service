@@ -743,7 +743,14 @@ for the full rationale.
   (so the chain keeps verifying across the redaction), and appends a
   final chained `erased` accountability row. Irreversible; idempotent on
   an already-erased or already soft-deleted `pid` (a right does not lapse
-  because the record was already retired).
+  because the record was already retired). **All of it is one
+  transaction** (§13 CS-G1): a failure at any step leaves the case, its
+  links and its audit trail exactly as they were. The `erased` row is the
+  last statement inside that transaction, after the chain's advisory lock
+  is taken on the same connection (just before the redaction sweep, and
+  after the case and link rows are updated, the order every other writer
+  takes them in), so it commits only with the erasure it records and a
+  rollback leaves the chain head where it was.
 - **External-witness checkpoints** ([`src/compliance/checkpoint.rs`](../src/compliance/checkpoint.rs)).
   The hash chain cannot detect **tail** deletion (delete the last *N* rows
   and there is no successor left to break). `GET /api/cases/checkpoint`
@@ -837,6 +844,49 @@ These obligations are why `case ↔ person` is governed more strictly than
 the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
+
+- [x] **CS-E1 (S) — erasure removes the case from the search index.**
+  *(Done 2026-11-08; repo `tasks.md` CS-E1.)* The erase handler calls
+  `streaming::deindex_best_effort` after the commit, as soft delete does;
+  `tests/requests/cases.rs` `erasure_removes_the_case_from_the_search_index`
+  searches the index before and after, and failed before.
+
+- [x] **CS-G1 — GDPR erasure is one transaction.** *(Done 2026-11-08;
+  repo `tasks.md` "Found 2026-11-08 (moving case to sqlx)", the same
+  defect as authentication's AU-G1.)* `POST /api/cases/{pid}/erase` ran
+  its tombstone `UPDATE`, link sweep, audit redaction and `erased` append
+  on one pooled connection with no transaction, so a failure part-way
+  left a subject half erased: tombstoned with nothing in the audit trail
+  saying why, or with the `subject_of` edge withdrawn and the audit
+  content still held. The controller now opens one transaction for every
+  step and commits once; each statement's effect is unchanged. The
+  `erased` row stays **inside** it, unlike authentication's unchained
+  `account_erased` row, which is written after the commit: it is a link
+  in the hash chain and the controller's Art. 17(3)(b) accountability
+  record, so it must commit with the erasure and must not exist without
+  it. The chain's `pg_advisory_xact_lock` is taken on the transaction
+  (new `AuditModel::lock_chain`) before the redaction sweep and held to
+  the commit, so no other audit row about the case can land between the
+  sweep and the `erased` row and survive unredacted, and the head the
+  row chains onto cannot move. It is taken after the case and link rows
+  are updated, matching every other writer's order (entity row, then
+  chain lock), so an erasure cannot deadlock a concurrent mutation. On a
+  rollback no row is appended and the head is unchanged, so the chain
+  verifies on both paths. `tests/requests/cases.rs`
+  `erasure_failing_late_leaves_nothing_changed` makes the last step fail
+  with a trigger on `erased` inserts and checks the case is live and
+  unchanged, its link still active, nothing redacted, no `erased` row
+  and the chain verifying; then that a retry erases fully. It failed
+  before (the case was already tombstoned).
+- [x] **CS-T1 — `db truncate` clears every service table.** *(Done
+  2026-11-08.)* `models::delete_all_rows` left `event_outbox`,
+  `bulk_jobs` and `review_queue`, so a truncated database still held
+  unsent events the relay would ship, bulk jobs, and review pairs for
+  records it no longer had. They are now deleted first; no table
+  declares a foreign key, so the order is safe either way. axa's own
+  `axa_queue` is left to axa. `truncate_clears_outbox_bulk_jobs_and_review_queue`
+  seeds a row in each, truncates, and checks all seven tables are empty;
+  it failed before.
 
 - [x] **CASE-SQLX — SeaORM → sqlx.** *(Done 2026-11-08;
   [`spec/tech-stack/index.md`](../../../spec/tech-stack/index.md) §5,

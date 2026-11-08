@@ -8616,10 +8616,18 @@ All were there on SeaORM, and the move keeps them as they were.
 
 Both were there on SeaORM, and the move keeps them as they were.
 
-- [ ] **CS-G1 (S)** case's GDPR erasure runs on the pool with no
+- [x] **CS-G1 (S)** case's GDPR erasure runs on the pool with no
   transaction, so a failure part-way leaves a subject half erased: the
   same defect as authentication's AU-G1, fixed in `2fddcf91`. Make it one
   transaction, with the same kind of failing-late DB test.
-- [ ] **CS-T1 (S)** `db truncate` leaves `event_outbox`, `bulk_jobs` and
+- [x] **CS-T1 (S)** `db truncate` leaves `event_outbox`, `bulk_jobs` and
   `review_queue`, so a truncated database still holds unsent events, jobs
   and review items for records it no longer has.
+  Done 2026-11-08: all seven tables are deleted. CS-G1 done the same day:
+  erasure is one transaction with the chained `erased` row inside it.
+  DB suite 68, was 66.
+- [x] **CS-E1 (S)** case's erasure left the erased title, subjects and
+  identifiers in the Tantivy index, which soft delete and merge clean up.
+  Fixed 2026-11-08: removed after the erasure commits, with a DB test that
+  searches the index directly. care-pathway, person and worker must be
+  checked for the same in their sqlx moves.

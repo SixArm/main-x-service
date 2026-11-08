@@ -193,6 +193,27 @@ impl Model {
         Ok(row)
     }
 
+    /// Take the chain's append lock on `conn` (see `CHAIN_LOCK_KEY`),
+    /// held to the end of the enclosing transaction.
+    ///
+    /// [`Self::record_with_context`] takes it itself; this is for a caller
+    /// that needs it *earlier* in the same transaction. The GDPR erasure
+    /// takes it before its redaction sweep, so no audit row about the
+    /// subject can be committed between the sweep and the erasure's own
+    /// `erased` row and survive unredacted. Taking it again in the same
+    /// transaction is a no-op, since advisory locks are re-entrant per
+    /// session.
+    ///
+    /// # Errors
+    ///
+    /// When the lock query fails.
+    pub async fn lock_chain(conn: &mut PgConnection) -> ModelResult<()> {
+        sqlx::query!("SELECT pg_advisory_xact_lock($1)", CHAIN_LOCK_KEY)
+            .execute(conn)
+            .await?;
+        Ok(())
+    }
+
     /// Both chain heads — `(SHA-256, SHA-3)` — from the same row.
     ///
     /// Read together so an append binds each algorithm's *own*

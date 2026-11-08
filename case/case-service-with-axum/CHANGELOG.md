@@ -9,6 +9,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- **Erasure removes the case from the search index** (repo `tasks.md`
+  CS-E1). Soft delete and merge de-indexed a retired case, but erasure did
+  not, so the erased title, subjects and identifiers stayed in the
+  Tantivy index on disk. Search answers resolve against the tombstoned row
+  and never returned them, but the data was still held. It is removed
+  after the erasure commits, and a DB test checks the index directly.
+
+- **GDPR erasure is atomic** (spec §13 CS-G1). `POST
+  /api/cases/{pid}/erase` ran its four steps (tombstone, link sweep,
+  audit redaction, chained `erased` row) on one connection with no
+  transaction, so a failure part-way left a subject half erased. They
+  now commit or roll back together, and each step's effect is unchanged.
+  The `erased` row is the last statement inside the transaction, after
+  the chain's advisory lock is taken on it, so it commits only with the
+  erasure it records and a failure leaves the chain as it was. A DB test
+  makes the last step fail and checks nothing changed, then that a retry
+  erases fully; it failed before.
+- **`db truncate` clears `event_outbox`, `bulk_jobs` and
+  `review_queue`** (spec §13 CS-T1), so a truncated database no longer
+  holds unsent events, jobs and review pairs for records it does not
+  have. A DB test seeds each and checks every table is empty; it failed
+  before.
+
 ### Changed — SeaORM replaced by sqlx
 
 - **Persistence is sqlx with no ORM** (spec §10, §13 CASE-SQLX;

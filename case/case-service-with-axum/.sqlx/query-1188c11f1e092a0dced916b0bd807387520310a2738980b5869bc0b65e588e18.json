@@ -1,0 +1,63 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (SELECT count(*) FROM cases) AS \"cases!\",\n                      (SELECT count(*) FROM audit_logs) AS \"audit_logs!\",\n                      (SELECT count(*) FROM entity_links) AS \"entity_links!\",\n                      (SELECT count(*) FROM merge_records) AS \"merge_records!\",\n                      (SELECT count(*) FROM event_outbox) AS \"event_outbox!\",\n                      (SELECT count(*) FROM bulk_jobs) AS \"bulk_jobs!\",\n                      (SELECT count(*) FROM review_queue) AS \"review_queue!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "cases!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "audit_logs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "entity_links!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "merge_records!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "event_outbox!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "bulk_jobs!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "review_queue!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "1188c11f1e092a0dced916b0bd807387520310a2738980b5869bc0b65e588e18"
+}
