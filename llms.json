@@ -118,6 +118,7 @@
         { "title": "agents/share/index.md", "url": "agents/share/index.md", "description": "The index of every shared doc below, kept current in one place" },
         { "title": "agents/share/dataflow.md", "url": "agents/share/dataflow.md", "description": "Create / match / merge / search data flows" },
         { "title": "agents/share/match-search-merge.md", "url": "agents/share/match-search-merge.md", "description": "Matching, search, and merge workflows combined" },
+        { "title": "agents/share/match-evidence.md", "url": "agents/share/match-evidence.md", "description": "Match evidence: consistent-with-duplicate vs proven duplicate" },
         { "title": "agents/share/privacy.md", "url": "agents/share/privacy.md", "description": "Data masking, GDPR export, consent" },
         { "title": "agents/share/jwt.md", "url": "agents/share/jwt.md", "description": "Why JWTs are not used for sessions" },
         { "title": "agents/share/authentication-sessions.md", "url": "agents/share/authentication-sessions.md", "description": "Cookie sessions + PASETO v4 cross-service tokens + the BFF pattern" },

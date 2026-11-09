@@ -26,4 +26,5 @@ Algorithms:
 - Similarity scoring algorithms
 - Confidence scoring for match quality (certain/probable/possible)
 - Configurable matching rules (threshold, max_candidates, auto_merge_threshold)
+- Match evidence beside the score: log-likelihood weight in bits, contradictions, and a `Proven` / `Consistent` / `Contradicted` / `NonMatch` strength that gates merging — see [match-evidence.md](match-evidence.md)
 - Review queue persisted in a `review_queue` table with status tracking (`pending`, `confirmed`, `rejected`, `automerged`) and confirm/reject decision endpoints (person / worker / place / thing / organization / case / care-pathway)

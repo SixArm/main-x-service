@@ -53,6 +53,7 @@ Per-crate `spec.md`:
 | [availability.md](availability.md)                               | Availability, scaling, health checks                   |
 | [dataflow.md](dataflow.md)                                       | Create / match / merge / search data flows             |
 | [match.md](match.md)                                             | Matching algorithms                                    |
+| [match-evidence.md](match-evidence.md)                           | Match evidence: consistent-with-duplicate vs proven duplicate (log-likelihood weights, contradictions, the merge gate) |
 | [search.md](search.md)                                           | Search (Tantivy)                                       |
 | [merge.md](merge.md)                                             | Merge workflow                                         |
 | [match-search-merge.md](match-search-merge.md)                   | Combined match / search / merge reference              |

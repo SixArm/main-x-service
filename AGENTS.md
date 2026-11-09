@@ -300,6 +300,7 @@ CI runner, so no front-end code was ever actually exercised by a check.
 @agents/share/dataflow.md
 @agents/share/match-search-merge.md
 @agents/share/match.md
+@agents/share/match-evidence.md
 @agents/share/search.md
 @agents/share/merge.md
 @agents/share/privacy.md

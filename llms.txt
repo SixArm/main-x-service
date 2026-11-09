@@ -98,6 +98,7 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 - [agents/share/index.md](agents/share/index.md): the index of every shared doc below, kept current in one place
 - [agents/share/dataflow.md](agents/share/dataflow.md): create / match / merge / search data flows
 - [agents/share/match-search-merge.md](agents/share/match-search-merge.md): matching, search, and merge workflows combined
+- [agents/share/match-evidence.md](agents/share/match-evidence.md): match evidence, telling a consistent-looking pair from a proven duplicate before a merge
 - [agents/share/privacy.md](agents/share/privacy.md): data masking, GDPR export, consent
 - [agents/share/jwt.md](agents/share/jwt.md): why JWTs are not used for sessions
 - [agents/share/authentication-sessions.md](agents/share/authentication-sessions.md): cookie sessions + PASETO v4 cross-service tokens + the BFF pattern
