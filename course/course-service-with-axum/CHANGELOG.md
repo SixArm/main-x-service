@@ -9,6 +9,25 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- **Match evidence** (spec §6.1, §13 T-33;
+  `agents/share/match-evidence.md`). The `409` candidates,
+  `POST /api/courses/match`, `check-duplicates` and every review-queue
+  item now carry the matcher's `evidence`, and
+  `course_match_scores.evidence` (migration
+  `2026110900000001_add_review_evidence`) stores it. Value frequencies
+  over the course name adjust the name's weight once the registry holds
+  1 000 or more courses.
+
+### Changed
+
+- **The batch scan auto-merges only `proven` pairs.** A pair at or above
+  `auto_merge_threshold` whose evidence is `consistent` (two courses
+  sharing only a title) or `contradicted` (two different DOIs) is now
+  queued as `Pending` instead of merged. Merged pairs are stored as
+  `AutoMerged` and returned in the new `auto_merged_items`.
+
 ### Fixed
 
 - The outbox relay's ack stamps `published_at` from this process's clock,

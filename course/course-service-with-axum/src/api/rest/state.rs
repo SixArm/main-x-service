@@ -8,7 +8,7 @@ use sqlx::PgPool;
 
 use crate::config::Config;
 use crate::db::{CourseRepository, PgCourseRepository, audit::AuditLogRepository};
-use crate::matching::CourseMatcher;
+use crate::matching::{CourseMatcher, FrequencyCache};
 use crate::search::SearchEngine;
 use crate::streaming::{EventPublisher, InMemoryEventPublisher};
 
@@ -29,6 +29,10 @@ pub struct AppState {
     pub search_engine: Arc<SearchEngine>,
     /// Record matcher.
     pub matcher: Arc<CourseMatcher>,
+    /// Value frequencies for the create-time and `check-duplicates`
+    /// evidence, rebuilt lazily every ten minutes
+    /// (`crate::matching::frequencies`).
+    pub frequencies: Arc<FrequencyCache>,
     /// Loaded service configuration.
     pub config: Arc<Config>,
 
@@ -65,6 +69,7 @@ impl AppState {
             event_publisher,
             search_engine: Arc::new(search_engine),
             matcher: Arc::new(matcher),
+            frequencies: Arc::new(FrequencyCache::new()),
             config: Arc::new(config),
             require_auth: super::auth::require_auth_from_env(),
         }

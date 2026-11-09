@@ -169,6 +169,8 @@ pub struct ReviewQueueRow {
     pub detection_method: String,
     /// Per-component breakdown (JSONB).
     pub score_breakdown: Option<serde_json::Value>,
+    /// The matcher's evidence (JSONB); `NULL` on rows older than the column.
+    pub evidence: Option<serde_json::Value>,
     /// `Pending` / `Confirmed` / `Rejected` / `AutoMerged`.
     pub status: String,
     /// Deciding operator.

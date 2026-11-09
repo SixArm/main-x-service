@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO course_match_scores\n                     (id, course_id, candidate_id, match_score, match_quality, detection_method,\n                      score_breakdown, status, reviewed_by, created_at, reviewed_at)\n                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, $9, NULL)\n                 ON CONFLICT (course_id, candidate_id) DO UPDATE SET\n                     match_score = EXCLUDED.match_score,\n                     match_quality = EXCLUDED.match_quality,\n                     detection_method = EXCLUDED.detection_method,\n                     score_breakdown = EXCLUDED.score_breakdown\n                 RETURNING id, course_id, candidate_id, match_score, match_quality,\n                           detection_method, score_breakdown, status, reviewed_by,\n                           created_at, reviewed_at",
+  "query": "INSERT INTO course_match_scores\n                     (id, course_id, candidate_id, match_score, match_quality, detection_method,\n                      score_breakdown, evidence, status, reviewed_by, created_at, reviewed_at)\n                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, $10, NULL)\n                 ON CONFLICT (course_id, candidate_id) DO UPDATE SET\n                     match_score = EXCLUDED.match_score,\n                     match_quality = EXCLUDED.match_quality,\n                     detection_method = EXCLUDED.detection_method,\n                     score_breakdown = EXCLUDED.score_breakdown,\n                     evidence = EXCLUDED.evidence,\n                     status = CASE\n                         WHEN course_match_scores.status = $11 AND EXCLUDED.status = $12\n                         THEN EXCLUDED.status\n                         ELSE course_match_scores.status\n                     END\n                 RETURNING id, course_id, candidate_id, match_score, match_quality,\n                           detection_method, score_breakdown, evidence, status, reviewed_by,\n                           created_at, reviewed_at",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,17 @@
       },
       {
         "ordinal": 7,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "evidence"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "status",
         "type_info": "Varchar",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "reviewed_by",
         "type_info": "Varchar",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "reviewed_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -134,8 +145,11 @@
         "Varchar",
         "Varchar",
         "Jsonb",
+        "Jsonb",
         "Varchar",
-        "Timestamptz"
+        "Timestamptz",
+        "Text",
+        "Text"
       ]
     },
     "nullable": [
@@ -146,11 +160,12 @@
       false,
       false,
       true,
+      true,
       false,
       true,
       false,
       true
     ]
   },
-  "hash": "979bcb5a3c003fbf44396a825c331095a69221a3f3483feaae080c81ead6d1ae"
+  "hash": "45a9feaad871779b11e22772a2f2784e058fd47be9d844fdfdf931e2fda5e2ab"
 }

@@ -6,7 +6,7 @@
 //! and re-exports the result shape. See `agents/matching.md` for the
 //! field-routing rules.
 
-use course_matcher::{MatchConfig, MatchingEngine};
+use course_matcher::{MatchConfig, MatchingEngine, NoFrequencies, ValueFrequencies};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -14,6 +14,11 @@ use crate::config::MatchingConfig;
 use crate::models::Course;
 
 pub mod adapter;
+pub mod evidence;
+pub mod frequencies;
+
+pub use evidence::{EvidenceComponent, EvidenceContradiction, EvidenceStrength, MatchEvidence};
+pub use frequencies::{CourseFrequencies, FrequencyCache, MIN_FREQUENCY_POPULATION};
 
 /// Re-export of the canonical `course-matcher` library crate so
 /// callers (integration tests, the bridge suite under `tests/`) can
@@ -55,9 +60,25 @@ impl CourseMatcher {
     /// `course-matcher` algorithm.
     #[must_use]
     pub fn match_courses(&self, a: &Course, b: &Course) -> MatchResult {
+        self.match_courses_with_frequencies(a, b, &NoFrequencies)
+    }
+
+    /// Score two courses with the evidence's name agreement weighed by
+    /// the name's own share in `frequencies` (match-evidence.md §7).
+    /// `score`, `is_match`, `confidence` and `breakdown` are the same as
+    /// from [`Self::match_courses`]; only `evidence` can differ.
+    #[must_use]
+    pub fn match_courses_with_frequencies(
+        &self,
+        a: &Course,
+        b: &Course,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         let ma = adapter::to_matcher_course(a);
         let mb = adapter::to_matcher_course(b);
-        let r = self.engine.match_courses(&ma, &mb);
+        let r = self
+            .engine
+            .match_courses_with_frequencies(&ma, &mb, frequencies);
         from_matcher_result(&r)
     }
 
@@ -77,7 +98,8 @@ impl CourseMatcher {
 /// [`MatchResult`], mapping the confidence enum and copying each
 /// per-component score across. `identifier_score` is left `None`
 /// because the matcher folds identifier matches into the deterministic
-/// short-circuit rather than a weighted component.
+/// short-circuit rather than a weighted component. The matcher's
+/// evidence is carried across unchanged (match-evidence.md §10 step 4).
 fn from_matcher_result(r: &course_matcher::MatchResult) -> MatchResult {
     MatchResult {
         score: r.score,
@@ -97,6 +119,7 @@ fn from_matcher_result(r: &course_matcher::MatchResult) -> MatchResult {
             identifier_score: None,
             deterministic_match: r.breakdown.deterministic_match,
         },
+        evidence: MatchEvidence::from(&r.evidence),
     }
 }
 
@@ -112,6 +135,8 @@ pub struct MatchResult {
     pub confidence: MatchConfidence,
     /// Per-component score breakdown.
     pub breakdown: MatchBreakdown,
+    /// How much the compared data proves; gates automatic merging.
+    pub evidence: MatchEvidence,
 }
 
 /// Coarse confidence band for a [`MatchResult`], mirroring
@@ -190,6 +215,37 @@ mod tests {
         let r = m.match_courses(&a, &b);
         assert!(r.breakdown.deterministic_match);
         assert!((r.score - 1.0).abs() < 1e-9);
+        assert_eq!(r.evidence.strength, EvidenceStrength::Proven);
+    }
+
+    /// A name-only agreement scores high but is only `consistent`.
+    #[test]
+    fn name_only_agreement_is_consistent_not_proven() {
+        let m = CourseMatcher::new(cfg());
+        let a = Course::new("Intro to Computer Science");
+        let r = m.match_courses(&a, &a.clone());
+        assert!(r.score >= 0.95);
+        assert_eq!(r.evidence.strength, EvidenceStrength::Consistent);
+        assert!(!r.evidence.permits_auto_merge());
+    }
+
+    /// Two different DOIs contradict, whatever the name score.
+    #[test]
+    fn conflicting_doi_is_contradicted() {
+        let m = CourseMatcher::new(cfg());
+        let mut a = Course::new("Intro to Computer Science");
+        let mut b = a.clone();
+        let ident = |v: &str| CourseIdentifier {
+            property_id: IdentifierType::Doi,
+            value: v.into(),
+            name: None,
+            url: None,
+        };
+        a.identifiers = vec![ident("10.1234/abc")];
+        b.identifiers = vec![ident("10.1234/xyz")];
+        let r = m.match_courses(&a, &b);
+        assert_eq!(r.evidence.strength, EvidenceStrength::Contradicted);
+        assert_eq!(r.evidence.contradictions[0].field, "identifier:doi");
     }
 
     /// `find_matches` returns candidates ranked by descending score.

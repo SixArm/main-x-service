@@ -596,3 +596,183 @@ async fn a_written_record_verifies() {
         "a row edited in SQL must be flagged"
     );
 }
+
+// ────────────── Match evidence (agents/share/match-evidence.md) ──────────────
+
+/// A course named `name` carrying one DOI `doi`.
+fn course_with_doi(name: &str, doi: &str) -> Course {
+    use course_service::models::{CourseIdentifier, IdentifierType};
+    let mut c = Course::new(name);
+    c.identifiers = vec![CourseIdentifier {
+        property_id: IdentifierType::Doi,
+        value: doi.into(),
+        name: None,
+        url: None,
+    }];
+    c
+}
+
+/// Run a batch scan at `auto_merge_threshold = 0.95` and return the body.
+async fn run_dedup(app: &axum::Router) -> Value {
+    let req = json!({
+        "threshold": 0.50,
+        "max_candidates": 10,
+        "auto_merge_threshold": 0.95,
+    });
+    let (status, env) = send(app, Method::POST, "/api/courses/deduplicate", Some(req)).await;
+    assert_eq!(status, StatusCode::OK, "body: {env}");
+    env
+}
+
+/// The item in `items` whose pair is `{a, b}`.
+fn find_pair(items: &[Value], a: uuid::Uuid, b: uuid::Uuid) -> Option<&Value> {
+    let (a, b) = (a.to_string(), b.to_string());
+    items.iter().find(|i| {
+        let ids = [
+            i["course_id_a"].as_str().unwrap_or_default(),
+            i["course_id_b"].as_str().unwrap_or_default(),
+        ];
+        ids.contains(&a.as_str()) && ids.contains(&b.as_str())
+    })
+}
+
+/// Two courses agreeing only on their name score above
+/// `auto_merge_threshold`, but their evidence is only `consistent`: the
+/// scan leaves them `Pending`, stores the evidence and returns it from
+/// the list endpoint.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn batch_dedup_keeps_a_name_only_pair_pending_as_consistent() {
+    let (app, state) = common::boot().await;
+    let name = common::unique_name("EvidenceNameOnly");
+    let a = common::seed_course(&state, &name).await;
+    let b = common::seed_course(&state, &name).await;
+
+    let env = run_dedup(&app).await;
+    let items = env["review_items"].as_array().expect("review_items");
+    let pair = find_pair(items, a, b).unwrap_or_else(|| panic!("pair not queued: {env}"));
+    assert!(pair["match_score"].as_f64().unwrap() >= 0.95, "{pair}");
+    assert_eq!(pair["status"], "Pending");
+    assert_eq!(pair["evidence"]["strength"], "consistent");
+    assert!(find_pair(env["auto_merged_items"].as_array().unwrap(), a, b).is_none());
+
+    let (status, env) = send(
+        &app,
+        Method::GET,
+        "/api/courses/review-queue?status=Pending&limit=500",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let stored = find_pair(env["items"].as_array().unwrap(), a, b)
+        .unwrap_or_else(|| panic!("pair missing from review-queue"))
+        .clone();
+    assert_eq!(stored["evidence"]["strength"], "consistent");
+    assert!(stored["evidence"]["components"].is_array());
+
+    // Both records survive.
+    for id in [a, b] {
+        let (status, _) = send(&app, Method::GET, &format!("/api/courses/{id}"), None).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+}
+
+/// A pair sharing a DOI is `proven`: the scan merges it and stores the
+/// pair as `AutoMerged` with its evidence.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn batch_dedup_auto_merges_a_proven_pair() {
+    let (app, state) = common::boot().await;
+    let name = common::unique_name("EvidenceProven");
+    let doi = format!("10.5555/{}", uuid::Uuid::new_v4().simple());
+    let a = common::seed_full_course(&state, &course_with_doi(&name, &doi)).await;
+    let b = common::seed_full_course(&state, &course_with_doi(&name, &doi)).await;
+
+    let env = run_dedup(&app).await;
+    let merged = env["auto_merged_items"]
+        .as_array()
+        .expect("auto_merged_items");
+    let pair = find_pair(merged, a, b).unwrap_or_else(|| panic!("pair not merged: {env}"));
+    assert_eq!(pair["status"], "AutoMerged");
+    assert_eq!(pair["evidence"]["strength"], "proven");
+    assert!(find_pair(env["review_items"].as_array().unwrap(), a, b).is_none());
+
+    // Exactly one of the two survives.
+    let mut alive = 0;
+    for id in [a, b] {
+        let (status, _) = send(&app, Method::GET, &format!("/api/courses/{id}"), None).await;
+        if status == StatusCode::OK {
+            alive += 1;
+        }
+    }
+    assert_eq!(alive, 1);
+}
+
+/// Two different DOIs contradict: the pair stays `Pending` as
+/// `contradicted`, whatever its name score.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn batch_dedup_keeps_a_contradicted_pair_pending() {
+    let (app, state) = common::boot().await;
+    let name = common::unique_name("EvidenceContradicted");
+    let token = uuid::Uuid::new_v4().simple().to_string();
+    let a = common::seed_full_course(
+        &state,
+        &course_with_doi(&name, &format!("10.5555/{token}a")),
+    )
+    .await;
+    let b = common::seed_full_course(
+        &state,
+        &course_with_doi(&name, &format!("10.5555/{token}b")),
+    )
+    .await;
+
+    let env = run_dedup(&app).await;
+    let items = env["review_items"].as_array().expect("review_items");
+    let pair = find_pair(items, a, b).unwrap_or_else(|| panic!("pair not queued: {env}"));
+    assert_eq!(pair["status"], "Pending");
+    assert_eq!(pair["evidence"]["strength"], "contradicted");
+    assert_eq!(
+        pair["evidence"]["contradictions"][0]["field"],
+        "identifier:doi"
+    );
+}
+
+/// `check-duplicates` and the create-time `409` both carry evidence.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+async fn check_duplicates_and_409_carry_evidence() {
+    let app = common::create_test_router().await;
+    let body = common::course_json("EvidenceCheck");
+    let (status, env) = send(&app, Method::POST, "/api/courses", Some(body.clone())).await;
+    assert_eq!(status, StatusCode::CREATED, "body: {env}");
+    let created: Course = serde_json::from_value(env).unwrap();
+
+    let probe = json!({ "name": created.name, "course_code": "TEST101", "status": "published" });
+    let (status, env) = send(
+        &app,
+        Method::POST,
+        "/api/courses/check-duplicates",
+        Some(probe.clone()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let hit = env
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["course_id"] == json!(created.id))
+        .unwrap_or_else(|| panic!("no hit: {env}"));
+    assert!(hit["evidence"]["weight_bits"].is_number());
+    assert!(hit["evidence"]["strength"].is_string());
+
+    let (status, env) = send(&app, Method::POST, "/api/courses", Some(probe)).await;
+    assert_eq!(status, StatusCode::CONFLICT, "body: {env}");
+    let hit = env["errors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["course_id"] == json!(created.id))
+        .unwrap_or_else(|| panic!("no 409 candidate: {env}"));
+    assert!(hit["evidence"]["strength"].is_string());
+}

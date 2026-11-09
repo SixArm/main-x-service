@@ -562,28 +562,44 @@ impl CourseRepository for PgCourseRepository {
 
     async fn upsert_review_items(&self, items: &[NewReviewItem]) -> Result<Vec<ReviewQueueItem>> {
         let pending = enum_to_string(&ReviewStatus::Pending)?;
+        let auto_merged = enum_to_string(&ReviewStatus::AutoMerged)?;
         let mut out = Vec::with_capacity(items.len());
         for item in items {
             // Normalize the pair order so (a, b) and (b, a) share one row
             // under the migration's plain `UNIQUE (course_id, candidate_id)`
             // constraint (T-27).
             let (course_id, candidate_id) = canonical_pair(item.course_id_a, item.course_id_b);
-            // On conflict, refresh only the score-describing columns — the
-            // row's `id`, `status`, `reviewed_by`, and `reviewed_at` are
-            // left untouched, so a re-scan never clobbers a decided item.
+            let status = enum_to_string(&item.status)?;
+            let evidence = item
+                .evidence
+                .as_ref()
+                .map(serde_json::to_value)
+                .transpose()
+                .map_err(|e| crate::Error::Database(format!("serialise evidence: {e}")))?;
+            // On conflict, refresh only the score-describing columns and
+            // the evidence — the row's `id`, `reviewed_by`, and
+            // `reviewed_at` are left untouched, and so is `status`, except
+            // that a `Pending` row this scan auto-merged becomes
+            // `AutoMerged`. A re-scan never clobbers a decided item.
             let row = sqlx::query_as!(
                 ReviewQueueRow,
                 "INSERT INTO course_match_scores
                      (id, course_id, candidate_id, match_score, match_quality, detection_method,
-                      score_breakdown, status, reviewed_by, created_at, reviewed_at)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULL, $9, NULL)
+                      score_breakdown, evidence, status, reviewed_by, created_at, reviewed_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL, $10, NULL)
                  ON CONFLICT (course_id, candidate_id) DO UPDATE SET
                      match_score = EXCLUDED.match_score,
                      match_quality = EXCLUDED.match_quality,
                      detection_method = EXCLUDED.detection_method,
-                     score_breakdown = EXCLUDED.score_breakdown
+                     score_breakdown = EXCLUDED.score_breakdown,
+                     evidence = EXCLUDED.evidence,
+                     status = CASE
+                         WHEN course_match_scores.status = $11 AND EXCLUDED.status = $12
+                         THEN EXCLUDED.status
+                         ELSE course_match_scores.status
+                     END
                  RETURNING id, course_id, candidate_id, match_score, match_quality,
-                           detection_method, score_breakdown, status, reviewed_by,
+                           detection_method, score_breakdown, evidence, status, reviewed_by,
                            created_at, reviewed_at",
                 Uuid::new_v4(),
                 course_id,
@@ -592,8 +608,11 @@ impl CourseRepository for PgCourseRepository {
                 item.match_quality,
                 item.detection_method,
                 item.score_breakdown,
-                pending,
+                evidence,
+                status,
                 Utc::now(),
+                pending,
+                auto_merged,
             )
             .fetch_one(&self.db)
             .await?;
@@ -611,7 +630,7 @@ impl CourseRepository for PgCourseRepository {
         let rows = sqlx::query_as!(
             ReviewQueueRow,
             "SELECT id, course_id, candidate_id, match_score, match_quality, detection_method,
-                    score_breakdown, status, reviewed_by, created_at, reviewed_at
+                    score_breakdown, evidence, status, reviewed_by, created_at, reviewed_at
              FROM course_match_scores
              WHERE ($1::text IS NULL OR status = $1)
              ORDER BY created_at DESC, id ASC
@@ -670,7 +689,7 @@ async fn find_review_row(db: &PgPool, id: Uuid) -> Result<Option<ReviewQueueRow>
     let row = sqlx::query_as!(
         ReviewQueueRow,
         "SELECT id, course_id, candidate_id, match_score, match_quality, detection_method,
-                score_breakdown, status, reviewed_by, created_at, reviewed_at
+                score_breakdown, evidence, status, reviewed_by, created_at, reviewed_at
          FROM course_match_scores
          WHERE id = $1",
         id,
@@ -691,6 +710,11 @@ fn review_row_to_item(row: ReviewQueueRow) -> Result<ReviewQueueItem> {
         match_quality: row.match_quality,
         detection_method: row.detection_method,
         score_breakdown: row.score_breakdown,
+        evidence: row.evidence.and_then(|v| {
+            serde_json::from_value(v)
+                .inspect_err(|e| tracing::warn!(id = %row.id, "unreadable review evidence: {e}"))
+                .ok()
+        }),
         status: enum_from_string(&row.status)?,
         reviewed_by: row.reviewed_by,
         created_at: row.created_at,

@@ -266,3 +266,20 @@
   (`id` is outside the pre-image), tampers with it in SQL, and asserts
   `?limit=3` reports it; it failed before the fix (`verified: true`,
   `mismatched: []`).
+- [x] **T-33 (M) — carry match evidence through the service.**
+  *(Done 2026-11-09; [`match-evidence.md`](../../../agents/share/match-evidence.md)
+  §10 step 4.)* `matching::MatchResult` carries the matcher's evidence
+  through `from_matcher_result` as `MatchEvidence` (an `OpenAPI`-schema'd
+  mirror whose JSON is the matcher's own); `ScoredCandidate` (`409`,
+  match, check-duplicates) and `ReviewQueueItem` return it. The batch
+  scan's auto-merge is now `dedup_disposition`: score at or above
+  `auto_merge_threshold` **and** `proven`, otherwise `Pending`. Merged
+  pairs are stored as `AutoMerged` with their evidence and returned in
+  `auto_merged_items`. Migration `2026110900000001_add_review_evidence`
+  adds `course_match_scores.evidence`. Value frequencies over the
+  course name come from `matching::frequencies` (`CourseFrequencies`,
+  `FrequencyCache`; §6.1). Tests: DB-free disposition, frequency and
+  old-JSON tests; DB tests for a name-only pair kept `Pending` as
+  `consistent`, a shared-DOI pair auto-merged as `proven`, a
+  conflicting-DOI pair kept `Pending` as `contradicted`, and evidence
+  on `check-duplicates` and the `409`.

@@ -70,7 +70,10 @@ Tables (9 core + 7 collection child tables from the
   `course_instance_sessions` — instance collections.
 - `syllabus_sections` — hierarchical (parent_id self-FK).
 - `course_syllabus_text_values` — per-section teaches / resource strings.
-- `course_match_scores` — historical match scores / review queue.
+- `course_match_scores` — historical match scores / review queue. Its
+  nullable `evidence` JSONB column (migration
+  `2026110900000001_add_review_evidence`, §6.1) holds the matcher's
+  evidence for the pair; older rows are `NULL`.
 - `course_merge_records` — merge audit trail with transferred-data snapshot.
 - `audit_log` — HIPAA / FERPA-style trail for who / what / when.
 

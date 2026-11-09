@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
+use crate::matching::MatchEvidence;
+
 /// Lifecycle state of a [`ReviewQueueItem`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum ReviewStatus {
@@ -66,6 +68,10 @@ pub struct ReviewQueueItem {
     /// Optional per-component score breakdown as JSON.
     #[serde(default)]
     pub score_breakdown: Option<serde_json::Value>,
+    /// The matcher's evidence for the pair (`agents/share/match-evidence.md`).
+    /// `None` on rows written before the evidence column existed.
+    #[serde(default)]
+    pub evidence: Option<MatchEvidence>,
     /// Current review state.
     pub status: ReviewStatus,
     /// Actor that reviewed the item, once reviewed.
@@ -89,7 +95,10 @@ pub struct BatchDeduplicationRequest {
     /// Cap on candidate comparisons considered per course.
     #[serde(default = "default_max_candidates")]
     pub max_candidates: u32,
-    /// Score at or above which a pair is auto-merged without review.
+    /// Score at or above which a pair may be auto-merged without review.
+    /// A pair also needs `proven` evidence: a `consistent` or
+    /// `contradicted` pair is queued as `Pending` whatever its score
+    /// (`agents/share/match-evidence.md` §4).
     #[serde(default = "default_auto_merge_threshold")]
     pub auto_merge_threshold: f64,
 }
@@ -126,6 +135,12 @@ pub struct NewReviewItem {
     pub detection_method: String,
     /// Optional per-component score breakdown.
     pub score_breakdown: Option<serde_json::Value>,
+    /// The matcher's evidence for the pair; refreshed on a re-scan.
+    pub evidence: Option<MatchEvidence>,
+    /// `Pending` for a queued pair, `AutoMerged` for one the scan merged.
+    /// A re-scan never changes a stored row's status, except that a
+    /// `Pending` row the scan has now merged becomes `AutoMerged`.
+    pub status: ReviewStatus,
 }
 
 /// Outcome of a decision attempt on one persisted review item (T-27).
@@ -176,6 +191,10 @@ pub struct BatchDeduplicationResponse {
     pub queued_for_review: u64,
     /// The queued items themselves.
     pub review_items: Vec<ReviewQueueItem>,
+    /// The pairs this scan merged, stored as `AutoMerged` with their
+    /// (always `proven`) evidence.
+    #[serde(default)]
+    pub auto_merged_items: Vec<ReviewQueueItem>,
 }
 
 #[cfg(test)]
@@ -216,6 +235,30 @@ mod tests {
             serde_json::to_value(ReviewStatus::AutoMerged).unwrap(),
             serde_json::json!("AutoMerged")
         );
+    }
+
+    /// A review item stored before the evidence column existed (no
+    /// `evidence` key at all) still deserialises, with `evidence: None`.
+    #[test]
+    fn review_item_without_evidence_still_deserialises() {
+        let item: ReviewQueueItem = serde_json::from_value(serde_json::json!({
+            "id": "00000000-0000-0000-0000-000000000001",
+            "course_id_a": "00000000-0000-0000-0000-000000000002",
+            "course_id_b": "00000000-0000-0000-0000-000000000003",
+            "match_score": 0.9,
+            "match_quality": "Medium",
+            "detection_method": "BatchScan",
+            "status": "Pending",
+            "created_at": "2026-01-01T00:00:00Z",
+        }))
+        .unwrap();
+        assert!(item.evidence.is_none());
+        let resp: BatchDeduplicationResponse = serde_json::from_value(serde_json::json!({
+            "courses_scanned": 0, "duplicates_found": 0, "auto_merged": 0,
+            "queued_for_review": 0, "review_items": [],
+        }))
+        .unwrap();
+        assert!(resp.auto_merged_items.is_empty());
     }
 
     /// `reviewed_by` is optional on the wire (omitted ⇒ `None`), matching

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, course_id, candidate_id, match_score, match_quality, detection_method,\n                score_breakdown, status, reviewed_by, created_at, reviewed_at\n         FROM course_match_scores\n         WHERE id = $1",
+  "query": "SELECT id, course_id, candidate_id, match_score, match_quality, detection_method,\n                score_breakdown, evidence, status, reviewed_by, created_at, reviewed_at\n         FROM course_match_scores\n         WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,17 @@
       },
       {
         "ordinal": 7,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "course_match_scores",
+            "name": "evidence"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "status",
         "type_info": "Varchar",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "reviewed_by",
         "type_info": "Varchar",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "reviewed_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -138,11 +149,12 @@
       false,
       false,
       true,
+      true,
       false,
       true,
       false,
       true
     ]
   },
-  "hash": "678e1902ae43291e4d5e2bf9d7b3ab39624afc35e59b4da26e434e28179cc362"
+  "hash": "e4f33f38df3d70a855f08c283fd03c5ce60f7cc875356faa2557797ffc1d69d0"
 }

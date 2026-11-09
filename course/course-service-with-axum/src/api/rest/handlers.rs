@@ -167,6 +167,9 @@ pub struct ScoredCandidate {
     pub confidence: &'static str,
     /// Per-component score breakdown from the matcher.
     pub breakdown: crate::matching::MatchBreakdown,
+    /// How much the compared data proves (`agents/share/match-evidence.md`).
+    /// Component names and bits only, never a field value.
+    pub evidence: crate::matching::MatchEvidence,
 }
 
 // ────────────────── Handlers (FR-1..FR-5, FR-7) ──────────────────
@@ -638,20 +641,10 @@ async fn find_probable_duplicates(
         }
     }
 
+    let frequencies = state.frequencies.current(&state.course_repository).await;
     let mut scored: Vec<ScoredCandidate> = candidates
         .iter()
-        .map(|c| {
-            let r = state.matcher.match_courses(probe, c);
-            ScoredCandidate {
-                course_id: c.id,
-                name: c.name.clone(),
-                course_code: c.course_code.clone(),
-                score: r.score,
-                is_match: r.is_match,
-                confidence: confidence_label(r.confidence),
-                breakdown: r.breakdown,
-            }
-        })
+        .map(|c| scored_candidate(state, probe, c, frequencies.as_ref()))
         .filter(|r| r.is_match)
         .collect();
     scored.sort_by(|a, b| {
@@ -660,6 +653,29 @@ async fn find_probable_duplicates(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
     Ok(scored)
+}
+
+/// Score `candidate` against `probe` and project it onto the wire shape,
+/// evidence included.
+fn scored_candidate(
+    state: &AppState,
+    probe: &Course,
+    candidate: &Course,
+    frequencies: &dyn crate::matching::matcher_lib::ValueFrequencies,
+) -> ScoredCandidate {
+    let r = state
+        .matcher
+        .match_courses_with_frequencies(probe, candidate, frequencies);
+    ScoredCandidate {
+        course_id: candidate.id,
+        name: candidate.name.clone(),
+        course_code: candidate.course_code.clone(),
+        score: r.score,
+        is_match: r.is_match,
+        confidence: confidence_label(r.confidence),
+        breakdown: r.breakdown,
+        evidence: r.evidence,
+    }
 }
 
 /// Map a [`MatchConfidence`](crate::matching::MatchConfidence) band to
@@ -951,20 +967,10 @@ async fn score_all_blocked_candidates(
         }
     }
 
+    let frequencies = state.frequencies.current(&state.course_repository).await;
     let mut scored: Vec<ScoredCandidate> = candidates
         .iter()
-        .map(|c| {
-            let r = state.matcher.match_courses(probe, c);
-            ScoredCandidate {
-                course_id: c.id,
-                name: c.name.clone(),
-                course_code: c.course_code.clone(),
-                score: r.score,
-                is_match: r.is_match,
-                confidence: confidence_label(r.confidence),
-                breakdown: r.breakdown,
-            }
-        })
+        .map(|c| scored_candidate(state, probe, c, frequencies.as_ref()))
         .collect();
     scored.sort_by(|a, b| {
         b.score
@@ -977,8 +983,9 @@ async fn score_all_blocked_candidates(
 // ────────────────── Batch dedup (FR-9) ──────────────────
 
 /// FR-9 — scan every active Course, score against blocked candidates,
-/// auto-merge above `auto_merge_threshold`, queue everything else
-/// above `threshold` for review.
+/// auto-merge a pair at or above `auto_merge_threshold` **with `proven`
+/// evidence**, and queue everything else above `threshold` for review
+/// (`agents/share/match-evidence.md` §4).
 #[utoipa::path(
     post, path = "/api/courses/deduplicate",
     request_body = BatchDeduplicationRequest,
@@ -1028,10 +1035,16 @@ async fn run_batch_dedup(
         auto_merged: 0,
         queued_for_review: 0,
         review_items: Vec::new(),
+        auto_merged_items: Vec::new(),
     };
+    // Value frequencies (match-evidence.md §7), counted from the records
+    // this scan pages through, in a first pass over the same pages.
+    let frequencies =
+        crate::matching::CourseFrequencies::scan(state.course_repository.as_ref()).await?;
     let mut seen_pairs: HashSet<(Uuid, Uuid)> = HashSet::new();
     let mut soft_deleted: HashSet<Uuid> = HashSet::new();
     let mut pending_items: Vec<NewReviewItem> = Vec::new();
+    let mut merged_items: Vec<NewReviewItem> = Vec::new();
     let mut offset: u64 = 0;
 
     loop {
@@ -1067,25 +1080,34 @@ async fn run_batch_dedup(
                     continue;
                 };
 
-                let r = state.matcher.match_courses(probe, &candidate);
-                if r.score < req.threshold {
+                let r =
+                    state
+                        .matcher
+                        .match_courses_with_frequencies(probe, &candidate, &frequencies);
+                let disposition = dedup_disposition(
+                    r.score,
+                    &r.evidence,
+                    req.threshold,
+                    req.auto_merge_threshold,
+                );
+                if disposition == DedupDisposition::Skip {
                     continue;
                 }
                 response.duplicates_found += 1;
 
-                if r.score >= req.auto_merge_threshold {
+                let status = if disposition == DedupDisposition::AutoMerge {
                     auto_merge(state, probe, &candidate, r.score).await?;
                     soft_deleted.insert(candidate.id);
                     response.auto_merged += 1;
+                    ReviewStatus::AutoMerged
                 } else {
-                    pending_items.push(NewReviewItem {
-                        course_id_a: probe.id,
-                        course_id_b: candidate.id,
-                        match_score: r.score,
-                        match_quality: confidence_label(r.confidence).to_string(),
-                        detection_method: "BatchScan".to_string(),
-                        score_breakdown: serde_json::to_value(&r.breakdown).ok(),
-                    });
+                    ReviewStatus::Pending
+                };
+                let item = batch_review_item(probe.id, candidate.id, r, status);
+                if status == ReviewStatus::AutoMerged {
+                    merged_items.push(item);
+                } else {
+                    pending_items.push(item);
                 }
             }
         }
@@ -1110,8 +1132,65 @@ async fn run_batch_dedup(
         response.queued_for_review += stored.len() as u64;
         response.review_items = stored;
     }
+    // The merged pairs are stored too, as `AutoMerged`, so the evidence
+    // that justified each automatic merge stays on record.
+    if !merged_items.is_empty() {
+        response.auto_merged_items = state
+            .course_repository
+            .upsert_review_items(&merged_items)
+            .await?;
+    }
 
     Ok(response)
+}
+
+/// The review-queue row for one batch-scanned pair, evidence included.
+fn batch_review_item(
+    a: Uuid,
+    b: Uuid,
+    r: crate::matching::MatchResult,
+    status: ReviewStatus,
+) -> NewReviewItem {
+    NewReviewItem {
+        course_id_a: a,
+        course_id_b: b,
+        match_score: r.score,
+        match_quality: confidence_label(r.confidence).to_string(),
+        detection_method: "BatchScan".to_string(),
+        score_breakdown: serde_json::to_value(&r.breakdown).ok(),
+        evidence: Some(r.evidence),
+        status,
+    }
+}
+
+/// What the batch scan does with one scored pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DedupDisposition {
+    /// Below `threshold`: not a candidate.
+    Skip,
+    /// Queued as `Pending` for a person to decide.
+    Review,
+    /// Merged automatically.
+    AutoMerge,
+}
+
+/// The batch-scan decision. A pair is merged automatically only when
+/// its score reaches `auto_merge_threshold` **and** its evidence is
+/// `proven`; a `consistent` or `contradicted` pair goes to review
+/// whatever its score (`agents/share/match-evidence.md` §4).
+fn dedup_disposition(
+    score: f64,
+    evidence: &crate::matching::MatchEvidence,
+    threshold: f64,
+    auto_merge_threshold: f64,
+) -> DedupDisposition {
+    if score < threshold {
+        DedupDisposition::Skip
+    } else if score >= auto_merge_threshold && evidence.permits_auto_merge() {
+        DedupDisposition::AutoMerge
+    } else {
+        DedupDisposition::Review
+    }
 }
 
 /// Auto-merge `duplicate` into `main` inside the batch scan. Mirrors
@@ -1746,64 +1825,39 @@ mod tests {
         assert_eq!(canonical_pair(a, a), (a, a));
     }
 
-    /// The batch-dedup classification (FR-9) routes each scored candidate
-    /// pair by the same comparison the `deduplicate` handler applies:
-    /// below `threshold` → skipped; in `[threshold, auto_merge_threshold)`
-    /// → review queue (`Pending`); at/above `auto_merge_threshold` →
-    /// auto-merge. This pins the boundary semantics (half-open lower band,
-    /// closed auto-merge cutoff) DB-free, independently of the live scan.
+    /// The batch-dedup classification (FR-9): below `threshold` →
+    /// skipped; in `[threshold, auto_merge_threshold)` → review; at or
+    /// above `auto_merge_threshold` → auto-merge **only with `proven`
+    /// evidence**. Pins the boundary semantics (half-open lower band,
+    /// closed auto-merge cutoff) and the evidence gate DB-free.
     #[test]
-    fn batch_dedup_classifies_by_threshold_bands() {
-        /// Mirror of the inline branching in `deduplicate`: returns the
-        /// disposition for a candidate score against the two cutoffs.
-        #[derive(Debug, PartialEq)]
-        enum Disposition {
-            Skip,
-            ReviewQueue,
-            AutoMerge,
-        }
-        fn classify(score: f64, threshold: f64, auto_merge_threshold: f64) -> Disposition {
-            if score < threshold {
-                Disposition::Skip
-            } else if score >= auto_merge_threshold {
-                Disposition::AutoMerge
-            } else {
-                Disposition::ReviewQueue
-            }
-        }
-
-        let (lo, hi) = (0.80_f64, 0.95_f64);
-        // Below the lower threshold → skipped.
-        assert_eq!(classify(0.50, lo, hi), Disposition::Skip);
-        assert_eq!(classify(0.79, lo, hi), Disposition::Skip);
-        // At the lower threshold (inclusive) → review queue.
-        assert_eq!(classify(0.80, lo, hi), Disposition::ReviewQueue);
-        assert_eq!(classify(0.94, lo, hi), Disposition::ReviewQueue);
-        // At/above the auto-merge cutoff (inclusive) → auto-merge.
-        assert_eq!(classify(0.95, lo, hi), Disposition::AutoMerge);
-        assert_eq!(classify(1.00, lo, hi), Disposition::AutoMerge);
-
-        // A review-queue disposition is the one that materialises a
-        // `ReviewQueueItem { status: Pending, … }` in the response body.
-        assert_eq!(
-            classify(0.85, lo, hi),
-            Disposition::ReviewQueue,
-            "mid-band scores must enqueue for review, not auto-merge",
-        );
-        let item = ReviewQueueItem {
-            id: Uuid::from_u128(1),
-            course_id_a: Uuid::from_u128(2),
-            course_id_b: Uuid::from_u128(3),
-            match_score: 0.85,
-            match_quality: "probable".into(),
-            detection_method: "BatchScan".into(),
-            score_breakdown: None,
-            status: ReviewStatus::Pending,
-            reviewed_by: None,
-            created_at: chrono::Utc::now(),
-            reviewed_at: None,
+    fn batch_dedup_classifies_by_threshold_bands_and_evidence() {
+        use crate::matching::{EvidenceStrength, MatchEvidence};
+        let with = |strength| MatchEvidence {
+            strength,
+            ..MatchEvidence::default()
         };
-        assert_eq!(item.status, ReviewStatus::Pending);
-        assert_eq!(item.detection_method, "BatchScan");
+        let proven = with(EvidenceStrength::Proven);
+        let classify = |score: f64, e: &MatchEvidence| dedup_disposition(score, e, 0.80, 0.95);
+
+        assert_eq!(classify(0.50, &proven), DedupDisposition::Skip);
+        assert_eq!(classify(0.79, &proven), DedupDisposition::Skip);
+        assert_eq!(classify(0.80, &proven), DedupDisposition::Review);
+        assert_eq!(classify(0.94, &proven), DedupDisposition::Review);
+        assert_eq!(classify(0.95, &proven), DedupDisposition::AutoMerge);
+        assert_eq!(classify(1.00, &proven), DedupDisposition::AutoMerge);
+
+        // Above the cutoff, only `proven` merges.
+        for strength in [
+            EvidenceStrength::Consistent,
+            EvidenceStrength::Contradicted,
+            EvidenceStrength::NonMatch,
+        ] {
+            assert_eq!(
+                classify(1.00, &with(strength)),
+                DedupDisposition::Review,
+                "{strength:?} must go to review, not auto-merge"
+            );
+        }
     }
 }

@@ -124,6 +124,11 @@ spec.md FR-19.
 | GET | `/api/courses/review-queue` | Persisted review queue (`?status=&limit=`, `status`/`limit` optional) |
 | POST | `/api/courses/review-queue/{id}/decision` | Decide a `Pending` item (`{"status": "Confirmed" \| "Rejected", "reviewed_by": Option<String>}`); first-writer-wins — `422` if already decided, `404` if unknown |
 
+Every scored candidate and review item carries the matcher's
+`evidence` (`weight_bits`, `fields_compared`, `contradictions`,
+`strength`, `components`). The batch scan auto-merges only a `proven`
+pair at or above `auto_merge_threshold`; see spec §6.1.
+
 Blocking: by `name` (FuzzyTermQuery, multi-token) AND/OR by
 `(provider_id, course_code)` when both present.
 

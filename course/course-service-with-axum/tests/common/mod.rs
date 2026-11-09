@@ -118,3 +118,22 @@ pub async fn seed_course(state: &course_service::api::rest::AppState, name: &str
         .expect("index seeded course");
     created.id
 }
+
+/// Seed `course` as given (identifiers and all) directly through the
+/// repository + search index, bypassing the create endpoint's duplicate
+/// check, as [`seed_course`] does for a bare name.
+pub async fn seed_full_course(
+    state: &course_service::api::rest::AppState,
+    course: &course_service::models::Course,
+) -> uuid::Uuid {
+    let created = state
+        .course_repository
+        .create(course)
+        .await
+        .expect("seed course directly via the repository");
+    state
+        .search_engine
+        .index_course(&created)
+        .expect("index seeded course");
+    created.id
+}

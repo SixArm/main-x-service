@@ -125,3 +125,12 @@ single-handedly mints a High-confidence classification.
 
 Soundex is initial-letter-preserving: `Smyth ↔ Smith` matches
 (both `S530`); `Catherine ↔ Katheryn` does not.
+
+## Evidence and the auto-merge gate
+
+Beside `score`, every match result carries the matcher's Fellegi–Sunter
+`evidence` (`src/matching/evidence.rs`), and the batch scan auto-merges a
+pair only when it is `proven` as well as above `auto_merge_threshold`.
+Agreement on the course name is weighed by the name's own frequency in
+the registry (`src/matching/frequencies.rs`) once it holds 1 000 or more
+courses. See spec §6.1 and `agents/share/match-evidence.md`.
