@@ -147,7 +147,10 @@ pub mod normalizer;
 pub mod scorer;
 
 pub use error::{MatchingError, Result};
-pub use evidence::{Contradiction, Evidence, MatchStrength};
+pub use evidence::{
+    ComponentBits, Contradiction, Evidence, FrequencyTable, MatchStrength, NoFrequencies,
+    ValueFrequencies,
+};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
 pub use models::{
     Address, BloodType, Gender, PassportBook, RelationKind, RelationshipRef, Worker, WorkerBuilder,

@@ -13,8 +13,10 @@
 
 use chrono::NaiveDate;
 use proptest::prelude::*;
+use worker_matcher::evidence::frequency_key;
 use worker_matcher::{
-    Confidence, Gender, MatchConfig, MatchStrength, MatchingEngine, Normalizer, Worker,
+    Confidence, FrequencyTable, Gender, MatchConfig, MatchStrength, MatchingEngine, Normalizer,
+    Worker,
 };
 
 // ---------- Strategies ----------
@@ -278,5 +280,35 @@ proptest! {
             MatchStrength::NonMatch
         };
         prop_assert_eq!(e.strength, expected);
+        let sum: f64 = e.components.iter().map(|t| t.bits).sum();
+        prop_assert!((sum - e.weight_bits).abs() < 1e-9, "terms {} != weight {}", sum, e.weight_bits);
+    }
+
+    /// The listed terms MUST add up to `weight_bits`, with or without value
+    /// frequencies (agents/share/match-evidence.md §8), and frequencies MUST
+    /// leave `score` / `is_match` / `confidence` untouched.
+    #[test]
+    fn evidence_terms_sum_to_weight_bits(
+        p1 in worker_strategy(),
+        p2 in worker_strategy(),
+        share in 0.0f64..=1.0,
+    ) {
+        let mut table = FrequencyTable::new();
+        for (component, worker) in [("family_name", &p1), ("given_name", &p2)] {
+            let raw = if component == "family_name" { &worker.family_name } else { &worker.given_name };
+            if let Some(key) = raw.as_deref().and_then(|r| frequency_key(component, r)) {
+                table.insert(component, &key, share);
+            }
+        }
+        let engine = MatchingEngine::default_config();
+        let plain = engine.match_workers(&p1, &p2);
+        let r = engine.match_workers_with_frequencies(&p1, &p2, &table);
+        let e = &r.evidence;
+        let sum: f64 = e.components.iter().map(|t| t.bits).sum();
+        prop_assert!(e.weight_bits.is_finite());
+        prop_assert!((sum - e.weight_bits).abs() < 1e-9, "terms {} != weight {}", sum, e.weight_bits);
+        prop_assert!((r.score - plain.score).abs() < f64::EPSILON);
+        prop_assert_eq!(r.is_match, plain.is_match);
+        prop_assert_eq!(r.confidence, plain.confidence);
     }
 }

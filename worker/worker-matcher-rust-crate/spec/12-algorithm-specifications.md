@@ -49,7 +49,7 @@ The per-component `m`/`u` table (informed estimates, not measurements; `src/evid
 | Component | `m` | `u` | agree bits | disagree bits |
 |---|---|---|---|---|
 | given name | 0.95 | 0.02 | 5.57 | −4.29 |
-| family name | 0.95 | 0.01 | 6.57 | −4.31 |
+| family name | 0.95 | 0.005 | 7.57 | −4.31 |
 | date of birth | 0.97 | 1/14 600 | 13.79 | −5.06 |
 | gender | 0.98 | 0.5 | 0.97 | −4.64 |
 | blood type | 0.98 | 0.25 | 1.97 | −5.23 |
@@ -62,6 +62,44 @@ The per-component `m`/`u` table (informed estimates, not measurements; `src/evid
 | email | 0.85 | 1e-5 | 16.38 | −2.74 |
 | relationships | 0.60 | 0.10 | 2.58 | −1.17 |
 | tags | 0.60 | 0.20 | 1.58 | −1.00 |
-| phonetic name | 0.90 | 0.50 | 0.85 | −2.32 |
 
-Consequence: an identical name + DOB + gender record, which is `is_match` and fires the demographic-tuple branch, totals ≈ 27.7 bits with the phonetic component — `Consistent`, not `Proven`, since twins look the same. Adding address, phone or email to an identical pair clears the default 30-bit bar.
+The phonetic-name component is **not** summed: it is derived from the two name components, so counting it would count the names twice (contract §6). It still lifts `score` (§12.3). Family-name `u` was `0.01` in T-38 and is `0.005` since T-39: the sum of squared surname shares, so a common surname with its own share of `0.01` (§12.9) is weaker than the average.
+
+Consequences at defaults (T-39):
+
+| Identical pair holding | Bits | Strength |
+|---|---|---|
+| given + family + DOB + gender | 27.90 | `Consistent` |
+| … + blood type | 29.87 | `Consistent` — just under the bar on purpose: nothing here rules out two workers with a common name born the same day; one more independent field clears it |
+| … + address, birth place, phone, email | ≈ 70 | `Proven` |
+| address + phone only | 19.54 | not `Proven` (§12.8) |
+| family name + address + phone | 27.11 | not `Proven`; ungrouped it would be 33.6 |
+
+### 12.8 Correlated Components (T-39)
+
+Per contract §6, `CORRELATED_GROUPS` (public contract, `src/evidence.rs`) lists components that are not independent given the match status. Within a group the present member with the largest absolute bits (ties to the larger value) counts in full and every other present member at `CORRELATED_DISCOUNT = 0.5`, for agreement and disagreement alike; the result does not depend on component order. The groups are disjoint.
+
+| Group | Why |
+|---|---|
+| `address`, `phone` | A household's landline is recorded with, and moves with, its address. Two people in one house agree on both for one reason, and a move makes both disagree for one reason. |
+| `death_date`, `death_place` | Both come from one death registration. |
+
+`birth_place` + `address` is **not** grouped: they are recorded separately and at different times, and the address comparison is postcode-and-street led, which a birth city does not predict. Name, birth date and gender stay independent of each other.
+
+### 12.9 Common and Rare Values (T-39)
+
+Per contract §7, `MatchingEngine::match_workers_with_frequencies(a, b, &dyn ValueFrequencies)` adjusts the agreement weight of each `FREQUENCY_COMPONENTS` entry when both workers hold the **same** key and the source knows its share: the bits are `frequency_bits(m, share) = log2(m / clamp(share, MIN_SHARE = 1e-9, m))` in place of the table's `u`, so a share at or above `m` gives `0`, never negative. Partial agreement (e.g. "Prichard" vs "Pritchard", a nickname boost) and disagreement are not adjusted. `match_workers` uses `NoFrequencies`, so plain calls see the §12.7 table exactly. `score`, `is_match`, `confidence` and `breakdown` are identical with or without frequencies. `FrequencyTable` (`new`, `from_counts(counts, total)` → `count / total`, `insert(component, value, share)`) is an in-memory source.
+
+The frequency components and their keys are public contract; `frequency_key(component, raw)` returns exactly the key the matcher looks up:
+
+| Component | Key |
+|---|---|
+| `given_name` | `Normalizer::normalize_name` (lowercase, diacritics and punctuation stripped, whitespace collapsed); `None` if empty. The middle name is not part of the key. |
+| `family_name` | as `given_name` |
+| `date_of_birth` | ISO 8601 `YYYY-MM-DD`; `raw` must parse as one |
+
+Examples: a family name with share `0.01` gives 6.57 bits against the table's 7.57; one with share `1e-6` gives 19.86. A placeholder birth date such as `1900-01-01` held by 30% of records gives 1.69 bits against the table's 13.79.
+
+### 12.10 Per-Term Listing (T-39)
+
+Per contract §8, `Evidence.components: Vec<ComponentBits>` lists every term of the sum, in order: `"identifier"` (when shared), one `"contradiction:identifier:<scheme>"` per contradiction, then each compared component by its `COMPONENTS` name, with `bits` after any discount, `correlated` (a discounted non-strongest group member) and `frequency_adjusted`. The terms add up to `weight_bits`; a property test checks it.

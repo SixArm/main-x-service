@@ -13,6 +13,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
 
+### Added — correlated groups, value frequencies and per-term evidence (T-39)
+
+Per `agents/share/match-evidence.md` §6–§8. Correlated components
+(`CORRELATED_GROUPS`: address + phone, death date + death place) count
+their strongest member in full and the rest at `CORRELATED_DISCOUNT`
+(0.5), so a household's shared address and landline are one piece of
+evidence. New `MatchingEngine::match_workers_with_frequencies` takes a
+`ValueFrequencies` source (`NoFrequencies`, `FrequencyTable`) and weighs
+an exact agreement on given name, family name or date of birth by the
+value's own share (`frequency_bits`, `MIN_SHARE`); `frequency_key`
+returns the key the matcher looks up. `Evidence.components` lists every
+term of the sum (`ComponentBits`), adding up to `weight_bits`.
+`ComponentBits`, `FrequencyTable`, `NoFrequencies` and
+`ValueFrequencies` are re-exported from the root. `match_workers`, and
+`score` / `is_match` / `confidence` everywhere, are unchanged.
+
+### Changed — evidence weights (T-39)
+
+- The phonetic-name component is no longer summed into the evidence: it
+  is derived from the names (contract §6). It still lifts `score`.
+- Family-name `u` 0.01 → 0.005. Identical name + DOB + gender is now
+  27.90 bits (was ≈ 27.7), still `Consistent`; adding blood type gives
+  29.87, still `Consistent`.
+
 ### Added — match evidence beside the similarity score (T-38)
 
 `MatchResult` gains `evidence: Evidence` (`#[serde(default)]`):

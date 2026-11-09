@@ -893,6 +893,41 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_workers(&self, worker1: &Worker, worker2: &Worker) -> MatchResult {
+        self.match_workers_with_frequencies(worker1, worker2, &evidence::NoFrequencies)
+    }
+
+    /// [`Self::match_workers`], with value frequencies for the evidence.
+    ///
+    /// For each component in [`evidence::FREQUENCY_COMPONENTS`] on which
+    /// the two workers hold the **same** [`evidence::frequency_key`], and
+    /// for which `frequencies` knows the value's share, the agreement
+    /// weight is [`evidence::frequency_bits`] of that share in place of the
+    /// table's `u` (`agents/share/match-evidence.md` §7). Partial agreement
+    /// and disagreement are not adjusted. `score`, `is_match`,
+    /// `confidence` and `breakdown` are exactly those of
+    /// [`Self::match_workers`]; only `evidence` can differ.
+    ///
+    /// ```
+    /// use worker_matcher::evidence::{frequency_key, FrequencyTable};
+    /// use worker_matcher::{MatchingEngine, Worker};
+    ///
+    /// let a = Worker::builder().given_name("John").family_name("Smith").build();
+    /// let mut table = FrequencyTable::new();
+    /// table.insert("family_name", &frequency_key("family_name", "Smith").unwrap(), 0.01);
+    ///
+    /// let engine = MatchingEngine::default_config();
+    /// let plain = engine.match_workers(&a, &a.clone());
+    /// let common = engine.match_workers_with_frequencies(&a, &a.clone(), &table);
+    /// assert_eq!(plain.score, common.score);
+    /// assert!(common.evidence.weight_bits < plain.evidence.weight_bits);
+    /// ```
+    #[must_use]
+    pub fn match_workers_with_frequencies(
+        &self,
+        worker1: &Worker,
+        worker2: &Worker,
+        frequencies: &dyn evidence::ValueFrequencies,
+    ) -> MatchResult {
         let breakdown = self.calculate_breakdown(worker1, worker2);
         let score = self.calculate_weighted_score(&breakdown);
         let above_threshold = score >= self.config.match_threshold;
@@ -907,7 +942,8 @@ impl MatchingEngine {
             above_threshold
         };
         let confidence = Confidence::from_score(score);
-        let evidence = self.calculate_evidence(worker1, worker2, &breakdown, is_match);
+        let overrides = frequency_overrides(worker1, worker2, frequencies);
+        let evidence = self.calculate_evidence(worker1, worker2, &breakdown, is_match, &overrides);
 
         MatchResult {
             score,
@@ -929,15 +965,17 @@ impl MatchingEngine {
         worker2: &Worker,
         breakdown: &MatchBreakdown,
         is_match: bool,
+        overrides: &[(&str, f64)],
     ) -> Evidence {
+        let proof_bits = self.config.proof_bits;
         if breakdown.address_score.is_some() && !addresses_comparable(worker1, worker2) {
             let without_address = MatchBreakdown {
                 address_score: None,
                 ..breakdown.clone()
             };
-            evidence::evaluate(&without_address, is_match, self.config.proof_bits)
+            evidence::evaluate_adjusted(&without_address, is_match, proof_bits, overrides)
         } else {
-            evidence::evaluate(breakdown, is_match, self.config.proof_bits)
+            evidence::evaluate_adjusted(breakdown, is_match, proof_bits, overrides)
         }
     }
 
@@ -1858,6 +1896,38 @@ impl MatchingEngine {
         let family_name_match = f64::from(p1_family_name_phonetic == p2_family_name_phonetic);
         Some(f64::midpoint(given_name_match, family_name_match))
     }
+}
+
+/// The frequency-adjusted agreement weights for one pair: for each
+/// [`evidence::FREQUENCY_COMPONENTS`] entry on which both workers hold the
+/// same [`evidence::frequency_key`] and `frequencies` knows its share,
+/// `(component, frequency_bits(m, share))`.
+fn frequency_overrides(
+    worker1: &Worker,
+    worker2: &Worker,
+    frequencies: &dyn evidence::ValueFrequencies,
+) -> Vec<(&'static str, f64)> {
+    let raw = |w: &Worker, component: &str| -> Option<String> {
+        match component {
+            "given_name" => w.given_name.clone(),
+            "family_name" => w.family_name.clone(),
+            "date_of_birth" => w.date_of_birth.map(|d| d.format("%Y-%m-%d").to_string()),
+            _ => None,
+        }
+    };
+    let mut out = Vec::new();
+    for component in evidence::FREQUENCY_COMPONENTS {
+        let key1 = raw(worker1, component).and_then(|r| evidence::frequency_key(component, &r));
+        let key2 = raw(worker2, component).and_then(|r| evidence::frequency_key(component, &r));
+        if let (Some(k1), Some(k2)) = (key1, key2)
+            && k1 == k2
+            && let Some(share) = frequencies.share(component, &k1)
+            && let Some(mu) = evidence::component_weights(component)
+        {
+            out.push((component, evidence::frequency_bits(mu.m, share)));
+        }
+    }
+    out
 }
 
 /// `true` iff some address pair (current or previous, either side) has at
@@ -3139,8 +3209,8 @@ mod tests {
         assert!(r.is_match);
         assert_eq!(r.evidence.strength, crate::MatchStrength::Consistent);
         assert!(r.evidence.contradictions.is_empty());
-        // given + family + DOB + gender + phonetic.
-        assert_eq!(r.evidence.fields_compared, 5);
+        // given + family + DOB + gender (phonetic is derived, not summed).
+        assert_eq!(r.evidence.fields_compared, 4);
         assert!(r.evidence.weight_bits > 20.0);
         assert!(r.evidence.weight_bits < MatchConfig::default().proof_bits);
     }
@@ -3288,5 +3358,197 @@ mod tests {
     fn config_without_proof_bits_defaults_to_thirty() {
         let c: MatchConfig = serde_json::from_str(r#"{"match_threshold":0.9}"#).unwrap();
         approx(c.proof_bits, 30.0);
+    }
+
+    // ---------- evidence phase 2: groups, frequencies, terms ----------
+
+    use crate::evidence::{FrequencyTable, NoFrequencies, frequency_key};
+
+    fn household_member(given: &str, born: NaiveDate) -> Worker {
+        Worker::builder()
+            .given_name(given)
+            .family_name("Pritchard")
+            .date_of_birth(born)
+            .address(
+                Address::new()
+                    .with_line1("12 Castle Street")
+                    .with_city("Cardiff")
+                    .with_postcode("CF10 1AA"),
+            )
+            .phone("029 2000 0000")
+            .build()
+    }
+
+    #[test]
+    fn evidence_household_address_and_phone_alone_is_not_proven() {
+        // Two people known only by the house they share: address and
+        // landline agree for one reason. Summed independently they would
+        // give ~26 bits; grouped they give ~19.5.
+        let a = Worker::builder()
+            .address(
+                Address::new()
+                    .with_postcode("CF10 1AA")
+                    .with_line1("12 Castle Street"),
+            )
+            .phone("029 2000 0000")
+            .build();
+        let r = MatchingEngine::default_config().match_workers(&a, &a.clone());
+        assert_ne!(r.evidence.strength, crate::MatchStrength::Proven);
+        assert!(r.evidence.weight_bits < 20.0, "{}", r.evidence.weight_bits);
+    }
+
+    #[test]
+    fn evidence_household_with_shared_surname_is_not_proven() {
+        // Same surname, address and phone, nothing else held: the case the
+        // address+phone group exists for. Ungrouped this sums to ~33.6
+        // bits and would be Proven; grouped it is ~27.1.
+        let a = Worker::builder()
+            .family_name("Pritchard")
+            .address(
+                Address::new()
+                    .with_postcode("CF10 1AA")
+                    .with_line1("12 Castle Street"),
+            )
+            .phone("029 2000 0000")
+            .build();
+        let r = MatchingEngine::default_config().match_workers(&a, &a.clone());
+        assert_ne!(r.evidence.strength, crate::MatchStrength::Proven);
+        let ungrouped: f64 = r
+            .evidence
+            .components
+            .iter()
+            .map(|t| if t.correlated { t.bits * 2.0 } else { t.bits })
+            .sum();
+        assert!(ungrouped >= MatchConfig::default().proof_bits);
+        assert!(r.evidence.weight_bits < MatchConfig::default().proof_bits);
+    }
+
+    #[test]
+    fn evidence_two_people_in_one_household_are_not_a_match() {
+        let a = household_member("Carys", dob(1985, 1, 1));
+        let b = household_member("Gareth", dob(1958, 7, 30));
+        let r = MatchingEngine::default_config().match_workers(&a, &b);
+        assert_ne!(r.evidence.strength, crate::MatchStrength::Proven);
+        assert!(!r.is_match);
+        assert!(r.evidence.weight_bits < 20.0, "{}", r.evidence.weight_bits);
+    }
+
+    #[test]
+    fn evidence_name_dob_gender_blood_type_is_consistent_at_defaults() {
+        // given 5.57 + family 7.57 + DOB 13.79 + gender 0.97 + blood type
+        // 1.97 = 29.87 bits, just under the 30-bit bar. Deliberately so:
+        // identical twins differ in given name, but a pair agreeing on
+        // name, DOB, gender and a quarter-of-the-population blood type has
+        // nothing that rules out two different workers with a common name
+        // born the same day. One more independent field (address, phone,
+        // email, birth place) clears the bar.
+        let a = Worker {
+            blood_type: Some(crate::models::BloodType::OPositive),
+            ..sparse_worker()
+        };
+        let r = MatchingEngine::default_config().match_workers(&a, &a.clone());
+        approx_tol(r.evidence.weight_bits, 29.87, 0.01);
+        assert_eq!(r.evidence.strength, crate::MatchStrength::Consistent);
+    }
+
+    fn approx_tol(a: f64, b: f64, tol: f64) {
+        assert!((a - b).abs() < tol, "{a} != {b}");
+    }
+
+    #[test]
+    fn evidence_terms_sum_to_weight_bits() {
+        let a = household_member("Carys", dob(1985, 1, 1));
+        let r = MatchingEngine::default_config().match_workers(&a, &a.clone());
+        let sum: f64 = r.evidence.components.iter().map(|t| t.bits).sum();
+        approx(sum, r.evidence.weight_bits);
+    }
+
+    #[test]
+    fn frequencies_common_and_rare_family_names() {
+        let p = sparse_worker();
+        let key = frequency_key("family_name", "Pritchard").unwrap();
+        let engine = MatchingEngine::default_config();
+        let plain = engine.match_workers(&p, &p.clone());
+        let mut common = FrequencyTable::new();
+        common.insert("family_name", &key, 0.01);
+        let mut rare = FrequencyTable::new();
+        rare.insert("family_name", &key, 1e-6);
+        let c = engine.match_workers_with_frequencies(&p, &p.clone(), &common);
+        let r = engine.match_workers_with_frequencies(&p, &p.clone(), &rare);
+        let fam = |e: &Evidence| {
+            e.components
+                .iter()
+                .find(|t| t.component == "family_name")
+                .unwrap()
+                .clone()
+        };
+        assert!(fam(&c.evidence).bits < fam(&plain.evidence).bits);
+        assert!(fam(&r.evidence).bits > fam(&plain.evidence).bits);
+        assert!(fam(&c.evidence).frequency_adjusted);
+        assert!(!fam(&plain.evidence).frequency_adjusted);
+        // score, is_match and confidence are untouched.
+        assert!((c.score - plain.score).abs() < f64::EPSILON);
+        assert_eq!(c.is_match, plain.is_match);
+        assert_eq!(c.confidence, plain.confidence);
+    }
+
+    #[test]
+    fn frequencies_placeholder_birth_date_proves_next_to_nothing() {
+        // 1900-01-01 is a placeholder for an unknown birth date; say 30%
+        // of records carry it. Agreeing on it is worth ~1.7 bits, not the
+        // table's ~13.8.
+        let p = Worker {
+            date_of_birth: Some(dob(1900, 1, 1)),
+            ..sparse_worker()
+        };
+        let mut table = FrequencyTable::new();
+        table.insert(
+            "date_of_birth",
+            &frequency_key("date_of_birth", "1900-01-01").unwrap(),
+            0.3,
+        );
+        let engine = MatchingEngine::default_config();
+        let r = engine.match_workers_with_frequencies(&p, &p.clone(), &table);
+        let dob_term = r
+            .evidence
+            .components
+            .iter()
+            .find(|t| t.component == "date_of_birth")
+            .unwrap();
+        assert!(dob_term.frequency_adjusted);
+        assert!(dob_term.bits < 2.0, "{}", dob_term.bits);
+        let plain = engine.match_workers(&p, &p.clone());
+        assert!(r.evidence.weight_bits < plain.evidence.weight_bits - 10.0);
+    }
+
+    #[test]
+    fn frequencies_do_not_adjust_partial_agreement_or_disagreement() {
+        let a = sparse_worker();
+        let mut table = FrequencyTable::new();
+        for name in ["pritchard", "prichard", "jones"] {
+            table.insert("family_name", name, 1e-6);
+        }
+        let engine = MatchingEngine::default_config();
+        for other in ["Prichard", "Jones"] {
+            let b = Worker {
+                family_name: Some(other.into()),
+                ..sparse_worker()
+            };
+            let plain = engine.match_workers(&a, &b);
+            let freq = engine.match_workers_with_frequencies(&a, &b, &table);
+            assert_eq!(plain.evidence, freq.evidence, "{other}");
+        }
+    }
+
+    #[test]
+    fn frequencies_none_equals_match_workers() {
+        let a = household_member("Carys", dob(1985, 1, 1));
+        let b = household_member("Carys", dob(1985, 1, 2));
+        let engine = MatchingEngine::default_config();
+        let plain = engine.match_workers(&a, &b);
+        let none = engine.match_workers_with_frequencies(&a, &b, &NoFrequencies);
+        assert_eq!(plain.evidence, none.evidence);
+        assert!((plain.score - none.score).abs() < f64::EPSILON);
+        assert_eq!(plain.is_match, none.is_match);
     }
 }
