@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — correlated groups, value frequencies, per-term evidence (2026-11-09)
+
+Per `agents/share/match-evidence.md` §6–§8 and spec §5.12.1–§5.12.4.
+
+- `CORRELATED_GROUPS`: `{image, main_entity_of_page}` (scraped from one
+  page) and `{description, disambiguating_description}` (one source's
+  text), discounted at `CORRELATED_DISCOUNT = 0.5` after each group's
+  strongest member via `group_bits` / `strongest_first`.
+- `ValueFrequencies`, `NoFrequencies`, `FrequencyTable`
+  (`from_counts`, `insert`), `MIN_SHARE`, `frequency_bits`,
+  `FREQUENCY_COMPONENTS = ["name"]` and `frequency_key`; new
+  `MatchingEngine::match_things_with_frequencies`. `match_things` is that
+  call with `NoFrequencies`.
+- `Evidence::components: Vec<ComponentBits>` (`#[serde(default)]`), every
+  term of the sum including `identifier` and
+  `contradiction:identifier:<scheme>`; `weight_bits` is exactly their
+  sum.
+
+### Changed — evidence weights (2026-11-09)
+
+- `name_phonetic_score` no longer adds evidence bits (it is derived from
+  the name). The grouped components now count less: an identical
+  record with every non-identity field drops from `≈ 58.0` to `≈ 49.7`
+  bits (still `Proven`). `score`, `is_match` and `confidence` are
+  unchanged.
+
 ### Added — match evidence (2026-11-09)
 
 - `MatchResult::evidence` (`#[serde(default)]`): Fellegi–Sunter

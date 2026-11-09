@@ -8,8 +8,10 @@
 //! names, sparse / dense `Thing` records.
 
 use proptest::prelude::*;
+use thing_matcher::evidence::frequency_key;
 use thing_matcher::{
-    Confidence, Identifier, MatchConfig, MatchStrength, MatchingEngine, Normalizer, Thing,
+    Confidence, FrequencyTable, Identifier, MatchConfig, MatchStrength, MatchingEngine, Normalizer,
+    Thing,
 };
 
 // ---------- Strategies ----------
@@ -273,5 +275,31 @@ proptest! {
             MatchStrength::NonMatch
         };
         prop_assert_eq!(e.strength, expected);
+    }
+
+    /// The per-term listing MUST sum exactly to `weight_bits`
+    /// (agents/share/match-evidence.md §8).
+    #[test]
+    fn evidence_components_sum_to_weight_bits(
+        p1 in thing_strategy(),
+        p2 in thing_strategy(),
+        ids1 in prop::collection::vec(("[ab]", "[0-9]{1,2}"), 0..3),
+        ids2 in prop::collection::vec(("[ab]", "[0-9]{1,2}"), 0..3),
+        share in prop::option::of(0.0f64..=1.0),
+    ) {
+        let mut p1 = p1;
+        let mut p2 = p2;
+        p1.identifiers = ids1.into_iter().filter_map(|(k, v)| Identifier::new(k, v)).collect();
+        p2.identifiers = ids2.into_iter().filter_map(|(k, v)| Identifier::new(k, v)).collect();
+        let mut table = FrequencyTable::new();
+        if let (Some(share), Some(name)) = (share, p1.name.as_deref())
+            && let Some(key) = frequency_key("name", name)
+        {
+            table.insert("name", key, share);
+        }
+        let r = MatchingEngine::default_config().match_things_with_frequencies(&p1, &p2, &table);
+        let sum: f64 = r.evidence.components.iter().map(|c| c.bits).sum();
+        prop_assert_eq!(sum.to_bits(), r.evidence.weight_bits.to_bits());
+        prop_assert!(r.evidence.weight_bits.is_finite());
     }
 }

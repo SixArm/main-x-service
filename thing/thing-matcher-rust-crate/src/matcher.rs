@@ -35,7 +35,7 @@
 //! assert!(result.is_match);
 //! ```
 
-use crate::evidence::Evidence;
+use crate::evidence::{Evidence, NoFrequencies, ValueFrequencies};
 use crate::models::{Identifier, RelationKind, RelationshipRef, Thing};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
@@ -473,6 +473,38 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_things(&self, thing1: &Thing, thing2: &Thing) -> MatchResult {
+        self.match_things_with_frequencies(thing1, thing2, &NoFrequencies)
+    }
+
+    /// [`Self::match_things`], with value frequencies adjusting the
+    /// evidence for an exact agreement on a [`FREQUENCY_COMPONENTS`]
+    /// component (spec §5.12; `agents/share/match-evidence.md` §7).
+    /// `score`, `is_match`, `confidence` and `breakdown` are identical to
+    /// [`Self::match_things`]; only `evidence` can differ.
+    ///
+    /// [`FREQUENCY_COMPONENTS`]: crate::evidence::FREQUENCY_COMPONENTS
+    ///
+    /// ```
+    /// use thing_matcher::evidence::{frequency_key, FrequencyTable};
+    /// use thing_matcher::{MatchingEngine, Thing};
+    ///
+    /// let a = Thing::builder().name("USB Cable").build();
+    /// let mut common = FrequencyTable::new();
+    /// common.insert("name", frequency_key("name", "USB Cable").unwrap(), 0.01);
+    ///
+    /// let engine = MatchingEngine::default_config();
+    /// let plain = engine.match_things(&a, &a);
+    /// let adjusted = engine.match_things_with_frequencies(&a, &a, &common);
+    /// assert_eq!(plain.score, adjusted.score);
+    /// assert!(adjusted.evidence.weight_bits < plain.evidence.weight_bits);
+    /// ```
+    #[must_use]
+    pub fn match_things_with_frequencies(
+        &self,
+        thing1: &Thing,
+        thing2: &Thing,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         // 1. Score every field independently into a breakdown.
         let breakdown = self.calculate_breakdown(thing1, thing2);
         // 2. Fold the breakdown into one renormalised weighted score.
@@ -491,8 +523,14 @@ impl MatchingEngine {
         // configured threshold (see [`Confidence`]).
         let confidence = Confidence::from_score(score);
         // Evidence sits beside the score and never changes it (spec §5.12).
-        let evidence =
-            crate::evidence::compute(&breakdown, thing1, thing2, is_match, self.config.proof_bits);
+        let evidence = crate::evidence::compute(
+            &breakdown,
+            thing1,
+            thing2,
+            is_match,
+            self.config.proof_bits,
+            frequencies,
+        );
 
         MatchResult {
             score,

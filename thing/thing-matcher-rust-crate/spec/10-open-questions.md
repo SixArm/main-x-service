@@ -87,6 +87,18 @@ purely as prose elsewhere.
   component (or not at all). The per-component `m` / `u` table in
   `src/evidence.rs` is an informed estimate; estimating it from
   review-queue decisions is the service's job
-  (`agents/share/match-evidence.md` §6).
+  (`agents/share/match-evidence.md` §9).
+
+- **OQ-J (question) — Correlated groups and frequency components are
+  judgement.** §5.12.1 groups `image` with `mainEntityOfPage` and the two
+  descriptions at the family's `0.5` discount; neither the groups nor the
+  discount is measured. Open: whether `url` and `sameAs` disagreements
+  (both scraped alongside the page) belong with the image/page group;
+  whether `description` should also be frequency-adjusted (boilerplate
+  blurbs repeat across a catalogue, but the matcher compares
+  descriptions by similarity, so an exact-equality key would rarely
+  fire); and whether `additionalType` / tag values should carry shares
+  (a `schema.org/Product` agreement is worth almost nothing). Review-queue
+  decisions are the data that could settle all three.
 ---
 

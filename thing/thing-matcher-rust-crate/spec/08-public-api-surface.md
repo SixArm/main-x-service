@@ -4,12 +4,12 @@
 |---|---|---|
 | `Thing`, `ThingBuilder`, `Identifier`, `RelationshipRef`, `RelationKind` | `crate::models` | structs + `#[non_exhaustive]` enum |
 | `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, `Confidence` | `crate::matcher` | structs + enum |
-| `Evidence`, `Contradiction`, `MatchStrength` | `crate::evidence` | structs + enum (§5.12; `agents/share/match-evidence.md`) |
+| `Evidence`, `Contradiction`, `MatchStrength`, `ComponentBits`, `ValueFrequencies`, `NoFrequencies`, `FrequencyTable` | `crate::evidence` | structs + enum + trait (§5.12; `agents/share/match-evidence.md`) |
 | `Normalizer` | `crate::normalizer` | unit type with associated fns |
 | `Scorer`, `SimilarityAlgorithm` | `crate::scorer` | unit type + enum |
 | `MatchingError`, `Result` | `crate::error` | enum + alias |
 
-`MatchResult` carries `#[serde(default)] evidence: Evidence`, so JSON written before the field still deserialises (to an empty `NonMatch` evidence). `MatchConfig` carries `proof_bits: f64` (default `30.0`, serde-defaulted); it affects only `evidence.strength`. The `crate::evidence` module also exposes `component_bits`, `AGREE_AT`, `DISAGREE_AT`, `IDENTIFIER_BITS`, `CONTRADICTION_BITS`, `DEFAULT_PROOF_BITS` and the per-component `(m, u)` constants.
+`MatchResult` carries `#[serde(default)] evidence: Evidence`, so JSON written before the field still deserialises (to an empty `NonMatch` evidence). `MatchConfig` carries `proof_bits: f64` (default `30.0`, serde-defaulted); it affects only `evidence.strength`. The `crate::evidence` module also exposes `component_bits`, `AGREE_AT`, `DISAGREE_AT`, `IDENTIFIER_BITS`, `CONTRADICTION_BITS`, `DEFAULT_PROOF_BITS`, the per-component `(m, u)` constants, and — for correlated groups and value frequencies (§5.12.1–5.12.3) — `CORRELATED_DISCOUNT`, `CORRELATED_GROUPS`, `group_bits`, `strongest_first`, `MIN_SHARE`, `frequency_bits`, `FREQUENCY_COMPONENTS` and `frequency_key`. `CORRELATED_GROUPS`, `FREQUENCY_COMPONENTS` and the `frequency_key` normalised form are public contract: a service counts values under those names and keys. `Evidence::components` is `#[serde(default)]`. `MatchingEngine::match_things_with_frequencies(&Thing, &Thing, &dyn ValueFrequencies) -> MatchResult` is the frequency-aware entry point; `match_things` is it with `NoFrequencies`.
 
 All of the above are re-exported from the crate root, so a downstream consumer can write `use thing_matcher::{Thing, MatchingEngine, MatchConfig};` without reaching into submodules.
 

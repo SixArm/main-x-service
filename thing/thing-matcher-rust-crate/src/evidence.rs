@@ -28,6 +28,15 @@
 //!   both records hold at least one non-blank value, with no value in
 //!   common, is a [`Contradiction`] named `identifier:<scheme lowercase>`
 //!   and adds [`CONTRADICTION_BITS`].
+//! - **Correlated groups** ([`CORRELATED_GROUPS`]): `image` with
+//!   `main_entity_of_page`, and `description` with
+//!   `disambiguating_description`; non-strongest members count at
+//!   [`CORRELATED_DISCOUNT`]. `name_phonetic_score` is not summed.
+//! - **Frequencies** ([`FREQUENCY_COMPONENTS`]): an exact shared name
+//!   uses its own share via [`frequency_bits`], when a
+//!   [`ValueFrequencies`] source knows it.
+//! - **Listing.** [`Evidence::components`] holds every term, identity and
+//!   contradiction terms included; [`Evidence::weight_bits`] is their sum.
 
 use crate::matcher::MatchBreakdown;
 use crate::models::Thing;
@@ -61,8 +70,9 @@ pub const DEFAULT_PROOF_BITS: f64 = 30.0;
 /// Name: `u` — two unrelated things rarely share a normalised name
 /// (title, product name, landmark), though generic names ("Chair") exist.
 pub const NAME: (f64, f64) = (0.95, 1e-3);
-/// Soundex on names: `u` — 4-character codes collide often, and the
-/// signal largely repeats `NAME`, so it is kept weak on purpose.
+/// Soundex on names: `u` — 4-character codes collide often. **Not
+/// summed**: the code is derived from the name, so it would count the
+/// name twice (match-evidence.md §6). Kept for the table's completeness.
 pub const NAME_PHONETIC: (f64, f64) = (0.90, 0.30);
 /// Description: `u` — free text near-equal by chance is very rare;
 /// `m` is low because descriptions are rewritten between sources.
@@ -141,7 +151,8 @@ pub struct Contradiction {
 /// How much the compared data proves, beside the similarity score.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Evidence {
-    /// Sum of the components' log-likelihood weights, in bits.
+    /// Sum of the components' log-likelihood weights, in bits. Always the
+    /// sum of [`Self::components`]' `bits`, in list order.
     pub weight_bits: f64,
     /// Components both records held (identifiers count as one).
     pub fields_compared: u32,
@@ -149,31 +160,290 @@ pub struct Evidence {
     pub contradictions: Vec<Contradiction>,
     /// The verdict (§4).
     pub strength: MatchStrength,
+    /// Every term of the sum (match-evidence.md §8). Empty on JSON that
+    /// pre-dates the field.
+    #[serde(default)]
+    pub components: Vec<ComponentBits>,
 }
 
-/// Running total of bits and compared fields.
+/// One term of the evidence sum.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComponentBits {
+    /// The component, e.g. `"name"`, `"identifier"`,
+    /// `"contradiction:identifier:isbn"`.
+    pub component: String,
+    /// Bits this term added, after any discount or adjustment.
+    pub bits: f64,
+    /// Discounted as a non-strongest member of a correlated group.
+    pub correlated: bool,
+    /// Agreement weight taken from the value's own frequency.
+    pub frequency_adjusted: bool,
+}
+
+// ---- Correlated components (match-evidence.md §6) ----------------------
+
+/// Weight of each member of a correlated group after its strongest.
+pub const CORRELATED_DISCOUNT: f64 = 0.5;
+
+/// This crate's correlated groups, by component name. Within a group the
+/// member with the largest absolute weight counts in full and every other
+/// present member at [`CORRELATED_DISCOUNT`].
+///
+/// - `image` + `main_entity_of_page`: both are scraped from the same web
+///   page, so two records harvested from one page (one catalogue listing
+///   several products) agree on both for one reason.
+/// - `description` + `disambiguating_description`: both are free text
+///   written by one source, often the second abridged from the first, so
+///   a copied blurb agrees on both for one reason.
+///
+/// `name_phonetic` is not in a group: it is derived from the name and is
+/// left out of the sum entirely (§6).
+pub const CORRELATED_GROUPS: &[&[&str]] = &[
+    &["image", "main_entity_of_page"],
+    &["description", "disambiguating_description"],
+];
+
+/// Index of the strongest member: largest absolute value, ties to the
+/// larger value, exact ties to the earliest. `None` when empty.
+fn strongest_index(member_bits: &[f64]) -> Option<usize> {
+    let mut best: Option<usize> = None;
+    for (i, &b) in member_bits.iter().enumerate() {
+        best = match best {
+            None => Some(i),
+            Some(j) => {
+                let c = member_bits[j];
+                let order = b.abs().total_cmp(&c.abs()).then(b.total_cmp(&c));
+                if order == std::cmp::Ordering::Greater {
+                    Some(i)
+                } else {
+                    Some(j)
+                }
+            }
+        };
+    }
+    best
+}
+
+/// Split a group's present members into its strongest (by absolute
+/// value, ties to the larger value) and the rest. `None` when empty.
+#[must_use]
+pub fn strongest_first(member_bits: &[f64]) -> Option<(f64, Vec<f64>)> {
+    let i = strongest_index(member_bits)?;
+    let rest = member_bits
+        .iter()
+        .enumerate()
+        .filter(|&(j, _)| j != i)
+        .map(|(_, &b)| b)
+        .collect();
+    Some((member_bits[i], rest))
+}
+
+/// The bits a correlated group adds, from its present members' bits.
+#[must_use]
+pub fn group_bits(member_bits: &[f64]) -> f64 {
+    let Some((strongest, rest)) = strongest_first(member_bits) else {
+        return 0.0;
+    };
+    strongest + CORRELATED_DISCOUNT * rest.iter().sum::<f64>()
+}
+
+// ---- Common and rare values (match-evidence.md §7) ---------------------
+
+/// Where the share of records holding a value comes from.
+pub trait ValueFrequencies {
+    /// The share, in `0.0..=1.0`, of records whose `component` holds
+    /// `value` (already in the matcher's normalised form, see
+    /// [`frequency_key`]), or `None` when unknown.
+    fn share(&self, component: &str, value: &str) -> Option<f64>;
+}
+
+/// No frequencies: every share is unknown, so the plain `m`/`u` table
+/// applies. What [`crate::MatchingEngine::match_things`] uses.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoFrequencies;
+
+impl ValueFrequencies for NoFrequencies {
+    fn share(&self, _component: &str, _value: &str) -> Option<f64> {
+        None
+    }
+}
+
+/// Shares held in memory, keyed by component and [`frequency_key`].
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FrequencyTable {
+    shares: BTreeMap<(String, String), f64>,
+}
+
+impl FrequencyTable {
+    /// An empty table.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Build from `(component, key, count)` rows over `total` records:
+    /// each share is `count / total`. A `total` of `0` gives an empty
+    /// table. Keys should come from [`frequency_key`].
+    #[must_use]
+    pub fn from_counts<C, K, I>(counts: I, total: u64) -> Self
+    where
+        C: Into<String>,
+        K: Into<String>,
+        I: IntoIterator<Item = (C, K, u64)>,
+    {
+        let mut table = Self::new();
+        if total == 0 {
+            return table;
+        }
+        #[allow(clippy::cast_precision_loss)]
+        let total = total as f64;
+        for (component, key, count) in counts {
+            #[allow(clippy::cast_precision_loss)]
+            let share = count as f64 / total;
+            table.insert(component, key, share);
+        }
+        table
+    }
+
+    /// Set one share. The key should come from [`frequency_key`].
+    pub fn insert(&mut self, component: impl Into<String>, key: impl Into<String>, share: f64) {
+        self.shares.insert((component.into(), key.into()), share);
+    }
+}
+
+impl ValueFrequencies for FrequencyTable {
+    fn share(&self, component: &str, value: &str) -> Option<f64> {
+        self.shares
+            .get(&(component.to_owned(), value.to_owned()))
+            .copied()
+    }
+}
+
+/// Smallest share used, so a value seen once cannot give unbounded bits.
+pub const MIN_SHARE: f64 = 1e-9;
+
+/// Agreement bits for a value held by `share` of records.
+#[must_use]
+pub fn frequency_bits(m: f64, share: f64) -> f64 {
+    let share = if share.is_finite() {
+        share.clamp(MIN_SHARE, m)
+    } else {
+        m
+    };
+    (m / share).log2()
+}
+
+/// The components whose exact agreement is frequency-adjusted. Public
+/// contract: a service counts values under these names.
+///
+/// - `name`: the primary `name` and every `alternateName`, each keyed by
+///   [`Normalizer::normalize_name`]. Generic names ("USB Cable") are held
+///   by many unrelated products.
+pub const FREQUENCY_COMPONENTS: &[&str] = &["name"];
+
+/// The key the matcher looks up for `raw` under `component`: the same
+/// normalised form it compares. `None` for a component not in
+/// [`FREQUENCY_COMPONENTS`] or a value that normalises to empty.
+///
+/// ```
+/// use thing_matcher::evidence::frequency_key;
+/// assert_eq!(frequency_key("name", "  USB Cable ").as_deref(), Some("usb cable"));
+/// assert_eq!(frequency_key("description", "x"), None);
+/// assert_eq!(frequency_key("name", "   "), None);
+/// ```
+#[must_use]
+pub fn frequency_key(component: &str, raw: &str) -> Option<String> {
+    match component {
+        "name" => {
+            let key = Normalizer::normalize_name(raw);
+            (!key.is_empty()).then_some(key)
+        }
+        _ => None,
+    }
+}
+
+// ---- Computation -------------------------------------------------------
+
+/// One raw term before correlation discounts.
+struct Term {
+    component: String,
+    bits: f64,
+    frequency_adjusted: bool,
+}
+
+/// Running list of terms and compared fields.
 #[derive(Default)]
 struct Tally {
-    bits: f64,
+    terms: Vec<Term>,
     fields: u32,
 }
 
 impl Tally {
-    fn add(&mut self, similarity: Option<f64>, (m, u): (f64, f64)) {
+    fn push(&mut self, component: impl Into<String>, bits: f64, frequency_adjusted: bool) {
+        self.terms.push(Term {
+            component: component.into(),
+            bits,
+            frequency_adjusted,
+        });
+    }
+
+    fn add(&mut self, component: &str, similarity: Option<f64>, (m, u): (f64, f64)) {
         if let Some(s) = similarity {
-            self.bits += component_bits(s, m, u);
+            self.push(component, component_bits(s, m, u), false);
             self.fields += 1;
         }
     }
 }
 
+/// Every normalised, non-empty name a thing holds (primary + alternates).
+fn name_keys(thing: &Thing) -> BTreeSet<String> {
+    thing
+        .name
+        .iter()
+        .chain(thing.alternate_names.iter())
+        .filter_map(|n| frequency_key("name", n))
+        .collect()
+}
+
+/// Name bits: frequency-adjusted on an exact shared normalised name,
+/// the plain table otherwise. With several shared names the strongest
+/// one counts (a rare shared alternate name is real evidence even when
+/// the primary is generic).
+fn name_term(
+    similarity: f64,
+    thing1: &Thing,
+    thing2: &Thing,
+    frequencies: &dyn ValueFrequencies,
+) -> (f64, bool) {
+    let (m, u) = NAME;
+    let shared: Vec<String> = name_keys(thing1)
+        .intersection(&name_keys(thing2))
+        .cloned()
+        .collect();
+    if shared.is_empty() {
+        return (component_bits(similarity, m, u), false);
+    }
+    let plain = component_bits(1.0, m, u);
+    let mut best: Option<(f64, bool)> = None;
+    for key in &shared {
+        let candidate = match frequencies.share("name", key) {
+            Some(share) => (frequency_bits(m, share), true),
+            None => (plain, false),
+        };
+        if best.is_none_or(|(b, _)| candidate.0 > b) {
+            best = Some(candidate);
+        }
+    }
+    best.unwrap_or((plain, false))
+}
+
 /// Compute the evidence for one compared pair.
 ///
 /// `breakdown` is the pair's [`MatchBreakdown`]; the things are passed
-/// too because the identity group and the two set components need the
-/// raw values to tell "absent on one side" from "present and different"
-/// (the similarity breakdown scores an empty-vs-non-empty `sameAs` or
-/// `additionalType` set as `0.0`, which evidence must not count).
+/// too because the identity group, the set components and the name's
+/// frequency adjustment need the raw values (the similarity breakdown
+/// scores an empty-vs-non-empty `sameAs` or `additionalType` set as
+/// `0.0`, which evidence must not count).
 #[must_use]
 pub(crate) fn compute(
     breakdown: &MatchBreakdown,
@@ -181,22 +451,30 @@ pub(crate) fn compute(
     thing2: &Thing,
     is_match: bool,
     proof_bits: f64,
+    frequencies: &dyn ValueFrequencies,
 ) -> Evidence {
     let mut tally = Tally::default();
 
     // Plain components: `None` in the breakdown means absent on a side.
-    tally.add(breakdown.name_score, NAME);
-    tally.add(breakdown.name_phonetic_score, NAME_PHONETIC);
-    tally.add(breakdown.description_score, DESCRIPTION);
+    // `name_phonetic_score` is derived from the name and not summed (§6).
+    if let Some(s) = breakdown.name_score {
+        let (bits, adjusted) = name_term(s, thing1, thing2, frequencies);
+        tally.push("name", bits, adjusted);
+        tally.fields += 1;
+    }
+    tally.add("description", breakdown.description_score, DESCRIPTION);
     tally.add(
+        "disambiguating_description",
         breakdown.disambiguating_description_score,
         DISAMBIGUATING_DESCRIPTION,
     );
     tally.add(
+        "image",
         present_url_pair(thing1.image.as_ref(), thing2.image.as_ref()).and(breakdown.image_score),
         IMAGE,
     );
     tally.add(
+        "main_entity_of_page",
         present_url_pair(
             thing1.main_entity_of_page.as_ref(),
             thing2.main_entity_of_page.as_ref(),
@@ -207,15 +485,19 @@ pub(crate) fn compute(
     let both_types = !url_set(&thing1.additional_types).is_empty()
         && !url_set(&thing2.additional_types).is_empty();
     tally.add(
+        "additional_types",
         breakdown.additional_types_score.filter(|_| both_types),
         ADDITIONAL_TYPES,
     );
-    tally.add(breakdown.relationships_score, RELATIONSHIPS);
-    tally.add(breakdown.tags_score, TAGS);
+    tally.add(
+        "relationships",
+        breakdown.relationships_score,
+        RELATIONSHIPS,
+    );
+    tally.add("tags", breakdown.tags_score, TAGS);
 
     // Identity group: identifiers, canonical url, sameAs.
     let mut identity = false;
-
     let contradictions = identifier_contradictions(thing1, thing2);
     let shared_identifier = shares_identifier(thing1, thing2);
     identity |= shared_identifier;
@@ -223,15 +505,12 @@ pub(crate) fn compute(
         // Identifiers count as one field however many schemes compared.
         tally.fields += 1;
     }
-    for _ in &contradictions {
-        tally.bits += CONTRADICTION_BITS;
-    }
 
     if let Some((a, b)) = normalized_url_pair(thing1.url.as_ref(), thing2.url.as_ref()) {
         if a == b {
             identity = true;
         } else {
-            tally.add(Some(0.0), URL);
+            tally.add("url", Some(0.0), URL);
         }
     }
 
@@ -239,23 +518,33 @@ pub(crate) fn compute(
     let same_as2 = url_set(&thing2.same_as);
     if !same_as1.is_empty() && !same_as2.is_empty() {
         if same_as1.is_disjoint(&same_as2) {
-            tally.add(Some(0.0), SAME_AS);
+            tally.add("same_as", Some(0.0), SAME_AS);
         } else {
             identity = true;
         }
     }
 
     if identity {
-        tally.bits += IDENTIFIER_BITS;
+        tally.push("identifier", IDENTIFIER_BITS, false);
         // The shared identifier already counted itself above.
         if !shared_identifier && contradictions.is_empty() {
             tally.fields += 1;
         }
     }
+    for c in &contradictions {
+        tally.push(
+            format!("contradiction:{}", c.field),
+            CONTRADICTION_BITS,
+            false,
+        );
+    }
+
+    let components = apply_groups(tally.terms);
+    let weight_bits = components.iter().map(|c| c.bits).sum::<f64>();
 
     let strength = if !contradictions.is_empty() {
         MatchStrength::Contradicted
-    } else if tally.bits >= proof_bits {
+    } else if weight_bits >= proof_bits {
         MatchStrength::Proven
     } else if is_match {
         MatchStrength::Consistent
@@ -264,11 +553,44 @@ pub(crate) fn compute(
     };
 
     Evidence {
-        weight_bits: tally.bits,
+        weight_bits,
         fields_compared: tally.fields,
         contradictions,
         strength,
+        components,
     }
+}
+
+/// Discount every non-strongest present member of each correlated group.
+fn apply_groups(terms: Vec<Term>) -> Vec<ComponentBits> {
+    let mut out: Vec<ComponentBits> = terms
+        .into_iter()
+        .map(|t| ComponentBits {
+            component: t.component,
+            bits: t.bits,
+            correlated: false,
+            frequency_adjusted: t.frequency_adjusted,
+        })
+        .collect();
+    for group in CORRELATED_GROUPS {
+        let members: Vec<usize> = out
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| group.contains(&c.component.as_str()))
+            .map(|(i, _)| i)
+            .collect();
+        let bits: Vec<f64> = members.iter().map(|&i| out[i].bits).collect();
+        let Some(strongest) = strongest_index(&bits) else {
+            continue;
+        };
+        for (k, &i) in members.iter().enumerate() {
+            if k != strongest {
+                out[i].bits *= CORRELATED_DISCOUNT;
+                out[i].correlated = true;
+            }
+        }
+    }
+    out
 }
 
 /// Both URLs normalised, iff both are present and normalise to non-empty
@@ -570,5 +892,279 @@ mod tests {
     fn old_config_json_without_proof_bits_defaults_to_30() {
         let c: MatchConfig = serde_json::from_str(r#"{"match_threshold":0.8}"#).unwrap();
         assert!((c.proof_bits - DEFAULT_PROOF_BITS).abs() < 1e-12);
+    }
+
+    // ---- Phase 2: correlated groups, frequencies, per-term listing ----
+
+    fn bits_of(e: &Evidence, component: &str) -> f64 {
+        e.components
+            .iter()
+            .find(|c| c.component == component)
+            .map_or(0.0, |c| c.bits)
+    }
+
+    fn components_sum(e: &Evidence) -> f64 {
+        e.components.iter().map(|c| c.bits).sum()
+    }
+
+    #[test]
+    fn correlated_agreement_gives_less_than_the_sum_in_any_order() {
+        let img = component_bits(1.0, IMAGE.0, IMAGE.1);
+        let mep = component_bits(1.0, MAIN_ENTITY_OF_PAGE.0, MAIN_ENTITY_OF_PAGE.1);
+        let ab = group_bits(&[img, mep]);
+        let ba = group_bits(&[mep, img]);
+        assert!((ab - ba).abs() < 1e-12);
+        assert!(ab < img + mep);
+        assert!((ab - (mep + CORRELATED_DISCOUNT * img)).abs() < 1e-12);
+
+        let a = Thing::builder()
+            .image("https://example.org/p.jpg")
+            .main_entity_of_page("https://example.org/p")
+            .build();
+        let e = engine().match_things(&a, &a.clone()).evidence;
+        assert!((e.weight_bits - ab).abs() < 1e-9);
+        let image = e
+            .components
+            .iter()
+            .find(|c| c.component == "image")
+            .unwrap();
+        assert!(image.correlated);
+        let page = e
+            .components
+            .iter()
+            .find(|c| c.component == "main_entity_of_page")
+            .unwrap();
+        assert!(!page.correlated);
+    }
+
+    #[test]
+    fn strongest_first_orders_by_absolute_value_ties_to_larger() {
+        assert_eq!(strongest_first(&[]), None);
+        let (s, rest) = strongest_first(&[1.0, -3.0, 2.0]).unwrap();
+        assert!((s + 3.0).abs() < 1e-12);
+        assert_eq!(rest, vec![1.0, 2.0]);
+        let (s, _) = strongest_first(&[-2.0, 2.0]).unwrap();
+        assert!((s - 2.0).abs() < 1e-12);
+        let (s, _) = strongest_first(&[2.0, -2.0]).unwrap();
+        assert!((s - 2.0).abs() < 1e-12);
+        assert!(group_bits(&[]).abs() < 1e-12);
+    }
+
+    #[test]
+    fn uncorrelated_fields_still_sum() {
+        let a = Thing::builder()
+            .name("Eiffel Tower")
+            .add_tag("landmark")
+            .build();
+        let e = engine().match_things(&a, &a.clone()).evidence;
+        let expected = component_bits(1.0, NAME.0, NAME.1) + component_bits(1.0, TAGS.0, TAGS.1);
+        assert!((e.weight_bits - expected).abs() < 1e-9);
+        assert!(e.components.iter().all(|c| !c.correlated));
+    }
+
+    #[test]
+    fn correlated_disagreements_are_discounted_too() {
+        let a = Thing::builder()
+            .image("https://example.org/a.jpg")
+            .main_entity_of_page("https://example.org/a")
+            .build();
+        let b = Thing::builder()
+            .image("https://example.org/b.jpg")
+            .main_entity_of_page("https://example.org/b")
+            .build();
+        let e = engine().match_things(&a, &b).evidence;
+        let img = component_bits(0.0, IMAGE.0, IMAGE.1);
+        let mep = component_bits(0.0, MAIN_ENTITY_OF_PAGE.0, MAIN_ENTITY_OF_PAGE.1);
+        assert!(e.weight_bits < 0.0);
+        assert!(e.weight_bits > img + mep);
+        assert!((e.weight_bits - group_bits(&[img, mep])).abs() < 1e-9);
+    }
+
+    #[test]
+    fn same_source_page_with_different_names_is_not_proven() {
+        // Two different products scraped from one catalogue page: the
+        // page and its hero image are shared, the names are not.
+        let page = || {
+            Thing::builder()
+                .image("https://shop.example.com/cables/hero.jpg")
+                .main_entity_of_page("https://shop.example.com/cables")
+                .add_additional_type("https://schema.org/Product")
+        };
+        let a = page().name("Braided Lightning Cable").build();
+        let b = page().name("Ethernet Patch Lead").build();
+        let e = engine().match_things(&a, &b).evidence;
+        assert!(e.weight_bits < DEFAULT_PROOF_BITS, "bits {}", e.weight_bits);
+        assert_ne!(e.strength, MatchStrength::Proven);
+        assert!(bits_of(&e, "name") < 0.0);
+    }
+
+    #[test]
+    fn generic_name_and_description_are_not_proven() {
+        let product = || {
+            Thing::builder()
+                .name("USB Cable")
+                .description("A USB cable for charging and data")
+                .add_additional_type("https://schema.org/Product")
+                .add_tag("cable")
+        };
+        let (a, b) = (product().build(), product().build());
+        let mut table = FrequencyTable::new();
+        table.insert("name", frequency_key("name", "USB Cable").unwrap(), 0.01);
+        let plain = engine().match_things(&a, &b).evidence;
+        let e = engine()
+            .match_things_with_frequencies(&a, &b, &table)
+            .evidence;
+        assert!(e.weight_bits < plain.weight_bits);
+        assert_ne!(e.strength, MatchStrength::Proven);
+        let name = e.components.iter().find(|c| c.component == "name").unwrap();
+        assert!(name.frequency_adjusted);
+    }
+
+    #[test]
+    fn common_value_gives_fewer_bits_and_rare_value_more() {
+        let (m, u) = NAME;
+        let default = component_bits(1.0, m, u);
+        assert!(frequency_bits(m, 0.01) < default);
+        assert!(frequency_bits(m, 1e-6) > default);
+
+        let a = Thing::builder().name("USB Cable").build();
+        let key = frequency_key("name", "USB Cable").unwrap();
+        let mut common = FrequencyTable::new();
+        common.insert("name", key.clone(), 0.01);
+        let mut rare = FrequencyTable::new();
+        rare.insert("name", key, 1e-6);
+        let e_common = engine()
+            .match_things_with_frequencies(&a, &a, &common)
+            .evidence;
+        let e_rare = engine()
+            .match_things_with_frequencies(&a, &a, &rare)
+            .evidence;
+        assert!(e_common.weight_bits < default);
+        assert!(e_rare.weight_bits > default);
+    }
+
+    #[test]
+    fn share_at_or_above_m_gives_zero_never_negative() {
+        let (m, _) = NAME;
+        assert!(frequency_bits(m, m).abs() < 1e-12);
+        assert!(frequency_bits(m, 1.0).abs() < 1e-12);
+        assert!(frequency_bits(m, f64::NAN).abs() < 1e-12);
+        assert!(frequency_bits(m, 0.0) <= (m / MIN_SHARE).log2() + 1e-9);
+    }
+
+    #[test]
+    fn no_frequency_adjustment_on_partial_agreement_or_disagreement() {
+        let mut table = FrequencyTable::new();
+        for raw in ["Eiffel Tower", "Eiffel Towers", "Big Ben"] {
+            table.insert("name", frequency_key("name", raw).unwrap(), 1e-6);
+        }
+        let a = Thing::builder().name("Eiffel Tower").build();
+        for other in ["Eiffel Towers", "Big Ben"] {
+            let b = Thing::builder().name(other).build();
+            let plain = engine().match_things(&a, &b).evidence;
+            let e = engine()
+                .match_things_with_frequencies(&a, &b, &table)
+                .evidence;
+            assert_eq!(e, plain, "{other}");
+            assert!(e.components.iter().all(|c| !c.frequency_adjusted));
+        }
+    }
+
+    #[test]
+    fn no_frequencies_equals_match_things() {
+        let a = Thing::builder()
+            .name("Eiffel Tower")
+            .description("Lattice tower")
+            .image("https://example.org/e.jpg")
+            .add_identifier(id("wikidata", "Q243"))
+            .build();
+        let b = Thing::builder()
+            .name("Tour Eiffel")
+            .description("Lattice tower in Paris")
+            .add_identifier(id("wikidata", "Q9"))
+            .build();
+        for (x, y) in [(&a, &b), (&a, &a)] {
+            let plain = engine().match_things(x, y);
+            let none = engine().match_things_with_frequencies(x, y, &NoFrequencies);
+            assert_eq!(plain.score.to_bits(), none.score.to_bits());
+            assert_eq!(plain.is_match, none.is_match);
+            assert_eq!(plain.confidence, none.confidence);
+            assert_eq!(plain.evidence, none.evidence);
+        }
+    }
+
+    #[test]
+    fn frequencies_never_change_score_or_is_match() {
+        let a = Thing::builder().name("USB Cable").build();
+        let mut table = FrequencyTable::new();
+        table.insert("name", "usb cable", 0.5);
+        let plain = engine().match_things(&a, &a);
+        let adj = engine().match_things_with_frequencies(&a, &a, &table);
+        assert_eq!(plain.score.to_bits(), adj.score.to_bits());
+        assert_eq!(plain.is_match, adj.is_match);
+        assert_eq!(plain.confidence, adj.confidence);
+    }
+
+    #[test]
+    fn components_sum_to_weight_bits_including_identity_terms() {
+        let a = Thing::builder()
+            .name("Pride and Prejudice")
+            .description("Novel")
+            .disambiguating_description("1813 novel")
+            .add_identifier(id("doi", "10.1/a"))
+            .add_identifier(id("isbn", "1"))
+            .build();
+        let b = Thing::builder()
+            .name("Pride and Prejudice")
+            .description("Novel")
+            .disambiguating_description("1813 novel")
+            .add_identifier(id("doi", "10.1/a"))
+            .add_identifier(id("isbn", "2"))
+            .build();
+        let e = engine().match_things(&a, &b).evidence;
+        assert_eq!(e.weight_bits.to_bits(), components_sum(&e).to_bits());
+        assert!((bits_of(&e, "identifier") - IDENTIFIER_BITS).abs() < 1e-12);
+        assert!((bits_of(&e, "contradiction:identifier:isbn") - CONTRADICTION_BITS).abs() < 1e-12);
+    }
+
+    #[test]
+    fn phonetic_score_is_not_summed() {
+        let lenient = MatchingEngine::new(MatchConfig::lenient());
+        let a = Thing::builder().name("Eiffel Tower").build();
+        let r = lenient.match_things(&a, &a.clone());
+        assert!(r.breakdown.name_phonetic_score.is_some());
+        assert_eq!(r.evidence.components.len(), 1);
+        assert_eq!(r.evidence.fields_compared, 1);
+    }
+
+    #[test]
+    fn frequency_table_from_counts() {
+        let t = FrequencyTable::from_counts([("name", "usb cable", 50_u64)], 1000);
+        assert!((t.share("name", "usb cable").unwrap() - 0.05).abs() < 1e-12);
+        assert_eq!(t.share("name", "other"), None);
+        let empty = FrequencyTable::from_counts([("name", "x", 1_u64)], 0);
+        assert_eq!(empty, FrequencyTable::new());
+    }
+
+    #[test]
+    fn frequency_key_matches_the_compared_form() {
+        assert_eq!(
+            frequency_key("name", "Café  Tower!"),
+            Some(Normalizer::normalize_name("Café  Tower!"))
+        );
+        assert_eq!(frequency_key("tags", "x"), None);
+        assert!(
+            FREQUENCY_COMPONENTS
+                .iter()
+                .all(|c| frequency_key(c, "abc").is_some())
+        );
+    }
+
+    #[test]
+    fn old_evidence_json_without_components_deserialises() {
+        let json = r#"{"weight_bits":1.5,"fields_compared":1,"contradictions":[],"strength":"consistent"}"#;
+        let e: Evidence = serde_json::from_str(json).unwrap();
+        assert!(e.components.is_empty());
+        assert_eq!(e.strength, MatchStrength::Consistent);
     }
 }

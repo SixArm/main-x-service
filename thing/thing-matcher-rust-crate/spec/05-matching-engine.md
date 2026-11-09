@@ -159,7 +159,7 @@ Per-component `m` / `u` (informed estimates, `src/evidence.rs`):
 | Component | `m` | `u` | Agree bits | Disagree bits |
 |---|---|---|---|---|
 | `name_score` | 0.95 | 1e-3 | +9.89 | −4.32 |
-| `name_phonetic_score` | 0.90 | 0.30 | +1.58 | −2.81 |
+| `name_phonetic_score` | 0.90 | 0.30 | not summed (derived from the name, §6 of the contract) | — |
 | `description_score` | 0.70 | 1e-3 | +9.45 | −1.74 |
 | `disambiguating_description_score` | 0.80 | 5e-3 | +7.32 | −2.31 |
 | `identifiers_score` | 0.99 | 1e-12 | identity group (+39.85 once) | per contradicted scheme (−6.64) |
@@ -171,7 +171,39 @@ Per-component `m` / `u` (informed estimates, `src/evidence.rs`):
 | `relationships_score` | 0.60 | 0.05 | +3.58 | −1.25 |
 | `tags_score` | 0.60 | 0.10 | +2.58 | −1.17 |
 
-Worked figures: two identical records holding only a name score `1.0` and carry `+9.89` bits — `Consistent`, not `Proven`. An identical record with every non-identity field populated (name, both descriptions, image, `mainEntityOfPage`, a type, a relationship, a tag) and no identifier, `url` or `sameAs` carries `≈ +58.0` bits and is `Proven`; `mainEntityOfPage` and `image` carry most of that, so a deployment that sees shared placeholder pages or images should raise their `u`.
+#### 5.12.1 Correlated groups (public contract)
+
+`evidence::CORRELATED_GROUPS` (contract §6). Within a group the present member with the largest absolute bits (ties to the larger value) counts in full, every other present member at `CORRELATED_DISCOUNT = 0.5`. Agreements and disagreements alike are discounted; the result does not depend on component order. A component in no group stands alone.
+
+| Group | Why the members move together |
+|---|---|
+| `image`, `main_entity_of_page` | Both are scraped from the same web page. Two different products harvested from one catalogue page share its hero image and its page URL for one reason — the page — not two. |
+| `description`, `disambiguating_description` | Both are free text written by one source, the second often abridged from the first. A copied blurb agrees on both for one reason. |
+
+`name_phonetic_score` is in no group because it is not summed at all: a Soundex code is derived from the name (contract §6).
+
+#### 5.12.2 Value frequencies (public contract)
+
+`MatchingEngine::match_things_with_frequencies(a, b, &dyn ValueFrequencies)` adjusts the agreement weight of the components in `evidence::FREQUENCY_COMPONENTS` (contract §7); `match_things` calls it with `NoFrequencies`, so a plain call uses the table above unchanged. `score`, `is_match`, `confidence` and `breakdown` are identical in both.
+
+| Component | Values counted | Key (`frequency_key(component, raw)`) |
+|---|---|---|
+| `name` | the primary `name` and every `alternateName` | `Normalizer::normalize_name(raw)`; `None` if it normalises to empty |
+
+- Adjusted only on an **exact** agreement: the two records share at least one normalised name. Then the name term is `frequency_bits(0.95, share)` = `log2(0.95 / clamp(share, MIN_SHARE = 1e-9, 0.95))` for the shared key — `0` bits at or above `m`, never negative. With several shared names the strongest term counts; a shared name with no known share uses the table's agreement weight.
+- Partial agreement (similar, not equal) and disagreement are never adjusted.
+- `FrequencyTable` holds shares in memory: `FrequencyTable::from_counts(rows, total)` from `(component, key, count)` rows (`share = count / total`; `total = 0` gives an empty table) and `insert(component, key, share)`.
+
+#### 5.12.3 Per-term listing
+
+`evidence.components: Vec<ComponentBits>` (`#[serde(default)]`) lists every term — `name`, `description`, `disambiguating_description`, `image`, `main_entity_of_page`, `additional_types`, `relationships`, `tags`, `url`, `same_as` (disagreements only), `identifier` (the single identity term) and one `contradiction:identifier:<scheme>` per contradiction — each with its bits after discount/adjustment and `correlated` / `frequency_adjusted` flags. `weight_bits` is exactly their sum, in list order.
+
+#### 5.12.4 Worked figures
+
+- Two identical records holding only a name: score `1.0`, `+9.89` bits — `Consistent`, not `Proven`.
+- An identical record with every non-identity field populated (name, both descriptions, image, `mainEntityOfPage`, a type, a relationship, a tag) and no identifier, `url` or `sameAs`: `+49.73` bits, `Proven` (it was `+58.0` before the groups; the image/page group now gives `17.39` instead of `22.0`, the description group `13.11` instead of `16.77`).
+- Same source: two products from one catalogue page sharing image, `mainEntityOfPage` and a type, with different names: `+16.24` bits, `NonMatch` (`+20.86` without the image/page group).
+- Generic product: two different products both named "USB Cable" with the same description, type and tag: `+25.10` bits from the table, `+21.78` with a name share of `0.01` — `Consistent`, never `Proven`.
 
 ---
 
