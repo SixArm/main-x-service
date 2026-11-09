@@ -289,6 +289,12 @@ async fn keyless_row_with_a_likely_duplicate_creates_and_queues_for_review() {
             pair["match_score"].as_f64().unwrap() >= 0.7,
             "queued pair: {pair:?}"
         );
+        // A name-only agreement is alike but not proof: the import path
+        // writes its evidence too (match-evidence.md).
+        assert_eq!(
+            pair["evidence"]["strength"], "consistent",
+            "queued pair: {pair:?}"
+        );
     })
     .await;
 }

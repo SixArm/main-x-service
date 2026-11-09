@@ -37,6 +37,9 @@ pub mod cursor_key;
 /// HL7 FHIR R5 interop (`Organization` resource) — conversions, wire
 /// types, and search-parameter parsing for the mounted `/fhir` endpoints.
 pub mod fhir;
+/// Value frequencies for the matcher's match evidence
+/// (`agents/share/match-evidence.md` §7): the counted name-share table.
+pub mod frequencies;
 /// Loco initializers (currently empty; reserved for app-startup wiring).
 pub mod initializers;
 /// Pure record-merge logic (fold a duplicate into a survivor).

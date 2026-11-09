@@ -9,6 +9,28 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — match evidence
+
+- Match results carry the matcher's `evidence` (`weight_bits`,
+  `fields_compared`, `contradictions`, `strength`, `components`) beside
+  the unchanged `score`: `check-duplicates` hits, the create-time `409`
+  candidates, and review-queue items, which store it in a new nullable
+  `review_queue.evidence` column (migration
+  `2026110900000001_review_queue_evidence`; old rows read `null`),
+  including pairs queued by bulk import. See
+  [`agents/share/match-evidence.md`](../../agents/share/match-evidence.md).
+- `POST /api/organizations/deduplicate` takes an optional
+  `auto_merge_threshold`: a pair is marked `automerged` only when its
+  score clears it and its evidence is `proven`; `consistent` and
+  `contradicted` pairs stay `pending`. Without it nothing is marked, as
+  before, and `auto_merged` counts the marked rows instead of always
+  reporting 0.
+- Value frequencies for the name (`src/frequencies.rs`): a common name
+  proves less than a rare one. `deduplicate` counts the records it
+  scanned; `check-duplicates`, create and bulk import use a cached table
+  rebuilt every 10 minutes, scanning at most 200 000 records. Below
+  1 000 records no frequencies are used.
+
 ### Fixed
 
 - The outbox relay's ack stamps `published_at` from this process's clock,

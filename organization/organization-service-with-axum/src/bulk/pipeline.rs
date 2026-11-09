@@ -423,12 +423,15 @@ async fn find_keyless_duplicate(
     };
 
     let matcher = MatchingEngine::new(MatchConfig::default());
+    // The same cached value-frequency table `check-duplicates` uses
+    // (match-evidence.md §7).
+    let freqs = crate::frequencies::current(db).await;
     let mut best: Option<(OrgModel, MatchResult)> = None;
     for row in rows {
         let Ok(candidate) = row.to_org() else {
             continue;
         };
-        let result = matcher.match_organizations(org, &candidate);
+        let result = matcher.match_organizations_with_frequencies(org, &candidate, &*freqs);
         if result.score < crate::bulk::IMPORT_REVIEW_THRESHOLD {
             continue;
         }
@@ -458,8 +461,11 @@ async fn create_and_queue_for_review(
         match_quality: match_quality_label(result.confidence),
         detection_method: "import_duplicate_detection".to_string(),
         score_breakdown: serde_json::to_value(&result.breakdown).ok(),
+        // Always `pending`: the import path never marks a pair for
+        // automatic merge, whatever its evidence.
         status: "pending".to_string(),
         provenance: "import".to_string(),
+        evidence: serde_json::to_value(&result.evidence).ok(),
     };
     if let Err(e) = review_queue::upsert(db, &[item]).await {
         tracing::warn!(

@@ -26,6 +26,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
   "rt-multi-thread",
+  "sync",
 ] }
 async-trait = { version = "0.1" }
 axum = { version = "0.8" }

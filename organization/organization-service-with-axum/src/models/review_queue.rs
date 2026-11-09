@@ -41,6 +41,10 @@ pub struct ReviewQueueRow {
     /// vocabulary). Never touched on a re-scan upsert, so it always
     /// reflects the pair's origin, not its most recent detection.
     pub provenance: String,
+    /// The matcher's match evidence for the pair
+    /// (`agents/share/match-evidence.md`), JSON-encoded. Refreshed on a
+    /// re-scan upsert; `None` for a row queued before the column existed.
+    pub evidence: Option<serde_json::Value>,
     /// Reviewer identity recorded by the decision endpoint.
     pub reviewed_by: Option<String>,
     /// When the pair was first queued.
@@ -64,13 +68,18 @@ pub struct NewReviewItem {
     pub detection_method: String,
     /// Optional per-component score breakdown.
     pub score_breakdown: Option<serde_json::Value>,
-    /// Initial lowercase status token (`pending` here — no auto-merge).
+    /// Initial lowercase status token: `pending`, or `automerged` only for
+    /// a `Proven` pair at or above the scan's `auto_merge_threshold`.
     pub status: String,
     /// How this pair was first surfaced (`operator` / `import` /
     /// `matcher_suggested`). Only applied on insert; excluded from the
     /// re-scan `DO UPDATE SET` so a re-scan never overwrites a pair's
     /// original provenance.
     pub provenance: String,
+    /// The matcher's match evidence for the pair, JSON-encoded
+    /// (`agents/share/match-evidence.md`). Written on insert and
+    /// refreshed on a re-scan, like the score columns.
+    pub evidence: Option<serde_json::Value>,
 }
 
 /// Outcome of a decision attempt on one review item.
@@ -108,15 +117,16 @@ pub async fn upsert(db: impl Into<Db<'_>>, items: &[NewReviewItem]) -> Result<Ve
             ReviewQueueRow,
             "INSERT INTO review_queue
                  (id, record_id_a, record_id_b, match_score, match_quality,
-                  detection_method, score_breakdown, status, provenance)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                  detection_method, score_breakdown, status, provenance, evidence)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET
                  match_score = EXCLUDED.match_score,
                  match_quality = EXCLUDED.match_quality,
                  detection_method = EXCLUDED.detection_method,
-                 score_breakdown = EXCLUDED.score_breakdown
+                 score_breakdown = EXCLUDED.score_breakdown,
+                 evidence = EXCLUDED.evidence
              RETURNING id, record_id_a, record_id_b, match_score, match_quality,
-                       detection_method, score_breakdown, status, provenance,
+                       detection_method, score_breakdown, status, provenance, evidence,
                        reviewed_by, created_at, reviewed_at",
             Uuid::new_v4(),
             a,
@@ -127,6 +137,7 @@ pub async fn upsert(db: impl Into<Db<'_>>, items: &[NewReviewItem]) -> Result<Ve
             item.score_breakdown,
             item.status,
             item.provenance,
+            item.evidence,
         )
         .fetch_one(&mut *conn)
         .await?;
@@ -153,7 +164,7 @@ pub async fn list(
     let rows = sqlx::query_as!(
         ReviewQueueRow,
         "SELECT id, record_id_a, record_id_b, match_score, match_quality,
-                detection_method, score_breakdown, status, provenance,
+                detection_method, score_breakdown, status, provenance, evidence,
                 reviewed_by, created_at, reviewed_at
          FROM review_queue
          WHERE ($1::text IS NULL OR status = $1)
@@ -189,7 +200,7 @@ pub async fn decide(
          SET status = $2, reviewed_by = $3, reviewed_at = now()
          WHERE id = $1 AND status = 'pending'
          RETURNING id, record_id_a, record_id_b, match_score, match_quality,
-                   detection_method, score_breakdown, status, provenance,
+                   detection_method, score_breakdown, status, provenance, evidence,
                    reviewed_by, created_at, reviewed_at",
         id,
         status,

@@ -136,7 +136,10 @@ fn crud_paths() -> Value {
                     "tags": ["matching"],
                     "summary": "Batch-scan stored organizations pairwise and persist likely duplicates in the review queue",
                     "requestBody": { "required": true, "content": { "application/json": { "schema": {
-                        "type": "object", "properties": { "threshold": { "type": "number", "format": "double", "nullable": true } } } } } },
+                        "type": "object", "properties": {
+                            "threshold": { "type": "number", "format": "double", "nullable": true },
+                            "auto_merge_threshold": { "type": "number", "format": "double", "nullable": true,
+                                "description": "Score at or above which a pair whose evidence is `proven` is marked `automerged`. Absent: none is marked. `consistent` and `contradicted` pairs stay `pending` at any score (agents/share/match-evidence.md §4)." } } } } } },
                     "responses": { "200": { "description": "Scan report over the STORED review rows (stable ids)",
                         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchDeduplicationResponse" } } } } }
                 }
@@ -248,7 +251,24 @@ fn components() -> Value {
                 "ScoredRef": { "type": "object", "properties": {
                     "pid": { "type": "string" }, "name": { "type": "string" },
                     "score": { "type": "number", "format": "double" }, "confidence": { "type": "string" },
-                    "is_match": { "type": "boolean" } } },
+                    "is_match": { "type": "boolean" },
+                    "evidence": { "$ref": "#/components/schemas/Evidence" } } },
+                "Evidence": { "type": "object",
+                    "description": "How much the compared data proves, beside the similarity score (agents/share/match-evidence.md). Component names and bits only, never field values.",
+                    "required": ["weight_bits", "fields_compared", "contradictions", "strength"],
+                    "properties": {
+                        "weight_bits": { "type": "number", "format": "double" },
+                        "fields_compared": { "type": "integer" },
+                        "contradictions": { "type": "array", "items": { "type": "object", "required": ["field"],
+                            "properties": { "field": { "type": "string" } } } },
+                        "strength": { "type": "string", "enum": ["contradicted", "proven", "consistent", "non_match"] },
+                        "components": { "type": "array", "items": { "type": "object",
+                            "required": ["component", "bits", "correlated", "frequency_adjusted"],
+                            "properties": {
+                                "component": { "type": "string" },
+                                "bits": { "type": "number", "format": "double" },
+                                "correlated": { "type": "boolean" },
+                                "frequency_adjusted": { "type": "boolean" } } } } } },
                 "ReviewQueueItem": { "type": "object", "properties": {
                     "id": { "type": "string", "format": "uuid" },
                     "organization_id_a": { "type": "string", "format": "uuid" },
@@ -258,6 +278,9 @@ fn components() -> Value {
                     "detection_method": { "type": "string" },
                     "score_breakdown": { "type": "object", "nullable": true },
                     "status": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] },
+                    "provenance": { "type": "string" },
+                    "evidence": { "allOf": [{ "$ref": "#/components/schemas/Evidence" }], "nullable": true,
+                        "description": "Stored at detection time; null for a row queued before evidence was recorded." },
                     "reviewed_by": { "type": "string", "nullable": true },
                     "created_at": { "type": "string", "format": "date-time" },
                     "reviewed_at": { "type": "string", "format": "date-time", "nullable": true } } },
@@ -315,6 +338,23 @@ mod tests {
         assert_eq!(s["openapi"], "3.0.3");
         assert!(s["paths"]["/api/organizations"]["post"].is_object());
         assert!(s["components"]["schemas"]["Organization"]["properties"]["name"].is_object());
+    }
+
+    /// Match evidence is documented on the duplicate-check hit and the
+    /// review-queue item (`agents/share/match-evidence.md`).
+    #[test]
+    fn spec_documents_match_evidence() {
+        let s = spec();
+        let schemas = &s["components"]["schemas"];
+        assert_eq!(
+            schemas["ScoredRef"]["properties"]["evidence"]["$ref"],
+            "#/components/schemas/Evidence"
+        );
+        assert!(schemas["ReviewQueueItem"]["properties"]["evidence"].is_object());
+        assert_eq!(
+            schemas["Evidence"]["properties"]["strength"]["enum"],
+            json!(["contradicted", "proven", "consistent", "non_match"])
+        );
     }
 
     /// The merge endpoints and the `MergeRequest` schema are documented.

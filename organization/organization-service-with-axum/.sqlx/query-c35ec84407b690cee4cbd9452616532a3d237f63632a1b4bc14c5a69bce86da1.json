@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE review_queue\n         SET status = $2, reviewed_by = $3, reviewed_at = now()\n         WHERE id = $1 AND status = 'pending'\n         RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                   detection_method, score_breakdown, status, provenance,\n                   reviewed_by, created_at, reviewed_at",
+  "query": "UPDATE review_queue\n         SET status = $2, reviewed_by = $3, reviewed_at = now()\n         WHERE id = $1 AND status = 'pending'\n         RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                   detection_method, score_breakdown, status, provenance, evidence,\n                   reviewed_by, created_at, reviewed_at",
   "describe": {
     "columns": [
       {
@@ -104,6 +104,17 @@
       },
       {
         "ordinal": 9,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "evidence"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
         "name": "reviewed_by",
         "type_info": "Varchar",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "reviewed_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -154,9 +165,10 @@
       false,
       false,
       true,
+      true,
       false,
       true
     ]
   },
-  "hash": "fa04d09aa7e72a197589eb36ecb1ad643600df56f2c327c8ba1cd399bc415ce1"
+  "hash": "c35ec84407b690cee4cbd9452616532a3d237f63632a1b4bc14c5a69bce86da1"
 }

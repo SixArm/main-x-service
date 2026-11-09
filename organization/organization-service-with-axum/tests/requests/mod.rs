@@ -9,6 +9,7 @@ use serde_json::json;
 
 mod bulk;
 mod event_outbox;
+mod evidence;
 mod fhir;
 mod organizations;
 

@@ -11,7 +11,9 @@ use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::extract::OriginalUri;
 use axum::http::StatusCode;
-use organization_matcher::{MatchConfig, MatchingEngine, Organization};
+use organization_matcher::{
+    Evidence, MatchConfig, MatchResult, MatchStrength, MatchingEngine, Organization,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
@@ -81,6 +83,10 @@ struct ScoredRef {
     confidence: String,
     /// Whether the score cleared the match threshold.
     is_match: bool,
+    /// How much the compared data proves, beside `score`
+    /// (`agents/share/match-evidence.md`): component names and bits
+    /// only, never field values.
+    evidence: Evidence,
 }
 
 /// Validate an incoming `Organization` payload.
@@ -413,10 +419,13 @@ async fn score_against_index(
     let engine = MatchingEngine::new(MatchConfig::default());
     let hits = index.candidates(query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
     let rows = OrgModel::find_by_pids(&ctx.db, &parse_pids(&hits)).await?;
+    // The cached value-frequency table (match-evidence.md §7); a common
+    // name proves less than a rare one.
+    let freqs = crate::frequencies::current(&ctx.db).await;
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_org()?;
-        let r = engine.match_organizations(query, &candidate);
+        let r = engine.match_organizations_with_frequencies(query, &candidate, &*freqs);
         if r.is_match {
             hits.push(ScoredRef {
                 pid: row.pid.to_string(),
@@ -424,6 +433,7 @@ async fn score_against_index(
                 score: r.score,
                 confidence: format!("{:?}", r.confidence),
                 is_match: r.is_match,
+                evidence: r.evidence,
             });
         }
     }
@@ -475,8 +485,27 @@ enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate.
     Rejected,
-    /// Auto-merged (no auto-merge path here; present for wire parity).
+    /// Marked for automatic merge: `score >= auto_merge_threshold` and
+    /// the evidence is `Proven` ([`review_status_for`]). Nothing is
+    /// merged by the scan itself.
     AutoMerged,
+}
+
+/// The status a freshly scanned pair is queued with
+/// (`agents/share/match-evidence.md` §4).
+///
+/// `automerged` only when the request named an `auto_merge_threshold`,
+/// the score clears it, **and** the evidence strength is `Proven`. A
+/// `Consistent` pair (alike, but short of proof — e.g. two records that
+/// agree only on a name) and a `Contradicted` one (a conflicting
+/// identifier under one scheme) are `pending`, whatever their score.
+fn review_status_for(result: &MatchResult, auto_merge_threshold: Option<f64>) -> ReviewStatus {
+    match auto_merge_threshold {
+        Some(t) if result.score >= t && result.evidence.strength == MatchStrength::Proven => {
+            ReviewStatus::AutoMerged
+        }
+        _ => ReviewStatus::Pending,
+    }
 }
 
 /// The lowercase wire token for a review status.
@@ -524,6 +553,10 @@ struct ReviewQueueItem {
     /// How the pair was first surfaced (`operator` / `import` /
     /// `matcher_suggested`; BLK-5).
     provenance: String,
+    /// The matcher's match evidence for the pair, as stored at detection
+    /// time (`agents/share/match-evidence.md`). `None` for a row queued
+    /// before the column existed.
+    evidence: Option<Evidence>,
     /// Reviewer identity recorded by the decision endpoint, if decided.
     reviewed_by: Option<String>,
     /// When the pair was first queued.
@@ -544,10 +577,19 @@ fn review_row_to_item(row: &crate::models::review_queue::ReviewQueueRow) -> Revi
         score_breakdown: row.score_breakdown.clone(),
         status: parse_review_status(&row.status),
         provenance: row.provenance.clone(),
+        evidence: stored_evidence(row.evidence.as_ref()),
         reviewed_by: row.reviewed_by.clone(),
         created_at: row.created_at,
         reviewed_at: row.reviewed_at,
     }
+}
+
+/// Decode a stored `evidence` column. `NULL` (a row queued before the
+/// column existed) and JSON that no longer decodes both read as `None`.
+fn stored_evidence(value: Option<&serde_json::Value>) -> Option<Evidence> {
+    value
+        .filter(|v| !v.is_null())
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
 }
 
 /// Request body for the batch scan. With no `threshold` the matcher's
@@ -557,6 +599,12 @@ struct BatchDeduplicationRequest {
     /// Optional score threshold overriding the matcher's verdict.
     #[serde(default)]
     threshold: Option<f64>,
+    /// Optional score at or above which a **`Proven`** pair is marked
+    /// `automerged` (`agents/share/match-evidence.md` §4). Absent, no
+    /// pair is marked, as before. `Consistent` and `Contradicted` pairs
+    /// stay `pending` at any score.
+    #[serde(default)]
+    auto_merge_threshold: Option<f64>,
 }
 
 /// Response for the batch scan, in the family's report shape.
@@ -566,7 +614,8 @@ struct BatchDeduplicationResponse {
     organizations_scanned: usize,
     /// Number of duplicate pairs found (stored rows reported).
     duplicates_found: usize,
-    /// Auto-merged count (always 0 — no auto-merge path here).
+    /// Stored pairs currently marked `automerged` (only `Proven` pairs
+    /// at or above the request's `auto_merge_threshold`).
     auto_merged: usize,
     /// Number of stored pairs currently `pending` review.
     queued_for_review: usize,
@@ -603,12 +652,15 @@ async fn deduplicate(
         .iter()
         .map(|row| Ok((row.pid, row.to_org()?)))
         .collect::<Result<_>>()?;
+    // Value frequencies counted over the records this scan loaded
+    // (match-evidence.md §7); below the population floor, none.
+    let freqs = crate::frequencies::from_records(orgs.iter().map(|(_, o)| o));
     let mut new_items = Vec::new();
     // Upper-triangular pair iteration: j starts at i+1 so each unordered
     // pair is scored once and no record is compared with itself.
     for i in 0..orgs.len() {
         for j in (i + 1)..orgs.len() {
-            let r = engine.match_organizations(&orgs[i].1, &orgs[j].1);
+            let r = engine.match_organizations_with_frequencies(&orgs[i].1, &orgs[j].1, &freqs);
             let is_dup = req.threshold.map_or(r.is_match, |t| r.score >= t);
             if is_dup {
                 new_items.push(crate::models::review_queue::NewReviewItem {
@@ -622,8 +674,10 @@ async fn deduplicate(
                     // so a re-fetch of the queue doesn't need a second
                     // `/match` call to explain the score.
                     score_breakdown: serde_json::to_value(&r.breakdown).ok(),
-                    status: review_status_token(ReviewStatus::Pending).to_string(),
+                    status: review_status_token(review_status_for(&r, req.auto_merge_threshold))
+                        .to_string(),
                     provenance: "operator".to_string(),
+                    evidence: serde_json::to_value(&r.evidence).ok(),
                 });
             }
         }
@@ -634,10 +688,14 @@ async fn deduplicate(
         .iter()
         .filter(|i| i.status == ReviewStatus::Pending)
         .count();
+    let auto_merged = review_items
+        .iter()
+        .filter(|i| i.status == ReviewStatus::AutoMerged)
+        .count();
     format::json(BatchDeduplicationResponse {
         organizations_scanned: orgs.len(),
         duplicates_found: review_items.len(),
-        auto_merged: 0,
+        auto_merged,
         queued_for_review,
         review_items,
     })
@@ -1175,5 +1233,98 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    // ─── match evidence (agents/share/match-evidence.md) ────────────
+
+    use organization_matcher::{IdentifierScheme, OrgIdentifier};
+
+    fn with_lei(name: &str, lei: &str) -> Organization {
+        let mut org = Organization::new(name);
+        org.identifiers.push(OrgIdentifier {
+            scheme: IdentifierScheme::Lei,
+            value: lei.into(),
+        });
+        org
+    }
+
+    fn scored(a: &Organization, b: &Organization) -> MatchResult {
+        MatchingEngine::new(MatchConfig::default()).match_organizations(a, b)
+    }
+
+    /// A name-only agreement is alike but proves little: above the
+    /// auto-merge threshold it still queues `pending`.
+    #[test]
+    fn a_consistent_pair_is_never_automerged() {
+        let a = Organization::new("Zephyrine Holdings");
+        let r = scored(&a, &a.clone());
+        assert!(r.score >= 0.95);
+        assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+        assert_eq!(review_status_for(&r, Some(0.9)), ReviewStatus::Pending);
+    }
+
+    /// A shared LEI is proof: above the threshold it is `automerged`;
+    /// without a threshold nothing is marked.
+    #[test]
+    fn a_proven_pair_is_automerged_only_with_a_threshold() {
+        let lei = "5493001KJTIIGC8Y1R12";
+        let r = scored(&with_lei("Acme, Inc.", lei), &with_lei("Acme Inc", lei));
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+        assert_eq!(review_status_for(&r, Some(0.95)), ReviewStatus::AutoMerged);
+        assert_eq!(review_status_for(&r, None), ReviewStatus::Pending);
+        // Below the threshold, even proof waits for review.
+        assert_eq!(review_status_for(&r, Some(1.01)), ReviewStatus::Pending);
+    }
+
+    /// Two different LEIs contradict, whatever the name says.
+    #[test]
+    fn a_contradicted_pair_is_never_automerged() {
+        let r = scored(
+            &with_lei("Zephyrine Holdings", "5493001KJTIIGC8Y1R12"),
+            &with_lei("Zephyrine Holdings", "529900T8BM49AURSDO55"),
+        );
+        assert!(r.score >= 0.95);
+        assert_eq!(r.evidence.strength, MatchStrength::Contradicted);
+        assert_eq!(review_status_for(&r, Some(0.5)), ReviewStatus::Pending);
+    }
+
+    /// A row queued before the `evidence` column existed reads as
+    /// `None`, and evidence JSON written before `components` existed
+    /// still decodes.
+    #[test]
+    fn stored_evidence_tolerates_old_rows() {
+        assert!(stored_evidence(None).is_none());
+        assert!(stored_evidence(Some(&serde_json::Value::Null)).is_none());
+        let old = serde_json::json!({
+            "weight_bits": 9.9, "fields_compared": 1,
+            "contradictions": [], "strength": "consistent"
+        });
+        let ev = stored_evidence(Some(&old)).expect("old evidence decodes");
+        assert_eq!(ev.strength, MatchStrength::Consistent);
+        assert!(ev.components.is_empty());
+        // A whole old `MatchResult` without `evidence` still decodes too.
+        let r = scored(&Organization::new("A"), &Organization::new("A"));
+        let mut v = serde_json::to_value(&r).unwrap();
+        v.as_object_mut().unwrap().remove("evidence");
+        let back: MatchResult = serde_json::from_value(v).unwrap();
+        assert_eq!(back.evidence.strength, MatchStrength::NonMatch);
+    }
+
+    /// Evidence carries component names and bits, never field values,
+    /// so it is safe beside a masked view.
+    #[test]
+    fn evidence_carries_no_field_values() {
+        let a = with_lei("Zephyrine Holdings", "5493001KJTIIGC8Y1R12");
+        let b = with_lei("Zephyrine Holdings", "529900T8BM49AURSDO55");
+        let json = serde_json::to_string(&scored(&a, &b).evidence).unwrap();
+        for value in [
+            "Zephyrine",
+            "zephyrine",
+            "5493001KJTIIGC8Y1R12",
+            "529900T8BM49AURSDO55",
+        ] {
+            assert!(!json.contains(value), "{value} leaked into {json}");
+        }
+        assert!(json.contains("identifier:lei"));
     }
 }

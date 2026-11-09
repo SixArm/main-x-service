@@ -104,17 +104,23 @@ are never fed to the matcher. See §8 and
    not on how recently it was inserted. `503` when the index is
    unavailable — answering "no duplicates" from a broken index would let
    a caller create a duplicate believing it had been checked.
+   Each hit (here and in the create-time `409` body) carries the
+   matcher's **`evidence`** (§6.15).
 8. `POST /api/organizations/deduplicate` — batch-scan the stored
    records pairwise (up to the §6 R-DUP scan cap) and **persist** likely
    duplicates in the stored `review_queue` (normalized-pair upsert:
    re-scans refresh scores, decided rows keep their decision, item ids
    stay stable); the response reports the stored rows
-   (`organizations_scanned` / `duplicates_found` / `auto_merged` (always
-   0) / `queued_for_review` / `review_items[]`). Destructive-classed
-   under ABAC, like merge.
+   (`organizations_scanned` / `duplicates_found` / `auto_merged` /
+   `queued_for_review` / `review_items[]`). Destructive-classed
+   under ABAC, like merge. An optional `auto_merge_threshold` marks a
+   pair `automerged` only when its score clears it **and** its evidence
+   is `proven`; absent, no pair is marked (§6.15). Nothing is merged by
+   the scan itself.
 9. `GET /api/organizations/review-queue[?status=&limit=]` — list the
    stored review queue, newest first (limit cap 500; unknown status
-   token → `422`).
+   token → `422`). Each item carries the `evidence` stored with it
+   (`null` for a row queued before evidence was recorded).
 10. `POST /api/organizations/review-queue/{id}/decision` — decide a
     `pending` item (`{"status": "confirmed" | "rejected"}`);
     first-writer-wins in SQL (`404` unknown id, `422` already decided).
@@ -146,6 +152,38 @@ are never fed to the matcher. See §8 and
 14. `GET /metrics.prom` — Prometheus metrics in text-exposition format
    (`text/plain; version=0.0.4`). Mounted at the application **root**
    (not under `/api`), public even under blanket auth enforcement.
+15. **Match evidence** ([`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)).
+    Every match result the service returns carries the matcher's
+    `evidence` (`weight_bits`, `fields_compared`, `contradictions`,
+    `strength`, `components`) beside the unchanged `score`: the
+    `check-duplicates` hits, the create-time `409` candidates, the
+    `match` endpoint's results, and every review-queue item (stored in
+    `review_queue.evidence`, written on insert and on the re-scan
+    upsert, including the bulk-import `provenance = "import"` path).
+    Evidence holds component names, bits and contradiction fields such
+    as `identifier:lei` — never field values — so it is safe beside the
+    masked view; it does reveal that both records hold a value under a
+    named scheme.
+    - **Auto-merge only on `Proven`** (§4 of the contract). A pair is
+      `automerged` only when `score >= auto_merge_threshold` and
+      `evidence.strength == proven`. `consistent` (alike, short of
+      proof — e.g. a name-only agreement) and `contradicted` (conflicting
+      identifiers under one scheme) pairs stay `pending` at any score.
+      The bulk-import path and `check-duplicates` never auto-merge; the
+      service performs no real automatic merge anywhere.
+    - **Value frequencies** (§7 of the contract; `src/frequencies.rs`).
+      The frequency component is the name; a record contributes each
+      distinct legal-suffix-stripped key of its `name`, `legal_name`
+      and `alternate_names` once, and a share is `count / population`.
+      Below `MIN_FREQUENCY_POPULATION` (1 000) records the source is
+      `NoFrequencies`. `deduplicate` counts the records its scan
+      loaded. `check-duplicates`, create and bulk import use a
+      process-wide cached table, rebuilt lazily when older than
+      10 minutes: the first use scans inline (concurrent first callers
+      wait on that one scan), a stale table keeps answering while one
+      background task rebuilds it. The rebuild pages through active
+      records, oldest first, capped at 200 000 — above the cap the
+      table is a sample. `match` stays stateless (no frequencies).
 
 ## 7. Non-functional requirements
 
@@ -314,10 +352,10 @@ an `axa::sqlx::Db` (the pool, or the caller's open transaction), which
 is how an `organizations` row, its `event_outbox` row and its audit row
 commit in one transaction under the `outbox` transport.
 
-The schema is the plain SQL under `migrations/`, eight reversible
+The schema is the plain SQL under `migrations/`, nine reversible
 `<version>_<name>.up.sql` / `.down.sql` pairs (organizations, audit
 logs, merge records, event outbox, review queue, integrity digests,
-review-queue provenance, bulk jobs), embedded by `sqlx::migrate!` and
+review-queue provenance, bulk jobs, review-queue evidence), embedded by `sqlx::migrate!` and
 recorded in `_sqlx_migrations`. `db migrate | down [steps] | reset |
 status` run through `axa::sqlx`; `auto_migrate` is on in development.
 They replace the SeaORM `migration/` crate one for one, in the same
@@ -507,6 +545,23 @@ right-of-access export have landed (§13, §6.12–13) and honour the ABAC
 organization is not a data subject.
 
 ## 13. Tasks (live work queue)
+
+- [x] **ORG-EV1 — carry match evidence through the service.** *(Done
+  2026-11-09; [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+  §10 step 4.)* §6.15: `evidence` on `check-duplicates` hits, the
+  create-time `409` candidates and review-queue items (OpenAPI
+  `Evidence` schema); `review_queue.evidence` JSONB
+  (`2026110900000001_review_queue_evidence`), written on insert and
+  re-scan upsert by both `deduplicate` and the bulk-import review path;
+  `deduplicate`'s new optional `auto_merge_threshold` marks only
+  `proven` pairs `automerged`; the name-share frequency source
+  (`src/frequencies.rs`) feeds `match_organizations_with_frequencies`
+  on every stored-record match path. Tests: unit (the gate per
+  strength, old-row decoding, no field values in evidence, the
+  population floor and the common-name discount) and DB
+  (`tests/requests/evidence.rs`: consistent/proven/contradicted scans,
+  evidence on `check-duplicates` and the `409`, a NULL-evidence row;
+  `tests/requests/bulk.rs`: evidence on the import review row).
 
 - [x] **INT-V1 — a written record verifies.** *(Done 2026-11-07; repo
   `tasks.md` INT-V1, after event's EVT-V1.)* The DB test
