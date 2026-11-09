@@ -24,6 +24,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Consistent`, not `Proven`. Spec §5.5, §7.1, §9.2; T-6.
 - `score`, `is_match` and `confidence` are unchanged.
 
+### Added — correlated groups, value frequencies, per-term evidence (T-7, 2026-11-09)
+
+- Correlated components (contract §6): `evidence::CORRELATED_GROUPS` =
+  `{start_date, end_date}`, `{location, organizer, country_code}`,
+  `{url, name}`; the strongest present member counts in full and the
+  rest at `CORRELATED_DISCOUNT = 0.5` (`group_bits`, `strongest_first`).
+  Two occurrences of one series a week apart are no longer `Proven`
+  (26.17 bits, was 32.95). The richest identical record without an
+  identifier drops from 67.92 to 56.58 bits and stays `Proven`.
+- Value frequencies (contract §7): `ValueFrequencies`, `NoFrequencies`,
+  `FrequencyTable`, `MIN_SHARE`, `frequency_bits`,
+  `FREQUENCY_COMPONENTS = ["name"]`, `frequency_key`, and
+  `MatchingEngine::match_events_with_frequencies`. An exact name
+  agreement takes its weight from the name's share; `match_events` uses
+  `NoFrequencies`.
+- `Evidence::components: Vec<ComponentBits>` (`#[serde(default)]`): every
+  term of the sum, identifier and contradiction terms included; they add
+  up to `weight_bits` exactly.
+
+### Fixed — OQ-J in the evidence (T-7)
+
+- A location or nested address that shares no comparable field is
+  missing data in the evidence, not a disagreement (it weighed about
+  −2.7 bits). `breakdown.location_score` and `score` keep the neutral
+  `0.5`, unchanged.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

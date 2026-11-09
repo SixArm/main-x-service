@@ -11,7 +11,7 @@ The following design questions are deliberately unresolved. Proposing a resoluti
 - **OQ-G — Address `line2`, `county`, `country` scoring.** These fields are stored but not scored (§6.4). Should they contribute, and if so with what sub-weights?
 - **OQ-H — Per-category temporal / spatial scale defaults.** The defaults `start_date_scale_seconds = 3600.0` and `coordinates_scale_metres = 100.0` suit single-venue, clock-scheduled events. Multi-day festivals tolerate hours of start-time drift across sources; stadium fixtures may need a wider coordinate scale than club gigs. Should defaults vary by `EventCategory`?
 - **OQ-I — URL canonicalisation.** `url_score` and the `virtual_url` sub-score compare by exact equality after trim (§6.10). Should the matcher canonicalise URLs first (case-fold scheme and host, strip trailing slash and tracking query parameters)? Trade-off: recall vs false positives on path-significant platforms.
-- **OQ-J — Neutral `0.5` vs `None` for a present-but-fully-vacuous `Location`/`Address`.** §6.4 documents that `compare_locations`/`compare_addresses` return the neutral `0.5` — not `None` — when both sides carry the sub-object but it shares no comparable field (e.g. both sides have `location: Some(Location::new())` with every field `None`, or an `address: Some(Address::new())` nested inside an otherwise-populated location). This is deliberate ("neither evidence for nor against" per §6.4), but it means the neutral value gets weighted into the overall average as if it were real signal: found via `tests/property_tests.rs`'s widened `event_strategy()` (T-1), where it can pull a **self-match** below `High` confidence purely because a present-but-empty `Location`/`Address` happened to be attached — a reason unrelated to whether the two records are actually the same event. Should `compare_locations`/`compare_addresses` instead return `None` (skip, no weight contributed) when literally nothing is shared, matching every other component's "both present but nothing to compare ⇒ skip" convention, and restoring the self-match invariant unconditionally? Trade-off: the current `0.5` is a considered choice (a present empty object is treated as weaker "no signal" than an absent one would be, since the caller at least tried to supply it) vs. an unconditional `None` being simpler to reason about and family-consistent. The property test that found this (`self_match_confidence_is_high`) narrowly filters out this exact input class in the interim rather than resolving the question unilaterally — see `location_is_meaningful` in `tests/property_tests.rs`. Related to OQ-G (whether `line2`/`county`/`country` should score at all) but distinct: OQ-G asks whether to score *more* fields; OQ-J asks what the *fallback* should be when *none* of the currently-scored fields are shared.
+- **OQ-J — Neutral `0.5` vs `None` for a present-but-fully-vacuous `Location`/`Address`.** *(Resolved for evidence 2026-11-09, T-7; still open for `score`.)* §6.4 returns the neutral `0.5` — not `None` — when both sides carry the sub-object but it shares no comparable field. That neutral value is weighted into `score` as if it were real signal, which the widened `event_strategy()` (T-1) showed can pull a self-match below `High` confidence; `self_match_confidence_is_high` filters that input class out (`location_is_meaningful`). **The evidence (§5.5) no longer has this problem:** it weighs its own location blend, leaving out a nested address that shares nothing and treating a location that shares nothing as missing data, as the place and worker matchers do, so it is never a disagreement there. **Still open:** whether `score` should follow (return `None` and restore the self-match invariant unconditionally), which would change `score` and is a separate, behaviour-changing decision. Related to OQ-G but distinct: OQ-G asks whether to score *more* fields; OQ-J asks what the fallback should be when *none* are shared.
 
 ### Implementation tasks
 
@@ -138,7 +138,26 @@ AGENTS.md guidance to prefer Open Questions over a unilateral decision.
   consistent with contradictions.
   - **Resolved.** As specified; event-service adopting `evidence` (gating
     auto-merge on `Proven`, closing its T-16) is the service's own task.
-    The neutral `0.5` for a present-but-empty `Location` (OQ-J) weighs as
-    a disagreement under §5.5; resolving OQ-J to `None` would remove that.
+    The neutral `0.5` for a present-but-empty `Location` (OQ-J) weighed as
+    a disagreement under §5.5 until T-7 made it missing data.
+
+- [x] **T-7 (M)** *(resolved 2026-11-09.)* Adopt match-evidence
+  contract §6–§8: `CORRELATED_GROUPS` (`{start_date, end_date}`,
+  `{location, organizer, country_code}`, `{url, name}`) with
+  `CORRELATED_DISCOUNT`, `group_bits`, `strongest_first`;
+  `ValueFrequencies` / `NoFrequencies` / `FrequencyTable`, `MIN_SHARE`,
+  `frequency_bits`, `FREQUENCY_COMPONENTS = ["name"]`, `frequency_key`;
+  `Evidence::components` (`ComponentBits`);
+  `MatchingEngine::match_events_with_frequencies`. Also resolves OQ-J for
+  the evidence. Spec §5.5, §9.2.
+  **Acceptance:** `score`, `is_match`, `confidence` unchanged with and
+  without frequencies; correlated agreements and disagreements discounted
+  order-independently; a series a week apart is not `Proven`; a common
+  name gives fewer bits than the table and a rare one more; a share at or
+  above `m` gives `0`; no adjustment on partial agreement or disagreement;
+  `NoFrequencies` equals `match_events`; a property pins
+  `sum(components) == weight_bits`.
+  - **Resolved.** As specified. A service supplying frequencies from its
+    own counts, and gating merge on `Proven`, is the service's task.
 
 ---

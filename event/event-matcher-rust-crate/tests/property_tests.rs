@@ -324,6 +324,10 @@ proptest! {
         } else {
             prop_assert_eq!(e.strength, MatchStrength::Contradicted);
         }
+        // The listed terms sum to the total, exactly (spec §5.5).
+        let sum: f64 = e.components.iter().map(|t| t.bits).sum();
+        prop_assert_eq!(sum.to_bits(), e.weight_bits.to_bits());
+        prop_assert!(e.components.iter().all(|t| t.bits.is_finite()));
         // Self-match never contradicts itself.
         let s = MatchingEngine::default_config().match_events(&p1, &p1);
         prop_assert!(s.evidence.contradictions.is_empty());

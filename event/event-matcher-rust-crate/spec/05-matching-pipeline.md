@@ -78,10 +78,14 @@ pub struct Evidence {
     pub fields_compared: u32,        // components both records held (identifiers count as one)
     pub contradictions: Vec<Contradiction>, // { field: "identifier:<scheme>" }
     pub strength: MatchStrength,     // Contradicted | Proven | Consistent | NonMatch
+    #[serde(default)]
+    pub components: Vec<ComponentBits>, // every term of the sum (contract §8)
 }
 ```
 
-- **Components.** Each `Some` breakdown component adds `component_bits(s, m, u)`: the agreement weight `log2(m/u)` at `s >= 0.95`, the disagreement weight `log2((1−m)/(1−u))` at `s <= 0.60`, linear between. A `None` component adds `0` and is not counted. The neutral `0.5` that §6.4 returns for a present-but-empty `Location`/`Address` (OQ-J) therefore weighs as a disagreement here.
+`match_events(a, b)` is `match_events_with_frequencies(a, b, &NoFrequencies)`. Passing a `ValueFrequencies` source changes only `evidence`; `score`, `is_match`, `confidence` and `breakdown` are identical either way.
+
+- **Components.** Each `Some` breakdown component adds `component_bits(s, m, u)`: the agreement weight `log2(m/u)` at `s >= 0.95`, the disagreement weight `log2((1−m)/(1−u))` at `s <= 0.60`, linear between. A `None` component adds `0` and is not counted. **Location (OQ-J):** the evidence weighs its own location blend, in which a nested address sharing no comparable field is left out and a location pair sharing no comparable sub-field is `None`. The neutral `0.5` of §6.4 is therefore missing data here, as in the place and worker matchers, never a disagreement; `breakdown.location_score` and `score` keep the `0.5` unchanged.
 - **Per-component `m`/`u`** (informed estimates, not measurements; each constant's doc comment says where its `u` comes from):
 
   | Component | `m` | `u` | Agree bits | Disagree bits |
@@ -99,8 +103,18 @@ pub struct Evidence {
   | `tags_score` | 0.60 | 0.10 | +2.58 | −1.17 |
 
   `name_phonetic_score` is not weighed (it is derived from the same names as `name_score`). `event_ids_score` is not weighed as a component; the identifier rule replaces it.
+- **Correlated groups** (contract §6; `CORRELATED_GROUPS`, public). Within a group the present member with the largest absolute bits counts in full (ties to the larger value, so input order never matters) and every other present member at `CORRELATED_DISCOUNT = 0.5`; agreements and disagreements alike. Components in no group stand alone.
+
+  | Group | Why the members are not independent |
+  |---|---|
+  | `start_date`, `end_date` | One event's two endpoints: an end is usually the start plus a standard duration, and a reschedule moves both. |
+  | `location`, `organizer`, `country_code` | A series run by one organiser at one venue agrees on all three for one reason, and the venue fixes the country. |
+  | `url`, `name` | Event pages are slugged from the title, and a recurring series reuses both its title and its page. |
+
+- **Value frequencies** (contract §7; `FREQUENCY_COMPONENTS = ["name"]`, public). When both events hold the same normalised name (primary or alternate; `frequency_key("name", raw)` = `Normalizer::normalize_name(raw)`, `None` if empty) and the caller's `ValueFrequencies::share("name", key)` knows it, the name's agreement weight is `frequency_bits(m, share) = log2(m / clamp(share, MIN_SHARE = 1e-9, m))` instead of `log2(m/u)`. Several shared names: the most common is used. A share at or above `m` gives `0` bits, never negative. Partial agreement (a fuzzy name with no shared normalised value) and disagreement are never adjusted. A recurring title such as "Annual General Meeting" at a share of `0.2` gives `2.25` bits where the table gives `7.57`; `0.01` gives `6.57`; a rare `1e-6` gives `19.86`. `FrequencyTable` (`new`, `from_counts(counts, total)`, `insert`) stores keys through `frequency_key`, so raw and normalised values both work.
+- **Explainability** (contract §8). `components` holds one `ComponentBits { component, bits, correlated, frequency_adjusted }` per term: the weighed components by name, `identifier` for a shared event id, and `contradiction:identifier:<scheme>` per contradiction. `weight_bits` is defined as the sum of those terms in list order, so the two are equal exactly.
 - **Identifiers.** Every `EventIdScheme`, `Other(_)` included, is identity, because §5.1 rule 1 short-circuits on any shared `(scheme, value)`. A non-blank shared pair adds `IDENTIFIER_BITS = log2(0.99/1e-12) ≈ 39.85` once. Per scheme, when both records hold at least one non-blank value and the sets are disjoint, a `Contradiction { field: "identifier:<scheme>" }` is recorded (`wikidata`, `eventbrite`, …, `googlecalendar`, `icalendaruid`, `other:<name>`) and `log2(0.01/(1−1e-12)) ≈ −6.64` bits added. Different schemes neither share nor contradict. The §5.1 rule 2 (name + start instant) is **not** an identifier.
 - **Strength**, checked in order: any contradiction → `Contradicted`; `weight_bits >= MatchConfig::proof_bits` (default `30`, §7) → `Proven`; `is_match` → `Consistent`; else `NonMatch`.
-- **Reference points.** Identical name + start date only: `17.38` bits, `Consistent` (it is `is_match` and satisfies §5.1 rule 2, yet is not proof). All eleven weighed components identical, no identifier: `67.92` bits, `Proven`; it stays `Proven` without the URL (`54.78`).
+- **Reference points.** Identical name + start date only: `17.38` bits, `Consistent` (it is `is_match` and satisfies §5.1 rule 2, yet is not proof; the two are in different groups, so nothing is discounted). All eleven weighed components identical, no identifier: `56.58` bits after the group discount (`67.92` summed independently), `Proven`; `47.23` without the URL, still `Proven`. Two occurrences of one series a week apart (same name, organiser, venue, URL, category and country; both dates disagree): `26.17` bits, not `Proven` — summed independently the same terms would have been `32.95`.
 
 ---

@@ -35,7 +35,9 @@
 //! assert!(result.is_match);
 //! ```
 
-use crate::evidence::{self, DEFAULT_PROOF_BITS, Evidence};
+use crate::evidence::{
+    self, DEFAULT_PROOF_BITS, Evidence, EvidenceInputs, NoFrequencies, ValueFrequencies,
+};
 use crate::models::{Address, Event, Location, RelationKind, RelationshipRef};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
@@ -455,6 +457,40 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_events(&self, event1: &Event, event2: &Event) -> MatchResult {
+        self.match_events_with_frequencies(event1, event2, &NoFrequencies)
+    }
+
+    /// [`MatchingEngine::match_events`] with a caller-supplied
+    /// [`ValueFrequencies`] source for the evidence's frequency-adjusted
+    /// components ([`crate::evidence::FREQUENCY_COMPONENTS`]; spec §5.5).
+    ///
+    /// Only [`MatchResult::evidence`] can differ from `match_events`:
+    /// `score`, `is_match`, `confidence` and `breakdown` are identical.
+    ///
+    /// ```
+    /// use event_matcher::{Event, MatchingEngine};
+    /// use event_matcher::evidence::FrequencyTable;
+    ///
+    /// let e = Event::builder()
+    ///     .name("Annual General Meeting")
+    ///     .start_date("2024-09-10T09:00:00Z")
+    ///     .build();
+    /// let mut common = FrequencyTable::new();
+    /// common.insert("name", "Annual General Meeting", 0.2);
+    ///
+    /// let engine = MatchingEngine::default_config();
+    /// let plain = engine.match_events(&e, &e);
+    /// let adjusted = engine.match_events_with_frequencies(&e, &e, &common);
+    /// assert_eq!(plain.score, adjusted.score);
+    /// assert!(adjusted.evidence.weight_bits < plain.evidence.weight_bits);
+    /// ```
+    #[must_use]
+    pub fn match_events_with_frequencies(
+        &self,
+        event1: &Event,
+        event2: &Event,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         let breakdown = self.calculate_breakdown(event1, event2);
         let score = self.calculate_weighted_score(&breakdown);
         let above_threshold = score >= self.config.match_threshold;
@@ -464,8 +500,17 @@ impl MatchingEngine {
             above_threshold
         };
         let confidence = Confidence::from_score(score);
-        let evidence =
-            evidence::compute(event1, event2, &breakdown, is_match, self.config.proof_bits);
+        let evidence = evidence::compute(
+            event1,
+            event2,
+            &EvidenceInputs {
+                breakdown: &breakdown,
+                location: self.evidence_location(event1, event2),
+                is_match,
+                proof_bits: self.config.proof_bits,
+            },
+            frequencies,
+        );
 
         MatchResult {
             score,
@@ -788,6 +833,30 @@ impl MatchingEngine {
     /// locations share no comparable sub-field the function returns the
     /// neutral `0.5` (neither evidence for nor against).
     fn compare_locations(&self, l1: &Location, l2: &Location) -> f64 {
+        self.blend_locations(l1, l2, false).unwrap_or(0.5)
+    }
+
+    /// The location similarity the evidence weighs (spec §5.5, OQ-J):
+    /// `None` when either side has no location, or when the two share no
+    /// comparable sub-field, so the neutral `0.5` of
+    /// [`MatchingEngine::compare_locations`] counts as missing data rather
+    /// than as a disagreement. A nested address that shares no comparable
+    /// field is likewise left out of the blend.
+    fn evidence_location(&self, e1: &Event, e2: &Event) -> Option<f64> {
+        let (l1, l2) = (e1.location.as_ref()?, e2.location.as_ref()?);
+        self.blend_locations(l1, l2, true)
+    }
+
+    /// The weighted location blend, or `None` when no sub-field is shared.
+    /// `skip_neutral_address` drops a nested address that shares nothing
+    /// (the evidence path) instead of blending in its neutral `0.5` (the
+    /// score path, unchanged).
+    fn blend_locations(
+        &self,
+        l1: &Location,
+        l2: &Location,
+        skip_neutral_address: bool,
+    ) -> Option<f64> {
         // Each sub-component contributes a raw score in `[0.0, 1.0]` and a
         // weight. Final score is the weight-renormalised average across
         // sub-components that fired. Coordinates dominate (`0.5`), then
@@ -812,8 +881,11 @@ impl MatchingEngine {
         }
 
         if let (Some(a1), Some(a2)) = (l1.address.as_ref(), l2.address.as_ref()) {
-            weighted_sum += compare_addresses(a1, a2) * 0.3;
-            total_weight += 0.3;
+            let address = blend_addresses(a1, a2);
+            if let Some(a) = address.or((!skip_neutral_address).then_some(0.5)) {
+                weighted_sum += a * 0.3;
+                total_weight += 0.3;
+            }
         }
 
         if let (Some(v1), Some(v2)) = (l1.venue_name.as_deref(), l2.venue_name.as_deref()) {
@@ -829,9 +901,9 @@ impl MatchingEngine {
         }
 
         if total_weight == 0.0 {
-            0.5
+            None
         } else {
-            weighted_sum / total_weight
+            Some(weighted_sum / total_weight)
         }
     }
 
@@ -1059,7 +1131,11 @@ fn name_and_start_date_match(e1: &Event, e2: &Event) -> bool {
 /// Compare two postal addresses; same blend rule as the previous
 /// place-matcher implementation: postcode dominates (0.5), then city
 /// (0.3), then line 1 (0.2).
-fn compare_addresses(addr1: &Address, addr2: &Address) -> f64 {
+///
+/// Returns `None` when the two share no comparable field; the score path
+/// then blends in the neutral `0.5` (spec §6.4) and the evidence path
+/// leaves the address out (OQ-J).
+fn blend_addresses(addr1: &Address, addr2: &Address) -> Option<f64> {
     let mut weighted_sum = 0.0_f64;
     let mut total_weight = 0.0_f64;
 
@@ -1094,9 +1170,9 @@ fn compare_addresses(addr1: &Address, addr2: &Address) -> f64 {
     }
 
     if total_weight == 0.0 {
-        0.5
+        None
     } else {
-        weighted_sum / total_weight
+        Some(weighted_sum / total_weight)
     }
 }
 
