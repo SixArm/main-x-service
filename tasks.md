@@ -2716,9 +2716,18 @@
   `invalid_merge` before any read. Tests need no database (a `422` with
   the pool aimed at a closed port proves the refusal came first); event
   also has a DB test that the record survives, which fails on the old
-  handler. Found while writing event T-5's merge tests. *Still open:*
-  these four take no SEC-B5 row lock on the participants, so two
-  concurrent merges of one duplicate can both apply.
+  handler. Found while writing event T-5's merge tests.
+  *Row locks, the same day:* these four also took no SEC-B5 row lock, so
+  two concurrent merges of one duplicate could both apply, and in place
+  "B into A" racing "A into B" deleted both. Each repository's `merge`
+  now locks both rows `FOR UPDATE` in id order on its own transaction
+  and requires both still active, or answers `Conflict` (`409`
+  `merge_conflict`; event and worker gained the variant) and writes
+  nothing. This goes one step past person's SEC-B5 check, which rechecks
+  only the duplicate. Each crate has a DB test in which another
+  transaction holds a participant's row while deleting it: the merge
+  waits, then refuses, and the survivor is unchanged. Each fails with
+  the lock turned off.
 - [x] **SEC-B6 (M) 🟠** Relay exactly-once. *(all 10 services done 2026-07-13)*
   `drain_once` now runs in a transaction and `unpublished` claims rows with
   `FOR UPDATE SKIP LOCKED`, so >1 relay instance can't double-ship (a second

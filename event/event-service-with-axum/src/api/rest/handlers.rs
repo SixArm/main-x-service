@@ -879,9 +879,16 @@ pub async fn merge_events(
     // atomically in one transaction; the repository enqueues the `Merged`
     // (+`merged_from`) and `Deleted` outbox rows and publishes the
     // in-memory `Merged`/`Deleted` stream events.
-    if let Err(e) = state.event_repository.merge(&merged, &duplicate.id).await {
-        return ApiProblem::new("database_error", format!("Failed to merge events: {e}"))
-            .respond(StatusCode::INTERNAL_SERVER_ERROR);
+    match state.event_repository.merge(&merged, &duplicate.id).await {
+        Ok(_) => {}
+        // A concurrent merge or delete won the row lock first (SEC-B5).
+        Err(crate::Error::Conflict(why)) => {
+            return ApiProblem::new("merge_conflict", why).respond(StatusCode::CONFLICT);
+        }
+        Err(e) => {
+            return ApiProblem::new("database_error", format!("Failed to merge events: {e}"))
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
+        }
     }
 
     // Post-merge search-index updates are best-effort: the merge is

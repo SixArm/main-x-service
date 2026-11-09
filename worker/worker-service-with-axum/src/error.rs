@@ -41,6 +41,12 @@ pub enum Error {
     #[error("Validation error: {0}")]
     Validation(String),
 
+    /// The request conflicts with the records' current state, such as a
+    /// merge whose survivor or duplicate a concurrent write already
+    /// deleted. Maps to HTTP `409 Conflict`.
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
     /// A matching/scoring operation failed. Maps to HTTP `500 Internal
     /// Server Error`.
     #[error("Matching error: {0}")]

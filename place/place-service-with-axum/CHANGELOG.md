@@ -33,6 +33,10 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- Two concurrent merges can no longer both apply. `merge` locks both
+  records and checks they are still active before writing; the loser
+  answers `409` `merge_conflict` and changes nothing (repo `tasks.md`
+  SEC-B5b).
 - `POST /api/places/merge` refuses to merge a record into itself, with
   `422`. It used to apply the survivor and then soft-delete the same
   record, so the request deleted it and answered `500` (repo `tasks.md`

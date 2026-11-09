@@ -780,6 +780,12 @@ impl PlaceRepository for PgPlaceRepository {
         // The whole merge — the duplicate soft-delete plus both outbox rows
         // — commits (or rolls back) under one transaction.
         let mut txn = self.db.begin().await?;
+        // SEC-B5: the merge was computed from unlocked reads, so lock both
+        // rows before writing and check under the lock that both are still
+        // active. Otherwise two concurrent merges of one duplicate both
+        // apply, and "B into A" racing "A into B" deletes both. The loser
+        // gets `Conflict` (409) and writes nothing.
+        lock_merge_participants(&mut txn, survivor.id, *duplicate_id).await?;
         mark_deleted(&mut txn, *duplicate_id).await?;
         // Durable event bus (Phase 2): a `Merged` outbox row for the survivor
         // (carrying the duplicate's pid via `merged_from`, so a merge-
@@ -1042,6 +1048,41 @@ async fn update_place_row(conn: &mut PgConnection, row: &PlaceRow) -> Result<()>
         ));
     }
     Ok(())
+}
+
+/// Lock a merge's two rows `FOR UPDATE`, in id order so two merges of the
+/// same pair in opposite directions cannot deadlock, then require both to
+/// be active (SEC-B5). Returns [`crate::Error::Conflict`] when either was
+/// deleted since the caller read it, and the caller's transaction then
+/// writes nothing.
+///
+/// # Errors
+/// [`crate::Error::Conflict`] as above, or a database error.
+async fn lock_merge_participants(
+    conn: &mut PgConnection,
+    survivor_id: Uuid,
+    duplicate_id: Uuid,
+) -> Result<()> {
+    let mut ids = [survivor_id, duplicate_id];
+    ids.sort();
+    for id in ids {
+        sqlx::query_scalar!("SELECT id FROM places WHERE id = $1 FOR UPDATE", id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    }
+    let active = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "active!" FROM places WHERE id = ANY($1) AND is_deleted = false"#,
+        &ids[..],
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    if active == 2 {
+        Ok(())
+    } else {
+        Err(crate::Error::Conflict(format!(
+            "place {survivor_id} or {duplicate_id} is no longer active (merged or deleted meanwhile)"
+        )))
+    }
 }
 
 /// Soft-delete one place: set the tombstone and its timestamp. Nothing
@@ -1486,6 +1527,58 @@ mod tests {
         assert!(
             matches!(result, Err(crate::Error::Conflict(_))),
             "expected Conflict, got {result:?}"
+        );
+    }
+
+    /// SEC-B5: a merge locks both rows and rechecks them under the lock.
+    /// Another transaction is soft-deleting the survivor and holds its
+    /// row; the merge waits for it, then finds the survivor gone and
+    /// answers `Conflict` without deleting the duplicate. Without the lock
+    /// "B into A" racing "A into B" deleted both.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn a_merge_waits_for_a_concurrent_delete_and_then_refuses() {
+        let db = connect().await;
+        let repo = PgPlaceRepository::new(db.clone());
+        let survivor = repo.create(&Place::new("Race Survivor")).await.unwrap();
+        let duplicate = repo.create(&Place::new("Race Duplicate")).await.unwrap();
+
+        let mut other = db.begin().await.unwrap();
+        super::mark_deleted(&mut other, survivor.id).await.unwrap();
+
+        let merger = PgPlaceRepository::new(db.clone());
+        let main = survivor.clone();
+        let dup_id = duplicate.id;
+        let merge = tokio::spawn(async move { merger.merge(&main, &dup_id).await });
+
+        // Wait, up to ten seconds, until Postgres reports a backend waiting
+        // on a lock held by `other`.
+        let mut blocked = false;
+        for _ in 0..200 {
+            let waiting: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_stat_activity
+                 WHERE datname = current_database() AND wait_event_type = 'Lock'",
+            )
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            if waiting > 0 {
+                blocked = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        other.commit().await.unwrap();
+
+        let result = merge.await.unwrap();
+        assert!(blocked, "the merge never waited on the survivor's row lock");
+        assert!(
+            matches!(result, Err(crate::Error::Conflict(_))),
+            "expected Conflict, got {result:?}"
+        );
+        assert!(
+            repo.get_by_id(&duplicate.id).await.unwrap().is_some(),
+            "the duplicate was not deleted"
         );
     }
 }

@@ -463,6 +463,41 @@ async fn stamp_digests(conn: &mut PgConnection, id: Uuid) -> Result<()> {
     Ok(())
 }
 
+/// Lock a merge's two rows `FOR UPDATE`, in id order so two merges of the
+/// same pair in opposite directions cannot deadlock, then require both to
+/// be active (SEC-B5). Returns [`crate::Error::Conflict`] when either was
+/// deleted since the caller read it, and the caller's transaction then
+/// writes nothing.
+///
+/// # Errors
+/// [`crate::Error::Conflict`] as above, or a database error.
+async fn lock_merge_participants(
+    conn: &mut PgConnection,
+    survivor_id: Uuid,
+    duplicate_id: Uuid,
+) -> Result<()> {
+    let mut ids = [survivor_id, duplicate_id];
+    ids.sort();
+    for id in ids {
+        sqlx::query_scalar!("SELECT id FROM workers WHERE id = $1 FOR UPDATE", id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    }
+    let active = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "active!" FROM workers WHERE id = ANY($1) AND deleted_at IS NULL"#,
+        &ids[..],
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    if active == 2 {
+        Ok(())
+    } else {
+        Err(crate::Error::Conflict(format!(
+            "worker {survivor_id} or {duplicate_id} is no longer active (merged or deleted meanwhile)"
+        )))
+    }
+}
+
 /// Soft-delete worker `id` on `conn` by stamping `deleted_at` and
 /// `deleted_by = 'system'`, leaving every other column (and the child
 /// rows) in place. Shared by [`WorkerRepository::delete`] and
@@ -1243,6 +1278,12 @@ impl WorkerRepository for PgWorkerRepository {
         // The whole merge — survivor row updates + duplicate soft-delete +
         // both outbox rows — commits (or rolls back) under one transaction.
         let mut txn = self.db.begin().await?;
+        // SEC-B5: the merge was computed from unlocked reads, so lock both
+        // rows before writing and check under the lock that both are still
+        // active. Otherwise two concurrent merges of one duplicate both
+        // apply, and "B into A" racing "A into B" deletes both. The loser
+        // gets `Conflict` (409) and writes nothing.
+        lock_merge_participants(&mut txn, survivor.id, *duplicate_id).await?;
 
         // Apply the survivor's parent + child rows (parent update + wholesale
         // child-row replacement + digest stamp), shared with `update`.
@@ -1661,6 +1702,75 @@ mod tests {
             deleted_rows.len(),
             1,
             "one deleted outbox row for duplicate"
+        );
+    }
+
+    /// SEC-B5: a merge locks both rows and rechecks them under the lock.
+    /// Another transaction is soft-deleting the duplicate and holds its
+    /// row; the merge waits for it, then finds the duplicate gone and
+    /// answers `Conflict` without writing the survivor.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn a_merge_waits_for_a_concurrent_delete_and_then_refuses() {
+        let db = connect().await;
+        let repo = PgWorkerRepository::new(db.clone());
+        let system = AuditContext::default();
+        let survivor = repo
+            .create(&a_worker("RaceSurvivor"), &system)
+            .await
+            .unwrap();
+        let duplicate = repo
+            .create(&a_worker("RaceDuplicate"), &system)
+            .await
+            .unwrap();
+
+        let mut other = db.begin().await.unwrap();
+        super::apply_soft_delete_row(&mut other, &duplicate.id, Some(&duplicate))
+            .await
+            .unwrap();
+
+        let mut renamed = survivor.clone();
+        renamed.name.family = "RaceSurvivorMerged".into();
+        let merger = PgWorkerRepository::new(db.clone());
+        let dup_id = duplicate.id;
+        let merge = tokio::spawn(async move {
+            merger
+                .merge(&renamed, &dup_id, &AuditContext::default())
+                .await
+        });
+
+        // Wait, up to ten seconds, until Postgres reports a backend waiting
+        // on a lock held by `other`.
+        let mut blocked = false;
+        for _ in 0..200 {
+            let waiting: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_stat_activity
+                 WHERE datname = current_database() AND wait_event_type = 'Lock'",
+            )
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            if waiting > 0 {
+                blocked = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        other.commit().await.unwrap();
+
+        let result = merge.await.unwrap();
+        assert!(
+            blocked,
+            "the merge never waited on the duplicate's row lock"
+        );
+        assert!(
+            matches!(result, Err(crate::Error::Conflict(_))),
+            "expected Conflict, got {result:?}"
+        );
+        let stored = repo.get_by_id(&survivor.id).await.unwrap().unwrap();
+        assert_eq!(
+            stored.name.family, "RaceSurvivor",
+            "the survivor was not written"
         );
     }
 }

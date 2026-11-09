@@ -1114,13 +1114,20 @@ pub async fn merge_workers(
     // in one transaction; the repository enqueues the `Merged` (+`merged_from`)
     // and `Deleted` outbox rows and publishes the in-memory `Merged`/`Deleted`
     // stream events.
-    if let Err(e) = state
+    match state
         .worker_repository
         .merge(&merged, &duplicate.id, &audit_context_of(&caller, client))
         .await
     {
-        return ApiProblem::new("database_error", format!("Failed to merge workers: {e}"))
-            .respond(StatusCode::INTERNAL_SERVER_ERROR);
+        Ok(_) => {}
+        // A concurrent merge or delete won the row lock first (SEC-B5).
+        Err(crate::Error::Conflict(why)) => {
+            return ApiProblem::new("merge_conflict", why).respond(StatusCode::CONFLICT);
+        }
+        Err(e) => {
+            return ApiProblem::new("database_error", format!("Failed to merge workers: {e}"))
+                .respond(StatusCode::INTERNAL_SERVER_ERROR);
+        }
     }
 
     // Post-merge search-index updates are best-effort: the merge is already
