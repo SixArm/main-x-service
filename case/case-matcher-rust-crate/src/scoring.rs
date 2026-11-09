@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::evidence::Evidence;
+
 /// The outcome of matching two cases.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchResult {
@@ -13,6 +15,11 @@ pub struct MatchResult {
     pub confidence: Confidence,
     /// Per-component score breakdown.
     pub breakdown: MatchBreakdown,
+    /// How much the compared data proves, beside the similarity `score`
+    /// (`agents/share/match-evidence.md`). Defaults when absent from JSON
+    /// written before the field existed.
+    #[serde(default)]
+    pub evidence: Evidence,
 }
 
 impl Default for MatchResult {
@@ -26,6 +33,7 @@ impl Default for MatchResult {
             is_match: false,
             confidence: Confidence::Low,
             breakdown: MatchBreakdown::default(),
+            evidence: Evidence::default(),
         }
     }
 }

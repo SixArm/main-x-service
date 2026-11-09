@@ -36,6 +36,9 @@
 //!   [`CaseStatus`], [`Priority`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
+//! - [`Evidence`], [`Contradiction`], [`MatchStrength`] — the
+//!   log-likelihood evidence beside the score
+//!   (`agents/share/match-evidence.md`).
 //!
 //! ## The caller must bound array sizes
 //!
@@ -67,6 +70,8 @@ pub mod case;
 pub mod config;
 /// Crate error type and its [`Result`] alias.
 pub mod error;
+/// Fellegi–Sunter match evidence beside the similarity score.
+pub mod evidence;
 /// The [`MatchingEngine`] entry point and the matching algorithm.
 pub mod matcher;
 /// Input normalisation helpers (fold / case-number / URL / set).
@@ -83,5 +88,6 @@ pub mod scoring;
 pub use case::{Case, CaseIdentifier, CaseStatus, CaseType, IdentifierScheme, Priority};
 pub use config::MatchConfig;
 pub use error::{Error, Result};
+pub use evidence::{Contradiction, Evidence, MatchStrength};
 pub use matcher::MatchingEngine;
 pub use scoring::{Confidence, MatchBreakdown, MatchResult};

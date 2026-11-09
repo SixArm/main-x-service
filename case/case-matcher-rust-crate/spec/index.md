@@ -62,6 +62,7 @@ Input: Case A, Case B, MatchConfig
   ├─ tags_score         (both set)    Jaccard over folded tags  — PLANNED, §13b/§23, not yet in code
   ├─ relationships_score(≥1 set)      typed-set Jaccard over (relation, case_id)  — PLANNED, §13a/§23, not yet in code
   └─ renormalised weighted average over present components
+  └─ evidence (always, beside the score)  log-likelihood bits, §18a
 ```
 
 `priority`, `opened_date`, and `in_language` are carried on `Case`
@@ -129,6 +130,11 @@ and `relationships_weight` 0.05 (a supporting signal — §13a); once
 added, the eight weights would be renormalised over the participating
 components per match (§17), so they need not sum to exactly 1.0.
 Threshold 0.85. Presets: `strict()` 0.95, `lenient()` 0.70.
+
+`proof_bits` (default `30.0`, `#[serde(default)]` so older JSON still
+loads) is the evidence bar for `MatchStrength::Proven` (§18a,
+[`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+§4); `validated` also rejects a non-finite or non-positive value.
 
 Changing any default weight is a three-part change: edit this section,
 the `MatchConfig` defaults, and `CHANGELOG.md`.
@@ -254,6 +260,46 @@ contributing weights.
 `High` ≥ 0.95, `Medium` ≥ 0.70, else `Low`. Separate from
 `MatchConfig::threshold` (`is_match`).
 
+## 18a. Match evidence
+
+Every `MatchResult` carries `evidence: Evidence` (`#[serde(default)]`)
+beside `score`, per the family contract
+[`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md).
+`score`, `is_match` and `confidence` are unchanged by it. `src/evidence.rs`
+holds the code and this crate's `(m, u)` table:
+
+| Component | m | u | agree bits | disagree bits | Where `u` comes from |
+|---|---|---|---|---|---|
+| title | 0.95 | 0.005 | +7.57 | −4.31 | template titles are reused across unrelated cases |
+| subjects | 0.85 | 0.01 | +6.41 | −2.72 | one claimant files several matters |
+| case_number (same agency) | 0.95 | 0.001 | +9.89 | −4.32 | renumbered / recycled numbers within one agency |
+| case_type | 0.95 | 0.15 | +2.66 | −4.09 | a dozen unevenly used types |
+| status | 0.80 | 0.25 | +1.68 | −1.91 | a handful of statuses; changes over time |
+| keywords | 0.80 | 0.05 | +4.00 | −2.25 | small shared tag vocabulary |
+
+- A component either record lacks adds `0` and is not counted.
+- Any deterministic rule (R-0 identifier, R-1 same-agency case number,
+  R-2 `same_as`) adds `IDENTIFIER_BITS` ≈ 39.85 once. On that path the
+  components are still computed for evidence (the returned breakdown
+  stays all-`None`), and an agreeing case number is not weighed again,
+  since under R-1 it *is* the identifier.
+- **Contradictions.** For each deterministic scheme (`Docket`,
+  `ExternalCaseId`, `Uri`, `Uuid`) where both records hold a non-trivial
+  folded value and the sets are disjoint: `identifier:docket` /
+  `identifier:externalcaseid` / `identifier:uri` / `identifier:uuid`.
+  The same agency with different non-empty normalised case numbers:
+  `identifier:case_number`. Each adds ≈ −6.64 bits. `same_as` URLs are
+  not a scheme and never contradict.
+- **Strength**, in order: `Contradicted`, `Proven` (`weight_bits ≥
+  proof_bits`), `Consistent` (`is_match`), `NonMatch`.
+- Consequence of the table: identical title-only records score ≈ 7.57
+  bits (`Consistent`); the richest identical record without an
+  identifier or case number (title, subjects, type, status, keywords)
+  scores ≈ 22.3 bits and is **not** `Proven`. A case's descriptive
+  fields are shared by a claimant's related matters, so only an
+  identifier proves identity. Pinned by
+  `richest_identical_record_without_identifier_is_not_proven`.
+
 ## 19. Quality goals
 
 Total functions (no `unwrap`/`expect`/`panic`); no `unsafe`;
@@ -287,7 +333,8 @@ contract.
 Semantic versioning. Re-exports from `lib.rs` are the contract:
 `Case`, `CaseIdentifier`, `IdentifierScheme`, `CaseType`, `CaseStatus`,
 `Priority`, `MatchingEngine`, `MatchConfig`, `MatchResult`,
-`MatchBreakdown`, `Confidence`, `Error`, `Result`. (`RelationshipRef`
+`MatchBreakdown`, `Confidence`, `Evidence`, `Contradiction`,
+`MatchStrength`, `Error`, `Result`. (`RelationshipRef`
 and `RelationKind` are **planned** additions — §13a, §23 — not yet
 present in `src/case.rs` or re-exported from `lib.rs`; add them to
 this list in the same PR that lands §23's relationships task.)
@@ -300,6 +347,15 @@ a `case_number` across agencies. Do not score `priority`,
 IO, async, or panics to library code.
 
 ## 23. Tasks (live work queue)
+
+- [x] **Match evidence** (`agents/share/match-evidence.md` rollout step
+      2): `src/evidence.rs` with the §18a `(m, u)` table,
+      `MatchResult::evidence`, `MatchConfig::proof_bits` (default 30,
+      validated), identifier bits on every deterministic rule,
+      scheme and same-agency case-number contradictions, and tests
+      (unit + a proptest that `weight_bits` is finite and the strength
+      agrees with the contradictions). `score`, `is_match` and
+      `confidence` unchanged.
 
 - [ ] Implement the `relationships` component in code: add
       `relationships: Vec<RelationshipRef>` to `Case`, the

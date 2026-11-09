@@ -12,8 +12,9 @@
 
 use strsim::jaro_winkler;
 
-use crate::case::Case;
+use crate::case::{Case, IdentifierScheme};
 use crate::config::MatchConfig;
+use crate::evidence::{self, Contradiction};
 use crate::normalize;
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
@@ -111,64 +112,78 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_cases(&self, a: &Case, b: &Case) -> MatchResult {
+        // Components are computed on both paths: the probabilistic score
+        // needs them, and so does the evidence (match-evidence.md §3 — a
+        // short-circuit still weighs the components it can compute). Each
+        // returns `None` when one or both records lack the data. `title`
+        // is always present (title is required).
+        let components = MatchBreakdown {
+            title_score: Some(title_score(a, b)),
+            subjects_score: set_jaccard(&a.subjects, &b.subjects),
+            case_number_score: case_number_score(a, b),
+            case_type_score: case_type_score(a, b),
+            status_score: status_score(a, b),
+            keywords_score: set_jaccard(&a.keywords, &b.keywords),
+            deterministic_match: false,
+        };
+        let contradictions = contradictions(a, b);
+
         // Phase 1: deterministic short-circuit. A globally-unique
         // identifier match, a same-agency case-number match, or a
-        // `same_as` URL overlap is conclusive — skip scoring entirely
-        // and pin the result to a certain match.
+        // `same_as` URL overlap is conclusive — pin the result to a
+        // certain match.
         if deterministic_match(a, b) {
+            let evidence = evidence::assess(
+                &components,
+                true,
+                contradictions,
+                true,
+                self.config.proof_bits,
+            );
             return MatchResult {
                 score: 1.0,
                 is_match: true,
                 confidence: Confidence::High,
                 breakdown: MatchBreakdown {
                     deterministic_match: true,
-                    // All per-component scores stay `None`: when the
-                    // deterministic rule fired, the fuzzy components were
-                    // never computed and must not appear to contribute.
+                    // All per-component scores stay `None` in the
+                    // breakdown: when the deterministic rule fired, the
+                    // fuzzy components do not contribute to the score and
+                    // must not appear to.
                     ..Default::default()
                 },
+                evidence,
             };
         }
 
-        // Phase 2: probabilistic scoring. Each component is computed
-        // independently. `title` is always present (title is required),
-        // so it is wrapped in `Some`; every other component returns
-        // `None` when one or both records lack the data, so it drops out
-        // of the renormalised average rather than scoring 0.
-        let title_score = Some(title_score(a, b));
-        let subjects_score = set_jaccard(&a.subjects, &b.subjects);
-        let case_number_score = case_number_score(a, b);
-        let case_type_score = case_type_score(a, b);
-        let status_score = status_score(a, b);
-        let keywords_score = set_jaccard(&a.keywords, &b.keywords);
-
-        // Weighted average over only the present components: absent
-        // components neither add to the numerator nor the denominator.
+        // Phase 2: probabilistic scoring. Weighted average over only the
+        // present components: absent components neither add to the
+        // numerator nor the denominator.
         let score = weighted_average(&[
-            (title_score, self.config.title_weight),
-            (subjects_score, self.config.subjects_weight),
-            (case_number_score, self.config.case_number_weight),
-            (case_type_score, self.config.case_type_weight),
-            (status_score, self.config.status_weight),
-            (keywords_score, self.config.keywords_weight),
+            (components.title_score, self.config.title_weight),
+            (components.subjects_score, self.config.subjects_weight),
+            (components.case_number_score, self.config.case_number_weight),
+            (components.case_type_score, self.config.case_type_weight),
+            (components.status_score, self.config.status_weight),
+            (components.keywords_score, self.config.keywords_weight),
         ]);
 
         // `is_match` is purely a threshold comparison; the same `score`
         // can be a match under `lenient` and a non-match under `strict`.
         let is_match = score >= self.config.threshold;
+        let evidence = evidence::assess(
+            &components,
+            false,
+            contradictions,
+            is_match,
+            self.config.proof_bits,
+        );
         MatchResult {
             score,
             is_match,
             confidence: Confidence::classify(score),
-            breakdown: MatchBreakdown {
-                title_score,
-                subjects_score,
-                case_number_score,
-                case_type_score,
-                status_score,
-                keywords_score,
-                deterministic_match: false,
-            },
+            breakdown: components,
+            evidence,
         }
     }
 
@@ -337,6 +352,56 @@ fn deterministic_match(a: &Case, b: &Case) -> bool {
     }
 
     false
+}
+
+/// The hard conflicts between `a` and `b` (match-evidence.md §3).
+///
+/// For each deterministic scheme, both records hold at least one
+/// non-trivial folded value and the two value sets share none →
+/// `identifier:<scheme>`. The same agency with two different non-empty
+/// normalised case numbers → `identifier:case_number`. A record holding
+/// several values under one scheme is not contradicted by a partner
+/// holding any one of them; blank and sentinel values (SEC-M2) are
+/// ignored. Returns the contradictions in a fixed scheme order, so the
+/// result is symmetric in `a` and `b`.
+fn contradictions(a: &Case, b: &Case) -> Vec<Contradiction> {
+    let values = |c: &Case, scheme: &IdentifierScheme| -> Vec<String> {
+        c.identifiers
+            .iter()
+            .filter(|i| &i.scheme == scheme)
+            .map(|i| normalize::fold(&i.value))
+            .filter(|v| !is_trivial_identifier(v))
+            .collect()
+    };
+    let mut out = Vec::new();
+    for (scheme, name) in [
+        (IdentifierScheme::Docket, "docket"),
+        (IdentifierScheme::ExternalCaseId, "externalcaseid"),
+        (IdentifierScheme::Uri, "uri"),
+        (IdentifierScheme::Uuid, "uuid"),
+    ] {
+        let av = values(a, &scheme);
+        let bv = values(b, &scheme);
+        if !av.is_empty() && !bv.is_empty() && !av.iter().any(|v| bv.contains(v)) {
+            out.push(Contradiction {
+                field: format!("identifier:{name}"),
+            });
+        }
+    }
+    if let (Some(ak), Some(bk), Some(ac), Some(bc)) = (
+        agency_key(a),
+        agency_key(b),
+        a.case_number.as_deref(),
+        b.case_number.as_deref(),
+    ) {
+        let (an, bn) = (normalize::case_number(ac), normalize::case_number(bc));
+        if ak == bk && !an.is_empty() && !bn.is_empty() && an != bn {
+            out.push(Contradiction {
+                field: "identifier:case_number".into(),
+            });
+        }
+    }
+    out
 }
 
 // ─── Probabilistic components ────────────────────────────────────
@@ -852,5 +917,153 @@ mod tests {
         let matches = engine.find_matches(&query, &cands);
         assert!(matches.iter().all(|(_, r)| r.is_match));
         assert!(engine.match_one_to_many(&query, &[]).is_empty());
+    }
+
+    // ─── Evidence (agents/share/match-evidence.md) ───────────────
+
+    use crate::evidence::{IDENTIFIER_BITS, MatchStrength};
+
+    /// A richly populated case with no deterministic identifier and no
+    /// case number (a shared same-agency case number would fire R-1).
+    fn rich_case() -> Case {
+        let mut c = Case::new("Housing benefit appeal — J. Smith");
+        c.subjects = vec!["John Smith".into(), "Leeds City Council".into()];
+        c.keywords = vec!["housing".into(), "appeal".into()];
+        c.case_type = Some(CaseType::Benefit);
+        c.status = Some(CaseStatus::Open);
+        c
+    }
+
+    // Identical title-only records are a match on similarity but prove
+    // little: a template title is shared by unrelated cases.
+    #[test]
+    fn identical_sparse_records_are_consistent_not_proven() {
+        let engine = MatchingEngine::default_config();
+        let a = Case::new("Housing benefit appeal — J. Smith");
+        let r = engine.match_cases(&a, &a.clone());
+        assert!(r.is_match);
+        assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+        assert_eq!(r.evidence.fields_compared, 1);
+        assert!(r.evidence.weight_bits > 0.0 && r.evidence.weight_bits < 30.0);
+    }
+
+    // A shared globally-unique identifier clears the bar alone, even with
+    // unrelated titles; the returned score/breakdown are unchanged.
+    #[test]
+    fn shared_identifier_is_proven() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Case::new("Alpha");
+        let mut b = Case::new("Omega");
+        a.identifiers
+            .push(ident(IdentifierScheme::Docket, "CV-2024-001234"));
+        b.identifiers
+            .push(ident(IdentifierScheme::Docket, "cv-2024-001234"));
+        let r = engine.match_cases(&a, &b);
+        assert!((r.score - 1.0).abs() < 1e-12);
+        assert!(r.breakdown.deterministic_match);
+        assert!(r.breakdown.title_score.is_none());
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+        assert!(r.evidence.weight_bits >= IDENTIFIER_BITS - 10.0);
+        assert!(r.evidence.contradictions.is_empty());
+    }
+
+    // Same-agency case number (R-1) is the identifier: weighed once, not
+    // again as the case-number component.
+    #[test]
+    fn same_agency_case_number_is_proven_and_weighed_once() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Case::new("Housing benefit appeal — J. Smith");
+        a.agency_id = Some("leeds".into());
+        a.case_number = Some("HB-2024-77".into());
+        let r = engine.match_cases(&a, &a.clone());
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+        // title + identifier only.
+        assert_eq!(r.evidence.fields_compared, 2);
+    }
+
+    // Conflicting docket numbers on otherwise identical records are
+    // contradicted, at any score.
+    #[test]
+    fn conflicting_identifiers_are_contradicted() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich_case();
+        let mut b = rich_case();
+        a.identifiers.push(ident(IdentifierScheme::Docket, "CV-1"));
+        b.identifiers.push(ident(IdentifierScheme::Docket, "CV-2"));
+        let r = engine.match_cases(&a, &b);
+        assert!(r.is_match);
+        assert_eq!(r.evidence.strength, MatchStrength::Contradicted);
+        assert_eq!(r.evidence.contradictions[0].field, "identifier:docket");
+
+        // A partner holding either of two values is not contradicted.
+        a.identifiers.push(ident(IdentifierScheme::Docket, "CV-2"));
+        let r = engine.match_cases(&a, &b);
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+    }
+
+    // Same agency, different case numbers: a contradiction.
+    #[test]
+    fn same_agency_different_case_numbers_are_contradicted() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich_case();
+        let mut b = rich_case();
+        a.agency_id = Some("leeds".into());
+        b.agency_id = Some("leeds".into());
+        a.case_number = Some("HB-1".into());
+        b.case_number = Some("HB-2".into());
+        let r = engine.match_cases(&a, &b);
+        assert_eq!(r.evidence.strength, MatchStrength::Contradicted);
+        assert_eq!(r.evidence.contradictions[0].field, "identifier:case_number");
+    }
+
+    // Blank and sentinel identifiers cannot contradict (SEC-M2).
+    #[test]
+    fn trivial_identifiers_do_not_contradict() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich_case();
+        let mut b = rich_case();
+        a.identifiers.push(ident(IdentifierScheme::Uuid, "0"));
+        b.identifiers.push(ident(IdentifierScheme::Uuid, "CV-9"));
+        let r = engine.match_cases(&a, &b);
+        assert!(r.evidence.contradictions.is_empty());
+    }
+
+    // Pins that a case can NOT be proven from its fields alone under the
+    // default table: title + subjects + type + status + keywords sum to
+    // about 22.3 bits, short of 30. A case's descriptive fields are
+    // shared by related matters (one claimant's several appeals), so only
+    // an identifier or a same-agency case number proves identity.
+    #[test]
+    fn richest_identical_record_without_identifier_is_not_proven() {
+        let engine = MatchingEngine::default_config();
+        let a = rich_case();
+        let r = engine.match_cases(&a, &a.clone());
+        assert!(r.is_match);
+        assert_eq!(r.evidence.fields_compared, 5);
+        assert!(
+            (r.evidence.weight_bits - 22.3).abs() < 0.1,
+            "got {}",
+            r.evidence.weight_bits
+        );
+        assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+    }
+
+    // A clear disagreement gives negative evidence.
+    #[test]
+    fn clear_disagreement_is_negative() {
+        let engine = MatchingEngine::default_config();
+        let a = rich_case();
+        let mut b = Case::new("Commercial driving licence renewal");
+        b.subjects = vec!["Acme Haulage Ltd".into()];
+        b.keywords = vec!["licensing".into()];
+        b.case_type = Some(CaseType::Legal);
+        b.status = Some(CaseStatus::Pending);
+        let r = engine.match_cases(&a, &b);
+        assert!(
+            r.evidence.weight_bits < 0.0,
+            "got {}",
+            r.evidence.weight_bits
+        );
+        assert_eq!(r.evidence.strength, MatchStrength::NonMatch);
     }
 }

@@ -25,6 +25,18 @@ pub struct MatchConfig {
     pub status_weight: f64,
     /// Weight of the keywords (Jaccard) component. Default 0.15.
     pub keywords_weight: f64,
+
+    /// Evidence, in bits, at or above which an uncontradicted pair is
+    /// [`crate::MatchStrength::Proven`]. Default 30
+    /// (`agents/share/match-evidence.md` §4). Absent from older JSON ⇒
+    /// the default.
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
+}
+
+/// Serde default for [`MatchConfig::proof_bits`].
+fn default_proof_bits() -> f64 {
+    crate::evidence::DEFAULT_PROOF_BITS
 }
 
 impl Default for MatchConfig {
@@ -50,6 +62,9 @@ impl Default for MatchConfig {
             status_weight: 0.05,
             // Free-form keywords/tags: moderate corroboration.
             keywords_weight: 0.15,
+            // Evidence bar for `Proven`: a million records at one false
+            // merge in a thousand needs 20 + 10 bits.
+            proof_bits: default_proof_bits(),
         }
     }
 }
@@ -107,7 +122,8 @@ impl MatchConfig {
     ///
     /// Returns [`Error::InvalidConfig`] naming the first offending
     /// field if any weight is negative, `NaN`, or infinite, or if
-    /// `threshold` is outside `[0.0, 1.0]`.
+    /// `threshold` is outside `[0.0, 1.0]`, or if `proof_bits` is not a
+    /// finite positive number.
     pub fn validated(self) -> Result<Self> {
         let weights = [
             ("title_weight", self.title_weight),
@@ -128,6 +144,12 @@ impl MatchConfig {
             return Err(Error::InvalidConfig(format!(
                 "threshold must be finite and within [0.0, 1.0], got {}",
                 self.threshold
+            )));
+        }
+        if !self.proof_bits.is_finite() || self.proof_bits <= 0.0 {
+            return Err(Error::InvalidConfig(format!(
+                "proof_bits must be a finite, positive number, got {}",
+                self.proof_bits
             )));
         }
         Ok(self)
@@ -235,5 +257,18 @@ mod tests {
             ..MatchConfig::default()
         };
         assert!(c.validated().is_err());
+    }
+
+    /// `proof_bits` must be finite and strictly positive.
+    #[test]
+    fn validated_rejects_bad_proof_bits() {
+        for bad in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let c = MatchConfig {
+                proof_bits: bad,
+                ..MatchConfig::default()
+            };
+            assert!(c.validated().is_err(), "accepted proof_bits {bad}");
+        }
+        assert!((MatchConfig::default().proof_bits - 30.0).abs() < 1e-12);
     }
 }

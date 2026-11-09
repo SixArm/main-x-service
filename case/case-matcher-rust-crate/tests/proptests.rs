@@ -24,7 +24,9 @@
 //! - **Soundex shape** — the phonetic encoder returns `None` or a
 //!   `[A-Z][0-9]{3}` code for any UTF-8 input, and never panics.
 
-use case_matcher::{Case, Confidence, MatchConfig, MatchingEngine};
+use case_matcher::{
+    Case, CaseIdentifier, Confidence, IdentifierScheme, MatchConfig, MatchStrength, MatchingEngine,
+};
 use case_matcher::{normalize, phonetic};
 use proptest::prelude::*;
 
@@ -94,7 +96,34 @@ fn config_from(values: &[f64]) -> MatchConfig {
         case_type_weight: values[3],
         status_weight: values[4],
         keywords_weight: values[5],
+        ..MatchConfig::default()
     }
+}
+
+/// A `Case` from `case_strategy` plus zero to two deterministic
+/// identifiers drawn from a tiny value pool, so shared, disjoint, and
+/// trivial values (`"0"`, blank) all occur often.
+fn case_with_ids() -> impl Strategy<Value = Case> {
+    let scheme = prop_oneof![
+        Just(IdentifierScheme::Docket),
+        Just(IdentifierScheme::Uuid),
+        Just(IdentifierScheme::Uri),
+    ];
+    let value = prop_oneof![Just("A"), Just("B"), Just("0"), Just(" ")];
+    (
+        case_strategy(),
+        prop::collection::vec((scheme, value), 0..3),
+    )
+        .prop_map(|(mut c, ids)| {
+            c.identifiers = ids
+                .into_iter()
+                .map(|(scheme, v)| CaseIdentifier {
+                    scheme,
+                    value: v.to_string(),
+                })
+                .collect();
+            c
+        })
 }
 
 // ---------- Properties ----------
@@ -257,5 +286,31 @@ proptest! {
                 "validated() rejected a well-formed config: {values:?}"
             );
         }
+    }
+
+    /// Evidence MUST be finite, and its strength MUST agree with its
+    /// contradictions and the bar: `Contradicted` exactly when there is a
+    /// contradiction; otherwise `Proven` exactly when `weight_bits` clears
+    /// `proof_bits`, else `Consistent` iff `is_match`.
+    #[test]
+    fn evidence_is_finite_and_strength_is_consistent(a in case_with_ids(), b in case_with_ids()) {
+        let engine = MatchingEngine::default_config();
+        let r = engine.match_cases(&a, &b);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "weight_bits not finite: {}", e.weight_bits);
+        let expected = if !e.contradictions.is_empty() {
+            MatchStrength::Contradicted
+        } else if e.weight_bits >= engine.config().proof_bits {
+            MatchStrength::Proven
+        } else if r.is_match {
+            MatchStrength::Consistent
+        } else {
+            MatchStrength::NonMatch
+        };
+        prop_assert_eq!(e.strength, expected);
+        // Evidence is symmetric too.
+        let rev = engine.match_cases(&b, &a).evidence;
+        prop_assert!((e.weight_bits - rev.weight_bits).abs() < 1e-9);
+        prop_assert_eq!(e.strength, rev.strength);
     }
 }

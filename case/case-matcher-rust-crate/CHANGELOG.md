@@ -10,6 +10,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — match evidence beside the similarity score
+
+Per `agents/share/match-evidence.md`: `MatchResult` gains
+`#[serde(default)] evidence: Evidence` (Fellegi–Sunter log-likelihood
+`weight_bits`, `fields_compared`, `contradictions`, and a
+`MatchStrength` of `Contradicted` / `Proven` / `Consistent` /
+`NonMatch`), and `MatchConfig` gains `proof_bits` (default 30,
+checked by `validated`). New `src/evidence.rs` holds the per-component
+`(m, u)` table (spec §18a). Any deterministic rule adds ≈ 39.85 bits;
+conflicting `Docket` / `ExternalCaseId` / `Uri` / `Uuid` values, or the
+same agency with different case numbers, are contradictions. `score`,
+`is_match` and `confidence` are unchanged. A `MatchConfig` struct
+literal must now set `proof_bits` or use `..MatchConfig::default()`.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
