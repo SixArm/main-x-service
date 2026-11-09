@@ -8,6 +8,36 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed
+
+- Matching defers to the `event-matcher` crate: score, `is_match`,
+  quality and breakdown are the matcher's, so a component neither event
+  holds is skipped instead of scored `0`. Two identical events with no
+  shared identifier now score `1.0` and a second create is a `409`;
+  before, they scored `0.75` and got through (T-16). The service's own
+  scorers (`ProbabilisticScorer`, `DeterministicScorer`,
+  `DeterministicMatcher`, `MatchQuality`) are removed.
+- `score_breakdown` takes the matcher's components, each `null` when not
+  compared (`performers_score`, `event_ids_score`, `category_score`, …);
+  `performer_score`, `attendee_score` and `identifier_score` are gone.
+  Quality labels follow the matcher's bands: `certain` ≥ 0.90,
+  `probable` ≥ 0.75.
+- Identifiers of the service's own types are matched per system: two
+  systems' references no longer count as one scheme.
+
+### Added
+
+- Match evidence (`agents/share/match-evidence.md`) on every match
+  result — the `409` body, `check-duplicates`, `match` and batch
+  `deduplicate` items — and in the OpenAPI schema (T-23).
+- A batch item is `automerged` only when its score clears
+  `auto_merge_threshold` and its evidence is `proven`; `consistent` and
+  `contradicted` pairs stay `pending` (T-23). The review queue is still
+  not persisted (T-15), so evidence is in the response only.
+- Value frequencies for the name's evidence weight, counted from active
+  records (none below 1 000), cached for ten minutes and rebuilt in the
+  background (T-23).
+
 ### Fixed
 
 - Events can carry booking, confirmation, ticket, encounter, transaction

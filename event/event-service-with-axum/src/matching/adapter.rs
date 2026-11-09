@@ -365,8 +365,18 @@ fn identifier_to_event_id(id: &Identifier) -> Option<MEventId> {
 /// Meetup, Ticketmaster, Songkick, Wikidata, …); the service's vocabulary
 /// is operational (`BookingNumber`, `ConfirmationCode`, `TicketNumber`, …). When
 /// the `system` URI hints at one of the matcher's known schemes that wins,
-/// otherwise the identifier-type name flows through as `Other(name)` so the
-/// scheme label still participates in `(scheme, value)` equality.
+/// otherwise the identifier-type name and the trimmed `system` flow through
+/// as `Other("<Type>@<system>")` (or `Other("<Type>")` with no system).
+///
+/// The system is part of the scheme because the service's identity is
+/// `(type, system, value)`: two systems' booking references are two
+/// namespaces. Without it the matcher would read `REF-A` from one system
+/// and `REF-B` from another as one scheme holding two values, a
+/// **contradiction** that blocks any automatic merge, and the same value
+/// from two systems as a shared identifier worth proof on its own
+/// (`agents/share/match-evidence.md` §3). The system therefore appears in
+/// a contradiction's `field`; it is a namespace URI the masked view shows
+/// unmasked too, never an identifier value.
 #[must_use]
 pub fn map_identifier_scheme(t: &IdentifierType, system: &str) -> MScheme {
     let sys = system.to_ascii_lowercase();
@@ -400,15 +410,21 @@ pub fn map_identifier_scheme(t: &IdentifierType, system: &str) -> MScheme {
     if sys.contains("ical") || sys.contains("vcal") {
         return MScheme::ICalendarUid;
     }
-    MScheme::Other(match t {
-        IdentifierType::BookingNumber => "BookingNumber".into(),
-        IdentifierType::ConfirmationCode => "ConfirmationCode".into(),
-        IdentifierType::TicketNumber => "TicketNumber".into(),
-        IdentifierType::EncounterId => "EncounterId".into(),
-        IdentifierType::TransactionId => "TransactionId".into(),
-        IdentifierType::ExternalRef => "ExternalRef".into(),
-        IdentifierType::Tax => "Tax".into(),
-        IdentifierType::Other => "Other".into(),
+    let type_name = match t {
+        IdentifierType::BookingNumber => "BookingNumber",
+        IdentifierType::ConfirmationCode => "ConfirmationCode",
+        IdentifierType::TicketNumber => "TicketNumber",
+        IdentifierType::EncounterId => "EncounterId",
+        IdentifierType::TransactionId => "TransactionId",
+        IdentifierType::ExternalRef => "ExternalRef",
+        IdentifierType::Tax => "Tax",
+        IdentifierType::Other => "Other",
+    };
+    let system = system.trim();
+    MScheme::Other(if system.is_empty() {
+        type_name.to_string()
+    } else {
+        format!("{type_name}@{system}")
     })
 }
 
@@ -509,5 +525,27 @@ mod tests {
         assert_eq!(m.event_ids.len(), 1);
         assert_eq!(m.event_ids[0].scheme, MScheme::Eventbrite);
         assert_eq!(m.event_ids[0].value, "123456789");
+    }
+
+    /// An operational identifier's scheme carries its system, so two
+    /// systems' references are two namespaces, not one scheme holding
+    /// two conflicting values.
+    #[test]
+    fn other_scheme_is_scoped_by_system() {
+        assert_eq!(
+            map_identifier_scheme(
+                &IdentifierType::TicketNumber,
+                " https://tickets.example.org "
+            ),
+            MScheme::Other("TicketNumber@https://tickets.example.org".into())
+        );
+        assert_eq!(
+            map_identifier_scheme(&IdentifierType::BookingNumber, ""),
+            MScheme::Other("BookingNumber".into())
+        );
+        assert_ne!(
+            map_identifier_scheme(&IdentifierType::ExternalRef, "https://a.example.org"),
+            map_identifier_scheme(&IdentifierType::ExternalRef, "https://b.example.org")
+        );
     }
 }

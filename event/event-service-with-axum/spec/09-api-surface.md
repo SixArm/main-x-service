@@ -16,6 +16,14 @@ All REST endpoints return bare JSON on success and an RFC 9457 problem
 has no `detail`; its cause is logged. `409` on duplicate-detected
 create; `422` on validation failure.
 
+Match results (`MatchResponse`, in the `409` body's
+`errors.potential_matches`, `POST /api/events/check-duplicates` and
+`POST /api/events/match`) carry `score`, `is_match`, `quality`,
+`score_breakdown` and `evidence` (`MatchEvidence`); batch
+`ReviewQueueItem`s carry `evidence` too, optional so an item without it
+still deserialises. All are in the OpenAPI schema. See §6.2 and
+[match-evidence.md](../../../agents/share/match-evidence.md).
+
 Authentication is opt-in per handler: taking an `AuthUser` argument
 requires a valid `Authorization: Bearer <paseto>` token, verified
 offline (PASETO `v4.public`, Ed25519) against the auth-service

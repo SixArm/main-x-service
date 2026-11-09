@@ -158,7 +158,11 @@ fn bench_probabilistic_match(c: &mut Criterion) {
         c.iter(|| {
             black_box(
                 matcher
-                    .find_matches(black_box(&query), black_box(&candidates))
+                    .find_matches(
+                        black_box(&query),
+                        black_box(&candidates),
+                        &event_service::matching::matcher_lib::NoFrequencies,
+                    )
                     .unwrap(),
             )
         });

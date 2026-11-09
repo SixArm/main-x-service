@@ -1,8 +1,9 @@
 //! Component matching algorithms for events.
 //!
 //! Each `mod` here scores a single facet (name, time, location, …)
-//! in `[0.0, 1.0]`. The scorers in [`crate::matching::scoring`] combine
-//! these into an overall match.
+//! in `[0.0, 1.0]`. They are standalone similarity functions: since spec
+//! §13 T-16 the service scores pairs with the `event-matcher` crate (see
+//! [`crate::matching`]), not by combining these.
 //!
 //! All scorers are pure functions of their inputs (no I/O, no shared
 //! state), which makes them cheap to test and to call in a hot loop

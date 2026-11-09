@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::db::{AuditLogRepository, EventRepository, PgEventRepository};
-use crate::matching::{EventMatcher, ProbabilisticMatcher};
+use crate::matching::{EventMatcher, FrequencyCache, ProbabilisticMatcher};
 use crate::search::SearchEngine;
 use crate::streaming::{EventProducer, InMemoryEventPublisher};
 
@@ -38,6 +38,12 @@ pub struct AppState {
 
     /// Event matcher for finding duplicates
     pub matcher: Arc<dyn EventMatcher>,
+
+    /// Cached value frequencies for request-time matching (create,
+    /// `check-duplicates`, `match`): rebuilt in the background when older
+    /// than ten minutes, never on a request's own time
+    /// (`matching::frequencies`, `agents/share/match-evidence.md` §7).
+    pub frequencies: Arc<FrequencyCache>,
 
     /// Application configuration
     pub config: Arc<Config>,
@@ -84,6 +90,7 @@ impl AppState {
         ) as Arc<dyn EventRepository>;
 
         let event_matcher = Arc::new(matcher) as Arc<dyn EventMatcher>;
+        let frequencies = Arc::new(FrequencyCache::new(event_repository.clone()));
 
         Self {
             db,
@@ -92,6 +99,7 @@ impl AppState {
             audit_log,
             search_engine: Arc::new(search_engine),
             matcher: event_matcher,
+            frequencies,
             config: Arc::new(config),
             require_auth: super::auth::require_auth_from_env(),
         }

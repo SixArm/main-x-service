@@ -465,7 +465,12 @@ clearly described manual check confirms the acceptance criterion.
     version needs. BUS-2 (link-graph Fluvio consumer) and rolling
     `FluvioSink` to the remaining services continue elsewhere.
 
-- [ ] **T-12 — Wire or retire the `event-matcher` crate's second-opinion adapter.**
+- [x] **T-12 — Wire or retire the `event-matcher` crate's second-opinion adapter.**
+  *(Closed 2026-11-09 by T-16, option (a) and further: the adapter and
+  `MatchingEngine` are now the **only** scoring path, for create-time,
+  `check-duplicates`, `match` and the batch scan; the crate-local
+  scorers are deleted. `tests/duplicate_detection.rs` stays as the
+  bridge's contract suite.)* Original text:
   `src/matching/adapter.rs::to_matcher_event` and the `matcher_lib`
   re-export (`pub use ::event_matcher as matcher_lib` in
   `src/matching/mod.rs`) exist to score two service `Event`s through
@@ -727,18 +732,67 @@ clearly described manual check confirms the acceptance criterion.
   included), all passing. Dependencies 387 → 352 unique normal
   crates.
 
-- [ ] **T-16 (decision) — A component neither event has scores `0`.**
-  *(Found 2026-11-09, T-5.)* `ProbabilisticScorer` adds every weighted
-  component, so two events identical in name, start, end, venue and
-  organiser score `0.75`, and with only name and start `0.45`, under the
-  default `0.85` threshold. Only a shared strong identifier (which
-  short-circuits to `1.0`) or matching performers, attendees and
-  identifiers as well reaches it, so the real-time check on create and
-  the batch scan at its default flag almost nothing. The family's
-  matching guide says only fields present in both should contribute.
-  Renormalising over the components either event has, lowering the
-  threshold, or deferring to the `event-matcher` crate (T-12) all change
-  which records are flagged, so this needs a decision, not a patch.
+- [x] **T-16 (decision) — A component neither event has scores `0`.**
+  *(Found 2026-11-09, T-5; closed 2026-11-09.)* `ProbabilisticScorer`
+  added every weighted component, so two events identical in name,
+  start, end, venue and organiser scored `0.75`, and with only name and
+  start `0.45`, under the default `0.85` threshold. Only a shared strong
+  identifier (which short-circuits to `1.0`) or matching performers,
+  attendees and identifiers as well reached it, so the real-time check
+  on create and the batch scan at its default flagged almost nothing.
+  **Decision: defer to the `event-matcher` crate**, as
+  [match-evidence.md](../../../agents/share/match-evidence.md) §10 step 4
+  says. `ProbabilisticMatcher` now projects both events through
+  `adapter::to_matcher_event` and takes **score, `is_match`, quality
+  and evidence** from `MatchingEngine::match_events_with_frequencies`;
+  the service scorers (`src/matching/scoring.rs`: `ProbabilisticScorer`,
+  `DeterministicScorer`, `MatchQuality`) and the unused
+  `DeterministicMatcher` are deleted. The breakdown DTO is replaced by
+  the matcher's components (§6.2), each `null` when not compared, so it
+  explains the score it accompanies. Identical events with no
+  identifier now score `1.0` and are a `409`; a high score alone no
+  longer buys an automatic merge, which now needs `proven` evidence
+  (T-23).
+  - **Acceptance:** `matching::tests::identical_events_without_an_identifier_match`;
+    `tests/dedup_merge_privacy.rs` rewritten for the new behaviour (the
+    create test no longer needs a shared ticket, the batch test no longer
+    asks for `0.7`).
+- [x] **T-23 — Carry match evidence; auto-merge only on `Proven`.**
+  *(2026-11-09; [match-evidence.md](../../../agents/share/match-evidence.md)
+  §10 step 4.)*
+  - Every match result carries the matcher's evidence
+    (`matching::MatchEvidence`, a schema'd mirror of
+    `event_matcher::Evidence`): the `409` body, `check-duplicates`,
+    `match`, and the batch scan's items. Evidence holds component names
+    and bits only; checked against the code, the one non-fixed string is
+    a contradiction's `identifier:<scheme>`, whose scheme is a type name
+    and the identifier's `system` URI, never a value.
+  - The adapter scopes `Other` schemes by system
+    (`Other("<Type>@<system>")`): without it two systems' references
+    contradicted each other and one value under two systems counted as
+    a shared identifier.
+  - The batch scan marks an item `AutoMerged` only when
+    `matching::permits_auto_merge` holds: score ≥
+    `auto_merge_threshold` **and** strength `proven`. No automatic merge
+    is executed anywhere (T-15); when one is, it goes through the same
+    gate.
+  - **No `review_queue` table** (T-15): evidence is in the batch
+    response items only (`ReviewQueueItem.evidence`, `#[serde(default)]`).
+  - Value frequencies: `matching::frequencies` — a `FrequencyTable`
+    over active records' names, `NoFrequencies` below
+    `MIN_FREQUENCY_POPULATION = 1 000`; the batch scan builds one from
+    its loaded events, request paths use `AppState::frequencies`, a
+    cache rebuilt lazily in the background after ten minutes, scanning
+    by id up to `FREQUENCY_SCAN_CAP = 200 000` records
+    (`EventRepository::list_active_names`).
+  - **Acceptance:** unit tests in `matching::{evidence, frequencies,
+    tests}` and `models::review_queue`; DB tests
+    `db::repositories::tests::{list_active_names_pages_by_id_with_alternates,
+    a_small_population_scans_to_no_frequencies}` and
+    `tests/dedup_merge_privacy.rs` (name + start alone ⇒ `pending` +
+    `consistent` above the auto-merge threshold; shared ticket ⇒
+    `automerged` + `proven`; two tickets from one system ⇒ `pending` +
+    `contradicted`; `409` and `check-duplicates` carry evidence).
 - [x] **T-19 — Identifiers other than `TAX` and `OTHER` could not be
   stored.** *(2026-11-09)* The repository wrote `identifier_type` in its
   serde form (`BOOKINGNUMBER`, `EXTERNALREF`), and the

@@ -6,6 +6,12 @@
 //! become [`ReviewQueueItem`]s awaiting a human decision
 //! ([`ReviewStatus`]). The default thresholds are supplied by the
 //! private `default_*` helpers below.
+//!
+//! The queue is not persisted (spec §13 T-15): items live only in the
+//! batch scan's response, which is where their evidence is carried. An
+//! item is `AutoMerged` only when its score clears `auto_merge_threshold`
+//! **and** its evidence is `Proven` (`agents/share/match-evidence.md`
+//! §4); `Consistent` and `Contradicted` pairs stay `Pending`.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -22,7 +28,8 @@ pub enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate
     Rejected,
-    /// Auto-merged (score above auto-merge threshold)
+    /// Auto-merge candidate: score at or above the auto-merge threshold
+    /// **and** evidence `proven`. A label only until T-15; no merge runs.
     AutoMerged,
 }
 
@@ -50,6 +57,11 @@ pub struct ReviewQueueItem {
     /// Breakdown of individual score components
     pub score_breakdown: Option<serde_json::Value>,
 
+    /// The matcher's evidence for the pair (`match-evidence.md`). Absent
+    /// on items serialised before it existed.
+    #[serde(default)]
+    pub evidence: Option<crate::matching::MatchEvidence>,
+
     /// Current review status
     pub status: ReviewStatus,
 
@@ -74,7 +86,9 @@ pub struct BatchDeduplicationRequest {
     #[serde(default = "default_max_candidates")]
     pub max_candidates: usize,
 
-    /// Score above which duplicates are auto-merged (default: 0.95)
+    /// Score at or above which a **proven** pair is marked auto-merged
+    /// (default: 0.95); a pair short of proof stays pending whatever its
+    /// score
     #[serde(default = "default_auto_merge_threshold")]
     pub auto_merge_threshold: f64,
 }
@@ -103,7 +117,8 @@ pub struct BatchDeduplicationResponse {
     /// Number of potential duplicates found
     pub duplicates_found: usize,
 
-    /// Number auto-merged (above auto-merge threshold)
+    /// Number marked auto-merged (score at or above the auto-merge
+    /// threshold and evidence proven)
     pub auto_merged: usize,
 
     /// Number added to review queue
@@ -111,4 +126,57 @@ pub struct BatchDeduplicationResponse {
 
     /// The review queue items created
     pub review_items: Vec<ReviewQueueItem>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An item serialised before `evidence` existed still deserialises,
+    /// with no evidence.
+    #[test]
+    fn item_without_evidence_still_deserialises() {
+        let old = serde_json::json!({
+            "id": Uuid::nil(),
+            "event_id_a": Uuid::nil(),
+            "event_id_b": Uuid::nil(),
+            "match_score": 0.9,
+            "match_quality": "certain",
+            "detection_method": "batch_deduplication",
+            "score_breakdown": null,
+            "status": "pending",
+            "reviewed_by": null,
+            "created_at": "2026-11-01T00:00:00Z",
+            "reviewed_at": null
+        });
+        let item: ReviewQueueItem = serde_json::from_value(old).unwrap();
+        assert!(item.evidence.is_none());
+        assert_eq!(item.status, ReviewStatus::Pending);
+    }
+
+    /// Evidence round-trips on an item.
+    #[test]
+    fn item_with_evidence_round_trips() {
+        let json = serde_json::json!({
+            "id": Uuid::nil(),
+            "event_id_a": Uuid::nil(),
+            "event_id_b": Uuid::nil(),
+            "match_score": 0.9,
+            "match_quality": "certain",
+            "detection_method": "batch_deduplication",
+            "score_breakdown": null,
+            "evidence": { "weight_bits": 17.4, "fields_compared": 2, "strength": "consistent" },
+            "status": "pending",
+            "reviewed_by": null,
+            "created_at": "2026-11-01T00:00:00Z",
+            "reviewed_at": null
+        });
+        let item: ReviewQueueItem = serde_json::from_value(json).unwrap();
+        let e = item.evidence.unwrap();
+        assert_eq!(
+            e.strength,
+            crate::matching::evidence::EvidenceStrength::Consistent
+        );
+        assert!(e.contradictions.is_empty() && e.components.is_empty());
+    }
 }

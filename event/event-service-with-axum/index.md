@@ -701,11 +701,12 @@ event-service-with-axum/
 │   │   ├── convert.rs     # DB ↔ domain conversions
 │   │   └── audit.rs       # Audit log repository
 │   ├── matching/
-│   │   ├── algorithms.rs  # Matching algorithms
-│   │   ├── scoring.rs     # Match scoring logic
+│   │   ├── algorithms.rs  # Standalone component similarity functions
 │   │   ├── adapter.rs     # Bridge to the canonical event-matcher crate
+│   │   ├── evidence.rs    # Match evidence DTOs + the auto-merge gate
+│   │   ├── frequencies.rs # Value-frequency table for evidence
 │   │   ├── phonetic.rs    # Soundex
-│   │   └── mod.rs         # Matcher implementations
+│   │   └── mod.rs         # Matcher (scores through event-matcher)
 │   ├── search/
 │   │   ├── index.rs       # Tantivy search index
 │   │   └── mod.rs         # Search engine interface

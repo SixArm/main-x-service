@@ -1,55 +1,41 @@
 # Matching Algorithm Reference
 
-The matching system compares two events and produces a confidence
-score in `[0.0, 1.0]` plus a per-component breakdown.
+The service scores every pair with the canonical `event-matcher` crate
+(spec §6.2, §13 T-16): `ProbabilisticMatcher` projects both events
+through `src/matching/adapter.rs` and calls
+`MatchingEngine::match_events_with_frequencies`. The **score**
+(`[0.0, 1.0]`, renormalised over the components both events hold),
+**`is_match`** (score ≥ `threshold_score`, default `0.85`), **quality**
+and **breakdown** are the matcher's; the weights and component
+algorithms are in the matcher spec §5–§7.
 
-## Strategies
+Quality labels, from the matcher's confidence band: `certain` (≥ 0.90),
+`probable` (≥ 0.75), `possible` (below).
 
-- **Probabilistic** — weighted fuzzy sum of component scores.
-- **Deterministic** — rule-based; counts satisfied rules as a
-  fraction of available rules.
+## Evidence and auto-merge
 
-Both short-circuit to `1.0` when the two events share an exact value
-on a **strong identifier type**: `BookingNumber`,
-`ConfirmationCode`, `TicketNumber`, `EncounterId`, or
-`TransactionId`.
+Every result carries the matcher's evidence
+([match-evidence.md](../../../agents/share/match-evidence.md)): bits,
+fields compared, contradictions, per-term components and a strength.
+A batch item is `AutoMerged` only when score ≥ `auto_merge_threshold`
+**and** strength is `proven` (`matching::permits_auto_merge`).
+`consistent` (a match on score, short of proof) and `contradicted`
+(two values under one identifier scheme) stay `Pending`.
 
-## Probabilistic weights
+The adapter scopes the service's own identifier types by system
+(`Other("<Type>@<system>")`), so two systems' references are separate
+schemes rather than a contradiction.
 
-| Component | Weight |
-|---|---|
-| Name (title + alternates) | 0.20 |
-| Start date | 0.20 |
-| End date | 0.10 |
-| Location | 0.15 |
-| Organizer | 0.10 |
-| Performer | 0.10 |
-| Attendee | 0.05 |
-| Identifier | 0.10 |
+The name's agreement weight is frequency-adjusted from counted shares
+(`src/matching/frequencies.rs`; none below 1 000 records).
 
-Weights sum to 1.0.
+## Standalone component algorithms
 
-## Deterministic rules
+`src/matching/algorithms.rs` and `phonetic.rs` hold the service's older
+component similarity functions. They were combined by the service's own
+scorer until T-16 (which counted absent components as `0`); no request
+path calls them now, and they are kept for their benchmarks.
 
-| Rule | Condition | Points |
-|---|---|---|
-| 0 (short-circuit) | Strong-identifier exact match | → 1.0 |
-| 1 | `name_score ≥ 0.90` AND `start_score ≥ 0.95` | 1 |
-| 2 | Both sides have locations AND `location_score ≥ 0.80` | 1 |
-| 3 | Both sides have organizers AND `organizer_score ≥ 0.90` | 1 |
-
-Final score = `achieved / available`. `is_match` threshold = `0.75`.
-
-## Match quality classification
-
-| Quality | Score range (probabilistic) |
-|---|---|
-| Definite | `≥ 0.95` |
-| Probable | `≥ threshold` (default `0.85`) |
-| Possible | `≥ 0.50` |
-| Unlikely | `< 0.50` |
-
-## Component algorithms
 
 ### Name (`name_matching`)
 
@@ -71,7 +57,7 @@ best pairwise score across both lists.
 > **Removed (T-13, 2026-09-06): `match_window_overlap`.** A
 > `match_window_overlap(a_start, a_end, b_start, b_end)` helper (Jaccard
 > ratio of the two `[start, end]` intervals) was implemented and unit
-> tested here but never called from `scoring::ProbabilisticScorer`,
+> tested here but never called from `scoring::ProbabilisticScorer` (since removed, T-16),
 > which scores `start_date`/`end_date` independently instead. Wiring it
 > in would mean unilaterally resolving `event-matcher`'s own still-open
 > **OQ-C** (`event-matcher-rust-crate/spec/10-open-questions.md`:
@@ -148,7 +134,9 @@ tracked as entity task ET-8.
 
 ## Source files
 
-- `src/matching/mod.rs` — `EventMatcher` trait, `ProbabilisticMatcher`, `DeterministicMatcher`, `MatchResult`, `MatchScoreBreakdown`
-- `src/matching/algorithms.rs` — `name_matching`, `time_matching`, `location_matching`, `party_matching`, `identifier_matching`, `reference_matching`
-- `src/matching/scoring.rs` — `ProbabilisticScorer`, `DeterministicScorer`, `MatchQuality`
+- `src/matching/mod.rs` — `EventMatcher` trait, `ProbabilisticMatcher`, `MatchResult`, `MatchScoreBreakdown`
+- `src/matching/adapter.rs` — service `Event` → `event_matcher::Event`
+- `src/matching/evidence.rs` — `MatchEvidence` (schema'd mirror of the matcher's evidence), `permits_auto_merge`
+- `src/matching/frequencies.rs` — `FrequencySource`, `FrequencyCache`, `MIN_FREQUENCY_POPULATION`
+- `src/matching/algorithms.rs` — standalone `name_matching`, `time_matching`, `location_matching`, `party_matching`, `identifier_matching`, `reference_matching`
 - `src/matching/phonetic.rs` — Soundex

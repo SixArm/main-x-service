@@ -73,6 +73,26 @@ pub trait EventRepository: Send + Sync {
     ///
     /// Returns an error if the id query or any per-id reload fails.
     async fn list_active(&self, limit: u64, offset: u64) -> Result<Vec<Event>>;
+    /// List up to `limit` active events' names, in id order, starting
+    /// after `after` (keyset paging). The value-frequency scan reads this
+    /// rather than whole records (`matching::frequencies`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails.
+    async fn list_active_names(&self, limit: u64, after: Option<Uuid>) -> Result<Vec<NameRecord>>;
+}
+
+/// One active event's names, as [`EventRepository::list_active_names`]
+/// returns them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NameRecord {
+    /// The event id.
+    pub id: Uuid,
+    /// The primary name.
+    pub name: String,
+    /// The alternate names, in stored order.
+    pub alternate_names: Vec<String>,
 }
 
 /// sqlx-backed [`EventRepository`] with optional event publishing and
@@ -1637,6 +1657,37 @@ impl EventRepository for PgEventRepository {
         }
         Ok(events)
     }
+
+    async fn list_active_names(&self, limit: u64, after: Option<Uuid>) -> Result<Vec<NameRecord>> {
+        let rows = sqlx::query!(
+            r#"SELECT e.id, e.name,
+                      COALESCE(
+                          array_agg(t.value ORDER BY t.position)
+                              FILTER (WHERE t.value IS NOT NULL),
+                          '{}'
+                      ) AS "alternate_names!"
+               FROM events e
+               LEFT JOIN event_text_values t
+                 ON t.event_id = e.id AND t.field = 'alternate_name'
+               WHERE e.deleted_at IS NULL AND e.active = true
+                 AND ($2::uuid IS NULL OR e.id > $2)
+               GROUP BY e.id
+               ORDER BY e.id
+               LIMIT $1"#,
+            to_i64(limit),
+            after,
+        )
+        .fetch_all(&self.db)
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| NameRecord {
+                id: r.id,
+                name: r.name,
+                alternate_names: r.alternate_names,
+            })
+            .collect())
+    }
 }
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path.
@@ -1757,5 +1808,63 @@ mod tests {
         );
         let stored = repo.get_by_id(&survivor.id).await.unwrap().unwrap();
         assert_eq!(stored.name, "Race Survivor", "the survivor was not written");
+    }
+
+    /// The frequency scan's name listing pages by id, carries alternate
+    /// names in order, and skips deleted events.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn list_active_names_pages_by_id_with_alternates() {
+        let db = connect().await;
+        let repo = PgEventRepository::new(db.clone());
+        let start = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
+        let tag = uuid::Uuid::new_v4();
+        let mut with_alts = Event::new(format!("Names {tag}"), start);
+        with_alts.alternate_names = vec!["First Alt".into(), "Second Alt".into()];
+        let a = repo.create(&with_alts).await.unwrap();
+        let b = repo
+            .create(&Event::new(format!("Names {tag} bare"), start))
+            .await
+            .unwrap();
+        let gone = repo
+            .create(&Event::new(format!("Names {tag} gone"), start))
+            .await
+            .unwrap();
+        repo.delete(&gone.id).await.unwrap();
+
+        // Walk every page; ids strictly increase across pages.
+        let mut all = Vec::new();
+        let mut after = None;
+        loop {
+            let page = repo.list_active_names(2, after).await.unwrap();
+            let Some(last) = page.last() else { break };
+            after = Some(last.id);
+            all.extend(page);
+        }
+        assert!(all.windows(2).all(|w| w[0].id < w[1].id));
+        let found_a = all.iter().find(|r| r.id == a.id).expect("a listed");
+        assert_eq!(found_a.alternate_names, vec!["First Alt", "Second Alt"]);
+        let found_b = all.iter().find(|r| r.id == b.id).expect("b listed");
+        assert!(found_b.alternate_names.is_empty());
+        assert!(
+            all.iter().all(|r| r.id != gone.id),
+            "deleted events are skipped"
+        );
+    }
+
+    /// A scan over fewer than `MIN_FREQUENCY_POPULATION` records knows no
+    /// shares.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn a_small_population_scans_to_no_frequencies() {
+        let db = connect().await;
+        let repo = PgEventRepository::new(db.clone());
+        let total = repo.list_active_names(10_000, None).await.unwrap().len();
+        let source = crate::matching::frequencies::scan(&repo).await.unwrap();
+        assert_eq!(
+            source.is_none(),
+            (total as u64) < crate::matching::MIN_FREQUENCY_POPULATION,
+            "{total} records"
+        );
     }
 }

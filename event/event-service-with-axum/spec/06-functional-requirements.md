@@ -11,31 +11,68 @@
 
 Algorithm reference: [`agents/matching.md`](../agents/matching.md).
 
-Default component weights (sum to 1.0):
+**Every pair is scored by the `event-matcher` crate** (§13 T-16,
+2026-11-09), through the adapter below: the service's **score**,
+**`is_match`**, **quality** and **evidence** are the matcher's
+`MatchResult`. The matcher's `match_threshold` is set from
+`MatchingConfig::threshold_score` (default `0.85`); its other settings
+are the matcher's defaults (weights in the matcher spec §5–§7). The
+score is renormalised over the components **both** events hold, so a
+component either lacks is skipped, not scored `0`. Until T-16 the
+service scored pairs itself and counted absent components as `0`: two
+identical events with no identifier reached `0.75`, under the
+threshold, and real-time detection caught almost nothing.
 
-| Component | Weight | Algorithm |
-|---|---:|---|
-| Name (title + alternates) | 0.20 | Jaro-Winkler + Levenshtein + Soundex floor |
-| Start date | 0.20 | Exponential decay (1 h half-life) |
-| End date | 0.10 | Exponential decay or window overlap |
-| Location | 0.15 | Place-id exact / address fuzzy / virtual URL / text |
-| Organizer | 0.10 | Party id exact / name fuzzy / email exact |
-| Performer | 0.10 | Same |
-| Attendee | 0.05 | Same |
-| Identifier | 0.10 | Type + system + value match |
+Breakdown (`score_breakdown`, schema `MatchScoreBreakdown`): the
+matcher's components, each `null` when not compared — `name_score`,
+`name_phonetic_score`, `start_date_score`, `end_date_score`,
+`location_score`, `category_score`, `country_code_score`,
+`event_ids_score`, `organizer_score`, `performers_score`, `url_score`,
+`relationships_score`, `tags_score`. This **replaces** the service's
+old eight-field breakdown (whose `performer_score`, `attendee_score`
+and `identifier_score` are gone; the matcher does not compare
+attendees), so that the breakdown always explains the score it sits
+beside.
 
-Deterministic short-circuit: exact value match on a **strong**
-identifier (`BookingNumber`, `ConfirmationCode`, `TicketNumber`,
-`EncounterId`, `TransactionId`) → 1.0.
+Match quality, from the matcher's confidence band:
 
-Match quality:
+| Quality | Matcher band | Score |
+|---|---|---|
+| `certain` | `High` | ≥ 0.90 |
+| `probable` | `Medium` | ≥ 0.75 |
+| `possible` | `Low` | < 0.75 |
 
-| Quality | Score |
-|---|---|
-| Definite | ≥ 0.95 |
-| Probable | ≥ 0.85 |
-| Possible | ≥ 0.50 |
-| Unlikely | < 0.50 |
+**Match evidence** ([match-evidence.md](../../../agents/share/match-evidence.md)).
+Every match result (the `409` body, `check-duplicates`, `match`, batch
+items) carries `evidence`: `weight_bits`, `fields_compared`,
+`contradictions`, `strength` (`proven` / `consistent` / `contradicted`
+/ `non_match`) and the per-term `components`. Evidence names components
+and carries bits, never a field value, so it is safe on any path the
+record itself is; a contradiction's field is `identifier:<scheme>`, and
+for the service's own identifier types the scheme is
+`other:<type>@<system>` — the system URI, which the masked view also
+shows, never the value. The adapter scopes those schemes by `system`
+because the service's identity is `(type, system, value)`: two systems'
+references are two namespaces, not a conflict.
+
+**Value frequencies** (match-evidence.md §7). The name is event's one
+frequency-adjusted component: agreeing on a common name gives fewer
+bits than the matcher's table default. Shares are counted by the
+service (`src/matching/frequencies.rs`) over active records, mapped
+through the adapter and `frequency_key("name", …)` (primary and
+alternate names, once per record), divided by the population. Below
+`MIN_FREQUENCY_POPULATION = 1 000` records no shares are used
+(`NoFrequencies`): a share from a small population is noise.
+
+- The batch scan counts from the events it loaded.
+- Create / `check-duplicates` / `match` use a cached table in
+  `AppState`, rebuilt **lazily in the background** when older than ten
+  minutes: a request starts the rebuild (one at a time) and matches
+  with the table it has, or none before the first build lands, so no
+  request ever waits on a scan. The scan pages by id
+  (`EventRepository::list_active_names`, 5 000 a page) and stops at
+  `FREQUENCY_SCAN_CAP = 200 000` records; above the cap the table is a
+  sample of the first 200 000 by id.
 
 #### Interoperability with `event-matcher`
 
@@ -122,8 +159,10 @@ sensitive identifiers or party emails.
 ### 6.4 Duplicate detection and merging
 
 - Real-time `409 Conflict` on `POST /api/events` when the blocking
-  step (name + start-date) yields a probable match above the
-  threshold.
+  step (name + start-date) yields a candidate the matcher counts as a
+  match (score ≥ `threshold_score`). Each candidate in the body carries
+  its evidence. Since T-16 identical events with no shared identifier
+  are caught too.
 - Explicit `POST /api/events/check-duplicates`.
 - Batch `POST /api/events/deduplicate`.
 - Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`) —
@@ -137,7 +176,13 @@ sensitive identifiers or party emails.
   and support a confirm/reject decision workflow (see
   [match-search-merge.md](../../../agents/share/match-search-merge.md)).
   `AutoMerged` on a scanned pair is a **label only**: the batch scan
-  does not itself perform a merge. Rerunning the scan re-discovers and
+  does not itself perform a merge. Each item carries the pair's
+  `evidence`, and an item is `AutoMerged` only when its score clears
+  `auto_merge_threshold` **and** its evidence is `proven`
+  ([match-evidence.md](../../../agents/share/match-evidence.md) §4);
+  `consistent` and `contradicted` pairs stay `Pending` whatever their
+  score. When T-15 makes `AutoMerged` execute a merge, the same gate
+  (`matching::permits_auto_merge`) applies to it. Rerunning the scan re-discovers and
   re-scores the same pairs from scratch. See §16 OQ-4.
 - Merge picks the surviving record; transfers identifiers, alternate
   names, keywords, locations, parties, and `same_as` URLs; appends the

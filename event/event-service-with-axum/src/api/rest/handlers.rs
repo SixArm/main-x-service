@@ -492,14 +492,26 @@ fn default_match_limit() -> usize {
 pub struct MatchResponse {
     /// The candidate event.
     pub event: Event,
-    /// Overall match score in `[0.0, 1.0]`.
+    /// Overall match score in `[0.0, 1.0]`, from the `event-matcher`
+    /// crate: renormalised over the components both events hold.
     pub score: f64,
-    /// Human label for the score (`certain` / `probable` / `possible`).
+    /// Whether the matcher counts the pair as a match (score at or above
+    /// the configured threshold).
+    #[serde(default)]
+    pub is_match: bool,
+    /// Human label for the matcher's confidence band (`certain` ≥ 0.90,
+    /// `probable` ≥ 0.75, else `possible`).
     pub quality: String,
     /// Which strategy produced the score (`"probabilistic"`).
     pub detection_method: String,
-    /// Optional per-component score breakdown as JSON.
+    /// Optional per-component score breakdown as JSON, shaped as
+    /// [`MatchScoreBreakdown`](crate::matching::MatchScoreBreakdown): a
+    /// component either event lacks is `null`.
     pub score_breakdown: Option<serde_json::Value>,
+    /// How much the compared data proves (`agents/share/match-evidence.md`):
+    /// component names and bits only, never field values.
+    #[serde(default)]
+    pub evidence: crate::matching::MatchEvidence,
 }
 
 /// Collection wrapper for match results.
@@ -541,14 +553,19 @@ pub async fn match_event(
     Json(payload): Json<MatchRequest>,
 ) -> impl IntoResponse {
     let candidates = blocking_candidates(&state, &payload.event).await;
+    let frequencies = state.frequencies.current();
 
-    let match_results = match state.matcher.find_matches(&payload.event, &candidates) {
-        Ok(r) => r,
-        Err(e) => {
-            let err = ApiProblem::new("match_error", format!("Matching failed: {e}"));
-            return err.respond(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
+    let match_results =
+        match state
+            .matcher
+            .find_matches(&payload.event, &candidates, frequencies.as_ref())
+        {
+            Ok(r) => r,
+            Err(e) => {
+                let err = ApiProblem::new("match_error", format!("Matching failed: {e}"));
+                return err.respond(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
 
     let threshold = payload.threshold.unwrap_or(0.5);
     let matches: Vec<MatchResponse> = match_results
@@ -581,20 +598,22 @@ pub struct DuplicateCheckResponse {
 
 /// Shared duplicate-detection core used by `create_event`,
 /// `check_duplicates`, and (PRO-H11) the gRPC `CreateEvent` RPC: block
-/// by name + date, score, keep candidates at or above the configured
-/// `threshold_score`.
+/// by name + date, score through the `event-matcher` crate with the
+/// cached value frequencies, keep the matcher's matches (score at or
+/// above the configured `threshold_score`), each with its evidence.
 pub(crate) async fn check_duplicates_internal(
     state: &AppState,
     event: &Event,
 ) -> Vec<MatchResponse> {
     let candidates = blocking_candidates(state, event).await;
+    let frequencies = state.frequencies.current();
     state
         .matcher
-        .find_matches(event, &candidates)
+        .find_matches(event, &candidates, frequencies.as_ref())
         .map(|results| {
             results
                 .into_iter()
-                .filter(|m| m.score >= state.config.matching.threshold_score)
+                .filter(|m| m.is_match)
                 .map(to_match_response)
                 .collect()
         })
@@ -633,23 +652,19 @@ async fn blocking_candidates(state: &AppState, event: &Event) -> Vec<Event> {
 }
 
 /// Convert an internal [`MatchResult`](crate::matching::MatchResult)
-/// into the API [`MatchResponse`], deriving the `quality` label from
-/// the score and serializing the breakdown to JSON.
+/// into the API [`MatchResponse`]: the matcher's score, verdict, quality
+/// band and evidence, and the breakdown as JSON.
 fn to_match_response(m: crate::matching::MatchResult) -> MatchResponse {
-    let quality = if m.score >= 0.95 {
-        "certain"
-    } else if m.score >= 0.7 {
-        "probable"
-    } else {
-        "possible"
-    };
+    let quality = m.quality();
     let breakdown_json = serde_json::to_value(&m.breakdown).ok();
     MatchResponse {
         event: m.event,
         score: m.score,
+        is_match: m.is_match,
         quality: quality.into(),
         detection_method: "probabilistic".into(),
         score_breakdown: breakdown_json,
+        evidence: m.evidence,
     }
 }
 
@@ -939,10 +954,15 @@ pub async fn merge_events(
 /// unordered pair is considered once). A `seen` set keyed on the
 /// id pair sorted low→high additionally guards against emitting a pair
 /// twice. Pairs scoring at/above `threshold` become
-/// [`ReviewQueueItem`](crate::models::ReviewQueueItem)s: `AutoMerged`
-/// when the score also clears `auto_merge_threshold`, otherwise
-/// `Pending` for human review. Always returns `200` with a
-/// `BatchDeduplicationResponse` summary.
+/// [`ReviewQueueItem`](crate::models::ReviewQueueItem)s carrying the
+/// matcher's evidence: `AutoMerged` only when the score also clears
+/// `auto_merge_threshold` **and** the evidence is `Proven`
+/// ([`permits_auto_merge`](crate::matching::permits_auto_merge),
+/// `agents/share/match-evidence.md` §4), otherwise `Pending` for human
+/// review, whatever the score. Value frequencies are counted from the
+/// events the scan loaded (none below
+/// [`MIN_FREQUENCY_POPULATION`](crate::matching::MIN_FREQUENCY_POPULATION)).
+/// Always returns `200` with a `BatchDeduplicationResponse` summary.
 ///
 /// Unlike the real-time path this does not use name + date blocking —
 /// it is an explicit, bounded full scan, so the 1000-row cap and the
@@ -960,6 +980,7 @@ pub async fn batch_deduplicate(
     };
 
     let events_scanned = events.len();
+    let frequencies = crate::matching::FrequencySource::from_events(&events);
     let mut review_items = Vec::new();
     let mut auto_merged = 0usize;
     let mut seen: std::collections::HashSet<(Uuid, Uuid)> = std::collections::HashSet::default();
@@ -979,7 +1000,7 @@ pub async fn batch_deduplicate(
         // such as the documented default of 0.7, used to change nothing.
         let matches = candidates
             .iter()
-            .filter_map(|c| state.matcher.match_events(event, c).ok());
+            .filter_map(|c| state.matcher.match_events(event, c, &frequencies).ok());
         for m in matches {
             if m.score < req.threshold {
                 continue;
@@ -994,14 +1015,14 @@ pub async fn batch_deduplicate(
             if !seen.insert(pair) {
                 continue;
             }
-            let quality = if m.score >= 0.95 {
-                "certain"
-            } else if m.score >= 0.7 {
-                "probable"
-            } else {
-                "possible"
-            };
-            let status = if m.score >= req.auto_merge_threshold {
+            let quality = m.quality();
+            // Auto-merge only on proof: a high score with `consistent` or
+            // `contradicted` evidence is a pair for a person to look at.
+            let status = if crate::matching::permits_auto_merge(
+                m.score,
+                req.auto_merge_threshold,
+                &m.evidence,
+            ) {
                 auto_merged += 1;
                 crate::models::ReviewStatus::AutoMerged
             } else {
@@ -1015,6 +1036,7 @@ pub async fn batch_deduplicate(
                 match_quality: quality.into(),
                 detection_method: "batch_deduplication".into(),
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
+                evidence: Some(m.evidence),
                 status,
                 reviewed_by: None,
                 created_at: chrono::Utc::now(),

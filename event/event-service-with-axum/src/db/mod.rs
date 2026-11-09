@@ -24,7 +24,9 @@ pub mod outbox;
 pub mod repositories;
 
 pub use audit::AuditLogRepository;
-pub use repositories::{AuditContext, EventRepository, PgEventRepository, rows_for_verification};
+pub use repositories::{
+    AuditContext, EventRepository, NameRecord, PgEventRepository, rows_for_verification,
+};
 
 /// The schema migrations: the plain SQL files under `migrations/`, one
 /// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
