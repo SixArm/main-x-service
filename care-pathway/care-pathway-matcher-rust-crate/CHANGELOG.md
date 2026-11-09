@@ -10,6 +10,24 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — correlated groups, value frequencies and evidence terms
+
+- Correlated components (`agents/share/match-evidence.md` §6):
+  `CORRELATED_GROUPS` = `{condition, interventions}`, `{keywords, tags}`.
+  The strongest present member counts in full, the rest at
+  `CORRELATED_DISCOUNT` (0.5), agreeing or disagreeing.
+- Value frequencies (§7): `ValueFrequencies`, `NoFrequencies`,
+  `FrequencyTable`, `frequency_bits`, `MIN_SHARE`,
+  `FREQUENCY_COMPONENTS` (`["name"]`) and `frequency_key`, used by the
+  new `MatchingEngine::match_care_pathways_with_frequencies`. An exact
+  primary-name agreement weighs by the name's own share; plain
+  `match_care_pathways` passes `NoFrequencies` and is unchanged.
+- `Evidence.components` (§8, `#[serde(default)]`): every term of
+  `weight_bits`, including identifier and contradiction terms, summing
+  to it exactly.
+- The richest identifier-free identical record now scores ~24.0 bits
+  (was ~26.5). `score`, `is_match` and `confidence` are unchanged.
+
 ### Added — match evidence beside the score
 
 - `src/evidence.rs` implements `agents/share/match-evidence.md`: every

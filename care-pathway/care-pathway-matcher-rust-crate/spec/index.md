@@ -272,14 +272,53 @@ provider with two non-empty, differing normalised pathway codes records
 −6.64 bits. `same_as` URLs never contradict: a pathway legitimately
 points at several identity pages.
 
+**Correlated groups** (§6 of the contract; public contract, the
+`CORRELATED_GROUPS` constant). Within a group the present member with
+the largest absolute bits counts in full and every other present member
+at `CORRELATED_DISCOUNT` = 0.5, for agreement and disagreement alike:
+
+- `condition` + `interventions` — the target condition largely
+  determines the interventions (every stroke pathway lists thrombolysis
+  and a CT head), so they agree for one reason.
+- `keywords` + `tags` — both are free labels from one specialty
+  vocabulary, often applied by the same editor.
+
+`care_setting` is in no group: the same condition and interventions run
+in acute, community and home settings, so the setting is a separate
+fact. It would also have made `interventions` a member of two groups.
+
+**Value frequencies** (§7; public contract). `FREQUENCY_COMPONENTS` is
+`["name"]`: titles such as "Stroke Pathway" recur across trusts.
+`frequency_key("name", raw)` is `normalize::fold(raw)` (NFKC, case-folded,
+trimmed), `None` when empty or for any other component. When both
+records' **primary** names give the same key and the caller's
+`ValueFrequencies` knows its share, the name's agreement weight is
+`frequency_bits(m, share)` = `log2(m / clamp(share, MIN_SHARE, m))`, so a
+share at or above `m` gives `0`, never negative. An agreement reached
+through an alternate name, a partial agreement and a disagreement are
+not adjusted. `MatchingEngine::match_care_pathways_with_frequencies(a,
+b, &dyn ValueFrequencies)` takes the source; `match_care_pathways`
+calls it with `NoFrequencies`, so plain calls see exactly the table.
+`FrequencyTable` (`new`, `insert(component, key, share)`,
+`from_counts(entries, total)` with share `count / total`) is provided.
+Frequencies change only `evidence`, never `score`, `is_match`,
+`confidence` or the breakdown.
+
+**Terms** (§8). `Evidence.components` (`#[serde(default)]`) lists every
+term as `ComponentBits { component, bits, correlated, frequency_adjusted }`:
+the present components by name, then `identifier`, then one
+`contradiction:<field>` per contradiction. `weight_bits` is their sum,
+exactly.
+
 **Strength**, in order: any contradiction ⇒ `Contradicted`;
 `weight_bits >= proof_bits` ⇒ `Proven`; `is_match` ⇒ `Consistent`;
 else `NonMatch`. Two identical name-only records score ≈ 7.49 bits
 (`Consistent`). The richest identical record with no identifier —
 name, conditions, setting, interventions, keywords, relationships and
-tags — reaches ≈ 26.45 bits, short of the default 30: two trusts can
-publish word-for-word the same pathway, so descriptive fields alone
-never prove one record; only an identifier does.
+tags — reaches ≈ 24.04 bits after the correlated discounts, short of
+the default 30: two trusts can publish word-for-word the same pathway,
+so descriptive fields alone never prove one record; only an identifier
+does.
 
 ## 18. Confidence classification
 
@@ -303,8 +342,10 @@ Semantic versioning. Re-exports from `lib.rs` are the contract:
 `CarePathway`, `PathwayIdentifier`, `IdentifierScheme`, `ConditionCode`,
 `CodeSystem`, `CareSetting`, `RelationshipRef`, `RelationKind`,
 `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`,
-`Confidence`, `Evidence`, `Contradiction`, `MatchStrength`, `Error`,
-`Result`.
+`Confidence`, `Evidence`, `Contradiction`, `MatchStrength`,
+`ComponentBits`, `ValueFrequencies`, `NoFrequencies`, `FrequencyTable`,
+`frequency_key`, `Error`, `Result`; plus `evidence::CORRELATED_GROUPS`
+and `evidence::FREQUENCY_COMPONENTS`.
 
 `Error`/`Result` are **reserved for future fallible APIs**: every
 current entry point (`match_care_pathways` and all component fns) is
@@ -348,6 +389,17 @@ add IO, async, or panics to library code.
       of proof, negative bits on clear disagreement, old JSON
       deserialising, and a proptest that `weight_bits` is finite and
       the strength follows the contradictions. Done 2026-11-09.
+- [x] **Match evidence, phase 2** (contract §6–§8): correlated groups
+      `{condition, interventions}` and `{keywords, tags}`
+      (`CORRELATED_DISCOUNT`, `group_bits`, `strongest_first`); name
+      value frequencies (`ValueFrequencies`, `NoFrequencies`,
+      `FrequencyTable`, `MIN_SHARE`, `frequency_bits`,
+      `FREQUENCY_COMPONENTS`, `frequency_key`,
+      `match_care_pathways_with_frequencies`); and the per-term
+      `Evidence.components` listing, summing exactly to `weight_bits`
+      (proptest). Richest identifier-free record re-pinned 26.45 →
+      24.04 bits. `score`/`is_match`/`confidence` unchanged. Done
+      2026-11-09.
 - [ ] Optional intervention-sequence (ordered) similarity.
 - [ ] Patient-group / age-band component.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file

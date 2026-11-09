@@ -15,7 +15,7 @@ use strsim::jaro_winkler;
 
 use crate::care_pathway::{CarePathway, CodeSystem, ConditionCode, RelationKind, RelationshipRef};
 use crate::config::MatchConfig;
-use crate::evidence;
+use crate::evidence::{self, NoFrequencies, ValueFrequencies};
 use crate::normalize;
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
@@ -111,6 +111,21 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_care_pathways(&self, a: &CarePathway, b: &CarePathway) -> MatchResult {
+        self.match_care_pathways_with_frequencies(a, b, &NoFrequencies)
+    }
+
+    /// Score two care pathways, weighing an exact name agreement by the
+    /// name's own frequency (`agents/share/match-evidence.md` §7). Only
+    /// `evidence` can differ from [`Self::match_care_pathways`]: `score`,
+    /// `is_match`, `confidence` and the breakdown are the same. Look-ups
+    /// use [`evidence::frequency_key`].
+    #[must_use]
+    pub fn match_care_pathways_with_frequencies(
+        &self,
+        a: &CarePathway,
+        b: &CarePathway,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         // Phase 1 — the probabilistic components. These are computed
         // even when the short-circuit below fires, because the evidence
         // (`agents/share/match-evidence.md` §3) weighs them; the returned
@@ -120,6 +135,15 @@ impl MatchingEngine {
         // present (records require a name), hence `Some`.
         let components = component_breakdown(a, b);
         let contradictions = evidence::contradictions(a, b, MAX_ARRAY_LEN);
+        // The share of records holding the pair's name, when both primary
+        // names normalise to the same key.
+        let name_share = match (
+            evidence::frequency_key("name", &a.name),
+            evidence::frequency_key("name", &b.name),
+        ) {
+            (Some(ka), Some(kb)) if ka == kb => frequencies.share("name", &ka),
+            _ => None,
+        };
 
         // Phase 2 — deterministic short-circuit. A shared globally-unique
         // identifier (or R-1/R-2 rule) is conclusive, so pin to 1.0 /
@@ -128,6 +152,7 @@ impl MatchingEngine {
         if deterministic_match(a, b) {
             let evidence = evidence::assess(
                 &components,
+                name_share,
                 true,
                 contradictions,
                 true,
@@ -175,6 +200,7 @@ impl MatchingEngine {
         let is_match = score >= self.config.threshold;
         let evidence = evidence::assess(
             &components,
+            name_share,
             false,
             contradictions,
             is_match,
@@ -590,7 +616,7 @@ fn tags_score(a: &[String], b: &[String]) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::care_pathway::{CareSetting, IdentifierScheme, PathwayIdentifier};
-    use crate::evidence::{Contradiction, MatchStrength};
+    use crate::evidence::{Contradiction, FrequencyTable, MatchStrength, frequency_key};
 
     /// Terse constructor for a [`PathwayIdentifier`] in tests.
     fn ident(scheme: IdentifierScheme, value: &str) -> PathwayIdentifier {
@@ -1153,9 +1179,10 @@ mod tests {
     }
 
     // The richest identical record with no identifier stops short of
-    // proof: name, conditions, setting, interventions, keywords,
-    // relationships and tags sum to about 26.5 bits under the default
-    // table, below the 30-bit bar. That is intended: two trusts can
+    // proof. Name 7.49, condition 5.49 with interventions 3.00 discounted
+    // to 1.50, keywords 3.00 with tags 1.81 discounted to 0.90, setting
+    // 1.85, relationships 3.81: ≈ 24.04 bits (26.45 before the correlated
+    // groups), below the 30-bit bar. That is intended: two trusts can
     // publish word-for-word the same stroke pathway, so a pathway
     // template's descriptive fields never prove one record; only an
     // identifier does.
@@ -1166,12 +1193,124 @@ mod tests {
         assert!(r.is_match);
         assert_eq!(r.evidence.fields_compared, 7);
         assert!(
-            r.evidence.weight_bits > 26.0 && r.evidence.weight_bits < 27.0,
+            (r.evidence.weight_bits - 24.042_735).abs() < 1e-5,
             "got {}",
             r.evidence.weight_bits
         );
         assert!(r.evidence.weight_bits < engine.config().proof_bits);
         assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+        let discounted: Vec<&str> = r
+            .evidence
+            .components
+            .iter()
+            .filter(|t| t.correlated)
+            .map(|t| t.component.as_str())
+            .collect();
+        assert_eq!(discounted, vec!["interventions", "tags"]);
+    }
+
+    /// Name-only bits for `a` vs `b` under a one-entry name table.
+    fn name_bits_with_share(a: &str, b: &str, share: f64) -> (f64, bool) {
+        let engine = MatchingEngine::default_config();
+        let mut table = FrequencyTable::new();
+        if let Some(key) = frequency_key("name", a) {
+            table.insert("name", key, share);
+        }
+        let r = engine.match_care_pathways_with_frequencies(
+            &CarePathway::new(a),
+            &CarePathway::new(b),
+            &table,
+        );
+        let t = &r.evidence.components[0];
+        assert_eq!(t.component, "name");
+        (t.bits, t.frequency_adjusted)
+    }
+
+    // "Stroke Pathway" held by 1% of records proves less than the table's
+    // u (0.5%) assumes; a title held by one in a million proves more.
+    #[test]
+    fn common_name_gives_fewer_bits_and_rare_name_more() {
+        let default = evidence::component_bits(1.0, evidence::NAME.m, evidence::NAME.u);
+        let (common, adjusted) = name_bits_with_share("Stroke Pathway", "stroke pathway", 0.01);
+        assert!(adjusted);
+        assert!(common < default, "{common} vs {default}");
+        assert!((common - (0.90_f64 / 0.01).log2()).abs() < 1e-9);
+        let (rare, _) = name_bits_with_share("Stroke Pathway", "Stroke Pathway", 1e-6);
+        assert!(rare > default, "{rare} vs {default}");
+        assert!((rare - (0.90_f64 / 1e-6).log2()).abs() < 1e-9);
+    }
+
+    // A share at or above m is no evidence, and never evidence against.
+    #[test]
+    fn share_at_or_above_m_gives_zero_bits() {
+        for share in [0.90, 0.95, 1.0] {
+            let (bits, adjusted) = name_bits_with_share("Stroke Pathway", "Stroke Pathway", share);
+            assert!(adjusted);
+            assert!(bits.abs() < 1e-12, "share {share} gave {bits}");
+        }
+    }
+
+    // Partial agreement and disagreement are not adjusted, even with the
+    // first name's key in the table.
+    #[test]
+    fn no_frequency_adjustment_on_partial_agreement_or_disagreement() {
+        let engine = MatchingEngine::default_config();
+        for other in ["Acute Stroke Pathway", "Type 2 Diabetes Management"] {
+            let (bits, adjusted) = name_bits_with_share("Acute Stroke Care Pathway", other, 1e-6);
+            assert!(!adjusted, "{other} was adjusted");
+            let plain = engine.match_care_pathways(
+                &CarePathway::new("Acute Stroke Care Pathway"),
+                &CarePathway::new(other),
+            );
+            assert!((bits - plain.evidence.components[0].bits).abs() < 1e-12);
+        }
+    }
+
+    // NoFrequencies is exactly the plain call; score, is_match and
+    // confidence never move with frequencies.
+    #[test]
+    fn no_frequencies_equals_the_plain_call() {
+        let engine = MatchingEngine::default_config();
+        let plain = engine.match_care_pathways(&rich(), &rich());
+        let none = engine.match_care_pathways_with_frequencies(&rich(), &rich(), &NoFrequencies);
+        assert_eq!(plain.evidence, none.evidence);
+        assert!((plain.score - none.score).abs() < f64::EPSILON);
+
+        let mut table = FrequencyTable::new();
+        table.insert(
+            "name",
+            frequency_key("name", &rich().name).unwrap_or_default(),
+            0.5,
+        );
+        let adjusted = engine.match_care_pathways_with_frequencies(&rich(), &rich(), &table);
+        assert!((plain.score - adjusted.score).abs() < f64::EPSILON);
+        assert_eq!(plain.is_match, adjusted.is_match);
+        assert_eq!(plain.confidence, adjusted.confidence);
+        assert!(adjusted.evidence.weight_bits < plain.evidence.weight_bits);
+    }
+
+    // Identifier and contradiction terms are listed, and every list sums
+    // to weight_bits.
+    #[test]
+    fn identifier_and_contradiction_terms_are_listed() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich();
+        let mut b = rich();
+        a.identifiers.push(ident(IdentifierScheme::Doi, "10.1/x"));
+        b.identifiers.push(ident(IdentifierScheme::Doi, "10.1/x"));
+        a.identifiers.push(ident(IdentifierScheme::Uuid, "u-1"));
+        b.identifiers.push(ident(IdentifierScheme::Uuid, "u-2"));
+        let r = engine.match_care_pathways(&a, &b);
+        let names: Vec<&str> = r
+            .evidence
+            .components
+            .iter()
+            .map(|t| t.component.as_str())
+            .collect();
+        assert!(names.contains(&"identifier"));
+        assert!(names.contains(&"contradiction:identifier:uuid"));
+        let sum: f64 = r.evidence.components.iter().map(|t| t.bits).sum();
+        assert!((sum - r.evidence.weight_bits).abs() < f64::EPSILON);
     }
 
     // A clear disagreement on every compared field gives negative bits.

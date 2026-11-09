@@ -80,7 +80,10 @@ pub use config::MatchConfig;
 // Error handling — typed error and the crate-local `Result` alias.
 pub use error::{Error, Result};
 // Evidence — how much the data proves, beside the similarity score.
-pub use evidence::{Contradiction, Evidence, MatchStrength};
+pub use evidence::{
+    ComponentBits, Contradiction, Evidence, FrequencyTable, MatchStrength, NoFrequencies,
+    ValueFrequencies, frequency_key,
+};
 // Engine — the entry point that scores pairs, plus the scoring-cost cap
 // (CPM-T3) a standalone caller can inspect rather than assume.
 pub use matcher::{MAX_ARRAY_LEN, MatchingEngine};

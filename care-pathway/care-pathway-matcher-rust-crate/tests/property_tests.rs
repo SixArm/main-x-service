@@ -11,9 +11,9 @@
 //! number in `[0.0, 1.0]`.
 
 use care_pathway_matcher::{
-    CarePathway, CodeSystem, ConditionCode, IdentifierScheme, MAX_ARRAY_LEN, MatchConfig,
-    MatchStrength, MatchingEngine, PathwayIdentifier, RelationKind, RelationshipRef, normalize,
-    phonetic,
+    CarePathway, CodeSystem, ConditionCode, FrequencyTable, IdentifierScheme, MAX_ARRAY_LEN,
+    MatchConfig, MatchStrength, MatchingEngine, PathwayIdentifier, RelationKind, RelationshipRef,
+    frequency_key, normalize, phonetic,
 };
 use proptest::prelude::*;
 
@@ -193,6 +193,25 @@ proptest! {
         prop_assert_eq!(e.strength, expected);
         let reverse = engine.match_care_pathways(&b, &a);
         prop_assert_eq!(&reverse.evidence.contradictions, &e.contradictions);
+    }
+
+    /// The listed terms sum exactly to `weight_bits` (match-evidence.md
+    /// §8), with and without a frequency table.
+    #[test]
+    fn evidence_terms_sum_to_weight_bits(a in pathway(), b in pathway(), share in 0.0f64..=1.0) {
+        let engine = MatchingEngine::default_config();
+        let mut table = FrequencyTable::new();
+        if let Some(key) = frequency_key("name", &a.name) {
+            table.insert("name", key, share);
+        }
+        for r in [
+            engine.match_care_pathways(&a, &b),
+            engine.match_care_pathways_with_frequencies(&a, &b, &table),
+        ] {
+            let sum: f64 = r.evidence.components.iter().map(|t| t.bits).sum();
+            prop_assert_eq!(sum.to_bits(), r.evidence.weight_bits.to_bits());
+            prop_assert!(r.evidence.weight_bits.is_finite());
+        }
     }
 
     /// An identical clone of a well-formed pathway MUST match itself. We
