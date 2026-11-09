@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, record_id_a, record_id_b, match_score, match_quality,\n                detection_method, score_breakdown, status, provenance,\n                reviewed_by, created_at, reviewed_at\n         FROM review_queue\n         WHERE ($1::text IS NULL OR status = $1)\n         ORDER BY created_at DESC, id\n         LIMIT $2",
+  "query": "UPDATE review_queue\n         SET status = $2, reviewed_by = $3, reviewed_at = now()\n         WHERE id = $1 AND status = 'pending'\n         RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                   detection_method, score_breakdown, status, provenance,\n                   reviewed_by, created_at, reviewed_at, evidence",
   "describe": {
     "columns": [
       {
@@ -134,12 +134,24 @@
             "name": "reviewed_at"
           }
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "evidence"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Int8"
+        "Uuid",
+        "Varchar",
+        "Varchar"
       ]
     },
     "nullable": [
@@ -154,8 +166,9 @@
       false,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "072c2124378f9a8a1fed60cdb69bee5106b0344f675afcb9ff1f7233e26e225a"
+  "hash": "15af02461d43e98a78893f1360b3f8134e01b7daa6b90d63546fc025bd954d7d"
 }

@@ -40,6 +40,8 @@ pub mod data;
 /// HL7 FHIR R5 interop — the `Task` resource mapping (best-effort) over
 /// the stored `case_matcher::Case` DTO.
 pub mod fhir;
+/// Value frequencies for match evidence (`agents/share/match-evidence.md` §7).
+pub mod frequencies;
 pub mod initializers;
 pub mod merge;
 pub mod metrics;

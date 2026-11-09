@@ -355,6 +355,10 @@ struct KeylessDuplicate {
     score: f64,
     /// The matcher's per-component breakdown, for the review-queue row.
     breakdown: serde_json::Value,
+    /// The matcher's evidence for the pair (`agents/share/match-evidence.md`),
+    /// for the review-queue row. An import never auto-merges: the pair is
+    /// queued `pending` whatever its strength.
+    evidence: serde_json::Value,
 }
 
 /// Find the best duplicate candidate for a **keyless** row, above
@@ -376,12 +380,14 @@ async fn find_keyless_duplicate(db: &PgPool, case: &Case) -> Option<KeylessDupli
         .ok()?;
 
     let matcher = MatchingEngine::new(MatchConfig::default());
+    // The cached registry-wide value frequencies (match-evidence.md §7).
+    let frequencies = crate::frequencies::current(db).await;
     let mut best: Option<KeylessDuplicate> = None;
     for row in rows {
         let Ok(candidate) = row.to_case() else {
             continue;
         };
-        let result = matcher.match_cases(case, &candidate);
+        let result = matcher.match_cases_with_frequencies(case, &candidate, frequencies.as_ref());
         if result.score < crate::bulk::IMPORT_REVIEW_THRESHOLD {
             continue;
         }
@@ -391,6 +397,7 @@ async fn find_keyless_duplicate(db: &PgPool, case: &Case) -> Option<KeylessDupli
                 score: result.score,
                 breakdown: serde_json::to_value(&result.breakdown)
                     .unwrap_or(serde_json::Value::Null),
+                evidence: serde_json::to_value(&result.evidence).unwrap_or(serde_json::Value::Null),
             });
         }
     }
@@ -419,6 +426,7 @@ async fn create_and_queue_for_review(
         score_breakdown: Some(duplicate.breakdown),
         status: "pending".to_string(),
         provenance: "import".to_string(),
+        evidence: Some(duplicate.evidence),
     };
     if let Err(e) = review_queue::upsert(db, &[item]).await {
         tracing::warn!(
@@ -919,6 +927,11 @@ mod db_tests {
             .expect("a pending pair references the existing record");
         assert_eq!(pair.provenance, "import");
         assert_eq!(pair.detection_method, "import_duplicate_detection");
+        // The import path writes the pair's evidence too, and never
+        // auto-merges (match-evidence.md §4).
+        let evidence = pair.evidence.as_ref().expect("evidence stored");
+        assert!(evidence["strength"].is_string(), "{evidence}");
+        assert_eq!(pair.status, "pending");
         assert!(pair.match_score >= crate::bulk::IMPORT_REVIEW_THRESHOLD);
     }
 

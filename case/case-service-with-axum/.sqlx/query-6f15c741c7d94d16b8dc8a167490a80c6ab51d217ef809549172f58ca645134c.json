@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE review_queue\n         SET status = $2, reviewed_by = $3, reviewed_at = now()\n         WHERE id = $1 AND status = 'pending'\n         RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                   detection_method, score_breakdown, status, provenance,\n                   reviewed_by, created_at, reviewed_at",
+  "query": "INSERT INTO review_queue\n                 (id, record_id_a, record_id_b, match_score, match_quality,\n                  detection_method, score_breakdown, status, provenance, evidence)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n             ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET\n                 match_score = EXCLUDED.match_score,\n                 match_quality = EXCLUDED.match_quality,\n                 detection_method = EXCLUDED.detection_method,\n                 score_breakdown = EXCLUDED.score_breakdown,\n                 evidence = EXCLUDED.evidence\n             RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                       detection_method, score_breakdown, status, provenance,\n                       reviewed_by, created_at, reviewed_at, evidence",
   "describe": {
     "columns": [
       {
@@ -134,13 +134,31 @@
             "name": "reviewed_at"
           }
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "evidence"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
+        "Uuid",
+        "Uuid",
+        "Float8",
         "Varchar",
-        "Varchar"
+        "Varchar",
+        "Jsonb",
+        "Varchar",
+        "Varchar",
+        "Jsonb"
       ]
     },
     "nullable": [
@@ -155,8 +173,9 @@
       false,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "fa04d09aa7e72a197589eb36ecb1ad643600df56f2c327c8ba1cd399bc415ce1"
+  "hash": "6f15c741c7d94d16b8dc8a167490a80c6ab51d217ef809549172f58ca645134c"
 }

@@ -9,6 +9,36 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — match evidence
+
+- Match evidence (`agents/share/match-evidence.md`) on every match
+  result: `check-duplicates` hits carry `evidence`, the `/match`
+  `MatchResult` carries it, and `review_queue` stores it in a new
+  nullable `evidence` JSONB column (migration
+  `2026110900000014_review_queue_evidence`), written by the batch
+  `deduplicate` and by the bulk import's keyless-duplicate path, and
+  returned by `GET /api/cases/review-queue`. Older rows stay `null`.
+- Title value frequencies for the evidence (`src/frequencies.rs`):
+  counted from active cases, `NoFrequencies` below 1 000 records, a
+  lazily rebuilt 10-minute cache for `check-duplicates` and import, the
+  scan's own cases for `deduplicate`.
+
+### Changed — auto-merge gate
+
+- `POST /api/cases/deduplicate` takes `auto_merge_threshold` (default
+  `0.95`) and marks a pair `automerged` only when its score reaches it
+  **and** its evidence is `proven`. `consistent` and `contradicted`
+  pairs stay `pending` whatever their score. Before, no pair was ever
+  marked; a pair sharing a docket is now `automerged` (a mark: nothing
+  is merged).
+
+### Security
+
+- Evidence on a case the caller may read only masked, or not at all, is
+  reduced to `weight_bits`, `fields_compared` and `strength`: its
+  `contradictions` and `components` would otherwise say that the hidden
+  case holds a docket, or that its subjects were compared.
+
 ### Fixed
 
 - The outbox relay's ack stamps `published_at` from this process's clock,

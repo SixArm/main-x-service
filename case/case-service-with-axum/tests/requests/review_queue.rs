@@ -46,6 +46,7 @@ async fn review_queue_lists_a_seeded_pending_item() {
                 score_breakdown: None,
                 status: "pending".to_string(),
                 provenance: "import".to_string(),
+                evidence: None,
             }],
         )
         .await
@@ -96,6 +97,7 @@ async fn a_decision_is_first_writer_wins() {
                 score_breakdown: None,
                 status: "pending".to_string(),
                 provenance: "import".to_string(),
+                evidence: None,
             }],
         )
         .await

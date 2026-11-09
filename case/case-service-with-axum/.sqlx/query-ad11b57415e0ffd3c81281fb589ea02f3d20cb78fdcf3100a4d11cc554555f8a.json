@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO review_queue\n                 (id, record_id_a, record_id_b, match_score, match_quality,\n                  detection_method, score_breakdown, status, provenance)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n             ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET\n                 match_score = EXCLUDED.match_score,\n                 match_quality = EXCLUDED.match_quality,\n                 detection_method = EXCLUDED.detection_method,\n                 score_breakdown = EXCLUDED.score_breakdown\n             RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                       detection_method, score_breakdown, status, provenance,\n                       reviewed_by, created_at, reviewed_at",
+  "query": "SELECT id, record_id_a, record_id_b, match_score, match_quality,\n                detection_method, score_breakdown, status, provenance,\n                reviewed_by, created_at, reviewed_at, evidence\n         FROM review_queue\n         WHERE ($1::text IS NULL OR status = $1)\n         ORDER BY created_at DESC, id\n         LIMIT $2",
   "describe": {
     "columns": [
       {
@@ -134,19 +134,23 @@
             "name": "reviewed_at"
           }
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "evidence"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Uuid",
-        "Uuid",
-        "Float8",
-        "Varchar",
-        "Varchar",
-        "Jsonb",
-        "Varchar",
-        "Varchar"
+        "Text",
+        "Int8"
       ]
     },
     "nullable": [
@@ -161,8 +165,9 @@
       false,
       true,
       false,
+      true,
       true
     ]
   },
-  "hash": "1dcd9a456078917cbef540a1c22fd5be67213c7a25e03979901cf782ab482e11"
+  "hash": "ad11b57415e0ffd3c81281fb589ea02f3d20cb78fdcf3100a4d11cc554555f8a"
 }

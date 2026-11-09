@@ -11,7 +11,7 @@ use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::extract::OriginalUri;
 use axum::http::StatusCode;
-use case_matcher::{Case, MatchConfig, MatchingEngine};
+use case_matcher::{Case, Evidence, MatchConfig, MatchStrength, MatchingEngine};
 
 use crate::compliance::checkpoint::Checkpoint;
 use serde::{Deserialize, Serialize};
@@ -210,6 +210,55 @@ struct ScoredRef {
     /// Whether the score cleared the match threshold (always `true` for a
     /// returned hit — only matches are collected).
     is_match: bool,
+    /// The matcher's evidence for the pair (`agents/share/match-evidence.md`);
+    /// reduced to its aggregate when the caller may read the candidate
+    /// only masked ([`redact_evidence`]).
+    evidence: Evidence,
+}
+
+/// Default score at or above which a batch-scan pair may be marked
+/// `automerged` — the matcher's "certain" band. Score alone is never
+/// enough: see [`auto_merge_allowed`].
+pub const DEFAULT_AUTO_MERGE_THRESHOLD: f64 = 0.95;
+
+/// The auto-merge gate (`agents/share/match-evidence.md` §4): a pair may
+/// be marked or executed as an automatic merge only when its score
+/// reaches `auto_merge_threshold` **and** its evidence is
+/// [`MatchStrength::Proven`]. A `consistent` pair (nothing contradicts,
+/// nothing proves — two different appeals filed under one template
+/// title) and a `contradicted` one (two different dockets) go to review
+/// as `pending`, whatever their score.
+#[must_use]
+pub fn auto_merge_allowed(score: f64, auto_merge_threshold: f64, evidence: &Evidence) -> bool {
+    score >= auto_merge_threshold && evidence.strength == MatchStrength::Proven
+}
+
+/// Evidence for a pair the caller may read only masked, or not at all:
+/// the aggregate (`weight_bits`, `fields_compared`, `strength`) with
+/// `contradictions` and `components` emptied.
+///
+/// Evidence holds component names and bits, never field values, but on a
+/// case those names still disclose what a masked view hides: a
+/// `contradiction:identifier:docket` term says the hidden case holds a
+/// docket, and a `subjects` or `case_number` term says the hidden
+/// subjects or case number were compared. The aggregate is no more than
+/// the score already discloses, and it keeps the strength the auto-merge
+/// gate and a reviewer need.
+#[must_use]
+pub fn redact_evidence(evidence: &Evidence) -> Evidence {
+    Evidence {
+        weight_bits: evidence.weight_bits,
+        fields_compared: evidence.fields_compared,
+        contradictions: Vec::new(),
+        strength: evidence.strength,
+        components: Vec::new(),
+    }
+}
+
+/// Whether a record-level read decision's obligations ask for the
+/// masked view.
+fn is_masked(obligations: &[String]) -> bool {
+    obligations.iter().any(|o| o == "mask")
 }
 
 /// Descending-by-score comparator for `check-duplicates` ranking.
@@ -678,22 +727,30 @@ async fn check_duplicates(
     };
     let candidates = index.candidates(&query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
     let rows = CaseModel::find_by_pids(&ctx.db, &parse_pids(&candidates)).await?;
+    // The cached registry-wide value frequencies (match-evidence.md §7).
+    let frequencies = crate::frequencies::current(&ctx.db).await;
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_case()?;
         // SEC-G3: a caller must not discover a concealed case via dedup —
         // skip candidates they may not read.
-        if crate::auth::read_visibility(&caller, &candidate).is_none() {
+        let Some(obligations) = crate::auth::read_visibility(&caller, &candidate) else {
             continue;
-        }
-        let r = engine.match_cases(&query, &candidate);
+        };
+        let r = engine.match_cases_with_frequencies(&query, &candidate, frequencies.as_ref());
         if r.is_match {
+            let evidence = if is_masked(&obligations) {
+                redact_evidence(&r.evidence)
+            } else {
+                r.evidence
+            };
             hits.push(ScoredRef {
                 pid: row.pid.to_string(),
                 title: row.title.clone(),
                 score: r.score,
                 confidence: format!("{:?}", r.confidence),
                 is_match: r.is_match,
+                evidence,
             });
         }
     }
@@ -704,11 +761,30 @@ async fn check_duplicates(
 
 /// Request body for the batch scan. With no `threshold` the matcher's
 /// own `is_match` verdict decides; with one, `score >= threshold` does.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct BatchDeduplicationRequest {
     /// Optional score threshold overriding the matcher's verdict.
     #[serde(default)]
     threshold: Option<f64>,
+    /// Score at or above which a `proven` pair is marked `automerged`
+    /// (default [`DEFAULT_AUTO_MERGE_THRESHOLD`]); see
+    /// [`auto_merge_allowed`].
+    #[serde(default = "default_auto_merge_threshold")]
+    auto_merge_threshold: f64,
+}
+
+impl Default for BatchDeduplicationRequest {
+    fn default() -> Self {
+        Self {
+            threshold: None,
+            auto_merge_threshold: DEFAULT_AUTO_MERGE_THRESHOLD,
+        }
+    }
+}
+
+/// serde default for [`BatchDeduplicationRequest::auto_merge_threshold`].
+const fn default_auto_merge_threshold() -> f64 {
+    DEFAULT_AUTO_MERGE_THRESHOLD
 }
 
 /// Response for the batch scan, in the family's report shape
@@ -719,12 +795,39 @@ struct BatchDeduplicationResponse {
     cases_scanned: usize,
     /// Number of duplicate pairs found (stored rows reported).
     duplicates_found: usize,
-    /// Auto-merged count (always 0 — no auto-merge path here).
+    /// Stored pairs marked `automerged` (score at or above
+    /// `auto_merge_threshold` and evidence `proven`). A mark only: the
+    /// scan never executes a merge.
     auto_merged: usize,
     /// Number of stored pairs currently `pending` review.
     queued_for_review: usize,
     /// The stored candidate pairs (stable ids across re-scans).
     review_items: Vec<ReviewQueueItem>,
+}
+
+/// The review-queue row for one batch-scan pair, with the auto-merge gate
+/// applied: `automerged` only when [`auto_merge_allowed`], else `pending`.
+fn batch_review_item(
+    pair: (uuid::Uuid, uuid::Uuid),
+    r: &case_matcher::MatchResult,
+    auto_merge_threshold: f64,
+) -> crate::models::review_queue::NewReviewItem {
+    let status = if auto_merge_allowed(r.score, auto_merge_threshold, &r.evidence) {
+        ReviewStatus::AutoMerged
+    } else {
+        ReviewStatus::Pending
+    };
+    crate::models::review_queue::NewReviewItem {
+        record_id_a: pair.0,
+        record_id_b: pair.1,
+        match_score: r.score,
+        match_quality: format!("{:?}", r.confidence).to_lowercase(),
+        detection_method: "batch_deduplication".to_string(),
+        score_breakdown: serde_json::to_value(&r.breakdown).ok(),
+        status: review_status_token(status).to_string(),
+        provenance: "operator".to_string(),
+        evidence: serde_json::to_value(&r.evidence).ok(),
+    }
 }
 
 /// Scan the stored cases for likely duplicates and queue them for review.
@@ -757,6 +860,7 @@ struct BatchDeduplicationResponse {
 #[debug_handler]
 async fn deduplicate(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(req): Json<BatchDeduplicationRequest>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
@@ -786,6 +890,9 @@ async fn deduplicate(
         known.insert(row.pid, case.clone());
         seeds.push((row.pid, case));
     }
+    // Value frequencies from the records this scan loaded
+    // (match-evidence.md §7); `NoFrequencies` below the population floor.
+    let frequencies = crate::frequencies::CaseFrequencies::from_cases(seeds.iter().map(|(_, c)| c));
 
     let mut seen_pairs = std::collections::HashSet::new();
     let mut new_items = Vec::new();
@@ -821,32 +928,31 @@ async fn deduplicate(
                 known.insert(cand_pid, c.clone());
                 c
             };
-            let r = engine.match_cases(case, &candidate);
-            let is_dup = req.threshold.map_or(r.is_match, |t| r.score >= t);
-            if is_dup {
-                new_items.push(crate::models::review_queue::NewReviewItem {
-                    record_id_a: pair.0,
-                    record_id_b: pair.1,
-                    match_score: r.score,
-                    match_quality: format!("{:?}", r.confidence).to_lowercase(),
-                    detection_method: "batch_deduplication".to_string(),
-                    score_breakdown: serde_json::to_value(&r.breakdown).ok(),
-                    status: review_status_token(ReviewStatus::Pending).to_string(),
-                    provenance: "operator".to_string(),
-                });
+            let r = engine.match_cases_with_frequencies(case, &candidate, &frequencies);
+            if req.threshold.map_or(r.is_match, |t| r.score >= t) {
+                new_items.push(batch_review_item(pair, &r, req.auto_merge_threshold));
             }
         }
     }
     let stored = crate::models::review_queue::upsert(&ctx.db, &new_items).await?;
-    let review_items: Vec<ReviewQueueItem> = stored.iter().map(review_row_to_item).collect();
+    // Every case in a stored pair is in `known` (seed or fetched).
+    let hidden = hidden_pids(&caller, &stored, |pid| known.get(&pid).cloned());
+    let review_items: Vec<ReviewQueueItem> = stored
+        .iter()
+        .map(|row| review_row_to_item(row, &hidden))
+        .collect();
     let queued_for_review = review_items
         .iter()
         .filter(|i| i.status == ReviewStatus::Pending)
         .count();
+    let auto_merged = review_items
+        .iter()
+        .filter(|i| i.status == ReviewStatus::AutoMerged)
+        .count();
     format::json(BatchDeduplicationResponse {
         cases_scanned: seeds.len(),
         duplicates_found: review_items.len(),
-        auto_merged: 0,
+        auto_merged,
         queued_for_review,
         review_items,
     })
@@ -1309,7 +1415,9 @@ enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate.
     Rejected,
-    /// Auto-merged (no auto-merge path here; present for wire parity).
+    /// Marked as an automatic merge by the batch scan: score at or above
+    /// `auto_merge_threshold` **and** evidence `proven`
+    /// ([`auto_merge_allowed`]). A mark only; no merge is executed.
     AutoMerged,
 }
 
@@ -1356,6 +1464,11 @@ struct ReviewQueueItem {
     /// How the pair was first surfaced (`operator` / `import` /
     /// `matcher_suggested`; BLK-5).
     provenance: String,
+    /// The matcher's evidence for the pair, refreshed on each re-scan;
+    /// `null` for a row queued before evidence was recorded. Reduced to
+    /// its aggregate ([`redact_evidence`]) when either case is one the
+    /// caller may read only masked, or not at all.
+    evidence: Option<Evidence>,
     /// Reviewer identity recorded by the decision endpoint, if decided.
     reviewed_by: Option<String>,
     /// When the pair was first queued.
@@ -1364,8 +1477,71 @@ struct ReviewQueueItem {
     reviewed_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-/// Map a stored review-queue row onto the wire item shape.
-fn review_row_to_item(row: &crate::models::review_queue::ReviewQueueRow) -> ReviewQueueItem {
+/// The cases, among those named by `rows`, whose evidence must be
+/// redacted for `caller`: those it may read only masked, may not read,
+/// or that `load` cannot supply (deleted since queued). Empty when
+/// record-level enforcement is off, so the default posture is unchanged.
+fn hidden_pids(
+    caller: &MaybeAuthUser,
+    rows: &[crate::models::review_queue::ReviewQueueRow],
+    load: impl Fn(uuid::Uuid) -> Option<Case>,
+) -> std::collections::HashSet<uuid::Uuid> {
+    let mut hidden = std::collections::HashSet::new();
+    if !crate::auth::require_auth() {
+        return hidden;
+    }
+    for pid in rows.iter().flat_map(|r| [r.record_id_a, r.record_id_b]) {
+        let visible = load(pid)
+            .and_then(|case| crate::auth::read_visibility(caller, &case))
+            .is_some_and(|obligations| !is_masked(&obligations));
+        if !visible {
+            hidden.insert(pid);
+        }
+    }
+    hidden
+}
+
+/// [`hidden_pids`] for rows whose cases are not loaded yet: one batch
+/// fetch of every case they name, skipped when enforcement is off.
+async fn hidden_pids_from_db(
+    db: &sqlx::PgPool,
+    caller: &MaybeAuthUser,
+    rows: &[crate::models::review_queue::ReviewQueueRow],
+) -> Result<std::collections::HashSet<uuid::Uuid>> {
+    if !crate::auth::require_auth() || rows.is_empty() {
+        return Ok(std::collections::HashSet::new());
+    }
+    let pids: Vec<uuid::Uuid> = rows
+        .iter()
+        .flat_map(|r| [r.record_id_a, r.record_id_b])
+        .collect();
+    let mut cases = std::collections::HashMap::new();
+    for model in CaseModel::find_by_pids(db, &pids).await? {
+        if let Ok(case) = model.to_case() {
+            cases.insert(model.pid, case);
+        }
+    }
+    Ok(hidden_pids(caller, rows, |pid| cases.get(&pid).cloned()))
+}
+
+/// Map a stored review-queue row onto the wire item shape. `hidden` is
+/// [`hidden_pids`]: when either case is in it, the evidence is reduced to
+/// its aggregate.
+fn review_row_to_item(
+    row: &crate::models::review_queue::ReviewQueueRow,
+    hidden: &std::collections::HashSet<uuid::Uuid>,
+) -> ReviewQueueItem {
+    let evidence = row
+        .evidence
+        .clone()
+        .and_then(|v| serde_json::from_value::<Evidence>(v).ok())
+        .map(|e| {
+            if hidden.contains(&row.record_id_a) || hidden.contains(&row.record_id_b) {
+                redact_evidence(&e)
+            } else {
+                e
+            }
+        });
     ReviewQueueItem {
         id: row.id.to_string(),
         case_id_a: row.record_id_a.to_string(),
@@ -1376,6 +1552,7 @@ fn review_row_to_item(row: &crate::models::review_queue::ReviewQueueRow) -> Revi
         score_breakdown: row.score_breakdown.clone(),
         status: parse_review_status(&row.status),
         provenance: row.provenance.clone(),
+        evidence,
         reviewed_by: row.reviewed_by.clone(),
         created_at: row.created_at,
         reviewed_at: row.reviewed_at,
@@ -1409,6 +1586,7 @@ struct ReviewQueueListResponse {
 async fn get_review_queue(
     Query(query): Query<ReviewQueueListQuery>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Result<Response> {
     if let Some(status) = query.status.as_deref()
         && !matches!(status, "pending" | "confirmed" | "rejected" | "automerged")
@@ -1427,7 +1605,11 @@ async fn get_review_queue(
         query.limit.unwrap_or(100),
     )
     .await?;
-    let items: Vec<ReviewQueueItem> = rows.iter().map(review_row_to_item).collect();
+    let hidden = hidden_pids_from_db(&ctx.db, &caller, &rows).await?;
+    let items: Vec<ReviewQueueItem> = rows
+        .iter()
+        .map(|row| review_row_to_item(row, &hidden))
+        .collect();
     let total = items.len();
     format::json(ReviewQueueListResponse { items, total })
 }
@@ -1483,7 +1665,9 @@ async fn review_decision(
             {
                 tracing::warn!("review-decision audit write failed: {err}");
             }
-            format::json(review_row_to_item(&row))
+            let rows = [*row];
+            let hidden = hidden_pids_from_db(&ctx.db, &caller, &rows).await?;
+            format::json(review_row_to_item(&rows[0], &hidden))
         }
         crate::models::review_queue::DecideOutcome::NotFound => Err(Error::NotFound),
         crate::models::review_queue::DecideOutcome::AlreadyDecided(current) => {
@@ -1658,6 +1842,139 @@ mod tests {
         assert_eq!(
             err.into_response().status(),
             StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+
+    fn docket(value: &str) -> case_matcher::CaseIdentifier {
+        case_matcher::CaseIdentifier {
+            scheme: case_matcher::IdentifierScheme::Docket,
+            value: value.to_string(),
+        }
+    }
+
+    /// The auto-merge gate (match-evidence.md §4): title-only agreement
+    /// scores above the threshold but is `consistent`, so it stays
+    /// pending; a shared docket is `proven` and may be marked; two
+    /// different dockets are `contradicted` and stay pending.
+    #[test]
+    fn auto_merge_needs_proven_evidence_not_just_score() {
+        let engine = MatchingEngine::new(MatchConfig::default());
+        let pair = (uuid::Uuid::new_v4(), uuid::Uuid::new_v4());
+
+        let title_only = engine.match_cases(
+            &Case::new("Housing benefit appeal"),
+            &Case::new("Housing benefit appeal"),
+        );
+        assert!(title_only.score >= DEFAULT_AUTO_MERGE_THRESHOLD);
+        assert_eq!(title_only.evidence.strength, MatchStrength::Consistent);
+        assert!(!auto_merge_allowed(
+            title_only.score,
+            DEFAULT_AUTO_MERGE_THRESHOLD,
+            &title_only.evidence
+        ));
+        assert_eq!(
+            batch_review_item(pair, &title_only, DEFAULT_AUTO_MERGE_THRESHOLD).status,
+            "pending"
+        );
+
+        let with = |d: &str| Case {
+            identifiers: vec![docket(d)],
+            ..Case::new("Housing benefit appeal")
+        };
+        let shared = engine.match_cases(&with("CV-1"), &with("cv-1"));
+        assert_eq!(shared.evidence.strength, MatchStrength::Proven);
+        let item = batch_review_item(pair, &shared, DEFAULT_AUTO_MERGE_THRESHOLD);
+        assert_eq!(item.status, "automerged");
+        assert_eq!(item.evidence.expect("evidence")["strength"], "proven");
+        // Proven, but below the score threshold: still pending.
+        assert_eq!(batch_review_item(pair, &shared, 1.01).status, "pending");
+
+        let conflict = engine.match_cases(&with("CV-1"), &with("CV-2"));
+        assert_eq!(conflict.evidence.strength, MatchStrength::Contradicted);
+        assert!(conflict.score >= DEFAULT_AUTO_MERGE_THRESHOLD);
+        assert_eq!(
+            batch_review_item(pair, &conflict, DEFAULT_AUTO_MERGE_THRESHOLD).status,
+            "pending"
+        );
+    }
+
+    /// Masked evidence keeps the aggregate and drops every term that
+    /// names a masked field, so it never reveals that a hidden case
+    /// holds a docket.
+    #[test]
+    fn redacted_evidence_discloses_no_scheme() {
+        let engine = MatchingEngine::new(MatchConfig::default());
+        let with = |d: &str| Case {
+            identifiers: vec![docket(d)],
+            subjects: vec!["person:x".into()],
+            ..Case::new("Housing benefit appeal")
+        };
+        let full = engine.match_cases(&with("CV-1"), &with("CV-2")).evidence;
+        assert!(!full.contradictions.is_empty());
+        let masked = redact_evidence(&full);
+        assert!(masked.contradictions.is_empty() && masked.components.is_empty());
+        assert_eq!(masked.strength, full.strength);
+        assert!((masked.weight_bits - full.weight_bits).abs() < 1e-12);
+        assert_eq!(masked.fields_compared, full.fields_compared);
+        let json = serde_json::to_string(&masked).expect("serialises");
+        assert!(
+            !json.contains("docket") && !json.contains("subjects"),
+            "{json}"
+        );
+    }
+
+    /// A stored row from before the evidence column reads back with
+    /// `evidence: null`, and stored evidence JSON written by an older
+    /// matcher (no `components`) still deserialises.
+    #[test]
+    fn rows_without_evidence_still_read() {
+        let row = crate::models::review_queue::ReviewQueueRow {
+            id: uuid::Uuid::new_v4(),
+            record_id_a: uuid::Uuid::new_v4(),
+            record_id_b: uuid::Uuid::new_v4(),
+            match_score: 0.9,
+            match_quality: "probable".into(),
+            detection_method: "batch_deduplication".into(),
+            score_breakdown: None,
+            status: "pending".into(),
+            provenance: "operator".into(),
+            reviewed_by: None,
+            created_at: chrono::Utc::now(),
+            reviewed_at: None,
+            evidence: None,
+        };
+        let none = std::collections::HashSet::new();
+        assert!(review_row_to_item(&row, &none).evidence.is_none());
+
+        let old = crate::models::review_queue::ReviewQueueRow {
+            evidence: Some(serde_json::json!({
+                "weight_bits": 7.5, "fields_compared": 1,
+                "contradictions": [], "strength": "consistent"
+            })),
+            ..row
+        };
+        let item = review_row_to_item(&old, &none);
+        let evidence = item.evidence.expect("old evidence parses");
+        assert_eq!(evidence.strength, MatchStrength::Consistent);
+        assert!(evidence.components.is_empty());
+
+        // Either side hidden ⇒ the aggregate only.
+        let hidden: std::collections::HashSet<_> = [old.record_id_b].into_iter().collect();
+        let with_terms = crate::models::review_queue::ReviewQueueRow {
+            evidence: serde_json::to_value(
+                MatchingEngine::new(MatchConfig::default())
+                    .match_cases(&Case::new("A b c"), &Case::new("A b c"))
+                    .evidence,
+            )
+            .ok(),
+            ..old
+        };
+        assert!(
+            review_row_to_item(&with_terms, &hidden)
+                .evidence
+                .expect("evidence")
+                .components
+                .is_empty()
         );
     }
 

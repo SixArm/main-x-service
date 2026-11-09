@@ -222,6 +222,65 @@ async fn mask_obligation_redacts_reads_and_exports() {
         .unwrap();
         assert!(view["subjects"].as_array().unwrap().is_empty());
         assert!(view["case_number"].is_null());
+
+        // Match evidence on a masked candidate discloses no scheme: a
+        // query with a different docket contradicts the stored case, and
+        // a caller who may read it in full sees `identifier:docket`; the
+        // masked caller gets the aggregate only, so it cannot learn that
+        // the hidden case holds a docket (match-evidence.md; spec §8).
+        let query = json!({
+            "title": "Housing benefit appeal",
+            "subjects": ["person:abc"],
+            "identifiers": [{"scheme": "Docket", "value": "CV-2099-000001"}]
+        });
+        let (fw_k, fw_v) = auth_header(&mint(&kid, &[("access", &["write"])]));
+        let full_hits: Value = serde_json::from_str(
+            &request
+                .post("/api/cases/check-duplicates")
+                .add_header(fw_k, fw_v)
+                .json(&query)
+                .await
+                .text(),
+        )
+        .unwrap();
+        let full_hit = &full_hits[0];
+        assert_eq!(
+            full_hit["evidence"]["strength"], "contradicted",
+            "{full_hits}"
+        );
+        assert_eq!(
+            full_hit["evidence"]["contradictions"][0]["field"],
+            "identifier:docket"
+        );
+        let (mw_k, mw_v) = auth_header(&mint(
+            &kid,
+            &[("dept", &["partner"]), ("access", &["write"])],
+        ));
+        let masked_hits = request
+            .post("/api/cases/check-duplicates")
+            .add_header(mw_k, mw_v)
+            .json(&query)
+            .await
+            .text();
+        let masked_hit = &serde_json::from_str::<Value>(&masked_hits).unwrap()[0];
+        assert_eq!(
+            masked_hit["evidence"]["strength"], "contradicted",
+            "{masked_hits}"
+        );
+        assert!(
+            masked_hit["evidence"]["contradictions"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            masked_hit["evidence"]["components"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        assert!(!masked_hits.contains("docket"), "{masked_hits}");
+        assert!(!masked_hits.contains("subjects"), "{masked_hits}");
     })
     .await;
 

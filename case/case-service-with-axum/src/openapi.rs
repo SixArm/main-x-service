@@ -91,6 +91,32 @@ fn crud_paths() -> Value {
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
                 }
             },
+            "/api/cases/deduplicate": {
+                "post": {
+                    "tags": ["matching"],
+                    "summary": "Batch-scan stored cases (search-blocked) and persist candidate pairs to the review queue",
+                    "description": "A pair is marked `automerged` only when its score reaches `auto_merge_threshold` AND its evidence strength is `proven` (agents/share/match-evidence.md §4). `consistent` and `contradicted` pairs stay `pending` whatever their score. No merge is executed.",
+                    "requestBody": { "required": false, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchDeduplicationRequest" } } } },
+                    "responses": { "200": { "description": "Scan report with the stored review items",
+                        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchDeduplicationResponse" } } } } }
+                }
+            },
+            "/api/cases/review-queue": {
+                "get": {
+                    "tags": ["matching"],
+                    "summary": "List the stored duplicate review queue (newest first)",
+                    "parameters": [
+                        { "name": "status", "in": "query", "required": false, "schema": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] } },
+                        { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } }
+                    ],
+                    "responses": {
+                        "200": { "description": "Review items", "content": { "application/json": { "schema": { "type": "object", "properties": {
+                            "items": { "type": "array", "items": { "$ref": "#/components/schemas/ReviewQueueItem" } },
+                            "total": { "type": "integer" } } } } } },
+                        "422": { "description": "Unknown status token" }
+                    }
+                }
+            },
             "/api/cases/merge": {
                 "post": {
                     "tags": ["matching"],
@@ -225,7 +251,36 @@ fn components() -> Value {
                 "ScoredRef": { "type": "object", "properties": {
                     "pid": { "type": "string" }, "title": { "type": "string" },
                     "score": { "type": "number", "format": "double" }, "confidence": { "type": "string" },
-                    "is_match": { "type": "boolean" } } },
+                    "is_match": { "type": "boolean" },
+                    "evidence": { "$ref": "#/components/schemas/Evidence" } } },
+                "Evidence": { "type": "object",
+                    "description": "How much the compared data proves, beside the similarity score (agents/share/match-evidence.md). Component names and bits only, never field values. On a candidate the caller may read only masked, it is reduced to its aggregate: `contradictions` and `components` are emptied, so it does not reveal which identifier schemes the hidden fields hold.",
+                    "properties": {
+                        "weight_bits": { "type": "number", "format": "double", "description": "Sum of the log-likelihood weights, in bits" },
+                        "fields_compared": { "type": "integer", "description": "Components both records held (identifiers count as one)" },
+                        "contradictions": { "type": "array", "items": { "type": "object", "properties": { "field": { "type": "string", "description": "e.g. identifier:docket" } } } },
+                        "strength": { "type": "string", "enum": ["contradicted", "proven", "consistent", "non_match"] },
+                        "components": { "type": "array", "items": { "type": "object", "properties": {
+                            "component": { "type": "string" }, "bits": { "type": "number", "format": "double" },
+                            "correlated": { "type": "boolean" }, "frequency_adjusted": { "type": "boolean" } } } } } },
+                "BatchDeduplicationRequest": { "type": "object", "properties": {
+                    "threshold": { "type": "number", "format": "double", "nullable": true, "description": "Score threshold overriding the matcher's is_match verdict" },
+                    "auto_merge_threshold": { "type": "number", "format": "double", "default": 0.95, "description": "Score at or above which a `proven` pair is marked automerged" } } },
+                "BatchDeduplicationResponse": { "type": "object", "properties": {
+                    "cases_scanned": { "type": "integer" }, "duplicates_found": { "type": "integer" },
+                    "auto_merged": { "type": "integer" }, "queued_for_review": { "type": "integer" },
+                    "review_items": { "type": "array", "items": { "$ref": "#/components/schemas/ReviewQueueItem" } } } },
+                "ReviewQueueItem": { "type": "object", "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "case_id_a": { "type": "string", "format": "uuid" }, "case_id_b": { "type": "string", "format": "uuid" },
+                    "match_score": { "type": "number", "format": "double" }, "match_quality": { "type": "string" },
+                    "detection_method": { "type": "string" }, "score_breakdown": { "type": "object", "nullable": true },
+                    "status": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] },
+                    "provenance": { "type": "string", "description": "operator | import | matcher_suggested" },
+                    "evidence": { "allOf": [{ "$ref": "#/components/schemas/Evidence" }], "nullable": true, "description": "Null for rows queued before evidence was recorded" },
+                    "reviewed_by": { "type": "string", "nullable": true },
+                    "created_at": { "type": "string", "format": "date-time" },
+                    "reviewed_at": { "type": "string", "format": "date-time", "nullable": true } } },
                 "MatchRequest": { "type": "object", "required": ["query", "candidates"], "properties": {
                     "query": { "$ref": "#/components/schemas/Case" },
                     "candidates": { "type": "array", "items": { "$ref": "#/components/schemas/Case" } } } },
@@ -320,6 +375,21 @@ mod tests {
         let op = &s["paths"]["/api/cases/search"]["get"];
         assert!(op.is_object());
         assert_eq!(op["parameters"][0]["name"], "q");
+    }
+
+    /// Pins that match evidence is documented on every match result.
+    #[test]
+    fn spec_documents_match_evidence() {
+        let s = spec();
+        let schemas = &s["components"]["schemas"];
+        assert_eq!(
+            schemas["ScoredRef"]["properties"]["evidence"]["$ref"],
+            "#/components/schemas/Evidence"
+        );
+        assert!(schemas["Evidence"]["properties"]["strength"]["enum"].is_array());
+        assert!(schemas["ReviewQueueItem"]["properties"]["evidence"].is_object());
+        assert!(s["paths"]["/api/cases/deduplicate"]["post"].is_object());
+        assert!(s["paths"]["/api/cases/review-queue"]["get"].is_object());
     }
 
     /// Pins that both merge endpoints and the `MergeRequest` schema are

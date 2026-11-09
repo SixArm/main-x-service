@@ -34,8 +34,8 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | PUT | `/api/cases/{pid}` | Replace payload |
 | DELETE | `/api/cases/{pid}` | Soft-delete |
 | POST | `/api/cases/match` | Rank a `{query, candidates}` set |
-| POST | `/api/cases/check-duplicates` | Match a query against stored cases |
-| POST | `/api/cases/deduplicate` | Batch-scan stored cases (search-blocked); persist candidates to the stored review queue |
+| POST | `/api/cases/check-duplicates` | Match a query against stored cases; each hit carries match `evidence` (aggregate only on a masked candidate) |
+| POST | `/api/cases/deduplicate` | Batch-scan stored cases (search-blocked); persist candidates with their evidence to the stored review queue; `automerged` only on score ≥ `auto_merge_threshold` **and** `proven` evidence (`agents/share/match-evidence.md`) |
 | GET | `/api/cases/review-queue` | Stored review queue (filter `status`, `limit`) |
 | POST | `/api/cases/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 | POST | `/api/cases/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |

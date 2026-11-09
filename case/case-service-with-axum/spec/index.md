@@ -98,7 +98,18 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
 6. `POST /api/cases/match` — rank an explicit `{query, candidates}` set
    (no persistence).
 7. `POST /api/cases/check-duplicates` — match a query against stored
-   cases; return those above threshold, ranked.
+   cases; return those above threshold, ranked. Each hit carries the
+   matcher's **match evidence** (`evidence`: `weight_bits`,
+   `fields_compared`, `contradictions`, `strength`, `components` —
+   [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)),
+   computed with the service's cached title frequencies (§6.16). A
+   candidate the caller may read only masked carries the aggregate only
+   (`contradictions` and `components` emptied, §6.15), and a concealed
+   one is omitted as before. `POST /api/cases/match` returns the
+   matcher's `MatchResult`, which carries `evidence` too (no
+   frequencies: it scores caller-supplied candidates, not the registry).
+   There is no create-time duplicate check on `POST /api/cases`, so
+   there is no `409` body to carry evidence.
 8. `POST /api/cases/merge` — fold a duplicate into a survivor (union
    fields, former-title alias, soft-delete the duplicate, `merge_records`
    history, `Merged` event); `422` equal pids, `404` unknown.
@@ -147,6 +158,55 @@ PascalCase strings; `Custom` as `{"Custom":"label"}`.
     never look like a complete answer. `404` for an unknown `pid`; `503`
     when the export could not be recorded on the audit trail
     (`CASE_AUDIT_FAIL_CLOSED`).
+15. **Match evidence on masked or concealed paths.** Evidence holds
+    component names and bits, never field values — but on a case the
+    names alone disclose what a masked view hides: a
+    `contradiction:identifier:docket` term says the hidden case holds a
+    docket, and a `subjects` or `case_number` term says the hidden
+    subjects or case number were compared. So wherever a caller may read
+    a case only masked (the `mask` obligation) or not at all, its
+    evidence is reduced to the aggregate — `weight_bits`,
+    `fields_compared`, `strength` kept; `contradictions` and
+    `components` emptied (`redact_evidence`). This applies to
+    `check-duplicates` hits, and to review-queue items (list, decision,
+    `deduplicate` response) when **either** case of the pair is masked,
+    concealed, or no longer readable. With enforcement off
+    (`CASE_REQUIRE_AUTH` unset) nothing is redacted, the same posture as
+    every other read path. The aggregate discloses no more than the
+    score already does.
+16. **Value frequencies.** The title is this matcher's frequency
+    component (`FREQUENCY_COMPONENTS = ["title"]`, match-evidence.md §7):
+    agreeing on a template title such as "Housing Benefit Claim" proves
+    less than the table's average `u`. `src/frequencies.rs` counts each
+    active case's title in the matcher's own key form (`frequency_key`)
+    and divides by the population, giving a `FrequencyTable`. Below
+    `MIN_FREQUENCY_POPULATION` (1 000) records it is `NoFrequencies`, a
+    share from a small population being noise. The batch `deduplicate`
+    builds one from the cases its scan loaded. `check-duplicates` and the
+    bulk-import duplicate check use a process-wide cached table, scanned
+    page by page (`FREQUENCY_SCAN_PAGE` 1 000) and capped at
+    `FREQUENCY_SCAN_CAP` (200 000) — above the cap the table is a sample
+    of the most recent cases. It is rebuilt **lazily on use** when older
+    than 10 minutes: the first use after boot builds it inline (one
+    bounded scan); a later use that finds it stale gets the stale table
+    at once and starts one background rebuild. A failed scan falls back
+    to `NoFrequencies` rather than failing the request.
+17. **Batch deduplicate, review queue, and the auto-merge gate.**
+    `POST /api/cases/deduplicate` stores each pair above threshold in
+    `review_queue` with its match evidence. A pair is marked
+    `automerged` only when its score is at least `auto_merge_threshold`
+    (request field, default `0.95`) **and** its evidence strength is
+    `proven` (`auto_merge_allowed`, match-evidence.md §4). A
+    `consistent` pair — nothing contradicts, nothing proves, such as two
+    appeals filed under one template title — and a `contradicted` one —
+    two different dockets, or two case numbers within one agency — stay
+    `pending` whatever their score. `automerged` is a mark: no merge is
+    executed anywhere in this service, the batch scan included, so
+    there is no executed merge to gate beyond the mark. A re-scan
+    refreshes a stored pair's score and evidence but never its status
+    (a decided pair keeps its decision; a `pending` pair stays
+    `pending`). `GET /api/cases/review-queue` returns each item's
+    `evidence` (`null` for a row queued before evidence was recorded).
 
 ## 7. Non-functional requirements
 
@@ -282,9 +342,11 @@ never a silent fallback to local disk.
 **Stable key(s) for upsert (import idempotency).** A row upserts in
 place when it carries a key that uniquely identifies an existing case;
 otherwise it runs duplicate detection (the same search-blocked
-`case-matcher` path `check-duplicates` uses) and routes a likely
-duplicate to the review queue with `provenance = import`. Keys, in
-priority order:
+`case-matcher` path `check-duplicates` uses, with the same cached title
+frequencies, §6.16) and routes a likely duplicate to the review queue
+with `provenance = import`, storing the pair's match evidence with it.
+An import never marks a pair `automerged`: it is queued `pending`
+whatever its evidence strength. Keys, in priority order:
 
 1. **Agency-scoped case number** — the `(agency_id, case_number)` pair,
    both present and non-blank. A case number is unique only *within* its
@@ -635,6 +697,13 @@ matcher or by `entity_links`; `review_queue` rows reference `cases.pid`
 values but carry no foreign key (mirroring the family's other
 review-queue tables), since a queued pair can outlive either side being
 merged or soft-deleted.
+
+**Match evidence on review-queue rows.** `2026110900000014_review_queue_evidence`
+adds a nullable `evidence` JSONB column: the matcher's `Evidence` for
+the pair, written on insert and refreshed on every re-scan upsert, like
+the score columns. Rows queued before it stay `NULL`, and a reader
+treats `NULL` as "not recorded", never as "no evidence". The `.down.sql`
+drops the column.
 
 ## 11. Testing strategy
 
@@ -1090,6 +1159,34 @@ the other v1 edge kinds even though it shares the same edge shape.
   passed in the `mod.rs` binary, including both new tests), `cargo fmt
   --check`.
 
+- [x] **T-10 (M) Carry match evidence through the service.**
+  *(done 2026-11-09.)* Per
+  [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+  §10 step 4: the matcher's `evidence` now rides on every match result —
+  `check-duplicates` hits (`ScoredRef.evidence`), the `/match`
+  `MatchResult`, `deduplicate`'s review items, the stored review queue
+  (new `evidence` column, migration `2026110900000014`), and the bulk
+  import's keyless-duplicate rows (`provenance = import`). The batch
+  scan marks a pair `automerged` only on `score >= auto_merge_threshold`
+  **and** `strength == proven` (§6.17); before this it never marked any
+  pair, so the existing `deduplicate_finds_and_queues_a_stored_pair`
+  test, whose pair shares a docket, now sees `automerged` / `proven`.
+  Title value frequencies feed the evidence (§6.16, `src/frequencies.rs`,
+  `MIN_FREQUENCY_POPULATION = 1 000`, lazy 10-minute cache, scan capped
+  at 200 000). Evidence on a masked or concealed case is reduced to its
+  aggregate, so it never discloses which identifier schemes a hidden
+  case holds (§6.15). OpenAPI documents `Evidence`, `ScoredRef.evidence`,
+  `/deduplicate` and `/review-queue`. Tests: unit
+  (`auto_merge_needs_proven_evidence_not_just_score`,
+  `redacted_evidence_discloses_no_scheme`,
+  `rows_without_evidence_still_read`, the frequency floor and
+  common-title tests, `spec_documents_match_evidence`) and DB
+  (`deduplicate_leaves_a_title_only_pair_pending_as_consistent`,
+  `deduplicate_leaves_a_contradicted_pair_pending`, the updated
+  `deduplicate_finds_and_queues_a_stored_pair` and
+  `can_check_duplicates_against_stored_cases`, evidence on the import
+  path, and the masked `check-duplicates` assertions in
+  `tests/export_masking.rs`).
 - [x] **T-9 (S) `subject_of` link read denial should be `404`, not `403`,
   per the later family precedent.** *(resolved 2026-09-04.)* §12.1 of this spec already flags
   "a 'denied read is indistinguishable from no-such-edge' refinement

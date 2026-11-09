@@ -371,6 +371,11 @@ async fn can_check_duplicates_against_stored_cases() {
         assert_eq!(hits[0]["title"], "Housing benefit appeal");
         assert_eq!(hits[0]["score"], 1.0);
         assert_eq!(hits[0]["is_match"], true);
+        // Match evidence rides along (agents/share/match-evidence.md): the
+        // shared docket proves the pair.
+        assert_eq!(hits[0]["evidence"]["strength"], "proven", "{body}");
+        assert!(hits[0]["evidence"]["weight_bits"].as_f64().unwrap() >= 30.0);
+        assert!(hits[0]["evidence"]["components"].is_array());
     })
     .await;
 }
@@ -1266,7 +1271,9 @@ async fn check_duplicates_blocks_on_identifier_alone() {
 /// candidate scan, persisted to the `review_queue` at
 /// `provenance = "operator"`, and shows up on a subsequent
 /// `GET /review-queue` — proving the round trip end to end, not just
-/// that the handler responds `200`.
+/// that the handler responds `200`. The shared docket makes the
+/// evidence `proven` at score 1.0, so the pair is marked `automerged`
+/// (match-evidence.md §4).
 #[tokio::test]
 #[serial]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
@@ -1308,7 +1315,8 @@ async fn deduplicate_finds_and_queues_a_stored_pair() {
             "all three seeded cases should be scan seeds: {body}"
         );
         assert_eq!(body["duplicates_found"], 1, "exactly one pair: {body}");
-        assert_eq!(body["queued_for_review"], 1);
+        assert_eq!(body["queued_for_review"], 0);
+        assert_eq!(body["auto_merged"], 1);
 
         let items = body["review_items"].as_array().expect("review_items");
         assert_eq!(items.len(), 1);
@@ -1319,7 +1327,8 @@ async fn deduplicate_finds_and_queues_a_stored_pair() {
         .into_iter()
         .collect();
         assert_eq!(pair, [a_pid.as_str(), b_pid.as_str()].into_iter().collect());
-        assert_eq!(items[0]["status"], "pending");
+        assert_eq!(items[0]["status"], "automerged");
+        assert_eq!(items[0]["evidence"]["strength"], "proven");
         assert_eq!(items[0]["provenance"], "operator");
         assert_eq!(items[0]["detection_method"], "batch_deduplication");
 
@@ -1329,6 +1338,7 @@ async fn deduplicate_finds_and_queues_a_stored_pair() {
         let listed_items = listed["items"].as_array().expect("items");
         assert_eq!(listed_items.len(), 1);
         assert_eq!(listed_items[0]["id"], items[0]["id"]);
+        assert_eq!(listed_items[0]["evidence"]["strength"], "proven");
 
         // Re-running the scan upserts the same row rather than creating
         // a second one (idempotent — the normalized-pair UNIQUE
@@ -1340,6 +1350,79 @@ async fn deduplicate_finds_and_queues_a_stored_pair() {
             .json();
         assert_eq!(again["review_items"].as_array().unwrap().len(), 1);
         assert_eq!(again["review_items"][0]["id"], items[0]["id"]);
+    })
+    .await;
+}
+
+/// Two cases that agree only on their title score above the auto-merge
+/// threshold, but nothing proves them one case: the batch scan leaves the
+/// pair `pending` with `consistent` evidence, stored and returned
+/// (match-evidence.md §4).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn deduplicate_leaves_a_title_only_pair_pending_as_consistent() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        for _ in 0..2 {
+            let r = request
+                .post("/api/cases")
+                .json(&json!({"title": "Housing benefit appeal"}))
+                .await;
+            assert_eq!(r.status_code(), 200);
+        }
+        let body: Value = request
+            .post("/api/cases/deduplicate")
+            .json(&json!({}))
+            .await
+            .json();
+        let items = body["review_items"].as_array().expect("review_items");
+        assert_eq!(items.len(), 1, "{body}");
+        assert!(items[0]["match_score"].as_f64().unwrap() >= 0.95, "{body}");
+        assert_eq!(items[0]["status"], "pending");
+        assert_eq!(items[0]["evidence"]["strength"], "consistent");
+        assert_eq!(body["auto_merged"], 0);
+        assert_eq!(body["queued_for_review"], 1);
+
+        let listed: Value = request.get("/api/cases/review-queue").await.json();
+        assert_eq!(listed["items"][0]["status"], "pending");
+        assert_eq!(listed["items"][0]["evidence"]["strength"], "consistent");
+    })
+    .await;
+}
+
+/// Two dockets under one scheme contradict each other: the pair stays
+/// `pending` with `contradicted` evidence however alike the rest is.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn deduplicate_leaves_a_contradicted_pair_pending() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        for docket in ["CV-2024-1", "CV-2024-2"] {
+            let r = request
+                .post("/api/cases")
+                .json(&json!({
+                    "title": "Housing benefit appeal",
+                    "identifiers": [{"scheme": "Docket", "value": docket}]
+                }))
+                .await;
+            assert_eq!(r.status_code(), 200);
+        }
+        let body: Value = request
+            .post("/api/cases/deduplicate")
+            .json(&json!({}))
+            .await
+            .json();
+        let items = body["review_items"].as_array().expect("review_items");
+        assert_eq!(items.len(), 1, "{body}");
+        assert_eq!(items[0]["status"], "pending");
+        assert_eq!(items[0]["evidence"]["strength"], "contradicted");
+        assert_eq!(
+            items[0]["evidence"]["contradictions"][0]["field"],
+            "identifier:docket"
+        );
+        assert_eq!(body["auto_merged"], 0);
     })
     .await;
 }
@@ -1624,6 +1707,7 @@ async fn truncate_clears_outbox_bulk_jobs_and_review_queue() {
                 score_breakdown: None,
                 status: "pending".to_string(),
                 provenance: "operator".to_string(),
+                evidence: None,
             }],
         )
         .await
