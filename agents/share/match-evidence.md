@@ -242,7 +242,9 @@ pub fn group_bits(member_bits: &[f64]) -> f64 {
 
 `strongest_first` orders by absolute value, breaking ties by the larger
 value, so the result does not depend on component order. A component in
-no group stands alone. Disagreements are discounted the same way:
+no group stands alone, and a component belongs to at most one group:
+declared groups that share a member are merged before discounting, so no
+term is discounted twice. Disagreements are discounted the same way:
 correlated fields disagreeing for one reason (a move) are one piece of
 evidence against, not several.
 
