@@ -114,12 +114,17 @@ async fn deduplicate_persists_and_review_queue_returns_the_score_breakdown() {
     let id_a = stored_a.id.to_string();
     let id_b = stored_b.id.to_string();
 
-    // A low threshold so this exact-name pair is guaranteed to be found
-    // regardless of the default matcher threshold.
+    // An exact-name pair scores 1.0, so 0.9 still finds it whatever the
+    // default matcher threshold. It must not be lower: the stored queue
+    // is read below through one page of at most 500, newest first, and
+    // at 0.3 this scan paired nearly every short name in the shared
+    // database, so this pair fell off the page once other tests seeded
+    // a few more places (the review queue cannot yet be paged past 500;
+    // spec §13 T-20).
     let (status, body) = post(
         &app,
         "/api/places/deduplicate",
-        &json!({ "threshold": 0.3, "max_candidates": 1000 }),
+        &json!({ "threshold": 0.9, "max_candidates": 1000 }),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");

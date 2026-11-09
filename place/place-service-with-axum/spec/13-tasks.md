@@ -91,7 +91,18 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] GiST index + `ST_DWithin` for geo-radius search.
   - **Acceptance:** geo-radius search ≤ 200 ms p50 at 1 M places.
 - [ ] **T-2 — Recursive CTE for place hierarchy depth queries.**
-  - [ ] Replace linear walk with `WITH RECURSIVE`.
+  - [x] Replace linear walk with `WITH RECURSIVE`. *(2026-11-09.)* The
+    T-16 cycle check is one recursive query instead of a round trip
+    per level, and it now runs inside the write's transaction under a
+    transaction-scoped advisory lock taken only by writes that name a
+    parent. Checked before the transaction, as it was, two concurrent
+    edits ("A inside B", "B inside A") could each see no cycle and both
+    commit one. DB tests: a four-level cycle is refused; a pre-existing
+    cycle not involving the place ends the walk; and an edit waits on a
+    concurrent writer holding the lock, then sees its change and
+    answers `409`.
+  - [ ] The descendants query below is still open: no endpoint lists a
+    place's descendants yet.
   - **Acceptance:** "list all descendants of `place_id`" returns
     correctly for ≥ 5 levels deep, ≤ 100 ms p50.
 - [ ] **T-3 — Production Fluvio publisher.**
@@ -600,3 +611,17 @@ clearly described manual check confirms the acceptance criterion.
   (`id` is outside the pre-image), tampers with it in SQL, and asserts
   `?limit=3` reports it; it failed before the fix (`verified: true`,
   `mismatched: []`).
+- [ ] **T-20 (S) — Page the review queue.** `GET /api/places/review-queue`
+  returns at most 500 rows, newest first (`db::review_queue::list`
+  clamps `limit` to 500), with no cursor, so a queue holding more cannot
+  be read past its first page, and a `limit` above 500 is quietly
+  clamped where `agents/share/restful.md` §Pagination refuses it. One
+  deduplicate scan at a low threshold stores hundreds of pairs, so this
+  is reachable in practice: it broke
+  `review_queue_score_breakdown` on 2026-11-09 once other tests seeded
+  ten more places, and that test now scans at 0.9 to stay on the first
+  page. **Acceptance:** the endpoint pages by signed cursor through
+  `axa::cursor_pagination` like `GET /api/places`, a `limit` above the
+  maximum is a `422`, and a DB test walks a queue of more than 500 rows
+  to its end. Check the other six crates with a review queue for the
+  same cap.

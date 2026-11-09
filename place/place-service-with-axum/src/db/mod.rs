@@ -192,40 +192,46 @@ impl PgPlaceRepository {
         Ok(())
     }
 
-    /// Walk the ancestor chain starting at `parent_id` and report whether
-    /// `place_id` appears in it — i.e. whether setting `place_id`'s
-    /// `contained_in_place` to `parent_id` would close a containment
-    /// cycle (T-16; the multi-hop half of OQ-2's "validation rejects on
-    /// insert", alongside `validate_place`'s pure direct-self-reference
-    /// check). A `visited` guard bounds the walk against a pre-existing
-    /// cycle that does not involve `place_id` (which this same check
-    /// should prevent going forward, but a corrupted row from before it
-    /// existed would otherwise loop forever).
+    /// Report whether `place_id` is `parent_id` or one of its ancestors,
+    /// i.e. whether setting `place_id`'s `contained_in_place` to
+    /// `parent_id` would close a containment cycle (T-16, the multi-hop
+    /// half of OQ-2's "validation rejects on insert", alongside
+    /// `validate_place`'s pure direct-self-reference check).
+    ///
+    /// One recursive query walks the chain (T-2), where this used to
+    /// cost a round trip per level. `UNION` rather than `UNION ALL`
+    /// drops a place already reached, so a pre-existing cycle that does
+    /// not involve `place_id` (a row corrupted before this check
+    /// existed) ends the walk instead of looping. Soft-deleted places
+    /// still count as ancestors, as they did.
+    ///
+    /// Run it on the write's own transaction, after
+    /// [`lock_containment`]: checked before the transaction, two
+    /// concurrent edits ("A inside B", "B inside A") could each see no
+    /// cycle and both commit one.
     ///
     /// # Errors
-    /// Propagates any database error from the ancestor lookups.
-    async fn ancestor_chain_contains(&self, place_id: Uuid, parent_id: Uuid) -> Result<bool> {
-        let mut current = parent_id;
-        let mut visited = std::collections::HashSet::new();
-        loop {
-            if current == place_id {
-                return Ok(true);
-            }
-            if !visited.insert(current) {
-                return Ok(false);
-            }
-            // Outer `None`: no such row. Inner `None`: a root place.
-            let parent = sqlx::query_scalar!(
-                "SELECT contained_in_place FROM places WHERE id = $1",
-                current,
-            )
-            .fetch_optional(&self.db)
-            .await?;
-            match parent.flatten() {
-                Some(next) => current = next,
-                None => return Ok(false),
-            }
-        }
+    /// Propagates any database error from the lookup.
+    async fn ancestor_chain_contains(
+        conn: &mut PgConnection,
+        place_id: Uuid,
+        parent_id: Uuid,
+    ) -> Result<bool> {
+        let found = sqlx::query_scalar!(
+            r#"WITH RECURSIVE chain(id) AS (
+                   SELECT $2::uuid
+                   UNION
+                   SELECT p.contained_in_place
+                   FROM places p JOIN chain c ON p.id = c.id
+                   WHERE p.contained_in_place IS NOT NULL
+               )
+               SELECT EXISTS (SELECT 1 FROM chain WHERE id = $1) AS "found!""#,
+            place_id,
+            parent_id,
+        )
+        .fetch_one(&mut *conn)
+        .await?;
+        Ok(found)
     }
 
     /// Read one `places` row by id, soft-deleted or not.
@@ -448,13 +454,6 @@ impl PlaceRepository for PgPlaceRepository {
         // T-16 multi-hop half: `validate_place` already rejects the
         // direct (0-hop) self-reference; this catches a cycle formed
         // through one or more existing ancestors.
-        if let Some(parent_id) = place.contained_in_place
-            && self.ancestor_chain_contains(place.id, parent_id).await?
-        {
-            return Err(crate::Error::Conflict(
-                "contained_in_place would create a containment cycle".into(),
-            ));
-        }
         // `created_at`/`updated_at` are server-managed (see `Place`'s
         // field docs): stamp both to "now" here, overriding whatever the
         // domain value carries, rather than trusting a client-supplied —
@@ -465,6 +464,9 @@ impl PlaceRepository for PgPlaceRepository {
         row.updated_at = now;
 
         let mut txn = self.db.begin().await?;
+        if let Some(parent_id) = place.contained_in_place {
+            reject_containment_cycle(&mut txn, place.id, parent_id).await?;
+        }
         insert_place_row(&mut txn, &row).await?;
         insert_collections(&mut txn, place).await?;
         // Digests over the record as stored, in this transaction (INT-V1).
@@ -500,13 +502,6 @@ impl PlaceRepository for PgPlaceRepository {
         // self-reference check in `validate_place` cannot see — this is
         // exactly the "A contains B, then update A to be contained in B"
         // shape).
-        if let Some(parent_id) = place.contained_in_place
-            && self.ancestor_chain_contains(place.id, parent_id).await?
-        {
-            return Err(crate::Error::Conflict(
-                "contained_in_place would create a containment cycle".into(),
-            ));
-        }
         // `created_at` is preserved (the UPDATE below does not name it,
         // so whatever the domain value carries — a stale read or a
         // defaulted-empty one — is ignored); `updated_at` is always
@@ -515,6 +510,9 @@ impl PlaceRepository for PgPlaceRepository {
         row.updated_at = Utc::now();
 
         let mut txn = self.db.begin().await?;
+        if let Some(parent_id) = place.contained_in_place {
+            reject_containment_cycle(&mut txn, place.id, parent_id).await?;
+        }
         update_place_row(&mut txn, &row).await?;
         delete_collections(&mut txn, place.id).await?;
         insert_collections(&mut txn, place).await?;
@@ -763,6 +761,42 @@ fn place_row(place: &Place) -> PlaceRow {
 }
 
 /// `INSERT` one whole `places` row.
+/// Serialise every write that sets a `contained_in_place`, for the rest
+/// of `conn`'s transaction, so the cycle check and the write it guards
+/// see no concurrent hierarchy edit. One key for the whole table: a
+/// cycle can join any two places, so no narrower key is safe, and only
+/// writes that name a parent take it.
+///
+/// # Errors
+/// Propagates any database error from taking the lock.
+async fn lock_containment(conn: &mut PgConnection) -> Result<()> {
+    sqlx::query_scalar!(
+        r#"SELECT pg_advisory_xact_lock(hashtext('place:contained_in_place')) AS "locked!: ()""#
+    )
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Take [`lock_containment`], then refuse with `409` when making
+/// `parent_id` the parent of `place_id` would close a cycle (T-16).
+///
+/// # Errors
+/// [`crate::Error::Conflict`] on a cycle; any database error otherwise.
+async fn reject_containment_cycle(
+    conn: &mut PgConnection,
+    place_id: Uuid,
+    parent_id: Uuid,
+) -> Result<()> {
+    lock_containment(conn).await?;
+    if PgPlaceRepository::ancestor_chain_contains(conn, place_id, parent_id).await? {
+        return Err(crate::Error::Conflict(
+            "contained_in_place would create a containment cycle".into(),
+        ));
+    }
+    Ok(())
+}
+
 async fn insert_place_row(conn: &mut PgConnection, row: &PlaceRow) -> Result<()> {
     sqlx::query!(
         "INSERT INTO places (
@@ -1211,5 +1245,115 @@ mod tests {
         // The rejected update must not have persisted: A is still a root.
         let reloaded = repo.get_by_id(&a.id).await.unwrap().unwrap();
         assert_eq!(reloaded.contained_in_place, None);
+    }
+
+    /// T-2: the recursive walk finds a cycle four levels up, where the
+    /// old loop took a round trip per level.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn update_rejects_a_cycle_four_levels_up() {
+        let db = connect().await;
+        let repo = PgPlaceRepository::new(db.clone());
+
+        let mut root = repo.create(&Place::new("Level 0")).await.unwrap();
+        let mut parent = root.id;
+        for level in 1..=4 {
+            let mut child = Place::new(&format!("Level {level}"));
+            child.contained_in_place = Some(parent);
+            parent = repo.create(&child).await.unwrap().id;
+        }
+
+        root.contained_in_place = Some(parent);
+        let err = repo.update(&root).await.unwrap_err();
+        assert!(
+            matches!(err, crate::Error::Conflict(_)),
+            "expected Conflict, got {err:?}"
+        );
+    }
+
+    /// A cycle already in the table that does not involve the place being
+    /// written ends the walk: the write is allowed, not looped on.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn a_pre_existing_unrelated_cycle_does_not_stop_a_write() {
+        let db = connect().await;
+        let repo = PgPlaceRepository::new(db.clone());
+
+        let p = repo.create(&Place::new("Cycle P")).await.unwrap();
+        let q = repo.create(&Place::new("Cycle Q")).await.unwrap();
+        // Corrupt rows, as from before the check existed: P and Q contain
+        // each other.
+        sqlx::query("UPDATE places SET contained_in_place = $1 WHERE id = $2")
+            .bind(q.id)
+            .bind(p.id)
+            .execute(&db)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE places SET contained_in_place = $1 WHERE id = $2")
+            .bind(p.id)
+            .bind(q.id)
+            .execute(&db)
+            .await
+            .unwrap();
+
+        let mut r = Place::new("Inside the cycle");
+        r.contained_in_place = Some(p.id);
+        let created = repo.create(&r).await.unwrap();
+        assert_eq!(created.contained_in_place, Some(p.id));
+    }
+
+    /// The cycle check and the write share one transaction under the
+    /// containment lock. Here another writer holds that lock and has put
+    /// B inside A without committing. An edit putting A inside B must wait
+    /// for it, then see B inside A and refuse. Checked outside the
+    /// transaction, as it was, the edit saw B as a root and both writes
+    /// committed a cycle.
+    #[tokio::test]
+    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    async fn a_concurrent_hierarchy_edit_cannot_close_a_cycle() {
+        let db = connect().await;
+        let repo = PgPlaceRepository::new(db.clone());
+        let mut a = repo.create(&Place::new("Race A")).await.unwrap();
+        let b = repo.create(&Place::new("Race B")).await.unwrap();
+
+        let mut other = db.begin().await.unwrap();
+        super::lock_containment(&mut other).await.unwrap();
+        sqlx::query("UPDATE places SET contained_in_place = $1 WHERE id = $2")
+            .bind(a.id)
+            .bind(b.id)
+            .execute(&mut *other)
+            .await
+            .unwrap();
+
+        a.contained_in_place = Some(b.id);
+        let editor = PgPlaceRepository::new(db.clone());
+        let edit = tokio::spawn(async move { editor.update(&a).await });
+
+        // Wait, up to ten seconds, until Postgres reports the edit queued
+        // on the containment lock.
+        let mut blocked = false;
+        for _ in 0..200 {
+            let waiting: i64 = sqlx::query_scalar(
+                "SELECT count(*) FROM pg_locks
+                 WHERE locktype = 'advisory' AND NOT granted AND objsubid = 1
+                   AND objid = (hashtext('place:contained_in_place')::bigint & 4294967295)::oid",
+            )
+            .fetch_one(&db)
+            .await
+            .unwrap();
+            if waiting > 0 {
+                blocked = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        other.commit().await.unwrap();
+
+        let result = edit.await.unwrap();
+        assert!(blocked, "the edit never waited on the containment lock");
+        assert!(
+            matches!(result, Err(crate::Error::Conflict(_))),
+            "expected Conflict, got {result:?}"
+        );
     }
 }

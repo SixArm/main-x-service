@@ -14,5 +14,7 @@
   place has at most **one** `contained_in_place`, the hierarchy is a
   tree (one upward path per place), so "two paths from A to B" does
   not arise in this data model — the walk needs no branching, just a
-  bounded single-chain traversal.
+  bounded single-chain traversal. Since 2026-11-09 (T-2) the walk is one
+  `WITH RECURSIVE` query run in the write's transaction under an
+  advisory lock, so concurrent edits cannot jointly close a cycle.
 

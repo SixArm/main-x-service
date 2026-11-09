@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH RECURSIVE chain(id) AS (\n                   SELECT $2::uuid\n                   UNION\n                   SELECT p.contained_in_place\n                   FROM places p JOIN chain c ON p.id = c.id\n                   WHERE p.contained_in_place IS NOT NULL\n               )\n               SELECT EXISTS (SELECT 1 FROM chain WHERE id = $1) AS \"found!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "found!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ec404d06cc68b2f5d976d5c5a658f6e3cb4f1b088fd7adb83c4b550c1378ffdc"
+}

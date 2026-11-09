@@ -10,6 +10,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- Two concurrent edits can no longer close a containment cycle between
+  them. The cycle check ran before the write's transaction and took no
+  lock, so "A inside B" and "B inside A" could each find no cycle and
+  both commit. It now runs inside the transaction, after a
+  transaction-scoped advisory lock that only writes naming a
+  `contained_in_place` take. The walk itself is one `WITH RECURSIVE`
+  query instead of a query per level (T-2).
+
 - The outbox relay's ack stamps `published_at` from this process's clock,
   the clock `purge_published` builds its retention cutoff on. It took
   Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged
