@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — match evidence (T-16)
+
+`MatchResult.evidence` reports how much the compared data **proves**,
+beside the unchanged similarity `score`, following
+`agents/share/match-evidence.md` (Fellegi–Sunter weights). New
+`src/evidence.rs` with `Evidence`, `Contradiction` and `MatchStrength`
+(re-exported from the crate root), `component_bits`, and this crate's
+per-component m/u table; new `MatchConfig::proof_bits` (default 30).
+A shared unique identifier, `same_as` URL or same-provider course code
+adds ≈ 39.85 bits; a disjoint unique scheme or a differing
+same-provider course code is a contradiction. Both new fields are
+`#[serde(default)]`, so older JSON still deserialises. `score`,
+`is_match`, `confidence` and `breakdown` are unchanged. See spec §18a.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

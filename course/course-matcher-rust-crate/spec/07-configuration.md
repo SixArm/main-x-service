@@ -40,3 +40,16 @@ regardless.
 Convenience presets: `MatchConfig::strict()` (threshold = 0.95) and
 `MatchConfig::lenient()` (threshold = 0.70). Same weights.
 
+Evidence bar (§18a, §23 T-16):
+
+| Field | Default |
+|---|---|
+| `proof_bits` | 30.0 |
+
+The bits `MatchResult.evidence.weight_bits` must reach for
+`MatchStrength::Proven` (`agents/share/match-evidence.md` §4). It is
+`#[serde(default)]`, so a config serialised before the field existed
+still loads. The presets keep the default. Like the weights, it is not
+validated (§22): a caller setting it non-positive makes every
+uncontradicted pair `Proven`.
+

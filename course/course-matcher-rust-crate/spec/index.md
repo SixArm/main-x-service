@@ -28,6 +28,7 @@ rules, …). The shorter §1–§18 shape is used by the service crates.
 16. [Same-as URL short-circuit](16-same-as-url-short-circuit.md)
 17. [Renormalisation](17-renormalisation.md)
 18. [Confidence classification](18-confidence-classification.md)
+18a. [Match evidence](18a-match-evidence.md)
 19. [Quality goals](19-quality-goals.md)
 20. [Consumption](20-consumption.md)
 21. [Compatibility](21-compatibility.md)

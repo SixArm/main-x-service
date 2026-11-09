@@ -33,6 +33,8 @@
 //!   [`EducationalLevel`], [`LearningResourceType`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
+//! - [`Evidence`], [`Contradiction`], [`MatchStrength`] — how much the
+//!   compared data *proves*, beside the similarity score (spec §18a).
 
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]
@@ -42,6 +44,7 @@
 pub mod config;
 pub mod course;
 pub mod error;
+pub mod evidence;
 pub mod matcher;
 pub mod normalize;
 pub mod phonetic;
@@ -53,5 +56,6 @@ pub use course::{
     RelationKind, RelationshipRef,
 };
 pub use error::{Error, Result};
+pub use evidence::{Contradiction, Evidence, MatchStrength};
 pub use matcher::MatchingEngine;
 pub use scoring::{Confidence, MatchBreakdown, MatchResult};

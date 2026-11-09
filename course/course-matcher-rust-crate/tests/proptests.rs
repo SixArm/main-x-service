@@ -12,7 +12,7 @@
 //! All tests drive the crate's **public** surface only
 //! (`use course_matcher::…`) — the same contract the service embeds.
 
-use course_matcher::{Course, MatchConfig, MatchingEngine};
+use course_matcher::{Course, MatchConfig, MatchStrength, MatchingEngine};
 use course_matcher::{normalize, phonetic};
 use proptest::prelude::*;
 
@@ -123,6 +123,26 @@ proptest! {
             r.score,
             r.is_match
         );
+    }
+
+    /// Evidence `weight_bits` MUST be finite, and the strength MUST agree
+    /// with the contradictions, the proof bar and `is_match` (spec §18a).
+    #[test]
+    fn evidence_is_finite_and_strength_consistent(a in course_strategy(), b in course_strategy()) {
+        let config = MatchConfig::default();
+        let r = MatchingEngine::new(config.clone()).match_courses(&a, &b);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "non-finite bits: {}", e.weight_bits);
+        let expected = if !e.contradictions.is_empty() {
+            MatchStrength::Contradicted
+        } else if e.weight_bits >= config.proof_bits {
+            MatchStrength::Proven
+        } else if r.is_match {
+            MatchStrength::Consistent
+        } else {
+            MatchStrength::NonMatch
+        };
+        prop_assert_eq!(e.strength, expected);
     }
 
     /// `soundex` MUST be `None`, or a 4-char `[A-Z][0-9]{3}` code —

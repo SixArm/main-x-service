@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::evidence::Evidence;
+
 /// The outcome of matching two courses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchResult {
@@ -13,6 +15,10 @@ pub struct MatchResult {
     pub confidence: Confidence,
     /// Per-component score breakdown.
     pub breakdown: MatchBreakdown,
+    /// How much the compared data proves (spec §18a). Defaulted so JSON
+    /// written before the field existed still deserialises.
+    #[serde(default)]
+    pub evidence: Evidence,
 }
 
 impl Default for MatchResult {
@@ -26,6 +32,7 @@ impl Default for MatchResult {
             is_match: false,
             confidence: Confidence::Low,
             breakdown: MatchBreakdown::default(),
+            evidence: Evidence::default(),
         }
     }
 }

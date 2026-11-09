@@ -7,3 +7,5 @@
 This is independent of `MatchConfig::threshold` (used by
 `is_match`).
 
+Confidence classifies similarity, not proof. Whether the data proves
+the pair is one course is `MatchResult.evidence.strength` (§18a).

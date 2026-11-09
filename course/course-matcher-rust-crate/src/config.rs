@@ -43,6 +43,19 @@ pub struct MatchConfig {
     /// but does not participate when either side has no tags
     /// recorded. See spec §5.2 / §13a / §7 / §23 T-12.
     pub tags_weight: f64,
+
+    /// Evidence bar, in bits, for [`MatchStrength::Proven`](crate::MatchStrength).
+    /// Default 30: `log2(N) + log2(1/α)` for a million records at one
+    /// false merge in a thousand. See spec §18a and
+    /// `agents/share/match-evidence.md` §4.
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
+}
+
+/// Serde default for [`MatchConfig::proof_bits`], so configs written
+/// before the field existed still deserialise.
+fn default_proof_bits() -> f64 {
+    crate::evidence::DEFAULT_PROOF_BITS
 }
 
 impl Default for MatchConfig {
@@ -57,6 +70,7 @@ impl Default for MatchConfig {
             teaches_weight: 0.15,
             relationships_weight: 0.05,
             tags_weight: 0.05,
+            proof_bits: default_proof_bits(),
         }
     }
 }

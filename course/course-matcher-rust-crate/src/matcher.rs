@@ -18,6 +18,7 @@ use strsim::jaro_winkler;
 
 use crate::config::MatchConfig;
 use crate::course::{Course, CourseIdentifier, EducationalLevel, RelationKind, RelationshipRef};
+use crate::evidence;
 use crate::normalize;
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
@@ -81,8 +82,14 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_courses(&self, a: &Course, b: &Course) -> MatchResult {
+        // The probabilistic components are computed on every path: the
+        // short-circuit does not score them, but the evidence weighs them
+        // (spec §18a).
+        let components = component_breakdown(a, b);
+
         // ── Deterministic short-circuit ──────────────────────────
         if deterministic_match(a, b) {
+            let evidence = evidence::assess(a, b, &components, true, self.config.proof_bits);
             return MatchResult {
                 score: 1.0,
                 is_match: true,
@@ -91,49 +98,36 @@ impl MatchingEngine {
                     deterministic_match: true,
                     ..Default::default()
                 },
+                evidence,
             };
         }
 
         // ── Probabilistic scoring ────────────────────────────────
-        let name_score = Some(name_score(a, b));
-        let course_code_score = course_code_score(a, b);
-        let provider_score = provider_score(a, b);
-        let educational_level_score = educational_level_score(a, b);
-        let keywords_score = set_jaccard(&a.keywords, &b.keywords);
-        let teaches_score = set_jaccard(&a.teaches, &b.teaches);
-        let relationships_score = relationships_score(&a.relationships, &b.relationships);
-        let tags_score = tags_score(&a.tags, &b.tags);
-
         let score = weighted_average(&[
-            (name_score, self.config.name_weight),
-            (course_code_score, self.config.course_code_weight),
-            (provider_score, self.config.provider_weight),
+            (components.name_score, self.config.name_weight),
+            (components.course_code_score, self.config.course_code_weight),
+            (components.provider_score, self.config.provider_weight),
             (
-                educational_level_score,
+                components.educational_level_score,
                 self.config.educational_level_weight,
             ),
-            (keywords_score, self.config.keywords_weight),
-            (teaches_score, self.config.teaches_weight),
-            (relationships_score, self.config.relationships_weight),
-            (tags_score, self.config.tags_weight),
+            (components.keywords_score, self.config.keywords_weight),
+            (components.teaches_score, self.config.teaches_weight),
+            (
+                components.relationships_score,
+                self.config.relationships_weight,
+            ),
+            (components.tags_score, self.config.tags_weight),
         ]);
 
         let is_match = score >= self.config.threshold;
+        let evidence = evidence::assess(a, b, &components, is_match, self.config.proof_bits);
         MatchResult {
             score,
             is_match,
             confidence: Confidence::classify(score),
-            breakdown: MatchBreakdown {
-                name_score,
-                course_code_score,
-                provider_score,
-                educational_level_score,
-                keywords_score,
-                teaches_score,
-                relationships_score,
-                tags_score,
-                deterministic_match: false,
-            },
+            breakdown: components,
+            evidence,
         }
     }
 
@@ -181,6 +175,22 @@ impl MatchingEngine {
             .into_iter()
             .filter(|(_, r)| r.is_match)
             .collect()
+    }
+}
+
+/// Every probabilistic component for the pair, with
+/// `deterministic_match` false.
+fn component_breakdown(a: &Course, b: &Course) -> MatchBreakdown {
+    MatchBreakdown {
+        name_score: Some(name_score(a, b)),
+        course_code_score: course_code_score(a, b),
+        provider_score: provider_score(a, b),
+        educational_level_score: educational_level_score(a, b),
+        keywords_score: set_jaccard(&a.keywords, &b.keywords),
+        teaches_score: set_jaccard(&a.teaches, &b.teaches),
+        relationships_score: relationships_score(&a.relationships, &b.relationships),
+        tags_score: tags_score(&a.tags, &b.tags),
+        deterministic_match: false,
     }
 }
 

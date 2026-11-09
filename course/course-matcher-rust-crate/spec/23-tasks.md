@@ -130,4 +130,20 @@
       - **Acceptance (met):** §24 and the T-8 note above both name
         `benches/match_pair.rs` alongside the service-side bench; no
         code change required.
-
+- [x] T-16: Match evidence (`agents/share/match-evidence.md`) *(resolved
+      2026-11-09)*. New `src/evidence.rs` with this crate's m/u table
+      (§18a), `MatchResult.evidence` (`#[serde(default)]`) and
+      `MatchConfig::proof_bits` (default 30). Identifier bits on a shared
+      DOI / Wikidata / OER / LOM / URI / UUID, an overlapping `same_as`
+      URL, or a same-provider course code; contradictions per disjoint
+      unique scheme and per same-provider differing course code. Evidence
+      is computed on the short-circuit path too. `score`, `is_match`,
+      `confidence` and `breakdown` unchanged.
+      - **Acceptance (met):** unit tests in `src/evidence.rs` (missing
+        component adds 0; identical sparse ⇒ `Consistent`; shared
+        identifier / `same_as` / same-provider code ⇒ `Proven`;
+        conflicting identifiers or same-provider codes ⇒ `Contradicted`;
+        richest identifier-free record ≈ 27.6 bits, pinned below the
+        default bar; clear disagreement < 0 bits; pre-field JSON
+        deserialises) and the `evidence_is_finite_and_strength_consistent`
+        property in `tests/proptests.rs`.
