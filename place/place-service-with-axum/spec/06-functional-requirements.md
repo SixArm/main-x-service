@@ -82,13 +82,17 @@ is by signed cursor (`agents/share/restful.md`, §9): `?limit=` and a signed `?c
 
 **Geo-radius search** (`GET /api/places/nearby?lat=&lon=&radius_km=
 &limit=&cursor=`, §13 T-9, delivered) filters places within
-`radius_km` of `(lat, lon)`, nearest-first, and pages the same way. [`within_radius`](../src/matching/geo.rs)
-(Haversine) is the exact per-candidate check; a new
-[`bounding_box`](../src/matching/geo.rs) helper computes a coarse
-rectangular pre-filter (derived from the same mean Earth radius
-`within_radius`'s distance calculation uses, so the two agree on one
-sphere) that `db::PlaceRepository::list_in_bbox` runs as a plain SQL
-range query over `idx_places_geo`, capped at 5,000 candidate rows.
+`radius_km` of `(lat, lon)`, nearest-first and then by `id`, and pages
+the same way. [`search_box`](../src/matching/geo.rs) computes a coarse
+rectangular pre-filter on the same 6 371 km sphere the Haversine
+distance uses, wrapping across the antimeridian (`west > east`) and
+covering every longitude once the circle reaches a pole.
+`db::PlaceRepository::page_within_radius` runs it over `idx_places_geo`
+and computes the Haversine distance in SQL, which filters to the
+circle, orders and pages, so following `next` reaches every place in
+the radius however many share the box (§13 T-21). The cost is a sort
+of every place in the box on each page; the request limits in
+`agents/share/security.md` §4 bound how often a caller can ask.
 PostGIS-backed spatial indexing is a further roadmap item (§13 T-1) —
 this SQL-range pre-filter is the interim answer the extensions list
 (§10.2) already named.

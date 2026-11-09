@@ -99,10 +99,12 @@ async fn a_stored_place_is_served_as_a_point_feature() {
         .expect("Postgres connection");
     let repo = place_service::db::PgPlaceRepository::new(db);
 
+    // In the Tasman Sea, far from every other suite's fixtures, so this
+    // place never lands on a page another test reads nearest-first.
     let mut place = Place::new(&format!("GeoJSON Fixture {}", uuid::Uuid::new_v4()));
     place.geo = Some(GeoCoordinates {
-        latitude_as_decimal_degrees: BigDecimal::from_str("40.785091").unwrap(),
-        longitude_as_decimal_degrees: BigDecimal::from_str("-73.968285").unwrap(),
+        latitude_as_decimal_degrees: BigDecimal::from_str("-38.123456").unwrap(),
+        longitude_as_decimal_degrees: BigDecimal::from_str("148.765432").unwrap(),
         elevation_as_decimal_metres: None,
     });
     let stored = repo.create(&place).await.expect("seed a located place");
@@ -133,7 +135,7 @@ async fn a_stored_place_is_served_as_a_point_feature() {
     );
     assert_eq!(
         body["geometry"]["coordinates"][0].as_f64(),
-        Some(-73.968_285)
+        Some(148.765_432)
     );
     assert_eq!(body["properties"]["name"], stored.name);
 

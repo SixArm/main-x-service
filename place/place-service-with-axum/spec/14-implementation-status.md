@@ -8,7 +8,7 @@
 | Database schema | plain-SQL `sqlx::migrate!` migrations, indexes, audit triggers |
 | Domain model | Full schema.org/Place property coverage including PostalAddress, GeoCoordinates, hierarchy |
 | Matching | Name (Jaro-Winkler + Soundex) + Geo (Haversine) + Address (weighted) + Identifier (GLN deterministic) |
-| Search | Tantivy full-text + fuzzy index (`q` / `limit` / `cursor` / `fuzzy` / `mask_sensitive`; signed-cursor paging with `Link: rel="next"` and no total, §9); geo-radius `GET /api/places/nearby` (bounding-box SQL pre-filter + `within_radius` Haversine, paged the same way) — T-9 |
+| Search | Tantivy full-text + fuzzy index (`q` / `limit` / `cursor` / `fuzzy` / `mask_sensitive`; signed-cursor paging with `Link: rel="next"` and no total, §9); geo-radius `GET /api/places/nearby` (wrapping bounding-box pre-filter, then Haversine distance, order and page in SQL) — T-9, T-21 |
 | REST API | 17 endpoints + OpenAPI/Swagger + CORS + structured errors |
 | FHIR R5 API | `Location` resource: read/create/update/delete/search at `/fhir/Location{,/{id}}` + `GET /fhir/metadata` `CapabilityStatement`; reuses the native validators, event/audit path, and blanket auth+ABAC guard (T-11) |
 | Integrity verification | SHA-256 + SHA3-256 digests and a keyed HMAC-SHA256 MAC over place records and `audit_log` rows, via the shared `integrity-mac` crate; `GET /api/records/verify` + `GET /api/audit/verify`; default off (`mac_absent`, not a mismatch) until `PLACE_INTEGRITY_MAC_KEY`/`_KEY_FILE` is configured — no hash chain / external-witness checkpoint yet (unlike person/worker/care-pathway/case) |

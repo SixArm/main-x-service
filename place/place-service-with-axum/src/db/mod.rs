@@ -98,28 +98,30 @@ pub trait PlaceRepository: Send + Sync {
     /// # Errors
     /// Propagates any database error from the query or hydration.
     async fn list(&self, limit: u64, offset: u64) -> Result<Vec<Place>>;
-    /// List non-deleted places whose coordinates fall within a
-    /// rectangular latitude/longitude bounding box (inclusive), up to
-    /// `cap` rows.
+    /// One page of the active places within `radius_m` metres of
+    /// `(lat, lon)`, nearest first and then by `id`: `limit` rows after
+    /// skipping `offset`.
     ///
-    /// This is the coarse **pre-filter** for geo-radius search
-    /// (`crate::matching::geo::bounding_box` computes the box; the
-    /// btree `idx_places_geo` index answers the range query cheaply). A
-    /// rectangle over-includes a circle's corners, so the caller MUST
-    /// still apply [`crate::matching::geo::within_radius`] to the
-    /// returned rows to get the true within-radius set. `cap` bounds how
-    /// many candidate rows are read, so a large box can never turn a
-    /// radius search into an unbounded table scan.
+    /// Distance is the Haversine great-circle distance on the same
+    /// 6 371 km sphere as [`GeoCoordinates::distance_to`], computed in SQL
+    /// so the filter, the order and the page are all the database's and
+    /// no candidate cap can leave a nearer place out. `bbox` (from
+    /// [`crate::matching::geo::search_box`], which wraps across the
+    /// antimeridian) is a coarse pre-filter the `idx_places_geo` index
+    /// answers; it must contain the whole circle.
+    ///
+    /// [`GeoCoordinates::distance_to`]: crate::models::geo::GeoCoordinates::distance_to
     ///
     /// # Errors
     /// Propagates any database error from the query or hydration.
-    async fn list_in_bbox(
+    async fn page_within_radius(
         &self,
-        lat_min: f64,
-        lat_max: f64,
-        lon_min: f64,
-        lon_max: f64,
-        cap: u64,
+        lat: f64,
+        lon: f64,
+        radius_m: f64,
+        bbox: crate::geojson::BoundingBox,
+        offset: u64,
+        limit: u64,
     ) -> Result<Vec<Place>>;
     /// One page of the active places whose coordinates fall inside the
     /// box, in `id` order: `limit` rows after skipping `offset`. The edges
@@ -586,20 +588,22 @@ impl PlaceRepository for PgPlaceRepository {
         self.hydrate_all(rows).await
     }
 
-    async fn list_in_bbox(
+    async fn page_within_radius(
         &self,
-        lat_min: f64,
-        lat_max: f64,
-        lon_min: f64,
-        lon_max: f64,
-        cap: u64,
+        lat: f64,
+        lon: f64,
+        radius_m: f64,
+        bbox: crate::geojson::BoundingBox,
+        offset: u64,
+        limit: u64,
     ) -> Result<Vec<Place>> {
-        // A range comparison against a NULL geo column is never true in
-        // SQL, so rows with no coordinates are excluded without a
-        // separate `IS NOT NULL` filter.
+        // The inner query narrows to the box on the index and computes the
+        // distance once; the outer one filters, orders and pages on it.
+        // `LEAST(1, …)` keeps `asin` inside its domain when rounding pushes
+        // the half-chord a hair past 1 for antipodal points.
         let rows = sqlx::query_as!(
             PlaceRow,
-            "SELECT id, name, alternate_name, description, place_type, place_type_custom,
+            r#"SELECT id, name, alternate_name, description, place_type, place_type_custom,
                     address_street_address, address_locality, address_region,
                     address_country, address_postal_code,
                     geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,
@@ -609,18 +613,38 @@ impl PlaceRepository for PgPlaceRepository {
                     smoking_allowed, maximum_attendee_capacity, is_deleted,
                     content_hash, content_hash_sha3, content_mac,
                     deleted_at, created_at, updated_at
-             FROM places
-             WHERE is_deleted = false
-               AND geo_latitude_as_decimal_degrees >= $1
-               AND geo_latitude_as_decimal_degrees <= $2
-               AND geo_longitude_as_decimal_degrees >= $3
-               AND geo_longitude_as_decimal_degrees <= $4
-             LIMIT $5",
-            bbox_decimal(lat_min),
-            bbox_decimal(lat_max),
-            bbox_decimal(lon_min),
-            bbox_decimal(lon_max),
-            to_i64(cap),
+             FROM (
+                 SELECT p.*,
+                        2 * 6371000.0 * asin(LEAST(1.0, sqrt(
+                            power(sin(radians(p.geo_latitude_as_decimal_degrees::float8 - $1::float8) / 2), 2)
+                            + cos(radians($1::float8))
+                              * cos(radians(p.geo_latitude_as_decimal_degrees::float8))
+                              * power(sin(radians(p.geo_longitude_as_decimal_degrees::float8 - $2::float8) / 2), 2)
+                        ))) AS distance_m
+                 FROM places p
+                 WHERE p.is_deleted = false
+                   AND p.geo_latitude_as_decimal_degrees >= $4
+                   AND p.geo_latitude_as_decimal_degrees <= $5
+                   AND CASE WHEN $6::numeric <= $7::numeric
+                            THEN p.geo_longitude_as_decimal_degrees >= $6
+                                 AND p.geo_longitude_as_decimal_degrees <= $7
+                            ELSE p.geo_longitude_as_decimal_degrees >= $6
+                                 OR p.geo_longitude_as_decimal_degrees <= $7
+                       END
+             ) candidates
+             WHERE distance_m <= $3::float8
+             ORDER BY distance_m, id
+             OFFSET $8
+             LIMIT $9"#,
+            lat,
+            lon,
+            radius_m,
+            bbox_decimal(bbox.south),
+            bbox_decimal(bbox.north),
+            bbox_decimal(bbox.west),
+            bbox_decimal(bbox.east),
+            to_i64(offset),
+            to_i64(limit),
         )
         .fetch_all(&self.db)
         .await?;

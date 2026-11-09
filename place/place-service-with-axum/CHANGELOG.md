@@ -22,6 +22,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- `GET /api/places/nearby` reaches every place in the radius. It read
+  at most 5 000 bounding-box candidates in no particular order before
+  filtering, so once more shared the box it could leave nearer places
+  out and answer a page differently twice. The database now computes
+  the distance, filters, orders (nearest first, then `id`) and pages.
+  A circle near the antimeridian also finds the places across it; the
+  box used to stop at ±180 (T-21).
+
 - Two concurrent edits can no longer close a containment cycle between
   them. The cycle check ran before the write's transaction and took no
   lock, so "A inside B" and "B inside A" could each find no cycle and

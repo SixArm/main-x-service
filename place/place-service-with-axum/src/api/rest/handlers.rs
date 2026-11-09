@@ -19,7 +19,7 @@ use super::state::AppState;
 use crate::api::{ApiProblem, ok};
 use crate::db::audit::AuditContext;
 use crate::matching::confidence_label;
-use crate::matching::geo::{bounding_box, within_radius};
+use crate::matching::geo::search_box;
 use crate::models::geo::GeoCoordinates;
 use crate::models::merge::{MergeRecord, MergeRequest, MergeResponse};
 use crate::models::place::Place;
@@ -512,21 +512,15 @@ pub const NEARBY_DEFAULT_LIMIT: u64 = 10;
 /// Largest page the `nearby` endpoint will serve in one call.
 pub const NEARBY_MAX_LIMIT: u64 = 100;
 
-/// Safety cap on how many bounding-box candidates are read from the
-/// database before the exact Haversine filter runs. Bounds the request
-/// to a fixed amount of work regardless of how large a box a caller's
-/// `radius_km` produces (SEC-M1: bound every input).
-pub const NEARBY_BBOX_SCAN_CAP: u64 = 5_000;
-
 /// Geo-radius search.
 ///
 /// `GET /api/places/nearby?lat=&lon=&radius_km=&limit=&cursor=`. Filters
-/// places within `radius_km` of `(lat, lon)`: a coarse SQL bounding-box
-/// pre-filter (`matching::geo::bounding_box`, over the `idx_places_geo`
-/// index) narrows the candidates, then the exact
-/// [`within_radius`](crate::matching::geo::within_radius) Haversine
-/// check keeps only those truly inside the circle. Results are ordered
-/// nearest-first. Returns `200` with a [`SearchResponse`] and a
+/// places within `radius_km` of `(lat, lon)`. A bounding box
+/// ([`search_box`], over the `idx_places_geo` index, wrapping across the
+/// antimeridian) narrows the rows, and the database computes the Haversine
+/// distance, keeps those inside the circle, orders them nearest-first and
+/// then by `id`, and pages them, so every place in the radius is reached
+/// by following `next` however many share the box (spec §13 T-21). Returns `200` with a [`SearchResponse`] and a
 /// `Link: rel="next"` header while more in-radius matches follow
 /// (`agents/share/restful.md`). `lat`/`lon`/`radius_km` out of range is
 /// a `400`; a `limit` above [`NEARBY_MAX_LIMIT`], or a cursor this
@@ -561,37 +555,21 @@ pub async fn nearby_places(
     };
 
     let center = GeoCoordinates::new(q.lat, q.lon);
-    let (lat_min, lat_max, lon_min, lon_max) = bounding_box(&center, q.radius_km);
-    let candidates = match state
+    let window = match state
         .place_repository
-        .list_in_bbox(lat_min, lat_max, lon_min, lon_max, NEARBY_BBOX_SCAN_CAP)
+        .page_within_radius(
+            q.lat,
+            q.lon,
+            q.radius_km * 1000.0,
+            search_box(&center, q.radius_km),
+            page.offset(),
+            page.limit() + 1,
+        )
         .await
     {
-        Ok(c) => c,
+        Ok(rows) => rows,
         Err(e) => return fail(&e).into_response(),
     };
-
-    let radius_m = q.radius_km * 1000.0;
-    let mut within: Vec<(f64, Place)> = candidates
-        .into_iter()
-        .filter_map(|p| {
-            let geo = p.geo.as_ref()?;
-            let dist = geo.distance_to(&center);
-            within_radius(geo, &center, radius_m).then_some((dist, p))
-        })
-        .collect();
-    // Nearest-first, so pagination is a meaningful "closer" ordering
-    // rather than an arbitrary one.
-    within.sort_by(|(da, _), (db, _)| da.partial_cmp(db).unwrap_or(std::cmp::Ordering::Equal));
-
-    let offset_usize = usize::try_from(page.offset()).unwrap_or(usize::MAX);
-    let limit_usize = usize::try_from(page.limit() + 1).unwrap_or(usize::MAX);
-    let window: Vec<Place> = within
-        .into_iter()
-        .skip(offset_usize)
-        .take(limit_usize)
-        .map(|(_dist, p)| p)
-        .collect();
     let (results, more_follow) = page.split(window);
 
     with_next(

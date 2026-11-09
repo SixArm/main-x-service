@@ -643,7 +643,7 @@ clearly described manual check confirms the acceptance criterion.
   maximum is a `422`, and a DB test walks a queue of more than 500 rows
   to its end. Check the other six crates with a review queue for the
   same cap.
-- [ ] **T-21 (S) — Order the nearby candidate scan.**
+- [x] **T-21 (S) — Order the nearby candidate scan.** *(Done 2026-11-09.)*
   `GET /api/places/nearby` reads at most 5 000 bounding-box candidates
   (`NEARBY_BBOX_SCAN_CAP`) through `list_in_bbox`, whose `LIMIT` has no
   `ORDER BY`. Past 5 000 places in the box, which candidates are read
@@ -656,3 +656,19 @@ clearly described manual check confirms the acceptance criterion.
   paging the candidates in SQL (distance, then `id`), or by refusing a
   radius whose box holds more than the cap rather than answering from
   an arbitrary subset. A DB test seeds more than the cap.
+  - Done by moving the filter into SQL: `page_within_radius` computes
+    the Haversine distance on the same sphere as `distance_to`, keeps
+    the circle, orders by distance then `id`, and pages with the
+    signed offset. `list_in_bbox` and `NEARBY_BBOX_SCAN_CAP` are gone.
+    The box now wraps across the antimeridian through
+    `matching::geo::search_box`; `bounding_box` clamped at ±180, so a
+    circle near the line lost its far side. DB tests
+    (`tests/nearby_paging.rs`), each run around a random centre of its
+    own: a walk three to a page finds exactly the places within the
+    radius, nearest first with ties in `id` order; a circle at 179.999°
+    finds a place across the line, and fails when the wrap is removed.
+    Not done as written: no test seeds more than 5 000 places, because
+    they would stay in the database every other suite shares and slow
+    its dedup scans; with no cap left, the property it would show holds
+    by construction. The cost moved: each page now sorts every place in
+    the box, where the old scan stopped at 5 000.

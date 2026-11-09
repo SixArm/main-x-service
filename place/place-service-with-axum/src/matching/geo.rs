@@ -165,6 +165,51 @@ pub fn bounding_box(center: &GeoCoordinates, radius_km: f64) -> (f64, f64, f64, 
     )
 }
 
+/// The [`BoundingBox`](crate::geojson::BoundingBox) holding every point
+/// within `radius_km` of `center`, wrapping across the antimeridian.
+///
+/// [`bounding_box`] clamps longitude at ±180, so a circle near the
+/// antimeridian loses the part on the far side. This box wraps instead:
+/// past 180 east it continues from 180 west, giving `west > east`, the
+/// RFC 7946 §5.2 form [`page_within_radius`] reads. A circle that reaches
+/// a pole, or whose longitude span is 360 degrees or more, covers every
+/// longitude.
+///
+/// [`page_within_radius`]: crate::db::PlaceRepository::page_within_radius
+#[must_use]
+pub fn search_box(center: &GeoCoordinates, radius_km: f64) -> crate::geojson::BoundingBox {
+    let lat = center.latitude_as_decimal_degrees.to_f64().unwrap_or(0.0);
+    let lon = center.longitude_as_decimal_degrees.to_f64().unwrap_or(0.0);
+    let radius_km = radius_km.max(0.0);
+    let delta_lat = radius_km / KM_PER_DEGREE_LATITUDE;
+    let km_per_degree_longitude = (KM_PER_DEGREE_LATITUDE * lat.to_radians().cos()).max(0.01);
+    let delta_lon = radius_km / km_per_degree_longitude;
+    let south = (lat - delta_lat).max(-90.0);
+    let north = (lat + delta_lat).min(90.0);
+    if north >= 90.0 || south <= -90.0 || delta_lon >= 180.0 {
+        return crate::geojson::BoundingBox {
+            west: -180.0,
+            south,
+            east: 180.0,
+            north,
+        };
+    }
+    let mut west = lon - delta_lon;
+    let mut east = lon + delta_lon;
+    if west < -180.0 {
+        west += 360.0;
+    }
+    if east > 180.0 {
+        east -= 360.0;
+    }
+    crate::geojson::BoundingBox {
+        west,
+        south,
+        east,
+        north,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346,5 +391,44 @@ mod tests {
         let tight = geo_similarity_with_reference(&a, &b, 0.1);
         let loose = geo_similarity_with_reference(&a, &b, 10.0);
         assert!(loose > tight, "loose: {loose}, tight: {tight}");
+    }
+
+    #[test]
+    fn search_box_matches_bounding_box_away_from_the_antimeridian() {
+        let center = GeoCoordinates::new(40.7829, -73.9654);
+        let (south, north, west, east) = bounding_box(&center, 10.0);
+        let b = search_box(&center, 10.0);
+        assert_eq!(
+            (b.south, b.north, b.west, b.east),
+            (south, north, west, east)
+        );
+    }
+
+    #[test]
+    fn search_box_wraps_past_the_antimeridian() {
+        let east_side = search_box(&GeoCoordinates::new(0.0, 179.99), 10.0);
+        assert!(east_side.west > east_side.east, "{east_side:?}");
+        assert!(east_side.east > -180.0 && east_side.east < -179.9);
+        let west_side = search_box(&GeoCoordinates::new(0.0, -179.99), 10.0);
+        assert!(west_side.west > west_side.east, "{west_side:?}");
+        assert!(west_side.west < 180.0 && west_side.west > 179.9);
+    }
+
+    #[test]
+    fn search_box_covers_every_longitude_when_it_reaches_a_pole() {
+        let b = search_box(&GeoCoordinates::new(89.99, 10.0), 50.0);
+        assert_eq!((b.west, b.east, b.north), (-180.0, 180.0, 90.0));
+    }
+
+    #[test]
+    fn search_box_contains_points_on_the_circle_across_the_antimeridian() {
+        // A point 9.9 km due east of 179.95 lies across the line.
+        let center = GeoCoordinates::new(0.0, 179.95);
+        let deg = 9.9 / KM_PER_DEGREE_LATITUDE;
+        let across = GeoCoordinates::new(0.0, 179.95 + deg - 360.0);
+        assert!(within_radius(&across, &center, 10_000.0));
+        let b = search_box(&center, 10.0);
+        let lon = across.longitude_as_decimal_degrees.to_f64().unwrap();
+        assert!(lon >= b.west || lon <= b.east, "{lon} outside {b:?}");
     }
 }
