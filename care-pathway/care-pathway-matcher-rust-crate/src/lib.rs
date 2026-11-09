@@ -37,6 +37,8 @@
 //!   [`RelationshipRef`], [`RelationKind`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
+//! - [`Evidence`], [`Contradiction`], [`MatchStrength`] — Fellegi–Sunter
+//!   evidence beside the score (`agents/share/match-evidence.md`).
 //! - [`Error`], [`Result`] — the crate error type and its `Result` alias.
 
 // Always start with high quality coding conventions.
@@ -57,6 +59,7 @@
 pub mod care_pathway; // domain model (`CarePathway` and its value types)
 pub mod config; // tunable weights + threshold (`MatchConfig`)
 pub mod error; // crate error type + `Result` alias
+pub mod evidence; // Fellegi–Sunter evidence beside the score
 pub mod matcher; // the `MatchingEngine` and scoring pipeline
 pub mod normalize; // case-fold / NFKC / pathway-code helpers
 pub mod phonetic; // Soundex encoder (name-component bonus)
@@ -76,6 +79,8 @@ pub use care_pathway::{
 pub use config::MatchConfig;
 // Error handling — typed error and the crate-local `Result` alias.
 pub use error::{Error, Result};
+// Evidence — how much the data proves, beside the similarity score.
+pub use evidence::{Contradiction, Evidence, MatchStrength};
 // Engine — the entry point that scores pairs, plus the scoring-cost cap
 // (CPM-T3) a standalone caller can inspect rather than assume.
 pub use matcher::{MAX_ARRAY_LEN, MatchingEngine};

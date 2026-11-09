@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::evidence::Evidence;
+
 /// The outcome of matching two care pathways.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchResult {
@@ -13,6 +15,11 @@ pub struct MatchResult {
     pub confidence: Confidence,
     /// Per-component score breakdown.
     pub breakdown: MatchBreakdown,
+    /// How much the compared data proves, beside `score`
+    /// (`agents/share/match-evidence.md`). Absent in JSON written before
+    /// the field existed, hence the serde default.
+    #[serde(default)]
+    pub evidence: Evidence,
 }
 
 impl Default for MatchResult {
@@ -22,6 +29,7 @@ impl Default for MatchResult {
             is_match: false,
             confidence: Confidence::Low,
             breakdown: MatchBreakdown::default(),
+            evidence: Evidence::default(),
         }
     }
 }
@@ -198,6 +206,21 @@ mod tests {
         assert!(!r.is_match);
         assert_eq!(r.confidence, Confidence::Low);
         assert!(!r.breakdown.deterministic_match);
+    }
+
+    // JSON written before `evidence` existed still deserialises, with a
+    // default (non-match, zero-bit) evidence.
+    #[test]
+    fn old_json_without_evidence_deserialises() {
+        let json = r#"{"score":0.9,"is_match":true,"confidence":"Medium",
+            "breakdown":{"name_score":0.9,"condition_score":null,
+            "pathway_code_score":null,"care_setting_score":null,
+            "interventions_score":null,"keywords_score":null,
+            "deterministic_match":false}}"#;
+        let r: MatchResult = serde_json::from_str(json).unwrap_or_default();
+        assert!((r.score - 0.9).abs() < 1e-12);
+        assert_eq!(r.evidence, Evidence::default());
+        assert_eq!(r.evidence.strength, crate::MatchStrength::NonMatch);
     }
 
     // Pins the derived `Default` for `Confidence` (the `#[default]` variant).

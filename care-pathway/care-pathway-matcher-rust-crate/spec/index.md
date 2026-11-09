@@ -63,6 +63,10 @@ Input: CarePathway A, CarePathway B, MatchConfig
   └─ renormalised weighted average over present components
 ```
 
+Beside the score, every result carries `evidence` (§17.1): the
+Fellegi–Sunter weight of the same components, computed whether or not a
+short-circuit fired, plus any identifier contradictions.
+
 `relationships_score` (§13.1) and `tags_score` (§13.2) are implemented
 (§23): `MatchConfig`, `CarePathway`, and `MatchBreakdown` carry the
 corresponding fields.
@@ -150,6 +154,12 @@ invariant §24 documents and the `Confidence` banding built on it. Same
 shape as the sibling `organization-matcher` crate's identical
 `MatchConfig`.
 
+**Evidence bar.** `proof_bits` (default `30`, `#[serde(default)]`) is
+the evidence at or above which an uncontradicted pair is `Proven`
+(§17.1; [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+§4). It never changes `score` or `is_match`. `validated` rejects a
+`proof_bits` that is not finite and positive.
+
 ## 8. Normalisation
 
 `fold` (trim + NFKC + lowercase, diacritic-preserving); `pathway_code`
@@ -227,6 +237,50 @@ care-setting mismatch *penalise* rather than just not corroborate?
 Weighted average over `Some` components only; divisor is the sum of
 contributing weights.
 
+### 17.1 Evidence (`src/evidence.rs`)
+
+Implements the family contract
+[`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+verbatim. `MatchResult` gains `#[serde(default)] evidence: Evidence`
+(`weight_bits`, `fields_compared`, `contradictions`, `strength`), so
+JSON written before the field deserialises. `score`, `is_match`,
+`confidence` and `breakdown` are unchanged: a short-circuit still
+returns a breakdown with every component `None`, but the components are
+computed anyway and weighed into the evidence.
+
+Each present component adds `component_bits(s, m, u)`; a missing one
+adds `0` and is not counted. A deterministic rule (R-0, R-1 or R-2)
+adds `IDENTIFIER_BITS` ≈ 39.85 once. Per-component table:
+
+| Component | m | u | Where `u` comes from |
+|---|---|---|---|
+| name | 0.90 | 0.005 | short formulaic titles; ~1 in 200 coincide |
+| condition codes | 0.90 | 0.02 | several pathways per condition in a registry |
+| pathway code | 0.95 | 0.001 | **not summed**: agreement is R-1, disagreement a contradiction |
+| care setting | 0.90 | 0.25 | a handful of settings, acute dominant |
+| interventions | 0.80 | 0.10 | lists overlap across related conditions |
+| keywords | 0.80 | 0.10 | recurring specialty vocabulary |
+| relationships | 0.70 | 0.05 | a shared reference to one specific pathway is uncommon |
+| tags | 0.70 | 0.20 | small, reused operator vocabulary |
+
+**Contradictions.** For each of DOI, Wikidata, `GuidelineId`, URI and
+UUID, both records holding at least one non-empty folded value with
+disjoint sets records `identifier:<scheme lowercase>`
+(`identifier:guidelineid` for `GuidelineId`). The same non-empty
+provider with two non-empty, differing normalised pathway codes records
+`identifier:pathway_code`. Each adds `log2(0.01 / (1 − 1e-12))` ≈
+−6.64 bits. `same_as` URLs never contradict: a pathway legitimately
+points at several identity pages.
+
+**Strength**, in order: any contradiction ⇒ `Contradicted`;
+`weight_bits >= proof_bits` ⇒ `Proven`; `is_match` ⇒ `Consistent`;
+else `NonMatch`. Two identical name-only records score ≈ 7.49 bits
+(`Consistent`). The richest identical record with no identifier —
+name, conditions, setting, interventions, keywords, relationships and
+tags — reaches ≈ 26.45 bits, short of the default 30: two trusts can
+publish word-for-word the same pathway, so descriptive fields alone
+never prove one record; only an identifier does.
+
 ## 18. Confidence classification
 
 `High` ≥ 0.95, `Medium` ≥ 0.70, else `Low`. Separate from
@@ -249,7 +303,8 @@ Semantic versioning. Re-exports from `lib.rs` are the contract:
 `CarePathway`, `PathwayIdentifier`, `IdentifierScheme`, `ConditionCode`,
 `CodeSystem`, `CareSetting`, `RelationshipRef`, `RelationKind`,
 `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`,
-`Confidence`, `Error`, `Result`.
+`Confidence`, `Evidence`, `Contradiction`, `MatchStrength`, `Error`,
+`Result`.
 
 `Error`/`Result` are **reserved for future fallible APIs**: every
 current entry point (`match_care_pathways` and all component fns) is
@@ -280,6 +335,19 @@ add IO, async, or panics to library code.
       `tags_score` field on `MatchBreakdown`, and `tags_weight` (default
       `0.05`) on `MatchConfig`, with the weighted average renormalised
       over present components (§17). Done 2026-08-28.
+- [x] **Match evidence** (repo-wide, `agents/share/match-evidence.md`
+      rollout step 2). `src/evidence.rs` with `component_bits`,
+      `AGREE_AT`/`DISAGREE_AT`, `IDENTIFIER_BITS`, the §17.1 m/u table,
+      `Evidence`/`Contradiction`/`MatchStrength` (re-exported),
+      `MatchConfig::proof_bits` (default 30, validated), and
+      `#[serde(default)] evidence` on `MatchResult`. `score`,
+      `is_match`, `confidence` and every existing test unchanged. Tests
+      pin missing-adds-zero, identical sparse ⇒ `Consistent`, shared
+      identifier ⇒ `Proven`, conflicting guideline ids ⇒
+      `Contradicted`, the richest identifier-free record stopping short
+      of proof, negative bits on clear disagreement, old JSON
+      deserialising, and a proptest that `weight_bits` is finite and
+      the strength follows the contradictions. Done 2026-11-09.
 - [ ] Optional intervention-sequence (ordered) similarity.
 - [ ] Patient-group / age-band component.
 - [ ] Split this single `spec/index.md` into the numbered §-per-file

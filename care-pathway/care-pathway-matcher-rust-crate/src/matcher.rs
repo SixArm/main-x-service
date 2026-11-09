@@ -15,6 +15,7 @@ use strsim::jaro_winkler;
 
 use crate::care_pathway::{CarePathway, CodeSystem, ConditionCode, RelationKind, RelationshipRef};
 use crate::config::MatchConfig;
+use crate::evidence;
 use crate::normalize;
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
@@ -110,11 +111,28 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_care_pathways(&self, a: &CarePathway, b: &CarePathway) -> MatchResult {
-        // Phase 1 — deterministic short-circuit. A shared globally-unique
-        // identifier (or R-1/R-2 rule) is conclusive, so skip scoring
-        // entirely and pin to 1.0 / High. The breakdown's component
-        // scores stay `None` because no fuzzy work was done.
+        // Phase 1 — the probabilistic components. These are computed
+        // even when the short-circuit below fires, because the evidence
+        // (`agents/share/match-evidence.md` §3) weighs them; the returned
+        // score and breakdown are unchanged by that. A component yields
+        // `None` when one or both records lack the data, so it is dropped
+        // from (rather than penalising) the average. `name` is always
+        // present (records require a name), hence `Some`.
+        let components = component_breakdown(a, b);
+        let contradictions = evidence::contradictions(a, b, MAX_ARRAY_LEN);
+
+        // Phase 2 — deterministic short-circuit. A shared globally-unique
+        // identifier (or R-1/R-2 rule) is conclusive, so pin to 1.0 /
+        // High. The breakdown's component scores stay `None`, exactly as
+        // before evidence existed.
         if deterministic_match(a, b) {
+            let evidence = evidence::assess(
+                &components,
+                true,
+                contradictions,
+                true,
+                self.config.proof_bits,
+            );
             return MatchResult {
                 score: 1.0,
                 is_match: true,
@@ -123,58 +141,51 @@ impl MatchingEngine {
                     deterministic_match: true,
                     ..Default::default()
                 },
+                evidence,
             };
         }
 
-        // Phase 2 — probabilistic scoring. Compute each component; a
-        // component yields `None` when one or both records lack the data
-        // so it is dropped from (rather than penalising) the average.
-        // `name` is always present (records require a name), hence `Some`.
-        let name_score = Some(name_score(a, b));
-        // Condition codes are the defining attribute of a pathway; compare
-        // them as a set via Jaccard over `"system:code"` tokens.
-        let condition_score = set_jaccard(
-            &condition_tokens(capped(&a.condition_codes)),
-            &condition_tokens(capped(&b.condition_codes)),
-        );
-        let pathway_code_score = pathway_code_score(a, b);
-        let care_setting_score = care_setting_score(a, b);
-        let interventions_score = set_jaccard(capped(&a.interventions), capped(&b.interventions));
-        let keywords_score = set_jaccard(capped(&a.keywords), capped(&b.keywords));
-        let relationships_score =
-            relationships_score(capped(&a.relationships), capped(&b.relationships));
-        let tags_score = tags_score(capped(&a.tags), capped(&b.tags));
-
-        // Renormalised weighted average over the present components only.
+        // Phase 3 — renormalised weighted average over the present
+        // components only.
         let score = weighted_average(&[
-            (name_score, self.config.name_weight),
-            (condition_score, self.config.condition_weight),
-            (pathway_code_score, self.config.pathway_code_weight),
-            (care_setting_score, self.config.care_setting_weight),
-            (interventions_score, self.config.interventions_weight),
-            (keywords_score, self.config.keywords_weight),
-            (relationships_score, self.config.relationships_weight),
-            (tags_score, self.config.tags_weight),
+            (components.name_score, self.config.name_weight),
+            (components.condition_score, self.config.condition_weight),
+            (
+                components.pathway_code_score,
+                self.config.pathway_code_weight,
+            ),
+            (
+                components.care_setting_score,
+                self.config.care_setting_weight,
+            ),
+            (
+                components.interventions_score,
+                self.config.interventions_weight,
+            ),
+            (components.keywords_score, self.config.keywords_weight),
+            (
+                components.relationships_score,
+                self.config.relationships_weight,
+            ),
+            (components.tags_score, self.config.tags_weight),
         ]);
 
         // `is_match` is purely threshold-driven; the band in `confidence`
         // is computed independently from the same score.
         let is_match = score >= self.config.threshold;
+        let evidence = evidence::assess(
+            &components,
+            false,
+            contradictions,
+            is_match,
+            self.config.proof_bits,
+        );
         MatchResult {
             score,
             is_match,
             confidence: Confidence::classify(score),
-            breakdown: MatchBreakdown {
-                name_score,
-                condition_score,
-                pathway_code_score,
-                care_setting_score,
-                interventions_score,
-                keywords_score,
-                relationships_score,
-                tags_score,
-                deterministic_match: false,
-            },
+            breakdown: components,
+            evidence,
         }
     }
 
@@ -239,6 +250,30 @@ impl MatchingEngine {
             .into_iter()
             .filter(|(_, r)| r.is_match)
             .collect()
+    }
+}
+
+/// Every probabilistic component for one pair, with
+/// `deterministic_match: false`.
+fn component_breakdown(a: &CarePathway, b: &CarePathway) -> MatchBreakdown {
+    MatchBreakdown {
+        name_score: Some(name_score(a, b)),
+        // Condition codes are the defining attribute of a pathway; compare
+        // them as a set via Jaccard over `"system:code"` tokens.
+        condition_score: set_jaccard(
+            &condition_tokens(capped(&a.condition_codes)),
+            &condition_tokens(capped(&b.condition_codes)),
+        ),
+        pathway_code_score: pathway_code_score(a, b),
+        care_setting_score: care_setting_score(a, b),
+        interventions_score: set_jaccard(capped(&a.interventions), capped(&b.interventions)),
+        keywords_score: set_jaccard(capped(&a.keywords), capped(&b.keywords)),
+        relationships_score: relationships_score(
+            capped(&a.relationships),
+            capped(&b.relationships),
+        ),
+        tags_score: tags_score(capped(&a.tags), capped(&b.tags)),
+        deterministic_match: false,
     }
 }
 
@@ -555,6 +590,7 @@ fn tags_score(a: &[String], b: &[String]) -> Option<f64> {
 mod tests {
     use super::*;
     use crate::care_pathway::{CareSetting, IdentifierScheme, PathwayIdentifier};
+    use crate::evidence::{Contradiction, MatchStrength};
 
     /// Terse constructor for a [`PathwayIdentifier`] in tests.
     fn ident(scheme: IdentifierScheme, value: &str) -> PathwayIdentifier {
@@ -978,5 +1014,183 @@ mod tests {
             "a strong multi-component match should still clear the default 0.85 threshold, got {}",
             r.score
         );
+    }
+
+    // ─── Evidence (agents/share/match-evidence.md) ───────────────
+
+    /// A pathway carrying every non-identifier field this crate scores.
+    fn rich() -> CarePathway {
+        let mut p = CarePathway::new("Acute Stroke Care Pathway");
+        p.condition_codes = vec![cond(CodeSystem::Icd10, "I63")];
+        p.care_setting = Some(CareSetting::Inpatient);
+        p.interventions = vec!["thrombolysis".into(), "ct head".into()];
+        p.keywords = vec!["stroke".into(), "hyperacute".into()];
+        p.relationships = vec![RelationshipRef {
+            relation: RelationKind::FollowedBy,
+            pathway_id: "stroke-rehab".into(),
+        }];
+        p.tags = vec!["cardiovascular".into()];
+        p
+    }
+
+    // Two identical name-only records are `is_match` (score 1.0) but the
+    // evidence is one title's worth of bits: consistent, not proven.
+    #[test]
+    fn identical_sparse_records_are_consistent_not_proven() {
+        let engine = MatchingEngine::default_config();
+        let a = CarePathway::new("Acute Stroke Care Pathway");
+        let r = engine.match_care_pathways(&a, &a.clone());
+        assert!(r.is_match);
+        assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+        assert_eq!(r.evidence.fields_compared, 1);
+        let expected = evidence::component_bits(1.0, evidence::NAME.m, evidence::NAME.u);
+        assert!((r.evidence.weight_bits - expected).abs() < 1e-9);
+        assert!(r.evidence.contradictions.is_empty());
+    }
+
+    // A shared DOI is proof on its own; score and breakdown are exactly as
+    // before evidence existed (components `None`, deterministic flag set).
+    #[test]
+    fn shared_unique_identifier_is_proven() {
+        let engine = MatchingEngine::default_config();
+        let mut a = CarePathway::new("A");
+        let mut b = CarePathway::new("Totally Different");
+        a.identifiers
+            .push(ident(IdentifierScheme::Doi, "10.1/stroke"));
+        b.identifiers
+            .push(ident(IdentifierScheme::Doi, "10.1/STROKE"));
+        let r = engine.match_care_pathways(&a, &b);
+        assert!((r.score - 1.0).abs() < 1e-9);
+        assert!(r.breakdown.deterministic_match);
+        assert_eq!(r.breakdown.name_score, None);
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+        assert!(r.evidence.weight_bits >= engine.config().proof_bits);
+        // Name (a clear disagreement) plus the identifier, counted once.
+        assert_eq!(r.evidence.fields_compared, 2);
+    }
+
+    // Same-provider pathway code (R-1) is an identifier too.
+    #[test]
+    fn same_provider_pathway_code_is_proven() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich();
+        let mut b = rich();
+        a.provider_id = Some("trust-1".into());
+        b.provider_id = Some("trust-1".into());
+        a.pathway_code = Some("STROKE-01".into());
+        b.pathway_code = Some("stroke 01".into());
+        let r = engine.match_care_pathways(&a, &b);
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+    }
+
+    // Two different guideline ids on otherwise identical records: the
+    // score still says alike, the evidence says a person must look.
+    #[test]
+    fn conflicting_same_scheme_identifiers_are_contradicted() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich();
+        let mut b = rich();
+        a.identifiers
+            .push(ident(IdentifierScheme::GuidelineId, "NICE-NG128"));
+        b.identifiers
+            .push(ident(IdentifierScheme::GuidelineId, "NICE-NG236"));
+        let r = engine.match_care_pathways(&a, &b);
+        assert!(r.is_match);
+        assert_eq!(r.evidence.strength, MatchStrength::Contradicted);
+        assert_eq!(
+            r.evidence.contradictions,
+            vec![Contradiction {
+                field: "identifier:guidelineid".into()
+            }]
+        );
+        let without = engine.match_care_pathways(&rich(), &rich());
+        assert!(
+            (r.evidence.weight_bits
+                - (without.evidence.weight_bits + evidence::CONTRADICTION_BITS))
+                .abs()
+                < 1e-9
+        );
+    }
+
+    // A partner holding either of a record's two values under one scheme
+    // is not contradicted; blank values never contradict.
+    #[test]
+    fn overlapping_or_blank_identifier_sets_do_not_contradict() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich();
+        let mut b = rich();
+        a.identifiers.push(ident(IdentifierScheme::Uri, "urn:old"));
+        a.identifiers.push(ident(IdentifierScheme::Uri, "urn:new"));
+        b.identifiers.push(ident(IdentifierScheme::Uri, "urn:new"));
+        a.identifiers.push(ident(IdentifierScheme::Uuid, "   "));
+        b.identifiers.push(ident(IdentifierScheme::Uuid, "abc"));
+        let r = engine.match_care_pathways(&a, &b);
+        assert!(r.evidence.contradictions.is_empty());
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+    }
+
+    // Same provider, different non-empty codes: contradicted, and the
+    // pathway_code component is not counted a second time.
+    #[test]
+    fn same_provider_different_pathway_codes_are_contradicted() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich();
+        let mut b = rich();
+        a.provider_id = Some("trust-1".into());
+        b.provider_id = Some("trust-1".into());
+        a.pathway_code = Some("STROKE-01".into());
+        b.pathway_code = Some("STROKE-02".into());
+        let r = engine.match_care_pathways(&a, &b);
+        assert_eq!(r.evidence.strength, MatchStrength::Contradicted);
+        assert_eq!(
+            r.evidence.contradictions[0].field,
+            "identifier:pathway_code"
+        );
+        // Different providers: no contradiction (codes are provider-scoped).
+        b.provider_id = Some("trust-2".into());
+        let r = engine.match_care_pathways(&a, &b);
+        assert!(r.evidence.contradictions.is_empty());
+    }
+
+    // The richest identical record with no identifier stops short of
+    // proof: name, conditions, setting, interventions, keywords,
+    // relationships and tags sum to about 26.5 bits under the default
+    // table, below the 30-bit bar. That is intended: two trusts can
+    // publish word-for-word the same stroke pathway, so a pathway
+    // template's descriptive fields never prove one record; only an
+    // identifier does.
+    #[test]
+    fn richest_identical_record_without_identifier_cannot_be_proven() {
+        let engine = MatchingEngine::default_config();
+        let r = engine.match_care_pathways(&rich(), &rich());
+        assert!(r.is_match);
+        assert_eq!(r.evidence.fields_compared, 7);
+        assert!(
+            r.evidence.weight_bits > 26.0 && r.evidence.weight_bits < 27.0,
+            "got {}",
+            r.evidence.weight_bits
+        );
+        assert!(r.evidence.weight_bits < engine.config().proof_bits);
+        assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+    }
+
+    // A clear disagreement on every compared field gives negative bits.
+    #[test]
+    fn clear_disagreement_gives_negative_bits() {
+        let engine = MatchingEngine::default_config();
+        let mut a = CarePathway::new("Acute Stroke Care Pathway");
+        let mut b = CarePathway::new("Type 2 Diabetes Management");
+        a.condition_codes = vec![cond(CodeSystem::Icd10, "I63")];
+        b.condition_codes = vec![cond(CodeSystem::Icd10, "E11")];
+        a.care_setting = Some(CareSetting::Inpatient);
+        b.care_setting = Some(CareSetting::PrimaryCare);
+        let r = engine.match_care_pathways(&a, &b);
+        assert!(!r.is_match);
+        assert!(
+            r.evidence.weight_bits < 0.0,
+            "got {}",
+            r.evidence.weight_bits
+        );
+        assert_eq!(r.evidence.strength, MatchStrength::NonMatch);
     }
 }

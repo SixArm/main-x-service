@@ -12,7 +12,8 @@
 
 use care_pathway_matcher::{
     CarePathway, CodeSystem, ConditionCode, IdentifierScheme, MAX_ARRAY_LEN, MatchConfig,
-    MatchingEngine, PathwayIdentifier, RelationKind, RelationshipRef, normalize, phonetic,
+    MatchStrength, MatchingEngine, PathwayIdentifier, RelationKind, RelationshipRef, normalize,
+    phonetic,
 };
 use proptest::prelude::*;
 
@@ -120,6 +121,7 @@ fn config_from(values: &[f64]) -> MatchConfig {
         keywords_weight: values[5],
         relationships_weight: values[6],
         tags_weight: values[7],
+        ..MatchConfig::default()
     }
 }
 
@@ -166,6 +168,31 @@ proptest! {
         );
         prop_assert_eq!(forward.is_match, reverse.is_match);
         prop_assert_eq!(forward.confidence, reverse.confidence);
+    }
+
+    /// Evidence (match-evidence.md): `weight_bits` is always finite, and
+    /// the strength is `Contradicted` exactly when a contradiction was
+    /// recorded; otherwise it follows the bar and `is_match`.
+    #[test]
+    fn evidence_is_finite_and_strength_follows_contradictions(
+        a in pathway(), b in pathway(),
+    ) {
+        let engine = MatchingEngine::default_config();
+        let r = engine.match_care_pathways(&a, &b);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "weight_bits not finite: {}", e.weight_bits);
+        let expected = if !e.contradictions.is_empty() {
+            MatchStrength::Contradicted
+        } else if e.weight_bits >= engine.config().proof_bits {
+            MatchStrength::Proven
+        } else if r.is_match {
+            MatchStrength::Consistent
+        } else {
+            MatchStrength::NonMatch
+        };
+        prop_assert_eq!(e.strength, expected);
+        let reverse = engine.match_care_pathways(&b, &a);
+        prop_assert_eq!(&reverse.evidence.contradictions, &e.contradictions);
     }
 
     /// An identical clone of a well-formed pathway MUST match itself. We

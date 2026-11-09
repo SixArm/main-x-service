@@ -10,6 +10,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — match evidence beside the score
+
+- `src/evidence.rs` implements `agents/share/match-evidence.md`: every
+  `MatchResult` now carries `evidence` (`weight_bits`,
+  `fields_compared`, `contradictions`, `strength`), a Fellegi–Sunter
+  log-likelihood weight that tells a pair the data is *consistent* with
+  from one it *proves*. A missing component adds `0`; a deterministic
+  rule adds ~39.85 bits once; two different values under one
+  deterministic scheme, or two different pathway codes under one
+  provider, are a `Contradiction`. `MatchStrength` is `Contradicted`,
+  `Proven`, `Consistent` or `NonMatch`.
+- `MatchConfig::proof_bits` (default `30`, serde-defaulted, checked by
+  `validated`). `Evidence`, `Contradiction` and `MatchStrength` are
+  re-exported from the crate root.
+- `score`, `is_match`, `confidence` and the breakdown are unchanged,
+  and `evidence` is `#[serde(default)]`, so older JSON still
+  deserialises. Identical name-only records are `Consistent` (~7.5
+  bits); the richest identifier-free identical record reaches ~26.5
+  bits, short of proof by design.
+
 ### Changed
 
 - The CPM-T3 cap is now proved without a stopwatch (repo `tasks.md`
