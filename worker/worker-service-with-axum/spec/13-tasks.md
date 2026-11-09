@@ -863,3 +863,21 @@ clearly described manual check confirms the acceptance criterion.
       far-future `updated_at` in ascending id order and reads `limit=5`;
       it read the wrong rows before.
   - Unit tests 374, DB suite 55 (was 52).
+
+- [x] **T-21 — Duplicate detection on create missed what it should
+  catch.** *(Found and done 2026-11-09, by the same audit as event's
+  T-20 to T-22.)* Three defects, each with a test that failed first:
+  - `search_by_name_and_year` and `fuzzy_search` built one fuzzy term
+    from the whole family name, which the tokenized field never holds,
+    so a family name of more than one word ("van der Berg") found no
+    candidate. They now match word by word, two edits for words over
+    five characters, one up to five, none up to two.
+  - The index reader reloads on commit only after a delay, so the next
+    request's duplicate check did not see a worker created a moment
+    before. `index_worker`, `index_workers` and `delete_worker` now
+    reload it.
+  - `POST /api/workers/deduplicate` filtered through `find_matches`,
+    which drops anything under the configured threshold first, so the
+    request's `threshold` (documented default `0.7`) could only raise
+    the cutoff. It now scores each pair and filters on the request's
+    threshold (`tests/batch_threshold.rs`).

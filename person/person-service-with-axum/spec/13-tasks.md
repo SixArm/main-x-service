@@ -1334,3 +1334,12 @@ PR; split larger tasks (`T-12a`, `T-12b`).
       in `tests/grpc_integration_test.rs` gets the same fix.
       `MAX_LIST_LIMIT` is unchanged.
       - Unit tests 415, DB suite 82 (was 80).
+
+- [x] **T-38 — The batch scan ignored a threshold below the
+  matcher's.** *(Found and done 2026-11-09, by the same audit as event's
+  T-22.)* `POST /api/persons/deduplicate` filtered through
+  `find_matches`, which drops anything under the configured threshold
+  first, so the request's `threshold` (documented default `0.7`) could
+  only raise the cutoff. It now scores each pair and filters on the
+  request's threshold. `tests/batch_threshold.rs` fails on the old
+  handler.

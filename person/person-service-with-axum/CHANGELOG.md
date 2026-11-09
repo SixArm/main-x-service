@@ -10,6 +10,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- `POST /api/persons/deduplicate` honours a `threshold` below the
+  configured one; a lower request threshold used to change nothing
+  (T-38).
 - The outbox relay's ack stamps `published_at` from this process's clock,
   the clock `purge_published` builds its retention cutoff on. It took
   Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged

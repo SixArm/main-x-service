@@ -128,6 +128,11 @@ impl SearchEngine {
             .commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit: {e}")))?;
 
+        // Read-your-writes: the reader reloads on commit only after a
+        // delay, so without this the next request's duplicate check did
+        // not see a worker created a moment before.
+        self.index.reload()?;
+
         Ok(())
     }
 
@@ -188,6 +193,11 @@ impl SearchEngine {
         writer
             .commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit: {e}")))?;
+
+        // Read-your-writes: the reader reloads on commit only after a
+        // delay, so without this the next request's duplicate check did
+        // not see a worker created a moment before.
+        self.index.reload()?;
 
         Ok(())
     }
@@ -259,12 +269,13 @@ impl SearchEngine {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
 
-        // Edit distance 2, prefix-enabled, against the family-name field.
-        let term = Term::from_field_text(schema.family_name, query_str);
-        let fuzzy_query = FuzzyTermQuery::new(term, 2, true);
+        let fuzzy_query = self.fuzzy_family_query(query_str)?;
 
         let top_docs = searcher
-            .search(&fuzzy_query, &TopDocs::with_limit(limit).order_by_score())
+            .search(
+                fuzzy_query.as_ref(),
+                &TopDocs::with_limit(limit).order_by_score(),
+            )
             .map_err(|e| crate::Error::Search(format!("Fuzzy search failed: {e}")))?;
 
         // Resolve each hit's stored `id` field into a worker-ID string.
@@ -282,6 +293,40 @@ impl SearchEngine {
         }
 
         Ok(worker_ids)
+    }
+
+    /// A query matching workers whose family name shares at least one word
+    /// with `text`, each word within an edit distance that grows with its
+    /// length, ranked by how many words match.
+    ///
+    /// `text` is split with the field's own tokenizer, so it is compared
+    /// word for word with what was indexed. Comparing the whole string as
+    /// one term, as this did, never matched a family name of more than one
+    /// word. Words of up to two characters must match exactly and words of
+    /// up to five may differ by one edit.
+    fn fuzzy_family_query(&self, text: &str) -> Result<Box<dyn Query>> {
+        let schema = self.index.schema();
+        let mut tokenizer = self
+            .index
+            .index()
+            .tokenizer_for_field(schema.family_name)
+            .map_err(|e| crate::Error::Search(format!("family-name tokenizer: {e}")))?;
+        let mut stream = tokenizer.token_stream(text);
+        let mut clauses: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+        while stream.advance() {
+            let word = &stream.token().text;
+            let distance = match word.chars().count() {
+                0..=2 => 0,
+                3..=5 => 1,
+                _ => 2,
+            };
+            let term = Term::from_field_text(schema.family_name, word);
+            clauses.push((
+                Occur::Should,
+                Box::new(FuzzyTermQuery::new(term, distance, true)),
+            ));
+        }
+        Ok(Box::new(BooleanQuery::new(clauses)))
     }
 
     /// Blocking query for the matching layer: finds candidate workers by a
@@ -307,9 +352,8 @@ impl SearchEngine {
         let searcher = self.index.reader().searcher();
         let schema = self.index.schema();
 
-        // Required clause: fuzzy family-name match (edit distance 2).
-        let name_term = Term::from_field_text(schema.family_name, family_name);
-        let name_query: Box<dyn Query> = Box::new(FuzzyTermQuery::new(name_term, 2, true));
+        // Required clause: fuzzy family-name match, word by word.
+        let name_query = self.fuzzy_family_query(family_name)?;
 
         // When a birth year is given, OR it in as a `Should` clause so it
         // boosts ranking but does not filter out name-only matches.
@@ -374,6 +418,11 @@ impl SearchEngine {
         writer
             .commit()
             .map_err(|e| crate::Error::Search(format!("Failed to commit deletion: {e}")))?;
+
+        // Read-your-writes: the reader reloads on commit only after a
+        // delay, so without this the next request's duplicate check did
+        // not see a worker created a moment before.
+        self.index.reload()?;
 
         Ok(())
     }
@@ -453,6 +502,42 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
+    }
+
+    /// Blocking finds a worker by a family name of more than one word, and
+    /// by that name with a typo. It searched the whole name as one term,
+    /// which the tokenized field never holds, so "van der Berg" found
+    /// nothing and the duplicate check on create never fired for it.
+    #[test]
+    fn name_blocking_finds_a_multi_word_family_name() {
+        let tmp = TempDir::new().unwrap();
+        let engine = SearchEngine::new(tmp.path()).unwrap();
+        let worker = create_test_worker("van der Berg", "Anna", None);
+        engine.index_worker(&worker).unwrap();
+        for probe in ["van der Berg", "Van Der Berg", "van der Bergh"] {
+            let ids = engine.search_by_name_and_year(probe, None, 10).unwrap();
+            assert_eq!(ids, vec![worker.id.to_string()], "{probe}");
+        }
+        assert_eq!(
+            engine.fuzzy_search("Garcia Lopez", 10).unwrap(),
+            Vec::<String>::new()
+        );
+    }
+
+    /// A worker indexed a moment ago is visible to the next search with no
+    /// explicit reload: the duplicate check on create depends on it.
+    #[test]
+    fn a_write_is_visible_to_the_next_search_without_a_reload() {
+        let tmp = TempDir::new().unwrap();
+        let engine = SearchEngine::new(tmp.path()).unwrap();
+        let worker = create_test_worker("Okonkwo", "Chidi", None);
+        engine.index_worker(&worker).unwrap();
+        assert_eq!(
+            engine.search_by_name_and_year("Okonkwo", None, 10).unwrap(),
+            vec![worker.id.to_string()]
+        );
+        engine.delete_worker(&worker.id.to_string()).unwrap();
+        assert!(engine.fuzzy_search("Okonkwo", 10).unwrap().is_empty());
     }
 
     /// Indexing then searching a family name returns that worker's ID.

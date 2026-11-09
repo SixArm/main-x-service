@@ -10,6 +10,10 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- The duplicate check on create finds a family name of more than one
+  word, and a worker created a moment before. `POST
+  /api/workers/deduplicate` honours a `threshold` below the configured
+  one (T-21).
 - Two concurrent merges can no longer both apply. `merge` locks both
   records and checks they are still active before writing; the loser
   answers `409` `merge_conflict` and changes nothing (repo `tasks.md`
