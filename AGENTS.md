@@ -219,6 +219,20 @@ scripts/ci-check.sh clippy                       # every crate
 scripts/ci-check.sh test-db care-pathway/care-pathway-service-with-axum
 ```
 
+### Before pushing
+
+A local **fast** pass is expected before every push: `make ci`
+(`scripts/ci-local.sh fast`) runs `fmt`, `docs`, `clippy` and `test` on
+the crates the change touches, plus `check`, `vitest` and `lint` on the
+front-ends it touches. `make ci-full` adds `deny`, `msrv`, `bench`,
+`test-db` and the front-end builds and enrolled Playwright suites. A
+stage that cannot run says `SKIPPED`, and the run is not then a full
+pass. `make hooks` opts a clone in to a pre-push hook that runs the
+fast tier under `CI_LOCAL_BUDGET` (default 600 s) and refuses the push
+when it fails or runs out of time; `git push --no-verify` skips it.
+Hosted CI still runs on every push. See
+[`spec/local-ci`](spec/local-ci/index.md).
+
 ### The local test database
 
 `test-db` needs a Postgres, so **every service crate carries a

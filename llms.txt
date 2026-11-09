@@ -123,6 +123,7 @@ GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
 
 - [.github/workflows/ci.yml](.github/workflows/ci.yml) and [.woodpecker.yml](.woodpecker.yml): the CI pipelines (fmt, clippy, test, test-db, deny, evidence, fuzz, msrv, bench)
 - [scripts/ci-check.sh](scripts/ci-check.sh): run any CI stage locally, exactly as CI runs it
+- [spec/local-ci](spec/local-ci/index.md): the local gate (`scripts/ci-local.sh fast|full`) and the opt-in pre-push hook (`scripts/install-hooks.sh`)
 - [ci/msrv.txt](ci/msrv.txt): the declared Minimum Supported Rust Version (current stable minus two)
 - [ci/db-suites.txt](ci/db-suites.txt): the allowlist of crates whose `--ignored` Postgres suite runs in CI
 - [SECURITY.md](SECURITY.md): how to report a vulnerability

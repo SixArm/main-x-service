@@ -386,7 +386,11 @@ tree. `scripts/ci-crates.sh` discovers all ~55 crates and feeds them to
 `docs`, `clippy`, `test`, `test-db`, `deny`, `evidence`, `fuzz`, `msrv`,
 `bench`. See the root [`AGENTS.md`](../../AGENTS.md) "Continuous
 integration" section for the full stage table and how to run any stage
-locally (`scripts/ci-check.sh <stage> [crate]`).
+locally (`scripts/ci-check.sh <stage> [crate]`). To run a whole tier
+of those stages on this machine before pushing — change-aware, with a
+skipped stage reported rather than passed — use `scripts/ci-local.sh
+fast|full` (`make ci` / `make ci-full`) and the opt-in pre-push hook;
+see [`spec/local-ci`](../local-ci/index.md).
 
 **`ci/db-suites.txt` is an allowlist, not a denylist.** The `test-db`
 stage (`cargo test -- --ignored`, i.e. the DB-gated suites §2 above

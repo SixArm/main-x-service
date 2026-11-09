@@ -14,13 +14,16 @@ issue reports, and feedback are welcome.
   `cargo clippy --all-targets -- -D warnings`, and `cargo test` must
   pass on every crate you touched (front-ends: `pnpm check` +
   `pnpm test`). Run any CI stage locally exactly as CI does:
-  `scripts/ci-check.sh <stage> [crate]`.
+  `scripts/ci-check.sh <stage> [crate]`, or the whole fast tier with
+  `make ci` (`scripts/ci-local.sh`; see
+  [spec/local-ci](spec/local-ci/index.md)). `make hooks` installs an
+  opt-in pre-push hook that runs it for you.
 - **Branch per change.** Branch from `main`, merge back with
   `--no-ff`; never commit directly to `main`.
 - **Constraints that are not up for debate** (see
   [agents/share/rust-axum-stack.md](agents/share/rust-axum-stack.md)):
   Podman not Docker, Tokio not async_std, PostgreSQL not SQLite,
-  PASETO cookie-session auth not JWT sessions, MSRV = stable N-3.
+  PASETO cookie-session auth not JWT sessions, MSRV = stable N-2.
 - **No real personal data, ever** — fixtures and examples are
   synthetic.
 

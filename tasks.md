@@ -8520,10 +8520,16 @@ then protect.
   the property asserts that no short-circuit fires and that the result
   equals the truncated records' result. It fails at `n = 257` with
   `capped` made a no-op. The timing test is kept, `#[ignore]`d.
-- [ ] **LCI-10 (S)** Docs: link `spec/local-ci` from `spec/testing`,
+- [x] **LCI-10 (S)** Docs: link `spec/local-ci` from `spec/testing`,
   `CONTRIBUTING.md`, `AGENTS.md` (Continuous integration section) and
   `llms.txt`/`llms.json`; state in AGENTS.md that a local `fast` pass is
   expected before pushing. Depends: LCI-1, LCI-2.
+  **Done 2026-11-09.** Linked from `spec/testing` §6.1, `CONTRIBUTING.md`
+  (green-gate rule, which also had a stale "MSRV = stable N-3"), a new
+  AGENTS.md "Before pushing" subsection stating the expectation, and
+  `llms.txt` / `llms.json`. `llms.json` still called the services
+  loco.rs in four places, where `llms.txt` already said axa; fixed.
+  Both stay under 40 KB (12,140 and 17,892 bytes).
 
 Suggested order: LCI-1 → LCI-2 → LCI-9 → LCI-3 → LCI-6 → LCI-5 → LCI-4 →
 LCI-8 → LCI-10 → LCI-7. The first three are what would have caught this
