@@ -38,7 +38,7 @@
 //! assert!(result.is_match);
 //! ```
 
-use crate::evidence::{Evidence, evidence_from_breakdown};
+use crate::evidence::{Evidence, NoFrequencies, ValueFrequencies, evidence_for};
 use crate::identifiers;
 use crate::models::{Address, PassportBook, Person, RelationKind, RelationshipRef};
 use crate::nicknames::NicknameTable;
@@ -898,6 +898,39 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_persons(&self, person1: &Person, person2: &Person) -> MatchResult {
+        self.match_persons_with_frequencies(person1, person2, &NoFrequencies)
+    }
+
+    /// [`Self::match_persons`], with the evidence's agreement weights for
+    /// [`crate::evidence::FREQUENCY_COMPONENTS`] taken from `frequencies`
+    /// where both records hold the same value
+    /// (`agents/share/match-evidence.md` §7, spec §12.7).
+    ///
+    /// Only [`MatchResult::evidence`] depends on `frequencies`; `score`,
+    /// `is_match`, `confidence` and the breakdown are identical to
+    /// [`Self::match_persons`].
+    ///
+    /// ```
+    /// use person_matcher::{FrequencyTable, MatchingEngine, Person};
+    /// use person_matcher::evidence::frequency_key;
+    ///
+    /// let p = Person::builder().given_name("John").family_name("Smith").build();
+    /// let mut freqs = FrequencyTable::new();
+    /// freqs.insert("family_name", frequency_key("family_name", "Smith").unwrap(), 0.01);
+    ///
+    /// let engine = MatchingEngine::default_config();
+    /// let plain = engine.match_persons(&p, &p);
+    /// let adjusted = engine.match_persons_with_frequencies(&p, &p, &freqs);
+    /// assert!(adjusted.evidence.weight_bits < plain.evidence.weight_bits);
+    /// assert!((adjusted.score - plain.score).abs() < f64::EPSILON);
+    /// ```
+    #[must_use]
+    pub fn match_persons_with_frequencies(
+        &self,
+        person1: &Person,
+        person2: &Person,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         let breakdown = self.calculate_breakdown(person1, person2);
         let score = self.calculate_weighted_score(&breakdown);
         let above_threshold = score >= self.config.match_threshold;
@@ -912,7 +945,14 @@ impl MatchingEngine {
             above_threshold
         };
         let confidence = Confidence::from_score(score);
-        let evidence = evidence_from_breakdown(&breakdown, is_match, self.config.proof_bits);
+        let evidence = evidence_for(
+            &breakdown,
+            person1,
+            person2,
+            frequencies,
+            is_match,
+            self.config.proof_bits,
+        );
 
         MatchResult {
             score,
@@ -3871,8 +3911,9 @@ mod tests {
         assert!(r.is_match);
         assert_eq!(r.evidence.strength, MatchStrength::Consistent);
         assert!(r.evidence.contradictions.is_empty());
-        // given + family + DOB + gender + phonetic bonus.
-        assert_eq!(r.evidence.fields_compared, 5);
+        // given + family + DOB + gender. The phonetic bonus is derived from
+        // the names and is left out of the evidence (match-evidence.md §6).
+        assert_eq!(r.evidence.fields_compared, 4);
         assert!(
             r.evidence.weight_bits > 25.0 && r.evidence.weight_bits < 30.0,
             "got {}",
@@ -4046,5 +4087,296 @@ mod tests {
         v.as_object_mut().unwrap().remove("proof_bits");
         let back: MatchConfig = serde_json::from_value(v).unwrap();
         assert!((back.proof_bits - 30.0).abs() < 1e-12);
+    }
+
+    // ── Evidence phase 2: correlated groups, frequencies, terms ──
+
+    use crate::evidence::{FrequencyTable, NoFrequencies, frequency_key};
+
+    fn term(e: &Evidence, component: &str) -> crate::ComponentBits {
+        e.components
+            .iter()
+            .find(|c| c.component == component)
+            .unwrap_or_else(|| panic!("no term {component}"))
+            .clone()
+    }
+
+    fn household_address() -> Address {
+        Address::new()
+            .with_line1("7 Ffordd y Parc")
+            .with_city("Swansea")
+            .with_postcode("SA2 8PP")
+    }
+
+    #[test]
+    fn evidence_household_sharing_address_and_phone_is_not_proven() {
+        // Two different people in one house: only the address and the
+        // landline agree, and they agree for one reason.
+        let a = Person::builder()
+            .given_name("Ceri")
+            .address(household_address())
+            .phone("01792 000111")
+            .build();
+        let b = Person::builder()
+            .given_name("Gethin")
+            .address(household_address())
+            .phone("01792 000111")
+            .build();
+        let e = MatchingEngine::default_config()
+            .match_persons(&a, &b)
+            .evidence;
+        assert_ne!(e.strength, MatchStrength::Proven);
+        let (addr, phone) = (term(&e, "address"), term(&e, "phone"));
+        assert!(!addr.correlated, "address is the strongest member");
+        assert!(phone.correlated, "phone is discounted");
+        // Same two agreements, alone, without the group discount.
+        let alone = crate::evidence::component_bits(1.0, 0.70, 1e-4)
+            + crate::evidence::component_bits(1.0, 0.60, 1e-3);
+        assert!(addr.bits + phone.bits < alone);
+        // And address + phone alone, with no disagreeing given name.
+        let a2 = Person::builder()
+            .address(household_address())
+            .phone("01792 000111")
+            .build();
+        let e2 = MatchingEngine::default_config()
+            .match_persons(&a2, &a2)
+            .evidence;
+        assert_ne!(e2.strength, MatchStrength::Proven);
+        assert!(e2.weight_bits < alone);
+    }
+
+    #[test]
+    fn evidence_uncorrelated_fields_still_sum() {
+        // given_name and date_of_birth are in no group.
+        let p = Person::builder()
+            .given_name("Ceri")
+            .date_of_birth(dob(1990, 6, 1))
+            .build();
+        let e = MatchingEngine::default_config()
+            .match_persons(&p, &p)
+            .evidence;
+        let expected = crate::evidence::component_bits(1.0, 0.95, 0.01)
+            + crate::evidence::component_bits(1.0, 0.97, 1e-4);
+        assert!((e.weight_bits - expected).abs() < 1e-9);
+        assert!(e.components.iter().all(|c| !c.correlated));
+    }
+
+    #[test]
+    fn evidence_correlated_disagreements_are_discounted() {
+        // A move: address and landline both disagree, for one reason.
+        let a = Person::builder()
+            .address(household_address())
+            .phone("01792 000111")
+            .build();
+        let b = Person::builder()
+            .address(
+                Address::new()
+                    .with_line1("90 Long Lane")
+                    .with_city("Leeds")
+                    .with_postcode("LS1 4ZZ"),
+            )
+            .phone("0113 999 8888")
+            .build();
+        let e = MatchingEngine::default_config()
+            .match_persons(&a, &b)
+            .evidence;
+        let undiscounted = crate::evidence::component_bits(0.0, 0.70, 1e-4)
+            + crate::evidence::component_bits(0.0, 0.60, 1e-3);
+        assert!(e.weight_bits < 0.0);
+        assert!(
+            e.weight_bits > undiscounted,
+            "{} vs {undiscounted}",
+            e.weight_bits
+        );
+        assert_eq!(e.components.iter().filter(|c| c.correlated).count(), 1);
+    }
+
+    #[test]
+    fn evidence_components_sum_to_weight_bits_including_identifier_terms() {
+        let a = Person {
+            us_ssn: Some("123-45-6789".into()),
+            passport_books: vec![PassportBook::new("GB", "123456789").unwrap()],
+            ..sparse_person()
+        };
+        let b = Person {
+            us_ssn: Some("234-56-7890".into()),
+            ..a.clone()
+        };
+        let e = MatchingEngine::default_config()
+            .match_persons(&a, &b)
+            .evidence;
+        let sum: f64 = e.components.iter().map(|c| c.bits).sum();
+        assert!((sum - e.weight_bits).abs() < f64::EPSILON);
+        assert!((term(&e, "identifier").bits - crate::evidence::IDENTIFIER_BITS).abs() < 1e-12);
+        assert!(
+            (term(&e, "contradiction:identifier:us_ssn").bits
+                - crate::evidence::CONTRADICTION_BITS)
+                .abs()
+                < 1e-12
+        );
+    }
+
+    fn family_name_table(share: f64) -> FrequencyTable {
+        let mut t = FrequencyTable::new();
+        t.insert(
+            "family_name",
+            frequency_key("family_name", "Tregarthen").unwrap(),
+            share,
+        );
+        t
+    }
+
+    #[test]
+    fn evidence_common_family_name_proves_less_and_rare_more() {
+        let p = sparse_person();
+        let engine = MatchingEngine::default_config();
+        let default = term(&engine.match_persons(&p, &p).evidence, "family_name");
+        let common = term(
+            &engine
+                .match_persons_with_frequencies(&p, &p, &family_name_table(0.01))
+                .evidence,
+            "family_name",
+        );
+        let rare = term(
+            &engine
+                .match_persons_with_frequencies(&p, &p, &family_name_table(1e-6))
+                .evidence,
+            "family_name",
+        );
+        assert!(!default.frequency_adjusted);
+        assert!(common.frequency_adjusted && rare.frequency_adjusted);
+        assert!(
+            common.bits < default.bits,
+            "{} vs {}",
+            common.bits,
+            default.bits
+        );
+        assert!(
+            rare.bits > default.bits,
+            "{} vs {}",
+            rare.bits,
+            default.bits
+        );
+    }
+
+    #[test]
+    fn evidence_share_at_or_above_m_gives_zero_not_negative() {
+        let p = sparse_person();
+        for share in [0.92, 0.95, 1.0] {
+            let e = MatchingEngine::default_config()
+                .match_persons_with_frequencies(&p, &p, &family_name_table(share))
+                .evidence;
+            let t = term(&e, "family_name");
+            assert!(t.frequency_adjusted);
+            assert!(t.bits.abs() < 1e-12, "share {share}: {}", t.bits);
+        }
+    }
+
+    #[test]
+    fn evidence_placeholder_birth_date_with_high_share_proves_almost_nothing() {
+        let a = Person::builder()
+            .given_name("Unknown")
+            .date_of_birth(dob(1900, 1, 1))
+            .build();
+        let mut t = FrequencyTable::new();
+        t.insert(
+            "date_of_birth",
+            frequency_key("date_of_birth", "1900-01-01").unwrap(),
+            0.5,
+        );
+        let e = MatchingEngine::default_config()
+            .match_persons_with_frequencies(&a, &a, &t)
+            .evidence;
+        let d = term(&e, "date_of_birth");
+        assert!(d.frequency_adjusted);
+        assert!(d.bits > 0.0 && d.bits < 1.0, "got {}", d.bits);
+        let plain = term(
+            &MatchingEngine::default_config()
+                .match_persons(&a, &a)
+                .evidence,
+            "date_of_birth",
+        );
+        assert!(plain.bits > 13.0, "the table's u would give {}", plain.bits);
+    }
+
+    #[test]
+    fn evidence_no_frequency_adjustment_on_partial_agreement_or_disagreement() {
+        let mut t = FrequencyTable::new();
+        for name in ["Tregarthen", "Tregarthan", "Okonkwo"] {
+            t.insert(
+                "family_name",
+                frequency_key("family_name", name).unwrap(),
+                1e-6,
+            );
+        }
+        let engine = MatchingEngine::default_config();
+        let base = sparse_person();
+        for other in ["Tregarthan", "Okonkwo"] {
+            let b = Person {
+                family_name: Some(other.into()),
+                ..sparse_person()
+            };
+            let plain = term(&engine.match_persons(&base, &b).evidence, "family_name");
+            let adj = term(
+                &engine
+                    .match_persons_with_frequencies(&base, &b, &t)
+                    .evidence,
+                "family_name",
+            );
+            assert!(!adj.frequency_adjusted, "{other}");
+            assert!((adj.bits - plain.bits).abs() < 1e-12, "{other}");
+        }
+    }
+
+    #[test]
+    fn evidence_no_frequencies_equals_match_persons() {
+        let engine = MatchingEngine::default_config();
+        let a = sparse_person();
+        let b = Person {
+            address: Some(household_address()),
+            ..sparse_person()
+        };
+        let plain = engine.match_persons(&a, &b);
+        let none = engine.match_persons_with_frequencies(&a, &b, &NoFrequencies);
+        assert_eq!(plain.evidence, none.evidence);
+        assert!((plain.score - none.score).abs() < f64::EPSILON);
+        assert_eq!(plain.is_match, none.is_match);
+        assert_eq!(plain.confidence, none.confidence);
+        // A frequency table changes only the evidence.
+        let adj = engine.match_persons_with_frequencies(&a, &b, &family_name_table(0.01));
+        assert!((plain.score - adj.score).abs() < f64::EPSILON);
+        assert_eq!(plain.is_match, adj.is_match);
+        assert_eq!(plain.confidence, adj.confidence);
+        assert_ne!(plain.evidence, adj.evidence);
+    }
+
+    #[test]
+    fn evidence_name_dob_gender_and_blood_type_at_defaults() {
+        // Pinned: name + DOB + gender is 28.31 bits (Consistent). An
+        // identical blood type adds log2(0.99 / 0.25) = 1.99 bits, which
+        // lifts the tuple to 30.29 — just over the default 30-bit bar, so
+        // it is Proven. That follows from the table: twins share family
+        // name, DOB and often blood type but not a given name, and the
+        // remaining risk, a common name, is what frequency adjustment
+        // (match_persons_with_frequencies) exists to catch. A deployment
+        // that wants this tuple to stay short of proof raises proof_bits.
+        let p = Person {
+            blood_type: Some(crate::BloodType::OPositive),
+            ..sparse_person()
+        };
+        let e = MatchingEngine::default_config()
+            .match_persons(&p, &p)
+            .evidence;
+        assert!(
+            (e.weight_bits - 30.29).abs() < 0.01,
+            "got {}",
+            e.weight_bits
+        );
+        assert_eq!(e.strength, MatchStrength::Proven);
+        // With a common family name counted, the same tuple falls short.
+        let e = MatchingEngine::default_config()
+            .match_persons_with_frequencies(&p, &p, &family_name_table(0.01))
+            .evidence;
+        assert_eq!(e.strength, MatchStrength::Consistent);
     }
 }

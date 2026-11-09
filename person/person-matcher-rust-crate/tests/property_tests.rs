@@ -12,8 +12,10 @@
 //! `#[test]` in `tests/integration_tests.rs` so it lives forever.
 
 use chrono::NaiveDate;
+use person_matcher::evidence::frequency_key;
 use person_matcher::{
-    Confidence, Gender, MatchConfig, MatchStrength, MatchingEngine, Normalizer, Person,
+    Confidence, FrequencyTable, Gender, MatchConfig, MatchStrength, MatchingEngine, Normalizer,
+    Person,
 };
 use proptest::prelude::*;
 
@@ -151,6 +153,43 @@ proptest! {
             MatchStrength::NonMatch
         };
         prop_assert_eq!(e.strength, expected);
+    }
+
+    /// The evidence terms MUST add up to `weight_bits` exactly, with or
+    /// without value frequencies (agents/share/match-evidence.md §8).
+    #[test]
+    fn evidence_components_sum_to_weight_bits(
+        p1 in person_strategy(),
+        p2 in person_strategy(),
+        ssn1 in prop::option::of(prop::sample::select(vec!["123-45-6789", "234-56-7890"])),
+        ssn2 in prop::option::of(prop::sample::select(vec!["123-45-6789", "234-56-7890"])),
+        share in 0.0f64..=1.0,
+    ) {
+        let mut p1 = p1;
+        let mut p2 = p2;
+        p1.us_ssn = ssn1.map(str::to_owned);
+        p2.us_ssn = ssn2.map(str::to_owned);
+        let mut freqs = FrequencyTable::new();
+        for (component, raw) in [
+            ("given_name", p1.given_name.clone()),
+            ("family_name", p1.family_name.clone()),
+            ("date_of_birth", p1.date_of_birth.map(|d| d.to_string())),
+        ] {
+            if let Some(key) = raw.and_then(|r| frequency_key(component, &r)) {
+                freqs.insert(component, key, share);
+            }
+        }
+        let engine = MatchingEngine::default_config();
+        for e in [
+            engine.match_persons(&p1, &p2).evidence,
+            engine.match_persons_with_frequencies(&p1, &p2, &freqs).evidence,
+        ] {
+            let sum: f64 = e.components.iter().map(|c| c.bits).sum();
+            prop_assert!(e.weight_bits.is_finite());
+            // Exact, bit for bit: weight_bits is defined as this sum.
+            prop_assert_eq!(sum.to_bits(), e.weight_bits.to_bits(),
+                "sum {} != weight_bits {}", sum, e.weight_bits);
+        }
     }
 
     /// Self-match MUST produce `is_match == true` for any `Person` that

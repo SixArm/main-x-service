@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — correlated groups, value frequencies and per-term evidence (T-41)
+
+Per `agents/share/match-evidence.md` §6–§8 (spec §12.7):
+
+- **Correlated groups.** `evidence::CORRELATED_GROUPS` = `{address,
+  phone}` (a household's address and landline) and `{death_date,
+  death_place}` (one fact). Within a group the strongest member counts in
+  full and the rest at `CORRELATED_DISCOUNT = 0.5`, agreements and
+  disagreements alike; `group_bits` / `strongest_first` are public. Two
+  people sharing only a house and landline now give ≈ 17.4 bits, not 22.
+- **Value frequencies.** `MatchingEngine::match_persons_with_frequencies`
+  takes a `&dyn ValueFrequencies`; for `given_name`, `family_name` and
+  `date_of_birth` (`FREQUENCY_COMPONENTS`) an exact agreement uses
+  `frequency_bits(m, share)` in place of the table's `u`. Keys come from
+  the public `evidence::frequency_key` (normalised name; ISO date).
+  `NoFrequencies` and `FrequencyTable` are provided; `match_persons` uses
+  `NoFrequencies`, so plain calls keep the table weights.
+- **Per-term listing.** `Evidence.components: Vec<ComponentBits>`
+  (`#[serde(default)]`) lists every term, identifier and contradiction
+  terms included; they sum exactly to `weight_bits`.
+
+### Changed — evidence leaves out the phonetic score
+
+The phonetic score is derived from the names, so it no longer adds
+evidence (it still lifts `score`). Identical name + DOB + gender is now
+≈ 28.31 bits (was ≈ 28.97); with an identical blood type it is ≈ 30.29,
+just over the default bar, so `Proven`. `score`, `is_match` and
+`confidence` are unchanged.
+
 ### Added — match evidence beside the similarity score (T-40)
 
 Every `MatchResult` now carries `evidence: Evidence` — a Fellegi–Sunter
@@ -21,7 +50,7 @@ log-likelihood weight in bits, the fields compared, any hard
 `MatchConfig` gains `proof_bits` (default `30.0`), the bar for `Proven`.
 A shared national identifier or passport pair adds ≈ 39.85 bits once; the
 name + DOB + gender deterministic tuple adds none, so an identical sparse
-record is `Consistent` (≈ 28.97 bits), not `Proven`. Differing parsed
+record is `Consistent` (≈ 28.31 bits since T-41), not `Proven`. Differing parsed
 values under one national scheme are a contradiction; passports never
 contradict (a renewed book has a new number). `score`, `is_match` and
 `confidence` are unchanged. Both new fields are `#[serde(default)]`, so

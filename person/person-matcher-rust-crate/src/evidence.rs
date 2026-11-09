@@ -8,13 +8,20 @@
 //! data prove?", as a Fellegi–Sunter log-likelihood ratio in bits, where a
 //! missing component contributes exactly `0`.
 //!
-//! This is the family-wide contract in `agents/share/match-evidence.md`;
-//! only the per-component `m`/`u` table ([`COMPONENTS`] and
-//! [`PHONETIC`]) is specific to this crate. Spec §12.7.
+//! This is the family-wide contract in `agents/share/match-evidence.md`.
+//! Specific to this crate: the per-component `m`/`u` table
+//! ([`COMPONENTS`]), the correlated groups ([`CORRELATED_GROUPS`]) and the
+//! frequency-adjusted components ([`FREQUENCY_COMPONENTS`], keyed by
+//! [`frequency_key`]). Spec §12.7.
 
+use std::collections::HashMap;
+
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
 use crate::matcher::MatchBreakdown;
+use crate::models::Person;
+use crate::normalizer::Normalizer;
 
 /// Similarity at or above which a component counts as full agreement.
 pub const AGREE_AT: f64 = 0.95;
@@ -92,6 +99,221 @@ pub struct Evidence {
     pub contradictions: Vec<Contradiction>,
     /// The verdict.
     pub strength: MatchStrength,
+    /// Every term of the sum, in order; the `bits` add up to
+    /// `weight_bits` exactly. Empty on JSON that pre-dates the field.
+    #[serde(default)]
+    pub components: Vec<ComponentBits>,
+}
+
+/// One term of the evidence sum.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComponentBits {
+    /// The component, e.g. `"family_name"`, `"identifier"`,
+    /// `"contradiction:identifier:us_ssn"`.
+    pub component: String,
+    /// Bits this term added, after any discount or adjustment.
+    pub bits: f64,
+    /// Discounted as a non-strongest member of a correlated group.
+    pub correlated: bool,
+    /// Agreement weight taken from the value's own frequency.
+    pub frequency_adjusted: bool,
+}
+
+// ── Correlated components (match-evidence.md §6) ──
+
+/// Weight of each member of a correlated group after its strongest.
+pub const CORRELATED_DISCOUNT: f64 = 0.5;
+
+/// This crate's correlated groups, by [`COMPONENTS`] name. Disjoint: a
+/// component is in at most one group.
+///
+/// - `address` + `phone`: a household's address and landline are recorded
+///   together and move together, so two people in one house agree on
+///   both for one reason.
+/// - `death_date` + `death_place`: both are determined by one fact, the
+///   death, and are usually recorded from the same certificate.
+///
+/// `birth_place` is deliberately **not** grouped with `address`: one is
+/// fixed at birth and the other is the current residence, so for
+/// different people they agree for different reasons, and putting
+/// `address` in two groups would discount it twice.
+pub const CORRELATED_GROUPS: &[&[&str]] = &[&["address", "phone"], &["death_date", "death_place"]];
+
+/// The index of the strongest of `member_bits`: largest absolute value,
+/// ties broken by the larger value, then by the earlier index (whose
+/// value is then identical, so the result does not depend on order).
+fn strongest_index(member_bits: &[f64]) -> Option<usize> {
+    let mut best: Option<usize> = None;
+    for (i, &b) in member_bits.iter().enumerate() {
+        best = match best {
+            None => Some(i),
+            Some(j) => {
+                let c = member_bits[j];
+                let order = b.abs().total_cmp(&c.abs()).then(b.total_cmp(&c));
+                if order == std::cmp::Ordering::Greater {
+                    Some(i)
+                } else {
+                    Some(j)
+                }
+            }
+        };
+    }
+    best
+}
+
+/// Split `member_bits` into its strongest member (largest absolute value,
+/// ties to the larger value) and the rest, or `None` when empty.
+#[must_use]
+pub fn strongest_first(member_bits: &[f64]) -> Option<(f64, Vec<f64>)> {
+    let i = strongest_index(member_bits)?;
+    let rest = member_bits
+        .iter()
+        .enumerate()
+        .filter(|(j, _)| *j != i)
+        .map(|(_, b)| *b)
+        .collect();
+    Some((member_bits[i], rest))
+}
+
+/// The bits a correlated group adds, from its present members' bits.
+#[must_use]
+pub fn group_bits(member_bits: &[f64]) -> f64 {
+    let Some((strongest, rest)) = strongest_first(member_bits) else {
+        return 0.0;
+    };
+    strongest + CORRELATED_DISCOUNT * rest.iter().sum::<f64>()
+}
+
+// ── Common and rare values (match-evidence.md §7) ──
+
+/// Where the share of records holding a value comes from.
+pub trait ValueFrequencies {
+    /// The share, in `0.0..=1.0`, of records whose `component` holds
+    /// `value` (already in the matcher's normalised form, see
+    /// [`frequency_key`]), or `None` when unknown.
+    fn share(&self, component: &str, value: &str) -> Option<f64>;
+}
+
+/// A frequency source that knows nothing: every agreement uses the
+/// table's `u`. What [`crate::MatchingEngine::match_persons`] uses.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoFrequencies;
+
+impl ValueFrequencies for NoFrequencies {
+    fn share(&self, _component: &str, _value: &str) -> Option<f64> {
+        None
+    }
+}
+
+/// An in-memory frequency source keyed by `(component, value)`, where
+/// `value` is a [`frequency_key`]. Values are stored as given.
+#[derive(Debug, Clone, Default)]
+pub struct FrequencyTable {
+    /// `(component, key)` → share of records.
+    shares: HashMap<(String, String), f64>,
+}
+
+impl FrequencyTable {
+    /// An empty table.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Build a table from `(component, key, count)` entries over a
+    /// population of `total` records: each share is `count / total`. A
+    /// `total` of `0` gives an empty table.
+    #[must_use]
+    pub fn from_counts<I, C, V>(counts: I, total: u64) -> Self
+    where
+        I: IntoIterator<Item = (C, V, u64)>,
+        C: Into<String>,
+        V: Into<String>,
+    {
+        let mut table = Self::new();
+        if total == 0 {
+            return table;
+        }
+        for (component, value, count) in counts {
+            table.insert(component, value, count as f64 / total as f64);
+        }
+        table
+    }
+
+    /// Set the share of records whose `component` holds `value`.
+    pub fn insert(&mut self, component: impl Into<String>, value: impl Into<String>, share: f64) {
+        self.shares.insert((component.into(), value.into()), share);
+    }
+}
+
+impl ValueFrequencies for FrequencyTable {
+    fn share(&self, component: &str, value: &str) -> Option<f64> {
+        self.shares
+            .get(&(component.to_owned(), value.to_owned()))
+            .copied()
+    }
+}
+
+/// Smallest share used, so a value seen once cannot give unbounded bits.
+pub const MIN_SHARE: f64 = 1e-9;
+
+/// Agreement bits for a value held by `share` of records.
+#[must_use]
+pub fn frequency_bits(m: f64, share: f64) -> f64 {
+    let share = if share.is_finite() {
+        share.clamp(MIN_SHARE, m)
+    } else {
+        m
+    };
+    (m / share).log2()
+}
+
+/// The components whose exact agreement is weighted by the value's own
+/// frequency. Public contract: a service counts values under these names.
+pub const FREQUENCY_COMPONENTS: &[&str] = &["given_name", "family_name", "date_of_birth"];
+
+/// The key the matcher looks up for `raw` under `component`, or `None`
+/// when `component` is not in [`FREQUENCY_COMPONENTS`] or `raw` has no
+/// usable form.
+///
+/// - `given_name`, `family_name`: [`Normalizer::normalize_name`] (the form
+///   name scoring compares); `None` when it normalises to empty.
+/// - `date_of_birth`: ISO 8601 `YYYY-MM-DD`; `raw` must parse as one.
+///
+/// ```
+/// use person_matcher::evidence::frequency_key;
+/// assert_eq!(frequency_key("family_name", "  SMITH ").as_deref(), Some("smith"));
+/// assert_eq!(frequency_key("date_of_birth", "1900-01-01").as_deref(), Some("1900-01-01"));
+/// assert_eq!(frequency_key("phone", "123"), None);
+/// ```
+#[must_use]
+pub fn frequency_key(component: &str, raw: &str) -> Option<String> {
+    match component {
+        "given_name" | "family_name" => {
+            let n = Normalizer::normalize_name(raw);
+            (!n.is_empty()).then_some(n)
+        }
+        "date_of_birth" => NaiveDate::parse_from_str(raw.trim(), "%Y-%m-%d")
+            .ok()
+            .map(|d| d.format("%Y-%m-%d").to_string()),
+        _ => None,
+    }
+}
+
+/// The key both persons share under a frequency component, or `None` when
+/// either lacks it or the keys differ (no exact agreement).
+fn shared_key(component: &str, p1: &Person, p2: &Person) -> Option<String> {
+    let raw = |p: &Person| -> Option<String> {
+        match component {
+            "given_name" => p.given_name.clone(),
+            "family_name" => p.family_name.clone(),
+            "date_of_birth" => p.date_of_birth.map(|d| d.format("%Y-%m-%d").to_string()),
+            _ => None,
+        }
+    };
+    let k1 = frequency_key(component, &raw(p1)?)?;
+    let k2 = frequency_key(component, &raw(p2)?)?;
+    (k1 == k2).then_some(k1)
 }
 
 /// `m` / `u` for one non-identifier breakdown component.
@@ -106,7 +328,9 @@ pub struct ComponentWeights {
 }
 
 /// The per-component table: one entry per non-identifier
-/// [`MatchBreakdown`] component except the phonetic bonus ([`PHONETIC`]).
+/// [`MatchBreakdown`] component except `phonetic_name`, which is derived
+/// from the two name components and so is left out of the sum entirely
+/// (match-evidence.md §6).
 ///
 /// Informed estimates, not measurements (`match-evidence.md` §5). The
 /// identifier components are not listed: they contribute
@@ -207,17 +431,6 @@ pub const COMPONENTS: &[ComponentWeights] = &[
     },
 ];
 
-/// The phonetic-name component. It is derived from the two name
-/// components, so — exactly as in [`crate::MatchResult::score`] — it only
-/// ever adds agreement (when `> 0.9`), never disagreement, and its weight
-/// is kept small to limit the double count. u: Soundex codes collide for
-/// a large share of unrelated name pairs.
-pub const PHONETIC: ComponentWeights = ComponentWeights {
-    name: "phonetic_name",
-    m: 0.95,
-    u: 0.60,
-};
-
 /// The non-identifier components of a breakdown, in [`COMPONENTS`] order.
 fn component_scores(b: &MatchBreakdown) -> [Option<f64>; 14] {
     [
@@ -293,25 +506,61 @@ fn national_identifier_scores(b: &MatchBreakdown) -> [(&'static str, Option<f64>
     ]
 }
 
-/// Compute the [`Evidence`] for a scored pair.
+/// Compute the [`Evidence`] for a scored pair with no value
+/// frequencies: every agreement uses the table's `u`.
+///
+/// See [`evidence_for`] for the rules.
+#[must_use]
+pub fn evidence_from_breakdown(b: &MatchBreakdown, is_match: bool, proof_bits: f64) -> Evidence {
+    evidence_with_shares(b, &|_| None, is_match, proof_bits)
+}
+
+/// Compute the [`Evidence`] for `p1` / `p2`, whose breakdown is `b`.
 ///
 /// - A shared value under any national identifier scheme, or a shared
 ///   `(country, number)` passport pair — the same rules the deterministic
-///   short-circuit uses — adds [`IDENTIFIER_BITS`] once. The exact
-///   name + birth date + gender tuple, the other deterministic rule, adds
-///   no identifier bits.
+///   short-circuit uses — adds [`IDENTIFIER_BITS`] once (term
+///   `"identifier"`). The exact name + birth date + gender tuple, the
+///   other deterministic rule, adds no identifier bits.
 /// - Each national scheme under which both records parse a value and the
 ///   values differ is a [`Contradiction`] (`identifier:<scheme>`) and adds
-///   [`CONTRADICTION_BITS`]. Passports never contradict: a passport number
-///   names a document, and a renewed book legitimately carries a new
-///   number, so disjoint passport lists are not a conflict.
+///   [`CONTRADICTION_BITS`] (term `"contradiction:identifier:<scheme>"`).
+///   Passports never contradict: a passport number names a document, and
+///   a renewed book legitimately carries a new number.
 /// - Every other component present in the breakdown adds
-///   [`component_bits`]; a missing one adds `0` and is not counted.
+///   [`component_bits`]; a missing one adds `0` and is not counted. A
+///   [`FREQUENCY_COMPONENTS`] member on which both records hold the same
+///   [`frequency_key`] and that `freqs` knows uses
+///   [`frequency_bits`] in place of the table's agreement weight.
+/// - Within each [`CORRELATED_GROUPS`] group, the strongest present member
+///   counts in full and the others at [`CORRELATED_DISCOUNT`].
 #[must_use]
-pub fn evidence_from_breakdown(b: &MatchBreakdown, is_match: bool, proof_bits: f64) -> Evidence {
-    let mut weight_bits = 0.0;
+pub fn evidence_for(
+    b: &MatchBreakdown,
+    p1: &Person,
+    p2: &Person,
+    freqs: &dyn ValueFrequencies,
+    is_match: bool,
+    proof_bits: f64,
+) -> Evidence {
+    let shares = |component: &str| {
+        let key = shared_key(component, p1, p2)?;
+        freqs.share(component, &key)
+    };
+    evidence_with_shares(b, &shares, is_match, proof_bits)
+}
+
+/// The rules of [`evidence_for`], with `shares(component)` giving the
+/// frequency of the value both records agree on exactly, when known.
+fn evidence_with_shares(
+    b: &MatchBreakdown,
+    shares: &dyn Fn(&str) -> Option<f64>,
+    is_match: bool,
+    proof_bits: f64,
+) -> Evidence {
     let mut fields_compared = 0u32;
     let mut contradictions = Vec::new();
+    let mut components = Vec::new();
 
     let national = national_identifier_scores(b);
     let shared =
@@ -322,29 +571,66 @@ pub fn evidence_from_breakdown(b: &MatchBreakdown, is_match: bool, proof_bits: f
         fields_compared += 1;
     }
     if shared {
-        weight_bits += IDENTIFIER_BITS;
+        components.push(ComponentBits {
+            component: "identifier".into(),
+            bits: IDENTIFIER_BITS,
+            correlated: false,
+            frequency_adjusted: false,
+        });
     }
     for (scheme, score) in national {
         if score == Some(0.0) {
-            contradictions.push(Contradiction {
-                field: format!("identifier:{scheme}"),
+            let field = format!("identifier:{scheme}");
+            components.push(ComponentBits {
+                component: format!("contradiction:{field}"),
+                bits: CONTRADICTION_BITS,
+                correlated: false,
+                frequency_adjusted: false,
             });
-            weight_bits += CONTRADICTION_BITS;
+            contradictions.push(Contradiction { field });
         }
     }
 
+    // Raw per-component terms, before the correlated-group discount.
+    let first_component = components.len();
     for (weights, score) in COMPONENTS.iter().zip(component_scores(b)) {
-        if let Some(s) = score {
-            weight_bits += component_bits(s, weights.m, weights.u);
-            fields_compared += 1;
+        let Some(s) = score else { continue };
+        fields_compared += 1;
+        let share =
+            if s.is_finite() && s >= AGREE_AT && FREQUENCY_COMPONENTS.contains(&weights.name) {
+                shares(weights.name)
+            } else {
+                None
+            };
+        let (bits, frequency_adjusted) = match share {
+            Some(share) => (frequency_bits(weights.m, share), true),
+            None => (component_bits(s, weights.m, weights.u), false),
+        };
+        components.push(ComponentBits {
+            component: weights.name.into(),
+            bits,
+            correlated: false,
+            frequency_adjusted,
+        });
+    }
+
+    for group in CORRELATED_GROUPS {
+        let members: Vec<usize> = (first_component..components.len())
+            .filter(|&i| group.contains(&components[i].component.as_str()))
+            .collect();
+        let bits: Vec<f64> = members.iter().map(|&i| components[i].bits).collect();
+        let Some(strongest) = strongest_index(&bits) else {
+            continue;
+        };
+        for (k, &i) in members.iter().enumerate() {
+            if k != strongest {
+                components[i].bits *= CORRELATED_DISCOUNT;
+                components[i].correlated = true;
+            }
         }
     }
-    if let Some(s) = b.phonetic_name_score
-        && s > 0.9
-    {
-        weight_bits += component_bits(s, PHONETIC.m, PHONETIC.u);
-        fields_compared += 1;
-    }
+
+    let weight_bits: f64 = components.iter().map(|c| c.bits).sum();
 
     let strength = if !contradictions.is_empty() {
         MatchStrength::Contradicted
@@ -361,6 +647,7 @@ pub fn evidence_from_breakdown(b: &MatchBreakdown, is_match: bool, proof_bits: f
         fields_compared,
         contradictions,
         strength,
+        components,
     }
 }
 
@@ -390,11 +677,94 @@ mod tests {
 
     #[test]
     fn every_table_entry_has_sane_probabilities() {
-        for w in COMPONENTS.iter().chain(std::iter::once(&PHONETIC)) {
+        for w in COMPONENTS {
             assert!(w.m > w.u, "{}: m must exceed u", w.name);
             assert!(w.m > 0.0 && w.m < 1.0, "{}", w.name);
             assert!(w.u > 0.0 && w.u < 1.0, "{}", w.name);
         }
+    }
+
+    #[test]
+    fn groups_and_frequency_components_name_table_entries() {
+        let names: Vec<&str> = COMPONENTS.iter().map(|w| w.name).collect();
+        let mut seen = Vec::new();
+        for group in CORRELATED_GROUPS {
+            assert!(group.len() >= 2);
+            for member in *group {
+                assert!(names.contains(member), "{member} not in COMPONENTS");
+                assert!(!seen.contains(member), "{member} in two groups");
+                seen.push(*member);
+            }
+        }
+        for c in FREQUENCY_COMPONENTS {
+            assert!(names.contains(c), "{c} not in COMPONENTS");
+        }
+    }
+
+    #[test]
+    fn correlated_agreements_give_less_than_their_sum_in_any_order() {
+        let (a, p) = (12.0, 9.0);
+        let g = group_bits(&[a, p]);
+        assert!(g < a + p);
+        assert!((g - (a + CORRELATED_DISCOUNT * p)).abs() < 1e-12);
+        assert!((group_bits(&[p, a]) - g).abs() < 1e-12);
+        assert!((group_bits(&[]) - 0.0).abs() < 1e-12);
+        assert!((group_bits(&[a]) - a).abs() < 1e-12);
+    }
+
+    #[test]
+    fn correlated_disagreements_are_discounted_too() {
+        let g = group_bits(&[-4.0, -1.5]);
+        assert!(g > -5.5, "discounted against");
+        assert!((g - (-4.0 - CORRELATED_DISCOUNT * 1.5)).abs() < 1e-12);
+        assert!((group_bits(&[-1.5, -4.0]) - g).abs() < 1e-12);
+    }
+
+    #[test]
+    fn strongest_first_orders_by_absolute_value_ties_to_larger() {
+        assert_eq!(strongest_first(&[3.0, -5.0]), Some((-5.0, vec![3.0])));
+        assert_eq!(strongest_first(&[-5.0, 5.0]), Some((5.0, vec![-5.0])));
+        assert_eq!(strongest_first(&[5.0, -5.0]), Some((5.0, vec![-5.0])));
+        assert_eq!(strongest_first(&[]), None);
+    }
+
+    #[test]
+    fn frequency_bits_common_rare_and_capped() {
+        let (m, u): (f64, f64) = (0.92, 0.005); // family_name
+        let default = (m / u).log2();
+        assert!(frequency_bits(m, 0.01) < default, "common name");
+        assert!(frequency_bits(m, 1e-6) > default, "rare name");
+        // A share at or above m is no evidence, never evidence against.
+        assert!(frequency_bits(m, m).abs() < 1e-12);
+        assert!(frequency_bits(m, 0.99).abs() < 1e-12);
+        assert!(frequency_bits(m, f64::NAN).abs() < 1e-12);
+        // MIN_SHARE bounds a value seen once.
+        assert!((frequency_bits(m, 0.0) - (m / MIN_SHARE).log2()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn frequency_table_from_counts_and_insert() {
+        let mut t = FrequencyTable::from_counts([("family_name", "smith", 10_u64)], 1000);
+        assert_eq!(t.share("family_name", "smith"), Some(0.01));
+        assert_eq!(t.share("family_name", "jones"), None);
+        t.insert("date_of_birth", "1900-01-01", 0.2);
+        assert_eq!(t.share("date_of_birth", "1900-01-01"), Some(0.2));
+        assert_eq!(
+            FrequencyTable::from_counts([("x", "y", 1_u64)], 0).share("x", "y"),
+            None
+        );
+        assert_eq!(NoFrequencies.share("family_name", "smith"), None);
+    }
+
+    #[test]
+    fn frequency_key_normalises_like_the_matcher() {
+        assert_eq!(
+            frequency_key("given_name", "Zoë").as_deref(),
+            Some(Normalizer::normalize_name("Zoë").as_str())
+        );
+        assert_eq!(frequency_key("family_name", " ... "), None);
+        assert_eq!(frequency_key("date_of_birth", "01/01/1900"), None);
+        assert_eq!(frequency_key("tags", "vip"), None);
     }
 
     #[test]
