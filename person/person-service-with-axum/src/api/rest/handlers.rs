@@ -768,6 +768,12 @@ pub struct MatchResponse {
     pub detection_method: String,
     /// Optional per-component score breakdown as JSON.
     pub score_breakdown: Option<serde_json::Value>,
+    /// What the data proves about the pair, beside `score`: the
+    /// matcher's Fellegi–Sunter evidence (`agents/share/match-evidence.md`).
+    /// Component names and bits only, never a field value. Absent on JSON
+    /// written before the field.
+    #[serde(default)]
+    pub evidence: crate::matching::evidence::MatchEvidence,
 }
 
 /// Wrapper holding all matches for a match request.
@@ -840,6 +846,7 @@ pub async fn match_person(
 
             // Filter by threshold if provided
             let threshold = payload.threshold.unwrap_or(0.5);
+            let freqs = state.frequencies.current(&state.db);
             let matches: Vec<MatchResponse> = match_results
                 .into_iter()
                 .filter(|m| m.score >= threshold)
@@ -848,6 +855,11 @@ pub async fn match_person(
                     let quality = crate::models::review_queue::match_quality_for_score(m.score);
 
                     let breakdown_json = serde_json::to_value(&m.breakdown).ok();
+                    let evidence = crate::matching::evidence::pair_evidence(
+                        &payload.person,
+                        &m.person,
+                        freqs.as_ref(),
+                    );
 
                     MatchResponse {
                         person: m.person.clone(),
@@ -855,6 +867,7 @@ pub async fn match_person(
                         quality: quality.to_string(),
                         detection_method: "probabilistic".to_string(),
                         score_breakdown: breakdown_json,
+                        evidence,
                     }
                 })
                 .collect();
@@ -923,13 +936,18 @@ pub(crate) async fn check_duplicates_internal(
         return Vec::new();
     };
 
-    // Return matches above the auto-review threshold (0.7)
+    // Return matches above the auto-review threshold (0.7), each with the
+    // matcher's evidence (match-evidence.md §10 step 4). The 409 on create
+    // is still decided on this list being non-empty, as before.
+    let freqs = state.frequencies.current(&state.db);
     match_results
         .into_iter()
         .filter(|m| m.score >= 0.7)
         .take(10)
         .map(|m| {
             let quality = crate::models::review_queue::match_quality_for_score(m.score);
+            let evidence =
+                crate::matching::evidence::pair_evidence(person, &m.person, freqs.as_ref());
 
             MatchResponse {
                 person: m.person.clone(),
@@ -937,6 +955,7 @@ pub(crate) async fn check_duplicates_internal(
                 quality: quality.to_string(),
                 detection_method: "duplicate_detection".to_string(),
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
+                evidence,
             }
         })
         .collect()
@@ -1204,9 +1223,13 @@ pub async fn merge_persons(
 ///
 /// For each person, compares against the subsequent records (upper
 /// triangle, so each unordered pair is scored once via `seen_pairs`).
-/// Pairs at/above `auto_merge_threshold` are marked `AutoMerged`; those
-/// at/above `threshold` are queued `Pending`. Does not itself merge —
-/// it only produces review-queue items.
+/// Pairs at/above `auto_merge_threshold` **with proven evidence** are
+/// marked `AutoMerged`; every other pair at/above `threshold` is queued
+/// `Pending`, including a `consistent` or `contradicted` pair whatever its
+/// score (`agents/share/match-evidence.md` §4). Evidence is computed
+/// through the adapter and the matcher, with value frequencies counted
+/// over the records this scan loaded. Does not itself merge — it only
+/// produces review-queue items.
 #[allow(clippy::too_many_lines)] // linear scan + persist + report walk
 pub async fn batch_deduplicate(
     State(state): State<AppState>,
@@ -1222,6 +1245,9 @@ pub async fn batch_deduplicate(
     };
 
     let persons_scanned = persons.len();
+    // Value frequencies from the records the scan loaded (§7): none below
+    // MIN_FREQUENCY_POPULATION, where a share would be noise.
+    let freqs = crate::matching::evidence::ValueFrequencySource::from_persons(&persons);
     let mut review_items = Vec::new();
     let mut seen_pairs: std::collections::HashSet<(Uuid, Uuid)> = std::collections::HashSet::new();
 
@@ -1262,7 +1288,16 @@ pub async fn batch_deduplicate(
 
             let quality = crate::models::review_queue::match_quality_for_score(m.score);
 
-            let status = if m.score >= req.auto_merge_threshold {
+            // The auto-merge gate: score alone is not enough. Only a pair
+            // whose evidence is `proven` may be flagged for an automatic
+            // merge; `consistent` (e.g. name + birth date only, which twins
+            // share) and `contradicted` pairs go to a person (§4).
+            let evidence = crate::matching::evidence::pair_evidence(person, &m.person, &freqs);
+            let status = if crate::matching::evidence::auto_merge_permitted(
+                m.score,
+                req.auto_merge_threshold,
+                &evidence,
+            ) {
                 crate::models::ReviewStatus::AutoMerged
             } else {
                 crate::models::ReviewStatus::Pending
@@ -1276,6 +1311,7 @@ pub async fn batch_deduplicate(
                 match_quality: quality.to_string(),
                 detection_method: "batch_deduplication".to_string(),
                 score_breakdown: serde_json::to_value(&m.breakdown).ok(),
+                evidence: Some(evidence),
                 status,
                 provenance: "operator".to_string(),
                 reviewed_by: None,
@@ -1299,6 +1335,10 @@ pub async fn batch_deduplicate(
             match_quality: r.match_quality.clone(),
             detection_method: r.detection_method.clone(),
             score_breakdown: r.score_breakdown.clone(),
+            evidence: r
+                .evidence
+                .as_ref()
+                .and_then(crate::matching::evidence::MatchEvidence::to_json),
             status: review_status_token(&r.status).to_string(),
             provenance: r.provenance.clone(),
         })
@@ -1369,6 +1409,10 @@ fn review_row_to_item(
         match_quality: row.match_quality.clone(),
         detection_method: row.detection_method.clone(),
         score_breakdown: row.score_breakdown.clone(),
+        evidence: row
+            .evidence
+            .clone()
+            .and_then(|v| serde_json::from_value(v).ok()),
         status: parse_review_status(&row.status),
         provenance: row.provenance.clone(),
         reviewed_by: row.reviewed_by.clone(),

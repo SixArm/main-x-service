@@ -509,6 +509,9 @@ async fn queue_cross_service_review(
             .to_string(),
         detection_method: "cross_service_same_identity".to_string(),
         score_breakdown,
+        // The far record is a worker in another service; no pair to
+        // compute evidence over here.
+        evidence: None,
         status: "pending".to_string(),
         provenance: "matcher_suggested".to_string(),
     };

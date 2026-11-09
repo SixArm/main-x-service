@@ -1356,3 +1356,22 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   `Conflict`, a `409` `conflict` naming the constraint, as the family's
   errors require. `tests/merge_identifiers.rs` covers both; each fails
   on the old code.
+- [x] **T-41 — Carry match evidence; auto-merge only on `proven`.**
+  *(2026-11-09; [match-evidence.md](../../../agents/share/match-evidence.md)
+  §10 step 4.)* The batch scan flagged `automerged` on score alone, so
+  two people sharing a name and birth date (score `1.0`) were marked for
+  a merge. Every match surface now carries the matcher's `evidence`
+  (`matching::evidence`, through the adapter), the scan flags
+  `automerged` only for `proven` evidence
+  (`auto_merge_permitted`), `review_queue` gains a nullable `evidence`
+  column (`2026110900000001_review_queue_evidence`) written on insert
+  and re-scan, and a re-scan returns an unsupported `automerged` flag to
+  `pending`. Value frequencies (§7) come from the scan's own records, or
+  for the interactive paths from a background-rebuilt cached table
+  (`FrequencyCache`, `db::frequency`; floor `MIN_FREQUENCY_POPULATION`
+  = 1 000, cap 200 000). The service's own score is unchanged. Tests:
+  `matching::evidence` unit tests (consistent / proven / contradicted,
+  no values in the JSON, the population floor, a common value weighing
+  less), `tests/match_evidence.rs` (the three scan cases, the `409` and
+  `check-duplicates` bodies, the DB scan), `tests/review_queue_db.rs`
+  (evidence round trip, the `automerged` → `pending` re-scan).

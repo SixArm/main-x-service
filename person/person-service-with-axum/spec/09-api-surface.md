@@ -142,3 +142,29 @@ machinery (filter = one `pid`).
 > `422` already decided); the reviewer identity is the verified bearer `sub` (or absent). Each decision writes a `review_decision` audit row.
 > Under ABAC the decision POST derives as a `write` action (not
 > destructive-classed).
+
+> **2026-11-09 — match evidence on every match surface (T-41).**
+> `MatchResponse` (in `POST /api/persons/match`, `POST
+> /api/persons/check-duplicates` and the `errors.potential_matches` of
+> the create-time `409`) and `ReviewQueueItem` (the batch scan response
+> and `GET /api/persons/review-queue`) gain `evidence`, schema
+> `MatchEvidence`: `weight_bits`, `fields_compared`, `contradictions[]`
+> (`{field}`, a scheme name such as
+> `identifier:united_kingdom_national_health_service_number`),
+> `strength` (`contradicted` | `proven` | `consistent` | `non_match`) and
+> `components[]` (`{component, bits, correlated, frequency_adjusted}`).
+> The review item's `evidence` is nullable (rows stored before it, and
+> cross-service suggestions, whose worker record is not held here) and
+> is stored in `review_queue.evidence` (`JSONB`, migration
+> `2026110900000001_review_queue_evidence`). JSON without the field
+> still deserialises. A batch scan flags `automerged` only for a
+> `proven` pair; a re-scan returns an `automerged` row that is no longer
+> `proven` to `pending`.
+>
+> Evidence names fields, never values. It says which fields both
+> records held and which identifier scheme conflicts, which the score
+> breakdown beside it already says; no masked path gains a value
+> through it. Neither `match` nor `check-duplicates` applies the
+> record-level read check to the candidate records they return (SEC-G3's
+> open remainder): that gap predates evidence, which neither widens nor
+> closes it.

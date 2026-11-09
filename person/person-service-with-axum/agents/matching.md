@@ -143,9 +143,24 @@ Examples: Smith → S530, Smyth → S530, Robert → R163
 
 Applied as a bonus (+0.05) when Soundex codes match and name score < 0.95.
 
+## Match Evidence and the Auto-Merge Gate
+
+The score above ranks and filters. Whether a pair may be merged without
+a person is decided on **evidence** instead
+([match-evidence.md](../../../agents/share/match-evidence.md); spec §6.4,
+T-41): the canonical `person-matcher` engine's Fellegi–Sunter weight in
+bits, its contradictions, and a strength (`proven` / `consistent` /
+`contradicted` / `non_match`), computed through
+`adapter::to_matcher_person` with value frequencies for given name,
+family name and birth date. A batch scan flags `automerged` only when
+the score clears `auto_merge_threshold` **and** the strength is
+`proven`. Name + birth date + gender alone is about 28 bits, short of
+the 30-bit bar: `consistent`, so review.
+
 ## Source Files
 
 - `src/matching/mod.rs` — Matcher traits, MatchResult, ProbabilisticMatcher, DeterministicMatcher
 - `src/matching/algorithms.rs` — All algorithm implementations
 - `src/matching/scoring.rs` — ProbabilisticScorer, DeterministicScorer
 - `src/matching/phonetic.rs` — Soundex implementation
+- `src/matching/evidence.rs` — match evidence, `auto_merge_permitted`, value frequencies and their cache

@@ -427,6 +427,14 @@ async fn create_and_queue_for_review(
         match_quality: match_quality_label(duplicate.score).to_string(),
         detection_method: "import_duplicate_detection".to_string(),
         score_breakdown: serde_json::to_value(&duplicate.breakdown).ok(),
+        // Evidence with the matcher's plain table: the import worker holds
+        // no frequency cache, and the pair is queued `pending` regardless.
+        evidence: crate::matching::evidence::pair_evidence(
+            &saved,
+            &duplicate.person,
+            &person_matcher::evidence::NoFrequencies,
+        )
+        .to_json(),
         status: "pending".to_string(),
         provenance: "import".to_string(),
     };

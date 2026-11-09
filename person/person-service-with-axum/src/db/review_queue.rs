@@ -5,7 +5,8 @@
 //! Pairs are stored in normalized order (`record_id_a < record_id_b`)
 //! under a UNIQUE constraint, so a re-scan **upserts** the same row:
 //! scores refresh, but a decided row keeps its decision (`status` is
-//! never touched on conflict). Statuses are stored as the family's
+//! never touched on conflict, except that an `automerged` flag a re-scan
+//! no longer supports falls back to `pending` — see [`upsert`]). Statuses are stored as the family's
 //! lowercase wire tokens (`pending` / `confirmed` / `rejected` /
 //! `automerged`); the handlers own the enum mapping.
 
@@ -34,6 +35,11 @@ pub struct ReviewQueueRow {
     pub detection_method: String,
     /// Optional per-component score breakdown.
     pub score_breakdown: Option<serde_json::Value>,
+    /// The matcher's match evidence for the pair
+    /// ([`crate::matching::evidence::MatchEvidence`] as JSON), refreshed
+    /// on re-scan. `None` on rows written before the column existed and
+    /// on cross-service rows, whose far record is not held here.
+    pub evidence: Option<serde_json::Value>,
     /// Lowercase status token (`pending` / `confirmed` / `rejected` /
     /// `automerged`).
     pub status: String,
@@ -65,7 +71,11 @@ pub struct NewReviewItem {
     pub detection_method: String,
     /// Optional per-component score breakdown.
     pub score_breakdown: Option<serde_json::Value>,
-    /// Initial lowercase status token (`pending` or `automerged`).
+    /// The matcher's match evidence for the pair, as JSON, or `None`
+    /// where none was computed (a cross-service suggestion).
+    pub evidence: Option<serde_json::Value>,
+    /// Initial lowercase status token (`pending` or `automerged`;
+    /// `automerged` only for a `proven` pair).
     pub status: String,
     /// How this pair was first surfaced (`operator` / `import` /
     /// `matcher_suggested`). Only applied on insert; excluded from the
@@ -96,6 +106,7 @@ struct ReviewQueueRaw {
     match_quality: String,
     detection_method: String,
     score_breakdown: Option<serde_json::Value>,
+    evidence: Option<serde_json::Value>,
     status: String,
     provenance: String,
     reviewed_by: Option<String>,
@@ -113,6 +124,7 @@ impl From<ReviewQueueRaw> for ReviewQueueRow {
             match_quality: r.match_quality,
             detection_method: r.detection_method,
             score_breakdown: r.score_breakdown,
+            evidence: r.evidence,
             status: r.status,
             provenance: r.provenance,
             reviewed_by: r.reviewed_by,
@@ -125,6 +137,15 @@ impl From<ReviewQueueRaw> for ReviewQueueRow {
 /// Insert-or-refresh one pair exactly as given, returning the stored row.
 /// `provenance` is excluded from the `DO UPDATE SET`, so a re-scan never
 /// overwrites a pair's original provenance.
+///
+/// `status` is kept on conflict with one exception: a row flagged
+/// `automerged` that the re-scan now classifies `pending` goes back to
+/// `pending`. `automerged` is only a flag (nothing was merged), and since
+/// the auto-merge gate requires `proven` evidence
+/// (`agents/share/match-evidence.md` §4), a flag written on score alone
+/// before the gate, or one whose evidence has since weakened, must not
+/// survive as a merge instruction. A decided row (`confirmed` /
+/// `rejected`) is never touched.
 async fn upsert_one(
     conn: &mut sqlx::PgConnection,
     a: Uuid,
@@ -135,15 +156,21 @@ async fn upsert_one(
         ReviewQueueRaw,
         "INSERT INTO review_queue
              (id, record_id_a, record_id_b, match_score, match_quality,
-              detection_method, score_breakdown, status, provenance)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              detection_method, score_breakdown, evidence, status, provenance)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET
              match_score = EXCLUDED.match_score,
              match_quality = EXCLUDED.match_quality,
              detection_method = EXCLUDED.detection_method,
-             score_breakdown = EXCLUDED.score_breakdown
+             score_breakdown = EXCLUDED.score_breakdown,
+             evidence = EXCLUDED.evidence,
+             status = CASE
+                 WHEN review_queue.status = 'automerged' AND EXCLUDED.status = 'pending'
+                 THEN 'pending'
+                 ELSE review_queue.status
+             END
          RETURNING id, record_id_a, record_id_b, match_score, match_quality,
-                   detection_method, score_breakdown, status, provenance, reviewed_by,
+                   detection_method, score_breakdown, evidence, status, provenance, reviewed_by,
                    created_at, reviewed_at",
         Uuid::new_v4(),
         a,
@@ -152,6 +179,7 @@ async fn upsert_one(
         item.match_quality,
         item.detection_method,
         item.score_breakdown,
+        item.evidence,
         item.status,
         item.provenance,
     )
@@ -162,7 +190,9 @@ async fn upsert_one(
 
 /// Insert-or-refresh a scan's candidate pairs and return the **stored**
 /// rows (stable ids; a previously decided pair returns its decided
-/// status untouched, with only the score columns refreshed).
+/// status untouched, with only the score and evidence columns refreshed;
+/// an `automerged` flag the re-scan no longer supports reverts to
+/// `pending`, see `upsert_one`).
 ///
 /// # Errors
 ///
@@ -249,7 +279,7 @@ pub async fn list(
     let rows = sqlx::query_as!(
         ReviewQueueRaw,
         "SELECT id, record_id_a, record_id_b, match_score, match_quality,
-                detection_method, score_breakdown, status, provenance, reviewed_by,
+                detection_method, score_breakdown, evidence, status, provenance, reviewed_by,
                 created_at, reviewed_at
          FROM review_queue
          WHERE ($1::text IS NULL OR status = $1)
@@ -285,7 +315,7 @@ pub async fn decide(
          SET status = $2, reviewed_by = $3, reviewed_at = now()
          WHERE id = $1 AND status = 'pending'
          RETURNING id, record_id_a, record_id_b, match_score, match_quality,
-                   detection_method, score_breakdown, status, provenance, reviewed_by,
+                   detection_method, score_breakdown, evidence, status, provenance, reviewed_by,
                    created_at, reviewed_at",
         id,
         status,

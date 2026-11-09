@@ -14,6 +14,7 @@ use std::sync::Arc;
 use crate::bulk::store::ArtifactStore;
 use crate::config::Config;
 use crate::db::{AuditLogRepository, PersonRepository, PgPersonRepository};
+use crate::matching::evidence::FrequencyCache;
 use crate::matching::{PersonMatcher, ProbabilisticMatcher};
 use crate::search::SearchEngine;
 use crate::streaming::{EventProducer, InMemoryEventPublisher};
@@ -49,6 +50,12 @@ pub struct AppState {
     /// dev/test, or an S3-compatible object store for deployment. See
     /// [`crate::bulk::store`].
     pub bulk_store: Arc<dyn ArtifactStore>,
+
+    /// Value frequencies for match evidence on the interactive paths
+    /// (create-time duplicate check, `check-duplicates`, `match`),
+    /// rebuilt in the background every ten minutes
+    /// (`agents/share/match-evidence.md` §7; [`FrequencyCache`]).
+    pub frequencies: Arc<FrequencyCache>,
 }
 
 impl AppState {
@@ -105,6 +112,7 @@ impl AppState {
             matcher: person_matcher,
             config: Arc::new(config),
             bulk_store,
+            frequencies: Arc::new(FrequencyCache::new()),
         })
     }
 }

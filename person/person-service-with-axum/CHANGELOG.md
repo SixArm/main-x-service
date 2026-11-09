@@ -8,8 +8,26 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed
+
+- Match results carry the matcher's `evidence` (weight in bits,
+  contradictions, strength) beside the service's `score`: `match`,
+  `check-duplicates`, the create-time `409` body, the batch scan and the
+  review queue, which stores it in a new nullable `evidence` column
+  (`2026110900000001_review_queue_evidence`). Evidence holds component
+  names and bits, never values. Value frequencies weight common names
+  and birth dates down, from a table cached in app state and rebuilt in
+  the background every ten minutes, once there are 1 000 active records
+  (T-41; `agents/share/match-evidence.md`).
+
 ### Fixed
 
+- The batch scan flags a pair `automerged` only when its evidence is
+  `proven`. It flagged on score alone, so two people sharing only a name
+  and birth date were marked for a merge. A `consistent` or
+  `contradicted` pair stays `pending` at any score, and a re-scan
+  returns an `automerged` flag the evidence no longer supports to
+  `pending` (T-41).
 - A merge succeeds when the duplicate holds an identifier, which moves to
   the survivor; it answered `500` (T-39). A create or update carrying an
   identifier another person holds answers `409` `conflict`, not `500`

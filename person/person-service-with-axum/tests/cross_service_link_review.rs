@@ -318,6 +318,7 @@ async fn ordinary_review_decision_is_unaffected_by_t32() {
             match_quality: "probable".to_string(),
             detection_method: "batch_deduplication".to_string(),
             score_breakdown: None,
+            evidence: None,
             status: "pending".to_string(),
             provenance: "operator".to_string(),
         }],

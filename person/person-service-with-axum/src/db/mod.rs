@@ -28,6 +28,8 @@ pub mod convert;
 pub mod entity_links;
 /// The statements of a GDPR Art. 17 erasure.
 pub mod erasure;
+/// The value-frequency scan behind match evidence (match-evidence.md §7).
+pub mod frequency;
 /// Row structs, one per table read whole.
 pub mod models;
 /// Transactional-outbox write + relay surface (durable event bus, Phase 2).

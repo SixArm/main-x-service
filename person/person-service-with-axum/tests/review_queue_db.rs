@@ -26,6 +26,11 @@ async fn review_queue_round_trip() {
     ))
     .await
     .expect("apply provenance migration");
+    db.execute(include_str!(
+        "../migrations/2026110900000001_review_queue_evidence.up.sql"
+    ))
+    .await
+    .expect("apply evidence migration");
     db.execute("DELETE FROM review_queue")
         .await
         .expect("clean slate");
@@ -39,6 +44,7 @@ async fn review_queue_round_trip() {
         match_quality: "probable".to_string(),
         detection_method: "batch_deduplication".to_string(),
         score_breakdown: Some(serde_json::json!({ "name": score })),
+        evidence: Some(serde_json::json!({ "weight_bits": score, "strength": "consistent" })),
         status: "pending".to_string(),
         provenance: "operator".to_string(),
     };
@@ -52,6 +58,7 @@ async fn review_queue_round_trip() {
     assert!(rows[0].record_id_a <= rows[0].record_id_b);
     assert_eq!(rows[0].status, "pending");
     assert!(rows[0].score_breakdown.is_some());
+    assert_eq!(rows[0].evidence.as_ref().unwrap()["strength"], "consistent");
 
     // A re-scan with the pair REVERSED upserts the same row (stable id)
     // and refreshes the score columns.
@@ -66,6 +73,8 @@ async fn review_queue_round_trip() {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, id);
     assert!((rows[0].match_score - 0.9).abs() < 1e-9);
+    // The re-scan refreshes the evidence column too.
+    assert_eq!(rows[0].evidence.as_ref().unwrap()["weight_bits"], 0.9);
 
     // Decide: pending -> confirmed; first writer wins.
     match review_queue::decide(&db, id, "confirmed", Some("tester"))
@@ -109,4 +118,26 @@ async fn review_queue_round_trip() {
             .expect("filtered")
             .is_empty()
     );
+
+    // An `automerged` flag a re-scan no longer supports (evidence short
+    // of proof) reverts to `pending`; one it still supports stays.
+    let (c, d) = (Uuid::new_v4(), Uuid::new_v4());
+    let flagged = |status: &str| NewReviewItem {
+        record_id_a: c,
+        record_id_b: d,
+        status: status.to_string(),
+        ..item(0.99)
+    };
+    let rows = review_queue::upsert(&db, &[flagged("automerged")])
+        .await
+        .expect("flag");
+    assert_eq!(rows[0].status, "automerged");
+    let rows = review_queue::upsert(&db, &[flagged("automerged")])
+        .await
+        .expect("still proven");
+    assert_eq!(rows[0].status, "automerged");
+    let rows = review_queue::upsert(&db, &[flagged("pending")])
+        .await
+        .expect("no longer proven");
+    assert_eq!(rows[0].status, "pending");
 }

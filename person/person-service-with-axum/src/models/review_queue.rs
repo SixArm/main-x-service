@@ -4,8 +4,10 @@
 //! active persons pairwise and emits a [`ReviewQueueItem`] for each pair
 //! scoring above the configured [`threshold`](BatchDeduplicationRequest::threshold).
 //! Pairs above the [`auto_merge_threshold`](BatchDeduplicationRequest::auto_merge_threshold)
-//! are flagged [`ReviewStatus::AutoMerged`]; the rest are
-//! [`ReviewStatus::Pending`] for a human to confirm or reject.
+//! **whose match evidence is `proven`** are flagged
+//! [`ReviewStatus::AutoMerged`]; the rest, including any `consistent` or
+//! `contradicted` pair whatever its score, are [`ReviewStatus::Pending`]
+//! for a human to confirm or reject (`agents/share/match-evidence.md` §4).
 //! [`BatchDeduplicationRequest`] / [`BatchDeduplicationResponse`] are
 //! the request/response envelope for that scan.
 
@@ -24,7 +26,8 @@ pub enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate
     Rejected,
-    /// Auto-merged (score above auto-merge threshold)
+    /// Flagged for automatic merge: score above the auto-merge threshold
+    /// **and** `proven` evidence
     AutoMerged,
 }
 
@@ -51,6 +54,14 @@ pub struct ReviewQueueItem {
 
     /// Breakdown of individual score components
     pub score_breakdown: Option<serde_json::Value>,
+
+    /// The matcher's match evidence for the pair: weight in bits,
+    /// contradictions and strength (`agents/share/match-evidence.md`).
+    /// Component names and bits only, never a field value. `None` on
+    /// rows stored before evidence existed and on cross-service
+    /// suggestions, whose far record this service does not hold.
+    #[serde(default)]
+    pub evidence: Option<crate::matching::evidence::MatchEvidence>,
 
     /// Current review status
     pub status: ReviewStatus,
@@ -80,7 +91,9 @@ pub struct BatchDeduplicationRequest {
     #[serde(default = "default_max_candidates")]
     pub max_candidates: usize,
 
-    /// Score above which duplicates are auto-merged (default: 0.95)
+    /// Score above which a duplicate with `proven` evidence is flagged
+    /// for automatic merge (default: 0.95). Below `proven`, no score is
+    /// high enough.
     #[serde(default = "default_auto_merge_threshold")]
     pub auto_merge_threshold: f64,
 }
@@ -200,6 +213,38 @@ mod review_decision_tests {
                 serde_json::json!({"status": "automerged"})
             )
             .is_err()
+        );
+    }
+
+    /// A review item stored or serialised before `evidence` existed
+    /// still reads, with no evidence; one with evidence reads it back.
+    #[test]
+    fn an_item_without_evidence_still_deserialises() {
+        let mut json = serde_json::json!({
+            "id": uuid::Uuid::nil(),
+            "person_id_a": uuid::Uuid::nil(),
+            "person_id_b": uuid::Uuid::nil(),
+            "match_score": 0.97,
+            "match_quality": "certain",
+            "detection_method": "batch_deduplication",
+            "score_breakdown": null,
+            "status": "pending",
+            "provenance": "operator",
+            "reviewed_by": null,
+            "created_at": "2026-07-19T00:00:00Z",
+            "reviewed_at": null
+        });
+        let old: ReviewQueueItem = serde_json::from_value(json.clone()).unwrap();
+        assert!(old.evidence.is_none());
+
+        json["evidence"] = serde_json::json!({
+            "weight_bits": 28.3, "fields_compared": 4,
+            "contradictions": [], "strength": "consistent"
+        });
+        let new: ReviewQueueItem = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            new.evidence.unwrap().strength,
+            crate::matching::evidence::EvidenceStrength::Consistent
         );
     }
 }

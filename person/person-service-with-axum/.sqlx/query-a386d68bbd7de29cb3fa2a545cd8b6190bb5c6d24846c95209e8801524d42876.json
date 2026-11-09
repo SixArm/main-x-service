@@ -1,0 +1,65 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT ON (p.id)\n                  p.id AS \"id!\",\n                  n.family AS \"family?\",\n                  n.given AS \"given?\",\n                  p.birth_date\n           FROM persons p\n           LEFT JOIN person_names n ON n.person_id = p.id AND n.is_primary\n           WHERE p.deleted_at IS NULL AND p.active = true\n             AND ($1::uuid IS NULL OR p.id > $1)\n           ORDER BY p.id, n.id\n           LIMIT $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "family?",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "family"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "given?",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "person_names",
+            "name": "given"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "birth_date",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "persons",
+            "name": "birth_date"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "a386d68bbd7de29cb3fa2a545cd8b6190bb5c6d24846c95209e8801524d42876"
+}

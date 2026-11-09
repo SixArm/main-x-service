@@ -89,6 +89,36 @@ bulk re-index supported.
 - Batch `POST /api/persons/deduplicate` with configurable `threshold`,
   `max_candidates`, `auto_merge_threshold`.
 - Review queue with `Pending` / `Confirmed` / `Rejected` / `AutoMerged`.
+- **Match evidence** ([match-evidence.md](../../../agents/share/match-evidence.md),
+  §10 step 4; T-41). Every scored pair — the `match` endpoint,
+  `check-duplicates`, the create-time `409` body, the batch scan and its
+  stored review items, bulk-import review rows — carries the matcher's
+  `evidence` (weight in bits, fields compared, contradictions, strength,
+  per-term listing) beside the service's own renormalised `score`, which
+  is unchanged and still ranks and filters. Evidence is computed through
+  `matching::adapter::to_matcher_person` and the canonical engine's
+  `match_persons_with_frequencies` (default `MatchConfig`: `is_match` at
+  `0.85`, proof bar `30` bits). It holds component names and bits, never
+  a field value.
+- **Auto-merge only on `proven`.** The batch scan flags a pair
+  `AutoMerged` only when `score >= auto_merge_threshold` **and**
+  `evidence.strength == proven`; a `consistent` pair (name + birth date +
+  gender only: twins) or a `contradicted` one (two different national
+  identifiers under one scheme) is queued `Pending` whatever its score.
+  The service performs no automatic merge itself; the flag is the only
+  auto-merge surface, and the gate is `matching::evidence::auto_merge_permitted`.
+  The create-time `409` is unchanged.
+- **Value frequencies** (match-evidence.md §7). The batch scan counts
+  given name, family name and birth date (the matcher's
+  `FREQUENCY_COMPONENTS`, keyed by its `frequency_key`) over the records
+  it loaded. The interactive paths use a table cached in app state,
+  built by a keyset scan of active persons (`db::frequency`, 1 000 per
+  page, capped at 200 000: above the cap the table is a sample of the
+  first 200 000 by id) and rebuilt on a spawned task when older than ten
+  minutes; a request never waits on it, and before the first build it
+  uses no frequencies. Below `MIN_FREQUENCY_POPULATION` (1 000) records
+  no table is supplied, because a share from a small population is
+  noise.
 - Merge transfers identifiers, names, addresses, contacts, documents,
   tax ID, emergency contacts; appends the duplicate's primary name as
   a "former" alias on the survivor; adds `Replaces` link; soft-deletes

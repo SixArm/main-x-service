@@ -22,6 +22,9 @@ use crate::models::Person;
 pub mod adapter;
 /// Per-field comparison algorithms (name, DOB, gender, address, …).
 pub mod algorithms;
+/// Match evidence from the canonical matcher, the auto-merge gate, and
+/// value frequencies (`agents/share/match-evidence.md`).
+pub mod evidence;
 /// Soundex phonetic encoding and similarity.
 pub mod phonetic;
 /// Probabilistic and deterministic scoring strategies.

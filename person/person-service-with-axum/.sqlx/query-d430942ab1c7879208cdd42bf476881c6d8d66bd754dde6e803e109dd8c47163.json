@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, record_id_a, record_id_b, match_score, match_quality,\n                detection_method, score_breakdown, status, provenance, reviewed_by,\n                created_at, reviewed_at\n         FROM review_queue\n         WHERE ($1::text IS NULL OR status = $1)\n         ORDER BY created_at DESC, id\n         LIMIT $2",
+  "query": "SELECT id, record_id_a, record_id_b, match_score, match_quality,\n                detection_method, score_breakdown, evidence, status, provenance, reviewed_by,\n                created_at, reviewed_at\n         FROM review_queue\n         WHERE ($1::text IS NULL OR status = $1)\n         ORDER BY created_at DESC, id\n         LIMIT $2",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,17 @@
       },
       {
         "ordinal": 7,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "evidence"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "status",
         "type_info": "Varchar",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "provenance",
         "type_info": "Varchar",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "reviewed_by",
         "type_info": "Varchar",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "reviewed_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -150,6 +161,7 @@
       false,
       false,
       true,
+      true,
       false,
       false,
       true,
@@ -157,5 +169,5 @@
       true
     ]
   },
-  "hash": "76ab0491f8c16c5a143d762a7eea67e9e7b953d46e020dea19ad467364fb2633"
+  "hash": "d430942ab1c7879208cdd42bf476881c6d8d66bd754dde6e803e109dd8c47163"
 }

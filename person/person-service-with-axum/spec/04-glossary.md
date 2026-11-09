@@ -9,5 +9,6 @@
 | **Match quality** | Definite / Probable / Possible / Unlikely buckets keyed off configurable thresholds |
 | **Merge** | An operation that transfers a duplicate's data onto a surviving record, soft-deletes the duplicate, and writes a `Replaces` link |
 | **Review queue** | A persisted set of candidate duplicate pairs, each `Pending` / `Confirmed` / `Rejected` / `AutoMerged` |
+| **Match evidence** | The matcher's Fellegi–Sunter weight for a pair, in bits, with its contradictions and strength (`proven` / `consistent` / `contradicted` / `non_match`); only `proven` permits an automatic merge ([match-evidence.md](../../../agents/share/match-evidence.md)) |
 | **Soft delete** | Persistence-level retention with `active = false`; never `DELETE FROM` |
 
