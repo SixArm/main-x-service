@@ -56,5 +56,11 @@ Single source of truth for outstanding work; absorbs what an SDD workflow would 
 - [x] Add an explicit "out of scope" clause to `spec/02-scope.md` stating that `worker-service`'s aptitude / personality / psychometric / selection assessment data (per-scale results, score bands, derived profile — the `worker-service` row of `agents/share/overview.md`) is never a matcher input, output, or scoring signal, mirroring the existing organisation-level-identifiers out-of-scope paragraph already in that section (verified: `grep -rni 'assessment|psychometric|aptitude|personality'` across this crate's `spec/` and `src/` returned zero hits — the boundary held in practice but was nowhere stated).
 - **Acceptance (met):** §2 now carries an "Out of scope (permanently): assessment data" paragraph in the same style as the organisation-level-identifiers paragraph, cross-referencing `worker-service`. No code change; `cargo test` / `cargo clippy --all-targets -- -D warnings` clean.
 
+
+**T-38 — Match evidence beside the similarity score (§12.7 / §13.3 / §16).** *(Done 2026-11-09.)*
+- [x] Add `src/evidence.rs` per [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md): `component_bits`, `AGREE_AT`/`DISAGREE_AT`, `IDENTIFIER_BITS`, `Evidence`, `Contradiction`, `MatchStrength`, and this crate's per-component `m`/`u` table; re-export the three types from the crate root.
+- [x] `MatchResult.evidence` (`#[serde(default)]`), computed in `match_workers` (and so in `match_one_to_many` / `rank_one_to_many`); `MatchConfig.proof_bits` (default 30).
+- [x] Contradictions per national-identifier scheme; passports add identifier bits but never contradict (renewals change the number); the demographic tuple adds no identifier bits; the neutral address `0.5` is excluded.
+- **Acceptance (met):** `score`, `is_match`, `confidence` and every existing test unchanged. New unit tests: missing component adds 0; identical name + DOB + gender → `Consistent` (≈ 27.7 bits); shared NHS number / passport → `Proven`; conflicting NHS numbers on otherwise identical records → `Contradicted`; richly identical record with no identifier → `Proven` (≈ 76 bits); clear disagreement → negative; legacy JSON without `evidence` deserialises. Property test: bits finite, strength consistent with contradictions.
 ---
 

@@ -8,5 +8,8 @@ Default thresholds: `match_threshold` = **0.85** (strict 0.95 / lenient 0.75). A
 
 When `strict_mode` is `true`, `is_match = (score >= match_threshold) && deterministic_match(p1, p2)`. Probabilistic `score` and `confidence` are unchanged across modes — strict mode tightens only the binary `is_match` decision, rejecting fuzzy matches that lack a deterministic anchor.
 
----
+### 13.3 `proof_bits`
 
+`proof_bits: f64`, default **30.0**, `#[serde(default)]` so configs written before the field still load. The evidence bar of §12.7: a pair with no contradiction and `evidence.weight_bits ≥ proof_bits` is `MatchStrength::Proven`. Thirty bits is `log2(N) + log2(1/α)` for a million records at one false merge in a thousand ([`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md) §4). The same across presets; a deployment sets its own. The crate has no config validator; consumers should keep it finite and positive.
+
+---

@@ -25,6 +25,7 @@
 //! | [`normalizer`]   | Text normalisation: names, postcodes, phone numbers, phonetic codes. |
 //! | [`scorer`]       | String-similarity primitives: Jaro-Winkler, Levenshtein, exact, combined. |
 //! | [`matcher`]      | Orchestration: [`MatchingEngine`], [`MatchConfig`], [`MatchResult`]. |
+//! | [`evidence`]     | Fellegi–Sunter match evidence: [`Evidence`], [`MatchStrength`], [`Contradiction`]. |
 //! | [`error`]        | Error enum [`MatchingError`] and [`Result`] alias. |
 //!
 //! See [`agents/architecture.md`](https://github.com/sixarm/worker-matcher/blob/main/agents/architecture.md)
@@ -137,6 +138,7 @@
 #![warn(clippy::pedantic)]
 
 pub mod error;
+pub mod evidence;
 pub mod identifiers;
 pub mod matcher;
 pub mod models;
@@ -145,6 +147,7 @@ pub mod normalizer;
 pub mod scorer;
 
 pub use error::{MatchingError, Result};
+pub use evidence::{Contradiction, Evidence, MatchStrength};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
 pub use models::{
     Address, BloodType, Gender, PassportBook, RelationKind, RelationshipRef, Worker, WorkerBuilder,

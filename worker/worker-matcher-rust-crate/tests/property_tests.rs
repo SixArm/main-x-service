@@ -13,7 +13,9 @@
 
 use chrono::NaiveDate;
 use proptest::prelude::*;
-use worker_matcher::{Confidence, Gender, MatchConfig, MatchingEngine, Normalizer, Worker};
+use worker_matcher::{
+    Confidence, Gender, MatchConfig, MatchStrength, MatchingEngine, Normalizer, Worker,
+};
 
 // ---------- Strategies ----------
 
@@ -241,5 +243,40 @@ proptest! {
             hi,
             Confidence::from_score(hi)
         );
+    }
+
+    /// Evidence MUST be finite, and the strength MUST agree with the
+    /// contradictions: `Contradicted` iff any contradiction is recorded,
+    /// otherwise `Proven` iff the bar is cleared (agents/share/match-evidence.md §4).
+    /// Each side optionally carries one of two different valid NHS numbers,
+    /// so shared, contradicted and absent identifiers are all exercised.
+    #[test]
+    fn evidence_is_finite_and_strength_is_consistent(
+        p1 in worker_strategy(),
+        p2 in worker_strategy(),
+        n1 in prop::option::of(prop_oneof![Just("9434765919"), Just("4010232137")]),
+        n2 in prop::option::of(prop_oneof![Just("9434765919"), Just("4010232137")]),
+    ) {
+        let mut p1 = p1;
+        let mut p2 = p2;
+        p1.uk_nhs_number = n1.map(str::to_string);
+        p2.uk_nhs_number = n2.map(str::to_string);
+        let config = MatchConfig::default();
+        let bar = config.proof_bits;
+        let r = MatchingEngine::new(config).match_workers(&p1, &p2);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "bits {}", e.weight_bits);
+        let contradicted = n1.is_some() && n2.is_some() && n1 != n2;
+        prop_assert_eq!(!e.contradictions.is_empty(), contradicted);
+        let expected = if contradicted {
+            MatchStrength::Contradicted
+        } else if e.weight_bits >= bar {
+            MatchStrength::Proven
+        } else if r.is_match {
+            MatchStrength::Consistent
+        } else {
+            MatchStrength::NonMatch
+        };
+        prop_assert_eq!(e.strength, expected);
     }
 }

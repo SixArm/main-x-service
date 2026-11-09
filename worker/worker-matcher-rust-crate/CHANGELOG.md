@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
 
+### Added — match evidence beside the similarity score (T-38)
+
+`MatchResult` gains `evidence: Evidence` (`#[serde(default)]`):
+Fellegi–Sunter log-likelihood `weight_bits`, `fields_compared`,
+`contradictions`, and a `MatchStrength` (`Contradicted` / `Proven` /
+`Consistent` / `NonMatch`), per the family contract
+`agents/share/match-evidence.md`. New `src/evidence.rs` holds
+`component_bits`, the constants, and this crate's per-component `m`/`u`
+table; `Evidence`, `Contradiction` and `MatchStrength` are re-exported
+from the root. `MatchConfig` gains `proof_bits` (default `30.0`). A
+shared national identifier or passport pair is proof; two different
+values under one identifier scheme are a contradiction; an identical
+name + DOB + gender record is `Consistent`, not `Proven`. `score`,
+`is_match` and `confidence` are unchanged. A `MatchConfig` struct
+literal without `..Default::default()` must now name `proof_bits`.
+See spec §12.7 / §13.3.
+
 ### Added — fuzz target for the national-identifier parsers (T-35)
 
 `fuzz/fuzz_targets/identifiers.rs` (new, the fourth target alongside

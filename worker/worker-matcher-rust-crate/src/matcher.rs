@@ -37,6 +37,7 @@
 //! assert!(result.is_match);
 //! ```
 
+use crate::evidence::{self, Evidence};
 use crate::identifiers;
 use crate::models::{Address, PassportBook, RelationKind, RelationshipRef, Worker};
 use crate::nicknames::NicknameTable;
@@ -129,6 +130,7 @@ use std::collections::HashSet;
 ///     nickname_table: worker_matcher::NicknameTable::empty(),
 ///     gmail_dot_folding: false,
 ///     phone_default_country: Some("GB".into()),
+///     proof_bits: 30.0,
 /// };
 /// assert_eq!(custom.match_threshold, 0.80);
 /// ```
@@ -362,6 +364,18 @@ pub struct MatchConfig {
     /// UK-centric behaviour. Set to the worker population's predominant
     /// jurisdiction in production deployments.
     pub phone_default_country: Option<String>,
+
+    /// Evidence, in bits, at or above which a pair with no contradiction
+    /// is [`crate::MatchStrength::Proven`]. Defaults to `30` — a million records
+    /// at one false merge in a thousand (`log2(1e6) + log2(1e3)`). See
+    /// [`crate::evidence`] and `agents/share/match-evidence.md` §4.
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
+}
+
+/// Serde default for [`MatchConfig::proof_bits`].
+fn default_proof_bits() -> f64 {
+    evidence::DEFAULT_PROOF_BITS
 }
 
 impl Default for MatchConfig {
@@ -440,6 +454,7 @@ impl Default for MatchConfig {
             nickname_table: NicknameTable::empty(),
             gmail_dot_folding: false,
             phone_default_country: Some("GB".to_string()),
+            proof_bits: evidence::DEFAULT_PROOF_BITS,
         }
     }
 }
@@ -596,6 +611,13 @@ pub struct MatchResult {
 
     /// Per-field score contributions for explainability.
     pub breakdown: MatchBreakdown,
+
+    /// How much the compared data proves, beside `score`: Fellegi–Sunter
+    /// log-likelihood bits, contradictions, and the [`crate::MatchStrength`]
+    /// verdict. Defaults to an empty [`Evidence`] (`NonMatch`) on JSON
+    /// written before the field existed. See [`crate::evidence`].
+    #[serde(default)]
+    pub evidence: Evidence,
 }
 
 /// Backstop for legacy `MatchResult` JSON payloads that lack the
@@ -885,12 +907,37 @@ impl MatchingEngine {
             above_threshold
         };
         let confidence = Confidence::from_score(score);
+        let evidence = self.calculate_evidence(worker1, worker2, &breakdown, is_match);
 
         MatchResult {
             score,
             is_match,
             confidence,
             breakdown,
+            evidence,
+        }
+    }
+
+    /// Compute the [`Evidence`] for a pair from its breakdown.
+    ///
+    /// One adjustment: an address pair with no sub-field present on both
+    /// sides scores a neutral `0.5` for `score`, but that is absence, not
+    /// disagreement, so it is left out of the evidence.
+    fn calculate_evidence(
+        &self,
+        worker1: &Worker,
+        worker2: &Worker,
+        breakdown: &MatchBreakdown,
+        is_match: bool,
+    ) -> Evidence {
+        if breakdown.address_score.is_some() && !addresses_comparable(worker1, worker2) {
+            let without_address = MatchBreakdown {
+                address_score: None,
+                ..breakdown.clone()
+            };
+            evidence::evaluate(&without_address, is_match, self.config.proof_bits)
+        } else {
+            evidence::evaluate(breakdown, is_match, self.config.proof_bits)
         }
     }
 
@@ -1811,6 +1858,27 @@ impl MatchingEngine {
         let family_name_match = f64::from(p1_family_name_phonetic == p2_family_name_phonetic);
         Some(f64::midpoint(given_name_match, family_name_match))
     }
+}
+
+/// `true` iff some address pair (current or previous, either side) has at
+/// least one of postcode, city or line 1 present on both — i.e. the
+/// address score is a real comparison rather than the neutral `0.5`.
+fn addresses_comparable(worker1: &Worker, worker2: &Worker) -> bool {
+    let all1 = worker1
+        .address
+        .iter()
+        .chain(worker1.previous_addresses.iter());
+    all1.into_iter().any(|a1| {
+        worker2
+            .address
+            .iter()
+            .chain(worker2.previous_addresses.iter())
+            .any(|a2| {
+                (a1.postcode.is_some() && a2.postcode.is_some())
+                    || (a1.city.is_some() && a2.city.is_some())
+                    || (a1.line1.is_some() && a2.line1.is_some())
+            })
+    })
 }
 
 /// One national-identifier scheme to compare between two workers: the same
@@ -3051,5 +3119,174 @@ mod tests {
         let p2 = Worker::builder().given_name("X").family_name("Y").build();
         let r = MatchingEngine::default_config().match_workers(&p1, &p2);
         assert_eq!(r.breakdown.death_place_score, None);
+    }
+
+    // ---------- evidence (agents/share/match-evidence.md) ----------
+
+    fn sparse_worker() -> Worker {
+        Worker::builder()
+            .given_name("Carys")
+            .family_name("Pritchard")
+            .date_of_birth(dob(1985, 1, 1))
+            .gender(crate::models::Gender::Female)
+            .build()
+    }
+
+    #[test]
+    fn evidence_identical_sparse_record_is_consistent_not_proven() {
+        let p = sparse_worker();
+        let r = MatchingEngine::default_config().match_workers(&p, &p.clone());
+        assert!(r.is_match);
+        assert_eq!(r.evidence.strength, crate::MatchStrength::Consistent);
+        assert!(r.evidence.contradictions.is_empty());
+        // given + family + DOB + gender + phonetic.
+        assert_eq!(r.evidence.fields_compared, 5);
+        assert!(r.evidence.weight_bits > 20.0);
+        assert!(r.evidence.weight_bits < MatchConfig::default().proof_bits);
+    }
+
+    #[test]
+    fn evidence_name_dob_gender_tuple_adds_no_identifier_bits() {
+        // The deterministic demographic tuple holds, but it is not an
+        // identifier: the evidence is the sum of its components only.
+        let p = sparse_worker();
+        let engine = MatchingEngine::default_config();
+        assert!(engine.deterministic_match(&p, &p.clone()));
+        let r = engine.match_workers(&p, &p.clone());
+        assert!(r.evidence.weight_bits < crate::evidence::IDENTIFIER_BITS);
+    }
+
+    #[test]
+    fn evidence_shared_unique_identifier_is_proven() {
+        let a = Worker::builder().uk_nhs_number("943 476 5919").build();
+        let b = Worker::builder().uk_nhs_number("9434765919").build();
+        let r = MatchingEngine::default_config().match_workers(&a, &b);
+        assert_eq!(r.evidence.strength, crate::MatchStrength::Proven);
+        assert_eq!(r.evidence.fields_compared, 1);
+        approx(r.evidence.weight_bits, crate::evidence::IDENTIFIER_BITS);
+    }
+
+    #[test]
+    fn evidence_shared_passport_is_proven() {
+        let book = PassportBook::new("GB", "123456789").expect("valid book");
+        let a = Worker::builder().passport_books(vec![book.clone()]).build();
+        let b = Worker::builder().passport_books(vec![book]).build();
+        let r = MatchingEngine::default_config().match_workers(&a, &b);
+        assert_eq!(r.evidence.strength, crate::MatchStrength::Proven);
+    }
+
+    #[test]
+    fn evidence_conflicting_identifier_contradicts_an_otherwise_identical_record() {
+        let a = Worker {
+            uk_nhs_number: Some("9434765919".into()),
+            ..sparse_worker()
+        };
+        let b = Worker {
+            uk_nhs_number: Some("4010232137".into()),
+            ..sparse_worker()
+        };
+        let r = MatchingEngine::default_config().match_workers(&a, &b);
+        assert_eq!(r.evidence.strength, crate::MatchStrength::Contradicted);
+        assert_eq!(
+            r.evidence.contradictions,
+            vec![crate::Contradiction {
+                field: "identifier:uk_nhs_number".into()
+            }]
+        );
+        let clean =
+            MatchingEngine::default_config().match_workers(&sparse_worker(), &sparse_worker());
+        approx(
+            r.evidence.weight_bits - clean.evidence.weight_bits,
+            crate::evidence::CONTRADICTION_BITS,
+        );
+    }
+
+    #[test]
+    fn evidence_richly_identical_record_without_identifier_is_proven() {
+        let p = Worker::builder()
+            .given_name("Carys")
+            .middle_name("Elin")
+            .family_name("Pritchard")
+            .date_of_birth(dob(1985, 1, 1))
+            .gender(crate::models::Gender::Female)
+            .blood_type(crate::models::BloodType::APositive)
+            .address(
+                Address::new()
+                    .with_line1("12 Castle Street")
+                    .with_city("Cardiff")
+                    .with_postcode("CF10 1AA"),
+            )
+            .birth_place(Address::new().with_city("Swansea").with_country("GB"))
+            .phone("029 2000 0000")
+            .email("carys.pritchard@example.org")
+            .build();
+        let r = MatchingEngine::default_config().match_workers(&p, &p.clone());
+        assert_eq!(r.evidence.strength, crate::MatchStrength::Proven);
+        assert!(r.evidence.weight_bits > 60.0, "{}", r.evidence.weight_bits);
+    }
+
+    #[test]
+    fn evidence_clear_disagreement_is_negative() {
+        let a = sparse_worker();
+        let b = Worker::builder()
+            .given_name("Gareth")
+            .family_name("Hughes")
+            .date_of_birth(dob(1962, 7, 30))
+            .gender(crate::models::Gender::Male)
+            .build();
+        let r = MatchingEngine::default_config().match_workers(&a, &b);
+        assert!(!r.is_match);
+        assert!(r.evidence.weight_bits < -10.0, "{}", r.evidence.weight_bits);
+        assert_eq!(r.evidence.strength, crate::MatchStrength::NonMatch);
+    }
+
+    #[test]
+    fn evidence_ignores_the_neutral_address_score() {
+        // Both sides carry an address, but no sub-field is on both, so
+        // `address_score` is the neutral 0.5 — which is absence, not
+        // disagreement, and must not cost evidence.
+        let a = Worker {
+            address: Some(Address::new().with_postcode("CF10 1AA")),
+            ..sparse_worker()
+        };
+        let b = Worker {
+            address: Some(Address::new().with_city("Cardiff")),
+            ..sparse_worker()
+        };
+        let r = MatchingEngine::default_config().match_workers(&a, &b);
+        assert_eq!(r.breakdown.address_score, Some(0.5));
+        let clean =
+            MatchingEngine::default_config().match_workers(&sparse_worker(), &sparse_worker());
+        approx(r.evidence.weight_bits, clean.evidence.weight_bits);
+        assert_eq!(r.evidence.fields_compared, clean.evidence.fields_compared);
+    }
+
+    #[test]
+    fn evidence_respects_a_configured_proof_bar() {
+        let p = sparse_worker();
+        let low_bar = MatchingEngine::new(MatchConfig {
+            proof_bits: 10.0,
+            ..MatchConfig::default()
+        });
+        let r = low_bar.match_workers(&p, &p.clone());
+        assert_eq!(r.evidence.strength, crate::MatchStrength::Proven);
+    }
+
+    #[test]
+    fn match_result_without_evidence_deserialises() {
+        let p = sparse_worker();
+        let r = MatchingEngine::default_config().match_workers(&p, &p.clone());
+        let mut value = serde_json::to_value(&r).unwrap();
+        value.as_object_mut().unwrap().remove("evidence");
+        let back: MatchResult = serde_json::from_value(value).unwrap();
+        assert_eq!(back.evidence, crate::Evidence::default());
+        assert_eq!(back.evidence.strength, crate::MatchStrength::NonMatch);
+        assert!((back.score - r.score).abs() < 1e-12);
+    }
+
+    #[test]
+    fn config_without_proof_bits_defaults_to_thirty() {
+        let c: MatchConfig = serde_json::from_str(r#"{"match_threshold":0.9}"#).unwrap();
+        approx(c.proof_bits, 30.0);
     }
 }

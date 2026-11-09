@@ -94,6 +94,7 @@ fn build_custom_config() -> MatchConfig {
         nickname_table: NicknameTable::english(),
         gmail_dot_folding: false,
         phone_default_country: Some("GB".into()),
+        proof_bits: 30.0,
     }
 }
 
@@ -165,6 +166,7 @@ fn build_nhs_config() -> MatchConfig {
         nickname_table: NicknameTable::empty(),
         gmail_dot_folding: false,
         phone_default_country: Some("GB".into()),
+        proof_bits: 30.0,
     }
 }
 
