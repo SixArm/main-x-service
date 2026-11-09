@@ -2706,6 +2706,19 @@
   (96) + no-run + clippy + fmt. *(Residual: a deterministic concurrent-race
   integration test, and the case `memory` (dev, non-transactional)
   path — both follow-ups.)*
+- [x] **SEC-B5b (S) 🔴** Self-merge guard for event, worker, place and
+  thing. *(found and done 2026-11-09)* SEC-B5 added it to person and case;
+  course, organization and care-pathway had it; these four did not. With
+  `main == duplicate` the merge applied the survivor and then soft-deleted
+  the same id, and the read-back then found nothing, so one request
+  deleted the record and answered `500`. Seen on a real database: event's
+  old handler left the row with `deleted_at` set. Each now answers `422`
+  `invalid_merge` before any read. Tests need no database (a `422` with
+  the pool aimed at a closed port proves the refusal came first); event
+  also has a DB test that the record survives, which fails on the old
+  handler. Found while writing event T-5's merge tests. *Still open:*
+  these four take no SEC-B5 row lock on the participants, so two
+  concurrent merges of one duplicate can both apply.
 - [x] **SEC-B6 (M) 🟠** Relay exactly-once. *(all 10 services done 2026-07-13)*
   `drain_once` now runs in a transaction and `unpublished` claims rows with
   `FOR UPDATE SKIP LOCKED`, so >1 relay instance can't double-ship (a second

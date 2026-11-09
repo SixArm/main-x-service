@@ -81,3 +81,31 @@ async fn max_candidates_above_the_cap_is_refused_before_any_read() {
     .into_response();
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+fn merge_request(
+    main: uuid::Uuid,
+    duplicate: uuid::Uuid,
+) -> place_service::models::merge::MergeRequest {
+    serde_json::from_value(serde_json::json!({
+        "main_place_id": main,
+        "duplicate_place_id": duplicate,
+    }))
+    .expect("a merge request")
+}
+
+/// A merge of a record into itself is refused with `422` before any read
+/// (SEC-B5): with `main == duplicate` the merge applied the survivor and
+/// then soft-deleted the same id. The database is unreachable, so a read
+/// would have answered `500`.
+#[tokio::test]
+async fn merging_a_record_into_itself_is_refused_before_any_read() {
+    let index = tempfile::tempdir().unwrap();
+    let id = uuid::Uuid::new_v4();
+    let response = place_service::api::rest::handlers::merge_places(
+        State(unreachable_state(&index)),
+        Json(merge_request(id, id)),
+    )
+    .await
+    .into_response();
+    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+}

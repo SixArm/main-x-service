@@ -33,6 +33,10 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- `POST /api/places/merge` refuses to merge a record into itself, with
+  `422`. It used to apply the survivor and then soft-delete the same
+  record, so the request deleted it and answered `500` (repo `tasks.md`
+  SEC-B5b).
 - Masking no longer panics on a value with a multi-byte character.
   `mask_phone`, which masks telephone and fax numbers, cut the string at a byte offset, so a value such as `"€€€€€€"`
   made the masked view, and any masked list or search holding that

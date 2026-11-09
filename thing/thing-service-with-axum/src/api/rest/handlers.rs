@@ -570,6 +570,17 @@ pub async fn merge_things(
     State(state): State<AppState>,
     Json(req): Json<MergeRequest>,
 ) -> impl IntoResponse {
+    // SEC-B5: a record cannot be merged into itself. With `main ==
+    // duplicate` the merge applies the survivor and then soft-deletes the
+    // same id, so the record is gone. Refused before any read, as person,
+    // course and the controller-style services already do.
+    if req.main_thing_id == req.duplicate_thing_id {
+        return ApiProblem::new(
+            "invalid_merge",
+            "main_thing_id and duplicate_thing_id must differ".to_string(),
+        )
+        .respond(StatusCode::UNPROCESSABLE_ENTITY);
+    }
     let main = match state.thing_repository.get_by_id(&req.main_thing_id).await {
         Ok(Some(t)) => t,
         Ok(None) => {
