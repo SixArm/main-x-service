@@ -10,6 +10,16 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- Events can carry booking, confirmation, ticket, encounter, transaction
+  and external identifiers. The repository wrote the identifier type in a
+  spelling the database's CHECK constraint refuses, so saving any of
+  them failed (T-19).
+- The duplicate check on create works. It searched for an event's whole
+  name as one word, so no name of two words or more found a candidate,
+  and it could not see an event indexed a moment before (T-20, T-21).
+- `POST /api/events/deduplicate` honours a `threshold` below `0.85`
+  (T-22).
+
 - Two concurrent merges can no longer both apply. `merge` locks both
   records and checks they are still active before writing; the loser
   answers `409` `merge_conflict` and changes nothing (repo `tasks.md`

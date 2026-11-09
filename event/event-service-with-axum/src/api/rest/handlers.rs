@@ -973,9 +973,13 @@ pub async fn batch_deduplicate(
         if candidates.is_empty() {
             continue;
         }
-        let Ok(matches) = state.matcher.find_matches(event, &candidates) else {
-            continue;
-        };
+        // Score every pair and filter on the request's own threshold.
+        // `find_matches` drops anything under the matcher's configured
+        // threshold first (0.85 by default), so a request for a lower one,
+        // such as the documented default of 0.7, used to change nothing.
+        let matches = candidates
+            .iter()
+            .filter_map(|c| state.matcher.match_events(event, c).ok());
         for m in matches {
             if m.score < req.threshold {
                 continue;

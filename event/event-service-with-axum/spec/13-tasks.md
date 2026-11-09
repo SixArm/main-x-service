@@ -143,10 +143,19 @@ clearly described manual check confirms the acceptance criterion.
     `EventTransport::Outbox` → `FluvioSink` → `drain_once` → assert
     `published_at`) against a real broker; see T-11 for the full
     acceptance record.
-- [ ] **T-5 — Dedup / merge / privacy integration tests.**
-  - [ ] Real-time dedup on create.
-  - [ ] Batch dedup + auto-merge.
-  - [ ] Mask + export round-trip.
+- [~] **T-5 — Dedup / merge / privacy integration tests.**
+  *(2026-11-09: in `tests/dedup_merge_privacy.rs` rather than
+  `api_integration_test.rs`; auto-merge waits on T-15.)* Writing them
+  found four defects, each fixed with a test that failed first: T-19
+  to T-22 below.
+  - [x] Real-time dedup on create: a second create sharing a ticket
+    number is a `409` naming the first.
+  - [~] Batch dedup finds the pair, and `merge` folds it: the duplicate
+    reads `404`, the survivor holds both identifiers, a repeat merge is
+    a `404`. Auto-merge is a label only until T-15.
+  - [x] Mask + export round-trip: the masked view hides the identifier
+    value, the organiser e-mail and the external party id that the
+    export returns whole.
   - **Acceptance:** `cargo test --test api_integration_test` covers
     all three workflows.
 - [~] **T-6 — gRPC implementation.** **Landed 2026-09-02 (repo
@@ -717,3 +726,45 @@ clearly described manual check confirms the acceptance criterion.
   holds. Unit tests 199 → 198, DB-gated suite 11 → 12 (gRPC 4/4
   included), all passing. Dependencies 387 → 352 unique normal
   crates.
+
+- [ ] **T-16 (decision) — A component neither event has scores `0`.**
+  *(Found 2026-11-09, T-5.)* `ProbabilisticScorer` adds every weighted
+  component, so two events identical in name, start, end, venue and
+  organiser score `0.75`, and with only name and start `0.45`, under the
+  default `0.85` threshold. Only a shared strong identifier (which
+  short-circuits to `1.0`) or matching performers, attendees and
+  identifiers as well reaches it, so the real-time check on create and
+  the batch scan at its default flag almost nothing. The family's
+  matching guide says only fields present in both should contribute.
+  Renormalising over the components either event has, lowering the
+  threshold, or deferring to the `event-matcher` crate (T-12) all change
+  which records are flagged, so this needs a decision, not a patch.
+- [x] **T-19 — Identifiers other than `TAX` and `OTHER` could not be
+  stored.** *(2026-11-09)* The repository wrote `identifier_type` in its
+  serde form (`BOOKINGNUMBER`, `EXTERNALREF`), and the
+  `event_identifiers` CHECK constraint lists the `Display` form
+  (`BOOKING_NUMBER`), so creating or updating an event with a booking,
+  confirmation, ticket, encounter, transaction or external identifier
+  failed with a constraint violation. It now writes and reads the
+  `Display` form; only `TAX` and `OTHER` could have been stored, and they
+  are the same in both, so no row changes. Deserialisation also accepts
+  `BookingNumber` (what the front-end sends, which fell through to
+  `Other`) and `BOOKING_NUMBER`; what the API sends is unchanged. One
+  wire spelling for service and front-end is still to choose.
+- [x] **T-20 — The duplicate check on create found no multi-word name.**
+  *(2026-11-09)* `search_by_name_and_date` and `fuzzy_search` built one
+  fuzzy term from the whole name, which the tokenized `name` field never
+  holds, so "Annual Cardiology Conference" found nothing. Both now split
+  the text with the field's tokenizer and match word by word, two edits
+  for words over five characters, one up to five, none up to two.
+- [x] **T-21 — An event created a moment ago was invisible to the next
+  request's duplicate check.** *(2026-11-09)* The index reader reloads
+  on commit only after a delay; `index_event`, `index_events` and
+  `delete_event` now reload it themselves, so a double submission is
+  caught.
+- [x] **T-22 — The batch scan ignored a threshold below the matcher's.**
+  *(2026-11-09)* `POST /api/events/deduplicate` filtered through
+  `find_matches`, which drops anything under the configured threshold
+  (`0.85`) first, so the request's `threshold`, documented with a
+  default of `0.7`, could only raise the cutoff. It now scores each pair
+  and filters on the request's threshold.

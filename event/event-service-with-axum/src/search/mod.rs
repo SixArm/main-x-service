@@ -64,6 +64,10 @@ impl SearchEngine {
         writer
             .commit()
             .map_err(|e| crate::Error::Search(format!("commit: {e}")))?;
+        // Read-your-writes: the reader reloads on commit only after a
+        // delay, so without this the next request's duplicate check did
+        // not see an event created a moment before.
+        self.index.reload()?;
         Ok(())
     }
 
@@ -84,6 +88,10 @@ impl SearchEngine {
         writer
             .commit()
             .map_err(|e| crate::Error::Search(format!("commit: {e}")))?;
+        // Read-your-writes: the reader reloads on commit only after a
+        // delay, so without this the next request's duplicate check did
+        // not see an event created a moment before.
+        self.index.reload()?;
         Ok(())
     }
 
@@ -117,7 +125,42 @@ impl SearchEngine {
         Ok(extract_ids(&searcher, s.id, &top))
     }
 
-    /// Fuzzy search on the event title.
+    /// A query matching events whose name shares at least one word with
+    /// `text`, each word within an edit distance that grows with its
+    /// length, ranked by how many words match.
+    ///
+    /// `text` is split with the `name` field's own tokenizer, so it is
+    /// compared word for word with what was indexed. Comparing the whole
+    /// string as one term, as this did, never matched a name of more than
+    /// one word. Words of up to two characters must match exactly and
+    /// words of up to five may differ by one edit, so a short word does
+    /// not match every other short word in the index.
+    fn fuzzy_name_query(&self, text: &str) -> Result<Box<dyn Query>> {
+        let s = self.index.schema();
+        let mut tokenizer = self
+            .index
+            .index()
+            .tokenizer_for_field(s.name)
+            .map_err(|e| crate::Error::Search(format!("name tokenizer: {e}")))?;
+        let mut stream = tokenizer.token_stream(text);
+        let mut clauses: Vec<(Occur, Box<dyn Query>)> = Vec::new();
+        while stream.advance() {
+            let word = &stream.token().text;
+            let distance = match word.chars().count() {
+                0..=2 => 0,
+                3..=5 => 1,
+                _ => 2,
+            };
+            let term = Term::from_field_text(s.name, word);
+            clauses.push((
+                Occur::Should,
+                Box::new(FuzzyTermQuery::new(term, distance, true)),
+            ));
+        }
+        Ok(Box::new(BooleanQuery::new(clauses)))
+    }
+
+    /// Fuzzy search on the event title, word by word.
     ///
     /// # Errors
     ///
@@ -125,10 +168,9 @@ impl SearchEngine {
     pub fn fuzzy_search(&self, query_str: &str, limit: usize) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let s = self.index.schema();
-        let term = Term::from_field_text(s.name, query_str);
-        let query = FuzzyTermQuery::new(term, 2, true);
+        let query = self.fuzzy_name_query(query_str)?;
         let top = searcher
-            .search(&query, &TopDocs::with_limit(limit).order_by_score())
+            .search(query.as_ref(), &TopDocs::with_limit(limit).order_by_score())
             .map_err(|e| crate::Error::Search(format!("fuzzy_search: {e}")))?;
         Ok(extract_ids(&searcher, s.id, &top))
     }
@@ -176,8 +218,7 @@ impl SearchEngine {
     ) -> Result<Vec<String>> {
         let searcher = self.index.reader().searcher();
         let s = self.index.schema();
-        let name_term = Term::from_field_text(s.name, name);
-        let name_q: Box<dyn Query> = Box::new(FuzzyTermQuery::new(name_term, 2, true));
+        let name_q = self.fuzzy_name_query(name)?;
         let final_q: Box<dyn Query> = if let Some(date) = date_yyyy_mm_dd {
             let parser = QueryParser::for_index(self.index.index(), vec![s.start_date]);
             if let Ok(date_q) = parser.parse_query(date) {
@@ -213,6 +254,7 @@ impl SearchEngine {
         writer
             .commit()
             .map_err(|e| crate::Error::Search(format!("commit delete: {e}")))?;
+        self.index.reload()?;
         Ok(())
     }
 
@@ -405,6 +447,63 @@ mod tests {
         let ids = engine.search("Conference", 10).unwrap();
         assert_eq!(ids.len(), 1);
         assert_eq!(ids[0], event.id.to_string());
+    }
+
+    /// The duplicate check's blocking query finds an event by its own
+    /// multi-word name, and by that name with a typo. It searched for the
+    /// whole name as one term, which a tokenized field never holds, so any
+    /// name of more than one word found nothing and the create path's
+    /// duplicate check never fired.
+    #[test]
+    fn name_and_date_blocking_finds_a_multi_word_name() {
+        let tmp = TempDir::new().unwrap();
+        let engine = SearchEngine::new(tmp.path()).unwrap();
+        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let event = evt("Annual Cardiology Conference", when);
+        engine.index_event(&event).unwrap();
+        engine.reload().unwrap();
+        for probe in [
+            "Annual Cardiology Conference",
+            "annual cardiology conference",
+            "Anual Cardiology Conferense",
+        ] {
+            let ids = engine
+                .search_by_name_and_date(probe, Some("2026-03-01"), 10)
+                .unwrap();
+            assert_eq!(ids, vec![event.id.to_string()], "{probe}");
+        }
+        let fuzzy = engine.fuzzy_search("Cardiolgy Conference", 10).unwrap();
+        assert_eq!(fuzzy, vec![event.id.to_string()]);
+    }
+
+    /// An indexed event is visible to the very next search, with no
+    /// explicit reload: the duplicate check on create depends on it.
+    #[test]
+    fn a_write_is_visible_to_the_next_search_without_a_reload() {
+        let tmp = TempDir::new().unwrap();
+        let engine = SearchEngine::new(tmp.path()).unwrap();
+        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let event = evt("Grand Rounds", when);
+        engine.index_event(&event).unwrap();
+        let ids = engine
+            .search_by_name_and_date("Grand Rounds", Some("2026-03-01"), 10)
+            .unwrap();
+        assert_eq!(ids, vec![event.id.to_string()]);
+        engine.delete_event(&event.id.to_string()).unwrap();
+        assert!(engine.fuzzy_search("Grand Rounds", 10).unwrap().is_empty());
+    }
+
+    /// Short words are matched exactly, not within two edits, so "t5" does
+    /// not match every two-letter word in the index.
+    #[test]
+    fn short_name_words_are_not_fuzzed_into_everything() {
+        let tmp = TempDir::new().unwrap();
+        let engine = SearchEngine::new(tmp.path()).unwrap();
+        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let other = evt("Q3 Review", when);
+        engine.index_event(&other).unwrap();
+        engine.reload().unwrap();
+        assert!(engine.fuzzy_search("T5", 10).unwrap().is_empty());
     }
 
     /// Fuzzy search tolerates a one-character typo in the title.

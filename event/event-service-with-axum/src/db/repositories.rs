@@ -384,7 +384,9 @@ fn to_rows(event: &Event) -> ChildRows {
             id: Uuid::new_v4(),
             event_id: event.id,
             use_type: id.use_type.as_ref().map(enum_to_str),
-            identifier_type: enum_to_str(&id.identifier_type),
+            // The `Display` form (`BOOKING_NUMBER`), which the CHECK
+            // constraint names; the serde form (`BOOKINGNUMBER`) is refused.
+            identifier_type: id.identifier_type.to_string(),
             system: id.system.clone(),
             value: id.value.clone(),
             assigner: id.assigner.clone(),
@@ -790,10 +792,11 @@ fn str_to_enum<T: serde::de::DeserializeOwned>(s: &str, default: T) -> T {
     serde_json::from_value::<T>(serde_json::Value::String(s.to_string())).unwrap_or(default)
 }
 
-/// Parse an `identifier_type` column string into an [`IdentifierType`],
-/// defaulting to [`IdentifierType::Other`] for unknown values.
+/// Parse an `identifier_type` column string, stored in its `Display`
+/// form, into an [`IdentifierType`], defaulting to
+/// [`IdentifierType::Other`] for unknown values.
 fn parse_identifier_type(s: &str) -> IdentifierType {
-    str_to_enum(s, IdentifierType::Other)
+    IdentifierType::from_stored(s).unwrap_or(IdentifierType::Other)
 }
 
 /// Parse a `use_type` column string into an optional [`IdentifierUse`];

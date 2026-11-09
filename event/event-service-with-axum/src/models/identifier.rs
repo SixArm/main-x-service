@@ -59,22 +59,33 @@ pub enum IdentifierUse {
 /// `ExternalRef` is the catch-all for opaque IDs from other systems.
 /// `TAX` is reserved for billable events that carry a tax/invoice ref.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema, PartialEq, Eq, Hash)]
+///
+/// On the wire each serializes in `UPPERCASE` (`BOOKINGNUMBER`) and is also
+/// read in its Rust name (`BookingNumber`, what the front-end sends) and its
+/// `Display` form (`BOOKING_NUMBER`). Storage uses the `Display` form, the
+/// one the `event_identifiers` CHECK constraint names.
 #[serde(rename_all = "UPPERCASE")]
 pub enum IdentifierType {
     /// Reservation / booking number (hotels, restaurants, …).
+    #[serde(alias = "BookingNumber", alias = "BOOKING_NUMBER")]
     BookingNumber,
     /// Confirmation code (typically alphanumeric, human-readable).
+    #[serde(alias = "ConfirmationCode", alias = "CONFIRMATION_CODE")]
     ConfirmationCode,
     /// Ticket number (specific ticket within a sale).
+    #[serde(alias = "TicketNumber", alias = "TICKET_NUMBER")]
     TicketNumber,
     /// Healthcare encounter ID (Encounter resource).
+    #[serde(alias = "EncounterId", alias = "ENCOUNTER_ID")]
     EncounterId,
     /// Sale / payment / order transaction ID.
+    #[serde(alias = "TransactionId", alias = "TRANSACTION_ID")]
     TransactionId,
     /// Opaque external system reference.
+    #[serde(alias = "ExternalRef", alias = "EXTERNAL_REF")]
     ExternalRef,
     /// Tax / invoice reference for billable events.
-    #[serde(rename = "TAX")]
+    #[serde(rename = "TAX", alias = "Tax")]
     Tax,
     /// Any other identifier type.
     #[serde(other)]
@@ -97,6 +108,27 @@ impl std::fmt::Display for IdentifierType {
             IdentifierType::Other => "OTHER",
         };
         f.write_str(s)
+    }
+}
+
+impl IdentifierType {
+    /// Every variant, in declaration order.
+    pub const ALL: [IdentifierType; 8] = [
+        IdentifierType::BookingNumber,
+        IdentifierType::ConfirmationCode,
+        IdentifierType::TicketNumber,
+        IdentifierType::EncounterId,
+        IdentifierType::TransactionId,
+        IdentifierType::ExternalRef,
+        IdentifierType::Tax,
+        IdentifierType::Other,
+    ];
+
+    /// The variant whose [`Display`](std::fmt::Display) form is `s`, the
+    /// form stored in `event_identifiers.identifier_type`.
+    #[must_use]
+    pub fn from_stored(s: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|t| t.to_string() == s)
     }
 }
 
@@ -158,5 +190,40 @@ mod tests {
         )
         .unwrap();
         assert_eq!(id.identifier_type, IdentifierType::Other);
+    }
+
+    /// The stored form round-trips for every variant, and is the form the
+    /// `event_identifiers` CHECK constraint lists.
+    #[test]
+    fn every_identifier_type_round_trips_through_its_stored_form() {
+        for t in IdentifierType::ALL {
+            assert_eq!(IdentifierType::from_stored(&t.to_string()), Some(t));
+        }
+        assert_eq!(IdentifierType::BookingNumber.to_string(), "BOOKING_NUMBER");
+        assert_eq!(IdentifierType::from_stored("BOOKINGNUMBER"), None);
+    }
+
+    /// The front-end sends the Rust name; it used to fall through to
+    /// `Other` and lose the type.
+    #[test]
+    fn identifier_types_are_read_in_all_three_spellings() {
+        for (text, want) in [
+            ("\"BOOKINGNUMBER\"", IdentifierType::BookingNumber),
+            ("\"BookingNumber\"", IdentifierType::BookingNumber),
+            ("\"BOOKING_NUMBER\"", IdentifierType::BookingNumber),
+            ("\"ExternalRef\"", IdentifierType::ExternalRef),
+            ("\"EXTERNAL_REF\"", IdentifierType::ExternalRef),
+            ("\"Tax\"", IdentifierType::Tax),
+            ("\"TAX\"", IdentifierType::Tax),
+            ("\"something else\"", IdentifierType::Other),
+        ] {
+            let got: IdentifierType = serde_json::from_str(text).unwrap();
+            assert_eq!(got, want, "{text}");
+        }
+        assert_eq!(
+            serde_json::to_string(&IdentifierType::BookingNumber).unwrap(),
+            "\"BOOKINGNUMBER\"",
+            "what the API sends is unchanged"
+        );
     }
 }
