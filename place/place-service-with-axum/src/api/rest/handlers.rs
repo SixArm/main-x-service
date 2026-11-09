@@ -470,11 +470,16 @@ pub async fn list_places(
         Err(refused) => return invalid_page(&refused),
     };
     let mask_sensitive = q.mask_sensitive.unwrap_or(false);
-    let places = state
+    // A database failure is a 500, not an empty page: an empty list would
+    // tell the caller there are no places.
+    let places = match state
         .place_repository
         .list(page.limit() + 1, page.offset())
         .await
-        .unwrap_or_default();
+    {
+        Ok(rows) => rows,
+        Err(e) => return fail(&e),
+    };
     let (places, more_follow) = page.split(places);
     let results: Vec<Place> = places
         .into_iter()
@@ -901,10 +906,18 @@ pub struct BatchDeduplicationRequest {
     /// Match threshold (default 0.7).
     #[serde(default)]
     pub threshold: Option<f64>,
-    /// Max candidates to scan (default 100).
+    /// Max candidates to scan: default 100, at most
+    /// [`DEDUPLICATE_MAX_CANDIDATES`]. Every pair of them is scored, so a
+    /// larger value is refused with `422` rather than clamped.
     #[serde(default)]
     pub max_candidates: Option<u64>,
 }
+
+/// The most active places one `POST /api/places/deduplicate` scans. The
+/// scan scores every pair, about half a million at this cap, so an
+/// unbounded value would let one request occupy the service for as long
+/// as the table is large (SEC-M1, bound every input).
+pub const DEDUPLICATE_MAX_CANDIDATES: u64 = 1_000;
 
 /// Review disposition of one queued duplicate pair. Serialized with the
 /// family's lowercase wire tokens (`pending`, `confirmed`, `rejected`,
@@ -982,12 +995,18 @@ pub async fn deduplicate(
     Json(req): Json<BatchDeduplicationRequest>,
 ) -> impl IntoResponse {
     let limit = req.max_candidates.unwrap_or(100);
+    if limit > DEDUPLICATE_MAX_CANDIDATES {
+        return ApiProblem::new(
+            "validation",
+            format!("max_candidates must be at most {DEDUPLICATE_MAX_CANDIDATES}"),
+        )
+        .respond(StatusCode::UNPROCESSABLE_ENTITY);
+    }
     let threshold = req.threshold.unwrap_or_else(|| state.matcher.threshold());
-    let places = state
-        .place_repository
-        .list(limit, 0)
-        .await
-        .unwrap_or_default();
+    let places = match state.place_repository.list(limit, 0).await {
+        Ok(rows) => rows,
+        Err(e) => return fail(&e),
+    };
     let mut review_items = Vec::new();
     // Upper-triangular pair iteration: j starts at i+1 so each pair is
     // scored once and no record is compared with itself. Every pair at

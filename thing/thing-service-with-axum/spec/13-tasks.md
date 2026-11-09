@@ -668,3 +668,15 @@ clearly described manual check confirms the acceptance criterion.
   (`id` is outside the pre-image), tampers with it in SQL, and asserts
   `?limit=3` reports it; it failed before the fix (`verified: true`,
   `mismatched: []`).
+- [x] **T-17 (S, security) — Answer a database failure, and bound the
+  dedup scan.** *(Found and done 2026-11-09.)* `GET /api/things` and
+  `POST /api/things/deduplicate` read through `.unwrap_or_default()`,
+  so a database outage answered `200` with an empty list, telling the
+  caller there were no things. Both now answer the error (`500`).
+  `deduplicate` also loaded `max_candidates` rows with no ceiling and
+  scored every pair, so one request could ask for the square of the
+  table; a value above `DEDUPLICATE_MAX_CANDIDATES` (1 000, about half a
+  million pairs) is now a `422`, refused rather than clamped, before
+  anything is read. `tests/unreachable_database.rs` needs no database:
+  it points the real repository at a port nothing listens on, and the
+  list test fails with `200` when the error is swallowed again.

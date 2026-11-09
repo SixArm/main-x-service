@@ -8,6 +8,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security
+
+- `POST /api/places/deduplicate` refuses a `max_candidates` above 1 000
+  with `422`. It scores every pair of the records it loads, and had no
+  ceiling (T-22).
+
 ### Added
 
 - `GET /api/places/{id}/descendants` lists every active place below a
@@ -27,6 +33,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- A database failure on `GET /api/places` and
+  `POST /api/places/deduplicate` answers `500`. Both answered `200`
+  with nothing in it, as if there were no places (T-22).
 - `GET /api/places/nearby` reaches every place in the radius. It read
   at most 5 000 bounding-box candidates in no particular order before
   filtering, so once more shared the box it could leave nearer places

@@ -8,8 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security
+
+- `POST /api/things/deduplicate` refuses a `max_candidates` above 1 000
+  with `422`. It scores every pair of the records it loads, and had no
+  ceiling (T-17).
+
 ### Fixed
 
+- A database failure on `GET /api/things` and
+  `POST /api/things/deduplicate` answers `500`. Both answered `200`
+  with nothing in it, as if there were no things (T-17).
 - The outbox relay's ack stamps `published_at` from this process's clock,
   the clock `purge_published` builds its retention cutoff on. It took
   Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged

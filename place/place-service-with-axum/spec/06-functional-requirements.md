@@ -102,7 +102,9 @@ this SQL-range pre-filter is the interim answer the extensions list
 - Real-time `409 Conflict` on `POST /api/places` when an existing
   place is within proximity threshold + name match.
 - Explicit `POST /api/places/check-duplicates`.
-- Batch `POST /api/places/deduplicate`.
+- Batch `POST /api/places/deduplicate`, scanning `max_candidates` active
+  records (default 100, at most 1 000; above is a `422`) and scoring
+  every pair.
 - Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`).
 - Merge transfers identifiers, alternate names, amenity features,
   opening-hours specifications, `same_as` URLs, hierarchy links;

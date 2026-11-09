@@ -84,7 +84,9 @@ to consent constraints.
 - Real-time `409 Conflict` on `POST /api/things` when an existing
   Thing matches on a deterministic identifier or on name + URL.
 - Explicit `POST /api/things/check-duplicates`.
-- Batch `POST /api/things/deduplicate`.
+- Batch `POST /api/things/deduplicate`, scanning `max_candidates` active
+  records (default 100, at most 1 000; above is a `422`) and scoring
+  every pair.
 - Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`).
 - Merge transfers identifiers, `alternate_names`, `same_as`,
   `images`; appends the duplicate's name as `alternate_name` on the
