@@ -101,6 +101,20 @@ not contradicted by a partner holding either of them. Blank values, after
 the crate's own normalisation, are ignored, as for the short-circuit
 (SEC-M2).
 
+**Document numbers prove but never contradict.** A passport or similar
+document number identifies a document, not its holder, and changes on
+every renewal. A shared `(country, number)` pair adds `IDENTIFIER_BITS`,
+but two different passports record no contradiction, or a renewed
+passport would contradict its holder's older record (person and worker).
+For the same reason, `same_as` URL sets never contradict: one record may
+cite a Wikidata page and the other an OER entry for the same thing.
+
+**Placeholder scores are missing data.** Some components return a neutral
+`0.5` when neither side holds a comparable sub-field (an address with no
+shared part). Evidence treats that as absent, not as a partial
+disagreement (place, worker). Event's empty-location `0.5` (its OQ-J)
+still weighs as one, and is recorded there.
+
 ## 4. Strength
 
 ```rust
@@ -191,6 +205,13 @@ measurement. Rules of thumb:
 
 ## 6. What this deliberately leaves out
 
+- **Correlated components.** Summing weights assumes the components are
+  independent given match status. Start and end date, or organiser and
+  venue, are not, so a rich record somewhat overstates its evidence. The
+  tables keep derived components (Soundex next to the name, an event-id
+  score next to the identifier rule) out of the sum for this reason, and
+  a deployment that sees false `Proven` results should raise `proof_bits`
+  before anything else.
 - **Frequency-adjusted weights.** Agreeing on "Smith" proves less than
   agreeing on a rare name (Winkler; Splink's term-frequency adjustment).
   That needs per-deployment value frequencies, so it belongs in the
