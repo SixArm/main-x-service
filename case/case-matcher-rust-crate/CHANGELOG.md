@@ -10,6 +10,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — correlated groups, value frequencies, evidence listing
+
+Per `agents/share/match-evidence.md` §6–§8 (spec §18a):
+`CORRELATED_GROUPS` `{title, subjects, keywords}` and
+`{case_type, status}` count their non-strongest members at half weight,
+so the richest identical case without an identifier now scores ≈ 16.3
+bits (was ≈ 22.3). Title agreement can be weighed by the title's own
+share through the new `MatchingEngine::match_cases_with_frequencies`
+with a `ValueFrequencies` source (`FrequencyTable`, `NoFrequencies`,
+`frequency_key`); `match_cases` uses `NoFrequencies`. `Evidence` gains
+`#[serde(default)] components: Vec<ComponentBits>`, every term of
+`weight_bits` including identifier and contradiction terms. `score`,
+`is_match` and `confidence` are unchanged.
+
 ### Added — match evidence beside the similarity score
 
 Per `agents/share/match-evidence.md`: `MatchResult` gains

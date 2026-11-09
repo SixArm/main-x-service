@@ -14,7 +14,7 @@ use strsim::jaro_winkler;
 
 use crate::case::{Case, IdentifierScheme};
 use crate::config::MatchConfig;
-use crate::evidence::{self, Contradiction};
+use crate::evidence::{self, Contradiction, NoFrequencies, ValueFrequencies};
 use crate::normalize;
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
@@ -112,6 +112,23 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_cases(&self, a: &Case, b: &Case) -> MatchResult {
+        self.match_cases_with_frequencies(a, b, &NoFrequencies)
+    }
+
+    /// Score two cases, weighing an exact agreement on a
+    /// [`evidence::FREQUENCY_COMPONENTS`] value by that value's own share
+    /// from `frequencies` (`agents/share/match-evidence.md` §7).
+    ///
+    /// Only `evidence` can differ from [`MatchingEngine::match_cases`]:
+    /// `score`, `is_match`, `confidence` and the breakdown are identical.
+    /// Passing [`NoFrequencies`] gives exactly the plain call's result.
+    #[must_use]
+    pub fn match_cases_with_frequencies(
+        &self,
+        a: &Case,
+        b: &Case,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         // Components are computed on both paths: the probabilistic score
         // needs them, and so does the evidence (match-evidence.md §3 — a
         // short-circuit still weighs the components it can compute). Each
@@ -127,6 +144,17 @@ impl MatchingEngine {
             deterministic_match: false,
         };
         let contradictions = contradictions(a, b);
+        // A share is looked up only when both primary titles have the same
+        // key, i.e. the records hold the same normalised value.
+        let mut shares: Vec<(&str, f64)> = Vec::new();
+        if let (Some(ka), Some(kb)) = (
+            evidence::frequency_key("title", &a.title),
+            evidence::frequency_key("title", &b.title),
+        ) && ka == kb
+            && let Some(share) = frequencies.share("title", &ka)
+        {
+            shares.push(("title", share));
+        }
 
         // Phase 1: deterministic short-circuit. A globally-unique
         // identifier match, a same-agency case-number match, or a
@@ -137,6 +165,7 @@ impl MatchingEngine {
                 &components,
                 true,
                 contradictions,
+                &shares,
                 true,
                 self.config.proof_bits,
             );
@@ -175,6 +204,7 @@ impl MatchingEngine {
             &components,
             false,
             contradictions,
+            &shares,
             is_match,
             self.config.proof_bits,
         );
@@ -1029,8 +1059,9 @@ mod tests {
     }
 
     // Pins that a case can NOT be proven from its fields alone under the
-    // default table: title + subjects + type + status + keywords sum to
-    // about 22.3 bits, short of 30. A case's descriptive fields are
+    // default table: title 7.57 + ½(subjects 6.41 + keywords 4.00) +
+    // type 2.66 + ½ status 1.68 ≈ 16.28 bits after the correlated-group
+    // discount (22.3 before it), short of 30. A case's descriptive fields are
     // shared by related matters (one claimant's several appeals), so only
     // an identifier or a same-agency case number proves identity.
     #[test]
@@ -1041,7 +1072,7 @@ mod tests {
         assert!(r.is_match);
         assert_eq!(r.evidence.fields_compared, 5);
         assert!(
-            (r.evidence.weight_bits - 22.3).abs() < 0.1,
+            (r.evidence.weight_bits - 16.28).abs() < 0.01,
             "got {}",
             r.evidence.weight_bits
         );
@@ -1065,5 +1096,129 @@ mod tests {
             r.evidence.weight_bits
         );
         assert_eq!(r.evidence.strength, MatchStrength::NonMatch);
+    }
+
+    // ─── Correlated groups and value frequencies ─────────────────
+
+    use crate::evidence::{FrequencyTable, NoFrequencies, frequency_key};
+
+    // One claimant's two separate cases: templated title, same type, same
+    // subjects, different (but unknown) numbers. Related matters, not one
+    // case, so they must not be Proven, with or without frequencies.
+    #[test]
+    fn related_matters_of_one_claimant_are_not_proven() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Case::new("Housing Benefit Claim");
+        a.subjects = vec!["John Smith".into()];
+        a.case_type = Some(CaseType::Benefit);
+        let mut b = a.clone();
+        a.status = Some(CaseStatus::Closed);
+        b.status = Some(CaseStatus::Open);
+        let plain = engine.match_cases(&a, &b);
+        assert_ne!(plain.evidence.strength, MatchStrength::Proven);
+        assert!(
+            plain.evidence.weight_bits < 30.0,
+            "got {}",
+            plain.evidence.weight_bits
+        );
+
+        let mut table = FrequencyTable::default();
+        let key = frequency_key("title", &a.title).expect("key");
+        table.insert("title", &key, 0.2);
+        let freq = engine.match_cases_with_frequencies(&a, &b, &table);
+        assert_ne!(freq.evidence.strength, MatchStrength::Proven);
+        assert!(freq.evidence.weight_bits < plain.evidence.weight_bits);
+    }
+
+    // A templated title held by a fifth of all cases proves little:
+    // log2(0.95 / 0.2) ≈ 2.25 bits, against 7.57 from the default u.
+    #[test]
+    fn common_templated_title_proves_little() {
+        let engine = MatchingEngine::default_config();
+        let a = Case::new("Housing Benefit Claim");
+        let b = Case::new("  housing benefit claim ");
+        let table =
+            FrequencyTable::from_counts(&[("title", "housing benefit claim", 2000)], 10_000);
+        let r = engine.match_cases_with_frequencies(&a, &b, &table);
+        let title = &r.evidence.components[0];
+        assert_eq!(title.component, "title");
+        assert!(title.frequency_adjusted);
+        assert!(
+            (title.bits - (0.95_f64 / 0.2).log2()).abs() < 1e-9,
+            "got {}",
+            title.bits
+        );
+        assert!(title.bits < 2.5);
+        // score / is_match / confidence are untouched by frequencies.
+        let plain = engine.match_cases(&a, &b);
+        assert!((r.score - plain.score).abs() < 1e-15);
+        assert_eq!(r.is_match, plain.is_match);
+        assert_eq!(r.confidence, plain.confidence);
+    }
+
+    // A share is not used when the titles only nearly agree.
+    #[test]
+    fn near_agreeing_titles_are_not_frequency_adjusted() {
+        let engine = MatchingEngine::default_config();
+        let a = Case::new("Housing benefit appeal — J. Smith");
+        let b = Case::new("Housing benefit appeal — John Smith");
+        let mut table = FrequencyTable::default();
+        for t in [&a.title, &b.title] {
+            table.insert("title", &frequency_key("title", t).expect("key"), 0.5);
+        }
+        let r = engine.match_cases_with_frequencies(&a, &b, &table);
+        assert!(!r.evidence.components[0].frequency_adjusted);
+        assert_eq!(
+            serde_json::to_value(&r.evidence).expect("json"),
+            serde_json::to_value(&engine.match_cases(&a, &b).evidence).expect("json"),
+        );
+    }
+
+    // `NoFrequencies` gives exactly the plain call.
+    #[test]
+    fn no_frequencies_equals_plain_call() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich_case();
+        let b = rich_case();
+        a.identifiers.push(ident(IdentifierScheme::Docket, "CV-1"));
+        for (x, y) in [(&a, &b), (&b, &b)] {
+            let plain = serde_json::to_value(engine.match_cases(x, y)).expect("json");
+            let none =
+                serde_json::to_value(engine.match_cases_with_frequencies(x, y, &NoFrequencies))
+                    .expect("json");
+            assert_eq!(plain, none);
+        }
+    }
+
+    // The evidence listing names every term and sums to weight_bits,
+    // including the identifier and contradiction terms.
+    #[test]
+    fn components_list_every_term() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich_case();
+        let mut b = rich_case();
+        a.identifiers.push(ident(IdentifierScheme::Docket, "CV-1"));
+        b.identifiers.push(ident(IdentifierScheme::Docket, "CV-1"));
+        a.identifiers.push(ident(IdentifierScheme::Uuid, "u-1"));
+        b.identifiers.push(ident(IdentifierScheme::Uuid, "u-2"));
+        let e = engine.match_cases(&a, &b).evidence;
+        let names: Vec<&str> = e.components.iter().map(|c| c.component.as_str()).collect();
+        assert!(names.contains(&"identifier"));
+        assert!(names.contains(&"contradiction:identifier:uuid"));
+        let sum: f64 = e.components.iter().map(|c| c.bits).sum();
+        assert!((sum - e.weight_bits).abs() < 1e-12);
+        assert!(e.components.iter().any(|c| c.correlated));
+    }
+
+    // The frequency key is the folded primary title; other components and
+    // blank titles have none.
+    #[test]
+    fn frequency_key_is_the_compared_form() {
+        assert_eq!(
+            frequency_key("title", "  Housing Benefit CLAIM "),
+            Some("housing benefit claim".into())
+        );
+        assert_eq!(frequency_key("title", "   "), None);
+        assert_eq!(frequency_key("subjects", "John"), None);
     }
 }

@@ -25,7 +25,8 @@
 //!   `[A-Z][0-9]{3}` code for any UTF-8 input, and never panics.
 
 use case_matcher::{
-    Case, CaseIdentifier, Confidence, IdentifierScheme, MatchConfig, MatchStrength, MatchingEngine,
+    Case, CaseIdentifier, Confidence, FrequencyTable, IdentifierScheme, MatchConfig, MatchStrength,
+    MatchingEngine, frequency_key,
 };
 use case_matcher::{normalize, phonetic};
 use proptest::prelude::*;
@@ -312,5 +313,24 @@ proptest! {
         let rev = engine.match_cases(&b, &a).evidence;
         prop_assert!((e.weight_bits - rev.weight_bits).abs() < 1e-9);
         prop_assert_eq!(e.strength, rev.strength);
+    }
+
+    /// The listed terms MUST add up to `weight_bits` exactly, with or
+    /// without a frequency source.
+    #[test]
+    fn evidence_components_sum_to_weight_bits(
+        a in case_with_ids(), b in case_with_ids(), share in 0.0f64..=1.0,
+    ) {
+        let engine = MatchingEngine::default_config();
+        let mut table = FrequencyTable::default();
+        if let Some(k) = frequency_key("title", &a.title) {
+            table.insert("title", &k, share);
+        }
+        for r in [engine.match_cases(&a, &b), engine.match_cases_with_frequencies(&a, &b, &table)] {
+            let e = &r.evidence;
+            let sum: f64 = e.components.iter().map(|c| c.bits).sum();
+            prop_assert!((sum - e.weight_bits).abs() <= 1e-9, "sum {} vs {}", sum, e.weight_bits);
+            prop_assert!(e.components.iter().all(|c| c.bits.is_finite()));
+        }
     }
 }

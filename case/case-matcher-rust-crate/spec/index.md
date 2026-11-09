@@ -292,13 +292,53 @@ holds the code and this crate's `(m, u)` table:
   not a scheme and never contradict.
 - **Strength**, in order: `Contradicted`, `Proven` (`weight_bits ≥
   proof_bits`), `Consistent` (`is_match`), `NonMatch`.
-- Consequence of the table: identical title-only records score ≈ 7.57
-  bits (`Consistent`); the richest identical record without an
-  identifier or case number (title, subjects, type, status, keywords)
-  scores ≈ 22.3 bits and is **not** `Proven`. A case's descriptive
-  fields are shared by a claimant's related matters, so only an
-  identifier proves identity. Pinned by
-  `richest_identical_record_without_identifier_is_not_proven`.
+- **Correlated groups** (contract §6), public contract as
+  `evidence::CORRELATED_GROUPS`. Within a group the present member with
+  the largest absolute bits counts in full and each other present member
+  at `CORRELATED_DISCOUNT = 0.5`, agreements and disagreements alike;
+  the result does not depend on component order. The groups are disjoint:
+  - `{title, subjects, keywords}` — agencies generate titles from the
+    matter and the party ("Housing benefit appeal — J. Smith") and tag
+    keywords from the same matter, so one claimant's related cases agree
+    on all three for one reason. (The two pairs `{subjects, keywords}`
+    and `{title, keywords}` are merged into one group so that `keywords`
+    is never discounted twice.)
+  - `{case_type, status}` — the type sets the workflow, and with it the
+    statuses a case of that type passes through.
+  `case_number` stands alone.
+- **Value frequencies** (contract §7). `FREQUENCY_COMPONENTS = ["title"]`:
+  template titles ("Housing Benefit Claim") are very common. The key is
+  `frequency_key("title", raw)` = `normalize::fold(raw)` of the
+  **primary** title (alternate titles are not looked up); a blank title
+  has no key, and every other component returns `None`. When both
+  primary titles have the same key and the `ValueFrequencies` source
+  knows its share, the title's full-agreement weight is
+  `log2(m / clamp(share, MIN_SHARE = 1e-9, m))` in place of `log2(m/u)`;
+  a share at or above `m` gives `0`. Partial agreement and disagreement
+  are never adjusted. `MatchingEngine::match_cases_with_frequencies(a, b,
+  &dyn ValueFrequencies)` takes the source; `match_cases` passes
+  `NoFrequencies`, so plain calls get the table unchanged. `FrequencyTable`
+  builds a source from `(component, key, count)` counts over a total.
+  Frequencies change only `evidence`, never `score`, `is_match`,
+  `confidence` or the breakdown.
+- **Explainability** (contract §8). `Evidence.components`
+  (`#[serde(default)]`) lists every term as `ComponentBits { component,
+  bits, correlated, frequency_adjusted }`: the components in the order
+  of the table above, then `identifier`, then one
+  `contradiction:identifier:<scheme>` per contradiction. The terms sum
+  exactly to `weight_bits` (proptest
+  `evidence_components_sum_to_weight_bits`).
+- Consequence of the table (default u, no frequencies): identical
+  title-only records score ≈ 7.57 bits (`Consistent`). The richest
+  identical record without an identifier or case number scores
+  7.57 + ½(6.41 + 4.00) + 2.66 + ½·1.68 ≈ 16.28 bits and is **not**
+  `Proven`: a case's descriptive fields are shared by a claimant's
+  related matters, so only an identifier proves identity. One
+  claimant's two cases under a templated title with the same type and
+  subjects but different statuses score ≈ 12.5 bits, ≈ 9.2 with the
+  title at a 0.2 share. Pinned by
+  `richest_identical_record_without_identifier_is_not_proven` and
+  `related_matters_of_one_claimant_are_not_proven`.
 
 ## 19. Quality goals
 
@@ -334,7 +374,10 @@ Semantic versioning. Re-exports from `lib.rs` are the contract:
 `Case`, `CaseIdentifier`, `IdentifierScheme`, `CaseType`, `CaseStatus`,
 `Priority`, `MatchingEngine`, `MatchConfig`, `MatchResult`,
 `MatchBreakdown`, `Confidence`, `Evidence`, `Contradiction`,
-`MatchStrength`, `Error`, `Result`. (`RelationshipRef`
+`MatchStrength`, `ComponentBits`, `ValueFrequencies`, `NoFrequencies`,
+`FrequencyTable`, `frequency_key`, `Error`, `Result`; the
+`evidence::CORRELATED_GROUPS` and `evidence::FREQUENCY_COMPONENTS` lists
+and the frequency-key form are contract too (§18a). (`RelationshipRef`
 and `RelationKind` are **planned** additions — §13a, §23 — not yet
 present in `src/case.rs` or re-exported from `lib.rs`; add them to
 this list in the same PR that lands §23's relationships task.)
@@ -356,6 +399,14 @@ IO, async, or panics to library code.
       (unit + a proptest that `weight_bits` is finite and the strength
       agrees with the contradictions). `score`, `is_match` and
       `confidence` unchanged.
+- [x] **Match evidence, phase 2** (`agents/share/match-evidence.md`
+      §6–§8): `CORRELATED_GROUPS` (`{title, subjects, keywords}`,
+      `{case_type, status}`) with the 0.5 discount; title value
+      frequencies (`ValueFrequencies`, `NoFrequencies`,
+      `FrequencyTable`, `frequency_key`,
+      `match_cases_with_frequencies`); `Evidence.components` summing
+      exactly to `weight_bits`. Plain `match_cases` results change only
+      in `weight_bits` (the discount) and the new listing.
 
 - [ ] Implement the `relationships` component in code: add
       `relationships: Vec<RelationshipRef>` to `Case`, the

@@ -88,6 +88,9 @@ pub mod scoring;
 pub use case::{Case, CaseIdentifier, CaseStatus, CaseType, IdentifierScheme, Priority};
 pub use config::MatchConfig;
 pub use error::{Error, Result};
-pub use evidence::{Contradiction, Evidence, MatchStrength};
+pub use evidence::{
+    ComponentBits, Contradiction, Evidence, FrequencyTable, MatchStrength, NoFrequencies,
+    ValueFrequencies, frequency_key,
+};
 pub use matcher::MatchingEngine;
 pub use scoring::{Confidence, MatchBreakdown, MatchResult};
