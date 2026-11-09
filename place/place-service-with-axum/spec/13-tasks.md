@@ -90,7 +90,7 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] Add `geometry(Point, 4326)` column on `place_geo_coordinates`.
   - [ ] GiST index + `ST_DWithin` for geo-radius search.
   - **Acceptance:** geo-radius search ≤ 200 ms p50 at 1 M places.
-- [ ] **T-2 — Recursive CTE for place hierarchy depth queries.**
+- [x] **T-2 — Recursive CTE for place hierarchy depth queries.** *(Both halves 2026-11-09.)*
   - [x] Replace linear walk with `WITH RECURSIVE`. *(2026-11-09.)* The
     T-16 cycle check is one recursive query instead of a round trip
     per level, and it now runs inside the write's transaction under a
@@ -101,8 +101,18 @@ clearly described manual check confirms the acceptance criterion.
     cycle not involving the place ends the walk; and an edit waits on a
     concurrent writer holding the lock, then sees its change and
     answers `409`.
-  - [ ] The descendants query below is still open: no endpoint lists a
-    place's descendants yet.
+  - [x] `GET /api/places/{id}/descendants` *(2026-11-09)* lists every
+    place below one, at any depth, in one `WITH RECURSIVE` query
+    (`page_descendants`) over the `contained_in_place` index. The walk
+    goes through active places only, so a soft-deleted place hides its
+    subtree, and `UNION` ends it on a cycle already in the data. Places
+    come in `id` order, paged by signed cursor with `GET /api/places`'s
+    limits; `mask_sensitive` applies; an unknown `{id}` is a `404`. DB
+    test (`tests/descendants_endpoint.rs`): a six-level chain with a
+    branch, walked two to a page, lists exactly the seven places below
+    the root, not the root, not an unrelated place, and not the child
+    of a soft-deleted place, which it does when the deleted-place
+    filter is removed. The ≤ 100 ms p50 figure was not measured.
   - **Acceptance:** "list all descendants of `place_id`" returns
     correctly for ≥ 5 levels deep, ≤ 100 ms p50.
 - [ ] **T-3 — Production Fluvio publisher.**

@@ -487,6 +487,60 @@ pub async fn list_places(
     )
 }
 
+/// Every place below one place in the `contained_in_place` hierarchy, at
+/// any depth (spec §13 T-2).
+///
+/// `GET /api/places/{id}/descendants?limit=&cursor=&mask_sensitive=`.
+/// One recursive query walks down through active places; the place itself
+/// is not in the answer, and a cycle already in the data ends the walk.
+/// Places come in `id` order and page by signed cursor like
+/// `GET /api/places`, with the same limits. An unknown `{id}` is a `404`.
+#[utoipa::path(get, path = "/api/places/{id}/descendants", tag = "places",
+    params(("id" = Uuid, Path, description = "Place id"), ListQuery),
+    responses(
+        (status = 200, body = ListResponse),
+        (status = 404, description = "Not found"),
+        (status = 422, description = "invalid limit or cursor")
+    ))]
+pub async fn place_descendants(
+    State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
+    Path(id): Path<Uuid>,
+    Query(q): Query<ListQuery>,
+) -> impl IntoResponse {
+    let page = match page_of(
+        &uri,
+        limits(LIST_DEFAULT_LIMIT as u64, LIST_MAX_LIMIT as u64),
+    ) {
+        Ok(page) => page,
+        Err(refused) => return invalid_page(&refused),
+    };
+    match state.place_repository.get_by_id(&id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return fail(&crate::Error::NotFound),
+        Err(e) => return fail(&e),
+    }
+    let rows = match state
+        .place_repository
+        .page_descendants(id, page.offset(), page.limit() + 1)
+        .await
+    {
+        Ok(rows) => rows,
+        Err(e) => return fail(&e),
+    };
+    let (places, more_follow) = page.split(rows);
+    let mask_sensitive = q.mask_sensitive.unwrap_or(false);
+    let results: Vec<Place> = places
+        .into_iter()
+        .map(|p| if mask_sensitive { mask_place(&p) } else { p })
+        .collect();
+    with_next(
+        &page,
+        more_follow,
+        ok(StatusCode::OK, ListResponse { results }),
+    )
+}
+
 /// Query parameters for `GET /api/places/nearby`.
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 pub struct NearbyQuery {

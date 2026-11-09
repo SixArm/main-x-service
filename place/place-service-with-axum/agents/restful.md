@@ -192,6 +192,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET    | `/api/places/{id}/export` | GDPR data export      |
 | GET    | `/api/places/{id}/masked` | Masked place view     |
 | GET    | `/api/places/search.geojson?bbox=` | Places in a box as a GeoJSON `FeatureCollection`, paged |
+| GET    | `/api/places/{id}/descendants` | Every place below this one in the hierarchy, paged |
 | GET    | `/api/places/{id}/geojson` | The place as a GeoJSON `Feature` (`application/geo+json`) |
 | GET    | `/api/places/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |

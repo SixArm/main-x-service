@@ -10,6 +10,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Added
 
+- `GET /api/places/{id}/descendants` lists every active place below a
+  place in the `contained_in_place` hierarchy, at any depth, in `id`
+  order, paged by signed cursor. A soft-deleted place hides the places
+  below it (T-2).
+
 - `GET /api/places/{id}/geojson` answers the place as an RFC 7946
   `Feature`, as `application/geo+json`: a `Point` geometry, longitude
   first, and the other fields as properties. A place with no

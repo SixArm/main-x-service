@@ -4,7 +4,7 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 19 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
+| REST (Axum) | 20 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | Integrity verification (Axum) | `GET /api/records/verify`, `GET /api/audit/verify` — keyed-MAC + digest checks over place records / the audit log (§13; default `mac_absent` with no key configured) |
 | FHIR R5 (Axum) | `Location` resource — `GET/POST/PUT/DELETE /fhir/Location{,/{id}}`, `GET /fhir/metadata` (`CapabilityStatement`) — see §13 T-11 |
@@ -13,7 +13,7 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` |
 
-The 19 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
+The 20 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 `GET`/`PUT`/`DELETE /api/places/{id}`; `GET /api/places/search`;
 `GET /api/places/nearby`; `GET /api/places/search.geojson`;
 `POST /api/places/match`;
@@ -22,7 +22,7 @@ The 19 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 `GET /api/places/review-queue`;
 `POST /api/places/review-queue/{id}/decision`;
 `GET /api/places/{id}/export`; `GET /api/places/{id}/masked`;
-`GET /api/places/{id}/geojson`;
+`GET /api/places/{id}/geojson`; `GET /api/places/{id}/descendants`;
 `GET /api/places/{id}/audit`; `GET /api/audit/recent`
 (plus `GET /api/whoami` and the integrity-verify pair listed above as
 their own tiers). Full table: [`agents/restful.md`](../agents/restful.md).
@@ -44,6 +44,12 @@ most 100), paged in the database, so following `next` reaches every
 place in the box. A `bbox` that is not four finite numbers, has a
 coordinate out of range, or has `south` above `north` is a `400`
 `invalid_bbox`.
+
+`GET /api/places/{id}/descendants?limit=&cursor=&mask_sensitive=` lists
+every active place below `{id}` in the `contained_in_place` hierarchy,
+at any depth, not including `{id}` itself, in `id` order. It pages like
+`GET /api/places`. A soft-deleted place hides the places below it, and
+an unknown `{id}` is a `404` (§13 T-2).
 
 Search query parameters are `q`, `limit`, `cursor`, `fuzzy`,
 `mask_sensitive`; `GET /api/places/nearby?lat=&lon=&radius_km=&limit=

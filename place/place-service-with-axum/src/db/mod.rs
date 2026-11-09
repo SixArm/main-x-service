@@ -123,6 +123,16 @@ pub trait PlaceRepository: Send + Sync {
         offset: u64,
         limit: u64,
     ) -> Result<Vec<Place>>;
+    /// One page of the active places below `root` in the
+    /// `contained_in_place` hierarchy, at any depth, in `id` order:
+    /// `limit` rows after skipping `offset`. `root` itself is not
+    /// included. The walk goes through active places only, so the
+    /// children of a soft-deleted place are not reached through it. It
+    /// stops on a cycle already in the data rather than looping.
+    ///
+    /// # Errors
+    /// Propagates any database error from the query or hydration.
+    async fn page_descendants(&self, root: Uuid, offset: u64, limit: u64) -> Result<Vec<Place>>;
     /// One page of the active places whose coordinates fall inside the
     /// box, in `id` order: `limit` rows after skipping `offset`. The edges
     /// are inclusive. When `lon_west > lon_east` the box crosses the
@@ -643,6 +653,44 @@ impl PlaceRepository for PgPlaceRepository {
             bbox_decimal(bbox.north),
             bbox_decimal(bbox.west),
             bbox_decimal(bbox.east),
+            to_i64(offset),
+            to_i64(limit),
+        )
+        .fetch_all(&self.db)
+        .await?;
+        self.hydrate_all(rows).await
+    }
+
+    async fn page_descendants(&self, root: Uuid, offset: u64, limit: u64) -> Result<Vec<Place>> {
+        // `UNION` (not `UNION ALL`) drops a place already reached, so a
+        // cycle in the data ends the walk; each step uses the index on
+        // `contained_in_place`.
+        let rows = sqlx::query_as!(
+            PlaceRow,
+            r#"WITH RECURSIVE tree(id) AS (
+                   SELECT $1::uuid
+                   UNION
+                   SELECT p.id
+                   FROM places p JOIN tree t ON p.contained_in_place = t.id
+                   WHERE p.is_deleted = false
+               )
+               SELECT p.id, p.name, p.alternate_name, p.description, p.place_type,
+                      p.place_type_custom,
+                      p.address_street_address, p.address_locality, p.address_region,
+                      p.address_country, p.address_postal_code,
+                      p.geo_latitude_as_decimal_degrees, p.geo_longitude_as_decimal_degrees,
+                      p.geo_elevation_as_decimal_metres,
+                      p.telephone, p.fax_number, p.url, p.global_location_number,
+                      p.branch_code, p.contained_in_place, p.is_accessible_for_free,
+                      p.public_access, p.smoking_allowed, p.maximum_attendee_capacity,
+                      p.is_deleted, p.content_hash, p.content_hash_sha3, p.content_mac,
+                      p.deleted_at, p.created_at, p.updated_at
+               FROM places p JOIN tree t ON p.id = t.id
+               WHERE p.id <> $1
+               ORDER BY p.id
+               OFFSET $2
+               LIMIT $3"#,
+            root,
             to_i64(offset),
             to_i64(limit),
         )

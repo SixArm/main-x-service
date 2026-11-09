@@ -63,6 +63,7 @@ impl utoipa::Modify for SecurityAddon {
         handlers::masked_place,
         handlers::place_geojson,
         handlers::places_in_bbox_geojson,
+        handlers::place_descendants,
         handlers::audit_for_place,
         handlers::audit_recent,
     ),
@@ -147,6 +148,7 @@ pub fn places_routes() -> axa::routes::Routes {
         .add("/places/{id}/export", get(handlers::export_place_data))
         .add("/places/{id}/masked", get(handlers::masked_place))
         .add("/places/{id}/geojson", get(handlers::place_geojson))
+        .add("/places/{id}/descendants", get(handlers::place_descendants))
         .add("/places/{id}/audit", get(handlers::audit_for_place))
         .add("/audit/recent", get(handlers::audit_recent))
         // Both registration surfaces carry these: this crate is
@@ -191,6 +193,7 @@ mod tests {
             "/api/places/search",
             "/api/places/{id}/geojson",
             "/api/places/search.geojson",
+            "/api/places/{id}/descendants",
         ] {
             assert!(
                 doc.paths.paths.contains_key(path),
