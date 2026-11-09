@@ -13,6 +13,9 @@ use super::{Client, Error, MoveEvent, RecordMove};
 pub struct StubClient {
     /// Recorded moves, in insertion order.
     events: Mutex<Vec<MoveEvent>>,
+    /// When `Some(n)`, `record` succeeds `n` more times and then fails as
+    /// an unreachable service would. `None` never fails.
+    records_before_failure: Mutex<Option<usize>>,
 }
 
 impl StubClient {
@@ -50,6 +53,17 @@ impl StubClient {
     /// Panics if the internal mutex is poisoned.
     pub fn clear(&self) {
         self.events.lock().unwrap().clear();
+        self.fail_records_after(None);
+    }
+
+    /// Let `record` succeed `n` more times and then fail with
+    /// [`Error::Transport`]; `None` turns failure off.
+    /// [`clear`](Self::clear) resets it.
+    ///
+    /// # Panics
+    /// Panics if the internal mutex is poisoned.
+    pub fn fail_records_after(&self, n: Option<usize>) {
+        *self.records_before_failure.lock().unwrap() = n;
     }
 }
 
@@ -66,8 +80,17 @@ impl Client for StubClient {
     /// returns it — mirroring the real service's create semantics.
     ///
     /// # Errors
-    /// Infallible in practice; signature returns `Result` for trait parity.
+    /// [`Error::Transport`] once the count set by
+    /// [`StubClient::fail_records_after`] runs out; never otherwise.
     async fn record(&self, input: RecordMove) -> Result<MoveEvent, Error> {
+        {
+            let mut left = self.records_before_failure.lock().unwrap();
+            match *left {
+                Some(0) => return Err(Error::Transport("stub: record set to fail".into())),
+                Some(n) => *left = Some(n - 1),
+                None => {}
+            }
+        }
         let event = MoveEvent {
             id: Uuid::new_v4(),
             folder_id: input.folder_id,

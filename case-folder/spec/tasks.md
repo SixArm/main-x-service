@@ -131,6 +131,33 @@
   the crate's actual API) or records a stated reason it doesn't apply
   here (e.g. the table-less-aggregator constraint in [D-1](design.md))
   before T-G2 implementation starts.
+- [x] **T-20** *(found and fixed 2026-11-09)* A volume move could
+  repoint the volume and move none of its folders.
+  `POST /api/volumes/{id}/move` read the member list through
+  `unwrap_or_default()`, so a Main Thing Service failure there looked
+  like an empty volume: no folder moved, the volume's own cabinet was
+  updated anyway, and the answer was `200`. Each folder's event and
+  cabinet writes were also `.ok()`, so a folder could change cabinet
+  with no move event in the audit log. It now follows `POST
+  /api/moves` (D-8): a failed member list is a `503` before any write;
+  each folder's event is recorded before its cabinet is touched; the
+  first event failure stops the walk, leaves the volume where it was,
+  and answers `503` naming how many folders moved, so repeating the
+  request finishes it. Cabinet and volume-pointer write failures are
+  logged, as for a single move. The Thing and Event stubs gained
+  failure switches (`set_listing_fails`, `fail_records_after`) for the
+  two request tests, which fail on the old handler.
+- [ ] **T-21** Read paths that swallow an upstream failure, against D-8's
+  fail-loud default. Found with T-20: `GET /api/volumes/{id}` shows a
+  volume's folders and history as empty when the Main Thing or Event
+  Service fails (`volumes.rs` `volume_show`); `GET /api/places/{id}/history`
+  shows no presences when the Main Event Service fails; the volume,
+  place, folder and patient lists do the same for their folder and
+  history lookups. D-8 names only aggregate stats and patient lookup as
+  soft-fail. For each, either answer `503` or add it to D-8's
+  exceptions with a stated reason. Container labels falling back to
+  empty (`label_path(...).unwrap_or_default()`) are cosmetic and can
+  stay.
 
 ## Production gates (blocked on deployment decisions)
 

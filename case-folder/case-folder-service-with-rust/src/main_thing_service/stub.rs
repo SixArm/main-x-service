@@ -15,6 +15,9 @@ pub struct StubClient {
     folders: Mutex<Vec<Folder>>,
     /// Stored volumes, in insertion order.
     volumes: Mutex<Vec<Volume>>,
+    /// When set, `list_for_patient` fails as an unreachable service
+    /// would, so a test can pin what a caller does then.
+    listing_fails: std::sync::atomic::AtomicBool,
 }
 
 impl StubClient {
@@ -53,6 +56,15 @@ impl StubClient {
     pub fn clear(&self) {
         self.folders.lock().unwrap().clear();
         self.volumes.lock().unwrap().clear();
+        self.set_listing_fails(false);
+    }
+
+    /// Make `list_for_patient` fail with [`Error::Transport`] until reset,
+    /// as an unreachable Main Thing Service would. [`clear`](Self::clear)
+    /// resets it.
+    pub fn set_listing_fails(&self, fails: bool) {
+        self.listing_fails
+            .store(fails, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -99,10 +111,14 @@ impl Client for StubClient {
     /// All folders whose `patient_id` matches.
     ///
     /// # Errors
-    /// Infallible; returns `Result` for trait parity.
+    /// [`Error::Transport`] while [`StubClient::set_listing_fails`] is on;
+    /// never otherwise.
     /// # Panics
     /// Panics if the internal mutex is poisoned.
     async fn list_for_patient(&self, patient_id: Uuid) -> Result<Vec<Folder>, Error> {
+        if self.listing_fails.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(Error::Transport("stub: listing set to fail".into()));
+        }
         let guard = self.folders.lock().unwrap();
         Ok(guard
             .iter()

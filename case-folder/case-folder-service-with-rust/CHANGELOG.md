@@ -10,6 +10,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- `POST /api/volumes/{id}/move` no longer repoints a volume while moving
+  none of its folders. A Main Thing Service failure listing the folders
+  read as an empty volume and answered `200`; it is now a `503` before
+  any write. Each folder's move event is recorded before its cabinet
+  changes, and the first failed event stops the move with a `503`
+  naming how many folders moved (T-20).
+
 ### Changed
 
 - The seed task runs only in development or test

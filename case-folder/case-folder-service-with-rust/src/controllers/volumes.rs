@@ -434,8 +434,18 @@ pub struct MoveVolumeInput {
 /// Response: `200 OK` with the refreshed `VolumeShow`.
 /// Errors: `404 Not Found` if the volume is missing; `422 Unprocessable
 /// Entity` for an invalid cabinet UUID; `503 Service Unavailable` if the
-/// Main Thing Service is unreachable. Per-folder event/cabinet writes are
-/// best-effort.
+/// Main Thing Service cannot list the volume's folders, before anything is
+/// written, or if a folder's move event cannot be recorded.
+///
+/// Each folder follows the single-folder move's rule (`POST /api/moves`):
+/// its move event is recorded first, and its cabinet is updated only once
+/// that succeeds, so no folder moves without an entry in the audit log.
+/// The cabinet update after it is best-effort and logged. The moves are
+/// separate upstream writes with no transaction across them, so when an
+/// event fails part-way the folders before it have moved and the rest have
+/// not: the walk stops there, the volume's own cabinet is left as it was,
+/// and the `503` says how many moved. Repeating the request moves the
+/// rest.
 #[debug_handler]
 pub async fn move_volume(
     Extension(workers): Extension<Arc<dyn MainWorkerServiceClient>>,
@@ -476,36 +486,30 @@ pub async fn move_volume(
         None => None,
     };
 
-    let typed = input.moved_by.as_deref().unwrap_or("").trim().to_string();
-    let worker_id = input
-        .worker_id
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .and_then(|s| Uuid::parse_str(s).ok());
-    let (final_worker_id, final_name, worker_role) = match worker_id {
-        Some(wid) => match workers.find_by_id(wid).await {
-            Ok(Some(w)) => (Some(w.id), w.name, w.role),
-            _ => (None, fallback_name(&typed), None),
-        },
-        None => (None, fallback_name(&typed), None),
-    };
+    let (final_worker_id, final_name, worker_role) = resolve_mover(workers.as_ref(), &input).await;
 
-    let members: Vec<_> = things
-        .list_for_patient(volume.patient_id)
-        .await
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|f| f.volume_id == Some(volume.id))
-        .collect();
+    // Without the member list, moving the volume would move none of its
+    // folders and still repoint the volume, so refuse before any write.
+    let members: Vec<_> = match things.list_for_patient(volume.patient_id).await {
+        Ok(folders) => folders
+            .into_iter()
+            .filter(|f| f.volume_id == Some(volume.id))
+            .collect(),
+        Err(e) => {
+            return responses::service_unavailable(format!(
+                "Main Thing Service could not list the volume's folders: {e}"
+            ));
+        }
+    };
 
     // Record a move event + cabinet update for every member folder. The
     // default per-folder reason references the volume title.
     let base_reason = input.reason.clone().filter(|s| !s.trim().is_empty());
-    for f in &members {
+    for (moved, f) in members.iter().enumerate() {
         let reason = base_reason
             .clone()
             .unwrap_or_else(|| format!("Moved with volume “{}”", volume.title));
-        events
+        let recorded = events
             .record(RecordMove {
                 folder_id: f.id,
                 patient_id: f.patient_id,
@@ -526,22 +530,58 @@ pub async fn move_volume(
                 worker_role_snapshot: worker_role.clone(),
                 reason: Some(reason),
             })
-            .await
-            .ok();
-        things
+            .await;
+        if let Err(e) = recorded {
+            return responses::service_unavailable(format!(
+                "Main Event Service write failed after {moved} of {} folders moved; \
+                 repeat the request to move the rest: {e}",
+                members.len()
+            ));
+        }
+        if let Err(e) = things
             .update_cabinet(f.id, to_cabinet_id, to_cabinet_label.clone())
             .await
-            .ok();
+        {
+            tracing::warn!(?e, folder_id = %f.id, "Failed to update folder cabinet on Main Thing Service");
+        }
     }
 
     // Finally update the volume's own cabinet pointer; on failure keep
-    // the pre-move volume so the response still renders.
-    let updated = things
+    // the pre-move volume so the response still renders, and log it.
+    let updated = match things
         .update_volume_cabinet(volume.id, to_cabinet_id, to_cabinet_label.clone())
         .await
-        .unwrap_or(volume);
+    {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(?e, volume_id = %volume.id, "Failed to update volume cabinet on Main Thing Service");
+            volume
+        }
+    };
 
     Json(volume_show(things.as_ref(), events.as_ref(), &updated).await).into_response()
+}
+
+/// Who moved the volume, as `(worker_id, name, role)`: a `worker_id` the
+/// Main Worker Service resolves wins, else the typed `moved_by`, else
+/// `"Unknown porter"`, mirroring the single-folder move.
+async fn resolve_mover(
+    workers: &dyn MainWorkerServiceClient,
+    input: &MoveVolumeInput,
+) -> (Option<Uuid>, String, Option<String>) {
+    let typed = input.moved_by.as_deref().unwrap_or("").trim().to_string();
+    let worker_id = input
+        .worker_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    match worker_id {
+        Some(wid) => match workers.find_by_id(wid).await {
+            Ok(Some(w)) => (Some(w.id), w.name, w.role),
+            _ => (None, fallback_name(&typed), None),
+        },
+        None => (None, fallback_name(&typed), None),
+    }
 }
 
 /// Resolve the mover's display name from free text.

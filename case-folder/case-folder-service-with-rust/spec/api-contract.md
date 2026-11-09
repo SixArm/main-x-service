@@ -117,7 +117,11 @@ projections — no new stored data.
 
   `POST /api/volumes/{id}/move` accepts `{ to_cabinet_id, worker_id?, moved_by?,
   reason? }`, relocates the volume and every member folder, appends one move
-  event per folder, and returns the updated `VolumeShow`. Folder rows now also
+  event per folder, and returns the updated `VolumeShow`. Like `POST
+  /api/moves`, a folder's event is recorded before its cabinet changes. It
+  answers `503` before any write when the folders cannot be listed, and
+  `503` naming how many folders moved when an event write fails part-way;
+  the volume stays where it was, and repeating the request moves the rest. Folder rows now also
   carry `volume_id` and `volume_title` (null when unfiled).
 
 - **`Alert`** (`GET /api/alerts`): an iFIT-style geofence breach — a move
