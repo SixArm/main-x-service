@@ -66,6 +66,13 @@ before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
 `organization_identifiers`, `worker_match_scores`, `entity_links`,
 `worker_assessments`, `review_queue`, `event_outbox`, `audit_log`.
 
+> **`review_queue.evidence`** (JSONB, nullable; migration
+> `2026110900000001_review_queue_evidence`) holds the pair's match
+> evidence as the scan computed it (match-evidence.md §5): written on
+> insert and refreshed with the score on the re-scan upsert, returned by
+> the list and decision endpoints. Rows queued before the migration are
+> `NULL` and read as no evidence.
+
 > `worker_links` holds **within-entity** links to other worker records
 > (a matcher signal). `entity_links` (§10.3) holds **cross-service**
 > outbound edges (never a matcher signal). They are separate tables by

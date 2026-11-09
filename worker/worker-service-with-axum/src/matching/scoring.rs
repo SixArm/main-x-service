@@ -11,16 +11,37 @@
 //!   identity signals short-circuit to a perfect score and weaker rules
 //!   contribute fractional confidence.
 //!
-//! Both produce a [`MatchResult`] carrying the score and a full
+//! Both produce a [`ScoreResult`] carrying the score and a full
 //! [`MatchScoreBreakdown`]; [`MatchQuality`] buckets a score for display.
+//!
+//! **Not the service's scoring path.** [`ProbabilisticScorer`] counts a
+//! component neither worker holds as `0`, so two identical workers with no
+//! shared identifier score under the threshold (spec §13 T-23). Since
+//! T-23 closed, the service's [`ProbabilisticMatcher`](super::ProbabilisticMatcher)
+//! scores through the `worker-matcher` engine instead, which renormalises
+//! over the components both records hold. The scorers stay as a library
+//! surface (and [`DeterministicScorer`] still scores
+//! [`DeterministicMatcher`](super::DeterministicMatcher)).
 
+use super::MatchScoreBreakdown;
 use super::algorithms::{
     address_matching, dob_matching, document_matching, gender_matching, identifier_matching,
     name_matching, tax_id_matching,
 };
-use super::{MatchResult, MatchScoreBreakdown};
 use crate::config::MatchingConfig;
 use crate::models::Worker;
+
+/// The outcome of one scorer comparison: the candidate, the overall
+/// score, and the per-component breakdown that produced it.
+#[derive(Debug, Clone)]
+pub struct ScoreResult {
+    /// The candidate worker that was scored.
+    pub worker: Worker,
+    /// Overall confidence score in `[0.0, 1.0]`.
+    pub score: f64,
+    /// Per-component scores that were combined into [`score`](Self::score).
+    pub breakdown: MatchScoreBreakdown,
+}
 
 /// Weighted, fuzzy ("probabilistic") scoring strategy.
 ///
@@ -57,7 +78,7 @@ impl ProbabilisticScorer {
     /// birth date 0.25, gender/address/identifier/tax-ID 0.10 each, document
     /// 0.05).
     #[must_use]
-    pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> MatchResult {
+    pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> ScoreResult {
         // Weight factors for each component (probabilistic). These sum to 1.0
         // (0.30 + 0.25 + 0.10 + 0.10 + 0.10 + 0.10 + 0.05) so the weighted total
         // is itself a value in [0, 1]. Name and birth date carry the most weight
@@ -99,7 +120,7 @@ impl ProbabilisticScorer {
         // fuzzy components. The component scores are still recorded in the
         // breakdown for transparency in the API response / review queue.
         if tax_id_score >= 1.0 {
-            return MatchResult {
+            return ScoreResult {
                 worker: candidate.clone(),
                 score: 1.0,
                 breakdown: MatchScoreBreakdown {
@@ -120,7 +141,7 @@ impl ProbabilisticScorer {
         // issuers and are more prone to transcription collisions, so we leave a
         // small margin below "certain".
         if document_score >= 1.0 {
-            return MatchResult {
+            return ScoreResult {
                 worker: candidate.clone(),
                 score: 0.98,
                 breakdown: MatchScoreBreakdown {
@@ -154,7 +175,7 @@ impl ProbabilisticScorer {
             document_score,
         };
 
-        MatchResult {
+        ScoreResult {
             worker: candidate.clone(),
             score: total_score,
             breakdown,
@@ -217,7 +238,7 @@ impl DeterministicScorer {
     /// addresses — a strong address match (≥0.80) earns a fourth point. The
     /// returned score is earned/available.
     #[must_use]
-    pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> MatchResult {
+    pub fn calculate_score(&self, worker: &Worker, candidate: &Worker) -> ScoreResult {
         // `total_score` accumulates points earned; `points_available` the
         // points in play. The final score is the ratio, so a rule that does not
         // apply (e.g. no addresses on either side) is excluded from both —
@@ -229,7 +250,7 @@ impl DeterministicScorer {
         // overrides every fuzzy signal, so short-circuit straight to 1.0.
         let tax_id_score = tax_id_matching::match_tax_ids(worker, candidate);
         if tax_id_score >= 1.0 {
-            return MatchResult {
+            return ScoreResult {
                 worker: candidate.clone(),
                 score: 1.0,
                 breakdown: MatchScoreBreakdown {
@@ -252,7 +273,7 @@ impl DeterministicScorer {
             identifier_matching::match_identifiers(&worker.identifiers, &candidate.identifiers);
 
         if identifier_score >= 0.98 {
-            return MatchResult {
+            return ScoreResult {
                 worker: candidate.clone(),
                 score: 1.0,
                 breakdown: MatchScoreBreakdown {
@@ -275,7 +296,7 @@ impl DeterministicScorer {
             document_matching::match_documents(&worker.documents, &candidate.documents);
 
         if document_score >= 1.0 {
-            return MatchResult {
+            return ScoreResult {
                 worker: candidate.clone(),
                 score: 1.0,
                 breakdown: MatchScoreBreakdown {
@@ -346,7 +367,7 @@ impl DeterministicScorer {
             document_score,
         };
 
-        MatchResult {
+        ScoreResult {
             worker: candidate.clone(),
             score: final_score,
             breakdown,

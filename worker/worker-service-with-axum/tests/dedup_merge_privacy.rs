@@ -58,11 +58,15 @@ fn worker(family: &str, mrn: &str) -> Value {
     })
 }
 
-/// The second create of an identical worker is refused. Today it is the
-/// identifier's unique key that refuses it: the matcher scores a
-/// component neither worker has as `0`, so identical name, birth date,
-/// gender and MRN reach `0.75`, under the `0.85` threshold (spec §13
-/// T-23). Either way the caller gets a `409`; it used to get a `500`.
+/// The second create of an identical worker is refused by the duplicate
+/// check, before the insert. Since T-23 the score is the matcher's,
+/// renormalised over the components both workers hold, so identical name,
+/// birth date and gender score `1.0` and the check flags them; it used to
+/// count every component neither worker has as `0`, score `0.75`, miss
+/// them, and leave the identifier's unique key to refuse the insert. The
+/// `409` carries the candidate's evidence: consistent, not proven, because
+/// the MRN routes to no unique scheme and a name and birth date are not
+/// proof (`agents/share/match-evidence.md`).
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn creating_the_same_worker_twice_is_a_409() {
@@ -74,7 +78,27 @@ async fn creating_the_same_worker_twice_is_a_409() {
     assert_eq!(status, StatusCode::CREATED, "{first}");
     let (status, second) = call(&app, "POST", "/api/workers", Some(&body)).await;
     assert_eq!(status, StatusCode::CONFLICT, "{second}");
-    let _ = first;
+    assert_eq!(second["code"], "duplicate_detected", "{second}");
+    let candidate = second["errors"]["potential_matches"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["worker"]["id"] == first["id"])
+        .unwrap_or_else(|| panic!("the first worker is a candidate: {second}"));
+    assert!(candidate["score"].as_f64().unwrap() > 0.99, "{candidate}");
+    assert_eq!(candidate["quality"], "certain", "{candidate}");
+    assert_eq!(
+        candidate["evidence"]["strength"], "consistent",
+        "{candidate}"
+    );
+    assert!(
+        candidate["evidence"]["components"]
+            .as_array()
+            .unwrap()
+            .len()
+            >= 3,
+        "{candidate}"
+    );
 }
 
 /// A different worker carrying an identifier another worker already holds
@@ -110,23 +134,45 @@ async fn the_batch_scan_finds_a_pair_and_merge_folds_one_into_the_other() {
     let a = state.worker_repository.create(&a, &ctx).await.unwrap();
     let b = state.worker_repository.create(&b, &ctx).await.unwrap();
 
+    // The request's defaults: threshold 0.7, auto-merge at 0.95.
     let (status, scan) = call(
         &app,
         "POST",
         "/api/workers/deduplicate",
-        // The pair scores 0.65 (T-23), so ask for 0.6.
-        Some(&json!({ "threshold": 0.6, "max_candidates": 1000, "auto_merge_threshold": 0.999 })),
+        Some(&json!({ "max_candidates": 1000 })),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{scan}");
     let (ida, idb) = (a.id.to_string(), b.id.to_string());
-    assert!(
-        scan["review_items"].as_array().unwrap().iter().any(|i| {
-            let ids = [i["worker_id_a"].as_str(), i["worker_id_b"].as_str()];
-            ids.contains(&Some(ida.as_str())) && ids.contains(&Some(idb.as_str()))
-        }),
-        "the scan should pair the two seeded workers: {scan}"
-    );
+    let is_pair = |i: &&Value| {
+        let ids = [i["worker_id_a"].as_str(), i["worker_id_b"].as_str()];
+        ids.contains(&Some(ida.as_str())) && ids.contains(&Some(idb.as_str()))
+    };
+    let item = scan["review_items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(is_pair)
+        .unwrap_or_else(|| panic!("the scan should pair the two seeded workers: {scan}"));
+    // The pair agrees on everything it holds, so it scores 1.0, well over
+    // the auto-merge threshold (it scored 0.65 before T-23 closed). But
+    // name, birth date and gender are consistent with one worker, not
+    // proof of one: twins hold them too. So it is queued, not auto-merged.
+    assert!(item["match_score"].as_f64().unwrap() >= 0.95, "{item}");
+    assert_eq!(item["status"], "pending", "{item}");
+    assert_eq!(item["evidence"]["strength"], "consistent", "{item}");
+
+    // The stored queue returns the same evidence.
+    let (status, queue) = call(&app, "GET", "/api/workers/review-queue?limit=500", None).await;
+    assert_eq!(status, StatusCode::OK, "{queue}");
+    let stored = queue["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(is_pair)
+        .unwrap_or_else(|| panic!("the pair is stored: {queue}"));
+    assert_eq!(stored["evidence"]["strength"], "consistent", "{stored}");
+    assert_eq!(stored["evidence"], item["evidence"], "{stored}");
 
     let (status, merged) = call(
         &app,

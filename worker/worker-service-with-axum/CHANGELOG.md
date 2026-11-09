@@ -8,6 +8,32 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added
+
+- Match evidence (`agents/share/match-evidence.md`) on every scored
+  pair: `match`, `check-duplicates`, the create-time `409`, the batch
+  scan and the stored review queue carry an `evidence` object
+  (`weight_bits`, `fields_compared`, `contradictions`, `strength`,
+  `components`). Review-queue rows store it in a new nullable `evidence`
+  column (migration `2026110900000001_review_queue_evidence`). Evidence
+  is weighed with value frequencies for given name, family name and
+  birth date, counted over the registry once it holds 1 000 workers
+  (T-24).
+
+### Changed
+
+- The batch scan marks a pair `automerged` only when its score clears
+  `auto_merge_threshold` **and** its evidence is `proven`. A pair that
+  merely agrees on name and birth date, or one with conflicting
+  identifiers, stays `pending` whatever its score (T-24).
+- The match score, `quality` and `score_breakdown` are the
+  `worker-matcher` engine's. A component either worker lacks is left out
+  of the score, not counted as `0`, so identical workers with no shared
+  identifier score `1.0` and a second create of one is a `409`
+  `duplicate_detected`. `quality` bands are now `certain` ≥ 0.90,
+  `probable` ≥ 0.75; `score_breakdown` lists only the components both
+  workers hold, under the matcher's names (T-23).
+
 ### Fixed
 
 - A merge succeeds when the duplicate holds an identifier, which moves to

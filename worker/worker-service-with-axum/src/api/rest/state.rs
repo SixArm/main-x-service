@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::db::{AuditLogRepository, PgWorkerRepository, WorkerRepository};
-use crate::matching::{ProbabilisticMatcher, WorkerMatcher};
+use crate::matching::{FrequencyCache, ProbabilisticMatcher, WorkerMatcher};
 use crate::search::SearchEngine;
 use crate::streaming::{EventProducer, InMemoryEventPublisher};
 
@@ -40,6 +40,11 @@ pub struct AppState {
 
     /// Application configuration
     pub config: Arc<Config>,
+
+    /// Value frequencies for match evidence on the request paths
+    /// (`agents/share/match-evidence.md` §7), rebuilt in the background
+    /// when older than ten minutes.
+    pub frequencies: Arc<FrequencyCache>,
 }
 
 impl AppState {
@@ -82,7 +87,16 @@ impl AppState {
             search_engine: Arc::new(search_engine),
             matcher: worker_matcher,
             config: Arc::new(config),
+            frequencies: Arc::new(FrequencyCache::new()),
         }
+    }
+
+    /// The value frequencies a request path scores with. Starts a
+    /// background rebuild when the cached table is stale; never waits on
+    /// one (see [`FrequencyCache::current`]).
+    #[must_use]
+    pub fn value_frequencies(&self) -> Arc<crate::matching::FrequencySource> {
+        self.frequencies.current(&self.worker_repository)
     }
 }
 

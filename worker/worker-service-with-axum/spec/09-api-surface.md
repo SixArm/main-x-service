@@ -144,3 +144,21 @@ problem list (§5.5 invariants).
 > `422` already decided); the reviewer identity is the verified bearer `sub` (or absent).
 > Under ABAC the decision POST derives as a `write` action (not
 > destructive-classed).
+
+> **2026-11-09 — match evidence (§13 T-23, T-24).** `MatchResponse` (the
+> `match` and `check-duplicates` results, and the create-time `409`'s
+> `errors.potential_matches`) and `ReviewQueueItem` (the scan response
+> and the stored queue) carry an `evidence` object (`MatchEvidence` in
+> the OpenAPI document: `weight_bits`, `fields_compared`,
+> `contradictions[].field`, `strength` =
+> `proven | consistent | contradicted | non_match`, `components[]`;
+> [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)).
+> `score` is the `worker-matcher` engine's; `quality` is its confidence
+> band (`certain` ≥ 0.90, `probable` ≥ 0.75, `possible`), where it was
+> the service's own ≥ 0.95 / ≥ 0.7 bands; and `score_breakdown` is the
+> engine's breakdown, an object of only the components both workers
+> hold (`given_name_score`, `date_of_birth_score`, `us_ssn_score`, …),
+> where it was the service scorer's seven fields with `0` for absent.
+> Review items queued earlier keep their old breakdown and carry no
+> `evidence`. A scan's `automerged` now needs `strength = proven` as well
+> as the score.

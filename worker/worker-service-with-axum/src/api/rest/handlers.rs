@@ -713,16 +713,40 @@ fn default_match_limit() -> usize {
 pub struct MatchResponse {
     /// The candidate worker that was scored against the probe.
     pub worker: Worker,
-    /// Overall similarity score in `[0.0, 1.0]`.
+    /// Overall similarity score in `[0.0, 1.0]`, the `worker-matcher`
+    /// engine's: renormalised over the components both workers hold, so
+    /// a component either lacks is left out rather than scored `0`
+    /// (spec §13 T-23).
     pub score: f64,
-    /// Human-readable bucket: `"certain"` (≥0.95), `"probable"` (≥0.7),
-    /// else `"possible"`.
+    /// The matcher's confidence band: `"certain"` (score ≥ 0.90),
+    /// `"probable"` (≥ 0.75), else `"possible"`.
     pub quality: String,
     /// How this candidate surfaced (e.g. `"probabilistic"`,
     /// `"duplicate_detection"`, `"batch_deduplication"`).
     pub detection_method: String,
-    /// Per-component score breakdown as JSON, when available.
+    /// The matcher's per-component scores, as an object of the components
+    /// both workers hold (`given_name_score`, `date_of_birth_score`,
+    /// `uk_nhs_number_score`, …). Scores only, never values.
     pub score_breakdown: Option<serde_json::Value>,
+    /// How much the compared data proves, beside the score
+    /// (`agents/share/match-evidence.md`): bits, contradictions and the
+    /// `strength` verdict. Component names and bits only, never values.
+    #[serde(default)]
+    pub evidence: crate::matching::MatchEvidence,
+}
+
+impl MatchResponse {
+    /// The wire form of one scored candidate.
+    fn from_result(m: crate::matching::MatchResult, detection_method: &str) -> Self {
+        Self {
+            quality: m.quality().to_string(),
+            score_breakdown: Some(m.breakdown_json()),
+            score: m.score,
+            detection_method: detection_method.to_string(),
+            evidence: m.evidence,
+            worker: m.worker,
+        }
+    }
 }
 
 /// Body of a successful `/workers/match` response: the scored candidates.
@@ -790,8 +814,14 @@ pub async fn match_worker(
                 }
             }
 
-            // Run matcher on candidates
-            let match_results = match state.matcher.find_matches(&payload.worker, &candidates) {
+            // Run matcher on candidates, with the registry's value
+            // frequencies for the evidence.
+            let frequencies = state.value_frequencies();
+            let match_results = match state.matcher.find_matches_with_frequencies(
+                &payload.worker,
+                &candidates,
+                frequencies.as_ref(),
+            ) {
                 Ok(results) => results,
                 Err(e) => {
                     let error = ApiProblem::new("match_error", format!("Matching failed: {e}"));
@@ -800,33 +830,14 @@ pub async fn match_worker(
             };
 
             // Keep only candidates at/above the requested threshold (default
-            // 0.5), cap to `limit`, and label each with a quality bucket so the
-            // caller can triage by confidence band.
+            // 0.5), cap to `limit`, and label each with the matcher's
+            // confidence band so the caller can triage.
             let threshold = payload.threshold.unwrap_or(0.5);
             let matches: Vec<MatchResponse> = match_results
                 .into_iter()
                 .filter(|m| m.score >= threshold)
                 .take(payload.limit)
-                .map(|m| {
-                    // Quality bands: certain ≥0.95, probable ≥0.7, else possible.
-                    let quality = if m.score >= 0.95 {
-                        "certain"
-                    } else if m.score >= 0.7 {
-                        "probable"
-                    } else {
-                        "possible"
-                    };
-
-                    let breakdown_json = serde_json::to_value(&m.breakdown).ok();
-
-                    MatchResponse {
-                        worker: m.worker.clone(),
-                        score: m.score,
-                        quality: quality.to_string(),
-                        detection_method: "probabilistic".to_string(),
-                        score_breakdown: breakdown_json,
-                    }
-                })
+                .map(|m| MatchResponse::from_result(m, "probabilistic"))
                 .collect();
 
             let response = MatchResultsResponse {
@@ -889,8 +900,14 @@ pub(crate) async fn check_duplicates_internal(
     }
 
     // On a matcher error, return no duplicates rather than failing the caller:
-    // a detection failure must never block a create.
-    let Ok(match_results) = state.matcher.find_matches(worker, &candidates) else {
+    // a detection failure must never block a create. The registry's value
+    // frequencies feed the evidence only; they never change the score.
+    let frequencies = state.value_frequencies();
+    let Ok(match_results) =
+        state
+            .matcher
+            .find_matches_with_frequencies(worker, &candidates, frequencies.as_ref())
+    else {
         return Vec::new();
     };
 
@@ -900,23 +917,7 @@ pub(crate) async fn check_duplicates_internal(
         .into_iter()
         .filter(|m| m.score >= 0.7)
         .take(10)
-        .map(|m| {
-            let quality = if m.score >= 0.95 {
-                "certain"
-            } else if m.score >= 0.7 {
-                "probable"
-            } else {
-                "possible"
-            };
-
-            MatchResponse {
-                worker: m.worker.clone(),
-                score: m.score,
-                quality: quality.to_string(),
-                detection_method: "duplicate_detection".to_string(),
-                score_breakdown: serde_json::to_value(&m.breakdown).ok(),
-            }
-        })
+        .map(|m| MatchResponse::from_result(m, "duplicate_detection"))
         .collect()
 }
 
@@ -1176,9 +1177,15 @@ pub async fn merge_workers(
 ///
 /// For each worker, blocks against the workers that follow it (so each pair is
 /// considered once), scores them, and for pairs at or above `threshold`
-/// records a [`crate::models::ReviewQueueItem`] — `AutoMerged` when the score
-/// clears `auto_merge_threshold`, otherwise `Pending`. A `seen_pairs` set
-/// guards against re-recording the same unordered pair.
+/// records a [`crate::models::ReviewQueueItem`] — `AutoMerged` only when the
+/// score clears `auto_merge_threshold` **and** the matcher's evidence is
+/// `proven`, otherwise `Pending` (`agents/share/match-evidence.md` §4). A
+/// `seen_pairs` set guards against re-recording the same unordered pair.
+///
+/// The evidence is weighed with value frequencies counted over the workers
+/// this scan loaded ([`crate::matching::FrequencySource::from_workers`]),
+/// which supplies none below
+/// [`crate::matching::MIN_FREQUENCY_POPULATION`].
 #[utoipa::path(
     post,
     path = "/api/workers/deduplicate",
@@ -1204,6 +1211,7 @@ pub async fn batch_deduplicate(
     };
 
     let workers_scanned = workers.len();
+    let frequencies = crate::matching::FrequencySource::from_workers(&workers);
     let mut review_items = Vec::new();
     let mut seen_pairs: std::collections::HashSet<(Uuid, Uuid)> = std::collections::HashSet::new();
 
@@ -1223,9 +1231,12 @@ pub async fn batch_deduplicate(
         // Score every pair and filter on the request's own threshold.
         // `find_matches` drops anything under the matcher's configured
         // threshold first, so a request for a lower one changed nothing.
-        let matches = candidates
-            .iter()
-            .filter_map(|c| state.matcher.match_workers(worker, c).ok());
+        let matches = candidates.iter().filter_map(|c| {
+            state
+                .matcher
+                .match_workers_with_frequencies(worker, c, &frequencies)
+                .ok()
+        });
 
         for m in matches {
             if m.score < req.threshold {
@@ -1245,31 +1256,28 @@ pub async fn batch_deduplicate(
                 continue;
             }
 
-            let quality = if m.score >= 0.95 {
-                "certain"
-            } else if m.score >= 0.7 {
-                "probable"
-            } else {
-                "possible"
-            };
-
-            // Pairs that clear `auto_merge_threshold` are flagged AutoMerged
-            // (high enough confidence to merge without a human); the rest are
-            // queued Pending for manual review.
-            let status = if m.score >= req.auto_merge_threshold {
-                crate::models::ReviewStatus::AutoMerged
-            } else {
-                crate::models::ReviewStatus::Pending
-            };
+            // The auto-merge gate (`match-evidence.md` §4). A score says how
+            // alike the present data is, not that the pair is one worker:
+            // identical name and birth date score 1.0 for twins too. So a
+            // pair is flagged AutoMerged only when the score clears
+            // `auto_merge_threshold` AND the evidence is `proven` (a shared
+            // unique identifier, or enough bits). `consistent` and
+            // `contradicted` pairs are queued Pending whatever their score.
+            let status = crate::models::ReviewStatus::for_scan(
+                m.score,
+                req.auto_merge_threshold,
+                &m.evidence,
+            );
 
             review_items.push(crate::models::ReviewQueueItem {
                 id: Uuid::new_v4(),
                 worker_id_a: worker.id,
                 worker_id_b: m.worker.id,
                 match_score: m.score,
-                match_quality: quality.to_string(),
+                match_quality: m.quality().to_string(),
                 detection_method: "batch_deduplication".to_string(),
-                score_breakdown: serde_json::to_value(&m.breakdown).ok(),
+                score_breakdown: Some(m.breakdown_json()),
+                evidence: Some(m.evidence.clone()),
                 status,
                 reviewed_by: None,
                 created_at: chrono::Utc::now(),
@@ -1292,6 +1300,10 @@ pub async fn batch_deduplicate(
             match_quality: r.match_quality.clone(),
             detection_method: r.detection_method.clone(),
             score_breakdown: r.score_breakdown.clone(),
+            evidence: r
+                .evidence
+                .as_ref()
+                .and_then(|e| serde_json::to_value(e).ok()),
             status: review_status_token(&r.status).to_string(),
         })
         .collect();
@@ -1361,6 +1373,12 @@ fn review_row_to_item(
         match_quality: row.match_quality.clone(),
         detection_method: row.detection_method.clone(),
         score_breakdown: row.score_breakdown.clone(),
+        // A row from before the column, or one that no longer parses,
+        // reads as no evidence rather than failing the list.
+        evidence: row
+            .evidence
+            .clone()
+            .and_then(|e| serde_json::from_value(e).ok()),
         status: parse_review_status(&row.status),
         reviewed_by: row.reviewed_by.clone(),
         created_at: crate::db::convert::offset_to_ts(row.created_at),

@@ -4,6 +4,20 @@
 
 The matching system compares two worker records and produces a confidence score (0.00–1.00). Two strategies are available: probabilistic (weighted fuzzy) and deterministic (rule-based exact).
 
+> **The service scores through `worker-matcher` (2026-11-09, spec §13
+> T-23).** `ProbabilisticMatcher` takes the engine's score, `is_match`,
+> confidence band and breakdown via `adapter::to_matcher_worker`; the
+> engine renormalises over the components both workers hold, where the
+> weights below count a missing component as `0`. Every scored pair also
+> carries the engine's **evidence** (`strength` = `proven` /
+> `consistent` / `contradicted` / `non_match`), and the batch scan marks
+> a pair `automerged` only when its score clears `auto_merge_threshold`
+> **and** it is `proven` (spec §6.2, §6.4;
+> [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)).
+> The rest of this page describes the service's own
+> `ProbabilisticScorer` / `DeterministicScorer`, which remain as library
+> types; the deterministic one still scores `DeterministicMatcher`.
+
 ## Probabilistic Matching
 
 Computes a weighted sum of component scores.

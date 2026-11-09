@@ -893,9 +893,55 @@ clearly described manual check confirms the acceptance criterion.
   `500` for the same key; a unique violation is now `Conflict`, a `409`
   `conflict` naming the constraint. `tests/dedup_merge_privacy.rs`
   covers create, batch scan, merge and masked view against export.
-- [ ] **T-23 (decision) — A component neither worker has scores `0`.**
-  *(Found 2026-11-09, T-5.)* As event's T-16: two workers identical in
-  name, birth date, gender and MRN score `0.75`, under the `0.85`
-  threshold, so the duplicate check on create does not flag them (the
-  identifier's unique key refuses the second instead). Person
-  renormalises over present components and does not have this.
+- [x] **T-23 (decision) — A component neither worker has scores `0`.**
+  *(Found 2026-11-09, T-5; done 2026-11-09.)* As event's T-16: two
+  workers identical in name, birth date, gender and MRN scored `0.75`,
+  under the `0.85` threshold, so the duplicate check on create did not
+  flag them (the identifier's unique key refused the second instead).
+  **Decision:** the service takes its match score, `is_match` and
+  quality from the `worker-matcher` engine through
+  `adapter::to_matcher_worker`, which renormalises over the components
+  both workers hold ([`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+  §10 step 4). `ProbabilisticMatcher` wraps the engine;
+  `ProbabilisticScorer` stays as a library type and scores nothing on
+  the service's paths. The breakdown is **replaced**, not mapped: the
+  wire `score_breakdown` is the engine's, holding only the components
+  both workers hold, because mapping it onto the old seven fields would
+  have put the `0`-for-absent back into what a reviewer reads. `quality`
+  is the engine's confidence band (`certain` ≥ 0.90, `probable` ≥ 0.75).
+  The identical pair now scores `1.0` and the create is a `409`
+  `duplicate_detected` (`tests/dedup_merge_privacy.rs`
+  `creating_the_same_worker_twice_is_a_409`). `tests/batch_threshold.rs`
+  needed a pair that still scores under the threshold: "Margaret" /
+  "Margarethe" now scores 0.97, so it uses "Margaret" / "Theodora"
+  (0.71).
+- [x] **T-24 — Match evidence; auto-merge only on proof (2026-11-09).**
+  Per [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+  §10 step 4. Every scored pair carries the matcher's evidence
+  (`matching::MatchEvidence`, a wire mirror of the matcher's type with
+  an OpenAPI schema): on `match`, `check-duplicates`, the create-time
+  `409`, the batch scan and the stored review queue (new nullable JSONB
+  column `review_queue.evidence`, migration
+  `2026110900000001_review_queue_evidence`, written on insert and on the
+  re-scan upsert). The batch scan marks a pair `automerged` only when
+  `score ≥ auto_merge_threshold` **and** `strength = proven`
+  (`ReviewStatus::for_scan`); `consistent` and `contradicted` pairs stay
+  `pending`. Nothing performs a real automatic merge, so there is no
+  other gate. Value frequencies (`matching::frequencies`): the batch
+  scan counts the workers it loaded; the request paths read
+  `AppState::frequencies`, a cache rebuilt by a background task when
+  older than ten minutes (requests never wait on it; a scan pages
+  `list_active` and stops at 200 000 workers, above which the table is a
+  sample); below 1 000 workers, no frequencies. Evidence holds component
+  and scheme names and bits, never values: checked by a unit test over
+  the matcher's output and by `check_duplicates_carries_evidence_without_values`.
+  (The candidate `worker` beside it on `match` / `check-duplicates` / the
+  `409` is still unmasked; that is the SEC-G3 residual, not new here.)
+  Tests: `tests/match_evidence_db.rs` (proven → `automerged`,
+  contradicted → `pending`, evidence on `check-duplicates`),
+  `tests/dedup_merge_privacy.rs` (a name + birth date pair at `1.0`
+  stays `pending` as `consistent`, stored and listed; the `409` carries
+  evidence), `tests/review_queue_db.rs` (the column round-trips and
+  refreshes), unit tests for the gate, the frequency source (no
+  frequencies below the minimum; a common value weighs less than the
+  table default) and old review-item JSON without `evidence`.

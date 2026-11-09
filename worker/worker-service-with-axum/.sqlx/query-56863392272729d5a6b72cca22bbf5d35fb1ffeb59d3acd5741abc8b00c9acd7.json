@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, record_id_a, record_id_b, match_score, match_quality,\n                detection_method, score_breakdown, status, reviewed_by, created_at,\n                reviewed_at\n         FROM review_queue\n         WHERE ($1::text IS NULL OR status = $1)\n         ORDER BY created_at DESC, id\n         LIMIT $2",
+  "query": "UPDATE review_queue\n         SET status = $2, reviewed_by = $3, reviewed_at = now()\n         WHERE id = $1 AND status = 'pending'\n         RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                   detection_method, score_breakdown, evidence, status, reviewed_by, created_at,\n                   reviewed_at",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,17 @@
       },
       {
         "ordinal": 7,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "evidence"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "status",
         "type_info": "Varchar",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "reviewed_by",
         "type_info": "Varchar",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "reviewed_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -127,8 +138,9 @@
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Int8"
+        "Uuid",
+        "Varchar",
+        "Varchar"
       ]
     },
     "nullable": [
@@ -139,11 +151,12 @@
       false,
       false,
       true,
+      true,
       false,
       true,
       false,
       true
     ]
   },
-  "hash": "cb57a443ff5714975789fa45773e105c5fb518d1537fdeaa865010722d89a51a"
+  "hash": "56863392272729d5a6b72cca22bbf5d35fb1ffeb59d3acd5741abc8b00c9acd7"
 }

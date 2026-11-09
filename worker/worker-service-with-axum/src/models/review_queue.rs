@@ -5,8 +5,14 @@
 //! pairs. Pairs scoring above the auto-merge threshold are merged
 //! automatically; the rest become [`ReviewQueueItem`]s with status
 //! [`ReviewStatus::Pending`] for a human to confirm or reject. The
-//! per-component score breakdown is preserved so reviewers can see *why* a
-//! pair was flagged.
+//! per-component score breakdown and the match evidence are preserved so
+//! reviewers can see *why* a pair was flagged, and why it was or was not
+//! marked auto-merged.
+//!
+//! A pair is marked [`ReviewStatus::AutoMerged`] only when its score clears
+//! `auto_merge_threshold` **and** its evidence is `proven`
+//! (`agents/share/match-evidence.md` §4); a `consistent` or `contradicted`
+//! pair stays `pending` whatever its score.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -23,8 +29,28 @@ pub enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate
     Rejected,
-    /// Auto-merged (score above auto-merge threshold)
+    /// Auto-merged: score at or above the auto-merge threshold **and**
+    /// evidence `proven`
     AutoMerged,
+}
+
+impl ReviewStatus {
+    /// The status a batch scan gives a candidate pair: [`AutoMerged`](Self::AutoMerged)
+    /// only when `score` clears `auto_merge_threshold` **and** the evidence
+    /// permits an automatic merge (`proven`, `match-evidence.md` §4);
+    /// otherwise [`Pending`](Self::Pending), whatever the score.
+    #[must_use]
+    pub fn for_scan(
+        score: f64,
+        auto_merge_threshold: f64,
+        evidence: &crate::matching::MatchEvidence,
+    ) -> Self {
+        if score >= auto_merge_threshold && evidence.permits_auto_merge() {
+            Self::AutoMerged
+        } else {
+            Self::Pending
+        }
+    }
 }
 
 /// An item in the deduplication review queue
@@ -51,6 +77,11 @@ pub struct ReviewQueueItem {
     /// Breakdown of individual score components
     pub score_breakdown: Option<serde_json::Value>,
 
+    /// How much the compared data proves (`match-evidence.md`). Absent on
+    /// items queued before evidence was recorded.
+    #[serde(default)]
+    pub evidence: Option<crate::matching::MatchEvidence>,
+
     /// Current review status
     pub status: ReviewStatus,
 
@@ -75,7 +106,9 @@ pub struct BatchDeduplicationRequest {
     #[serde(default = "default_max_candidates")]
     pub max_candidates: usize,
 
-    /// Score above which duplicates are auto-merged (default: 0.95)
+    /// Score at or above which a pair whose evidence is `proven` is marked
+    /// auto-merged (default: 0.95). A pair short of proof stays `pending`
+    /// whatever its score.
     #[serde(default = "default_auto_merge_threshold")]
     pub auto_merge_threshold: f64,
 }
@@ -107,7 +140,8 @@ pub struct BatchDeduplicationResponse {
     /// Number of potential duplicates found
     pub duplicates_found: usize,
 
-    /// Number auto-merged (above auto-merge threshold)
+    /// Number marked auto-merged (score above the auto-merge threshold and
+    /// evidence `proven`)
     pub auto_merged: usize,
 
     /// Number added to review queue
@@ -146,6 +180,89 @@ pub struct ReviewQueueListResponse {
 #[cfg(test)]
 mod review_decision_tests {
     use super::*;
+    use crate::matching::{MatchEvidence, MatchStrength};
+
+    fn evidence(strength: MatchStrength) -> MatchEvidence {
+        MatchEvidence {
+            strength,
+            ..MatchEvidence::default()
+        }
+    }
+
+    /// Only a `proven` pair over the threshold is marked auto-merged; a
+    /// `consistent` or `contradicted` one stays pending at any score.
+    #[test]
+    fn auto_merge_needs_score_and_proof() {
+        let proven = evidence(MatchStrength::Proven);
+        assert_eq!(
+            ReviewStatus::for_scan(1.0, 0.95, &proven),
+            ReviewStatus::AutoMerged
+        );
+        assert_eq!(
+            ReviewStatus::for_scan(0.94, 0.95, &proven),
+            ReviewStatus::Pending
+        );
+        for strength in [
+            MatchStrength::Consistent,
+            MatchStrength::Contradicted,
+            MatchStrength::NonMatch,
+        ] {
+            assert_eq!(
+                ReviewStatus::for_scan(1.0, 0.95, &evidence(strength)),
+                ReviewStatus::Pending,
+                "{strength:?}"
+            );
+        }
+    }
+
+    /// An item serialized before `evidence` existed still deserialises,
+    /// with no evidence.
+    #[test]
+    fn an_item_without_evidence_still_deserialises() {
+        let old = serde_json::json!({
+            "id": Uuid::nil(),
+            "worker_id_a": Uuid::nil(),
+            "worker_id_b": Uuid::nil(),
+            "match_score": 0.9,
+            "match_quality": "certain",
+            "detection_method": "batch_deduplication",
+            "score_breakdown": { "name_score": 1.0 },
+            "status": "pending",
+            "reviewed_by": null,
+            "created_at": "2026-07-19T00:00:00Z",
+            "reviewed_at": null,
+        });
+        let item: ReviewQueueItem = serde_json::from_value(old).unwrap();
+        assert!(item.evidence.is_none());
+    }
+
+    /// Stored evidence round-trips through the item.
+    #[test]
+    fn an_item_with_evidence_round_trips() {
+        let evidence = crate::matching::MatchEvidence {
+            weight_bits: 12.5,
+            fields_compared: 3,
+            strength: crate::matching::MatchStrength::Consistent,
+            ..Default::default()
+        };
+        let stored = serde_json::to_value(&evidence).unwrap();
+        let value = serde_json::json!({
+            "id": Uuid::nil(),
+            "worker_id_a": Uuid::nil(),
+            "worker_id_b": Uuid::nil(),
+            "match_score": 0.9,
+            "match_quality": "certain",
+            "detection_method": "batch_deduplication",
+            "score_breakdown": null,
+            "evidence": stored,
+            "status": "pending",
+            "reviewed_by": null,
+            "created_at": "2026-07-19T00:00:00Z",
+            "reviewed_at": null,
+        });
+        let item: ReviewQueueItem = serde_json::from_value(value).unwrap();
+        assert_eq!(item.evidence, Some(evidence));
+    }
 
     /// Decision tokens are the lowercase wire form, and only the two
     /// operator verdicts parse — `pending` / `automerged` are refused.

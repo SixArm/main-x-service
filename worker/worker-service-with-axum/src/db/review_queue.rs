@@ -34,6 +34,9 @@ pub struct ReviewQueueRow {
     pub detection_method: String,
     /// Optional per-component score breakdown.
     pub score_breakdown: Option<serde_json::Value>,
+    /// The match evidence the scan computed (`match-evidence.md`);
+    /// `None` on rows queued before the column existed.
+    pub evidence: Option<serde_json::Value>,
     /// Lowercase status token (`pending` / `confirmed` / `rejected` /
     /// `automerged`).
     pub status: String,
@@ -60,6 +63,9 @@ pub struct NewReviewItem {
     pub detection_method: String,
     /// Optional per-component score breakdown.
     pub score_breakdown: Option<serde_json::Value>,
+    /// The pair's match evidence (`match-evidence.md`), refreshed on
+    /// re-scan with the score.
+    pub evidence: Option<serde_json::Value>,
     /// Initial lowercase status token (`pending` or `automerged`).
     pub status: String,
 }
@@ -67,8 +73,9 @@ pub struct NewReviewItem {
 /// Outcome of a decision attempt on one review item.
 #[derive(Debug, Clone)]
 pub enum DecideOutcome {
-    /// The row moved from `pending` to the requested status.
-    Decided(ReviewQueueRow),
+    /// The row moved from `pending` to the requested status. Boxed: the
+    /// row is far larger than the other variants.
+    Decided(Box<ReviewQueueRow>),
     /// No row with that id exists.
     NotFound,
     /// The row exists but is not `pending`; carries its current status.
@@ -86,6 +93,7 @@ struct ReviewQueueRaw {
     match_quality: String,
     detection_method: String,
     score_breakdown: Option<serde_json::Value>,
+    evidence: Option<serde_json::Value>,
     status: String,
     reviewed_by: Option<String>,
     created_at: DateTime<Utc>,
@@ -102,6 +110,7 @@ impl From<ReviewQueueRaw> for ReviewQueueRow {
             match_quality: r.match_quality,
             detection_method: r.detection_method,
             score_breakdown: r.score_breakdown,
+            evidence: r.evidence,
             status: r.status,
             reviewed_by: r.reviewed_by,
             created_at: ts_to_offset(r.created_at),
@@ -112,7 +121,8 @@ impl From<ReviewQueueRaw> for ReviewQueueRow {
 
 /// Insert-or-refresh a scan's candidate pairs and return the **stored**
 /// rows (stable ids; a previously decided pair returns its decided
-/// status untouched, with only the score columns refreshed).
+/// status untouched, with only the score and evidence columns
+/// refreshed).
 ///
 /// # Errors
 ///
@@ -134,15 +144,16 @@ pub async fn upsert(
             ReviewQueueRaw,
             "INSERT INTO review_queue
                  (id, record_id_a, record_id_b, match_score, match_quality,
-                  detection_method, score_breakdown, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                  detection_method, score_breakdown, evidence, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET
                  match_score = EXCLUDED.match_score,
                  match_quality = EXCLUDED.match_quality,
                  detection_method = EXCLUDED.detection_method,
-                 score_breakdown = EXCLUDED.score_breakdown
+                 score_breakdown = EXCLUDED.score_breakdown,
+                 evidence = EXCLUDED.evidence
              RETURNING id, record_id_a, record_id_b, match_score, match_quality,
-                       detection_method, score_breakdown, status, reviewed_by,
+                       detection_method, score_breakdown, evidence, status, reviewed_by,
                        created_at, reviewed_at",
             Uuid::new_v4(),
             a,
@@ -151,6 +162,7 @@ pub async fn upsert(
             item.match_quality,
             item.detection_method,
             item.score_breakdown,
+            item.evidence,
             item.status,
         )
         .fetch_optional(&mut *conn)
@@ -178,7 +190,7 @@ pub async fn list(
     let rows = sqlx::query_as!(
         ReviewQueueRaw,
         "SELECT id, record_id_a, record_id_b, match_score, match_quality,
-                detection_method, score_breakdown, status, reviewed_by, created_at,
+                detection_method, score_breakdown, evidence, status, reviewed_by, created_at,
                 reviewed_at
          FROM review_queue
          WHERE ($1::text IS NULL OR status = $1)
@@ -214,7 +226,7 @@ pub async fn decide(
          SET status = $2, reviewed_by = $3, reviewed_at = now()
          WHERE id = $1 AND status = 'pending'
          RETURNING id, record_id_a, record_id_b, match_score, match_quality,
-                   detection_method, score_breakdown, status, reviewed_by, created_at,
+                   detection_method, score_breakdown, evidence, status, reviewed_by, created_at,
                    reviewed_at",
         id,
         status,
@@ -223,7 +235,7 @@ pub async fn decide(
     .fetch_optional(&mut *conn)
     .await?;
     if let Some(row) = decided {
-        return Ok(DecideOutcome::Decided(row.into()));
+        return Ok(DecideOutcome::Decided(Box::new(row.into())));
     }
     let current = sqlx::query_scalar!("SELECT status FROM review_queue WHERE id = $1", id)
         .fetch_optional(&mut *conn)

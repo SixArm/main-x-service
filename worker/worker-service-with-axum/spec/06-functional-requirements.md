@@ -14,10 +14,48 @@ Algorithm reference: [`agents/matching.md`](../agents/matching.md).
 
 | Strategy | Output | Use |
 |---|---|---|
-| Probabilistic | Weighted sum 0.00–1.00 | Fuzzy input |
+| Probabilistic | The `worker-matcher` engine's score 0.00–1.00, renormalised over the components both workers hold | Fuzzy input; the service's matcher |
 | Deterministic | Rule-based; short-circuits on identifier (NPI, DEA, employee #), tax-ID, or document exact match | Hard guarantees |
 
-Default component weights:
+**The service scores through the matcher (since 2026-11-09, §13 T-23).**
+`ProbabilisticMatcher` maps both workers through
+`adapter::to_matcher_worker` and takes the engine's `score`, `is_match`,
+confidence band and breakdown, at the service's `threshold_score`. A
+component either worker lacks is left out of the score, not counted as
+`0`: two workers identical in what they hold score `1.0`. The service's
+own `ProbabilisticScorer` (the weights below) counted a missing
+component as `0`, so identical workers with no shared identifier scored
+`0.75`, under the threshold; it stays as a library type but scores
+nothing on the service's paths. `DeterministicMatcher` keeps its own
+rule-based score and takes the engine's breakdown and evidence.
+
+**Match evidence** ([`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)).
+Every scored pair also carries the engine's evidence: Fellegi–Sunter
+`weight_bits`, `fields_compared`, `contradictions`, the per-term
+`components`, and a `strength` — `proven` (a shared unique identifier,
+or bits over the engine's `proof_bits`, default 30), `consistent` (a
+match on score, short of proof), `contradicted` (two different values
+under one unique scheme), or `non_match`. A score says how alike the
+data is; only `proven` says the pair is one worker. Evidence holds
+component and scheme names and bits, never a value, so it travels on
+every path the score does, masked or not.
+
+**Value frequencies (§7 of that document).** Given name, family name and
+date of birth (the matcher's `FREQUENCY_COMPONENTS`) weigh by the agreed
+value's own share of workers, so "Smith" or a placeholder birth date
+proves less than a rare value. The service counts the shares
+(`matching::frequencies`): each active worker through the adapter and
+the matcher's `frequency_key`, divided by the population, into a
+`FrequencyTable`. Below `MIN_FREQUENCY_POPULATION` (1 000 workers) it
+supplies none, since a share from a small population is noise. The
+batch scan counts the workers it loaded; the request paths (create-time
+check, `check-duplicates`, `match`) read a cached table rebuilt in a
+background task when older than ten minutes, from a scan that pages
+the repository and stops at 200 000 workers (above that the table is a
+sample in id order). No request waits on a rebuild. Frequencies change
+the evidence only, never the score.
+
+The service's own scorer's component weights (library only, see above):
 
 | Component | Weight | Algorithm |
 |---|---:|---|
@@ -29,7 +67,7 @@ Default component weights:
 | Tax ID | 0.10 | Exact match (deterministic short-circuit to 1.0) |
 | Document | 0.05 | Type + number match |
 
-Match quality (configurable thresholds):
+`ProbabilisticMatcher::classify_match` bands (configurable thresholds):
 
 | Quality | Score |
 |---|---|
@@ -123,7 +161,17 @@ masking. Index stays synchronised with database writes.
 - Real-time `409 Conflict` on `POST /api/workers`.
 - Explicit `POST /api/workers/check-duplicates`.
 - Batch `POST /api/workers/deduplicate` with configurable thresholds.
-- Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`).
+- Every candidate on these three paths carries the matcher's `quality`
+  band (`certain` ≥ 0.90, `probable` ≥ 0.75, else `possible`), its
+  breakdown (the components both workers hold) and its `evidence`
+  (§6.2).
+- **Auto-merge only on proof.** The batch scan marks a pair `AutoMerged`
+  only when its score clears `auto_merge_threshold` **and** its evidence
+  is `proven`. A `consistent` or `contradicted` pair is queued `Pending`
+  whatever its score (match-evidence.md §4). `AutoMerged` is a marker:
+  the service performs no automatic merge itself.
+- Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`),
+  each item storing the pair's evidence (`review_queue.evidence`, §10).
 - Merge transfers identifiers (credentials!), names, addresses,
   contacts, documents, tax-ID, emergency contacts; appends the
   duplicate's primary name as a "former" alias on the survivor;

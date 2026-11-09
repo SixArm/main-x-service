@@ -1,32 +1,31 @@
 //! The worker-matching engine: algorithms, scoring, and matcher strategies.
 //!
 //! Matching answers the question "do these two worker records describe the
-//! same person?" by producing a confidence score in `[0.0, 1.0]` plus a
-//! per-component [`MatchScoreBreakdown`](crate::matching::MatchScoreBreakdown).
-//! Two strategies are offered behind the
-//! [`WorkerMatcher`](crate::matching::WorkerMatcher) trait:
+//! same person?" by producing a confidence score in `[0.0, 1.0]`, a
+//! per-component breakdown, and the [`MatchEvidence`] that says how much
+//! the compared data *proves* (`agents/share/match-evidence.md`). Two
+//! strategies are offered behind the [`WorkerMatcher`] trait:
 //!
-//! - [`ProbabilisticMatcher`](crate::matching::ProbabilisticMatcher) — a
-//!   weighted, fuzzy combination of name, birth date, gender, address,
-//!   identifier, tax-ID, and document scores.
-//! - [`DeterministicMatcher`](crate::matching::DeterministicMatcher) —
-//!   rule-based scoring with short-circuits (an exact tax-ID or identifier
-//!   match pins the score to 1.0).
+//! - [`ProbabilisticMatcher`] — the service's matcher. It scores through
+//!   the canonical `worker-matcher` engine via [`adapter::to_matcher_worker`]:
+//!   the score, `is_match`, the quality band, the breakdown and the
+//!   evidence are all the engine's. Since spec §13 T-23 closed, a
+//!   component neither worker holds is left out of the score rather than
+//!   counted as `0`.
+//! - [`DeterministicMatcher`] — rule-based scoring with short-circuits (an
+//!   exact tax-ID or identifier match pins the score to 1.0), from the
+//!   service's own [`DeterministicScorer`]; its breakdown and evidence are
+//!   the engine's view of the same pair.
 //!
 //! Submodules:
-//! - [`algorithms`](crate::matching::algorithms) — the individual component
-//!   comparison functions.
-//! - [`phonetic`](crate::matching::phonetic) — Soundex phonetic encoding used
-//!   as a name-score bonus.
-//! - [`scoring`](crate::matching::scoring) — the
-//!   [`ProbabilisticScorer`](crate::matching::ProbabilisticScorer) /
-//!   [`DeterministicScorer`](crate::matching::DeterministicScorer) that
-//!   combine the component scores and classify
-//!   [`MatchQuality`](crate::matching::MatchQuality).
-//! - [`adapter`](crate::matching::adapter) — bridges service
-//!   [`Worker`](crate::models::Worker) records into the canonical
-//!   `worker-matcher` crate (re-exported here as
-//!   [`matcher_lib`](crate::matching::matcher_lib)).
+//! - [`algorithms`] — the individual component comparison functions.
+//! - [`phonetic`] — Soundex phonetic encoding used as a name-score bonus.
+//! - [`scoring`] — the service's own [`ProbabilisticScorer`] /
+//!   [`DeterministicScorer`] and the [`MatchQuality`] bands.
+//! - [`adapter`] — bridges service [`Worker`] records into the canonical
+//!   `worker-matcher` crate (re-exported here as [`matcher_lib`]).
+//! - [`evidence`] — the wire mirror of the matcher's evidence.
+//! - [`frequencies`] — value frequencies counted over the registry.
 //!
 //! # Examples
 //!
@@ -52,12 +51,18 @@ use crate::models::Worker;
 pub mod adapter;
 /// Per-component matching algorithms (name, DOB, gender, address, identifier, tax id, document).
 pub mod algorithms;
+/// Match evidence on the wire (`agents/share/match-evidence.md`).
+pub mod evidence;
+/// Value frequencies counted over the registry (`match-evidence.md` §7).
+pub mod frequencies;
 /// Soundex phonetic encoding used as a name-matching bonus.
 pub mod phonetic;
 /// Probabilistic and deterministic scorers combining the component algorithms.
 pub mod scoring;
 
-pub use scoring::{DeterministicScorer, MatchQuality, ProbabilisticScorer};
+pub use evidence::{MatchEvidence, MatchStrength};
+pub use frequencies::{FrequencyCache, FrequencySource, MIN_FREQUENCY_POPULATION};
+pub use scoring::{DeterministicScorer, MatchQuality, ProbabilisticScorer, ScoreResult};
 
 /// Re-export the canonical `worker-matcher` library so callers can reach
 /// `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, the
@@ -66,24 +71,89 @@ pub use scoring::{DeterministicScorer, MatchQuality, ProbabilisticScorer};
 /// score two service `Worker` records through the reference algorithm.
 pub use ::worker_matcher as matcher_lib;
 
-/// The outcome of comparing a query worker against one candidate: the
-/// candidate, the overall [`score`](Self::score), and the per-component
-/// [`breakdown`](Self::breakdown) that produced it.
+use matcher_lib::evidence::{NoFrequencies, ValueFrequencies};
+
+/// The outcome of comparing a query worker against one candidate.
+///
+/// Everything but [`worker`](Self::worker) comes from the `worker-matcher`
+/// engine's result for the pair (except [`DeterministicMatcher`]'s score
+/// and `is_match`, which are its own rules').
 #[derive(Debug, Clone)]
 pub struct MatchResult {
     /// The candidate worker that was scored.
     pub worker: Worker,
-    /// Overall confidence score in `[0.0, 1.0]`.
+    /// Overall confidence score in `[0.0, 1.0]`, renormalised over the
+    /// components both workers hold.
     pub score: f64,
-    /// Per-component scores that were combined into [`score`](Self::score).
-    pub breakdown: MatchScoreBreakdown,
+    /// Whether the pair clears the matcher's threshold.
+    pub is_match: bool,
+    /// The matcher's coarse confidence band for [`score`](Self::score).
+    pub confidence: matcher_lib::Confidence,
+    /// The matcher's per-component scores; `None` means not compared.
+    pub breakdown: matcher_lib::MatchBreakdown,
+    /// How much the compared data proves (`match-evidence.md`).
+    pub evidence: MatchEvidence,
 }
 
-/// The individual component scores that make up a [`MatchResult::score`].
+impl MatchResult {
+    /// Wrap the engine's result for `candidate`.
+    #[must_use]
+    pub fn from_engine(candidate: Worker, result: &matcher_lib::MatchResult) -> Self {
+        Self {
+            worker: candidate,
+            score: result.score,
+            is_match: result.is_match,
+            confidence: result.confidence,
+            breakdown: result.breakdown.clone(),
+            evidence: MatchEvidence::from(&result.evidence),
+        }
+    }
+
+    /// The wire quality label, from the matcher's confidence band:
+    /// `"certain"` (high, score ≥ 0.90), `"probable"` (medium, ≥ 0.75),
+    /// else `"possible"`.
+    #[must_use]
+    pub fn quality(&self) -> &'static str {
+        quality_label(self.confidence)
+    }
+
+    /// The breakdown as wire JSON: an object of the components both
+    /// workers held, keyed by the matcher's field names
+    /// (`given_name_score`, `uk_nhs_number_score`, …). A component either
+    /// worker lacks is absent, not `0`. Scores only, never values.
+    #[must_use]
+    pub fn breakdown_json(&self) -> serde_json::Value {
+        breakdown_json(&self.breakdown)
+    }
+}
+
+/// The wire quality label for a matcher confidence band.
+#[must_use]
+pub fn quality_label(confidence: matcher_lib::Confidence) -> &'static str {
+    match confidence {
+        matcher_lib::Confidence::High => "certain",
+        matcher_lib::Confidence::Medium => "probable",
+        matcher_lib::Confidence::Low => "possible",
+    }
+}
+
+/// A matcher breakdown as a JSON object of its compared components only.
+#[must_use]
+pub fn breakdown_json(breakdown: &matcher_lib::MatchBreakdown) -> serde_json::Value {
+    let mut value = serde_json::to_value(breakdown).unwrap_or_default();
+    if let Some(map) = value.as_object_mut() {
+        map.retain(|_, v| !v.is_null());
+    }
+    value
+}
+
+/// The individual component scores of the service's own
+/// [`ProbabilisticScorer`] / [`DeterministicScorer`] ([`ScoreResult`]).
 ///
-/// Each field is a score in `[0.0, 1.0]` for one comparison axis. Serializable
-/// so the breakdown can be surfaced verbatim in API responses and review-queue
-/// items.
+/// Each field is a score in `[0.0, 1.0]` for one comparison axis, and a
+/// component neither worker holds scores `0` here. The service's match
+/// responses carry the matcher's breakdown instead
+/// ([`MatchResult::breakdown_json`]).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct MatchScoreBreakdown {
     /// Name similarity (Jaro-Winkler / Levenshtein / Soundex).
@@ -101,7 +171,6 @@ pub struct MatchScoreBreakdown {
     /// Best identity-document (type + number) match.
     pub document_score: f64,
 }
-
 impl MatchScoreBreakdown {
     /// Returns a human-readable summary listing the components that scored
     /// strongly, using per-component thresholds (e.g. name ≥ 0.90, address
@@ -164,31 +233,96 @@ impl MatchScoreBreakdown {
 /// The strategy interface shared by all matchers. Implementors are `Send +
 /// Sync` so they can be held in shared application state behind an `Arc`.
 pub trait WorkerMatcher: Send + Sync {
-    /// Scores `worker` against a single `candidate`, returning the candidate,
-    /// the overall score, and the component breakdown.
+    /// Scores `worker` against a single `candidate`, with value
+    /// frequencies for the evidence (`match-evidence.md` §7). Frequencies
+    /// change only the evidence, never the score.
     ///
     /// # Errors
     ///
     /// Returns an error if the underlying scoring fails.
-    fn match_workers(&self, worker: &Worker, candidate: &Worker) -> Result<MatchResult>;
+    fn match_workers_with_frequencies(
+        &self,
+        worker: &Worker,
+        candidate: &Worker,
+        frequencies: &dyn ValueFrequencies,
+    ) -> Result<MatchResult>;
 
-    /// Scores `worker` against every candidate, keeps those that clear the
-    /// threshold, and returns them sorted by descending score.
+    /// Scores `worker` against a single `candidate` with no value
+    /// frequencies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying scoring fails.
+    fn match_workers(&self, worker: &Worker, candidate: &Worker) -> Result<MatchResult> {
+        self.match_workers_with_frequencies(worker, candidate, &NoFrequencies)
+    }
+
+    /// Scores `worker` against every candidate, keeps the matches
+    /// (`is_match`), and returns them sorted by descending score.
     ///
     /// # Errors
     ///
     /// Returns an error if scoring any candidate fails.
-    fn find_matches(&self, worker: &Worker, candidates: &[Worker]) -> Result<Vec<MatchResult>>;
+    fn find_matches_with_frequencies(
+        &self,
+        worker: &Worker,
+        candidates: &[Worker],
+        frequencies: &dyn ValueFrequencies,
+    ) -> Result<Vec<MatchResult>> {
+        let mut matches = Vec::new();
+        for candidate in candidates {
+            let result = self.match_workers_with_frequencies(worker, candidate, frequencies)?;
+            if result.is_match {
+                matches.push(result);
+            }
+        }
+        sort_best_first(&mut matches);
+        Ok(matches)
+    }
+
+    /// [`find_matches_with_frequencies`](Self::find_matches_with_frequencies)
+    /// with no value frequencies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scoring any candidate fails.
+    fn find_matches(&self, worker: &Worker, candidates: &[Worker]) -> Result<Vec<MatchResult>> {
+        self.find_matches_with_frequencies(worker, candidates, &NoFrequencies)
+    }
 
     /// Returns `true` when `score` is at or above this matcher's threshold.
     fn is_match(&self, score: f64) -> bool;
 }
 
-/// A [`WorkerMatcher`] that combines weighted, fuzzy component scores into an
-/// overall probabilistic confidence.
+/// Sort best-first. `partial_cmp` can yield `None` only for NaN scores,
+/// which neither scorer produces; treat any such case as "equal".
+fn sort_best_first(matches: &mut [MatchResult]) {
+    matches.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+}
+
+/// The engine configuration for a service [`MatchingConfig`]: the
+/// matcher's defaults, with the service's threshold.
+fn engine_config(config: &MatchingConfig) -> matcher_lib::MatchConfig {
+    matcher_lib::MatchConfig {
+        match_threshold: config.threshold_score,
+        ..matcher_lib::MatchConfig::default()
+    }
+}
+
+/// The service's [`WorkerMatcher`]: scores through the `worker-matcher`
+/// engine, taking its score, `is_match`, confidence, breakdown and
+/// evidence (spec §13 T-23).
 pub struct ProbabilisticMatcher {
-    /// The underlying scorer holding the weights and threshold config.
-    scorer: ProbabilisticScorer,
+    /// The canonical engine, configured with the service's threshold.
+    engine: matcher_lib::MatchingEngine,
+    /// The service's threshold and [`MatchQuality`] bands
+    /// ([`threshold`](Self::threshold), [`classify_match`](Self::classify_match));
+    /// it scores nothing on this path.
+    bands: ProbabilisticScorer,
 }
 
 impl ProbabilisticMatcher {
@@ -196,63 +330,85 @@ impl ProbabilisticMatcher {
     #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self {
-            scorer: ProbabilisticScorer::new(config),
+            engine: matcher_lib::MatchingEngine::new(engine_config(&config)),
+            bands: ProbabilisticScorer::new(config),
         }
     }
 
     /// Returns the configured match threshold — the same
-    /// `MatchingConfig::threshold_score` the real `is_match`/
-    /// `classify_match` path already consults via
-    /// `ProbabilisticScorer::threshold_score`. Spec §13 T-17: this used to
-    /// return a hard-coded `0.85` regardless of the matcher's actual
-    /// configuration.
+    /// `MatchingConfig::threshold_score` the engine's `is_match` and
+    /// [`classify_match`](Self::classify_match) consult. Spec §13 T-17:
+    /// this used to return a hard-coded `0.85` regardless of the matcher's
+    /// actual configuration.
     #[must_use]
     pub fn threshold(&self) -> f64 {
-        self.scorer.threshold_score()
+        self.bands.threshold_score()
     }
 
     /// Classifies a raw score into a coarse [`MatchQuality`] band (definite /
     /// probable / possible / unlikely).
     #[must_use]
     pub fn classify_match(&self, score: f64) -> MatchQuality {
-        self.scorer.classify_match(score)
+        self.bands.classify_match(score)
     }
 }
 
 impl WorkerMatcher for ProbabilisticMatcher {
-    fn match_workers(&self, worker: &Worker, candidate: &Worker) -> Result<MatchResult> {
-        Ok(self.scorer.calculate_score(worker, candidate))
+    fn match_workers_with_frequencies(
+        &self,
+        worker: &Worker,
+        candidate: &Worker,
+        frequencies: &dyn ValueFrequencies,
+    ) -> Result<MatchResult> {
+        let result = self.engine.match_workers_with_frequencies(
+            &adapter::to_matcher_worker(worker),
+            &adapter::to_matcher_worker(candidate),
+            frequencies,
+        );
+        Ok(MatchResult::from_engine(candidate.clone(), &result))
     }
 
-    fn find_matches(&self, worker: &Worker, candidates: &[Worker]) -> Result<Vec<MatchResult>> {
+    fn find_matches_with_frequencies(
+        &self,
+        worker: &Worker,
+        candidates: &[Worker],
+        frequencies: &dyn ValueFrequencies,
+    ) -> Result<Vec<MatchResult>> {
+        // Project the query once, not once per candidate.
+        let query = adapter::to_matcher_worker(worker);
         let mut matches: Vec<MatchResult> = candidates
             .iter()
-            .map(|candidate| self.scorer.calculate_score(worker, candidate))
-            // Drop anything below the configured threshold up front.
-            .filter(|result| self.is_match(result.score))
+            .map(|candidate| {
+                let result = self.engine.match_workers_with_frequencies(
+                    &query,
+                    &adapter::to_matcher_worker(candidate),
+                    frequencies,
+                );
+                MatchResult::from_engine(candidate.clone(), &result)
+            })
+            .filter(|result| result.is_match)
             .collect();
-
-        // Sort best-first. `partial_cmp` can yield `None` only for NaN scores,
-        // which the scorer never produces; treat any such case as "equal".
-        matches.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
+        sort_best_first(&mut matches);
         Ok(matches)
     }
 
     fn is_match(&self, score: f64) -> bool {
-        self.scorer.is_match(score)
+        self.bands.is_match(score)
     }
 }
 
 /// A [`WorkerMatcher`] that applies rule-based deterministic scoring with
 /// short-circuits (e.g. an exact tax-ID match pins the score to 1.0).
+///
+/// The score and `is_match` are the [`DeterministicScorer`]'s; the
+/// confidence band, breakdown and evidence are the `worker-matcher`
+/// engine's view of the same pair, so a deterministic match still
+/// carries the evidence an auto-merge gate needs.
 pub struct DeterministicMatcher {
     /// The underlying rule-based scorer.
     scorer: DeterministicScorer,
+    /// The engine supplying breakdown and evidence.
+    engine: matcher_lib::MatchingEngine,
 }
 
 impl DeterministicMatcher {
@@ -260,32 +416,30 @@ impl DeterministicMatcher {
     #[must_use]
     pub fn new(config: MatchingConfig) -> Self {
         Self {
+            engine: matcher_lib::MatchingEngine::new(engine_config(&config)),
             scorer: DeterministicScorer::new(config),
         }
     }
 }
 
 impl WorkerMatcher for DeterministicMatcher {
-    fn match_workers(&self, worker: &Worker, candidate: &Worker) -> Result<MatchResult> {
-        Ok(self.scorer.calculate_score(worker, candidate))
-    }
-
-    fn find_matches(&self, worker: &Worker, candidates: &[Worker]) -> Result<Vec<MatchResult>> {
-        let mut matches: Vec<MatchResult> = candidates
-            .iter()
-            .map(|candidate| self.scorer.calculate_score(worker, candidate))
-            // Keep only candidates that satisfy the deterministic threshold.
-            .filter(|result| self.is_match(result.score))
-            .collect();
-
-        // Sort best-first (see the probabilistic impl for the NaN rationale).
-        matches.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-
-        Ok(matches)
+    fn match_workers_with_frequencies(
+        &self,
+        worker: &Worker,
+        candidate: &Worker,
+        frequencies: &dyn ValueFrequencies,
+    ) -> Result<MatchResult> {
+        let scored = self.scorer.calculate_score(worker, candidate);
+        let engine = self.engine.match_workers_with_frequencies(
+            &adapter::to_matcher_worker(worker),
+            &adapter::to_matcher_worker(candidate),
+            frequencies,
+        );
+        let mut result = MatchResult::from_engine(scored.worker, &engine);
+        result.score = scored.score;
+        result.is_match = self.scorer.is_match(scored.score);
+        result.confidence = matcher_lib::Confidence::from_score(scored.score);
+        Ok(result)
     }
 
     fn is_match(&self, score: f64) -> bool {

@@ -4,7 +4,7 @@
 //! own — "byte-identical to the person crate's tested module" (the
 //! 2026-07-19 task's acceptance note) is not "tested here", and worker's
 //! own copy has in fact since drifted from person's (no `provenance`
-//! column, unboxed `DecideOutcome::Decided`), so a worker-specific
+//! column; an `evidence` column since 2026-11-09), so a worker-specific
 //! migration or query regression would go undetected by this crate's
 //! own suite without this file.
 //!
@@ -50,6 +50,7 @@ async fn review_queue_round_trip() {
         match_quality: "probable".to_string(),
         detection_method: "batch_deduplication".to_string(),
         score_breakdown: Some(serde_json::json!({ "name": score })),
+        evidence: Some(serde_json::json!({ "weight_bits": score, "strength": "consistent" })),
         status: "pending".to_string(),
     };
 
@@ -62,6 +63,7 @@ async fn review_queue_round_trip() {
     assert!(rows[0].record_id_a <= rows[0].record_id_b);
     assert_eq!(rows[0].status, "pending");
     assert!(rows[0].score_breakdown.is_some());
+    assert_eq!(rows[0].evidence.as_ref().unwrap()["strength"], "consistent");
 
     // A re-scan with the pair REVERSED upserts the same row (stable id)
     // and refreshes the score columns.
@@ -76,6 +78,11 @@ async fn review_queue_round_trip() {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].id, id);
     assert!((rows[0].match_score - 0.9).abs() < 1e-9);
+    // The evidence refreshes with the score.
+    assert_eq!(
+        rows[0].evidence.as_ref().unwrap()["weight_bits"].as_f64(),
+        Some(0.9)
+    );
 
     // Decide: pending -> confirmed; first writer wins.
     match review_queue::decide(&db, id, "confirmed", Some("tester"))
@@ -112,7 +119,8 @@ async fn review_queue_round_trip() {
 
     // List + status filter.
     let all = review_queue::list(&db, None, 100).await.expect("list");
-    assert!(all.iter().any(|r| r.id == id));
+    let listed = all.iter().find(|r| r.id == id).expect("listed");
+    assert!(listed.evidence.is_some(), "the list returns the evidence");
     assert!(
         review_queue::list(&db, Some("pending"), 100)
             .await

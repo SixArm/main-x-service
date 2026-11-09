@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO review_queue\n                 (id, record_id_a, record_id_b, match_score, match_quality,\n                  detection_method, score_breakdown, status)\n             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n             ON CONFLICT (record_id_a, record_id_b) DO UPDATE SET\n                 match_score = EXCLUDED.match_score,\n                 match_quality = EXCLUDED.match_quality,\n                 detection_method = EXCLUDED.detection_method,\n                 score_breakdown = EXCLUDED.score_breakdown\n             RETURNING id, record_id_a, record_id_b, match_score, match_quality,\n                       detection_method, score_breakdown, status, reviewed_by,\n                       created_at, reviewed_at",
+  "query": "SELECT id, record_id_a, record_id_b, match_score, match_quality,\n                detection_method, score_breakdown, evidence, status, reviewed_by, created_at,\n                reviewed_at\n         FROM review_queue\n         WHERE ($1::text IS NULL OR status = $1)\n         ORDER BY created_at DESC, id\n         LIMIT $2",
   "describe": {
     "columns": [
       {
@@ -82,6 +82,17 @@
       },
       {
         "ordinal": 7,
+        "name": "evidence",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "review_queue",
+            "name": "evidence"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "status",
         "type_info": "Varchar",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "reviewed_by",
         "type_info": "Varchar",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "reviewed_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -127,14 +138,8 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Uuid",
-        "Uuid",
-        "Float8",
-        "Varchar",
-        "Varchar",
-        "Jsonb",
-        "Varchar"
+        "Text",
+        "Int8"
       ]
     },
     "nullable": [
@@ -145,11 +150,12 @@
       false,
       false,
       true,
+      true,
       false,
       true,
       false,
       true
     ]
   },
-  "hash": "045d531bc902aef2aec026e217809ea3d9d2f64f6d92f132856ded35eb10f960"
+  "hash": "60df6e5342765734df26e84ee30ecbce81b668fb81b7b2d3bde1632d32196a55"
 }

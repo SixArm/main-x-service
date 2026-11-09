@@ -106,6 +106,10 @@ pub use state::AppState;
             handlers::SearchResponse,
             handlers::MatchRequest,
             handlers::MatchResponse,
+            crate::matching::MatchEvidence,
+            crate::matching::MatchStrength,
+            crate::matching::evidence::Contradiction,
+            crate::matching::evidence::ComponentBits,
             handlers::MatchResultsResponse,
             handlers::DuplicateCheckResponse,
             handlers::AuditLogQuery,
@@ -237,4 +241,40 @@ pub fn fhir_routes() -> axa::routes::Routes {
                 .put(handlers::update_fhir_worker)
                 .delete(handlers::delete_fhir_worker),
         )
+}
+
+#[cfg(test)]
+mod openapi_tests {
+    use super::ApiDoc;
+    use utoipa::OpenApi;
+
+    /// The match and review-queue schemas carry `evidence`, and the
+    /// evidence types are in the document (`match-evidence.md`).
+    #[test]
+    fn match_and_review_schemas_carry_evidence() {
+        let doc = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let schemas = &doc["components"]["schemas"];
+        for name in [
+            "MatchEvidence",
+            "MatchStrength",
+            "Contradiction",
+            "ComponentBits",
+        ] {
+            assert!(schemas.get(name).is_some(), "{name} missing");
+        }
+        assert!(
+            schemas["MatchResponse"]["properties"]
+                .get("evidence")
+                .is_some()
+        );
+        assert!(
+            schemas["ReviewQueueItem"]["properties"]
+                .get("evidence")
+                .is_some()
+        );
+        let strengths = schemas["MatchStrength"].to_string();
+        for token in ["proven", "consistent", "contradicted", "non_match"] {
+            assert!(strengths.contains(token), "{token} missing: {strengths}");
+        }
+    }
 }

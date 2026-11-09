@@ -36,8 +36,12 @@ async fn a_pair_under_the_configured_threshold_is_found_at_a_lower_request_thres
     let state = common::create_test_app_state().await;
     let app = common::create_test_router().await;
     let family = format!("Thresholdson{}", uuid::Uuid::new_v4().simple());
-    // The same family name, different given names: a plausible pair that
-    // scores under the configured threshold on its own.
+    // The same family name, unrelated given names: a plausible pair that
+    // scores under the configured threshold on its own. Since T-23 the
+    // score is the matcher's, renormalised over what both workers hold,
+    // so near-identical given names ("Margaret" / "Margarethe") now score
+    // above the threshold (about 0.97); the given names have to differ
+    // properly for the pair to sit under it (about 0.71).
     let a = state
         .worker_repository
         .create(&named(&family, "Margaret"), &AuditContext::default())
@@ -45,7 +49,7 @@ async fn a_pair_under_the_configured_threshold_is_found_at_a_lower_request_thres
         .unwrap();
     let b = state
         .worker_repository
-        .create(&named(&family, "Margarethe"), &AuditContext::default())
+        .create(&named(&family, "Theodora"), &AuditContext::default())
         .await
         .unwrap();
 
