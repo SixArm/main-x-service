@@ -18,7 +18,7 @@ Rust crate.
 | Public types | `src/lib.rs` re-exports from `src/{organization,matcher,scoring,config,normalize,phonetic,error}.rs`. |
 | Deterministic schemes (short-circuit to 1.0) | LEI, DUNS, ISO 6523, GLN, Wikidata, ROR, ISNI, VAT; plus same-jurisdiction tax-id (R-1) and `same_as` URL overlap (R-2). |
 | Probabilistic components | name (legal-suffix-aware JW + Soundex), address (field-by-field), url/domain, jurisdiction, founding date, keywords (Jaccard). |
-| Public API shape | `MatchingEngine::new(MatchConfig::default()).match_organizations(&a, &b) -> MatchResult { score, confidence, is_match, breakdown }`. |
+| Public API shape | `MatchingEngine::new(MatchConfig::default()).match_organizations(&a, &b) -> MatchResult { score, confidence, is_match, breakdown, evidence }`. `evidence` (weight in bits, contradictions, `Proven`/`Consistent`/`Contradicted`/`NonMatch`) is what gates a merge — see `agents/share/match-evidence.md`. |
 
 ## Golden rules
 

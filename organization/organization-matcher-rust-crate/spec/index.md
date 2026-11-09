@@ -64,8 +64,13 @@ Input: Organization A, Organization B, MatchConfig
   ├─ keywords_score      (≥1 set)    Jaccard
   ├─ relationships_score (both set)  typed-set Jaccard over (relation, organization_id)
   ├─ tags_score          (both set)  Jaccard over folded tags
-  └─ renormalised weighted average over present components
+  ├─ renormalised weighted average over present components
+  └─ evidence (§18a): Fellegi–Sunter bits + contradictions → strength
 ```
+
+The evidence step runs on every path, the deterministic one included:
+there the components are computed for the evidence only, and the
+returned `score`/`breakdown` stay exactly as above.
 
 `relationships_score` and `tags_score` (§14a/§14b) are **supporting**
 components only: each is `None` unless both sides carry at least one
@@ -140,6 +145,11 @@ the first offending field. This exists because such a value reaching
 §17's renormaliser unchecked can push the returned score outside
 `[0.0, 1.0]` or produce `NaN`, breaking the bounded-and-finite
 invariant §24 documents and the `Confidence` banding built on it.
+
+**`proof_bits`** (default `30`, `#[serde(default)]` so older config
+JSON still loads) is the evidence bar for `MatchStrength::Proven`
+(§18a). `validated()` also rejects a `proof_bits` that is not finite
+and positive.
 
 ## 8. Normalisation
 
@@ -243,6 +253,50 @@ down.
 `High` ≥ 0.95, `Medium` ≥ 0.70, else `Low`. Separate from
 `MatchConfig::threshold` (drives `is_match`).
 
+## 18a. Match evidence
+
+Beside `score`, every `MatchResult` carries `evidence: Evidence`
+(`#[serde(default)]`, so older result JSON still deserialises), per the
+family contract [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md).
+`score`, `is_match` and `confidence` are unchanged by it.
+
+- **`weight_bits`** — the sum of `component_bits(s, m, u)` over every
+  `Some` component (full agreement at `s ≥ 0.95` adds `log2(m/u)`, full
+  disagreement at `s ≤ 0.60` adds `log2((1−m)/(1−u))`, linear between);
+  plus `IDENTIFIER_BITS ≈ 39.85` once when R-0, R-1 or R-2 fires; plus
+  `≈ −6.64` per contradiction. A component either record lacks adds `0`.
+- **`fields_compared`** — components both records held; identifiers
+  count as one.
+- **`contradictions`** — one `identifier:<scheme>` per deterministic
+  scheme (§15) under which both records hold a non-empty folded value
+  and the two sets are disjoint; `identifier:tax_id` when both share a
+  jurisdiction and hold disjoint non-empty tax ids. Blank values never
+  contradict; a record holding several values under one scheme is not
+  contradicted by a partner holding any of them.
+- **`strength`** — `Contradicted` if any contradiction, else `Proven`
+  if `weight_bits ≥ proof_bits`, else `Consistent` if `is_match`, else
+  `NonMatch`.
+
+Per-component `(m, u)` (`src/evidence.rs`, an informed estimate, not a
+measurement):
+
+| Component | m | u | agree bits | disagree bits | `u` from |
+|---|---|---|---|---|---|
+| name | 0.95 | 1e-3 | 9.89 | −4.32 | bare names ("acme") collide across unrelated organizations |
+| address | 0.85 | 1e-4 | 13.05 | −2.74 | shared street address is rare (office buildings aside); `m` allows relocation |
+| url | 0.90 | 5e-4 | 10.81 | −3.32 | a domain names one organization, but subsidiaries share a parent's |
+| jurisdiction | 0.98 | 0.20 | 2.29 | −5.32 | registries are dominated by a few countries |
+| founding_date | 0.90 | 0.01 | 6.49 | −3.31 | about a century of plausible founding years |
+| keywords | 0.70 | 0.05 | 3.81 | −1.66 | overlap mostly means same sector |
+| relationships | 0.70 | 0.05 | 3.81 | −1.66 | sibling subsidiaries share a parent reference |
+| tags | 0.60 | 0.10 | 2.58 | −1.17 | coarse operator labels |
+
+Consequences: identical name-only records are `Consistent` (9.89
+bits); a shared LEI alone is `Proven`; identical records carrying all
+eight components, with no identifier, are `Proven` (52.74 bits) — name +
+address + domain alone already give 33.76. Founding year one off
+(similarity `0.5`) counts as full disagreement under the shared formula.
+
 ## 19. Quality goals
 
 Total functions (no `unwrap`/`expect`/`panic` in library code); no
@@ -289,6 +343,16 @@ async, or panics to library code.
       `tags_weight` (default `0.05`, §7) on `MatchConfig`, and
       `tags_score: Option<f64>` on `MatchBreakdown`; pinned by unit
       tests in `src/matcher.rs` and a `tests/public_api.rs` case.
+- [x] **Match evidence** *(done 2026-11-09, `agents/share/match-evidence.md`
+      rollout step 2).* `src/evidence.rs` (`component_bits`,
+      `AGREE_AT`/`DISAGREE_AT`, `IDENTIFIER_BITS`, the §18a `m`/`u`
+      table, `Evidence`/`Contradiction`/`MatchStrength`, the identifier
+      contradiction rule), `MatchResult::evidence`, `MatchConfig::proof_bits`
+      (default 30, validated), computed on both the deterministic and
+      probabilistic paths with `score`/`is_match`/`confidence` unchanged.
+      Pinned by unit tests in `src/evidence.rs` / `src/matcher.rs` and a
+      `tests/property_tests.rs` property (finite bits, strength consistent
+      with contradictions/bar/`is_match`, symmetric).
 - [ ] Optional `phone`/`email` exact-match component.
 - [ ] Consider a configurable legal-suffix list (currently a const).
 - [x] **Address: postal-code exact-anchor boost.** *(resolved
@@ -392,7 +456,8 @@ Unit tests embedded per module; an integration suite
 (`tests/public_api.rs`) over the re-exported surface; a property-based
 suite (`tests/property_tests.rs`, `proptest`, SEC-M6) proving the engine
 and its pure helpers never panic on arbitrary UTF-8, scores stay bounded
-and finite, matching is symmetric, and an identical clone self-matches;
+and finite, matching is symmetric, an identical clone self-matches, and
+the evidence (§18a) is finite, symmetric and its strength consistent;
 a standalone `cargo-fuzz` harness (`fuzz/`, SEC-I2, nightly-only, not a
 workspace member) coverage-fuzzing the same never-panic/bounded-score
 invariants; rustdoc examples run as doctests. Run `cargo test`, `cargo

@@ -10,6 +10,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — match evidence (`agents/share/match-evidence.md`)
+
+- `src/evidence.rs`: Fellegi–Sunter log-likelihood evidence beside the
+  similarity score — `component_bits`, `AGREE_AT`/`DISAGREE_AT`,
+  `IDENTIFIER_BITS`, a per-component `m`/`u` table, and the
+  `Evidence`, `Contradiction` and `MatchStrength` types (re-exported
+  from the crate root).
+- `MatchResult::evidence` (`#[serde(default)]`): `weight_bits`,
+  `fields_compared`, `contradictions` (disjoint values under a
+  deterministic scheme, or disjoint tax ids in one jurisdiction) and
+  `strength` (`Contradicted` / `Proven` / `Consistent` / `NonMatch`).
+  Computed on the deterministic short-circuit path too, where the
+  returned score and breakdown are unchanged.
+- `MatchConfig::proof_bits` (default `30`, `#[serde(default)]`),
+  checked finite and positive by `validated()`.
+
+`score`, `is_match` and `confidence` are unchanged. A struct literal of
+`MatchConfig` or `MatchResult` must now name the new field (or use
+`..Default::default()`).
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

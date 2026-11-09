@@ -34,6 +34,9 @@
 //!   [`PostalAddress`], [`RelationshipRef`], [`RelationKind`].
 //! - [`MatchingEngine`], [`MatchConfig`], [`MatchResult`],
 //!   [`MatchBreakdown`], [`Confidence`].
+//! - [`Evidence`], [`Contradiction`], [`MatchStrength`] — how much the
+//!   compared data *proves*, beside the similarity score
+//!   (`agents/share/match-evidence.md`).
 
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)]
@@ -42,6 +45,7 @@
 
 pub mod config;
 pub mod error;
+pub mod evidence;
 pub mod matcher;
 pub mod normalize;
 pub mod organization;
@@ -50,6 +54,7 @@ pub mod scoring;
 
 pub use config::MatchConfig;
 pub use error::{Error, Result};
+pub use evidence::{Contradiction, Evidence, MatchStrength};
 pub use matcher::MatchingEngine;
 pub use organization::{
     IdentifierScheme, OrgIdentifier, Organization, PostalAddress, RelationKind, RelationshipRef,

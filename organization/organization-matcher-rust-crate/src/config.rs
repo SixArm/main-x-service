@@ -55,6 +55,18 @@ pub struct MatchConfig {
     /// organization, but does not participate when either side has no
     /// tags recorded. Spec §14b / §23.
     pub tags_weight: f64,
+
+    /// Evidence, in bits, at or above which an uncontradicted pair is
+    /// [`crate::MatchStrength::Proven`]. Default `30` — a million records
+    /// at one false merge in a thousand (`agents/share/match-evidence.md`
+    /// §4). Absent from older JSON ⇒ the default.
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
+}
+
+/// Serde default for [`MatchConfig::proof_bits`].
+fn default_proof_bits() -> f64 {
+    crate::evidence::DEFAULT_PROOF_BITS
 }
 
 impl Default for MatchConfig {
@@ -69,6 +81,7 @@ impl Default for MatchConfig {
             keywords_weight: 0.10,
             relationships_weight: 0.05,
             tags_weight: 0.05,
+            proof_bits: default_proof_bits(),
         }
     }
 }
@@ -127,7 +140,8 @@ impl MatchConfig {
     ///
     /// Returns [`Error::InvalidConfig`] naming the first offending
     /// field if any weight is negative, `NaN`, or infinite, or if
-    /// `threshold` is outside `[0.0, 1.0]`.
+    /// `threshold` is outside `[0.0, 1.0]`, or if `proof_bits` is not a
+    /// finite, positive number.
     pub fn validated(self) -> Result<Self> {
         let weights = [
             ("name_weight", self.name_weight),
@@ -150,6 +164,12 @@ impl MatchConfig {
             return Err(Error::InvalidConfig(format!(
                 "threshold must be finite and within [0.0, 1.0], got {}",
                 self.threshold
+            )));
+        }
+        if !self.proof_bits.is_finite() || self.proof_bits <= 0.0 {
+            return Err(Error::InvalidConfig(format!(
+                "proof_bits must be finite and positive, got {}",
+                self.proof_bits
             )));
         }
         Ok(self)
@@ -281,5 +301,25 @@ mod tests {
             ..MatchConfig::default()
         };
         assert!(c.validated().is_err());
+    }
+
+    /// Evidence: `proof_bits` defaults to 30, must be finite and
+    /// positive, and is filled in when absent from older JSON.
+    #[test]
+    fn proof_bits_default_validation_and_serde_default() {
+        let c = MatchConfig::default();
+        assert!((c.proof_bits - 30.0).abs() < 1e-12);
+        for bad in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let c = MatchConfig {
+                proof_bits: bad,
+                ..MatchConfig::default()
+            };
+            assert!(c.validated().is_err(), "accepted proof_bits {bad}");
+        }
+        let old = r#"{"threshold":0.85,"name_weight":0.35,"address_weight":0.2,
+            "url_weight":0.15,"jurisdiction_weight":0.1,"founding_date_weight":0.1,
+            "keywords_weight":0.1,"relationships_weight":0.05,"tags_weight":0.05}"#;
+        let c: MatchConfig = serde_json::from_str(old).expect("old config JSON");
+        assert!((c.proof_bits - 30.0).abs() < 1e-12);
     }
 }

@@ -17,8 +17,8 @@
 //! [`IdentifierScheme::is_deterministic`] scheme classifier.
 
 use organization_matcher::{
-    Confidence, IdentifierScheme, MatchConfig, MatchingEngine, OrgIdentifier, Organization,
-    PostalAddress, RelationKind, RelationshipRef, normalize, phonetic,
+    Confidence, IdentifierScheme, MatchConfig, MatchStrength, MatchingEngine, OrgIdentifier,
+    Organization, PostalAddress, RelationKind, RelationshipRef, normalize, phonetic,
 };
 use proptest::prelude::*;
 
@@ -180,6 +180,7 @@ fn config_from(values: &[f64]) -> MatchConfig {
         keywords_weight: values[5],
         relationships_weight: values[6],
         tags_weight: values[7],
+        ..MatchConfig::default()
     }
 }
 
@@ -321,5 +322,30 @@ proptest! {
                 "validated() rejected a well-formed config: {values:?}"
             );
         }
+    }
+
+    /// Evidence (match-evidence.md): `weight_bits` is always finite, and
+    /// the strength agrees with the contradictions, the bar and
+    /// `is_match` exactly as the contract orders them.
+    #[test]
+    fn evidence_is_finite_and_strength_is_consistent(a in org_strategy(), b in org_strategy()) {
+        let engine = MatchingEngine::default_config();
+        let r = engine.match_organizations(&a, &b);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "weight_bits not finite: {}", e.weight_bits);
+        let expected = if !e.contradictions.is_empty() {
+            MatchStrength::Contradicted
+        } else if e.weight_bits >= engine.config().proof_bits {
+            MatchStrength::Proven
+        } else if r.is_match {
+            MatchStrength::Consistent
+        } else {
+            MatchStrength::NonMatch
+        };
+        prop_assert_eq!(e.strength, expected);
+        // Evidence is symmetric too.
+        let rev = engine.match_organizations(&b, &a).evidence;
+        prop_assert!((e.weight_bits - rev.weight_bits).abs() < 1e-9);
+        prop_assert_eq!(e.strength, rev.strength);
     }
 }

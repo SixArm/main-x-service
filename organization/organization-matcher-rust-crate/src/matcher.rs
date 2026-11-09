@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use strsim::jaro_winkler;
 
 use crate::config::MatchConfig;
+use crate::evidence::{Evidence, identifier_contradictions};
 use crate::normalize;
 use crate::organization::{IdentifierScheme, Organization, RelationKind, RelationshipRef};
 use crate::phonetic;
@@ -98,11 +99,40 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_organizations(&self, a: &Organization, b: &Organization) -> MatchResult {
+        // Every component is computed up front, also on the
+        // deterministic path: the returned breakdown/score there stay as
+        // they always were, but the evidence (match-evidence.md §3)
+        // weighs whatever components the data supports.
+        //
+        // Name is always present (it is a required field), hence the
+        // unconditional `Some`; every other component returns `None`
+        // when the data is absent on either side so it can be skipped
+        // during renormalisation.
+        let computed = MatchBreakdown {
+            name_score: Some(name_score(a, b)),
+            address_score: address_score(a, b),
+            url_score: url_score(a, b),
+            jurisdiction_score: jurisdiction_score(a, b),
+            founding_date_score: founding_date_score(a, b),
+            keywords_score: set_jaccard(&a.keywords, &b.keywords),
+            relationships_score: relationships_score(&a.relationships, &b.relationships),
+            tags_score: tags_score(&a.tags, &b.tags),
+            deterministic_match: false,
+        };
+        let contradictions = identifier_contradictions(a, b);
+
         // Phase 1 — deterministic short-circuit. A shared globally-unique
         // identifier (or same-jurisdiction tax id, or `same_as` overlap)
         // is conclusive on its own, so we return a perfect score without
-        // computing — or being diluted by — any fuzzy components.
+        // being diluted by any fuzzy components.
         if deterministic_match(a, b) {
+            let evidence = Evidence::compute(
+                &computed,
+                true,
+                contradictions,
+                true,
+                self.config.proof_bits,
+            );
             return MatchResult {
                 score: 1.0,
                 is_match: true,
@@ -110,58 +140,51 @@ impl MatchingEngine {
                 breakdown: MatchBreakdown {
                     // Flag the short-circuit so callers can tell a rule
                     // hit apart from a fuzzy 1.0; the per-component
-                    // scores stay `None` because none were evaluated.
+                    // scores stay `None`, as they always have here.
                     deterministic_match: true,
                     ..Default::default()
                 },
+                evidence,
             };
         }
 
-        // Phase 2 — probabilistic scoring. Name is always present (it is
-        // a required field), hence the unconditional `Some`; every other
-        // component returns `None` when the data is absent on either side
-        // so it can be skipped during renormalisation.
-        let name_score = Some(name_score(a, b));
-        let address_score = address_score(a, b);
-        let url_score = url_score(a, b);
-        let jurisdiction_score = jurisdiction_score(a, b);
-        let founding_date_score = founding_date_score(a, b);
-        let keywords_score = set_jaccard(&a.keywords, &b.keywords);
-        let relationships_score = relationships_score(&a.relationships, &b.relationships);
-        let tags_score = tags_score(&a.tags, &b.tags);
-
-        // Renormalised weighted average: absent components drop out of
-        // both numerator and denominator, so missing data neither helps
-        // nor hurts the overall score.
+        // Phase 2 — probabilistic scoring. Renormalised weighted
+        // average: absent components drop out of both numerator and
+        // denominator, so missing data neither helps nor hurts the
+        // overall score.
         let score = weighted_average(&[
-            (name_score, self.config.name_weight),
-            (address_score, self.config.address_weight),
-            (url_score, self.config.url_weight),
-            (jurisdiction_score, self.config.jurisdiction_weight),
-            (founding_date_score, self.config.founding_date_weight),
-            (keywords_score, self.config.keywords_weight),
-            (relationships_score, self.config.relationships_weight),
-            (tags_score, self.config.tags_weight),
+            (computed.name_score, self.config.name_weight),
+            (computed.address_score, self.config.address_weight),
+            (computed.url_score, self.config.url_weight),
+            (computed.jurisdiction_score, self.config.jurisdiction_weight),
+            (
+                computed.founding_date_score,
+                self.config.founding_date_weight,
+            ),
+            (computed.keywords_score, self.config.keywords_weight),
+            (
+                computed.relationships_score,
+                self.config.relationships_weight,
+            ),
+            (computed.tags_score, self.config.tags_weight),
         ]);
 
         // A match is declared when the renormalised score clears the
         // configured probable-match threshold (default 0.85).
         let is_match = score >= self.config.threshold;
+        let evidence = Evidence::compute(
+            &computed,
+            false,
+            contradictions,
+            is_match,
+            self.config.proof_bits,
+        );
         MatchResult {
             score,
             is_match,
             confidence: Confidence::classify(score),
-            breakdown: MatchBreakdown {
-                name_score,
-                address_score,
-                url_score,
-                jurisdiction_score,
-                founding_date_score,
-                keywords_score,
-                relationships_score,
-                tags_score,
-                deterministic_match: false,
-            },
+            breakdown: computed,
+            evidence,
         }
     }
 
@@ -1052,5 +1075,165 @@ mod tests {
         assert!(r.score >= 0.99, "expected ~1.0, got {}", r.score);
         assert_eq!(r.breakdown.relationships_score, None);
         assert_eq!(r.breakdown.tags_score, None);
+    }
+
+    // ---------- evidence (agents/share/match-evidence.md) ----------
+
+    use crate::evidence::{Contradiction, IDENTIFIER_BITS, MatchStrength};
+
+    /// A record carrying every probabilistic component, and no identifier.
+    fn rich(name: &str) -> Organization {
+        let mut o = Organization::new(name);
+        o.address = Some(PostalAddress {
+            street_address: Some("1600 Amphitheatre Parkway".into()),
+            locality: Some("Mountain View".into()),
+            region: Some("CA".into()),
+            postal_code: Some("94043".into()),
+            country: Some("US".into()),
+        });
+        o.url = Some("https://www.acme.example".into());
+        o.jurisdiction = Some("US".into());
+        o.founding_date = Some("1998-09-04".into());
+        o.keywords = vec!["software".into(), "search".into()];
+        o.relationships =
+            vec![RelationshipRef::new(RelationKind::SubOrganizationOf, "org-1").unwrap()];
+        o.tags = vec!["vendor".into()];
+        o
+    }
+
+    /// Identical sparse records (name only) are a match, but the data
+    /// only says nothing contradicts it: Consistent, not Proven.
+    #[test]
+    fn identical_sparse_records_are_consistent_not_proven() {
+        let engine = MatchingEngine::default_config();
+        let a = Organization::new("Acme Corporation");
+        let r = engine.match_organizations(&a, &a.clone());
+        assert!(r.is_match);
+        assert_eq!(r.evidence.fields_compared, 1);
+        assert!(r.evidence.weight_bits > 0.0);
+        assert!(r.evidence.weight_bits < engine.config().proof_bits);
+        assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+    }
+
+    /// A shared LEI proves the match, even with unrelated names, and the
+    /// returned score/breakdown are exactly the short-circuit's.
+    #[test]
+    fn shared_lei_is_proven() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Organization::new("A");
+        let mut b = Organization::new("Totally Different");
+        a.identifiers
+            .push(ident(IdentifierScheme::Lei, "5493001KJTIIGC8Y1R12"));
+        b.identifiers
+            .push(ident(IdentifierScheme::Lei, "5493001kjtiigc8y1r12"));
+        let r = engine.match_organizations(&a, &b);
+        assert!((r.score - 1.0).abs() < 1e-12);
+        assert!(r.breakdown.deterministic_match);
+        assert_eq!(r.breakdown.name_score, None);
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+        // Identifier bits plus a disagreeing name component.
+        assert!(r.evidence.weight_bits < IDENTIFIER_BITS);
+        assert!(r.evidence.weight_bits >= engine.config().proof_bits);
+        assert_eq!(r.evidence.fields_compared, 2);
+    }
+
+    /// Conflicting LEIs on otherwise identical records: the score is
+    /// unchanged, but the pair is Contradicted.
+    #[test]
+    fn conflicting_leis_contradict_identical_records() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich("Acme Corporation");
+        let mut b = rich("Acme Corporation");
+        let plain = engine.match_organizations(&a, &b);
+        a.identifiers
+            .push(ident(IdentifierScheme::Lei, "5493001KJTIIGC8Y1R12"));
+        b.identifiers
+            .push(ident(IdentifierScheme::Lei, "529900T8BM49AURSDO55"));
+        let r = engine.match_organizations(&a, &b);
+        assert!((r.score - plain.score).abs() < 1e-12);
+        assert_eq!(r.is_match, plain.is_match);
+        assert_eq!(
+            r.evidence.contradictions,
+            vec![Contradiction {
+                field: "identifier:lei".into()
+            }]
+        );
+        assert_eq!(r.evidence.strength, MatchStrength::Contradicted);
+        assert!(r.evidence.weight_bits < plain.evidence.weight_bits);
+    }
+
+    /// A richly identical record with no identifier at all can reach
+    /// Proven: name, street address and domain together are enough.
+    #[test]
+    fn richly_identical_record_without_identifier_is_proven() {
+        let engine = MatchingEngine::default_config();
+        let a = rich("Acme Corporation");
+        let r = engine.match_organizations(&a, &a.clone());
+        assert!(!r.breakdown.deterministic_match);
+        assert_eq!(r.evidence.fields_compared, 8);
+        assert!(r.evidence.weight_bits >= engine.config().proof_bits);
+        assert_eq!(r.evidence.strength, MatchStrength::Proven);
+    }
+
+    /// A clear disagreement weighs negative and is a `NonMatch`.
+    #[test]
+    fn clear_disagreement_gives_negative_bits() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Organization::new("Acme Corporation");
+        let mut b = Organization::new("Globex Industries");
+        a.jurisdiction = Some("US".into());
+        b.jurisdiction = Some("GB".into());
+        a.founding_date = Some("1950".into());
+        b.founding_date = Some("2010".into());
+        let r = engine.match_organizations(&a, &b);
+        assert!(
+            r.evidence.weight_bits < 0.0,
+            "got {}",
+            r.evidence.weight_bits
+        );
+        assert_eq!(r.evidence.strength, MatchStrength::NonMatch);
+    }
+
+    /// A component either record lacks adds nothing: adding an address
+    /// to one side only leaves the evidence unchanged.
+    #[test]
+    fn one_sided_component_adds_nothing() {
+        let engine = MatchingEngine::default_config();
+        let a = Organization::new("Acme Corporation");
+        let mut b = a.clone();
+        let before = engine.match_organizations(&a, &b).evidence;
+        b.address = rich("x").address;
+        let after = engine.match_organizations(&a, &b).evidence;
+        assert_eq!(before, after);
+    }
+
+    /// Same jurisdiction, different tax ids: Contradicted on `tax_id`.
+    #[test]
+    fn disjoint_tax_ids_in_one_jurisdiction_contradict() {
+        let engine = MatchingEngine::default_config();
+        let mut a = Organization::new("Acme Corporation");
+        let mut b = a.clone();
+        a.jurisdiction = Some("US".into());
+        b.jurisdiction = Some("US".into());
+        a.identifiers
+            .push(ident(IdentifierScheme::TaxId, "12-3456789"));
+        b.identifiers
+            .push(ident(IdentifierScheme::TaxId, "98-7654321"));
+        let r = engine.match_organizations(&a, &b);
+        assert!(r.is_match);
+        assert_eq!(r.evidence.strength, MatchStrength::Contradicted);
+        assert_eq!(r.evidence.contradictions[0].field, "identifier:tax_id");
+    }
+
+    /// JSON written before `evidence` existed still deserialises.
+    #[test]
+    fn old_match_result_json_without_evidence_deserialises() {
+        let old = r#"{"score":0.9,"is_match":true,"confidence":"Medium",
+            "breakdown":{"name_score":0.9,"address_score":null,"url_score":null,
+            "jurisdiction_score":null,"founding_date_score":null,"keywords_score":null,
+            "relationships_score":null,"tags_score":null,"deterministic_match":false}}"#;
+        let r: MatchResult = serde_json::from_str(old).expect("old JSON");
+        assert_eq!(r.evidence, crate::Evidence::default());
+        assert_eq!(r.evidence.strength, MatchStrength::NonMatch);
     }
 }
