@@ -12,7 +12,8 @@
 //! All tests drive the crate's **public** surface only
 //! (`use course_matcher::…`) — the same contract the service embeds.
 
-use course_matcher::{Course, MatchConfig, MatchStrength, MatchingEngine};
+use course_matcher::evidence::frequency_key;
+use course_matcher::{Course, FrequencyTable, MatchConfig, MatchStrength, MatchingEngine};
 use course_matcher::{normalize, phonetic};
 use proptest::prelude::*;
 
@@ -143,6 +144,32 @@ proptest! {
             MatchStrength::NonMatch
         };
         prop_assert_eq!(e.strength, expected);
+    }
+
+    /// The listed evidence terms MUST add up to `weight_bits` exactly,
+    /// with and without a frequency source, and a frequency source MUST
+    /// NOT change `score`, `is_match` or `confidence` (spec §18a).
+    #[test]
+    fn evidence_terms_sum_to_weight_bits(
+        a in course_strategy(),
+        b in course_strategy(),
+        share in 0.0_f64..=1.0,
+    ) {
+        let engine = MatchingEngine::default_config();
+        let mut freq = FrequencyTable::new();
+        if let Some(key) = frequency_key("name", &a.name) {
+            freq.insert("name", key, share);
+        }
+        let plain = engine.match_courses(&a, &b);
+        let adjusted = engine.match_courses_with_frequencies(&a, &b, &freq);
+        for e in [&plain.evidence, &adjusted.evidence] {
+            let sum: f64 = e.components.iter().map(|t| t.bits).sum();
+            prop_assert!(sum.to_bits() == e.weight_bits.to_bits(), "{} != {}", sum, e.weight_bits);
+            prop_assert!(e.weight_bits.is_finite());
+        }
+        prop_assert!(plain.score.to_bits() == adjusted.score.to_bits());
+        prop_assert_eq!(plain.is_match, adjusted.is_match);
+        prop_assert_eq!(plain.confidence, adjusted.confidence);
     }
 
     /// `soundex` MUST be `None`, or a 4-char `[A-Z][0-9]{3}` code —

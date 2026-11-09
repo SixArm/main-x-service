@@ -18,7 +18,7 @@ use strsim::jaro_winkler;
 
 use crate::config::MatchConfig;
 use crate::course::{Course, CourseIdentifier, EducationalLevel, RelationKind, RelationshipRef};
-use crate::evidence;
+use crate::evidence::{self, NoFrequencies, ValueFrequencies};
 use crate::normalize;
 use crate::phonetic;
 use crate::scoring::{Confidence, MatchBreakdown, MatchResult, weighted_average};
@@ -82,6 +82,36 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_courses(&self, a: &Course, b: &Course) -> MatchResult {
+        self.match_courses_with_frequencies(a, b, &NoFrequencies)
+    }
+
+    /// Score two courses, taking the evidence's agreement weight for each
+    /// of [`FREQUENCY_COMPONENTS`](crate::evidence::FREQUENCY_COMPONENTS)
+    /// from the value's own share in `frequencies` (spec §18a). `score`,
+    /// `is_match`, `confidence` and `breakdown` are the same as from
+    /// [`MatchingEngine::match_courses`]; only `evidence` can differ.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use course_matcher::{Course, FrequencyTable, MatchingEngine};
+    ///
+    /// let mut freq = FrequencyTable::new();
+    /// freq.insert("name", "introduction to biology", 0.01);
+    /// let a = Course::new("Introduction to Biology");
+    /// let engine = MatchingEngine::default_config();
+    /// let plain = engine.match_courses(&a, &a.clone());
+    /// let adjusted = engine.match_courses_with_frequencies(&a, &a.clone(), &freq);
+    /// assert_eq!(plain.score, adjusted.score);
+    /// assert!(adjusted.evidence.weight_bits < plain.evidence.weight_bits);
+    /// ```
+    #[must_use]
+    pub fn match_courses_with_frequencies(
+        &self,
+        a: &Course,
+        b: &Course,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         // The probabilistic components are computed on every path: the
         // short-circuit does not score them, but the evidence weighs them
         // (spec §18a).
@@ -89,7 +119,8 @@ impl MatchingEngine {
 
         // ── Deterministic short-circuit ──────────────────────────
         if deterministic_match(a, b) {
-            let evidence = evidence::assess(a, b, &components, true, self.config.proof_bits);
+            let evidence =
+                evidence::assess(a, b, &components, true, self.config.proof_bits, frequencies);
             return MatchResult {
                 score: 1.0,
                 is_match: true,
@@ -121,7 +152,14 @@ impl MatchingEngine {
         ]);
 
         let is_match = score >= self.config.threshold;
-        let evidence = evidence::assess(a, b, &components, is_match, self.config.proof_bits);
+        let evidence = evidence::assess(
+            a,
+            b,
+            &components,
+            is_match,
+            self.config.proof_bits,
+            frequencies,
+        );
         MatchResult {
             score,
             is_match,

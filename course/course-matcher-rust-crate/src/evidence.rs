@@ -130,6 +130,20 @@ pub struct Contradiction {
     pub field: String,
 }
 
+/// One term of the evidence sum (match-evidence.md §8).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComponentBits {
+    /// The component, e.g. `"name"`, `"identifier"`,
+    /// `"contradiction:identifier:doi"`.
+    pub component: String,
+    /// Bits this term added, after any discount or adjustment.
+    pub bits: f64,
+    /// Discounted as a non-strongest member of a correlated group.
+    pub correlated: bool,
+    /// Agreement weight taken from the value's own frequency.
+    pub frequency_adjusted: bool,
+}
+
 /// How much the compared data proves, beside the similarity score.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Evidence {
@@ -141,6 +155,176 @@ pub struct Evidence {
     pub contradictions: Vec<Contradiction>,
     /// The verdict (§4).
     pub strength: MatchStrength,
+    /// Every term of the sum; the terms add up to `weight_bits`.
+    #[serde(default)]
+    pub components: Vec<ComponentBits>,
+}
+
+// ─── Correlated components (match-evidence.md §6) ──────────────────
+
+/// Weight of each member of a correlated group after its strongest.
+pub const CORRELATED_DISCOUNT: f64 = 0.5;
+
+/// This crate's correlated groups, by component name. Public contract
+/// (spec §18a):
+///
+/// - `keywords`, `teaches`, `tags` — often authored from one syllabus
+///   or catalogue entry, so two unrelated courses on one subject agree
+///   on all three for one reason.
+/// - `provider`, `educational_level` — a provider's catalogue sits at a
+///   few levels (a university's is all higher education), so two
+///   unrelated courses from one provider usually share a level too.
+pub const CORRELATED_GROUPS: &[&[&str]] = &[
+    &["keywords", "teaches", "tags"],
+    &["provider", "educational_level"],
+];
+
+/// Index of the strongest member: the largest absolute value, ties to
+/// the larger value, then to the first index.
+fn strongest_index(member_bits: &[f64]) -> Option<usize> {
+    let mut best: Option<usize> = None;
+    for (i, &v) in member_bits.iter().enumerate() {
+        best = match best {
+            None => Some(i),
+            Some(j) => {
+                let w = member_bits[j];
+                let order = v.abs().total_cmp(&w.abs()).then(v.total_cmp(&w));
+                if order == std::cmp::Ordering::Greater {
+                    Some(i)
+                } else {
+                    Some(j)
+                }
+            }
+        };
+    }
+    best
+}
+
+/// The strongest member (largest absolute value, ties to the larger
+/// value) and the rest, or `None` when there are no members.
+#[must_use]
+pub fn strongest_first(member_bits: &[f64]) -> Option<(f64, Vec<f64>)> {
+    let i = strongest_index(member_bits)?;
+    let rest = member_bits
+        .iter()
+        .enumerate()
+        .filter(|&(j, _)| j != i)
+        .map(|(_, &v)| v)
+        .collect();
+    Some((member_bits[i], rest))
+}
+
+/// The bits a correlated group adds, from its present members' bits.
+#[must_use]
+pub fn group_bits(member_bits: &[f64]) -> f64 {
+    let Some((strongest, rest)) = strongest_first(member_bits) else {
+        return 0.0;
+    };
+    strongest + CORRELATED_DISCOUNT * rest.iter().sum::<f64>()
+}
+
+// ─── Common and rare values (match-evidence.md §7) ─────────────────
+
+/// Where the share of records holding a value comes from.
+pub trait ValueFrequencies {
+    /// The share, in `0.0..=1.0`, of records whose `component` holds
+    /// `value` (already in the matcher's normalised form, see
+    /// [`frequency_key`]), or `None` when unknown.
+    fn share(&self, component: &str, value: &str) -> Option<f64>;
+}
+
+/// No frequencies: every share is unknown, so the m/u table stands.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoFrequencies;
+
+impl ValueFrequencies for NoFrequencies {
+    fn share(&self, _component: &str, _value: &str) -> Option<f64> {
+        None
+    }
+}
+
+/// An in-memory table of shares, keyed by component and normalised
+/// value (the output of [`frequency_key`]).
+#[derive(Debug, Clone, Default)]
+pub struct FrequencyTable {
+    shares: std::collections::HashMap<(String, String), f64>,
+}
+
+impl FrequencyTable {
+    /// An empty table.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Build from `(component, key, count)` triples over `total`
+    /// records: each share is `count / total`. A `total` of `0` gives an
+    /// empty table.
+    #[must_use]
+    pub fn from_counts<I, C, K>(counts: I, total: u64) -> Self
+    where
+        I: IntoIterator<Item = (C, K, u64)>,
+        C: Into<String>,
+        K: Into<String>,
+    {
+        let mut table = Self::new();
+        if total == 0 {
+            return table;
+        }
+        #[allow(clippy::cast_precision_loss)]
+        let total_f = total as f64;
+        for (component, key, count) in counts {
+            #[allow(clippy::cast_precision_loss)]
+            let share = count as f64 / total_f;
+            table.insert(component, key, share);
+        }
+        table
+    }
+
+    /// Set the share of `component` holding `key`. `key` must already be
+    /// in [`frequency_key`] form.
+    pub fn insert(&mut self, component: impl Into<String>, key: impl Into<String>, share: f64) {
+        self.shares.insert((component.into(), key.into()), share);
+    }
+}
+
+impl ValueFrequencies for FrequencyTable {
+    fn share(&self, component: &str, value: &str) -> Option<f64> {
+        self.shares
+            .get(&(component.to_string(), value.to_string()))
+            .copied()
+    }
+}
+
+/// Smallest share used, so a value seen once cannot give unbounded bits.
+pub const MIN_SHARE: f64 = 1e-9;
+
+/// The components whose agreement weight a [`ValueFrequencies`] source
+/// adjusts. Public contract (spec §18a).
+pub const FREQUENCY_COMPONENTS: &[&str] = &["name"];
+
+/// Agreement bits for a value held by `share` of records.
+#[must_use]
+pub fn frequency_bits(m: f64, share: f64) -> f64 {
+    let share = if share.is_finite() {
+        share.clamp(MIN_SHARE, m)
+    } else {
+        m
+    };
+    (m / share).log2()
+}
+
+/// The key the matcher looks up for `component`'s raw value, so a
+/// service can count values in the same form. `"name"` is the primary
+/// course name under [`normalize::fold`] (trim, NFKC, lowercase).
+/// Returns `None` for a component not in [`FREQUENCY_COMPONENTS`] or a
+/// value that normalises to empty.
+#[must_use]
+pub fn frequency_key(component: &str, raw: &str) -> Option<String> {
+    match component {
+        "name" => Some(normalize::fold(raw)).filter(|k| !k.is_empty()),
+        _ => None,
+    }
 }
 
 /// Folded, non-empty values `c` holds under `scheme`.
@@ -178,46 +362,114 @@ fn provider_scoped_codes(a: &Course, b: &Course) -> Option<(String, String)> {
     Some((ac, bc))
 }
 
-/// Compute the evidence for a pair.
-///
-/// `components` is the probabilistic breakdown, computed even when the
-/// deterministic short-circuit fired. Its `course_code_score` is not
-/// weighed as a component: the provider-scoped course code is weighed as
-/// an identifier instead, so it is not counted twice.
-#[must_use]
-pub(crate) fn assess(
+/// The frequency-adjusted agreement bits for `component`, when the two
+/// raw values have the same non-empty key and the source knows its
+/// share. `None` means use the m/u table.
+fn adjusted_agreement(
+    component: &str,
+    a_raw: &str,
+    b_raw: &str,
+    m: f64,
+    frequencies: &dyn ValueFrequencies,
+) -> Option<f64> {
+    let ak = frequency_key(component, a_raw)?;
+    let bk = frequency_key(component, b_raw)?;
+    if ak != bk {
+        return None;
+    }
+    frequencies
+        .share(component, &ak)
+        .map(|share| frequency_bits(m, share))
+}
+
+/// The per-component terms, after frequency adjustment and the
+/// correlated-group discount, and the number of components compared.
+fn component_terms(
     a: &Course,
     b: &Course,
     components: &MatchBreakdown,
-    is_match: bool,
-    proof_bits: f64,
-) -> Evidence {
-    let mut weight_bits = 0.0_f64;
+    frequencies: &dyn ValueFrequencies,
+) -> (Vec<ComponentBits>, u32) {
     let mut fields_compared = 0_u32;
     let table = [
-        (components.name_score, NAME_M, NAME_U),
-        (components.provider_score, PROVIDER_M, PROVIDER_U),
+        ("name", components.name_score, NAME_M, NAME_U),
         (
+            "provider",
+            components.provider_score,
+            PROVIDER_M,
+            PROVIDER_U,
+        ),
+        (
+            "educational_level",
             components.educational_level_score,
             EDUCATIONAL_LEVEL_M,
             EDUCATIONAL_LEVEL_U,
         ),
-        (components.keywords_score, KEYWORDS_M, KEYWORDS_U),
-        (components.teaches_score, TEACHES_M, TEACHES_U),
         (
+            "keywords",
+            components.keywords_score,
+            KEYWORDS_M,
+            KEYWORDS_U,
+        ),
+        ("teaches", components.teaches_score, TEACHES_M, TEACHES_U),
+        (
+            "relationships",
             components.relationships_score,
             RELATIONSHIPS_M,
             RELATIONSHIPS_U,
         ),
-        (components.tags_score, TAGS_M, TAGS_U),
+        ("tags", components.tags_score, TAGS_M, TAGS_U),
     ];
-    for (similarity, m, u) in table {
-        if let Some(s) = similarity {
-            weight_bits += component_bits(s, m, u);
-            fields_compared += 1;
+    // Raw per-component terms, before any correlated discount.
+    let mut terms: Vec<ComponentBits> = Vec::new();
+    for (name, similarity, m, u) in table {
+        let Some(s) = similarity else { continue };
+        fields_compared += 1;
+        // Only an exact agreement on the same normalised value adjusts.
+        let adjusted = if name == "name" {
+            adjusted_agreement(name, &a.name, &b.name, m, frequencies)
+        } else {
+            None
+        };
+        let (bits, frequency_adjusted) = match adjusted {
+            Some(bits) => (bits, true),
+            None => (component_bits(s, m, u), false),
+        };
+        terms.push(ComponentBits {
+            component: name.to_string(),
+            bits,
+            correlated: false,
+            frequency_adjusted,
+        });
+    }
+    // Correlated groups: the strongest present member counts in full,
+    // every other present member at CORRELATED_DISCOUNT.
+    for group in CORRELATED_GROUPS {
+        let members: Vec<usize> = terms
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| group.contains(&t.component.as_str()))
+            .map(|(i, _)| i)
+            .collect();
+        let bits: Vec<f64> = members.iter().map(|&i| terms[i].bits).collect();
+        let Some(strongest) = strongest_index(&bits) else {
+            continue;
+        };
+        for (k, &i) in members.iter().enumerate() {
+            if k != strongest {
+                terms[i].bits *= CORRELATED_DISCOUNT;
+                terms[i].correlated = true;
+            }
         }
     }
 
+    (terms, fields_compared)
+}
+
+/// The identifier and contradiction terms, the contradictions, and
+/// whether any identifier rule compared values on both sides.
+fn identifier_terms(a: &Course, b: &Course) -> (Vec<ComponentBits>, Vec<Contradiction>, bool) {
+    let mut terms = Vec::new();
     // Identifiers: one hit is worth IDENTIFIER_BITS once; each disjoint
     // scheme is a contradiction.
     let mut identifier_hit = false;
@@ -259,15 +511,49 @@ pub(crate) fn assess(
         }
     }
     if identifier_hit {
-        weight_bits += IDENTIFIER_BITS;
+        terms.push(ComponentBits {
+            component: "identifier".to_string(),
+            bits: IDENTIFIER_BITS,
+            correlated: false,
+            frequency_adjusted: false,
+        });
     }
-    for _ in &contradictions {
-        weight_bits += CONTRADICTION_BITS;
+    for c in &contradictions {
+        terms.push(ComponentBits {
+            component: format!("contradiction:{}", c.field),
+            bits: CONTRADICTION_BITS,
+            correlated: false,
+            frequency_adjusted: false,
+        });
     }
+    (terms, contradictions, identifiers_compared)
+}
+
+/// Compute the evidence for a pair.
+///
+/// `components` is the probabilistic breakdown, computed even when the
+/// deterministic short-circuit fired. Its `course_code_score` is not
+/// weighed as a component: the provider-scoped course code is weighed as
+/// an identifier instead, so it is not counted twice.
+#[must_use]
+pub(crate) fn assess(
+    a: &Course,
+    b: &Course,
+    components: &MatchBreakdown,
+    is_match: bool,
+    proof_bits: f64,
+    frequencies: &dyn ValueFrequencies,
+) -> Evidence {
+    let (mut terms, mut fields_compared) = component_terms(a, b, components, frequencies);
+    let (identifier, contradictions, identifiers_compared) = identifier_terms(a, b);
+    terms.extend(identifier);
     if identifiers_compared {
         fields_compared += 1;
     }
 
+    // The total is the sum of the listed terms, in list order, so the
+    // listing adds up to it exactly.
+    let weight_bits: f64 = terms.iter().map(|t| t.bits).sum();
     let strength = if !contradictions.is_empty() {
         MatchStrength::Contradicted
     } else if weight_bits >= proof_bits {
@@ -282,6 +568,7 @@ pub(crate) fn assess(
         fields_compared,
         contradictions,
         strength,
+        components: terms,
     }
 }
 
@@ -470,26 +757,261 @@ mod tests {
     }
 
     // The richest identifier-free course this crate models cannot reach
-    // the default bar: every field it carries, all agreeing, sums to about
-    // 27.6 bits. That is deliberate. Two sections or two years of one
-    // course agree on all of them and are still separate records, so
-    // without an identifier (or a provider-scoped code) the data is
-    // consistent with a duplicate but never proof of one.
+    // the default bar. Every field it carries, all agreeing, summed to
+    // about 27.6 bits before the correlated groups; with them it is about
+    // 23.62 (keywords/teaches/tags and provider/level each count their
+    // strongest member in full and the rest at half). That is deliberate.
+    // Two sections or two years of one course agree on all of them and
+    // are still separate records, so without an identifier (or a
+    // provider-scoped code) the data is consistent with a duplicate but
+    // never proof of one.
     #[test]
     fn richest_identical_record_without_identifier_is_not_proven() {
         let a = rich("Algorithms and Data Structures");
         let r = MatchingEngine::default_config().match_courses(&a, &a.clone());
         assert_eq!(r.evidence.fields_compared, 7);
-        assert!(r.evidence.weight_bits < DEFAULT_PROOF_BITS);
-        assert!(r.evidence.weight_bits > 27.0);
+        let expected = (NAME_M / NAME_U).log2()
+            + (RELATIONSHIPS_M / RELATIONSHIPS_U).log2()
+            + (TEACHES_M / TEACHES_U).log2()
+            + 0.5 * ((KEYWORDS_M / KEYWORDS_U).log2() + (TAGS_M / TAGS_U).log2())
+            + (PROVIDER_M / PROVIDER_U).log2()
+            + 0.5 * (EDUCATIONAL_LEVEL_M / EDUCATIONAL_LEVEL_U).log2();
+        assert!((r.evidence.weight_bits - expected).abs() < 1e-9);
+        assert!((r.evidence.weight_bits - 23.62).abs() < 0.01);
         assert_eq!(r.evidence.strength, MatchStrength::Consistent);
         // A deployment with a lower bar can accept it.
         let lenient = MatchConfig {
-            proof_bits: 25.0,
+            proof_bits: 20.0,
             ..MatchConfig::default()
         };
         let r = MatchingEngine::new(lenient).match_courses(&a, &a.clone());
         assert_eq!(r.evidence.strength, MatchStrength::Proven);
+    }
+
+    fn term<'a>(e: &'a Evidence, component: &str) -> &'a ComponentBits {
+        e.components
+            .iter()
+            .find(|t| t.component == component)
+            .unwrap_or_else(|| panic!("no term {component}"))
+    }
+
+    fn sum_of_terms(e: &Evidence) -> f64 {
+        e.components.iter().map(|t| t.bits).sum()
+    }
+
+    #[test]
+    fn group_bits_discounts_all_but_the_strongest() {
+        assert!((group_bits(&[4.0, 3.0]) - 5.5).abs() < 1e-12);
+        assert!(group_bits(&[4.0, 3.0]) < 4.0 + 3.0);
+        assert!(group_bits(&[]).abs() < 1e-12);
+        assert!((group_bits(&[2.5]) - 2.5).abs() < 1e-12);
+    }
+
+    // Order of the members does not change the result, ties included.
+    #[test]
+    fn group_bits_is_order_independent() {
+        let perms = [[4.0, 3.0, -2.0], [3.0, -2.0, 4.0], [-2.0, 4.0, 3.0]];
+        for p in perms {
+            assert!((group_bits(&p) - (4.0 + 0.5 * 1.0)).abs() < 1e-12);
+        }
+        // Tie on absolute value: the larger value is the strongest.
+        assert_eq!(strongest_first(&[-3.0, 3.0]).map(|(s, _)| s), Some(3.0));
+        assert_eq!(strongest_first(&[3.0, -3.0]).map(|(s, _)| s), Some(3.0));
+        assert!((group_bits(&[-3.0, 3.0]) - group_bits(&[3.0, -3.0])).abs() < 1e-12);
+        assert!((group_bits(&[-3.0, 3.0]) - 1.5).abs() < 1e-12);
+    }
+
+    // Disagreements in one group are discounted too: one reason, not two.
+    #[test]
+    fn correlated_disagreements_are_discounted() {
+        assert!((group_bits(&[-4.0, -2.0]) - (-5.0)).abs() < 1e-12);
+        let mut a = Course::new("Algorithms");
+        let mut b = Course::new("Algorithms");
+        a.keywords = vec!["graphs".into()];
+        b.keywords = vec!["poetry".into()];
+        a.teaches = vec!["recursion".into()];
+        b.teaches = vec!["metre".into()];
+        let r = MatchingEngine::default_config().match_courses(&a, &b);
+        let kw = ((1.0 - KEYWORDS_M) / (1.0 - KEYWORDS_U)).log2();
+        let te = ((1.0 - TEACHES_M) / (1.0 - TEACHES_U)).log2();
+        // teaches disagrees more strongly, so keywords is the one halved.
+        assert_eq!(term(&r.evidence, "teaches").bits.to_bits(), te.to_bits());
+        assert!((term(&r.evidence, "keywords").bits - 0.5 * kw).abs() < 1e-12);
+        assert!(term(&r.evidence, "keywords").correlated);
+        assert!(!term(&r.evidence, "teaches").correlated);
+    }
+
+    // Two agreeing correlated fields add less than their sum, whichever
+    // record order the matcher sees.
+    #[test]
+    fn correlated_agreements_add_less_than_their_sum() {
+        let mut a = Course::new("Algorithms");
+        a.keywords = vec!["graphs".into()];
+        a.teaches = vec!["recursion".into()];
+        let b = a.clone();
+        let engine = MatchingEngine::default_config();
+        let r = engine.match_courses(&a, &b);
+        let kw = (KEYWORDS_M / KEYWORDS_U).log2();
+        let te = (TEACHES_M / TEACHES_U).log2();
+        let group = term(&r.evidence, "keywords").bits + term(&r.evidence, "teaches").bits;
+        assert!(group < kw + te);
+        assert!((group - (te + 0.5 * kw)).abs() < 1e-12);
+        let rev = engine.match_courses(&b, &a);
+        assert!((rev.evidence.weight_bits - r.evidence.weight_bits).abs() < 1e-12);
+    }
+
+    // Components in different groups (or none) still add in full.
+    #[test]
+    fn uncorrelated_fields_still_sum() {
+        let mut a = Course::new("Algorithms");
+        a.keywords = vec!["graphs".into()];
+        a.educational_level = Some(EducationalLevel::Undergraduate);
+        let r = MatchingEngine::default_config().match_courses(&a, &a.clone());
+        let expected = (NAME_M / NAME_U).log2()
+            + (KEYWORDS_M / KEYWORDS_U).log2()
+            + (EDUCATIONAL_LEVEL_M / EDUCATIONAL_LEVEL_U).log2();
+        assert!((r.evidence.weight_bits - expected).abs() < 1e-12);
+        assert!(r.evidence.components.iter().all(|t| !t.correlated));
+    }
+
+    #[test]
+    fn frequency_bits_clamps_to_zero_and_min_share() {
+        assert!(frequency_bits(NAME_M, NAME_M).abs() < 1e-12);
+        assert!(frequency_bits(NAME_M, 0.99).abs() < 1e-12);
+        assert!(frequency_bits(NAME_M, 1.0) >= 0.0);
+        assert!((frequency_bits(NAME_M, 0.0) - (NAME_M / MIN_SHARE).log2()).abs() < 1e-9);
+        assert!(frequency_bits(NAME_M, f64::NAN).abs() < 1e-12);
+    }
+
+    fn name_table(name: &str, share: f64) -> FrequencyTable {
+        let mut t = FrequencyTable::new();
+        let key = frequency_key("name", name).expect("non-empty name");
+        t.insert("name", key, share);
+        t
+    }
+
+    // "Introduction to Biology" is offered by many providers. Agreeing on
+    // it, held by 1% of records, proves less than the table's average
+    // u; a name held by one record in a million proves more.
+    #[test]
+    fn common_name_proves_less_and_rare_name_more() {
+        let engine = MatchingEngine::default_config();
+        let default_bits = (NAME_M / NAME_U).log2();
+
+        let common = Course::new("Introduction to Biology");
+        let freq = name_table("  INTRODUCTION to Biology ", 0.01);
+        let r = engine.match_courses_with_frequencies(&common, &common.clone(), &freq);
+        let t = term(&r.evidence, "name");
+        assert!(t.frequency_adjusted);
+        assert!(t.bits < default_bits);
+        assert!((t.bits - (NAME_M / 0.01).log2()).abs() < 1e-12);
+
+        let rare = Course::new("Paleoclimatology of the Ordovician");
+        let freq = name_table("Paleoclimatology of the Ordovician", 1e-6);
+        let r = engine.match_courses_with_frequencies(&rare, &rare.clone(), &freq);
+        assert!(term(&r.evidence, "name").bits > default_bits);
+    }
+
+    // A value most records hold is no evidence, and never evidence against.
+    #[test]
+    fn share_at_or_above_m_gives_zero_bits() {
+        let a = Course::new("Introduction to Biology");
+        let engine = MatchingEngine::default_config();
+        for share in [NAME_M, 0.99, 1.0] {
+            let freq = name_table("Introduction to Biology", share);
+            let r = engine.match_courses_with_frequencies(&a, &a.clone(), &freq);
+            let t = term(&r.evidence, "name");
+            assert!(t.frequency_adjusted);
+            assert!(t.bits.abs() < 1e-12, "share {share} gave {}", t.bits);
+        }
+    }
+
+    // Partial agreement and disagreement keep the m/u table.
+    #[test]
+    fn no_frequency_adjustment_on_partial_agreement_or_disagreement() {
+        let engine = MatchingEngine::default_config();
+        let mut freq = name_table("Introduction to Biology", 1e-6);
+        freq.insert("name", "intro to biology", 1e-6);
+        freq.insert("name", "tudor history", 1e-6);
+        let a = Course::new("Introduction to Biology");
+        for other in ["Intro to Biology", "Tudor History"] {
+            let b = Course::new(other);
+            let plain = engine.match_courses(&a, &b);
+            let r = engine.match_courses_with_frequencies(&a, &b, &freq);
+            assert!(!term(&r.evidence, "name").frequency_adjusted);
+            assert_eq!(r.evidence, plain.evidence);
+        }
+    }
+
+    #[test]
+    fn no_frequencies_equals_the_plain_call() {
+        let engine = MatchingEngine::default_config();
+        let mut a = rich("Algorithms");
+        let b = rich("Algorithms and Data Structures");
+        a.identifiers.push(ident(IdentifierScheme::Doi, "10.1/x"));
+        for (x, y) in [(&a, &b), (&a, &a)] {
+            let plain = engine.match_courses(x, y);
+            let none = engine.match_courses_with_frequencies(x, y, &NoFrequencies);
+            assert_eq!(plain.evidence, none.evidence);
+            assert!((plain.score - none.score).abs() < f64::EPSILON);
+            assert_eq!(plain.is_match, none.is_match);
+            assert_eq!(plain.confidence, none.confidence);
+        }
+    }
+
+    // Frequencies change only the evidence, never score / is_match /
+    // confidence.
+    #[test]
+    fn frequencies_leave_score_unchanged() {
+        let engine = MatchingEngine::default_config();
+        let a = Course::new("Introduction to Biology");
+        let freq = name_table("Introduction to Biology", 0.5);
+        let plain = engine.match_courses(&a, &a.clone());
+        let r = engine.match_courses_with_frequencies(&a, &a.clone(), &freq);
+        assert!((plain.score - r.score).abs() < f64::EPSILON);
+        assert_eq!(plain.is_match, r.is_match);
+        assert_eq!(plain.confidence, r.confidence);
+    }
+
+    #[test]
+    fn frequency_key_matches_the_compared_form() {
+        assert_eq!(
+            frequency_key("name", "  Café  ÉTUDES "),
+            Some(normalize::fold("Café  ÉTUDES"))
+        );
+        assert_eq!(frequency_key("name", "   "), None);
+        assert_eq!(frequency_key("provider", "prov-1"), None);
+        assert!(
+            FREQUENCY_COMPONENTS
+                .iter()
+                .all(|c| frequency_key(c, "x").is_some())
+        );
+    }
+
+    #[test]
+    fn frequency_table_from_counts() {
+        let t = FrequencyTable::from_counts([("name", "introduction to biology", 25_u64)], 100);
+        assert_eq!(t.share("name", "introduction to biology"), Some(0.25));
+        assert_eq!(t.share("name", "other"), None);
+        let empty = FrequencyTable::from_counts([("name", "x", 1_u64)], 0);
+        assert_eq!(empty.share("name", "x"), None);
+    }
+
+    // Identifier and contradiction terms are listed, and the terms add
+    // up to weight_bits exactly.
+    #[test]
+    fn components_list_every_term_and_sum_to_weight_bits() {
+        let mut a = rich("Algorithms");
+        let mut b = a.clone();
+        a.identifiers.push(ident(IdentifierScheme::Doi, "10.1/x"));
+        b.identifiers.push(ident(IdentifierScheme::Doi, "10.1/x"));
+        a.identifiers.push(ident(IdentifierScheme::Uuid, "u-1"));
+        b.identifiers.push(ident(IdentifierScheme::Uuid, "u-2"));
+        let r = MatchingEngine::default_config().match_courses(&a, &b);
+        let e = &r.evidence;
+        assert!((term(e, "identifier").bits - IDENTIFIER_BITS).abs() < 1e-12);
+        assert!((term(e, "contradiction:identifier:uuid").bits - CONTRADICTION_BITS).abs() < 1e-12);
+        assert_eq!(sum_of_terms(e).to_bits(), e.weight_bits.to_bits());
     }
 
     #[test]
@@ -515,6 +1037,11 @@ mod tests {
             "deterministic_match":false}}"#;
         let r: MatchResult = serde_json::from_str(json).expect("deserialize");
         assert_eq!(r.evidence, Evidence::default());
+        let e: Evidence = serde_json::from_str(
+            r#"{"weight_bits":1.0,"fields_compared":1,"contradictions":[],"strength":"consistent"}"#,
+        )
+        .expect("deserialize phase-1 evidence");
+        assert!(e.components.is_empty());
         assert_eq!(r.evidence.strength, MatchStrength::NonMatch);
         let cfg: MatchConfig = serde_json::from_str(
             r#"{"threshold":0.85,"name_weight":0.35,"course_code_weight":0.15,

@@ -147,3 +147,23 @@
         default bar; clear disagreement < 0 bits; pre-field JSON
         deserialises) and the `evidence_is_finite_and_strength_consistent`
         property in `tests/proptests.rs`.
+- [x] T-17: Correlated groups, value frequencies and per-term evidence
+      (`agents/share/match-evidence.md` §6–§8) *(resolved 2026-11-09)*.
+      `CORRELATED_GROUPS` = {keywords, teaches, tags} and {provider,
+      educational_level} at `CORRELATED_DISCOUNT` 0.5;
+      `FREQUENCY_COMPONENTS` = `["name"]` with `frequency_key` (primary
+      name, folded); `ValueFrequencies`, `NoFrequencies`,
+      `FrequencyTable`, `MIN_SHARE`, `frequency_bits`;
+      `MatchingEngine::match_courses_with_frequencies`; and
+      `Evidence.components` (`#[serde(default)]`), whose terms sum to
+      `weight_bits`. `score`, `is_match`, `confidence` unchanged. The
+      richest identifier-free record falls from ≈ 27.6 to ≈ 23.62 bits.
+      - **Acceptance (met):** unit tests in `src/evidence.rs` (group sum
+        below the plain sum and order-independent, ties included;
+        uncorrelated fields still sum; correlated disagreements
+        discounted; common name (0.01) below and rare (1e-6) above the
+        default; share ≥ m gives 0; no adjustment on partial agreement or
+        disagreement; `NoFrequencies` equals the plain call; identifier
+        and contradiction terms listed) and the
+        `evidence_terms_sum_to_weight_bits` property in
+        `tests/proptests.rs`.

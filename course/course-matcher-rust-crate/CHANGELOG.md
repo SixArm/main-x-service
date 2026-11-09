@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — correlated groups, value frequencies, per-term evidence (T-17)
+
+Follows `agents/share/match-evidence.md` §6–§8. Correlated components
+(`CORRELATED_GROUPS`: keywords/teaches/tags and
+provider/educational_level) count their strongest member in full and
+the rest at `CORRELATED_DISCOUNT` 0.5 (`group_bits`, `strongest_first`).
+New `MatchingEngine::match_courses_with_frequencies` takes a
+`ValueFrequencies` source (`NoFrequencies`, `FrequencyTable`) and adjusts
+the course name's agreement weight by its share (`frequency_bits`,
+`MIN_SHARE`, `FREQUENCY_COMPONENTS`, `frequency_key`); `match_courses`
+passes `NoFrequencies`. `Evidence.components` (`#[serde(default)]`)
+lists every term as `ComponentBits`, and they sum to `weight_bits`.
+`score`, `is_match` and `confidence` are unchanged. Evidence values
+change: the richest identifier-free record now weighs ≈ 23.62 bits
+(was ≈ 27.6). See spec §18a.
+
 ### Added — match evidence (T-16)
 
 `MatchResult.evidence` reports how much the compared data **proves**,
