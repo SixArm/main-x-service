@@ -37,7 +37,7 @@
 //! assert!(result.is_match);
 //! ```
 
-use crate::evidence::{self, Evidence};
+use crate::evidence::{self, Evidence, NoFrequencies, ValueFrequencies};
 use crate::models::{Address, Place};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
@@ -494,6 +494,39 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_places(&self, place1: &Place, place2: &Place) -> MatchResult {
+        self.match_places_with_frequencies(place1, place2, &NoFrequencies)
+    }
+
+    /// [`Self::match_places`] with value frequencies for the evidence
+    /// (spec §5.5.2, `agents/share/match-evidence.md` §7).
+    ///
+    /// An exact agreement on a [`FREQUENCY_COMPONENTS`](crate::evidence::FREQUENCY_COMPONENTS)
+    /// value takes its agreement bits from that value's share of records.
+    /// `score`, `is_match`, `confidence` and the breakdown are identical to
+    /// [`Self::match_places`]; only `evidence` can differ.
+    ///
+    /// ```
+    /// use place_matcher::evidence::{frequency_key, FrequencyTable};
+    /// use place_matcher::{MatchingEngine, Place};
+    ///
+    /// let a = Place::builder().name("Starbucks").build();
+    /// let mut freqs = FrequencyTable::new();
+    /// let key = frequency_key("name", "Starbucks").unwrap();
+    /// freqs.insert("name", key, FrequencyTable::from_counts(200, 10_000).unwrap());
+    ///
+    /// let engine = MatchingEngine::default_config();
+    /// let plain = engine.match_places(&a, &a);
+    /// let adjusted = engine.match_places_with_frequencies(&a, &a, &freqs);
+    /// assert_eq!(plain.score, adjusted.score);
+    /// assert!(adjusted.evidence.weight_bits < plain.evidence.weight_bits);
+    /// ```
+    #[must_use]
+    pub fn match_places_with_frequencies(
+        &self,
+        place1: &Place,
+        place2: &Place,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         let breakdown = self.calculate_breakdown(place1, place2);
         let score = self.calculate_weighted_score(&breakdown);
         let above_threshold = score >= self.config.match_threshold;
@@ -512,6 +545,7 @@ impl MatchingEngine {
             &breakdown,
             address_compared,
             evidence::assess_identifiers(place1, place2),
+            evidence::name_share(place1, place2, frequencies),
             is_match,
             self.config.proof_bits,
         );

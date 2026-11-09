@@ -111,7 +111,10 @@ pub mod normalizer;
 pub mod scorer;
 
 pub use error::{MatchingError, Result};
-pub use evidence::{Contradiction, Evidence, MatchStrength};
+pub use evidence::{
+    ComponentBits, Contradiction, Evidence, FrequencyTable, MatchStrength, NoFrequencies,
+    ValueFrequencies,
+};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
 pub use models::{Address, Place, PlaceBuilder, PlaceCategory, PlaceId, PlaceIdScheme};
 pub use normalizer::{Normalizer, ParsedAddressLine};

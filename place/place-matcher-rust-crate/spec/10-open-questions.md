@@ -125,6 +125,9 @@ checklist — see `spec/index.md`'s table of contents, §1–§13 with no
   --no-deps` all clean. §6.4 updated; this closes OQ-G, removed from
   the list above.
 
+- **OQ-O — Chain branches sharing central contacts.** Two branches of one chain within ~11 m that also share a head-office phone and email can reach `Proven` even with a common-name share, because phone and email are only discounted against each other. Options: add phone/email to `FREQUENCY_COMPONENTS` (a switchboard number is a common value in the population), or group them with `name`. Today: neither; the 0.5 discount is the only guard.
+- **OQ-P — Discount and merged groups.** `CORRELATED_DISCOUNT = 0.5` is a choice, not a measurement, and merging overlapping groups (`coordinates`/`address`/`country_code`) halves the country code against coordinates too. Revisit with estimated dependence from review-queue decisions.
+- ~~**OQ-Q (task, M) — Correlated groups, value frequencies, per-term listing.**~~ — **DONE (2026-11-09).** §5.5.1–§5.5.3: `CORRELATED_GROUPS`, `group_bits` / `strongest_first`, `ValueFrequencies` / `NoFrequencies` / `FrequencyTable` / `frequency_bits` / `frequency_key`, `FREQUENCY_COMPONENTS = ["name"]`, `Evidence::components`, and `MatchingEngine::match_places_with_frequencies`. `score`, `is_match`, `confidence` unchanged.
 - ~~**OQ-N (task, M) — Match evidence beside the score.**~~ — **DONE (2026-11-09).** `src/evidence.rs` adds Fellegi–Sunter evidence per `agents/share/match-evidence.md`: `MatchResult::evidence` (`weight_bits`, `fields_compared`, `contradictions`, `strength`), `MatchConfig::proof_bits` (default `30`), and the re-exported `Evidence` / `Contradiction` / `MatchStrength`. `score`, `is_match` and `confidence` unchanged. See §5.5.
 
 ---

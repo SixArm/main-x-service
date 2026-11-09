@@ -277,4 +277,31 @@ proptest! {
         };
         prop_assert_eq!(e.strength, expected);
     }
+
+    /// The listed evidence terms MUST add up to `weight_bits` exactly
+    /// (match-evidence §8), with or without value frequencies, and
+    /// frequencies MUST NOT change the score.
+    #[test]
+    fn evidence_terms_sum_to_weight_bits(
+        p1 in place_with_ids_strategy(),
+        p2 in place_with_ids_strategy(),
+        share in 0.0f64..=1.0,
+    ) {
+        let engine = MatchingEngine::default_config();
+        let mut freqs = place_matcher::FrequencyTable::new();
+        for n in p1.name.iter().chain(p1.alternate_names.iter()) {
+            if let Some(k) = place_matcher::evidence::frequency_key("name", n) {
+                freqs.insert("name", k, share);
+            }
+        }
+        let plain = engine.match_places(&p1, &p2);
+        let adjusted = engine.match_places_with_frequencies(&p1, &p2, &freqs);
+        for e in [&plain.evidence, &adjusted.evidence] {
+            let sum: f64 = e.components.iter().map(|c| c.bits).sum();
+            prop_assert_eq!(sum.to_bits(), e.weight_bits.to_bits());
+            prop_assert!(e.weight_bits.is_finite());
+        }
+        prop_assert_eq!(plain.score.to_bits(), adjusted.score.to_bits());
+        prop_assert_eq!(plain.is_match, adjusted.is_match);
+    }
 }

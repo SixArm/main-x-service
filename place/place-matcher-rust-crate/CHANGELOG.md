@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — correlated groups, value frequencies and per-term evidence (`agents/share/match-evidence.md` §6–§8)
+
+- `CORRELATED_GROUPS`: `{coordinates, address}`, `{address, country_code}`,
+  `{phone, email}`; overlapping groups merge,
+  so coordinates/address/country code is one group. The strongest member
+  counts in full and the rest at `CORRELATED_DISCOUNT = 0.5`
+  (`group_bits`, `strongest_first`). Disagreements are discounted too.
+- `name_phonetic_score` (Soundex) is no longer summed into the evidence
+  at all: it is derived from the name, so it adds no term and is not
+  counted in `fields_compared`. It still feeds `score` as a bonus. Only
+  the opt-in `use_phonetic_matching` path is affected.
+- `ValueFrequencies`, `NoFrequencies`, `FrequencyTable`, `MIN_SHARE`,
+  `frequency_bits`, `FREQUENCY_COMPONENTS = ["name"]` and
+  `frequency_key` (the matcher's normalised name). New
+  `MatchingEngine::match_places_with_frequencies`; `match_places` calls
+  it with `NoFrequencies`. Only an exact agreement on a shared normalised
+  name is adjusted.
+- `Evidence::components: Vec<ComponentBits>` (`#[serde(default)]`), every
+  term including identifier and contradiction terms; they sum exactly to
+  `weight_bits`.
+
+### Behaviour change — evidence only
+
+- `evidence.weight_bits` is lower where correlated components agree: a
+  richly identical record goes from ≈ 55.3 to ≈ 44.4 bits (still
+  `Proven`); two businesses in one building reach ≈ 15.3. `score`,
+  `is_match`, `confidence` and the breakdown are unchanged.
+
 ### Added — match evidence beside the similarity score (`agents/share/match-evidence.md`)
 
 - `src/evidence.rs`: Fellegi–Sunter log-likelihood evidence. `MatchResult`

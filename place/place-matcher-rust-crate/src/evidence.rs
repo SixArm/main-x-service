@@ -27,6 +27,7 @@
 
 use crate::models::{Place, PlaceIdScheme};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Similarity at or above which a component counts as full agreement.
@@ -68,10 +69,9 @@ pub struct ComponentWeights {
 /// re-branding and transliteration.
 pub const NAME: ComponentWeights = ComponentWeights { m: 0.95, u: 0.005 };
 
-/// `name_phonetic_score`. Soundex over the same names, so it is strongly
-/// correlated with `NAME` and collides often (a four-character code):
-/// deliberately weak, `u` about one in three.
-pub const NAME_PHONETIC: ComponentWeights = ComponentWeights { m: 0.9, u: 0.3 };
+// `name_phonetic_score` has no entry and adds no term: the Soundex code is
+// derived from the names, so summing it would count `NAME` twice
+// (match-evidence §6). It still feeds `score` as a bonus.
 
 /// `coordinates_score`. Full agreement (`s >= 0.95`) at the default 50 m
 /// scale means the two points are within about 11 m. Two unrelated places
@@ -165,6 +165,241 @@ pub struct Evidence {
     pub contradictions: Vec<Contradiction>,
     /// The verdict.
     pub strength: MatchStrength,
+    /// Every term of the sum, in a fixed order; they add up to
+    /// `weight_bits` exactly. Empty on JSON written before the field.
+    #[serde(default)]
+    pub components: Vec<ComponentBits>,
+}
+
+/// One term of the evidence sum.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComponentBits {
+    /// The component, e.g. `"name"`, `"identifier"`,
+    /// `"contradiction:identifier:wikidata"`.
+    pub component: String,
+    /// Bits this term added, after any discount or adjustment.
+    pub bits: f64,
+    /// Discounted as a non-strongest member of a correlated group.
+    pub correlated: bool,
+    /// Agreement weight taken from the value's own frequency.
+    pub frequency_adjusted: bool,
+}
+
+// ---- Correlated components (match-evidence §6) -------------------------
+
+/// Weight of each member of a correlated group after its strongest.
+pub const CORRELATED_DISCOUNT: f64 = 0.5;
+
+/// Groups of components that are not independent given the pair's truth.
+///
+/// - `coordinates` / `address`: a geocoded address is the same fact twice
+///   (and a building's address and its point agree for every tenant).
+/// - `address` / `country_code`: the address determines the country.
+/// - `phone` / `email`: contact details recorded together, and shared
+///   together by every branch of a chain or tenant of a serviced office.
+///
+/// Groups that share a member are merged before discounting, so
+/// `coordinates`, `address` and `country_code` form one group: each
+/// component is discounted at most once and appears once in
+/// [`Evidence::components`].
+pub const CORRELATED_GROUPS: &[&[&str]] = &[
+    &["coordinates", "address"],
+    &["address", "country_code"],
+    &["phone", "email"],
+];
+
+/// Index of the member with the largest absolute value, ties to the larger
+/// value (then to the earlier index, which gives the same result).
+fn strongest_index(member_bits: &[f64]) -> Option<usize> {
+    let mut best: Option<usize> = None;
+    for (i, &b) in member_bits.iter().enumerate() {
+        best = match best {
+            None => Some(i),
+            Some(j) => {
+                let c = member_bits[j];
+                if b.abs().total_cmp(&c.abs()).then(b.total_cmp(&c)) == Ordering::Greater {
+                    Some(i)
+                } else {
+                    Some(j)
+                }
+            }
+        };
+    }
+    best
+}
+
+/// The strongest member (by absolute value, ties to the larger value) and
+/// the others, or `None` when there are no members.
+#[must_use]
+pub fn strongest_first(member_bits: &[f64]) -> Option<(f64, Vec<f64>)> {
+    let i = strongest_index(member_bits)?;
+    let rest = member_bits
+        .iter()
+        .enumerate()
+        .filter(|&(j, _)| j != i)
+        .map(|(_, &b)| b)
+        .collect();
+    Some((member_bits[i], rest))
+}
+
+/// The bits a correlated group adds, from its present members' bits.
+#[must_use]
+pub fn group_bits(member_bits: &[f64]) -> f64 {
+    let Some((strongest, rest)) = strongest_first(member_bits) else {
+        return 0.0;
+    };
+    strongest + CORRELATED_DISCOUNT * rest.iter().sum::<f64>()
+}
+
+/// [`CORRELATED_GROUPS`] with overlapping groups merged.
+fn merged_groups() -> Vec<BTreeSet<&'static str>> {
+    let mut merged: Vec<BTreeSet<&'static str>> = Vec::new();
+    for group in CORRELATED_GROUPS {
+        let mut set: BTreeSet<&'static str> = group.iter().copied().collect();
+        let mut i = 0;
+        while i < merged.len() {
+            if merged[i].is_disjoint(&set) {
+                i += 1;
+            } else {
+                set.extend(merged.swap_remove(i));
+                i = 0;
+            }
+        }
+        merged.push(set);
+    }
+    merged
+}
+
+// ---- Common and rare values (match-evidence §7) ------------------------
+
+/// Where the share of records holding a value comes from.
+pub trait ValueFrequencies {
+    /// The share, in `0.0..=1.0`, of records whose `component` holds
+    /// `value` (already in the matcher's normalised form), or `None`
+    /// when unknown.
+    fn share(&self, component: &str, value: &str) -> Option<f64>;
+}
+
+/// No frequencies: every share is unknown, so the plain table applies.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct NoFrequencies;
+
+impl ValueFrequencies for NoFrequencies {
+    fn share(&self, _component: &str, _value: &str) -> Option<f64> {
+        None
+    }
+}
+
+/// A [`ValueFrequencies`] built from counts.
+///
+/// Keys are `(component, value)` with `value` in the form
+/// [`frequency_key`] returns.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FrequencyTable {
+    shares: BTreeMap<(String, String), f64>,
+}
+
+impl FrequencyTable {
+    /// An empty table.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The share `count / total`, or `None` when `total` is zero.
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn from_counts(count: u64, total: u64) -> Option<f64> {
+        if total == 0 {
+            None
+        } else {
+            Some(count as f64 / total as f64)
+        }
+    }
+
+    /// Record the share of records whose `component` holds `value`
+    /// (already normalised, see [`frequency_key`]).
+    pub fn insert(&mut self, component: impl Into<String>, value: impl Into<String>, share: f64) {
+        self.shares.insert((component.into(), value.into()), share);
+    }
+}
+
+impl ValueFrequencies for FrequencyTable {
+    fn share(&self, component: &str, value: &str) -> Option<f64> {
+        self.shares
+            .get(&(component.to_string(), value.to_string()))
+            .copied()
+    }
+}
+
+/// Smallest share used, so a value seen once cannot give unbounded bits.
+pub const MIN_SHARE: f64 = 1e-9;
+
+/// Agreement bits for a value held by `share` of records.
+#[must_use]
+pub fn frequency_bits(m: f64, share: f64) -> f64 {
+    let share = if share.is_finite() {
+        share.clamp(MIN_SHARE, m)
+    } else {
+        m
+    };
+    (m / share).log2()
+}
+
+/// Components whose agreement weight adjusts to the value's frequency.
+///
+/// `name`: chain and generic names ("Starbucks", "Main Street Surgery",
+/// "St Mary's Church") are held by many places; a rare name is strong.
+/// Each of a place's names (primary and alternates) is a value.
+pub const FREQUENCY_COMPONENTS: &[&str] = &["name"];
+
+/// The key the matcher looks up for `raw` under `component`: the same
+/// normalised form it compares. `None` for a component not in
+/// [`FREQUENCY_COMPONENTS`] or a value that normalises to empty.
+///
+/// ```
+/// use place_matcher::evidence::frequency_key;
+/// assert_eq!(frequency_key("name", "  Café  de Flore! ").as_deref(), Some("cafe de flore"));
+/// assert_eq!(frequency_key("name", "..."), None);
+/// assert_eq!(frequency_key("phone", "+44 20 7946 0000"), None);
+/// ```
+#[must_use]
+pub fn frequency_key(component: &str, raw: &str) -> Option<String> {
+    match component {
+        "name" => {
+            let key = crate::Normalizer::normalize_name(raw);
+            (!key.is_empty()).then_some(key)
+        }
+        _ => None,
+    }
+}
+
+/// Normalised names held by both places, the values an exact name
+/// agreement can rest on.
+fn shared_name_keys(p1: &Place, p2: &Place) -> BTreeSet<String> {
+    let keys = |p: &Place| -> BTreeSet<String> {
+        p.name
+            .iter()
+            .chain(p.alternate_names.iter())
+            .filter_map(|n| frequency_key("name", n))
+            .collect()
+    };
+    let a = keys(p1);
+    let b = keys(p2);
+    a.intersection(&b).cloned().collect()
+}
+
+/// The share to use for an exact name agreement: the **largest** known
+/// share among the shared names (the conservative choice when several
+/// coincide), or `None` when none is known.
+pub(crate) fn name_share(p1: &Place, p2: &Place, freqs: &dyn ValueFrequencies) -> Option<f64> {
+    shared_name_keys(p1, p2)
+        .iter()
+        .filter_map(|k| freqs.share("name", k))
+        .filter(|s| s.is_finite())
+        .fold(None, |acc: Option<f64>, s| {
+            Some(acc.map_or(s, |a| a.max(s)))
+        })
 }
 
 /// The identifier outcome for a pair of places.
@@ -239,48 +474,92 @@ pub(crate) fn assess_identifiers(p1: &Place, p2: &Place) -> IdentifierAssessment
 ///
 /// `address_compared` is `false` when the address score is the neutral
 /// "no sub-field on both sides" `0.5`, which is absence, not disagreement.
+/// `name_share` is the frequency of the shared name, when known.
 pub(crate) fn assess(
     breakdown: &crate::MatchBreakdown,
     address_compared: bool,
     ids: IdentifierAssessment,
+    name_share: Option<f64>,
     is_match: bool,
     proof_bits: f64,
 ) -> Evidence {
-    let mut weight_bits = 0.0_f64;
-    let mut fields_compared = 0_u32;
     let address = if address_compared {
         breakdown.address_score
     } else {
         None
     };
-    let components = [
-        (breakdown.name_score, NAME),
-        (breakdown.name_phonetic_score, NAME_PHONETIC),
-        (breakdown.coordinates_score, COORDINATES),
-        (address, ADDRESS),
-        (breakdown.category_score, CATEGORY),
-        (breakdown.country_code_score, COUNTRY_CODE),
-        (breakdown.phone_score, PHONE),
-        (breakdown.email_score, EMAIL),
-        (breakdown.local_id_score, LOCAL_ID),
+    let table = [
+        ("name", breakdown.name_score, NAME),
+        ("coordinates", breakdown.coordinates_score, COORDINATES),
+        ("address", address, ADDRESS),
+        ("category", breakdown.category_score, CATEGORY),
+        ("country_code", breakdown.country_code_score, COUNTRY_CODE),
+        ("phone", breakdown.phone_score, PHONE),
+        ("email", breakdown.email_score, EMAIL),
+        ("local_id", breakdown.local_id_score, LOCAL_ID),
     ];
-    for (score, w) in components {
-        if let Some(s) = score {
-            weight_bits += component_bits(s, w.m, w.u);
-            fields_compared += 1;
+    let mut components: Vec<ComponentBits> = Vec::new();
+    for (name, score, w) in table {
+        let Some(s) = score else { continue };
+        // §7: only an exact agreement on a frequency component adjusts.
+        let adjusted = if FREQUENCY_COMPONENTS.contains(&name) && s >= AGREE_AT {
+            if name == "name" { name_share } else { None }
+        } else {
+            None
+        };
+        let (bits, frequency_adjusted) = match adjusted {
+            Some(share) => (frequency_bits(w.m, share), true),
+            None => (component_bits(s, w.m, w.u), false),
+        };
+        components.push(ComponentBits {
+            component: name.to_string(),
+            bits,
+            correlated: false,
+            frequency_adjusted,
+        });
+    }
+    // §6: within each (merged) group the strongest counts in full and the
+    // rest at CORRELATED_DISCOUNT.
+    for group in merged_groups() {
+        let members: Vec<usize> = components
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| group.contains(c.component.as_str()))
+            .map(|(i, _)| i)
+            .collect();
+        let bits: Vec<f64> = members.iter().map(|&i| components[i].bits).collect();
+        if let Some(k) = strongest_index(&bits) {
+            for (pos, &i) in members.iter().enumerate() {
+                if pos != k {
+                    components[i].bits *= CORRELATED_DISCOUNT;
+                    components[i].correlated = true;
+                }
+            }
         }
     }
+    let mut fields_compared = u32::try_from(components.len()).unwrap_or(u32::MAX);
     // `place_ids_score` is the identifier component: counted once, as
     // IDENTIFIER_BITS on a shared value, never also through the table.
     if ids.compared {
         fields_compared += 1;
     }
     if ids.shared {
-        weight_bits += IDENTIFIER_BITS;
+        components.push(ComponentBits {
+            component: "identifier".to_string(),
+            bits: IDENTIFIER_BITS,
+            correlated: false,
+            frequency_adjusted: false,
+        });
     }
-    for _ in &ids.contradictions {
-        weight_bits += CONTRADICTION_BITS;
+    for c in &ids.contradictions {
+        components.push(ComponentBits {
+            component: format!("contradiction:{}", c.field),
+            bits: CONTRADICTION_BITS,
+            correlated: false,
+            frequency_adjusted: false,
+        });
     }
+    let weight_bits: f64 = components.iter().map(|c| c.bits).sum();
     let strength = if !ids.contradictions.is_empty() {
         MatchStrength::Contradicted
     } else if weight_bits >= proof_bits {
@@ -295,6 +574,7 @@ pub(crate) fn assess(
         fields_compared,
         contradictions: ids.contradictions,
         strength,
+        components,
     }
 }
 
@@ -487,9 +767,11 @@ mod tests {
     fn richly_identical_record_without_identifier_is_proven() {
         let a = rich(Place::builder()).build();
         let r = engine().match_places(&a, &a);
-        // name + coordinates + address + category + country + phone + email
-        // = 7.57 + 13.14 + 9.73 + 3.17 + 3.29 + 9.73 + 8.64, about 55.3.
-        assert!(r.evidence.weight_bits > 55.0, "{}", r.evidence.weight_bits);
+        // name 7.57 + {coordinates 13.14, address 9.73/2, country 3.29/2}
+        // + category 3.17 + {phone 9.73, email 8.64/2}, about 44.4 bits
+        // (55.3 before the correlated-group discount).
+        let w = r.evidence.weight_bits;
+        assert!(w > 44.0 && w < 45.0, "{w}");
         assert_eq!(r.evidence.fields_compared, 7);
         assert_eq!(r.evidence.strength, MatchStrength::Proven);
     }
@@ -538,5 +820,303 @@ mod tests {
         };
         let r = MatchingEngine::new(cfg).match_places(&a, &a);
         assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+    }
+
+    fn term<'a>(e: &'a Evidence, name: &str) -> &'a ComponentBits {
+        e.components
+            .iter()
+            .find(|c| c.component == name)
+            .unwrap_or_else(|| panic!("no term {name}: {:?}", e.components))
+    }
+
+    fn terms_sum(e: &Evidence) -> f64 {
+        e.components.iter().map(|c| c.bits).sum()
+    }
+
+    // ---------- correlated groups (§6) ----------
+
+    #[test]
+    fn phonetic_score_is_derived_and_adds_no_term() {
+        let a = Place::builder().name("Smith Hall").build();
+        let b = Place::builder().name("Smyth Hall").build();
+        let on = MatchingEngine::new(MatchConfig::lenient()).match_places(&a, &b);
+        let off = MatchingEngine::new(MatchConfig {
+            use_phonetic_matching: false,
+            ..MatchConfig::lenient()
+        })
+        .match_places(&a, &b);
+        assert!(on.breakdown.name_phonetic_score.is_some());
+        assert!(
+            on.evidence
+                .components
+                .iter()
+                .all(|c| c.component != "name_phonetic")
+        );
+        assert_eq!(on.evidence, off.evidence);
+        assert_eq!(on.evidence.fields_compared, 1);
+    }
+
+    #[test]
+    fn group_bits_is_less_than_the_sum_and_order_independent() {
+        let a = component_bits(1.0, COORDINATES.m, COORDINATES.u);
+        let b = component_bits(1.0, ADDRESS.m, ADDRESS.u);
+        let g = group_bits(&[a, b]);
+        assert!(g < a + b);
+        assert!((g - (a + 0.5 * b)).abs() < 1e-12);
+        assert!((group_bits(&[b, a]) - g).abs() < 1e-12);
+        let c = 3.0;
+        assert!((group_bits(&[a, b, c]) - group_bits(&[c, b, a])).abs() < 1e-12);
+        assert!(group_bits(&[]).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn strongest_first_orders_by_absolute_value_ties_to_larger() {
+        assert_eq!(
+            strongest_first(&[2.0, -5.0, 1.0]),
+            Some((-5.0, vec![2.0, 1.0]))
+        );
+        assert_eq!(strongest_first(&[-3.0, 3.0]), Some((3.0, vec![-3.0])));
+        assert_eq!(strongest_first(&[3.0, -3.0]), Some((3.0, vec![-3.0])));
+        assert_eq!(strongest_first(&[]), None);
+    }
+
+    #[test]
+    fn overlapping_groups_merge() {
+        let merged = merged_groups();
+        assert!(merged.iter().any(|g| g.len() == 3
+            && g.contains("coordinates")
+            && g.contains("address")
+            && g.contains("country_code")));
+        // Every component appears in at most one merged group.
+        let total: usize = merged.iter().map(BTreeSet::len).sum();
+        let distinct: BTreeSet<_> = merged.iter().flatten().collect();
+        assert_eq!(total, distinct.len());
+    }
+
+    #[test]
+    fn agreeing_correlated_fields_are_discounted_in_the_match() {
+        let a = Place::builder()
+            .latitude_as_decimal_degrees(51.5)
+            .longitude_as_decimal_degrees(-0.12)
+            .address(Address::new().with_postcode("SW1A 1AA"))
+            .build();
+        let e = engine().match_places(&a, &a).evidence;
+        let coords = component_bits(1.0, COORDINATES.m, COORDINATES.u);
+        let addr = component_bits(1.0, ADDRESS.m, ADDRESS.u);
+        assert!((e.weight_bits - (coords + 0.5 * addr)).abs() < 1e-9);
+        assert!(!term(&e, "coordinates").correlated);
+        assert!(term(&e, "address").correlated);
+    }
+
+    #[test]
+    fn uncorrelated_fields_still_sum() {
+        let a = Place::builder()
+            .name("Eiffel Tower")
+            .category(PlaceCategory::Monument)
+            .build();
+        let e = engine().match_places(&a, &a).evidence;
+        let expected =
+            component_bits(1.0, NAME.m, NAME.u) + component_bits(1.0, CATEGORY.m, CATEGORY.u);
+        assert!((e.weight_bits - expected).abs() < 1e-12);
+        assert!(e.components.iter().all(|c| !c.correlated));
+    }
+
+    #[test]
+    fn correlated_disagreements_are_discounted_too() {
+        let a = Place::builder()
+            .phone("+44 20 7946 0000")
+            .email("a@example.org")
+            .build();
+        let b = Place::builder()
+            .phone("+44 20 7946 0999")
+            .email("b@example.org")
+            .build();
+        let e = engine().match_places(&a, &b).evidence;
+        let phone = component_bits(0.0, PHONE.m, PHONE.u);
+        let email = component_bits(0.0, EMAIL.m, EMAIL.u);
+        // phone (-2.74) is the stronger; email (-2.32) counts at half.
+        assert!((e.weight_bits - (phone + 0.5 * email)).abs() < 1e-12);
+        assert!(e.weight_bits > phone + email);
+        assert!(term(&e, "email").correlated);
+    }
+
+    #[test]
+    fn two_businesses_in_one_building_are_not_proven() {
+        let building = |name: &str| {
+            Place::builder()
+                .name(name)
+                .latitude_as_decimal_degrees(51.507_4)
+                .longitude_as_decimal_degrees(-0.127_8)
+                .address(
+                    Address::new()
+                        .with_line1("1 Example Street")
+                        .with_city("London")
+                        .with_postcode("WC2N 5DU"),
+                )
+                .country_code_as_iso_3166_1_alpha_2("GB")
+                .build()
+        };
+        let a = building("Harbour Dental Practice");
+        let b = building("Quill and Ink Solicitors");
+        let e = engine().match_places(&a, &b).evidence;
+        // name -4.31 + {coordinates 13.14, address 9.73/2, country 3.29/2}
+        // = about 15.3 bits; it would be 21.85 summed independently.
+        assert!(e.weight_bits < 20.0, "{}", e.weight_bits);
+        assert_ne!(e.strength, MatchStrength::Proven);
+    }
+
+    // ---------- value frequencies (§7) ----------
+
+    fn freqs(name: &str, share: f64) -> FrequencyTable {
+        let mut t = FrequencyTable::new();
+        t.insert("name", frequency_key("name", name).unwrap(), share);
+        t
+    }
+
+    #[test]
+    fn common_name_gives_fewer_bits_and_rare_name_more() {
+        let default_bits = component_bits(1.0, NAME.m, NAME.u);
+        assert!(frequency_bits(NAME.m, 0.01) < default_bits);
+        assert!(frequency_bits(NAME.m, 1e-6) > default_bits);
+        let a = Place::builder().name("Starbucks").build();
+        let e = engine()
+            .match_places_with_frequencies(&a, &a, &freqs("Starbucks", 0.01))
+            .evidence;
+        let t = term(&e, "name");
+        assert!(t.frequency_adjusted);
+        assert!((t.bits - (0.95_f64 / 0.01).log2()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn share_at_or_above_m_gives_zero_never_negative() {
+        assert!(frequency_bits(NAME.m, NAME.m).abs() < 1e-12);
+        assert!(frequency_bits(NAME.m, 1.0).abs() < 1e-12);
+        assert!(frequency_bits(NAME.m, f64::NAN).abs() < 1e-12);
+        assert!((frequency_bits(NAME.m, 0.0) - (NAME.m / MIN_SHARE).log2()).abs() < 1e-9);
+    }
+
+    #[test]
+    fn no_frequency_adjustment_on_partial_agreement_or_disagreement() {
+        let query = Place::builder().name("Starbucks Coffee").build();
+        let typo = Place::builder().name("Starbucks Cofee").build();
+        let partial = Place::builder().name("Starbucks Kitchen").build();
+        let other_name = Place::builder().name("Big Ben").build();
+        let table = freqs("Starbucks Coffee", 0.5);
+        // `typo` is near-exact (its similarity can clear AGREE_AT), `partial`
+        // a partial agreement (about 0.82), `other_name` a disagreement:
+        // none holds the same
+        // normalised value, so none is adjusted.
+        let partial_score = engine()
+            .match_places(&query, &partial)
+            .breakdown
+            .name_score
+            .unwrap();
+        assert!(partial_score > DISAGREE_AT && partial_score < AGREE_AT);
+        assert!(
+            engine()
+                .match_places(&query, &other_name)
+                .breakdown
+                .name_score
+                .unwrap()
+                <= DISAGREE_AT
+        );
+        for other in [&typo, &partial, &other_name] {
+            let plain = engine().match_places(&query, other);
+            let adjusted = engine().match_places_with_frequencies(&query, other, &table);
+            assert_eq!(plain.evidence, adjusted.evidence);
+            assert!(!term(&adjusted.evidence, "name").frequency_adjusted);
+        }
+    }
+
+    #[test]
+    fn no_frequencies_equals_match_places() {
+        let a = rich(Place::builder()).build();
+        let b = rich(Place::builder()).name("Cafe de Flore Paris").build();
+        let plain = engine().match_places(&a, &b);
+        let none = engine().match_places_with_frequencies(&a, &b, &NoFrequencies);
+        assert_eq!(plain.evidence, none.evidence);
+        assert_eq!(plain.score.to_bits(), none.score.to_bits());
+        assert_eq!(plain.is_match, none.is_match);
+        assert_eq!(plain.confidence, none.confidence);
+    }
+
+    #[test]
+    fn chain_branches_nearby_are_not_proven_on_the_name() {
+        // Two branches of one chain, about 25 m apart.
+        let branch = |lat: f64| {
+            Place::builder()
+                .name("Starbucks")
+                .latitude_as_decimal_degrees(lat)
+                .longitude_as_decimal_degrees(-0.127_8)
+                .category(PlaceCategory::Cafe)
+                .country_code_as_iso_3166_1_alpha_2("GB")
+                .build()
+        };
+        let a = branch(51.507_400);
+        let b = branch(51.507_625);
+        let f = freqs("Starbucks", 0.02);
+        let plain = engine().match_places(&a, &b);
+        let adjusted = engine().match_places_with_frequencies(&a, &b, &f);
+        assert_eq!(plain.score.to_bits(), adjusted.score.to_bits());
+        assert!(term(&adjusted.evidence, "name").bits < term(&plain.evidence, "name").bits);
+        assert!(adjusted.evidence.weight_bits < plain.evidence.weight_bits);
+        assert_ne!(plain.evidence.strength, MatchStrength::Proven);
+        assert_ne!(adjusted.evidence.strength, MatchStrength::Proven);
+    }
+
+    #[test]
+    fn frequency_table_from_counts() {
+        assert_eq!(FrequencyTable::from_counts(1, 4), Some(0.25));
+        assert_eq!(FrequencyTable::from_counts(1, 0), None);
+        let t = freqs("Starbucks", 0.25);
+        assert_eq!(t.share("name", "starbucks"), Some(0.25));
+        assert_eq!(t.share("name", "Starbucks"), None);
+        assert_eq!(NoFrequencies.share("name", "starbucks"), None);
+    }
+
+    #[test]
+    fn alternate_name_agreement_uses_largest_known_share() {
+        let a = Place::builder()
+            .name("Tour Eiffel")
+            .add_alternate_name("Eiffel Tower")
+            .build();
+        let b = Place::builder()
+            .name("Eiffel Tower")
+            .add_alternate_name("Tour Eiffel")
+            .build();
+        let mut t = freqs("Eiffel Tower", 1e-6);
+        t.insert("name", "tour eiffel", 1e-3);
+        let e = engine().match_places_with_frequencies(&a, &b, &t).evidence;
+        assert!((term(&e, "name").bits - (0.95_f64 / 1e-3).log2()).abs() < 1e-9);
+    }
+
+    // ---------- explainability (§8) ----------
+
+    #[test]
+    fn terms_sum_to_weight_bits_including_identifiers_and_contradictions() {
+        let a = rich(Place::builder())
+            .add_place_id(PlaceId::new(PlaceIdScheme::GeoNames, "1").unwrap())
+            .add_place_id(PlaceId::new(PlaceIdScheme::Wikidata, "Q1").unwrap())
+            .build();
+        let b = rich(Place::builder())
+            .add_place_id(PlaceId::new(PlaceIdScheme::GeoNames, "1").unwrap())
+            .add_place_id(PlaceId::new(PlaceIdScheme::Wikidata, "Q2").unwrap())
+            .build();
+        let e = engine().match_places(&a, &b).evidence;
+        assert!((term(&e, "identifier").bits - IDENTIFIER_BITS).abs() < f64::EPSILON);
+        assert!(
+            (term(&e, "contradiction:identifier:wikidata").bits - CONTRADICTION_BITS).abs()
+                < f64::EPSILON
+        );
+        assert_eq!(terms_sum(&e).to_bits(), e.weight_bits.to_bits());
+    }
+
+    #[test]
+    fn json_without_components_still_deserialises() {
+        let a = Place::builder().name("Eiffel Tower").build();
+        let mut value = serde_json::to_value(engine().match_places(&a, &a).evidence).unwrap();
+        value.as_object_mut().unwrap().remove("components");
+        let back: Evidence = serde_json::from_value(value).unwrap();
+        assert!(back.components.is_empty());
     }
 }
