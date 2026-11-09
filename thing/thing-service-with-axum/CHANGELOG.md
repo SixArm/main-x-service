@@ -8,6 +8,24 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added
+
+- Match evidence ([`agents/share/match-evidence.md`](../../agents/share/match-evidence.md)):
+  every scored pair (the `409` body, `check-duplicates`, `match`, the
+  batch scan and stored review items) carries the `thing-matcher`
+  crate's `evidence` beside the unchanged `score`. Review items store it
+  in a new nullable `review_queue.evidence` column (migration
+  `2026110900000001_add_review_queue_evidence`). Name value frequencies
+  adjust it once the registry holds at least 1 000 records (T-18).
+
+### Changed
+
+- `POST /api/things/deduplicate` takes an optional `auto_merge_threshold`
+  (default 0.95) and marks a pair `automerged` only when its score clears
+  it **and** its evidence is `proven`; `consistent` and `contradicted`
+  pairs stay `pending`. Before, every pair was `pending`. Marking only:
+  the scan merges nothing (T-18).
+
 ### Security
 
 - `POST /api/things/deduplicate` refuses a `max_candidates` above 1 000

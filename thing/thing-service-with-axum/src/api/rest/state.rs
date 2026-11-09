@@ -8,6 +8,7 @@ use sqlx::PgPool;
 
 use crate::config::Config;
 use crate::db::{AuditLogRepository, PgThingRepository, ThingRepository};
+use crate::matching::evidence::FrequencyCache;
 use crate::matching::{ProbabilisticMatcher, ThingMatcher};
 use crate::search::SearchEngine;
 use crate::streaming::{EventPublisher, InMemoryEventPublisher};
@@ -31,6 +32,10 @@ pub struct AppState {
     /// concrete type, so an alternative scorer can be substituted for
     /// [`ProbabilisticMatcher`] without changing `AppState`).
     pub matcher: Arc<dyn ThingMatcher>,
+    /// Cached value frequencies for create-time and `check-duplicates`
+    /// evidence (match-evidence.md §7): rebuilt lazily on use when older
+    /// than ten minutes (see [`FrequencyCache`]).
+    pub frequencies: Arc<FrequencyCache>,
     /// Loaded service configuration.
     pub config: Arc<Config>,
     /// Whether blanket `/api/*` bearer-token enforcement is on. Read
@@ -67,6 +72,7 @@ impl AppState {
             event_publisher,
             search_engine: Arc::new(search_engine),
             matcher,
+            frequencies: Arc::new(FrequencyCache::new()),
             config: Arc::new(config),
             require_auth: super::auth::require_auth_from_env(),
         }

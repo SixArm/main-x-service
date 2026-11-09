@@ -680,3 +680,28 @@ clearly described manual check confirms the acceptance criterion.
   anything is read. `tests/unreachable_database.rs` needs no database:
   it points the real repository at a port nothing listens on, and the
   list test fails with `200` when the error is swallowed again.
+- [x] **T-18 (M) — Carry match evidence; auto-merge only on `proven`.**
+  *(Done 2026-11-09; [match-evidence](../../../agents/share/match-evidence.md)
+  §10 step 4.)* The service's own `score` was the only thing deciding
+  a pair, so two records sharing nothing but a name looked as certain
+  as two sharing a DOI. Now `scoring::MatchResult` carries the
+  `thing-matcher` crate's `evidence` for the pair (through
+  `matching::adapter`), and `ScoredCandidate` (`match`,
+  `check-duplicates`, the `409` body) and `ReviewQueueItem` return it.
+  The batch scan gained `auto_merge_threshold` (default 0.95) and marks
+  a pair `automerged` only when `matching::evidence::permits_auto_merge`
+  holds: score at or above the threshold **and** strength `proven`.
+  `review_queue.evidence` (migration
+  `2026110900000001_add_review_queue_evidence`) stores it. Name value
+  frequencies (§6.4) come from the scan's own records in `deduplicate`
+  and from the cached `FrequencyCache` on create and `check-duplicates`;
+  `MIN_FREQUENCY_POPULATION` is 1 000. Tests: unit tests in
+  `matching::evidence` (consistent / proven / contradicted, the
+  population floor, a common name giving fewer bits than the table
+  default, no field values in evidence) and in the handlers (old
+  evidence JSON and `NULL` rows read back); `tests/review_queue_evidence.rs`
+  (`#[ignore]`d, DB): a name-only pair scoring above the threshold stays
+  `pending` / `consistent`, a shared DOI is `automerged` / `proven`,
+  conflicting DOIs stay `pending` / `contradicted` with the auto-merge
+  threshold under their score, and `check-duplicates` and the `409`
+  carry evidence.

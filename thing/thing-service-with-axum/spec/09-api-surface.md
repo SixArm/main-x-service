@@ -77,6 +77,17 @@ token's `attrs` claim. A valid token the policy denies gets `403`
 with the deciding rule; see
 [authorization-attributes](../../../agents/share/authorization-attributes.md).
 
+> **2026-11-09 — match evidence (T-18).** `ScoredCandidate` (the
+> `match` and `check-duplicates` candidates and the `409` body's
+> `errors[]`) and `ReviewQueueItem` gain `evidence`, the
+> `thing-matcher` crate's `Evidence` (OpenAPI schema
+> `MatchEvidenceSchema`; [match-evidence](../../../agents/share/match-evidence.md)
+> §5, §8). On a review item it is nullable: rows stored before the
+> column read back `null`. `BatchDeduplicationRequest` gains an optional
+> `auto_merge_threshold` (default 0.95); `auto_merged` now counts pairs
+> marked `automerged`, which requires `proven` evidence as well as the
+> score. A non-finite `auto_merge_threshold` is a `422`.
+
 > **2026-07-19 — enriched dedup report.** `POST /api/things/deduplicate`
 > now returns the family's person/worker-shaped report: alongside the
 > scan counts it carries `auto_merged` (always 0 — no auto-merge path

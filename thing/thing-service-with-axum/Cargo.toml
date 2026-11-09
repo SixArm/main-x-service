@@ -75,7 +75,11 @@ strsim = "0.11"
 # Prometheus metrics (text exposition for /metrics.prom)
 prometheus = "0.14"
 
-# Sibling matcher crate
+# Sibling matcher crate. The `path` is what a local build uses, and it is
+# load-bearing: only the in-tree matcher has the match-evidence API
+# (`MatchResult.evidence`, `match_things_with_frequencies`,
+# `FrequencyTable`, `frequency_key`; agents/share/match-evidence.md) that
+# the service's auto-merge gate and review queue depend on.
 thing-matcher = { version = "0.7.0", path = "../thing-matcher-rust-crate" }
 
 # Security

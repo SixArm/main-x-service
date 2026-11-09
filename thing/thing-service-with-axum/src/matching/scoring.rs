@@ -42,9 +42,12 @@
 
 use serde::Serialize;
 
+use thing_matcher::{NoFrequencies, ValueFrequencies};
+
 use crate::models::thing::Thing;
 
 use super::description::description_similarity;
+use super::evidence::{Evidence, evidence_for};
 use super::identifier::{has_deterministic_match, identifier_similarity};
 use super::name::name_similarity;
 use super::phonetic::soundex_match;
@@ -116,6 +119,10 @@ pub struct MatchResult {
     pub confidence: MatchConfidence,
     /// Per-component breakdown explaining the score.
     pub breakdown: MatchBreakdown,
+    /// The sibling matcher's evidence for the pair (match-evidence.md):
+    /// how much the data proves, beside how alike it is. Never changes
+    /// [`score`](Self::score); gates auto-merge.
+    pub evidence: Evidence,
 }
 
 /// Coarse, human-facing classification of a match [`score`](MatchResult::score).
@@ -192,6 +199,21 @@ impl MatchConfidence {
 /// ```
 #[must_use]
 pub fn compute_match(a: &Thing, b: &Thing, weights: &MatchWeights) -> MatchResult {
+    compute_match_with_frequencies(a, b, weights, &NoFrequencies)
+}
+
+/// [`compute_match`], with value `frequencies` adjusting the pair's
+/// [`evidence`](MatchResult::evidence) (match-evidence.md §7). The
+/// `score`, `confidence` and `breakdown` are identical to
+/// [`compute_match`]'s; only the evidence can differ.
+#[must_use]
+pub fn compute_match_with_frequencies(
+    a: &Thing,
+    b: &Thing,
+    weights: &MatchWeights,
+    frequencies: &dyn ValueFrequencies,
+) -> MatchResult {
+    let evidence = evidence_for(a, b, frequencies);
     // Step 1: deterministic short-circuit. A shared globally-unique
     // identifier is conclusive, so skip all fuzzy scoring and pin to 1.0.
     // The breakdown is filled with 1.0/true to make the reason explicit.
@@ -208,6 +230,7 @@ pub fn compute_match(a: &Thing, b: &Thing, weights: &MatchWeights) -> MatchResul
                 phonetic_match: true,
                 deterministic_match: true,
             },
+            evidence,
         };
     }
 
@@ -279,6 +302,7 @@ pub fn compute_match(a: &Thing, b: &Thing, weights: &MatchWeights) -> MatchResul
             phonetic_match: phonetic,
             deterministic_match: false,
         },
+        evidence,
     }
 }
 

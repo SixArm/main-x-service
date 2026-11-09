@@ -7,6 +7,10 @@ before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
   the migrator, the integrity-verification read), `audit.rs`,
   `outbox.rs` (including the relay's poll, ack and retention purge), and
   `review_queue.rs`. Nothing outside that directory runs a statement.
+  `review_queue.evidence` (nullable JSONB, migration
+  `2026110900000001_add_review_queue_evidence`, T-18) holds each pair's
+  match evidence, written on insert and refreshed on the re-scan upsert
+  like the score; older rows stay `NULL`.
   `models.rs` holds plain row structs (`ThingRow`, `AuditLogRow`,
   `OutboxRow`), one field per column, with no behaviour.
 - **Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`

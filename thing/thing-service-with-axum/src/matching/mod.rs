@@ -39,6 +39,9 @@
 pub mod adapter;
 /// Free-text description similarity (Jaro-Winkler).
 pub mod description;
+/// Match evidence (the matcher's Fellegi–Sunter bits), the `Proven`
+/// auto-merge gate, and the value-frequency source.
+pub mod evidence;
 /// Identifier-pair matching and the deterministic short-circuit predicate.
 pub mod identifier;
 /// Name similarity (Jaro-Winkler).
@@ -59,7 +62,10 @@ pub use ::thing_matcher as matcher_lib;
 
 use crate::config::MatchingConfig;
 use crate::models::thing::Thing;
-use scoring::{MatchConfidence, MatchResult, MatchWeights, compute_match};
+use scoring::{
+    MatchConfidence, MatchResult, MatchWeights, compute_match, compute_match_with_frequencies,
+};
+use thing_matcher::ValueFrequencies;
 
 /// Strategy trait for scoring two [`Thing`] records (T-2).
 ///
@@ -74,6 +80,14 @@ use scoring::{MatchConfidence, MatchResult, MatchWeights, compute_match};
 pub trait ThingMatcher: Send + Sync {
     /// Score two things, returning the full [`MatchResult`](scoring::MatchResult).
     fn score(&self, a: &Thing, b: &Thing) -> MatchResult;
+    /// Score two things with value `frequencies` adjusting the evidence
+    /// (match-evidence.md §7). The score is the same as [`Self::score`]'s.
+    fn score_with_frequencies(
+        &self,
+        a: &Thing,
+        b: &Thing,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult;
     /// Whether two things score at or above the configured threshold.
     fn is_match(&self, a: &Thing, b: &Thing) -> bool;
     /// The configured `is_match` threshold.
@@ -108,6 +122,16 @@ impl ThingMatcher for ProbabilisticMatcher {
     /// Delegates to [`compute_match`].
     fn score(&self, a: &Thing, b: &Thing) -> MatchResult {
         compute_match(a, b, &self.weights)
+    }
+
+    /// Delegates to [`compute_match_with_frequencies`].
+    fn score_with_frequencies(
+        &self,
+        a: &Thing,
+        b: &Thing,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
+        compute_match_with_frequencies(a, b, &self.weights, frequencies)
     }
 
     fn is_match(&self, a: &Thing, b: &Thing) -> bool {

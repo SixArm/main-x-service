@@ -20,6 +20,7 @@
 | FHIR R5 (`Device`) | Read/create/update/delete/search at `/fhir/Device{,/{id}}` + `GET /fhir/metadata`, `medium` fidelity (T-9) |
 | Durable event bus (Phase 2 outbox + Phase 3 relay) | `event_outbox` transactional write inside the entity write's transaction (`THING_EVENT_TRANSPORT=outbox`); relay/retention loop (`THING_EVENT_RELAY`); real-broker `FluvioSink` behind the `fluvio` Cargo feature (`THING_FLUVIO_ENDPOINT`), off by default — `LoggingSink` unchanged (T-10, BUS-3) |
 | Stored review queue + decisions | `review_queue` table (normalized-pair UNIQUE upsert); `GET /api/things/review-queue` + `POST /api/things/review-queue/{id}/decision` (2026-07-19) |
+| Match evidence + `proven` auto-merge gate | `evidence` on every scored pair and stored review item (`review_queue.evidence` JSONB); batch scan marks `automerged` only on `proven`; name value frequencies (scan-local in dedup, cached 10 min elsewhere, none below 1 000 records) (T-18, 2026-11-09) |
 | Row-level integrity digests | SHA-256/SHA-3/optional-MAC over the assembled record (child tables included), stamped on every write; `GET /api/records/verify` + `GET /api/audit/verify` (2026-07-28) |
 | Server-owned wire fields optional | `POST /api/things` no longer demands `id`/`created_at`/`updated_at`/collection fields it owns and discards (QA-SERVER-FIELDS, 2026-08-04) |
 | Persistence | `PgThingRepository`: sqlx `query!` CRUD with transactions, soft delete; plain-SQL `sqlx::migrate!` migrations; all SQL in `src/db/` (§10, T-16) |

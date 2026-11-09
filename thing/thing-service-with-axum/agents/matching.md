@@ -162,3 +162,16 @@ println!("Score: {}", result.score);              // 1.00 (deterministic)
 println!("Confidence: {:?}", result.confidence);  // Certain
 println!("Deterministic: {}", result.breakdown.deterministic_match);
 ```
+
+## Match evidence and the auto-merge gate
+
+Beside the score, every `MatchResult` carries `evidence`, the
+`thing-matcher` crate's Fellegi–Sunter evidence for the pair
+([match-evidence.md](../../../agents/share/match-evidence.md)). The
+score ranks and finds candidates; the evidence decides auto-merge. The
+batch scan marks a pair `automerged` only when
+`matching::evidence::permits_auto_merge` holds: score at least
+`auto_merge_threshold` and strength `proven`. A shared name alone is
+`consistent` and always goes to review. Value frequencies for the
+`name` component live in `matching::evidence` (`frequencies_from`,
+`FrequencyCache`); see spec §6.4.

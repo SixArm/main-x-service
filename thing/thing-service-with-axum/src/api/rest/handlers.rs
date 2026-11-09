@@ -14,6 +14,7 @@ use uuid::Uuid;
 use super::state::AppState;
 use crate::db::audit::AuditContext;
 use crate::matching::confidence_label;
+use crate::matching::evidence::{Evidence, frequencies_from, permits_auto_merge};
 use crate::models::merge::{MergeRecord, MergeRequest, MergeResponse};
 use crate::models::thing::Thing;
 use crate::privacy::{gdpr_export, mask_thing};
@@ -450,6 +451,63 @@ pub struct ScoredCandidate {
     pub score: f64,
     /// Confidence band (`certain`/`probable`/`possible`/`unlikely`).
     pub confidence: String,
+    /// The matcher's match evidence for the pair (match-evidence.md):
+    /// bits, fields compared, contradictions, strength and per-term
+    /// listing. Component names and bits only, never field values, so it
+    /// is returned unchanged when `thing` is masked.
+    #[schema(value_type = MatchEvidenceSchema)]
+    pub evidence: Evidence,
+}
+
+/// The `OpenAPI` shape of the matcher's `Evidence`
+/// (`agents/share/match-evidence.md` §5, §8). Schema only: the wire value
+/// is `thing_matcher::Evidence` serialized verbatim.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MatchEvidenceSchema {
+    /// Sum of the components' log-likelihood weights, in bits.
+    pub weight_bits: f64,
+    /// Components both records held (identifiers count as one).
+    pub fields_compared: u32,
+    /// Hard conflicts; any one makes the strength `contradicted`.
+    pub contradictions: Vec<MatchContradictionSchema>,
+    /// The verdict. Only `proven` permits an automatic merge.
+    pub strength: MatchStrengthSchema,
+    /// Every term of the sum; their `bits` add up to `weight_bits`.
+    pub components: Vec<MatchComponentBitsSchema>,
+}
+
+/// The `OpenAPI` shape of one evidence contradiction.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MatchContradictionSchema {
+    /// What conflicts, e.g. `identifier:isbn` (a scheme, never a value).
+    pub field: String,
+}
+
+/// The `OpenAPI` shape of one evidence term.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct MatchComponentBitsSchema {
+    /// The component, e.g. `name`, `identifier`, `contradiction:identifier:isbn`.
+    pub component: String,
+    /// Bits this term added, after any discount or adjustment.
+    pub bits: f64,
+    /// Discounted as a non-strongest member of a correlated group.
+    pub correlated: bool,
+    /// Agreement weight taken from the value's own frequency.
+    pub frequency_adjusted: bool,
+}
+
+/// The `OpenAPI` shape of the evidence strength.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchStrengthSchema {
+    /// A contradiction rules the pair out of any automatic merge.
+    Contradicted,
+    /// The evidence clears the proof bar, with no contradiction.
+    Proven,
+    /// A match with no contradiction, short of proof: review, never auto-merge.
+    Consistent,
+    /// Not a match.
+    NonMatch,
 }
 
 /// Score a request thing against existing records, sorted descending.
@@ -474,6 +532,9 @@ async fn find_candidates(
         .search_engine
         .search_by_name(&thing.name, 50)
         .unwrap_or_default();
+    // Value frequencies for the evidence (match-evidence.md §7): the
+    // cached table, rebuilt lazily when older than ten minutes.
+    let frequencies = state.frequencies.current(&state.thing_repository).await;
     let mut out = Vec::new();
     for id in ids {
         let Ok(uuid) = Uuid::parse_str(&id) else {
@@ -484,7 +545,9 @@ async fn find_candidates(
             continue;
         }
         if let Ok(Some(existing)) = state.thing_repository.get_by_id(&uuid).await {
-            let r = state.matcher.score(thing, &existing);
+            let r = state
+                .matcher
+                .score_with_frequencies(thing, &existing, frequencies.as_ref());
             out.push(ScoredCandidate {
                 thing: if mask_sensitive {
                     mask_thing(&existing)
@@ -493,6 +556,7 @@ async fn find_candidates(
                 },
                 score: r.score,
                 confidence: confidence_label(&r.confidence).to_string(),
+                evidence: r.evidence,
             });
         }
     }
@@ -662,7 +726,17 @@ pub struct BatchDeduplicationRequest {
     /// larger value is refused with `422` rather than clamped.
     #[serde(default)]
     pub max_candidates: Option<u64>,
+    /// Score at or above which a pair whose evidence is `proven` is marked
+    /// `automerged` (default [`DEFAULT_AUTO_MERGE_THRESHOLD`]). A pair
+    /// whose evidence is `consistent` or `contradicted` stays `pending`
+    /// whatever its score (match-evidence.md §4).
+    #[serde(default)]
+    pub auto_merge_threshold: Option<f64>,
 }
+
+/// Default [`BatchDeduplicationRequest::auto_merge_threshold`], the
+/// person/worker services' value.
+pub const DEFAULT_AUTO_MERGE_THRESHOLD: f64 = 0.95;
 
 /// The most active things one `POST /api/things/deduplicate` scans. The
 /// scan scores every pair, about half a million at this cap, so an
@@ -682,7 +756,9 @@ pub enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate.
     Rejected,
-    /// Auto-merged (score above an auto-merge threshold).
+    /// Auto-merged: score at or above the auto-merge threshold **and**
+    /// evidence `proven`. Marked only; the merge itself is not executed
+    /// by the scan.
     AutoMerged,
 }
 
@@ -709,6 +785,11 @@ pub struct ReviewQueueItem {
     /// serialized verbatim. `None` only for a row scanned before this field
     /// existed.
     pub score_breakdown: Option<serde_json::Value>,
+    /// The matcher's match evidence for the pair (match-evidence.md),
+    /// which decided whether it could be auto-merged. `None` only for a
+    /// row scanned before the field existed.
+    #[schema(value_type = Option<MatchEvidenceSchema>)]
+    pub evidence: Option<Evidence>,
     /// Current review state.
     pub status: ReviewStatus,
     /// Reviewer identity recorded by the decision endpoint, if decided.
@@ -726,12 +807,11 @@ pub struct BatchDeduplicationResponse {
     pub things_scanned: usize,
     /// Number of duplicate pairs found.
     pub duplicates_found: usize,
-    /// Number of pairs auto-merged. Always `0`: this service has no
-    /// auto-merge path; the field exists so the report shape matches
-    /// the person/worker services.
+    /// Number of pairs marked `automerged`: score at or above the
+    /// auto-merge threshold with `proven` evidence. Marked only; the scan
+    /// executes no merge.
     pub auto_merged: usize,
-    /// Number of pairs queued for human review (all found pairs, until
-    /// a review-decision endpoint exists).
+    /// Number of pairs queued for human review (`pending`).
     pub queued_for_review: usize,
     /// The queued candidate pairs.
     pub review_items: Vec<ReviewQueueItem>,
@@ -756,20 +836,40 @@ pub async fn deduplicate(
         )
         .respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
+    let auto_merge_threshold = req
+        .auto_merge_threshold
+        .unwrap_or(DEFAULT_AUTO_MERGE_THRESHOLD);
+    if !auto_merge_threshold.is_finite() {
+        return ApiProblem::new("validation", "auto_merge_threshold must be a finite number")
+            .respond(StatusCode::UNPROCESSABLE_ENTITY);
+    }
     let threshold = req.threshold.unwrap_or_else(|| state.matcher.threshold());
     let things = match state.thing_repository.list(limit, 0).await {
         Ok(rows) => rows,
         Err(e) => return fail(&e),
     };
+    // Value frequencies from the records this scan loaded
+    // (match-evidence.md §7); below the minimum population, none.
+    let frequencies = frequencies_from(&things);
     let mut review_items = Vec::new();
     // Upper-triangular pair iteration: j starts at i+1 so each pair is
     // scored once and no record is compared with itself. Every pair at
-    // or above the threshold becomes a pending review item (the
-    // person/worker report shape).
+    // or above the threshold becomes a review item (the person/worker
+    // report shape): `automerged` only when the score clears the
+    // auto-merge threshold AND the evidence is `proven`, else `pending`.
     for i in 0..things.len() {
         for j in (i + 1)..things.len() {
-            let result = state.matcher.score(&things[i], &things[j]);
+            let result = state
+                .matcher
+                .score_with_frequencies(&things[i], &things[j], &frequencies);
             if result.score >= threshold {
+                // The auto-merge gate (match-evidence.md §4).
+                let status =
+                    if permits_auto_merge(result.score, auto_merge_threshold, &result.evidence) {
+                        ReviewStatus::AutoMerged
+                    } else {
+                        ReviewStatus::Pending
+                    };
                 review_items.push(ReviewQueueItem {
                     id: Uuid::new_v4(),
                     thing_id_a: things[i].id,
@@ -778,7 +878,8 @@ pub async fn deduplicate(
                     match_quality: confidence_label(&result.confidence).to_string(),
                     detection_method: "batch_deduplication".to_string(),
                     score_breakdown: serde_json::to_value(&result.breakdown).ok(),
-                    status: ReviewStatus::Pending,
+                    evidence: Some(result.evidence),
+                    status,
                     reviewed_by: None,
                     created_at: chrono::Utc::now(),
                     reviewed_at: None,
@@ -800,6 +901,10 @@ pub async fn deduplicate(
             match_quality: r.match_quality.clone(),
             detection_method: r.detection_method.clone(),
             score_breakdown: r.score_breakdown.clone(),
+            evidence: r
+                .evidence
+                .as_ref()
+                .and_then(|e| serde_json::to_value(e).ok()),
             status: review_status_token(&r.status).to_string(),
         })
         .collect();
@@ -903,6 +1008,12 @@ fn review_row_to_item(row: &crate::db::review_queue::ReviewQueueRow) -> ReviewQu
         match_quality: row.match_quality.clone(),
         detection_method: row.detection_method.clone(),
         score_breakdown: row.score_breakdown.clone(),
+        // An unreadable stored value reads as "no evidence recorded"
+        // rather than failing the whole list.
+        evidence: row
+            .evidence
+            .clone()
+            .and_then(|v| serde_json::from_value(v).ok()),
         status: parse_review_status(&row.status),
         reviewed_by: row.reviewed_by.clone(),
         created_at: row.created_at,
@@ -1188,6 +1299,7 @@ mod review_report_tests {
             match_quality: "probable".to_string(),
             detection_method: "batch_deduplication".to_string(),
             score_breakdown: None,
+            evidence: None,
             status: ReviewStatus::Pending,
             reviewed_by: None,
             created_at: chrono::Utc::now(),
@@ -1196,6 +1308,63 @@ mod review_report_tests {
         let value = serde_json::to_value(&item).unwrap();
         assert_eq!(value["detection_method"], "batch_deduplication");
         assert_eq!(value["status"], "pending");
+        assert!(value["evidence"].is_null());
+    }
+
+    fn stored_row(evidence: Option<serde_json::Value>) -> crate::db::review_queue::ReviewQueueRow {
+        crate::db::review_queue::ReviewQueueRow {
+            id: Uuid::new_v4(),
+            record_id_a: Uuid::new_v4(),
+            record_id_b: Uuid::new_v4(),
+            match_score: 0.97,
+            match_quality: "certain".to_string(),
+            detection_method: "batch_deduplication".to_string(),
+            score_breakdown: None,
+            evidence,
+            status: "pending".to_string(),
+            reviewed_by: None,
+            created_at: chrono::Utc::now(),
+            reviewed_at: None,
+        }
+    }
+
+    /// A row stored before the `evidence` column (NULL) reads back as no
+    /// evidence; evidence JSON written before the matcher's `components`
+    /// field still deserialises; an unreadable value is no evidence, not
+    /// a failed list.
+    #[test]
+    fn stored_evidence_reads_back_old_and_new_shapes() {
+        assert!(review_row_to_item(&stored_row(None)).evidence.is_none());
+
+        let old = serde_json::json!({
+            "weight_bits": 9.9,
+            "fields_compared": 1,
+            "contradictions": [],
+            "strength": "consistent"
+        });
+        let item = review_row_to_item(&stored_row(Some(old)));
+        let evidence = item.evidence.expect("old evidence JSON deserialises");
+        assert_eq!(
+            evidence.strength,
+            crate::matching::evidence::MatchStrength::Consistent
+        );
+        assert!(evidence.components.is_empty());
+
+        let junk = serde_json::json!({ "strength": 7 });
+        assert!(
+            review_row_to_item(&stored_row(Some(junk)))
+                .evidence
+                .is_none()
+        );
+    }
+
+    /// A request written before `auto_merge_threshold` still parses, with
+    /// the default threshold.
+    #[test]
+    fn deduplicate_request_without_auto_merge_threshold_parses() {
+        let req: BatchDeduplicationRequest =
+            serde_json::from_value(serde_json::json!({ "threshold": 0.8 })).unwrap();
+        assert!(req.auto_merge_threshold.is_none());
     }
     /// Only the two operator verdicts parse as decisions.
     #[test]

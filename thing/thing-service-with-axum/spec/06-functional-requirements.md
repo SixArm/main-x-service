@@ -88,6 +88,34 @@ to consent constraints.
   records (default 100, at most 1 000; above is a `422`) and scoring
   every pair.
 - Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`).
+- **Match evidence** ([match-evidence](../../../agents/share/match-evidence.md),
+  T-18). Every scored pair (the `409` body, `check-duplicates`,
+  `match`, the batch scan, stored review items) carries the
+  `thing-matcher` crate's `evidence` (`weight_bits`, `fields_compared`,
+  `contradictions`, `strength`, `components`) beside the service's own
+  `score`, which is unchanged. It is computed through
+  `matching::adapter::to_matcher_thing` and holds component names and
+  bits only, never field values, so it is returned as-is on masked
+  paths.
+- **Auto-merge only on `proven`.** The batch scan marks a pair
+  `automerged` only when its score is at least `auto_merge_threshold`
+  (default 0.95) **and** its evidence strength is `proven`
+  (`matching::evidence::permits_auto_merge`). A `consistent` or
+  `contradicted` pair stays `pending` whatever its score. Marking is all
+  the scan does: no merge is executed automatically anywhere in this
+  service. The create-time `409` is unchanged.
+- **Value frequencies** (contract §7). The frequency component is
+  `name` (primary and alternate names, each record counted once per
+  key, under the matcher's `frequency_key`). The batch scan counts them
+  over the records it loaded; create and `check-duplicates` use a
+  cached table in `AppState` (`FrequencyCache`), rebuilt lazily on use
+  when older than 10 minutes (the first use builds it inline, a stale
+  table is used while one background rebuild runs, so no request waits
+  on more than one scan). A rebuild pages the repository and stops at
+  200 000 records, above which the table is a sample of the most
+  recently created. Below `MIN_FREQUENCY_POPULATION` (1 000) records
+  there are no frequencies, since a share from a small population is
+  noise.
 - Merge transfers identifiers, `alternate_names`, `same_as`,
   `images`; appends the duplicate's name as `alternate_name` on the
   survivor; adds a `Replaces` link; soft-deletes the duplicate;
