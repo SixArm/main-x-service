@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use strsim::jaro_winkler;
 
 use crate::config::MatchConfig;
-use crate::evidence::{Evidence, identifier_contradictions};
+use crate::evidence::{Evidence, NoFrequencies, ValueFrequencies, identifier_contradictions};
 use crate::normalize;
 use crate::organization::{IdentifierScheme, Organization, RelationKind, RelationshipRef};
 use crate::phonetic;
@@ -99,6 +99,37 @@ impl MatchingEngine {
     /// ```
     #[must_use]
     pub fn match_organizations(&self, a: &Organization, b: &Organization) -> MatchResult {
+        self.match_organizations_with_frequencies(a, b, &NoFrequencies)
+    }
+
+    /// Score two organizations, weighing an exact agreement on a
+    /// [`crate::evidence::FREQUENCY_COMPONENTS`] value by that value's own
+    /// share of records (`match-evidence.md` §7). Only the evidence
+    /// changes; `score`, `is_match` and `confidence` are exactly those of
+    /// [`Self::match_organizations`], which calls this with
+    /// [`NoFrequencies`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use organization_matcher::{FrequencyTable, MatchingEngine, Organization, frequency_key};
+    ///
+    /// let mut table = FrequencyTable::new();
+    /// table.insert("name", frequency_key("name", "City Council").unwrap(), 0.01);
+    /// let engine = MatchingEngine::default_config();
+    /// let a = Organization::new("City Council");
+    /// let common = engine.match_organizations_with_frequencies(&a, &a, &table);
+    /// let plain = engine.match_organizations(&a, &a);
+    /// assert!(common.evidence.weight_bits < plain.evidence.weight_bits);
+    /// assert_eq!(common.score, plain.score);
+    /// ```
+    #[must_use]
+    pub fn match_organizations_with_frequencies(
+        &self,
+        a: &Organization,
+        b: &Organization,
+        frequencies: &dyn ValueFrequencies,
+    ) -> MatchResult {
         // Every component is computed up front, also on the
         // deterministic path: the returned breakdown/score there stay as
         // they always were, but the evidence (match-evidence.md §3)
@@ -120,6 +151,10 @@ impl MatchingEngine {
             deterministic_match: false,
         };
         let contradictions = identifier_contradictions(a, b);
+        let shares: Vec<(&str, f64)> = name_share(a, b, frequencies)
+            .map(|share| ("name", share))
+            .into_iter()
+            .collect();
 
         // Phase 1 — deterministic short-circuit. A shared globally-unique
         // identifier (or same-jurisdiction tax id, or `same_as` overlap)
@@ -128,6 +163,7 @@ impl MatchingEngine {
         if deterministic_match(a, b) {
             let evidence = Evidence::compute(
                 &computed,
+                &shares,
                 true,
                 contradictions,
                 true,
@@ -174,6 +210,7 @@ impl MatchingEngine {
         let is_match = score >= self.config.threshold;
         let evidence = Evidence::compute(
             &computed,
+            &shares,
             false,
             contradictions,
             is_match,
@@ -346,6 +383,26 @@ fn name_keys(o: &Organization) -> Vec<String> {
     // match each other (two empties score 1.0 under Jaro-Winkler).
     keys.retain(|k| !k.is_empty());
     keys
+}
+
+/// The share of the name both records hold exactly (a name key in
+/// common, in [`crate::evidence::frequency_key`] form), or `None` when
+/// they share none or no share is known. Several shared keys (a primary
+/// name on one side matching an alias on the other) take the most
+/// common, so the adjustment never proves more than the weakest
+/// shared name.
+fn name_share(
+    a: &Organization,
+    b: &Organization,
+    frequencies: &dyn ValueFrequencies,
+) -> Option<f64> {
+    let b_keys = name_keys(b);
+    name_keys(a)
+        .iter()
+        .filter(|k| b_keys.contains(k))
+        .filter_map(|k| frequencies.share("name", k))
+        .filter(|s| s.is_finite())
+        .reduce(f64::max)
 }
 
 /// Name component score in `[0.0, 1.0]`: the best Jaro-Winkler
@@ -1235,5 +1292,94 @@ mod tests {
         let r: MatchResult = serde_json::from_str(old).expect("old JSON");
         assert_eq!(r.evidence, crate::Evidence::default());
         assert_eq!(r.evidence.strength, MatchStrength::NonMatch);
+    }
+
+    // ---------- correlated groups + value frequencies ----------
+
+    use crate::evidence::{FrequencyTable, NoFrequencies, frequency_key};
+
+    /// A parent and a subsidiary at one registered address, with
+    /// different names and domains: the shared office is one fact
+    /// (address + jurisdiction, discounted), never proof.
+    #[test]
+    fn parent_and_subsidiary_at_one_address_are_not_proven() {
+        let engine = MatchingEngine::default_config();
+        let mut parent = rich("Acme Holdings");
+        parent.url = Some("https://acme-holdings.example".into());
+        parent.keywords.clear();
+        parent.tags.clear();
+        parent.relationships.clear();
+        parent.founding_date = None;
+        let mut sub = parent.clone();
+        sub.name = "Globex Logistics".into();
+        sub.url = Some("https://globex-logistics.example".into());
+        let r = engine.match_organizations(&parent, &sub);
+        assert!(!r.is_match);
+        assert!(r.evidence.weight_bits < engine.config().proof_bits);
+        assert_ne!(r.evidence.strength, MatchStrength::Proven);
+        let jur = r
+            .evidence
+            .components
+            .iter()
+            .find(|c| c.component == "jurisdiction")
+            .expect("jurisdiction term");
+        assert!(jur.correlated);
+    }
+
+    /// Passing `NoFrequencies` is exactly the plain call.
+    #[test]
+    fn no_frequencies_equals_match_organizations() {
+        let engine = MatchingEngine::default_config();
+        let a = rich("Acme Corporation");
+        let mut b = rich("Acme Corp");
+        b.url = Some("https://acme.example".into());
+        for (x, y) in [(&a, &b), (&a, &a)] {
+            let plain = serde_json::to_value(engine.match_organizations(x, y)).unwrap();
+            let none = serde_json::to_value(engine.match_organizations_with_frequencies(
+                x,
+                y,
+                &NoFrequencies,
+            ))
+            .unwrap();
+            assert_eq!(plain, none);
+        }
+    }
+
+    /// A common shared name proves less than the table's default, a rare
+    /// one more; score, `is_match` and confidence never move.
+    #[test]
+    fn common_and_rare_names_move_only_the_evidence() {
+        let engine = MatchingEngine::default_config();
+        let a = Organization::new("City Council");
+        let key = frequency_key("name", "City Council").unwrap();
+        let plain = engine.match_organizations(&a, &a);
+        for (share, fewer) in [(0.01, true), (1e-6, false)] {
+            let mut t = FrequencyTable::new();
+            t.insert("name", key.clone(), share);
+            let r = engine.match_organizations_with_frequencies(&a, &a, &t);
+            assert!((r.score - plain.score).abs() < f64::EPSILON);
+            assert_eq!(r.is_match, plain.is_match);
+            assert_eq!(r.confidence, plain.confidence);
+            assert!(r.evidence.components[0].frequency_adjusted);
+            if fewer {
+                assert!(r.evidence.weight_bits < plain.evidence.weight_bits);
+            } else {
+                assert!(r.evidence.weight_bits > plain.evidence.weight_bits);
+            }
+        }
+    }
+
+    /// A known share is not used when the names only nearly agree.
+    #[test]
+    fn near_miss_names_are_not_frequency_adjusted() {
+        let engine = MatchingEngine::default_config();
+        let a = Organization::new("City Council");
+        let b = Organization::new("City Counsel");
+        let mut t = FrequencyTable::new();
+        t.insert("name", frequency_key("name", "City Council").unwrap(), 0.01);
+        t.insert("name", frequency_key("name", "City Counsel").unwrap(), 0.01);
+        let with = engine.match_organizations_with_frequencies(&a, &b, &t);
+        let plain = engine.match_organizations(&a, &b);
+        assert_eq!(with.evidence, plain.evidence);
     }
 }

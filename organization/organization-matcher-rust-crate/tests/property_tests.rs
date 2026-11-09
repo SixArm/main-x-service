@@ -17,8 +17,9 @@
 //! [`IdentifierScheme::is_deterministic`] scheme classifier.
 
 use organization_matcher::{
-    Confidence, IdentifierScheme, MatchConfig, MatchStrength, MatchingEngine, OrgIdentifier,
-    Organization, PostalAddress, RelationKind, RelationshipRef, normalize, phonetic,
+    Confidence, FrequencyTable, IdentifierScheme, MatchConfig, MatchStrength, MatchingEngine,
+    OrgIdentifier, Organization, PostalAddress, RelationKind, RelationshipRef, frequency_key,
+    normalize, phonetic,
 };
 use proptest::prelude::*;
 
@@ -347,5 +348,33 @@ proptest! {
         let rev = engine.match_organizations(&b, &a).evidence;
         prop_assert!((e.weight_bits - rev.weight_bits).abs() < 1e-9);
         prop_assert_eq!(e.strength, rev.strength);
+    }
+
+    /// Evidence (§8): the listed terms add up to `weight_bits`, with and
+    /// without a frequency source, and a frequency source never moves
+    /// `score`, `is_match` or `confidence`.
+    #[test]
+    fn evidence_components_sum_to_weight_bits(
+        a in org_strategy(),
+        b in org_strategy(),
+        share in prop_oneof![0.0f64..=1.0, Just(f64::NAN), Just(2.0)],
+    ) {
+        let engine = MatchingEngine::default_config();
+        let mut table = FrequencyTable::new();
+        for o in [&a, &b] {
+            if let Some(k) = frequency_key("name", &o.name) {
+                table.insert("name", k, share);
+            }
+        }
+        let plain = engine.match_organizations(&a, &b);
+        let freq = engine.match_organizations_with_frequencies(&a, &b, &table);
+        for r in [&plain, &freq] {
+            let sum: f64 = r.evidence.components.iter().map(|c| c.bits).sum();
+            prop_assert_eq!(sum.to_bits(), r.evidence.weight_bits.to_bits());
+            prop_assert!(r.evidence.weight_bits.is_finite());
+        }
+        prop_assert_eq!(plain.score.to_bits(), freq.score.to_bits());
+        prop_assert_eq!(plain.is_match, freq.is_match);
+        prop_assert_eq!(plain.confidence, freq.confidence);
     }
 }

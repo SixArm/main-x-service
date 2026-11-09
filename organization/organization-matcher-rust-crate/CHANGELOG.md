@@ -30,6 +30,27 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 `MatchConfig` or `MatchResult` must now name the new field (or use
 `..Default::default()`).
 
+### Added — correlated groups, value frequencies, evidence terms (`match-evidence.md` §6–§8)
+
+- `CORRELATED_GROUPS` — `[address, jurisdiction]`, `[keywords, tags]`,
+  `[name, url]` — with `CORRELATED_DISCOUNT` (0.5), `group_bits` and
+  `strongest_first`: within a group the strongest term counts in full and
+  the rest at half, for agreements and disagreements alike.
+- `ValueFrequencies`, `NoFrequencies`, `FrequencyTable` (`from_counts`,
+  `insert`), `MIN_SHARE`, `frequency_bits`, `FREQUENCY_COMPONENTS`
+  (`["name"]`) and `frequency_key` (the legal-suffix-stripped name);
+  `MatchingEngine::match_organizations_with_frequencies` weighs an exact
+  name agreement by that name's own share of records.
+- `ComponentBits` and `Evidence.components` (`#[serde(default)]`): every
+  term of the sum, including `identifier` and
+  `contradiction:identifier:<scheme>`; they add up to `weight_bits`.
+
+`score`, `is_match` and `confidence` are unchanged, and
+`match_organizations` gives the same result as before apart from the
+correlated discount on `weight_bits` (the richest identical record goes
+from 52.74 to 45.36 bits, still `Proven`). `Evidence::compute` takes a
+new `frequency_shares` argument.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

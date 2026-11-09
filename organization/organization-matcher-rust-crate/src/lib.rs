@@ -54,7 +54,10 @@ pub mod scoring;
 
 pub use config::MatchConfig;
 pub use error::{Error, Result};
-pub use evidence::{Contradiction, Evidence, MatchStrength};
+pub use evidence::{
+    ComponentBits, Contradiction, Evidence, FrequencyTable, MatchStrength, NoFrequencies,
+    ValueFrequencies, frequency_key,
+};
 pub use matcher::MatchingEngine;
 pub use organization::{
     IdentifierScheme, OrgIdentifier, Organization, PostalAddress, RelationKind, RelationshipRef,

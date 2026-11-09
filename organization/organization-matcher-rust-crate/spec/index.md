@@ -291,11 +291,54 @@ measurement):
 | relationships | 0.70 | 0.05 | 3.81 | −1.66 | sibling subsidiaries share a parent reference |
 | tags | 0.60 | 0.10 | 2.58 | −1.17 | coarse operator labels |
 
-Consequences: identical name-only records are `Consistent` (9.89
-bits); a shared LEI alone is `Proven`; identical records carrying all
-eight components, with no identifier, are `Proven` (52.74 bits) — name +
-address + domain alone already give 33.76. Founding year one off
-(similarity `0.5`) counts as full disagreement under the shared formula.
+**Correlated groups** (`CORRELATED_GROUPS`, public contract,
+`match-evidence.md` §6). Within a group the present member with the
+largest absolute bits (ties to the larger value) counts in full and
+every other present member at `CORRELATED_DISCOUNT = 0.5`; agreements
+and disagreements alike. A component in no group stands alone.
+
+| Group | Why the members are not independent |
+|---|---|
+| `address`, `jurisdiction` | the country is determined by the registered address; a parent and its subsidiary in one office agree on both for one reason |
+| `keywords`, `tags` | both are descriptive labels from the same sector vocabulary |
+| `name`, `url` | a domain is usually the name, and a brand family (parent, subsidiaries, franchises) shares both |
+
+`founding_date` and `relationships` stand alone.
+
+**Common and rare values** (`match-evidence.md` §7).
+`match_organizations_with_frequencies(a, b, &dyn ValueFrequencies)`
+takes a frequency source; `match_organizations` calls it with
+`NoFrequencies`, so plain calls are unchanged, and `score`, `is_match`
+and `confidence` never depend on the source. `FREQUENCY_COMPONENTS =
+["name"]`: names such as "ABC Ltd" or "City Council" recur across
+jurisdictions. When both records hold a name key in common (primary,
+legal or alternate name, compared exactly), the name's agreement weight
+is `frequency_bits(m, share) = log2(m / clamp(share, MIN_SHARE = 1e-9,
+m))` in place of `log2(m/u)`; several shared keys take the most common
+share. A share at or above `m` gives `0`, never negative; a partial
+agreement or a disagreement is never adjusted. **Frequency keys** are
+public contract: `frequency_key("name", raw)` returns
+`normalize::legal_name(raw)` (case-folded, NFC, legal suffix stripped,
+`None` if empty), exactly the key the matcher compares, and `None` for
+any other component. `FrequencyTable::from_counts(rows, total)` (rows of
+`(component, key, count)`, share `count / total`) and `insert(component,
+key, share)` build an in-memory source.
+
+**Explainability** (`match-evidence.md` §8). `Evidence.components:
+Vec<ComponentBits>` (`#[serde(default)]`) lists every term — one per
+present component (`correlated` / `frequency_adjusted` flags), then
+`identifier` when R-0/R-1/R-2 fires, then one
+`contradiction:identifier:<scheme>` per contradiction — and
+`weight_bits` is exactly their sum.
+
+Consequences: identical name-only records are `Consistent` (9.89 bits;
+6.57 for a name held by 1 % of records, 19.86 for one held by 1 in a
+million); a shared LEI alone is `Proven`; identical records carrying all
+eight components, with no identifier, are `Proven` at 45.36 bits (52.74
+before the correlated discount); a parent and subsidiary sharing one
+registered address with different names and domains score 10.05 bits,
+`NonMatch`. Founding year one off (similarity `0.5`) counts as full
+disagreement under the shared formula.
 
 ## 19. Quality goals
 
@@ -353,6 +396,18 @@ async, or panics to library code.
       Pinned by unit tests in `src/evidence.rs` / `src/matcher.rs` and a
       `tests/property_tests.rs` property (finite bits, strength consistent
       with contradictions/bar/`is_match`, symmetric).
+- [x] **Match evidence, phase 2** *(done 2026-11-09,
+      `match-evidence.md` §6–§8).* `CORRELATED_GROUPS` (address +
+      jurisdiction, keywords + tags, name + url) with
+      `CORRELATED_DISCOUNT`/`group_bits`/`strongest_first`;
+      `ValueFrequencies`, `NoFrequencies`, `FrequencyTable`, `MIN_SHARE`,
+      `frequency_bits`, `FREQUENCY_COMPONENTS = ["name"]`, `frequency_key`;
+      `MatchingEngine::match_organizations_with_frequencies`;
+      `ComponentBits` and `Evidence.components`. Pinned by unit tests
+      (order independence, uncorrelated sum, discounted disagreements,
+      the parent/subsidiary case, common vs rare names, share ≥ m ⇒ 0,
+      no adjustment on partial agreement, `NoFrequencies` ≡ plain call)
+      and a property that the terms sum to `weight_bits`.
 - [ ] Optional `phone`/`email` exact-match component.
 - [ ] Consider a configurable legal-suffix list (currently a const).
 - [x] **Address: postal-code exact-anchor boost.** *(resolved
