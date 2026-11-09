@@ -4,9 +4,12 @@
 |---|---|---|
 | `Thing`, `ThingBuilder`, `Identifier`, `RelationshipRef`, `RelationKind` | `crate::models` | structs + `#[non_exhaustive]` enum |
 | `MatchingEngine`, `MatchConfig`, `MatchResult`, `MatchBreakdown`, `Confidence` | `crate::matcher` | structs + enum |
+| `Evidence`, `Contradiction`, `MatchStrength` | `crate::evidence` | structs + enum (§5.12; `agents/share/match-evidence.md`) |
 | `Normalizer` | `crate::normalizer` | unit type with associated fns |
 | `Scorer`, `SimilarityAlgorithm` | `crate::scorer` | unit type + enum |
 | `MatchingError`, `Result` | `crate::error` | enum + alias |
+
+`MatchResult` carries `#[serde(default)] evidence: Evidence`, so JSON written before the field still deserialises (to an empty `NonMatch` evidence). `MatchConfig` carries `proof_bits: f64` (default `30.0`, serde-defaulted); it affects only `evidence.strength`. The `crate::evidence` module also exposes `component_bits`, `AGREE_AT`, `DISAGREE_AT`, `IDENTIFIER_BITS`, `CONTRADICTION_BITS`, `DEFAULT_PROOF_BITS` and the per-component `(m, u)` constants.
 
 All of the above are re-exported from the crate root, so a downstream consumer can write `use thing_matcher::{Thing, MatchingEngine, MatchConfig};` without reaching into submodules.
 

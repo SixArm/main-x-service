@@ -35,6 +35,7 @@
 //! assert!(result.is_match);
 //! ```
 
+use crate::evidence::Evidence;
 use crate::models::{Identifier, RelationKind, RelationshipRef, Thing};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
@@ -76,6 +77,7 @@ use std::collections::HashSet;
 ///     use_phonetic_matching: true,
 ///     name_algorithm: SimilarityAlgorithm::Combined,
 ///     strict_mode: false,
+///     proof_bits: 30.0,
 /// };
 /// assert_eq!(custom.match_threshold, 0.80);
 /// ```
@@ -141,6 +143,18 @@ pub struct MatchConfig {
 
     /// Reserved flag for stricter deterministic enforcement.
     pub strict_mode: bool,
+
+    /// Evidence, in bits, at which a non-contradicted pair is
+    /// [`crate::MatchStrength::Proven`]. Default `30` (a million records at one
+    /// false merge in a thousand). Does not affect `score` or `is_match`.
+    /// See `agents/share/match-evidence.md` §4 and spec §5.12.
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
+}
+
+/// Serde default for [`MatchConfig::proof_bits`].
+fn default_proof_bits() -> f64 {
+    crate::evidence::DEFAULT_PROOF_BITS
 }
 
 impl Default for MatchConfig {
@@ -169,6 +183,7 @@ impl Default for MatchConfig {
             use_phonetic_matching: false,
             name_algorithm: SimilarityAlgorithm::Combined,
             strict_mode: false,
+            proof_bits: default_proof_bits(),
         }
     }
 }
@@ -324,6 +339,13 @@ pub struct MatchResult {
 
     /// Per-field score contributions for explainability.
     pub breakdown: MatchBreakdown,
+
+    /// How much the compared data *proves*, beside the similarity
+    /// `score`: Fellegi–Sunter weight in bits, contradictions, and a
+    /// [`crate::MatchStrength`]. Defaults to an empty `NonMatch` evidence on
+    /// JSON that pre-dates the field. See spec §5.12.
+    #[serde(default)]
+    pub evidence: Evidence,
 }
 
 /// Backstop for legacy `MatchResult` JSON payloads that lack the
@@ -468,12 +490,16 @@ impl MatchingEngine {
         // Confidence is a coarse band on the raw score, independent of the
         // configured threshold (see [`Confidence`]).
         let confidence = Confidence::from_score(score);
+        // Evidence sits beside the score and never changes it (spec §5.12).
+        let evidence =
+            crate::evidence::compute(&breakdown, thing1, thing2, is_match, self.config.proof_bits);
 
         MatchResult {
             score,
             is_match,
             confidence,
             breakdown,
+            evidence,
         }
     }
 

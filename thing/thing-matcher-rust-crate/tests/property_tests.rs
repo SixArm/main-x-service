@@ -8,7 +8,9 @@
 //! names, sparse / dense `Thing` records.
 
 use proptest::prelude::*;
-use thing_matcher::{Confidence, Identifier, MatchConfig, MatchingEngine, Normalizer, Thing};
+use thing_matcher::{
+    Confidence, Identifier, MatchConfig, MatchStrength, MatchingEngine, Normalizer, Thing,
+};
 
 // ---------- Strategies ----------
 
@@ -234,5 +236,42 @@ proptest! {
             hi,
             Confidence::from_score(hi)
         );
+    }
+
+    /// Evidence `weight_bits` MUST be finite, and `strength` MUST follow
+    /// the contradiction / proof-bar / `is_match` order
+    /// (agents/share/match-evidence.md §4), with or without identifiers.
+    #[test]
+    fn evidence_is_finite_and_strength_consistent(
+        p1 in thing_strategy(),
+        p2 in thing_strategy(),
+        ids1 in prop::collection::vec(("[ab]", "[0-9]{1,2}"), 0..3),
+        ids2 in prop::collection::vec(("[ab]", "[0-9]{1,2}"), 0..3),
+    ) {
+        let mut p1 = p1;
+        let mut p2 = p2;
+        p1.identifiers = ids1
+            .into_iter()
+            .filter_map(|(k, v)| Identifier::new(k, v))
+            .collect();
+        p2.identifiers = ids2
+            .into_iter()
+            .filter_map(|(k, v)| Identifier::new(k, v))
+            .collect();
+        let config = MatchConfig::default();
+        let proof = config.proof_bits;
+        let r = MatchingEngine::new(config).match_things(&p1, &p2);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "bits {}", e.weight_bits);
+        let expected = if !e.contradictions.is_empty() {
+            MatchStrength::Contradicted
+        } else if e.weight_bits >= proof {
+            MatchStrength::Proven
+        } else if r.is_match {
+            MatchStrength::Consistent
+        } else {
+            MatchStrength::NonMatch
+        };
+        prop_assert_eq!(e.strength, expected);
     }
 }

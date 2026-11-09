@@ -74,5 +74,19 @@ purely as prose elsewhere.
   clean; spec §5.1/§10 updated (this closes OQ-C — remove it from the
   list above once landed).
 
+
+- **OQ-I (question) — Evidence inherits OQ-C.** Match evidence (§5.12,
+  2026-11-09) treats every `property_id` as a globally unique scheme,
+  because `deterministic_match` does: a shared value on any scheme adds
+  `IDENTIFIER_BITS`, and disjoint values on any scheme are a
+  contradiction. A non-unique scheme (`sku`, `mpn`) therefore both
+  over-proves on a coincidental share and over-contradicts on a
+  legitimate difference. When OQ-H lands its scheme set, evidence must
+  use the same set for both the identifier bits and the contradiction
+  rule; a non-listed scheme would then be weighed as an ordinary
+  component (or not at all). The per-component `m` / `u` table in
+  `src/evidence.rs` is an informed estimate; estimating it from
+  review-queue decisions is the service's job
+  (`agents/share/match-evidence.md` §6).
 ---
 

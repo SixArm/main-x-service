@@ -145,5 +145,33 @@ is_match = if config.strict_mode {
 
 `confidence = Confidence::from_score(score)` independently of `match_threshold` (see §3.8).
 
+### 5.12 Match evidence (`MatchResult::evidence`)
+
+Every `MatchResult` also carries an `Evidence` value: how much the compared data **proves**, beside how alike it is. The model is fixed family-wide by [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md) (Fellegi–Sunter log-likelihood weights); this section records only what is specific to this crate. `score`, `is_match` and `confidence` are unchanged by it.
+
+- **Weight.** `evidence.weight_bits` is the sum of `component_bits(s, m, u)` over every component both records hold, with `AGREE_AT = 0.95`, `DISAGREE_AT = 0.60` and linear interpolation between. A component either record lacks adds `0` and is not counted in `fields_compared`. Unlike the similarity breakdown, an empty-vs-non-empty `sameAs` or `additionalType` set, and a blank or fragment-only `image` / `mainEntityOfPage` / `url`, count as **absent**, not as `0.0`.
+- **Identity group.** The three signals `deterministic_match` (§5.1) treats as identity — a shared `(property_id, value)` identifier, any shared `sameAs` URL, an equal non-empty canonical `url` — add `IDENTIFIER_BITS = log2(0.99 / 1e-12) ≈ 39.85` **once** per pair however many of them agree, and count as one field. A `url` or `sameAs` set present on both sides that does not agree adds its own disagreement weight. The plain `url` counts as identity here because §5.1 already treats it as identity.
+- **Contradictions.** Every `property_id` (trimmed) is a scheme, exactly as §5.1 trusts every scheme (see OQ-C / OQ-H). For each scheme under which both records hold at least one non-blank value and the two value sets share none, `evidence.contradictions` gets `{ field: "identifier:<scheme lowercase>" }` and the weight gets `log2(0.01 / (1 − 1e-12)) ≈ −6.64` bits. A record holding several values under one scheme is not contradicted by a partner holding any one of them. Different schemes neither agree nor contradict.
+- **Strength.** `Contradicted` if any contradiction; else `Proven` if `weight_bits >= MatchConfig::proof_bits` (default `30`); else `Consistent` if `is_match`; else `NonMatch`.
+
+Per-component `m` / `u` (informed estimates, `src/evidence.rs`):
+
+| Component | `m` | `u` | Agree bits | Disagree bits |
+|---|---|---|---|---|
+| `name_score` | 0.95 | 1e-3 | +9.89 | −4.32 |
+| `name_phonetic_score` | 0.90 | 0.30 | +1.58 | −2.81 |
+| `description_score` | 0.70 | 1e-3 | +9.45 | −1.74 |
+| `disambiguating_description_score` | 0.80 | 5e-3 | +7.32 | −2.31 |
+| `identifiers_score` | 0.99 | 1e-12 | identity group (+39.85 once) | per contradicted scheme (−6.64) |
+| `url_score` | 0.70 | 1e-6 | identity group | −1.74 |
+| `same_as_score` | 0.50 | 1e-6 | identity group | −1.00 |
+| `image_score` | 0.60 | 1e-3 | +9.23 | −1.32 |
+| `main_entity_of_page_score` | 0.70 | 1e-4 | +12.77 | −1.74 |
+| `additional_types_score` | 0.90 | 0.10 | +3.17 | −3.17 |
+| `relationships_score` | 0.60 | 0.05 | +3.58 | −1.25 |
+| `tags_score` | 0.60 | 0.10 | +2.58 | −1.17 |
+
+Worked figures: two identical records holding only a name score `1.0` and carry `+9.89` bits — `Consistent`, not `Proven`. An identical record with every non-identity field populated (name, both descriptions, image, `mainEntityOfPage`, a type, a relationship, a tag) and no identifier, `url` or `sameAs` carries `≈ +58.0` bits and is `Proven`; `mainEntityOfPage` and `image` carry most of that, so a deployment that sees shared placeholder pages or images should raise their `u`.
+
 ---
 

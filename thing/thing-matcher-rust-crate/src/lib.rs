@@ -32,6 +32,7 @@
 //! | [`scorer`]       | String-similarity and set-similarity primitives. |
 //! | [`matcher`]      | Orchestration: [`MatchingEngine`], [`MatchConfig`], [`MatchResult`]. |
 //! | [`error`]        | Error enum [`MatchingError`] and [`Result`] alias. |
+//! | [`evidence`]     | Fellegi–Sunter match evidence: [`Evidence`], [`MatchStrength`], [`Contradiction`]. |
 //!
 //! ## Quick start — probabilistic match
 //!
@@ -109,12 +110,14 @@
 #![warn(clippy::pedantic)]
 
 pub mod error;
+pub mod evidence;
 pub mod matcher;
 pub mod models;
 pub mod normalizer;
 pub mod scorer;
 
 pub use error::{MatchingError, Result};
+pub use evidence::{Contradiction, Evidence, MatchStrength};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
 pub use models::{Identifier, RelationKind, RelationshipRef, Thing, ThingBuilder};
 pub use normalizer::Normalizer;
