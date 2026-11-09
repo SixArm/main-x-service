@@ -11,7 +11,7 @@ use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::extract::OriginalUri;
 use axum::http::StatusCode;
-use care_pathway_matcher::{CarePathway, MatchConfig, MatchingEngine};
+use care_pathway_matcher::{CarePathway, Evidence, MatchConfig, MatchingEngine};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{AuthUser, MaybeAuthUser};
@@ -286,6 +286,11 @@ struct ScoredRef {
     /// Whether the engine classified this as a match (always `true` here,
     /// since non-matches are filtered out before this struct is built).
     is_match: bool,
+    /// The matcher's match evidence for the pair
+    /// (`agents/share/match-evidence.md`): how much the data proves,
+    /// beside `score`. Component names and bits only, never field
+    /// values, so it reveals nothing the caller could not already read.
+    evidence: Evidence,
 }
 
 /// Create a care pathway.
@@ -661,12 +666,14 @@ async fn check_duplicates(
     };
     let candidates = index.candidates(&query, CHECK_DUPLICATES_CANDIDATE_LIMIT)?;
     let rows = PathwayModel::find_by_pids(&ctx.db, &parse_pids(&candidates)).await?;
+    // The cached registry-wide value frequencies (match-evidence.md §7).
+    let frequencies = crate::frequencies::current(&ctx.db).await;
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         // Each stored row is parsed back into a `CarePathway` and scored
         // against the query; only classified matches are surfaced.
         let candidate = row.to_pathway()?;
-        let r = engine.match_care_pathways(&query, &candidate);
+        let r = engine.match_care_pathways_with_frequencies(&query, &candidate, &*frequencies);
         if !r.is_match {
             continue;
         }
@@ -682,6 +689,7 @@ async fn check_duplicates(
             score: r.score,
             confidence: format!("{:?}", r.confidence),
             is_match: r.is_match,
+            evidence: r.evidence,
         });
     }
     // Best matches first. `f64` is only partially ordered, so NaN scores

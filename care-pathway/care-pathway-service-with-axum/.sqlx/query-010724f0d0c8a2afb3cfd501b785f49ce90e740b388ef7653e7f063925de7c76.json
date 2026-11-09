@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO review_queue\n                 (id, record_id_a, record_id_b, match_score, match_quality,\n                  detection_method, status, provenance)\n             VALUES ($1, $2, $3, 1.0, 'high', 'batch_deduplication', 'rejected', 'operator')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "010724f0d0c8a2afb3cfd501b785f49ce90e740b388ef7653e7f063925de7c76"
+}

@@ -286,6 +286,14 @@ async fn keyless_row_with_a_likely_duplicate_creates_and_queues_for_review() {
             pair["match_score"].as_f64().unwrap() >= 0.7,
             "queued pair: {pair:?}"
         );
+        // The import path stores the pair's match evidence too
+        // (match-evidence.md §10 step 4): a name-only agreement is
+        // consistent, not proven, and stays pending.
+        assert_eq!(
+            pair["evidence"]["strength"], "consistent",
+            "queued pair: {pair:?}"
+        );
+        assert!(pair["evidence"]["weight_bits"].is_number());
     })
     .await;
 }

@@ -433,12 +433,15 @@ async fn find_keyless_duplicate(
     };
 
     let matcher = MatchingEngine::new(MatchConfig::default());
+    // The cached registry-wide value frequencies (match-evidence.md §7).
+    let frequencies = crate::frequencies::current(db).await;
     let mut best: Option<(PathwayModel, MatchResult)> = None;
     for row in rows {
         let Ok(candidate) = row.to_pathway() else {
             continue;
         };
-        let result = matcher.match_care_pathways(pathway, &candidate);
+        let result =
+            matcher.match_care_pathways_with_frequencies(pathway, &candidate, &*frequencies);
         if result.score < crate::bulk::IMPORT_REVIEW_THRESHOLD {
             continue;
         }
@@ -468,8 +471,11 @@ async fn create_and_queue_for_review(
         match_quality: match_quality_label(result.confidence),
         detection_method: "import_duplicate_detection".to_string(),
         score_breakdown: serde_json::to_value(&result.breakdown).ok(),
+        // Always `pending`: an import never auto-merges, whatever the
+        // evidence (match-evidence.md §4).
         status: "pending".to_string(),
         provenance: "import".to_string(),
+        evidence: serde_json::to_value(&result.evidence).ok(),
     };
     if let Err(e) = review_queue::upsert(db, &[item]).await {
         tracing::warn!(

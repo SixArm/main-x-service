@@ -61,6 +61,10 @@ pub mod fhir;
 /// The time-based-analysis flow-gauge refresh loop: default-off,
 /// bounded by a series cap, and suppressed below a cohort floor.
 pub mod flow_metrics;
+/// Value frequencies for match evidence (`agents/share/match-evidence.md`
+/// §7): counted shares of each pathway name, cached for request-time
+/// matching and built per scan for the batch deduplicate.
+pub mod frequencies;
 pub mod initializers;
 /// Pure rules for the care-pathway instance layer.
 pub mod instances;

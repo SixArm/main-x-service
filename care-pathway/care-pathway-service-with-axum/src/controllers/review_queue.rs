@@ -14,13 +14,21 @@
 //! pairwise batch scan (`provenance = "operator"`) — the same
 //! stored-pair-upsert primitive either way, so a re-scan refreshes scores
 //! without disturbing a pair a human already decided.
+//!
+//! Every stored pair carries the matcher's match **evidence**
+//! (`agents/share/match-evidence.md`), and the batch scan marks a pair
+//! `automerged` only when its score clears the auto-merge threshold
+//! **and** its evidence is `Proven` ([`initial_status`]). A `Consistent`
+//! or `Contradicted` pair is queued `pending` whatever its score. Nothing
+//! here performs a merge: `automerged` is a disposition, as in the
+//! sibling registries, and the merge itself stays `POST /merge`.
 
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use axum::extract::State;
 use axum::http::StatusCode;
-use care_pathway_matcher::{MatchConfig, MatchingEngine};
+use care_pathway_matcher::{Evidence, MatchConfig, MatchStrength, MatchingEngine};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::MaybeAuthUser;
@@ -40,7 +48,8 @@ enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate.
     Rejected,
-    /// Auto-merged (no auto-merge path here; present for wire parity).
+    /// Auto-merge eligible: score at or above the auto-merge threshold
+    /// and evidence `Proven` (see [`initial_status`]).
     AutoMerged,
 }
 
@@ -87,6 +96,10 @@ struct ReviewQueueItem {
     /// How the pair was first surfaced (`operator` / `import` /
     /// `matcher_suggested`; §13 T-10).
     provenance: String,
+    /// The matcher's match evidence for the pair (component names and
+    /// bits, never field values); `null` on items queued before
+    /// evidence was stored.
+    evidence: Option<serde_json::Value>,
     /// Reviewer identity recorded by the decision endpoint, if decided.
     reviewed_by: Option<String>,
     /// When the pair was first queued.
@@ -107,6 +120,7 @@ fn review_row_to_item(row: &crate::models::review_queue::ReviewQueueRow) -> Revi
         score_breakdown: row.score_breakdown.clone(),
         status: parse_review_status(&row.status),
         provenance: row.provenance.clone(),
+        evidence: row.evidence.clone(),
         reviewed_by: row.reviewed_by.clone(),
         created_at: row.created_at,
         reviewed_at: row.reviewed_at,
@@ -114,13 +128,46 @@ fn review_row_to_item(row: &crate::models::review_queue::ReviewQueueRow) -> Revi
 }
 
 /// Request body for the batch-scan endpoint; every field optional.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct BatchDeduplicationRequest {
     /// Optional score threshold overriding the matcher's own `is_match`
     /// verdict: without one, the matcher's own boundary decides; with
     /// one, `score >= threshold` does.
     #[serde(default)]
     threshold: Option<f64>,
+    /// Score at or above which a **`Proven`** pair is marked
+    /// `automerged`. Default [`DEFAULT_AUTO_MERGE_THRESHOLD`].
+    #[serde(default = "default_auto_merge_threshold")]
+    auto_merge_threshold: f64,
+}
+
+/// Default auto-merge score threshold, the family's (person/worker).
+pub const DEFAULT_AUTO_MERGE_THRESHOLD: f64 = 0.95;
+
+/// serde default for [`BatchDeduplicationRequest::auto_merge_threshold`].
+fn default_auto_merge_threshold() -> f64 {
+    DEFAULT_AUTO_MERGE_THRESHOLD
+}
+
+impl Default for BatchDeduplicationRequest {
+    fn default() -> Self {
+        Self {
+            threshold: None,
+            auto_merge_threshold: DEFAULT_AUTO_MERGE_THRESHOLD,
+        }
+    }
+}
+
+/// The status a newly found pair is queued with: `automerged` only when
+/// `score >= auto_merge_threshold` **and** the evidence is
+/// [`MatchStrength::Proven`] (`agents/share/match-evidence.md` §4).
+/// `Consistent` and `Contradicted` pairs are `pending` at any score.
+fn initial_status(score: f64, evidence: &Evidence, auto_merge_threshold: f64) -> ReviewStatus {
+    if score >= auto_merge_threshold && evidence.strength == MatchStrength::Proven {
+        ReviewStatus::AutoMerged
+    } else {
+        ReviewStatus::Pending
+    }
 }
 
 /// Response for the batch scan, in the family's report shape.
@@ -130,7 +177,8 @@ struct BatchDeduplicationResponse {
     pathways_scanned: usize,
     /// Number of duplicate pairs found (stored rows reported).
     duplicates_found: usize,
-    /// Auto-merged count (always 0 — no auto-merge path here).
+    /// Stored pairs currently `automerged` (score over the auto-merge
+    /// threshold and evidence `Proven`).
     auto_merged: usize,
     /// Number of stored pairs currently `pending` review.
     queued_for_review: usize,
@@ -173,12 +221,21 @@ async fn deduplicate(
         .map(|row| Ok((row.pid, row.to_pathway()?)))
         .collect::<Result<_>>()?;
 
+    // Value frequencies counted over the rows this scan loaded
+    // (match-evidence.md §7); below MIN_FREQUENCY_POPULATION, none.
+    let frequencies =
+        crate::frequencies::from_pathways(pathways.iter().map(|(_, pathway)| pathway));
+
     let mut new_items = Vec::new();
     // Upper-triangular pair iteration: j starts at i+1 so each unordered
     // pair is scored once and no record is compared with itself.
     for i in 0..pathways.len() {
         for j in (i + 1)..pathways.len() {
-            let r = engine.match_care_pathways(&pathways[i].1, &pathways[j].1);
+            let r = engine.match_care_pathways_with_frequencies(
+                &pathways[i].1,
+                &pathways[j].1,
+                &frequencies,
+            );
             let is_dup = req.threshold.map_or(r.is_match, |t| r.score >= t);
             if is_dup {
                 new_items.push(crate::models::review_queue::NewReviewItem {
@@ -188,8 +245,14 @@ async fn deduplicate(
                     match_quality: format!("{:?}", r.confidence).to_lowercase(),
                     detection_method: "batch_deduplication".to_string(),
                     score_breakdown: serde_json::to_value(&r.breakdown).ok(),
-                    status: review_status_token(ReviewStatus::Pending).to_string(),
+                    status: review_status_token(initial_status(
+                        r.score,
+                        &r.evidence,
+                        req.auto_merge_threshold,
+                    ))
+                    .to_string(),
                     provenance: "operator".to_string(),
+                    evidence: serde_json::to_value(&r.evidence).ok(),
                 });
             }
         }
@@ -200,10 +263,14 @@ async fn deduplicate(
         .iter()
         .filter(|i| i.status == ReviewStatus::Pending)
         .count();
+    let auto_merged = review_items
+        .iter()
+        .filter(|i| i.status == ReviewStatus::AutoMerged)
+        .count();
     format::json(BatchDeduplicationResponse {
         pathways_scanned: pathways.len(),
         duplicates_found: review_items.len(),
-        auto_merged: 0,
+        auto_merged,
         queued_for_review,
         review_items,
     })
@@ -334,4 +401,43 @@ pub fn routes() -> Routes {
         .add("/deduplicate", post(deduplicate))
         .add("/review-queue", get(get_review_queue))
         .add("/review-queue/{id}/decision", post(review_decision))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn evidence(strength: MatchStrength) -> Evidence {
+        Evidence {
+            strength,
+            ..Evidence::default()
+        }
+    }
+
+    #[test]
+    fn only_a_proven_pair_over_the_threshold_is_automerged() {
+        let t = DEFAULT_AUTO_MERGE_THRESHOLD;
+        assert_eq!(
+            initial_status(1.0, &evidence(MatchStrength::Proven), t),
+            ReviewStatus::AutoMerged
+        );
+        assert_eq!(
+            initial_status(0.9, &evidence(MatchStrength::Proven), t),
+            ReviewStatus::Pending
+        );
+        for s in [
+            MatchStrength::Consistent,
+            MatchStrength::Contradicted,
+            MatchStrength::NonMatch,
+        ] {
+            assert_eq!(initial_status(1.0, &evidence(s), t), ReviewStatus::Pending);
+        }
+    }
+
+    #[test]
+    fn an_empty_request_defaults_the_auto_merge_threshold() {
+        let req: BatchDeduplicationRequest = serde_json::from_str("{}").expect("parse");
+        assert!((req.auto_merge_threshold - DEFAULT_AUTO_MERGE_THRESHOLD).abs() < f64::EPSILON);
+        assert!(req.threshold.is_none());
+    }
 }

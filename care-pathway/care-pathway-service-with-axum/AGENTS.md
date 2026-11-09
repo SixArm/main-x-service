@@ -37,7 +37,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | DELETE | `/api/care-pathways/{pid}` | Soft-delete |
 | POST | `/api/care-pathways/match` | Rank a `{query, candidates}` set |
 | POST | `/api/care-pathways/check-duplicates` | Match a query against stored pathways |
-| POST | `/api/care-pathways/deduplicate` | **Batch scan** (CP-T1): pairwise-score up to `CHECK_DUPLICATES_SCAN_CAP` active rows, persist hits to the review queue (`provenance=operator`); destructive under ABAC |
+| POST | `/api/care-pathways/deduplicate` | **Batch scan** (CP-T1): pairwise-score up to `CHECK_DUPLICATES_SCAN_CAP` active rows, persist hits to the review queue (`provenance=operator`) with match `evidence`; `automerged` only when score ≥ `auto_merge_threshold` **and** evidence `proven` (spec §6.21); destructive under ABAC |
 | POST | `/api/care-pathways/merge` | Merge a duplicate into a survivor (`422` equal pids, `404` unknown) |
 | GET | `/api/care-pathways/merges/recent` | Merge-history records |
 | GET | `/api/care-pathways/whoami` | Verified bearer-token claims (`401` without one) |

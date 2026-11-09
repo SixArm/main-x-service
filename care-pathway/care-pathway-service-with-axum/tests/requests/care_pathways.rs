@@ -446,6 +446,20 @@ async fn can_check_duplicates_against_stored_pathways() {
         assert_eq!(hits[0]["name"], "Acute Stroke Care Pathway");
         assert_eq!(hits[0]["score"], 1.0);
         assert_eq!(hits[0]["is_match"], true);
+        // Evidence rides beside the score (match-evidence.md): a shared
+        // guideline id proves the pair, and the evidence names
+        // components, never values.
+        assert_eq!(
+            hits[0]["evidence"]["strength"], "proven",
+            "hit: {:?}",
+            hits[0]
+        );
+        assert!(hits[0]["evidence"]["weight_bits"].as_f64().unwrap() >= 30.0);
+        let terms = hits[0]["evidence"]["components"]
+            .as_array()
+            .expect("components");
+        assert!(terms.iter().any(|t| t["component"] == "identifier"));
+        assert!(!hits[0]["evidence"].to_string().contains("nice-ng128"));
     })
     .await;
 }

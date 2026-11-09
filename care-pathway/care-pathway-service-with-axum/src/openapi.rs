@@ -89,7 +89,7 @@ fn crud_paths() -> Value {
                     "tags": ["matching"],
                     "summary": "Rank a query against an explicit candidate list (no persistence)",
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MatchRequest" } } } },
-                    "responses": { "200": { "description": "Ranked results (index + MatchResult)" } }
+                    "responses": { "200": { "description": "Ranked results (index + MatchResult). Each MatchResult carries `evidence` (an Evidence object) beside its score; scored with no value frequencies, since the population is the caller's." } }
                 }
             },
             "/api/care-pathways/check-duplicates": {
@@ -97,6 +97,7 @@ fn crud_paths() -> Value {
                     "tags": ["matching"],
                     "summary": "Match a query against stored pathways",
                     "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CarePathway" } } } },
+                    "description": "Each hit carries the matcher's match evidence (agents/share/match-evidence.md), weighed by the cached registry-wide name frequencies once the registry holds at least 1,000 active pathways.",
                     "responses": { "200": { "description": "Scored matches",
                         "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/ScoredRef" } } } } } }
                 }
@@ -288,6 +289,15 @@ fn bulk_paths() -> Value {
                     "responses": { "200": { "description": "Recent jobs" } }
                 }
             },
+            "/api/care-pathways/deduplicate": {
+                "post": {
+                    "tags": ["matching"],
+                    "summary": "Batch-scan active pathways for duplicates into the review queue",
+                    "description": "Scores every unordered pair of up to 1,000 active pathways. A pair is queued `automerged` only when its score is at or above `auto_merge_threshold` AND its evidence strength is `proven`; `consistent` and `contradicted` pairs are queued `pending` at any score. Nothing is merged. A re-scan refreshes score and evidence but never a stored status.",
+                    "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchDeduplicationRequest" } } } },
+                    "responses": { "200": { "description": "Scan report", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BatchDeduplicationResponse" } } } } }
+                }
+            },
             "/api/care-pathways/review-queue": {
                 "get": {
                     "tags": ["bulk"],
@@ -297,7 +307,9 @@ fn bulk_paths() -> Value {
                         { "name": "status", "in": "query", "required": false, "schema": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] } },
                         { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 100, "maximum": 500 } }
                     ],
-                    "responses": { "200": { "description": "Review queue items" }, "422": { "description": "Unknown status token" } }
+                    "responses": { "200": { "description": "Review queue items", "content": { "application/json": { "schema": { "type": "object", "properties": {
+                        "items": { "type": "array", "items": { "$ref": "#/components/schemas/ReviewQueueItem" } },
+                        "total": { "type": "integer" } } } } } }, "422": { "description": "Unknown status token" } }
                 }
             },
             "/api/care-pathways/review-queue/{id}/decision": {
@@ -347,7 +359,48 @@ fn components() -> Value {
                 "ScoredRef": { "type": "object", "properties": {
                     "pid": { "type": "string" }, "name": { "type": "string" },
                     "score": { "type": "number", "format": "double" }, "confidence": { "type": "string" },
-                    "is_match": { "type": "boolean" } } },
+                    "is_match": { "type": "boolean" },
+                    "evidence": { "$ref": "#/components/schemas/Evidence" } } },
+                "Evidence": { "type": "object",
+                    "description": "How much the compared data proves, beside the similarity score (agents/share/match-evidence.md). Component names and bits only, never field values.",
+                    "required": ["weight_bits", "fields_compared", "contradictions", "strength"], "properties": {
+                    "weight_bits": { "type": "number", "format": "double", "description": "Sum of the components' log-likelihood weights, in bits" },
+                    "fields_compared": { "type": "integer", "description": "Components both records held (identifiers count as one)" },
+                    "contradictions": { "type": "array", "items": { "type": "object", "required": ["field"], "properties": {
+                        "field": { "type": "string", "description": "e.g. identifier:doi" } } } },
+                    "strength": { "type": "string", "enum": ["contradicted", "proven", "consistent", "non_match"],
+                        "description": "Only `proven` permits an automatic merge" },
+                    "components": { "type": "array", "items": { "type": "object", "properties": {
+                        "component": { "type": "string" },
+                        "bits": { "type": "number", "format": "double" },
+                        "correlated": { "type": "boolean" },
+                        "frequency_adjusted": { "type": "boolean" } } } } } },
+                "ReviewQueueItem": { "type": "object", "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "pathway_id_a": { "type": "string", "format": "uuid" },
+                    "pathway_id_b": { "type": "string", "format": "uuid" },
+                    "match_score": { "type": "number", "format": "double" },
+                    "match_quality": { "type": "string" },
+                    "detection_method": { "type": "string" },
+                    "score_breakdown": { "type": "object", "nullable": true },
+                    "status": { "type": "string", "enum": ["pending", "confirmed", "rejected", "automerged"] },
+                    "provenance": { "type": "string", "enum": ["operator", "import", "matcher_suggested"] },
+                    "evidence": { "allOf": [{ "$ref": "#/components/schemas/Evidence" }], "nullable": true,
+                        "description": "Null on items queued before evidence was stored" },
+                    "reviewed_by": { "type": "string", "nullable": true },
+                    "created_at": { "type": "string", "format": "date-time" },
+                    "reviewed_at": { "type": "string", "format": "date-time", "nullable": true } } },
+                "BatchDeduplicationRequest": { "type": "object", "properties": {
+                    "threshold": { "type": "number", "format": "double", "nullable": true,
+                        "description": "Score cutoff overriding the matcher's is_match" },
+                    "auto_merge_threshold": { "type": "number", "format": "double", "default": 0.95,
+                        "description": "Score at or above which a proven pair is marked automerged" } } },
+                "BatchDeduplicationResponse": { "type": "object", "properties": {
+                    "pathways_scanned": { "type": "integer" },
+                    "duplicates_found": { "type": "integer" },
+                    "auto_merged": { "type": "integer" },
+                    "queued_for_review": { "type": "integer" },
+                    "review_items": { "type": "array", "items": { "$ref": "#/components/schemas/ReviewQueueItem" } } } },
                 "MatchRequest": { "type": "object", "required": ["query", "candidates"], "properties": {
                     "query": { "$ref": "#/components/schemas/CarePathway" },
                     "candidates": { "type": "array", "items": { "$ref": "#/components/schemas/CarePathway" } } } },
@@ -981,6 +1034,19 @@ mod tests {
         assert!(s["paths"]["/api/care-pathways/check-duplicates"]["post"].is_object());
         assert!(s["components"]["schemas"]["CarePathway"]["properties"]["name"].is_object());
         assert!(s["components"]["schemas"]["ConditionCode"]["properties"]["code"].is_object());
+    }
+
+    #[test]
+    fn spec_documents_match_evidence() {
+        let s = spec();
+        let schemas = &s["components"]["schemas"];
+        assert_eq!(
+            schemas["ScoredRef"]["properties"]["evidence"]["$ref"],
+            "#/components/schemas/Evidence"
+        );
+        assert!(schemas["Evidence"]["properties"]["strength"]["enum"].is_array());
+        assert!(schemas["ReviewQueueItem"]["properties"]["evidence"].is_object());
+        assert!(s["paths"]["/api/care-pathways/deduplicate"]["post"].is_object());
     }
 
     #[test]

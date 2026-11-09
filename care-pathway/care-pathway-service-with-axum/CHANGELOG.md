@@ -9,6 +9,33 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — match evidence (spec §6.21, §13 CP-T5)
+
+- Every scored pair carries the matcher's `evidence` (weight in bits,
+  fields compared, contradictions, strength, per-term components) per
+  `agents/share/match-evidence.md`: `/match` results,
+  `check-duplicates` hits, and review-queue items. Evidence names
+  components, never field values.
+- Migration `2026110900000017_review_queue_evidence`: a nullable
+  `review_queue.evidence` JSONB column, written by the batch scan and the
+  bulk-import keyless-duplicate path, refreshed on re-scan, and returned
+  by `GET /review-queue`. Older rows read `null`.
+- `src/frequencies.rs`: pathway-name value frequencies
+  (`MIN_FREQUENCY_POPULATION = 1_000`; a per-scan table for
+  `/deduplicate`; a 10-minute lazily rebuilt cache, capped at 200,000
+  records, for `check-duplicates` and import).
+- OpenAPI: `Evidence`, `ReviewQueueItem`, the batch-scan schemas, and the
+  `/deduplicate` operation.
+
+### Changed — auto-merge only on `Proven`
+
+- `POST /deduplicate` takes `auto_merge_threshold` (default `0.95`) and
+  queues a pair `automerged` only when its score clears it **and** its
+  evidence is `proven`. `consistent` and `contradicted` pairs queue
+  `pending` at any score; the bulk import still always queues `pending`.
+  Previously nothing was ever marked `automerged`. Nothing is merged
+  automatically either way.
+
 ### Fixed
 
 - The outbox relay's ack stamps `published_at` from this process's clock,

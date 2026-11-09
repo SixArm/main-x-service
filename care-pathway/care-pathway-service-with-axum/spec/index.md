@@ -110,9 +110,11 @@ The API DTO is `care_pathway_matcher::CarePathway`: `name`,
    `in_language` entry is malformed).
 5. `DELETE /api/care-pathways/{pid}` — soft-delete.
 6. `POST /api/care-pathways/match` — rank an explicit `{query,
-   candidates}` set (no persistence).
+   candidates}` set (no persistence). Each result carries the matcher's
+   `evidence` (§6.21), with no value frequencies.
 7. `POST /api/care-pathways/check-duplicates` — match a query against
-   stored pathways; return those above threshold, ranked.
+   stored pathways; return those above threshold, ranked. Each hit
+   carries `evidence` (§6.21).
 8. `POST /api/care-pathways/merge` — fold a duplicate into a survivor
    (union fields, former-title alias, soft-delete the duplicate,
    `merge_records` history, `Merged` event); `422` equal pids, `404`
@@ -672,6 +674,68 @@ nothing about anybody. Enforced in
 and pinned by `a_denied_request_is_reported_as_not_found` and
 `a_missing_credential_stays_unauthorized`.
 
+### 6.21 Match evidence and the auto-merge gate
+
+Per [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+(§10 step 4). A similarity `score` cannot tell "nothing contradicts a
+match" from "the data proves a match": two pathways sharing only a title
+score `1.0`. The embedded matcher's `MatchResult.evidence` answers the
+second question in bits, and this service carries it everywhere it
+scores a pair, keeping its own `score` as the ranking signal:
+
+- `POST /match` — inside each `MatchResult` (no frequencies: the
+  population is the caller's candidate list).
+- `POST /check-duplicates` — `evidence` on every `ScoredRef` hit. There
+  is no create-time duplicate check here (create never answers `409`).
+- `POST /deduplicate` and both review-queue writers (the batch scan,
+  `provenance = operator`; the bulk import's keyless-duplicate path,
+  `provenance = import`) store it in `review_queue.evidence` (JSONB,
+  nullable; migration `2026110900000017_review_queue_evidence`), written
+  on insert and refreshed on the re-scan upsert, and
+  `GET /review-queue` returns it. Rows queued before the migration read
+  `null`.
+
+**Evidence is safe on masked paths.** It holds component names
+(`name`, `condition`, `identifier`, …), bits, and contradiction labels
+(`identifier:doi`, `identifier:pathway_code`) — never a field value — so
+returning it beside a hit the caller may read discloses nothing more
+than the hit. `check-duplicates` still omits any candidate the caller's
+record-level policy denies (CP-T2), and its evidence with it.
+
+**Auto-merge only on `Proven`.** The batch scan queues a pair
+`automerged` only when `score >= auto_merge_threshold` (request field,
+default `0.95`) **and** `evidence.strength == proven`
+(`controllers::review_queue::initial_status`). `consistent` and
+`contradicted` pairs are queued `pending` at any score. The bulk import
+always queues `pending`. `automerged` is a review disposition, as in the
+sibling registries: nothing in this service merges automatically, and
+the merge itself stays `POST /merge`. A re-scan refreshes `score` and
+`evidence` but never a stored `status`, so a pair first queued
+`pending` stays `pending` until an operator decides it.
+
+**Value frequencies (§7 of the contract).** The frequency component is
+the pathway `name`: agreeing on "Stroke Pathway", which many trusts
+publish, proves less than agreeing on a distinctive title.
+`src/frequencies.rs` counts each name's share of active records in the
+matcher's own `frequency_key` form into a `FrequencyTable`:
+
+- Below `MIN_FREQUENCY_POPULATION = 1_000` records the source is
+  `NoFrequencies` — a share from a small population is noise.
+- `POST /deduplicate` counts over the rows that scan loaded (at most
+  `CHECK_DUPLICATES_SCAN_CAP = 1000`, so a table exists only when the
+  scan is full).
+- `check-duplicates` and the bulk import use a process-wide cached
+  table over the registry, paged in 1,000-row reads and capped at
+  `FREQUENCY_SCAN_CAP = 200_000` records (above the cap the table is a
+  sample of the newest records). It is rebuilt **lazily on use** when
+  older than 10 minutes: a stale table is served while one background
+  task rebuilds it; when none exists yet, the request that claims the
+  rebuild scans inline (one bounded scan) and concurrent requests use
+  `NoFrequencies` rather than wait.
+
+Frequencies change only `evidence`, never `score`, `is_match` or
+`confidence`.
+
 ### 6.x Per-clinician utilisation (permitted, not yet buildable)
 
 **Decision 2026-08-25.** Per-person utilisation — recorded effort
@@ -798,7 +862,9 @@ status` through `axa::sqlx`). Migrations
 `prev_hash` / `hash` for the tamper-evident chain, `context` for the
 per-access purpose-of-use and standing declarations, `disclosure` for
 the §164.528 access/disclosure split, `redacted_at` for GDPR Art. 17,
-plus an `entity_pid` index). Every added column is nullable or
+plus an `entity_pid` index), and
+`2026110900000017_review_queue_evidence` (the nullable
+`review_queue.evidence` JSONB column, §6.21). Every added column is nullable or
 defaulted, so rows written before the migration stay valid and are
 reported by chain verification as `unchained` rather than as breaks.
 `auto_migrate` on in development.
@@ -2018,6 +2084,30 @@ the evidence bundle.
   clippy --all-targets -- -D warnings`, `cargo test --lib` (318
   passed), `cargo test -- --ignored` against a real Postgres (54
   passed, including both new tests), `cargo fmt --check`.
+
+- [x] **CP-T5 (M) Carry match evidence; auto-merge only on `Proven`
+  (2026-11-09).** Per
+  [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
+  §10 step 4, specified in §6.21. `evidence` on `/match` results,
+  `check-duplicates` hits, and every review-queue item (new nullable
+  `review_queue.evidence` column, written by the batch scan and the
+  bulk-import keyless path, refreshed on re-scan, returned by the list);
+  the batch scan gains `auto_merge_threshold` (default `0.95`) and marks
+  a pair `automerged` only when its score clears it **and** its evidence
+  is `proven`; name value frequencies from `src/frequencies.rs`
+  (`MIN_FREQUENCY_POPULATION = 1_000`, a per-scan table for
+  `/deduplicate`, a 10-minute lazily rebuilt cache capped at 200,000
+  records for `check-duplicates` and import). OpenAPI gains `Evidence`,
+  `ReviewQueueItem`, and the `/deduplicate` operation. **Acceptance:**
+  DB-gated `tests/requests/review_queue.rs` — a name-only pair at score
+  `1.0` stays `pending` with `consistent` stored and listed; a shared
+  DOI is `automerged` with `proven`; two different DOIs under one name
+  stay `pending` with `contradicted` (`identifier:doi`);
+  `check-duplicates` (`tests/requests/care_pathways.rs`) and the import
+  path (`tests/requests/bulk.rs`) carry evidence; `models::review_queue`
+  pins that a row written without the column reads `null` and that old
+  evidence JSON without `components` parses; unit tests pin the gate,
+  and the frequency source below and above its minimum population.
 
 - [x] **Doc drift: stale MSRV 1.95 / N-3 reference (2026-09-06).** The
   2026-08-20 entry above said `rust-version = "1.95"` and "current

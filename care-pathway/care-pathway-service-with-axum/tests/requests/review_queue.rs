@@ -167,3 +167,124 @@ async fn unrelated_pathways_are_not_queued() {
     })
     .await;
 }
+
+/// Create two pathways from `a` and `b`, run the batch scan, and return
+/// the scan's item for that pair plus the same item as the list returns it.
+async fn scan_pair(request: &axa::testing::TestServer, a: Value, b: Value) -> (Value, Value) {
+    let a: Value = request.post("/api/care-pathways").json(&a).await.json();
+    let b: Value = request.post("/api/care-pathways").json(&b).await.json();
+    let pid_a = a["pid"].as_str().expect("pid a").to_string();
+    let pid_b = b["pid"].as_str().expect("pid b").to_string();
+    let is_pair = |i: &&Value| {
+        let x = i["pathway_id_a"].as_str().unwrap_or_default();
+        let y = i["pathway_id_b"].as_str().unwrap_or_default();
+        (x == pid_a && y == pid_b) || (x == pid_b && y == pid_a)
+    };
+    let scan: Value = request
+        .post("/api/care-pathways/deduplicate")
+        .json(&json!({}))
+        .await
+        .json();
+    let scanned = scan["review_items"]
+        .as_array()
+        .expect("review_items")
+        .iter()
+        .find(is_pair)
+        .unwrap_or_else(|| panic!("scan must find the pair: {scan:?}"))
+        .clone();
+    let listed: Value = request
+        .get("/api/care-pathways/review-queue?limit=500")
+        .await
+        .json();
+    let listed = listed["items"]
+        .as_array()
+        .expect("items")
+        .iter()
+        .find(is_pair)
+        .unwrap_or_else(|| panic!("list must return the pair: {listed:?}"))
+        .clone();
+    (scanned, listed)
+}
+
+/// A unique suffix for this test run's fixtures.
+fn suffix() -> String {
+    uuid::Uuid::new_v4().simple().to_string()
+}
+
+/// Two pathways agreeing only on their name score `1.0`, above the
+/// auto-merge threshold, but the evidence is only `consistent`: the pair
+/// stays `pending`, and the stored evidence comes back from the list
+/// (match-evidence.md §4).
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn a_name_only_pair_is_consistent_and_stays_pending() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let name = format!("EvidenceName {}", &suffix()[..8]);
+        let (scanned, listed) =
+            scan_pair(&request, json!({"name": name}), json!({"name": name})).await;
+        assert!(
+            scanned["match_score"].as_f64().unwrap() >= 0.95,
+            "{scanned:?}"
+        );
+        assert_eq!(scanned["status"], "pending");
+        assert_eq!(scanned["evidence"]["strength"], "consistent");
+        assert_eq!(listed["status"], "pending");
+        assert_eq!(listed["evidence"]["strength"], "consistent");
+        assert_eq!(listed["evidence"], scanned["evidence"]);
+    })
+    .await;
+}
+
+/// A pair sharing a DOI is `proven` and, at score `1.0`, `automerged`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn a_shared_identifier_is_proven_and_automerged() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let s = suffix();
+        let doi = format!("10.1000/{s}");
+        let a = json!({"name": format!("EvidenceDoi A {s}"),
+                       "identifiers": [{"scheme": "Doi", "value": doi}]});
+        let b = json!({"name": format!("Unrelated Title {s}"),
+                       "identifiers": [{"scheme": "Doi", "value": doi}]});
+        let (scanned, listed) = scan_pair(&request, a, b).await;
+        assert_eq!(scanned["evidence"]["strength"], "proven", "{scanned:?}");
+        assert_eq!(scanned["status"], "automerged");
+        assert_eq!(listed["status"], "automerged");
+        assert_eq!(listed["evidence"]["strength"], "proven");
+    })
+    .await;
+}
+
+/// A same-named pair with two different DOIs is `contradicted` and stays
+/// `pending` at score `1.0`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn conflicting_identifiers_are_contradicted_and_stay_pending() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let s = suffix();
+        let name = format!("EvidenceConflict {}", &s[..8]);
+        let a = json!({"name": name,
+                       "identifiers": [{"scheme": "Doi", "value": format!("10.1000/a{s}")}]});
+        let b = json!({"name": name,
+                       "identifiers": [{"scheme": "Doi", "value": format!("10.1000/b{s}")}]});
+        let (scanned, listed) = scan_pair(&request, a, b).await;
+        assert!(
+            scanned["match_score"].as_f64().unwrap() >= 0.95,
+            "{scanned:?}"
+        );
+        assert_eq!(scanned["evidence"]["strength"], "contradicted");
+        assert_eq!(
+            scanned["evidence"]["contradictions"][0]["field"],
+            "identifier:doi"
+        );
+        assert_eq!(scanned["status"], "pending");
+        assert_eq!(listed["status"], "pending");
+    })
+    .await;
+}
