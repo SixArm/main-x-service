@@ -135,6 +135,26 @@ flag, stage, crate/front-end, exit code, duration, `rustc -V`, `node -V`,
 thing that tells us how long each stage actually takes (the data we lack
 for scheduling and for spotting flakes such as the timing test above).
 
+### 4.2a The hook
+
+`hooks/pre-push` runs the **fast** tier. It is opt-in:
+`scripts/install-hooks.sh` points this clone's `core.hooksPath` at
+`hooks/`, and `--uninstall` undoes it. The installer refuses to replace a
+`core.hooksPath` it did not set, so a hook manager already in use is not
+silently turned off.
+
+- **Selection.** Each pushed ref is compared with the remote's current
+  commit for it, so only what the push adds is checked. A new branch, or
+  a remote commit this clone lacks, falls back to `origin/main`. A branch
+  deletion runs nothing. Uncommitted edits are selected too, because
+  `ci-local.sh` includes the worktree.
+- **Budget.** `CI_LOCAL_BUDGET` seconds, default 600. The gate runs in its
+  own process group, and past the budget the whole group is stopped and
+  **the push is refused**: a check that did not finish proved nothing,
+  and passing it would make the budget a way round the gate.
+- **Escape.** `git push --no-verify`, or `CI_LOCAL_HOOK=0`, skips one
+  push. Hosted CI still runs either way.
+
 ### 4.3 Attestation (option B) — the trust decision
 
 Publishing "local CI passed for `<sha>`" lets branch protection and

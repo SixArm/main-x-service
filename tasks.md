@@ -8454,10 +8454,24 @@ then protect.
   logged 2697 s for a single small crate — unexplained, plausibly machine
   contention from other sessions; watch the LCI-3 timings before trusting
   any budget (LCI-2).
-- [ ] **LCI-2 (S)** Opt-in `pre-push` hook (`scripts/install-hooks.sh`
+- [x] **LCI-2 (S)** Opt-in `pre-push` hook (`scripts/install-hooks.sh`
   sets `core.hooksPath` to a tracked `hooks/` dir) running the **fast**
   tier with a hard time budget; `--no-verify` documented as the escape,
   and the budget is the guard against its being habitual. Depends: LCI-1.
+  **Done 2026-11-09.** `hooks/pre-push`, `scripts/install-hooks.sh`
+  (`--uninstall`; refuses to replace a `core.hooksPath` it did not set),
+  `make hooks` / `make hooks-off`, `spec/local-ci` §4.2a. Each pushed ref
+  is checked against the remote's commit for it; a deletion runs nothing.
+  Budget `CI_LOCAL_BUDGET`, default 600 s; past it the gate's process
+  group is stopped and the push refused. `--no-verify` or
+  `CI_LOCAL_HOOK=0` skips one push. Verified by running the hook with a
+  pre-push stdin: deletion exits 0, a non-numeric budget exits 1, a 4 s
+  budget stopped the gate, refused the push and left no gate process, and
+  a real run passed 40 stages in 359 s on a machine shared with another
+  session's clippy. That run selected every front-end, because the
+  uncommitted root files counted as changes; a crate-only push selects
+  less. The installer was tested in a throwaway clone; it is not
+  installed here.
 - [x] **LCI-3 (S)** Per-stage run record to git-ignored `.ci-local/`
   (commit SHA, clean-tree flag, stage, target, exit code, duration,
   `rustc`/`node`/`pnpm` versions, host triple). Gives the first real

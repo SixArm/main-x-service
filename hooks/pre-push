@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#
+# Opt-in pre-push hook: the fast tier of the local CI gate, under a hard
+# time budget. spec/local-ci/index.md, tasks.md LCI-2.
+#
+# Install with scripts/install-hooks.sh (it points core.hooksPath here).
+# Skip one push with `git push --no-verify`; hosted CI still runs.
+#
+# Environment:
+#   CI_LOCAL_BUDGET   seconds the gate may take (default 600). Past it the
+#                     gate is stopped and the push refused, because a check
+#                     that did not finish proved nothing.
+#   CI_LOCAL_HOOK=0   skip the gate for this push, like --no-verify.
+#
+# Change selection: each pushed ref is compared with the remote's current
+# commit for it, so only what this push adds is checked. A new branch, or
+# a remote commit this clone lacks, falls back to origin/main. Uncommitted
+# edits are checked too (scripts/ci-local.sh selects the worktree), so
+# commit or stash them for a check of exactly what is pushed.
+
+set -uo pipefail
+
+if [[ "${CI_LOCAL_HOOK:-1}" == 0 ]]; then
+  echo "pre-push: CI_LOCAL_HOOK=0, gate skipped" >&2
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+BUDGET="${CI_LOCAL_BUDGET:-600}"
+if ! [[ "${BUDGET}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "pre-push: CI_LOCAL_BUDGET must be a positive number of seconds, got '${BUDGET}'" >&2
+  exit 1
+fi
+
+ZERO="0000000000000000000000000000000000000000"
+since=""
+pushing=false
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [[ "${local_sha}" == "${ZERO}" ]] && continue # a branch deletion pushes no code
+  pushing=true
+  if [[ "${remote_sha}" != "${ZERO}" ]] && git cat-file -e "${remote_sha}^{commit}" 2>/dev/null; then
+    # With several refs, check against the oldest base among them.
+    if [[ -z "${since}" ]] || git merge-base --is-ancestor "${remote_sha}" "${since}"; then
+      since="${remote_sha}"
+    fi
+  else
+    since="origin/main"
+  fi
+done
+
+if [[ "${pushing}" == false ]]; then
+  exit 0
+fi
+
+echo "pre-push: fast gate since ${since:0:12}, budget ${BUDGET}s (skip: git push --no-verify)" >&2
+
+# Run the gate in its own process group so the budget can stop cargo,
+# rustc and pnpm along with it.
+set -m
+CI_CHANGED_SINCE="${since}" "${ROOT}/scripts/ci-local.sh" fast </dev/null &
+gate=$!
+set +m
+
+waited=0
+while kill -0 "${gate}" 2>/dev/null; do
+  if (( waited >= BUDGET )); then
+    kill -TERM -- "-${gate}" 2>/dev/null
+    sleep 2
+    kill -KILL -- "-${gate}" 2>/dev/null
+    wait "${gate}" 2>/dev/null
+    echo >&2
+    echo "pre-push: STOPPED after ${BUDGET}s — the gate did not finish, so nothing was proven." >&2
+    echo "pre-push: push refused. Raise CI_LOCAL_BUDGET, or push with --no-verify." >&2
+    exit 1
+  fi
+  sleep 1
+  waited=$((waited + 1))
+done
+
+wait "${gate}"
+rc=$?
+if [[ ${rc} -ne 0 ]]; then
+  echo "pre-push: gate failed (exit ${rc}); push refused. Logs are in .ci-local/logs/." >&2
+  exit 1
+fi
+exit 0

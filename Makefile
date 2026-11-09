@@ -1,4 +1,4 @@
-.PHONY: github-pages ci ci-full
+.PHONY: github-pages ci ci-full hooks hooks-off
 
 # Push the docs site subdirectory out to the github-pages remote via
 # git's subtree mechanism. See spec/monorepo-github-pages/index.md.
@@ -13,3 +13,11 @@ ci:
 
 ci-full:
 	scripts/ci-local.sh full
+
+# Opt in to the pre-push hook (the fast tier under CI_LOCAL_BUDGET,
+# default 600 s); `make hooks-off` undoes it.
+hooks:
+	scripts/install-hooks.sh
+
+hooks-off:
+	scripts/install-hooks.sh --uninstall
