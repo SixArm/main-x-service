@@ -43,6 +43,11 @@ pub enum Error {
     #[error("Validation error: {0}")]
     Validation(String),
 
+    /// Another record already holds a value that must be unique, such as
+    /// an identifier's `(system, value)`. Maps to HTTP `409 Conflict`.
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
     /// A failure inside the matching engine.
     #[error("Matching error: {0}")]
     Matching(String),
@@ -89,7 +94,18 @@ impl Error {
 /// Every sqlx failure is an [`Error::Database`], carrying sqlx's own
 /// message, so `?` on a query reads the same everywhere in `src/db/`.
 impl From<sqlx::Error> for Error {
+    /// A unique-constraint violation becomes [`Error::Conflict`] (`409`),
+    /// as the family's errors require; it was a `500`. Every other database
+    /// error stays [`Error::Database`].
     fn from(e: sqlx::Error) -> Self {
+        if let sqlx::Error::Database(db) = &e
+            && db.is_unique_violation()
+        {
+            return Self::Conflict(format!(
+                "another person already holds this value ({})",
+                db.constraint().unwrap_or("unique constraint")
+            ));
+        }
         Self::Database(e.to_string())
     }
 }

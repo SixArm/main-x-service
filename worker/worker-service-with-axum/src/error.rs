@@ -108,7 +108,19 @@ impl Error {
 /// Every sqlx failure is an [`Error::Database`], carrying sqlx's own
 /// message, so `?` on a query reads the same everywhere in `src/db/`.
 impl From<sqlx::Error> for Error {
+    /// A unique-constraint violation becomes [`Error::Conflict`] (`409`),
+    /// as the family's errors require: another record already holds the
+    /// value, which the caller can act on. It was a `500`. Every other
+    /// database error stays [`Error::Database`].
     fn from(e: sqlx::Error) -> Self {
+        if let sqlx::Error::Database(db) = &e
+            && db.is_unique_violation()
+        {
+            return Self::Conflict(format!(
+                "another worker already holds this value ({})",
+                db.constraint().unwrap_or("unique constraint")
+            ));
+        }
         Self::Database(e.to_string())
     }
 }

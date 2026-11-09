@@ -10,6 +10,10 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- A merge succeeds when the duplicate holds an identifier, which moves to
+  the survivor. It failed every time on the identifier's unique key. A
+  create or update carrying an identifier another worker holds answers
+  `409` `conflict`, not `500` (T-22).
 - The masked view masks emergency contacts' phone, SMS and fax numbers,
   as it does the record's own; they were shown whole (repo `tasks.md`
   SEC-G9).

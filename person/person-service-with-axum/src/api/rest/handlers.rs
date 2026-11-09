@@ -158,6 +158,11 @@ pub async fn create_person(
 
             ok(StatusCode::CREATED, person)
         }
+        // Another person already holds a unique value, such as an
+        // identifier's `(system, value)`.
+        Err(crate::Error::Conflict(why)) => {
+            ApiProblem::new("conflict", why).respond(StatusCode::CONFLICT)
+        }
         Err(e) => {
             let error = ApiProblem::new("database_error", format!("Failed to create person: {e}"));
             error.respond(StatusCode::INTERNAL_SERVER_ERROR)
@@ -431,6 +436,9 @@ pub async fn update_person(
             }
 
             ok(StatusCode::OK, person)
+        }
+        Err(crate::Error::Conflict(why)) => {
+            ApiProblem::new("conflict", why).respond(StatusCode::CONFLICT)
         }
         Err(e) => {
             let error = ApiProblem::new("database_error", format!("Failed to update person: {e}"));

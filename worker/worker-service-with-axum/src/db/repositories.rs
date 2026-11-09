@@ -1287,12 +1287,31 @@ impl WorkerRepository for PgWorkerRepository {
 
         // Apply the survivor's parent + child rows (parent update + wholesale
         // child-row replacement + digest stamp), shared with `update`.
+        // The duplicate's identifiers move to the survivor, and
+        // `worker_identifiers` is unique on `(system, value)` across the
+        // table, so the duplicate's rows must go first: written with them
+        // still in place, every merge of a duplicate holding an identifier
+        // violated the key and failed. Its pre-image, identifiers and all,
+        // stays in the audit trail's DELETE row below.
+        sqlx::query!(
+            "DELETE FROM worker_identifiers WHERE worker_id = $1",
+            duplicate_id
+        )
+        .execute(&mut *txn)
+        .await?;
         apply_update_rows(&mut txn, survivor).await?;
 
         // Soft-delete the duplicate on the same transaction, rehashed over
         // the pre-image loaded above for the audit trail (shared with
         // `delete`).
-        apply_soft_delete_row(&mut txn, duplicate_id, old_duplicate.as_ref()).await?;
+        // The tombstone's digests cover it as stored: without the
+        // identifiers just moved to the survivor.
+        let tombstone = old_duplicate.as_ref().map(|d| {
+            let mut d = d.clone();
+            d.identifiers.clear();
+            d
+        });
+        apply_soft_delete_row(&mut txn, duplicate_id, tombstone.as_ref()).await?;
 
         // Durable event bus (Phase 2): a `Merged` outbox row for the survivor
         // (carrying the duplicate's pid via `merged_from`, so a merge-repointing

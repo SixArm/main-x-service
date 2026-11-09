@@ -881,3 +881,21 @@ clearly described manual check confirms the acceptance criterion.
     request's `threshold` (documented default `0.7`) could only raise
     the cutoff. It now scores each pair and filters on the request's
     threshold (`tests/batch_threshold.rs`).
+- [x] **T-22 — A merge of a duplicate holding an identifier failed.**
+  *(Found and done 2026-11-09, writing T-5's tests.)*
+  `worker_identifiers` is unique on `(system, value)` across the table,
+  and the merge wrote the survivor's copy of the duplicate's identifiers
+  while the duplicate's own rows were still there, so it violated the
+  key every time: a `500`. The merge now deletes the duplicate's
+  identifier rows on its transaction first; its pre-image keeps them in
+  the audit trail's DELETE row, and the tombstone is hashed as stored.
+  A create or update carrying an identifier another worker holds was a
+  `500` for the same key; a unique violation is now `Conflict`, a `409`
+  `conflict` naming the constraint. `tests/dedup_merge_privacy.rs`
+  covers create, batch scan, merge and masked view against export.
+- [ ] **T-23 (decision) — A component neither worker has scores `0`.**
+  *(Found 2026-11-09, T-5.)* As event's T-16: two workers identical in
+  name, birth date, gender and MRN score `0.75`, under the `0.85`
+  threshold, so the duplicate check on create does not flag them (the
+  identifier's unique key refuses the second instead). Person
+  renormalises over present components and does not have this.

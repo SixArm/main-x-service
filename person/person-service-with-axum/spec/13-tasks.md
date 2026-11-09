@@ -1343,3 +1343,16 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   only raise the cutoff. It now scores each pair and filters on the
   request's threshold. `tests/batch_threshold.rs` fails on the old
   handler.
+- [x] **T-39 — A merge of a duplicate holding an identifier failed.**
+  *(Found and done 2026-11-09, by worker's T-5 tests.)*
+  `person_identifiers` is unique on `(system, value)` across the table,
+  and the merge wrote the survivor's copy of the duplicate's identifiers
+  while the duplicate's own rows were still there, so every such merge
+  answered `500`. The merge now deletes the duplicate's identifier rows
+  on its transaction first; the audit trail's DELETE row keeps them.
+- [x] **T-40 — A unique-key violation answered `500`.** *(2026-11-09)*
+  A create or update carrying an identifier another person holds failed
+  on `person_identifiers`' key with a `500`. A unique violation is now
+  `Conflict`, a `409` `conflict` naming the constraint, as the family's
+  errors require. `tests/merge_identifiers.rs` covers both; each fails
+  on the old code.

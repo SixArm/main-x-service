@@ -1238,6 +1238,18 @@ impl PersonRepository for PgPersonRepository {
         }
 
         // Apply the survivor's parent + child rows (shared with `update`).
+        // The duplicate's identifiers move to the survivor, and
+        // `person_identifiers` is unique on `(system, value)` across the
+        // table, so the duplicate's rows must go first: written with them
+        // still in place, every merge of a duplicate holding an identifier
+        // violated the key and answered `500`. Its pre-image, identifiers
+        // and all, stays in the audit trail's DELETE row.
+        sqlx::query!(
+            "DELETE FROM person_identifiers WHERE person_id = $1",
+            duplicate_id
+        )
+        .execute(&mut *txn)
+        .await?;
         apply_update_rows(&mut txn, survivor, ctx).await?;
 
         // Soft-delete the duplicate (shared with `delete`), restamping all

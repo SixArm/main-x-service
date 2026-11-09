@@ -182,8 +182,13 @@ pub async fn create_worker(
             // 201 Created with the stored worker as the body.
             ok(StatusCode::CREATED, worker)
         }
+        // Another worker already holds a unique value, such as an
+        // identifier's `(system, value)`.
+        Err(crate::Error::Conflict(why)) => {
+            ApiProblem::new("conflict", why).respond(StatusCode::CONFLICT)
+        }
         Err(e) => {
-            // Any repository failure surfaces as 500 with a `DATABASE_ERROR` code.
+            // Any other repository failure surfaces as 500 with a `DATABASE_ERROR` code.
             let error = ApiProblem::new("database_error", format!("Failed to create worker: {e}"));
             error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
@@ -454,6 +459,9 @@ pub async fn update_worker(
             }
 
             ok(StatusCode::OK, worker)
+        }
+        Err(crate::Error::Conflict(why)) => {
+            ApiProblem::new("conflict", why).respond(StatusCode::CONFLICT)
         }
         Err(e) => {
             let error = ApiProblem::new("database_error", format!("Failed to update worker: {e}"));
