@@ -12,6 +12,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- The CPM-T3 cap is now proved without a stopwatch (repo `tasks.md`
+  LCI-9). `oversized_arrays_score_in_bounded_time` failed in a loaded
+  full-tree run (965 ms against a 500 ms ceiling) and passed alone. Its
+  replacement, `elements_past_the_cap_never_reach_scoring`, shares a DOI,
+  a `same_as` URL and every set member between two records only past
+  `MAX_ARRAY_LEN`, and asserts that no short-circuit fires and that the
+  result equals the truncated records' result. With `capped` made a
+  no-op it fails at `n = 257`. The timing test stays as an opt-in
+  `--ignored` check.
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
 
 ### Added — array-cardinality cap inside the library itself (CPM-T3)

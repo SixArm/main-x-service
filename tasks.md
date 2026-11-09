@@ -8491,12 +8491,21 @@ then protect.
   claim only the measured saving.** The repo is public (checked 2026-11-04), so
   expect the saving to be queue time and noise, not money; confirm from
   the billing page.
-- [ ] **LCI-9 (S)** Remove wall-clock flakes from the gate:
+- [x] **LCI-9 (S)** Remove wall-clock flakes from the gate:
   `care-pathway-matcher` `oversized_arrays_score_in_bounded_time` failed
   under a loaded full-tree run (965 ms vs a bound) and passed alone. Audit
   the other `*_in_bounded_time` / timing assertions; move them to an
   opt-in `--ignored` bench-style tier or make them count operations, not
   milliseconds. Depends: nothing.
+  **Done 2026-11-09.** It was the only elapsed-time assertion in the
+  tree: a grep of every `.rs` file for `elapsed()` found no other, and
+  the two front-end tests that read `Date.now()` use it for a polling
+  deadline and a unique name, not a timing bound. It is replaced by
+  `elements_past_the_cap_never_reach_scoring`. Two records share a DOI,
+  a `same_as` URL and every set member only past `MAX_ARRAY_LEN`, and
+  the property asserts that no short-circuit fires and that the result
+  equals the truncated records' result. It fails at `n = 257` with
+  `capped` made a no-op. The timing test is kept, `#[ignore]`d.
 - [ ] **LCI-10 (S)** Docs: link `spec/local-ci` from `spec/testing`,
   `CONTRIBUTING.md`, `AGENTS.md` (Continuous integration section) and
   `llms.txt`/`llms.json`; state in AGENTS.md that a local `fast` pass is

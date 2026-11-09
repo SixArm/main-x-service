@@ -398,6 +398,16 @@ add IO, async, or panics to library code.
       --all-targets -- -D warnings` clean, `cargo fmt --check` clean,
       `cargo +nightly fuzz build` still compiles against the changed
       internals.
+      **Revised 2026-11-09 (repo `tasks.md` LCI-9).** The wall-clock
+      acceptance proved flaky: 965 ms against the 500 ms ceiling under a
+      loaded full-tree run. The default-run proof is now
+      `elements_past_the_cap_never_reach_scoring`. Two records differ in
+      their first `MAX_ARRAY_LEN` elements and share everything after
+      them, including a DOI and a `same_as` URL. The property asserts
+      that no short-circuit fires and that the result equals the
+      truncated records' result. It fails at `n = 257` when `capped` is
+      a no-op. The timing test is kept, `#[ignore]`d, for an on-demand
+      check.
 
 ## 24. Testing strategy
 

@@ -211,75 +211,134 @@ proptest! {
 }
 
 // A dedicated block with far fewer cases: each iteration below builds
-// seven `n`-element `Vec`s (n up to ~2000) and times a real match, so
+// seven `n`-element `Vec`s (n up to ~2000) and runs real matches, so
 // running it at the default 400 cases would make the suite slow without
 // adding coverage — the property only needs a handful of large `n`
 // samples to prove the cap, not hundreds.
 proptest! {
     #![proptest_config(ProptestConfig { cases: 20, ..ProptestConfig::default() })]
 
-    /// CPM-T3: pairwise scoring cost is bounded by [`MAX_ARRAY_LEN`]
-    /// regardless of how many elements a caller packs into any of the
-    /// unbounded array fields (`identifiers`, `same_as`,
+    /// CPM-T3: no element past [`MAX_ARRAY_LEN`] reaches scoring, in any
+    /// of the unbounded array fields (`identifiers`, `same_as`,
     /// `condition_codes`, `interventions`, `keywords`, `relationships`,
-    /// `tags`) — the cap truncates every one of them before any O(n·m)
-    /// work runs, so growing `n` well past the cap must not grow
-    /// wall-clock cost. Mirrors the family's SEC-M8 "bound the report,
-    /// not just the work" precedent. `n` ranges well above
-    /// `MAX_ARRAY_LEN` (256) so the property actually exercises
-    /// truncation; the ceiling is deliberately generous (CI-noise
-    /// tolerant) — without the cap, an O(n²) scan at `n` in the
-    /// thousands, across seven fields, would take orders of magnitude
-    /// longer than this.
+    /// `tags`), so pairwise cost is bounded by the cap however large the
+    /// input. Proved by what the result depends on, not by a stopwatch
+    /// (repo `tasks.md` LCI-9): the first [`MAX_ARRAY_LEN`] elements
+    /// differ by side, and every element after them is **shared**,
+    /// including a DOI identifier and a `same_as` URL. An engine that
+    /// read past the cap would take the R-0 or R-2 short-circuit, or
+    /// score the shared tails into every Jaccard; one that honours it
+    /// returns exactly what the truncated records return.
     #[test]
-    fn oversized_arrays_score_in_bounded_time(n in 300usize..2000) {
-        // Two care pathways, both with `n` elements in every unbounded
-        // field. Values differ by side (the "a-…"/"b-…" prefix) so
-        // neither the R-0 (identifier) nor R-2 (`same_as`) deterministic
-        // short-circuit fires and every field truly reaches scoring —
-        // the worst case for cost, not the cheapest.
-        let build = |side: &str| {
-            let mut p = CarePathway::new(format!("{side} Stroke Care Pathway"));
-            p.condition_codes = (0..n)
-                .map(|i| ConditionCode {
-                    system: CodeSystem::Icd10,
-                    code: format!("{side}-code-{i}"),
-                })
-                .collect();
-            p.interventions = (0..n).map(|i| format!("{side}-intervention-{i}")).collect();
-            p.keywords = (0..n).map(|i| format!("{side}-keyword-{i}")).collect();
-            p.tags = (0..n).map(|i| format!("{side}-tag-{i}")).collect();
-            p.relationships = (0..n)
-                .map(|i| RelationshipRef {
-                    relation: RelationKind::SimilarTo,
-                    pathway_id: format!("{side}-pid-{i}"),
-                })
-                .collect();
-            p.identifiers = (0..n)
-                .map(|i| PathwayIdentifier {
-                    scheme: IdentifierScheme::Custom("registry".into()),
-                    value: format!("{side}-id-{i}"),
-                })
-                .collect();
-            p.same_as = (0..n).map(|i| format!("https://{side}.example.org/{i}")).collect();
-            p
-        };
-        let a = build("a");
-        let b = build("b");
-
+    fn elements_past_the_cap_never_reach_scoring(n in (MAX_ARRAY_LEN + 1)..2000) {
+        let a = oversized_pathway("a", n);
+        let b = oversized_pathway("b", n);
         let engine = MatchingEngine::default_config();
-        let start = std::time::Instant::now();
         let r = engine.match_care_pathways(&a, &b);
-        let elapsed = start.elapsed();
-
-        // Sanity: the short-circuits really didn't fire — this exercises
-        // the probabilistic path the cap protects, not the cheap R-0/R-2
-        // early return.
-        prop_assert!(!r.breakdown.deterministic_match);
         prop_assert!(
-            elapsed.as_secs_f64() < 0.5,
-            "match_care_pathways took {elapsed:?} for n={n} (>= {MAX_ARRAY_LEN}), \
-             exceeding the bounded-cost ceiling — did MAX_ARRAY_LEN stop being applied?"
+            !r.breakdown.deterministic_match,
+            "a shared identifier or same_as URL past MAX_ARRAY_LEN ({MAX_ARRAY_LEN}) \
+             fired a short-circuit for n={n}: the cap is not applied"
+        );
+        let truncated = engine.match_care_pathways(&truncate(&a), &truncate(&b));
+        prop_assert_eq!(
+            format!("{r:?}"),
+            format!("{truncated:?}"),
+            "elements past MAX_ARRAY_LEN ({}) changed the result for n={}",
+            MAX_ARRAY_LEN,
+            n
         );
     }
+}
+
+/// A pathway with `n` elements in every unbounded array field. The first
+/// [`MAX_ARRAY_LEN`] are unique to `side`; the rest are the same on
+/// every side, and the first identifier among them is a DOI, a
+/// globally unique scheme that R-0 short-circuits on.
+fn oversized_pathway(side: &str, n: usize) -> CarePathway {
+    let tag = |i: usize| {
+        if i < MAX_ARRAY_LEN {
+            format!("{side}-{i}")
+        } else {
+            format!("shared-{i}")
+        }
+    };
+    let mut p = CarePathway::new(format!("{side} Stroke Care Pathway"));
+    p.condition_codes = (0..n)
+        .map(|i| ConditionCode {
+            system: CodeSystem::Icd10,
+            code: format!("code-{}", tag(i)),
+        })
+        .collect();
+    p.interventions = (0..n).map(|i| format!("intervention-{}", tag(i))).collect();
+    p.keywords = (0..n).map(|i| format!("keyword-{}", tag(i))).collect();
+    p.tags = (0..n).map(|i| format!("tag-{}", tag(i))).collect();
+    p.relationships = (0..n)
+        .map(|i| RelationshipRef {
+            relation: RelationKind::SimilarTo,
+            pathway_id: format!("pid-{}", tag(i)),
+        })
+        .collect();
+    p.identifiers = (0..n)
+        .map(|i| PathwayIdentifier {
+            scheme: if i < MAX_ARRAY_LEN {
+                IdentifierScheme::Custom("registry".into())
+            } else {
+                IdentifierScheme::Doi
+            },
+            value: format!("10.1234/{}", tag(i)),
+        })
+        .collect();
+    p.same_as = (0..n)
+        .map(|i| format!("https://example.org/{}", tag(i)))
+        .collect();
+    p
+}
+
+/// `p` with every unbounded array field cut to [`MAX_ARRAY_LEN`].
+fn truncate(p: &CarePathway) -> CarePathway {
+    let mut t = p.clone();
+    t.condition_codes.truncate(MAX_ARRAY_LEN);
+    t.interventions.truncate(MAX_ARRAY_LEN);
+    t.keywords.truncate(MAX_ARRAY_LEN);
+    t.tags.truncate(MAX_ARRAY_LEN);
+    t.relationships.truncate(MAX_ARRAY_LEN);
+    t.identifiers.truncate(MAX_ARRAY_LEN);
+    t.same_as.truncate(MAX_ARRAY_LEN);
+    t
+}
+
+/// The wall-clock form of the property above, kept as an opt-in check
+/// (`cargo test -- --ignored`) because a loaded machine fails it: it
+/// took 965 ms against a 500 ms ceiling in a full-tree run and passed
+/// alone (repo `tasks.md` LCI-9). Values differ by side throughout, so
+/// neither short-circuit fires and every field reaches scoring.
+#[test]
+#[ignore = "wall-clock bound; flaky under load, run on demand"]
+fn oversized_arrays_score_in_bounded_time() {
+    let n = 2000;
+    let a = oversized_pathway_unshared("a", n);
+    let b = oversized_pathway_unshared("b", n);
+    let engine = MatchingEngine::default_config();
+    let start = std::time::Instant::now();
+    let r = engine.match_care_pathways(&a, &b);
+    let elapsed = start.elapsed();
+    assert!(!r.breakdown.deterministic_match);
+    assert!(
+        elapsed.as_secs_f64() < 0.5,
+        "match_care_pathways took {elapsed:?} for n={n}"
+    );
+}
+
+/// Like [`oversized_pathway`], with no element shared between sides.
+fn oversized_pathway_unshared(side: &str, n: usize) -> CarePathway {
+    let mut p = oversized_pathway(side, n);
+    for (i, id) in p.identifiers.iter_mut().enumerate() {
+        id.scheme = IdentifierScheme::Custom("registry".into());
+        id.value = format!("{side}-id-{i}");
+    }
+    for (i, url) in p.same_as.iter_mut().enumerate() {
+        *url = format!("https://{side}.example.org/{i}");
+    }
+    p
 }
