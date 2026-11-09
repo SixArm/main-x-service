@@ -3887,8 +3887,6 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 [[package]]
 name = "place-matcher"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca4a5e387758dad03d0ad47e366fd51057d5915d1ce38ec8f3affa21f88143a7"
 dependencies = [
  "mimalloc",
  "serde",

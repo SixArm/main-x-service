@@ -73,8 +73,13 @@ strsim = "0.11"
 # Prometheus metrics (text exposition for /metrics.prom)
 prometheus = "0.14"
 
-# Sibling matcher crate
-place-matcher = "0.7.1"
+# Sibling matcher crate. Path dependency, not a crates.io version pin:
+# match evidence (`MatchResult.evidence`, `match_places_with_frequencies`,
+# `FrequencyTable`, `frequency_key`; agents/share/match-evidence.md) is in
+# the local place-matcher but not in crates.io's 0.7.1, and the service
+# gates auto-merge on it. Revert to a version pin once a release carrying
+# the evidence API is published.
+place-matcher = { path = "../place-matcher-rust-crate" }
 
 # Geo
 geo = "0.33"

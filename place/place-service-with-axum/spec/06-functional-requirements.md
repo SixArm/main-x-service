@@ -73,6 +73,46 @@ algorithm and the matcher crate's
 [`spec.md §5–§7`](../../place-matcher-rust-crate/spec/index.md) for the
 canonical algorithm.
 
+#### 6.2.1 Match evidence
+
+Beside its own score, every scored pair carries the place-matcher's
+**evidence** ([`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)):
+`weight_bits`, `fields_compared`, `contradictions`, `strength`
+(`proven` / `consistent` / `contradicted` / `non_match`) and the
+per-term `components`. `PlaceMatcher::evaluate` computes it through
+`adapter::to_matcher_place` with an engine whose `match_threshold` is the
+service's `MATCHING_THRESHOLD`, so the matcher's `consistent` line sits at
+the score the service uses. The service keeps its own `score` for
+ranking, thresholds and `409`s; evidence decides only auto-merge (§6.4).
+
+Evidence holds component names and bits, never field values. The one
+caller-supplied string it can carry is the **scheme** label of a custom
+identifier type in a contradiction (`identifier:other:<scheme>`), which is
+a type name, not a value. It is therefore returned unchanged on masked
+paths.
+
+**Value frequencies** (match-evidence §7). The matcher's frequency
+component is `name`: agreeing on a chain name proves less than agreeing
+on a rare one. `matching::frequency` counts, over active places mapped
+through the adapter and keyed by the matcher's `frequency_key`, the share
+of records holding each name (a record holding a value under both its
+names counts once), and the service passes it to
+`match_places_with_frequencies`. Only `evidence` changes.
+
+- `MIN_FREQUENCY_POPULATION` = 1 000: below it the source is
+  `NoFrequencies` and the plain `u` table applies, because a share from a
+  small population is noise.
+- Batch `deduplicate` counts over the records the scan loaded.
+- Create-time and `check-duplicates` read `FrequencyCache` in app state.
+  It is rebuilt **lazily in the background**: a request that finds it
+  missing or older than ten minutes starts one rebuild (at most one at a
+  time) and uses the table it has, so no request ever waits on a scan;
+  the first requests after boot use `NoFrequencies`. A rebuild pages
+  active names by `id` (`db::active_names_page`, 1 000 a page) and stops
+  at `FREQUENCY_SCAN_CAP` = 200 000 records: above that the table is a
+  sample of the first 200 000 ids (random UUIDs, so effectively random).
+  A failed rebuild logs a warning and keeps the old table.
+
 ### 6.3 Search
 
 Tantivy across `name`, `alternate_name`, `identifiers`, address
@@ -106,6 +146,14 @@ this SQL-range pre-filter is the interim answer the extensions list
   records (default 100, at most 1 000; above is a `422`) and scoring
   every pair.
 - Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`).
+  A scanned pair is marked `automerged` only when its score is at least
+  `auto_merge_threshold` (request field, default 0.95) **and** its
+  evidence strength is `proven` (§6.2.1, match-evidence §4). A
+  `consistent` pair (agreeing on what both hold, proving too little,
+  such as a name alone) and a `contradicted` pair (conflicting
+  identifiers under one scheme) stay `pending` at any score. The mark is
+  only a mark: this service executes no merge without an operator. The
+  create-time `409` is unchanged.
 - Merge transfers identifiers, alternate names, amenity features,
   opening-hours specifications, `same_as` URLs, hierarchy links;
   appends the duplicate's name as `alternate_name` on the survivor;

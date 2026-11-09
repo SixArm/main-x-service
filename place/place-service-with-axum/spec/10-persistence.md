@@ -71,6 +71,18 @@ rows keep the float artefacts they were stored with, since back-filling a
 rounder number would invent precision the caller never sent.
 `idx_places_geo` is rebuilt by Postgres as part of the type change.
 
+#### `review_queue.evidence`
+
+`review_queue.evidence` is a nullable `JSONB` holding the matcher's
+evidence for the pair (§6.2.1), added by
+`2026110900000001_add_review_queue_evidence`. It is written on insert
+and refreshed with the score columns on the re-scan upsert; `status`
+still never changes on conflict, so a pair queued `pending` before its
+evidence reached `proven` stays `pending`. Rows scanned before the
+migration stay `NULL` and read back as `evidence: null`; a stored value
+that does not parse as evidence also reads as `null` rather than failing
+the list.
+
 ### 10.2 Extensions
 
 Required: `pg_stat_statements`, `uuid-ossp`, `pgcrypto`, `pg_trgm`,

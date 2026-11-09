@@ -682,6 +682,29 @@ clearly described manual check confirms the acceptance criterion.
     its dedup scans; with no cap left, the property it would show holds
     by construction. The cost moved: each page now sorts every place in
     the box, where the old scan stopped at 5 000.
+- [x] **T-23 (M) — Carry match evidence; auto-merge only on `proven`.**
+  *(Done 2026-11-09.)* Rollout step 4 of
+  [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md).
+  The service took `place-matcher` 0.7.1 from crates.io, which has no
+  evidence API, so `Cargo.toml` now takes it by path, as event-service
+  does. `PlaceMatcher::evaluate` returns the service's own score plus the
+  matcher's evidence, computed through the adapter with value
+  frequencies (§6.2.1); `ScoredCandidate` and `ReviewQueueItem` carry it,
+  with an `EvidenceDoc` OpenAPI schema; `review_queue.evidence` (JSONB,
+  nullable) stores it (§10.1). The batch scan marks a pair `automerged`
+  only when `score >= auto_merge_threshold` (new request field, default
+  0.95) and the strength is `proven`; before this the service never
+  marked one at all. `matching::frequency` adds `Frequencies`,
+  `FrequencyCounter` and the lazily rebuilt `FrequencyCache`. Tests:
+  unit tests for the frequency source (below the 1 000 population it is
+  `NoFrequencies`; above it a common name gives fewer bits than the
+  table default), for old review-item JSON without `evidence`
+  deserialising, and for stored evidence mapping back; DB tests in
+  `tests/match_evidence.rs` (a name-only pair above the auto-merge
+  threshold stays `pending` / `consistent`, stored and returned; a shared
+  GLN is `automerged` / `proven`; conflicting OSM ids stay `pending` /
+  `contradicted`; `check-duplicates`, masked or not, and the masked `409`
+  carry value-free evidence).
 - [x] **T-22 (S, security) — Answer a database failure, and bound the
   dedup scan.** *(Found and done 2026-11-09.)* `GET /api/places` and
   `POST /api/places/deduplicate` read through `.unwrap_or_default()`,

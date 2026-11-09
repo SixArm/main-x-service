@@ -13,12 +13,21 @@
 //! - [`phonetic`] — Soundex codes for sounds-alike name matching.
 //! - [`scoring`] — the [`compute_match`](scoring::compute_match) entry point.
 //! - [`adapter`] — projection to the canonical `place-matcher` crate.
+//! - [`frequency`] — value frequencies for the match evidence.
+//!
+//! **Score and evidence.** The service ranks and thresholds on its own
+//! [`compute_match`](scoring::compute_match) score. Beside it,
+//! [`PlaceMatcher::evaluate`] carries the matcher crate's
+//! [`Evidence`] (`agents/share/match-evidence.md`): how much the data
+//! *proves*, and whether a hard fact contradicts the pair. Only a
+//! [`MatchStrength::Proven`] pair may be auto-merged.
 //!
 //! For the algorithm contract see `agents/matching.md` and
 //! `agents/share/match.md`.
 
 pub mod adapter;
 pub mod address;
+pub mod frequency;
 pub mod geo;
 pub mod identifier;
 pub mod name;
@@ -33,9 +42,32 @@ pub mod scoring;
 /// through the reference algorithm.
 pub use ::place_matcher as matcher_lib;
 
+pub use ::place_matcher::{Evidence, MatchStrength};
+use ::place_matcher::{MatchConfig as EngineConfig, MatchingEngine, evidence::ValueFrequencies};
+
 use crate::config::MatchingConfig;
 use crate::models::place::Place;
 use scoring::{MatchConfidence, MatchResult, MatchWeights, compute_match};
+
+/// One scored pair: the service's own result plus the matcher's evidence.
+#[derive(Debug, Clone)]
+pub struct ScoredPair {
+    /// The service's score, confidence and breakdown.
+    pub result: MatchResult,
+    /// The matcher crate's evidence for the same pair.
+    pub evidence: Evidence,
+}
+
+impl ScoredPair {
+    /// Whether this pair may be auto-merged: its score clears
+    /// `auto_merge_threshold` **and** its evidence is
+    /// [`MatchStrength::Proven`] (`agents/share/match-evidence.md` §4).
+    /// `Consistent` and `Contradicted` pairs never auto-merge.
+    #[must_use]
+    pub fn may_auto_merge(&self, auto_merge_threshold: f64) -> bool {
+        self.result.score >= auto_merge_threshold && self.evidence.strength == MatchStrength::Proven
+    }
+}
 
 /// Service-tier matcher facade carried by the REST
 /// [`AppState`](crate::api::rest::AppState).
@@ -48,6 +80,10 @@ pub struct PlaceMatcher {
     weights: MatchWeights,
     /// `is_match` cut-off score in `[0.0, 1.0]`.
     threshold: f64,
+    /// The canonical matcher, used only for evidence. Its `match_threshold`
+    /// is the service's, so the matcher's `Consistent` / `NonMatch` line
+    /// sits at the same score the service uses.
+    engine: MatchingEngine,
 }
 
 impl PlaceMatcher {
@@ -57,7 +93,28 @@ impl PlaceMatcher {
         Self {
             weights: MatchWeights::default(),
             threshold: config.threshold_score,
+            engine: MatchingEngine::new(EngineConfig {
+                match_threshold: config.threshold_score,
+                ..EngineConfig::default()
+            }),
         }
+    }
+
+    /// Score two places and compute the matcher's evidence for them,
+    /// through [`adapter::to_matcher_place`], with `frequencies` adjusting
+    /// the agreement weight of common values (only `evidence` changes).
+    #[must_use]
+    pub fn evaluate(&self, a: &Place, b: &Place, frequencies: &dyn ValueFrequencies) -> ScoredPair {
+        let result = self.score(a, b);
+        let evidence = self
+            .engine
+            .match_places_with_frequencies(
+                &adapter::to_matcher_place(a),
+                &adapter::to_matcher_place(b),
+                frequencies,
+            )
+            .evidence;
+        ScoredPair { result, evidence }
     }
 
     /// Score two places, returning the full [`MatchResult`](scoring::MatchResult).

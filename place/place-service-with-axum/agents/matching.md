@@ -100,6 +100,16 @@ pub struct MatchBreakdown {
 }
 ```
 
+## Evidence (`PlaceMatcher::evaluate`)
+
+`compute_match` gives the similarity score. `PlaceMatcher::evaluate`
+returns it together with the place-matcher's `Evidence` (computed
+through `adapter::to_matcher_place`, with name frequencies from
+`matching::frequency`), which says how much the data **proves**. Only a
+pair whose score clears `auto_merge_threshold` **and** whose strength is
+`Proven` may be marked `automerged` (`ScoredPair::may_auto_merge`). See
+spec §6.2.1 and `agents/share/match-evidence.md`.
+
 ## Usage Example
 
 ```rust

@@ -8,6 +8,27 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added
+
+- Match evidence (`agents/share/match-evidence.md`): every scored pair in
+  `match`, `check-duplicates`, the create-time `409` and the batch
+  `deduplicate` report carries the place-matcher's `evidence`
+  (`weight_bits`, `fields_compared`, `contradictions`, `strength`,
+  `components`), and `review_queue` stores it in a new nullable
+  `evidence` column (migration
+  `2026110900000001_add_review_queue_evidence`) returned by
+  `GET /api/places/review-queue`. Value frequencies for `name` adjust the
+  evidence once 1 000 active places are counted (T-23).
+
+### Changed
+
+- `POST /api/places/deduplicate` takes `auto_merge_threshold` (default
+  0.95) and marks a pair `automerged` only when its score clears it and
+  its evidence is `proven`; a `consistent` or `contradicted` pair stays
+  `pending` at any score. No merge is executed (T-23).
+- `place-matcher` is a path dependency rather than crates.io 0.7.1,
+  which lacks the evidence API (T-23).
+
 ### Security
 
 - `POST /api/places/deduplicate` refuses a `max_candidates` above 1 000

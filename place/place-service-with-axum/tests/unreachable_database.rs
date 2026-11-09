@@ -58,6 +58,7 @@ async fn a_deduplicate_that_cannot_reach_the_database_is_a_500() {
         Json(BatchDeduplicationRequest {
             threshold: None,
             max_candidates: Some(10),
+            auto_merge_threshold: None,
         }),
     )
     .await
@@ -75,6 +76,7 @@ async fn max_candidates_above_the_cap_is_refused_before_any_read() {
         Json(BatchDeduplicationRequest {
             threshold: None,
             max_candidates: Some(DEDUPLICATE_MAX_CANDIDATES + 1),
+            auto_merge_threshold: None,
         }),
     )
     .await

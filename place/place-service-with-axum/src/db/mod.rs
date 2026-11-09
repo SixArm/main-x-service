@@ -819,6 +819,44 @@ pub async fn count_active(db: &PgPool) -> Result<u64> {
     Ok(u64::try_from(n).unwrap_or_default())
 }
 
+/// One active place's names, for counting value frequencies
+/// (`crate::matching::frequency`).
+#[derive(Debug, Clone)]
+pub struct PlaceNamesRow {
+    /// The place id (the keyset position).
+    pub id: Uuid,
+    /// Primary name.
+    pub name: String,
+    /// Alternate name, if any.
+    pub alternate_name: Option<String>,
+}
+
+/// A page of active places' names in `id` order, after `after` (keyset
+/// paging, so a long scan neither skips nor repeats a row as others are
+/// inserted ahead of it).
+///
+/// # Errors
+/// Propagates any database error from the query.
+pub async fn active_names_page(
+    db: &PgPool,
+    after: Option<Uuid>,
+    limit: u64,
+) -> Result<Vec<PlaceNamesRow>> {
+    let rows = sqlx::query_as!(
+        PlaceNamesRow,
+        "SELECT id, name, alternate_name
+         FROM places
+         WHERE is_deleted = false AND ($1::uuid IS NULL OR id > $1)
+         ORDER BY id
+         LIMIT $2",
+        after,
+        to_i64(limit),
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(rows)
+}
+
 /// The rows `GET /api/records/verify` recomputes, most recently updated
 /// first, soft-deleted ones included (the handler skips those).
 ///

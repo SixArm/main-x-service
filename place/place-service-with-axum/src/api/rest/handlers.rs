@@ -18,8 +18,8 @@ use uuid::Uuid;
 use super::state::AppState;
 use crate::api::{ApiProblem, ok};
 use crate::db::audit::AuditContext;
-use crate::matching::confidence_label;
 use crate::matching::geo::search_box;
+use crate::matching::{Evidence, confidence_label};
 use crate::models::geo::GeoCoordinates;
 use crate::models::merge::{MergeRecord, MergeRequest, MergeResponse};
 use crate::models::place::Place;
@@ -711,15 +711,75 @@ pub async fn places_in_bbox_geojson(
     }
 }
 
+// ─── Match evidence (OpenAPI shapes) ────────────────────────────────────────
+
+/// `OpenAPI` shape of the matcher's [`MatchStrength`]
+/// (`agents/share/match-evidence.md` §4). Only `proven` permits an
+/// automatic merge.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchStrengthDoc {
+    /// A contradiction rules the pair out of any automatic merge.
+    Contradicted,
+    /// The evidence clears the matcher's `proof_bits`, with no contradiction.
+    Proven,
+    /// A match, with no contradiction, but short of proof.
+    Consistent,
+    /// Not a match.
+    NonMatch,
+}
+
+/// `OpenAPI` shape of one hard conflict between two records.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ContradictionDoc {
+    /// What conflicts, e.g. `identifier:osm_node`.
+    pub field: String,
+}
+
+/// `OpenAPI` shape of one term of the evidence sum.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ComponentBitsDoc {
+    /// The component, e.g. `name`, `identifier`, `contradiction:identifier:other:gln`.
+    pub component: String,
+    /// Bits this term added.
+    pub bits: f64,
+    /// Discounted as a non-strongest member of a correlated group.
+    pub correlated: bool,
+    /// Agreement weight taken from the value's own frequency.
+    pub frequency_adjusted: bool,
+}
+
+/// `OpenAPI` shape of the place-matcher's [`Evidence`]: how much the compared
+/// data **proves**, beside the similarity score
+/// (`agents/share/match-evidence.md`). It carries component names and bits
+/// only, never field values, so it is returned unchanged on masked paths.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct EvidenceDoc {
+    /// Sum of the components' log-likelihood weights, in bits.
+    pub weight_bits: f64,
+    /// Components both records held (identifiers count as one).
+    pub fields_compared: u32,
+    /// Hard conflicts; any one makes the strength `contradicted`.
+    pub contradictions: Vec<ContradictionDoc>,
+    /// The verdict.
+    pub strength: MatchStrengthDoc,
+    /// Every term of the sum; they add up to `weight_bits`.
+    pub components: Vec<ComponentBitsDoc>,
+}
+
 /// A scored candidate place returned by match / duplicate endpoints.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ScoredCandidate {
     /// The candidate place.
     pub place: Place,
-    /// Overall match score in `[0.0, 1.0]`.
+    /// Overall match score in `[0.0, 1.0]` (the service's own scorer).
     pub score: f64,
     /// Confidence band (`certain`/`probable`/`possible`/`unlikely`).
     pub confidence: String,
+    /// The matcher's evidence for the pair. Names and bits only, so it is
+    /// the same whether or not `place` is masked.
+    #[schema(value_type = EvidenceDoc)]
+    pub evidence: Evidence,
 }
 
 /// Score a request place against existing records, returning candidates
@@ -742,6 +802,8 @@ async fn find_candidates(
         .search_engine
         .search_by_name(&place.name, 50)
         .unwrap_or_default();
+    // Cached shares; never waits on a rebuild (`matching::frequency`).
+    let frequencies = state.frequencies.get(&state.db);
     let mut out = Vec::new();
     for id in ids {
         let Ok(uuid) = Uuid::parse_str(&id) else {
@@ -751,15 +813,18 @@ async fn find_candidates(
             continue;
         }
         if let Ok(Some(existing)) = state.place_repository.get_by_id(&uuid).await {
-            let r = state.matcher.score(place, &existing);
+            let pair = state
+                .matcher
+                .evaluate(place, &existing, frequencies.as_ref());
             out.push(ScoredCandidate {
                 place: if mask_sensitive {
                     mask_place(&existing)
                 } else {
                     existing
                 },
-                score: r.score,
-                confidence: confidence_label(&r.confidence).to_string(),
+                score: pair.result.score,
+                confidence: confidence_label(&pair.result.confidence).to_string(),
+                evidence: pair.evidence,
             });
         }
     }
@@ -922,7 +987,17 @@ pub struct BatchDeduplicationRequest {
     /// larger value is refused with `422` rather than clamped.
     #[serde(default)]
     pub max_candidates: Option<u64>,
+    /// Score at or above which a pair is marked `automerged` (default
+    /// [`DEFAULT_AUTO_MERGE_THRESHOLD`]) — and only when its evidence is
+    /// also `proven` (`agents/share/match-evidence.md` §4). A `consistent`
+    /// or `contradicted` pair stays `pending` at any score.
+    #[serde(default)]
+    pub auto_merge_threshold: Option<f64>,
 }
+
+/// Default [`BatchDeduplicationRequest::auto_merge_threshold`], the
+/// family's value (event, person, worker, course).
+pub const DEFAULT_AUTO_MERGE_THRESHOLD: f64 = 0.95;
 
 /// The most active places one `POST /api/places/deduplicate` scans. The
 /// scan scores every pair, about half a million at this cap, so an
@@ -933,7 +1008,7 @@ pub const DEDUPLICATE_MAX_CANDIDATES: u64 = 1_000;
 /// Review disposition of one queued duplicate pair. Serialized with the
 /// family's lowercase wire tokens (`pending`, `confirmed`, `rejected`,
 /// `automerged`), matching the person/worker services.
-#[derive(Debug, Clone, Serialize, ToSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ReviewStatus {
     /// Awaiting manual review.
@@ -942,7 +1017,9 @@ pub enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate.
     Rejected,
-    /// Auto-merged (score above an auto-merge threshold).
+    /// Marked for automatic merge: the score clears the auto-merge
+    /// threshold **and** the evidence is `proven`. A mark only; this
+    /// service performs no merge without an operator.
     AutoMerged,
 }
 
@@ -950,7 +1027,7 @@ pub enum ReviewStatus {
 /// person/worker review-item shape (`detection_method` included) so the
 /// family front-ends can render one review queue. Items persist in the
 /// stored `review_queue` and are decided via the decision endpoint.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ReviewQueueItem {
     /// Server-generated review-item id.
     pub id: Uuid,
@@ -969,6 +1046,13 @@ pub struct ReviewQueueItem {
     /// serialized verbatim. `None` only for a row scanned before this field
     /// existed.
     pub score_breakdown: Option<serde_json::Value>,
+    /// The matcher's evidence for the pair (`agents/share/match-evidence.md`),
+    /// which decides whether it may be auto-merged. `None` for a row
+    /// scanned before the field existed; absent in older JSON, which still
+    /// deserialises.
+    #[serde(default)]
+    #[schema(value_type = Option<EvidenceDoc>)]
+    pub evidence: Option<Evidence>,
     /// Current review state.
     pub status: ReviewStatus,
     /// Reviewer identity recorded by the decision endpoint, if decided.
@@ -986,12 +1070,11 @@ pub struct BatchDeduplicationResponse {
     pub places_scanned: usize,
     /// Number of duplicate pairs found.
     pub duplicates_found: usize,
-    /// Number of pairs auto-merged. Always `0`: this service has no
-    /// auto-merge path; the field exists so the report shape matches
-    /// the person/worker services.
+    /// Number of pairs marked `automerged`: score at or above the
+    /// auto-merge threshold **and** evidence `proven`. A mark only; no
+    /// merge is executed.
     pub auto_merged: usize,
-    /// Number of pairs queued for human review (all found pairs, until
-    /// a review-decision endpoint exists).
+    /// Number of pairs left `pending` for human review.
     pub queued_for_review: usize,
     /// The queued candidate pairs.
     pub review_items: Vec<ReviewQueueItem>,
@@ -1014,19 +1097,33 @@ pub async fn deduplicate(
         .respond(StatusCode::UNPROCESSABLE_ENTITY);
     }
     let threshold = req.threshold.unwrap_or_else(|| state.matcher.threshold());
+    let auto_merge_threshold = req
+        .auto_merge_threshold
+        .unwrap_or(DEFAULT_AUTO_MERGE_THRESHOLD);
     let places = match state.place_repository.list(limit, 0).await {
         Ok(rows) => rows,
         Err(e) => return fail(&e),
     };
+    // Value frequencies from the records this scan loaded; below
+    // MIN_FREQUENCY_POPULATION this is NoFrequencies.
+    let frequencies = crate::matching::frequency::Frequencies::from_places(&places);
     let mut review_items = Vec::new();
     // Upper-triangular pair iteration: j starts at i+1 so each pair is
     // scored once and no record is compared with itself. Every pair at
-    // or above the threshold becomes a pending review item (the
-    // person/worker report shape).
+    // or above the threshold becomes a review item; it is marked
+    // `automerged` only when the score clears the auto-merge threshold
+    // AND the evidence is `proven` (match-evidence.md §4). Everything
+    // else, `consistent` and `contradicted` included, stays `pending`.
     for i in 0..places.len() {
         for j in (i + 1)..places.len() {
-            let result = state.matcher.score(&places[i], &places[j]);
+            let pair = state.matcher.evaluate(&places[i], &places[j], &frequencies);
+            let result = &pair.result;
             if result.score >= threshold {
+                let status = if pair.may_auto_merge(auto_merge_threshold) {
+                    ReviewStatus::AutoMerged
+                } else {
+                    ReviewStatus::Pending
+                };
                 review_items.push(ReviewQueueItem {
                     id: Uuid::new_v4(),
                     place_id_a: places[i].id,
@@ -1035,7 +1132,8 @@ pub async fn deduplicate(
                     match_quality: confidence_label(&result.confidence).to_string(),
                     detection_method: "batch_deduplication".to_string(),
                     score_breakdown: serde_json::to_value(&result.breakdown).ok(),
-                    status: ReviewStatus::Pending,
+                    evidence: Some(pair.evidence.clone()),
+                    status,
                     reviewed_by: None,
                     created_at: chrono::Utc::now(),
                     reviewed_at: None,
@@ -1057,6 +1155,10 @@ pub async fn deduplicate(
             match_quality: r.match_quality.clone(),
             detection_method: r.detection_method.clone(),
             score_breakdown: r.score_breakdown.clone(),
+            evidence: r
+                .evidence
+                .as_ref()
+                .and_then(|e| serde_json::to_value(e).ok()),
             status: review_status_token(&r.status).to_string(),
         })
         .collect();
@@ -1160,6 +1262,10 @@ fn review_row_to_item(row: &crate::db::review_queue::ReviewQueueRow) -> ReviewQu
         match_quality: row.match_quality.clone(),
         detection_method: row.detection_method.clone(),
         score_breakdown: row.score_breakdown.clone(),
+        evidence: row
+            .evidence
+            .clone()
+            .and_then(|v| serde_json::from_value(v).ok()),
         status: parse_review_status(&row.status),
         reviewed_by: row.reviewed_by.clone(),
         created_at: row.created_at,
@@ -1542,6 +1648,7 @@ mod review_report_tests {
             match_quality: "probable".to_string(),
             detection_method: "batch_deduplication".to_string(),
             score_breakdown: None,
+            evidence: None,
             status: ReviewStatus::Pending,
             reviewed_by: None,
             created_at: chrono::Utc::now(),
@@ -1550,6 +1657,61 @@ mod review_report_tests {
         let value = serde_json::to_value(&item).unwrap();
         assert_eq!(value["detection_method"], "batch_deduplication");
         assert_eq!(value["status"], "pending");
+    }
+
+    /// A review item serialized before `evidence` existed still
+    /// deserialises, with `evidence: None` (the migration leaves old rows
+    /// NULL, and old JSON simply lacks the key).
+    #[test]
+    fn old_review_item_json_without_evidence_deserialises() {
+        let old = serde_json::json!({
+            "id": Uuid::new_v4(),
+            "place_id_a": Uuid::new_v4(),
+            "place_id_b": Uuid::new_v4(),
+            "match_score": 0.9,
+            "match_quality": "probable",
+            "detection_method": "batch_deduplication",
+            "score_breakdown": null,
+            "status": "pending",
+            "reviewed_by": null,
+            "created_at": "2026-07-19T00:00:00Z",
+            "reviewed_at": null
+        });
+        let item: ReviewQueueItem = serde_json::from_value(old).unwrap();
+        assert!(item.evidence.is_none());
+        assert_eq!(item.status, ReviewStatus::Pending);
+    }
+
+    /// Evidence round-trips through the stored JSONB form, and a stored
+    /// row's evidence that is not valid evidence reads as `None` rather
+    /// than failing the list.
+    #[test]
+    fn stored_evidence_maps_onto_the_item() {
+        let engine = crate::matching::matcher_lib::MatchingEngine::default_config();
+        let a = crate::matching::matcher_lib::Place::builder()
+            .name("X")
+            .build();
+        let evidence = engine.match_places(&a, &a).evidence;
+        let row = crate::db::review_queue::ReviewQueueRow {
+            id: Uuid::new_v4(),
+            record_id_a: Uuid::new_v4(),
+            record_id_b: Uuid::new_v4(),
+            match_score: 1.0,
+            match_quality: "certain".into(),
+            detection_method: "batch_deduplication".into(),
+            score_breakdown: None,
+            evidence: Some(serde_json::to_value(&evidence).unwrap()),
+            status: "pending".into(),
+            reviewed_by: None,
+            created_at: chrono::Utc::now(),
+            reviewed_at: None,
+        };
+        assert_eq!(review_row_to_item(&row).evidence, Some(evidence));
+        let garbled = crate::db::review_queue::ReviewQueueRow {
+            evidence: Some(serde_json::json!("nonsense")),
+            ..row
+        };
+        assert!(review_row_to_item(&garbled).evidence.is_none());
     }
     /// Only the two operator verdicts parse as decisions.
     #[test]
