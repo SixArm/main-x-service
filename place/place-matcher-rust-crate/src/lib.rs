@@ -23,6 +23,7 @@
 //! | [`scorer`]       | String-similarity and geographic primitives (Jaro-Winkler, Levenshtein, Haversine, Gaussian-decay). |
 //! | [`matcher`]      | Orchestration: [`MatchingEngine`], [`MatchConfig`], [`MatchResult`]. |
 //! | [`error`]        | Error enum [`MatchingError`] and [`Result`] alias. |
+//! | [`evidence`]     | Fellegi–Sunter match evidence: [`Evidence`], [`MatchStrength`], [`Contradiction`]. |
 //!
 //! ## Quick start — probabilistic match
 //!
@@ -103,12 +104,14 @@
 #![warn(clippy::pedantic)]
 
 pub mod error;
+pub mod evidence;
 pub mod matcher;
 pub mod models;
 pub mod normalizer;
 pub mod scorer;
 
 pub use error::{MatchingError, Result};
+pub use evidence::{Contradiction, Evidence, MatchStrength};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
 pub use models::{Address, Place, PlaceBuilder, PlaceCategory, PlaceId, PlaceIdScheme};
 pub use normalizer::{Normalizer, ParsedAddressLine};

@@ -21,6 +21,8 @@ pub struct MatchConfig {
     pub phone_default_country: Option<String>,
     pub score_local_id: bool,
     pub local_id_weight: f64,
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
 }
 ```
 
@@ -47,6 +49,7 @@ pub struct MatchConfig {
 | `phone_default_country` | `Some("GB")` | Fallback ISO 3166-1 alpha-2 country for E.164 parsing (§4.3.2). |
 | `score_local_id` | `false` | Opt in to scoring `local_id` (§6.7a). Off by default — preserves the crate's long-standing behaviour of never treating `local_id` as identity evidence. |
 | `local_id_weight` | `0.05` | Weight of the local-ID component (§6.7a); inert unless `score_local_id = true`. |
+| `proof_bits` | `30.0` | Evidence bar, in bits, for `MatchStrength::Proven` (§5.5; `agents/share/match-evidence.md` §4). `log2(10^6)` records + `log2(10^3)` for one false merge in a thousand. Does not affect `score`, `is_match` or `confidence`. This crate has no `MatchConfig` validator; a caller setting `proof_bits` SHOULD keep it finite and positive. |
 
 A planned `setting_weight` (`0.05`) and `tags_weight` (`0.05`) are **not
 yet present** on `MatchConfig` — see §3.1.3 and §6.10/§6.11.

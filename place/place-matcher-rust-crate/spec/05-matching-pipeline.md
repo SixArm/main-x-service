@@ -60,5 +60,32 @@ If a field is `None` on either side, the corresponding `MatchBreakdown` entry is
 
 The single exception is `name_phonetic_score`: when `MatchConfig::use_phonetic_matching = false`, it is always `None` regardless of input data.
 
+### 5.5 Match evidence (Fellegi–Sunter)
+
+Every `MatchResult` also carries `evidence: Evidence`, computed by `src/evidence.rs` under the family contract in [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md). `score`, `is_match` and `confidence` are unchanged by it; evidence answers a different question ("how much does the data *prove*?") and is the gate a service uses for auto-merge.
+
+- **Components.** Each `Some` entry of the `MatchBreakdown` adds `component_bits(s, m, u)` (agreement at `s >= 0.95`, disagreement at `s <= 0.60`, linear between) and counts once in `fields_compared`. A `None` entry adds exactly `0`. The neutral `0.5` address score for two addresses with no sub-field populated on both sides (§6.4) is absence, not disagreement, and is skipped.
+- **Identifiers.** Every `PlaceIdScheme` (including `Other(_)`) is treated as globally unique within itself, the assumption the §5.1 shared-`(scheme, value)` rule already makes. `place_ids_score` is weighed as the identifier: a shared non-empty `(scheme, value)` adds `IDENTIFIER_BITS = log2(0.99/1e-12) ≈ 39.85` once, and is never also counted through the component table. Identifiers count once in `fields_compared` when at least one scheme is held by both sides.
+- **No identifier bits for name + postcode.** The second §5.1 rule (normalised name + postcode) is not a unique identifier; its fields are weighed as the `name` and `address` components. `local_id` (§6.7a) is unique only within one source and is likewise a plain component.
+- **Contradictions.** For each scheme under which both sides hold at least one non-empty (trimmed) value and the value sets are disjoint, a `Contradiction { field: "identifier:<scheme>" }` is recorded (`google`, `osm_node`, `osm_way`, `osm_relation`, `geonames`, `wikidata`, `foursquare`, `here`, `mapbox`, `other:<name lowercased>`) and `log2(0.01/(1-1e-12)) ≈ -6.64` bits are added. Different schemes never contradict each other (an OSM node and an OSM way for one feature is normal).
+- **Strength.** `Contradicted` if any contradiction; else `Proven` if `weight_bits >= MatchConfig::proof_bits` (default `30`); else `Consistent` if `is_match`; else `NonMatch`.
+
+The per-component `m`/`u` table (informed estimates, not measurements):
+
+| Component | `m` | `u` | Agree bits | Disagree bits | Where `u` comes from |
+|---|---|---|---|---|---|
+| `name_score` | 0.95 | 0.005 | +7.57 | −4.31 | place names repeat (chains, "Station Road Café") |
+| `name_phonetic_score` | 0.90 | 0.30 | +1.58 | −2.81 | Soundex collides often and is correlated with `name` |
+| `coordinates_score` | 0.90 | 1e-4 | +13.14 | −3.32 | full agreement is within ~11 m at the 50 m scale |
+| `address_score` | 0.85 | 0.001 | +9.73 | −2.74 | shared mainly within one building / centre |
+| `category_score` | 0.90 | 0.10 | +3.17 | −3.17 | a few categories cover most places |
+| `country_code_score` | 0.98 | 0.10 | +3.29 | −5.49 | registries skew to a few countries |
+| `place_ids_score` | — | — | +39.85 | −6.64 per scheme | identifier rule above |
+| `phone_score` | 0.85 | 0.001 | +9.73 | −2.74 | chain switchboards |
+| `email_score` | 0.80 | 0.002 | +8.64 | −2.32 | shared `info@` addresses |
+| `local_id_score` | 0.95 | 0.001 | +9.89 | −4.32 | unique within one source only (opt-in) |
+
+Worked figures with the default config: two identical records holding only a name and coordinates score `1.0` and `is_match`, but reach only ≈ 20.7 bits — `Consistent`, not `Proven`. A richly identical record (name, coordinates, address, category, country code, phone, email; no identifier) reaches ≈ 55.3 bits — `Proven` without an identifier. A shared `PlaceId` alone clears the bar.
+
 ---
 

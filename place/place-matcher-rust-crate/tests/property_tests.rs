@@ -7,7 +7,10 @@
 //! the failure modes that example-based tests miss: weird Unicode in
 //! names, edge-case coordinates, sparse / dense `Place` records.
 
-use place_matcher::{Confidence, MatchConfig, MatchingEngine, Normalizer, Place, PlaceCategory};
+use place_matcher::{
+    Confidence, MatchConfig, MatchStrength, MatchingEngine, Normalizer, Place, PlaceCategory,
+    PlaceId, PlaceIdScheme,
+};
 use proptest::prelude::*;
 
 // ---------- Strategies ----------
@@ -66,6 +69,23 @@ fn place_strategy() -> impl Strategy<Value = Place> {
                 b = b.category(c);
             }
             b.build()
+        })
+}
+
+/// A `Place` from [`place_strategy`] plus up to two Wikidata ids drawn
+/// from a tiny pool, so pairs often share or conflict on an identifier.
+fn place_with_ids_strategy() -> impl Strategy<Value = Place> {
+    (
+        place_strategy(),
+        prop::collection::vec(prop::sample::select(vec!["Q1", "Q2", "Q3"]), 0..3),
+    )
+        .prop_map(|(mut p, ids)| {
+            for v in ids {
+                if let Some(id) = PlaceId::new(PlaceIdScheme::Wikidata, v) {
+                    p.place_ids.push(id);
+                }
+            }
+            p
         })
 }
 
@@ -232,5 +252,29 @@ proptest! {
             hi,
             Confidence::from_score(hi)
         );
+    }
+
+    /// Evidence MUST be finite, and the strength MUST agree with the
+    /// contradictions, the proof bar and `is_match` (match-evidence §4).
+    #[test]
+    fn evidence_is_finite_and_strength_is_consistent(
+        p1 in place_with_ids_strategy(),
+        p2 in place_with_ids_strategy(),
+    ) {
+        let config = MatchConfig::default();
+        let proof_bits = config.proof_bits;
+        let r = MatchingEngine::new(config).match_places(&p1, &p2);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "weight_bits {}", e.weight_bits);
+        let expected = if !e.contradictions.is_empty() {
+            MatchStrength::Contradicted
+        } else if e.weight_bits >= proof_bits {
+            MatchStrength::Proven
+        } else if r.is_match {
+            MatchStrength::Consistent
+        } else {
+            MatchStrength::NonMatch
+        };
+        prop_assert_eq!(e.strength, expected);
     }
 }

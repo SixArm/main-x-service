@@ -37,6 +37,7 @@
 //! assert!(result.is_match);
 //! ```
 
+use crate::evidence::{self, Evidence};
 use crate::models::{Address, Place};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
@@ -78,6 +79,7 @@ use serde::{Deserialize, Serialize};
 ///     phone_default_country: Some("GB".into()),
 ///     score_local_id: false,
 ///     local_id_weight: 0.05,
+///     proof_bits: 30.0,
 /// };
 /// assert_eq!(custom.match_threshold, 0.80);
 /// ```
@@ -167,6 +169,14 @@ pub struct MatchConfig {
     /// (kept `Default`-derivable rather than `Option`-wrapped so a caller
     /// can pre-set a weight before flipping the flag on).
     pub local_id_weight: f64,
+
+    /// Evidence, in bits, at or above which an uncontradicted pair is
+    /// [`MatchStrength::Proven`](crate::MatchStrength::Proven) (spec §5.5,
+    /// `agents/share/match-evidence.md` §4). Default `30.0`: a million
+    /// records at one false merge in a thousand. Does not affect `score`,
+    /// `is_match` or `confidence`.
+    #[serde(default = "evidence::default_proof_bits")]
+    pub proof_bits: f64,
 }
 
 impl Default for MatchConfig {
@@ -197,6 +207,7 @@ impl Default for MatchConfig {
             phone_default_country: Some("GB".to_string()),
             score_local_id: false,
             local_id_weight: 0.05,
+            proof_bits: evidence::DEFAULT_PROOF_BITS,
         }
     }
 }
@@ -352,6 +363,13 @@ pub struct MatchResult {
 
     /// Per-field score contributions for explainability.
     pub breakdown: MatchBreakdown,
+
+    /// Fellegi–Sunter evidence beside the similarity score (spec §5.5):
+    /// how much the compared data *proves*, any identifier contradictions,
+    /// and the resulting [`MatchStrength`](crate::MatchStrength). Defaults
+    /// on JSON written before the field existed.
+    #[serde(default)]
+    pub evidence: Evidence,
 }
 
 /// Backstop for legacy `MatchResult` JSON payloads that lack the
@@ -486,12 +504,24 @@ impl MatchingEngine {
             above_threshold
         };
         let confidence = Confidence::from_score(score);
+        let address_compared = match (place1.address.as_ref(), place2.address.as_ref()) {
+            (Some(a1), Some(a2)) => Self::compare_addresses_signal(a1, a2).is_some(),
+            _ => false,
+        };
+        let evidence = evidence::assess(
+            &breakdown,
+            address_compared,
+            evidence::assess_identifiers(place1, place2),
+            is_match,
+            self.config.proof_bits,
+        );
 
         MatchResult {
             score,
             is_match,
             confidence,
             breakdown,
+            evidence,
         }
     }
 
@@ -846,6 +876,14 @@ impl MatchingEngine {
     /// rather than `0.0`, so an empty-vs-empty address is treated as "no
     /// signal" rather than "mismatch".
     fn compare_addresses(addr1: &Address, addr2: &Address) -> f64 {
+        Self::compare_addresses_signal(addr1, addr2).unwrap_or(0.5)
+    }
+
+    /// The address comparison of [`Self::compare_addresses`], or `None`
+    /// when no sub-component is populated on both sides (the case that
+    /// method reports as the neutral `0.5`). Evidence treats `None` as
+    /// absence rather than disagreement.
+    fn compare_addresses_signal(addr1: &Address, addr2: &Address) -> Option<f64> {
         // Each sub-component contributes its own raw score in `[0.0, 1.0]`
         // and a weight. The final sub-score is the weight-renormalised
         // average — `(score x weight) / weight` summed across the
@@ -928,9 +966,9 @@ impl MatchingEngine {
         }
 
         if total_weight == 0.0 {
-            0.5
+            None
         } else {
-            weighted_sum / total_weight
+            Some(weighted_sum / total_weight)
         }
     }
 

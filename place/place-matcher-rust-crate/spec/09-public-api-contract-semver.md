@@ -14,7 +14,7 @@ Removing fields or variants is breaking.
 
 ### 9.2 JSON shape stability
 
-Every public data type derives `serde::{Serialize, Deserialize}`. `MatchConfig` carries `#[serde(default)]` at struct level so partial documents inherit defaults from `MatchConfig::default()`. `MatchBreakdown::email_score` and `MatchResult::confidence` carry `#[serde(default)]` to allow legacy payloads predating those fields to round-trip.
+Every public data type derives `serde::{Serialize, Deserialize}`. `MatchConfig` carries `#[serde(default)]` at struct level so partial documents inherit defaults from `MatchConfig::default()`. `MatchBreakdown::email_score` and `MatchResult::confidence` carry `#[serde(default)]` to allow legacy payloads predating those fields to round-trip. `MatchResult::evidence` (§5.5) likewise carries `#[serde(default)]`: a payload without it deserialises with `Evidence::default()` (`weight_bits = 0`, `strength = non_match`). `Evidence`, `Contradiction` and `MatchStrength` are re-exported from the crate root; `MatchStrength` serialises in `snake_case` (`contradicted`, `proven`, `consistent`, `non_match`). Their shape is fixed family-wide by `agents/share/match-evidence.md` §5 and MUST NOT diverge from the other matcher crates.
 
 Renaming a JSON key or changing its type is breaking.
 

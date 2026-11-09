@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — match evidence beside the similarity score (`agents/share/match-evidence.md`)
+
+- `src/evidence.rs`: Fellegi–Sunter log-likelihood evidence. `MatchResult`
+  gains `#[serde(default)] evidence: Evidence` (`weight_bits`,
+  `fields_compared`, `contradictions`, `strength`); `MatchConfig` gains
+  `proof_bits` (default `30.0`). `Evidence`, `Contradiction` and
+  `MatchStrength` are re-exported from the crate root. Missing components
+  add `0` bits; a shared `PlaceId` adds `IDENTIFIER_BITS` (≈ 39.85) once;
+  disjoint values under one scheme are a `Contradiction`
+  (`identifier:<scheme>`). The name + postcode rule and `local_id` get no
+  identifier bits. Per-component `m`/`u` table in spec §5.5.
+- `score`, `is_match` and `confidence` are unchanged; every existing test
+  passes as before. JSON written before the field still deserialises.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

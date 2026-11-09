@@ -8,6 +8,7 @@ The following design questions are deliberately unresolved. Proposing a resoluti
 - **OQ-D — Locale-aware street-type vocabulary.** Should `expand_street_abbreviations` gain locale vocabularies for `rue` / `straße` / `via` / `calle` / `straat`? If so: opt-in field, Cargo feature, or always-on?
 - **OQ-E — Phonetic-encoder choice.** American Soundex is English-tuned. Add Double Metaphone or Daitch-Mokotoff behind a Cargo feature, default unchanged?
 - **OQ-H — Per-category default for `coordinates_scale_metres`.** The `50.0` m default suits venue precision; dense urban chains may need a per-category default.
+- **OQ-M — Estimated `m`/`u` and identifier stability.** The §5.5 evidence table is an informed estimate; a deployment should estimate its own from review-queue decisions (`agents/share/match-evidence.md` §6). Separately, some schemes are not permanent — Google Place IDs can be reissued and OSM elements are sometimes deleted and recreated — so a same-scheme mismatch is recorded as a `Contradiction` per the family contract even though it can be a stale id rather than two places. Should stale-prone schemes contradict, or only weaken? Today: they contradict (fail-safe: blocks auto-merge, routes to review).
 
 The following are grounded follow-up **tasks** rather than open design
 questions — each has a concrete, verified gap and a clear direction, so
@@ -123,6 +124,8 @@ checklist — see `spec/index.md`'s table of contents, §1–§13 with no
   --all-targets -- -D warnings` + `cargo fmt --check` + `cargo doc
   --no-deps` all clean. §6.4 updated; this closes OQ-G, removed from
   the list above.
+
+- ~~**OQ-N (task, M) — Match evidence beside the score.**~~ — **DONE (2026-11-09).** `src/evidence.rs` adds Fellegi–Sunter evidence per `agents/share/match-evidence.md`: `MatchResult::evidence` (`weight_bits`, `fields_compared`, `contradictions`, `strength`), `MatchConfig::proof_bits` (default `30`), and the re-exported `Evidence` / `Contradiction` / `MatchStrength`. `score`, `is_match` and `confidence` unchanged. See §5.5.
 
 ---
 
