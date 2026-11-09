@@ -10,8 +10,9 @@ not on similarity.
 
 This is a design document. It fixes the evidence model, the formula, the
 result shape, the contradiction rule and the default bar, so each matcher
-adopts it identically. Only the per-component `m`/`u` table differs per
-crate (§5).
+adopts it identically. Only the per-component `m`/`u` table, the
+correlated groups and the frequency components differ per crate
+(§5–§7).
 
 ## 1. Two questions, two numbers
 
@@ -203,35 +204,152 @@ measurement. Rules of thumb:
 - Set-overlap components (keywords, tags, relationships) carry weak
   weights: overlapping sets corroborate, they do not identify.
 
-## 6. What this deliberately leaves out
+## 6. Correlated components
 
-- **Correlated components.** Summing weights assumes the components are
-  independent given match status. Start and end date, or organiser and
-  venue, are not, so a rich record somewhat overstates its evidence. The
-  tables keep derived components (Soundex next to the name, an event-id
-  score next to the identifier rule) out of the sum for this reason, and
-  a deployment that sees false `Proven` results should raise `proof_bits`
-  before anything else.
-- **Frequency-adjusted weights.** Agreeing on "Smith" proves less than
-  agreeing on a rare name (Winkler; Splink's term-frequency adjustment).
-  That needs per-deployment value frequencies, so it belongs in the
-  service, which can count them. The matcher's `m`/`u` are the
-  value-independent baseline.
+The sum in §2 assumes each component is independent of the others, given
+whether the pair is one entity. Some are not, and summing them counts one
+fact more than once:
+
+- **Derived from each other.** Start and end date of one event; a venue
+  and its address.
+- **Recorded together.** A household's address, landline and postcode
+  move together. When one agrees because two people live in the same
+  house, the others agree for the same reason.
+- **Determined by one fact.** Death date and death place; an
+  organization's address and its jurisdiction.
+
+Two records from one household then look like `Proven` duplicates when
+the only fact they share is the house.
+
+**The rule.** Each crate declares `CORRELATED_GROUPS`, a list of groups of
+component names. Within a group, the component with the largest absolute
+weight counts in full, and every other present member counts at
+`CORRELATED_DISCOUNT = 0.5`:
+
+```rust
+/// Weight of each member of a correlated group after its strongest.
+pub const CORRELATED_DISCOUNT: f64 = 0.5;
+
+/// The bits a correlated group adds, from its present members' bits.
+#[must_use]
+pub fn group_bits(member_bits: &[f64]) -> f64 {
+    let Some((strongest, rest)) = strongest_first(member_bits) else {
+        return 0.0;
+    };
+    strongest + CORRELATED_DISCOUNT * rest.iter().sum::<f64>()
+}
+```
+
+`strongest_first` orders by absolute value, breaking ties by the larger
+value, so the result does not depend on component order. A component in
+no group stands alone. Disagreements are discounted the same way:
+correlated fields disagreeing for one reason (a move) are one piece of
+evidence against, not several.
+
+A discount of `0.5` is a choice, not a measurement. It sits between
+"fully independent" (`1.0`, the overcount) and "the same field twice"
+(`0.0`, which would ignore real corroboration). Components that are
+**derived** from another, such as a Soundex code from the name, are left
+out of the sum entirely rather than discounted (§5).
+
+## 7. Common and rare values
+
+The table's `u` is an average over all values. Agreeing on "Smith" is
+much weaker than that average, and agreeing on "Zbigniewska" much
+stronger. The same holds for placeholder values: a birth date of
+`1900-01-01` or 1 January is recorded for many people whose real date is
+unknown, so agreeing on it proves almost nothing.
+
+**The rule** (Winkler; Splink's term-frequency adjustment). A caller may
+pass a `ValueFrequencies` source. Each crate declares
+`FREQUENCY_COMPONENTS`, the components that adjust. For each of them, when
+the two records hold the **same normalised value** (an exact agreement,
+not a partial one), the agreement weight uses the value's own share of
+records in place of `u`:
+
+```rust
+/// Where the share of records holding a value comes from.
+pub trait ValueFrequencies {
+    /// The share, in `0.0..=1.0`, of records whose `component` holds
+    /// `value` (already in the matcher's normalised form), or `None`
+    /// when unknown.
+    fn share(&self, component: &str, value: &str) -> Option<f64>;
+}
+
+/// Smallest share used, so a value seen once cannot give unbounded bits.
+pub const MIN_SHARE: f64 = 1e-9;
+
+/// Agreement bits for a value held by `share` of records.
+#[must_use]
+pub fn frequency_bits(m: f64, share: f64) -> f64 {
+    let share = if share.is_finite() { share.clamp(MIN_SHARE, m) } else { m };
+    (m / share).log2()
+}
+```
+
+- A share at or above `m` gives `0` bits: a value most records hold is no
+  evidence, but agreeing on it is not evidence *against* either.
+- Partial agreement and disagreement are not adjusted. A share says how
+  often a value occurs, not how often two values are near each other.
+- `NoFrequencies` returns `None` for everything, and a matcher's plain
+  `match_*` call uses it, so a caller that passes nothing gets exactly the
+  §2 table.
+- **Keys.** The component names in `FREQUENCY_COMPONENTS` and the
+  normalised value form are part of each crate's public contract. Each
+  crate exports `frequency_key(component, raw) -> Option<String>`, which
+  returns the key its matcher will look up, so a service can count values
+  in the same form. A `FrequencyTable` built from counts is provided.
+- **Where frequencies come from.** The service counts them, because only
+  it sees the population: a share of `count / total` over its active
+  records. A share from a small population is noisy, so a service should
+  not supply one until the population is large enough to count from.
+
+## 8. Explainability
+
+`Evidence` lists every term of the sum, so a reviewer can see why a pair
+reached its strength:
+
+```rust
+/// One term of the evidence sum.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ComponentBits {
+    /// The component, e.g. `"family_name"`, `"identifier"`,
+    /// `"contradiction:identifier:lei"`.
+    pub component: String,
+    /// Bits this term added, after any discount or adjustment.
+    pub bits: f64,
+    /// Discounted as a non-strongest member of a correlated group.
+    pub correlated: bool,
+    /// Agreement weight taken from the value's own frequency.
+    pub frequency_adjusted: bool,
+}
+```
+
+`Evidence` gains `#[serde(default)] pub components: Vec<ComponentBits>`.
+The terms always add up to `weight_bits`, and a property test in each
+crate checks that.
+
+## 9. What this still leaves out
+
 - **Estimated `m`/`u`.** Confirmed and rejected review-queue decisions
   are the training data for estimating them (expectation–maximisation, as
   Splink does). Until a deployment estimates its own, the table's
   defaults stand.
+- **Measured correlation.** The `0.5` discount and the group lists are
+  judgement. The same review-queue data could measure them.
 - **Identifier verification status.** A verified NHS number (a PDS trace)
   is stronger evidence than a typed one. The matcher models carry no
   verification flag today.
 
-## 7. Rollout
+## 10. Rollout
 
 1. This document.
 2. All nine matcher crates: `src/evidence.rs`, the result and config
    fields, a spec edit, tests. `score`, `is_match` and `confidence` stay
    as they are.
-3. Services, each as its own task: carry `evidence` through their match
+3. All nine matchers: correlated groups (§6), value frequencies (§7) and
+   the per-term listing (§8).
+4. Services, each as its own task: carry `evidence` through their match
    responses and review-queue rows, gate auto-merge on `Proven`, and
    refuse it for `Consistent` and `Contradicted`. This is where
    event-service T-16 and worker-service T-23 close: their own scorers
