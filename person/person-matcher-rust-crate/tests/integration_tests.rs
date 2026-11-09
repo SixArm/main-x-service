@@ -958,6 +958,7 @@ fn test_custom_weights_can_swing_outcome() {
         nickname_table: NicknameTable::empty(),
         gmail_dot_folding: false,
         phone_default_country: Some("GB".into()),
+        proof_bits: 30.0,
     };
     let custom = MatchingEngine::new(cfg).match_persons(&p1, &p2);
     let default = MatchingEngine::default_config().match_persons(&p1, &p2);

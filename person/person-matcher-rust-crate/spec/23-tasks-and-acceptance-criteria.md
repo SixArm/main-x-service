@@ -99,6 +99,12 @@ Full list in [`agents/delivered-tasks.md`](../agents/delivered-tasks.md); covers
 - [ ] Update `agents/national-person-identifiers.md`'s reference table and the crate `Cargo.toml` description's scheme count.
 - **Acceptance:** each landed scheme has a parser, a weight, deterministic short-circuit tests, and property tests for the never-cross-match invariant; `cargo test` + `cargo clippy --all-targets -- -D warnings` clean (verified: §21.3 explicitly names this exact jurisdiction list as "further national-identifier schemes beyond 42 … incremental per consumer demand" with no §23 task yet opened for it, unlike T-17's now-delivered spike).
 
+**T-40 — Match evidence beside the similarity score (§12.7 / §13.1 / §16; [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)).** *(Resolved.)*
+- [x] Add `src/evidence.rs`: `component_bits`, `AGREE_AT`/`DISAGREE_AT`, `IDENTIFIER_BITS`, the per-component `m`/`u` table, `Evidence`, `Contradiction`, `MatchStrength`; re-export the three types from the crate root.
+- [x] Add `MatchResult::evidence` (`#[serde(default)]`) and `MatchConfig::proof_bits` (default `30`), computed in `match_persons` and so in `match_one_to_many` / `rank_one_to_many`.
+- [x] Identifier bits once for a shared national identifier or passport pair; none for the demographic tuple; a contradiction per national scheme with differing parsed values; passports never contradict.
+- **Acceptance (met):** `score`, `is_match`, `confidence` and every pre-existing test unchanged; unit tests pin missing-adds-zero, identical sparse record → `Consistent`, shared identifier → `Proven`, conflicting SSNs → `Contradicted` (even beside a shared passport), rich identical record without identifier → `Proven`, clear disagreement → negative bits, legacy JSON without `evidence` / `proof_bits`; a property test pins finite `weight_bits` and strength consistent with contradictions, bar and `is_match`. `cargo test` + `cargo clippy --all-targets -- -D warnings` clean.
+
 ### 23.3 Acceptance Criteria — Project-level
 
 "1.0-ready" when all §21.1 tasks complete; spec and code agree (T-7 enforced); `Person` / `Address` `#[non_exhaustive]` (T-8); public API unchanged for two consecutive minor releases; coverage `≥ 90%` and `cargo test` in `< 5 s`.

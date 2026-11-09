@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — match evidence beside the similarity score (T-40)
+
+Every `MatchResult` now carries `evidence: Evidence` — a Fellegi–Sunter
+log-likelihood weight in bits, the fields compared, any hard
+`Contradiction`s, and a `MatchStrength` (`Contradicted` / `Proven` /
+`Consistent` / `NonMatch`) — per the family contract in
+`agents/share/match-evidence.md` (spec §12.7). New module
+`src/evidence.rs` holds the per-component `m`/`u` table; `Evidence`,
+`Contradiction` and `MatchStrength` are re-exported from the crate root.
+`MatchConfig` gains `proof_bits` (default `30.0`), the bar for `Proven`.
+A shared national identifier or passport pair adds ≈ 39.85 bits once; the
+name + DOB + gender deterministic tuple adds none, so an identical sparse
+record is `Consistent` (≈ 28.97 bits), not `Proven`. Differing parsed
+values under one national scheme are a contradiction; passports never
+contradict (a renewed book has a new number). `score`, `is_match` and
+`confidence` are unchanged. Both new fields are `#[serde(default)]`, so
+older JSON still deserialises. A `MatchConfig { .. }` struct literal
+without `..Default::default()` must now name `proof_bits`.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

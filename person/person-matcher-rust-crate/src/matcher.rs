@@ -38,6 +38,7 @@
 //! assert!(result.is_match);
 //! ```
 
+use crate::evidence::{Evidence, evidence_from_breakdown};
 use crate::identifiers;
 use crate::models::{Address, PassportBook, Person, RelationKind, RelationshipRef};
 use crate::nicknames::NicknameTable;
@@ -130,6 +131,7 @@ use std::collections::HashSet;
 ///     nickname_table: person_matcher::NicknameTable::empty(),
 ///     gmail_dot_folding: false,
 ///     phone_default_country: Some("GB".into()),
+///     proof_bits: 30.0,
 /// };
 /// assert_eq!(custom.match_threshold, 0.80);
 /// ```
@@ -361,6 +363,20 @@ pub struct MatchConfig {
     /// UK-centric behaviour. Set to the person population's predominant
     /// jurisdiction in production deployments.
     pub phone_default_country: Option<String>,
+
+    /// Evidence bar, in bits, at or above which a pair with no
+    /// contradiction is [`crate::MatchStrength::Proven`]. Defaults to
+    /// `30.0` (about a million records at one false merge in a
+    /// thousand). Must be finite and positive. Does not affect `score`,
+    /// `is_match` or `confidence`. See `agents/share/match-evidence.md`
+    /// §4 and spec §12.7.
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
+}
+
+/// Serde default for [`MatchConfig::proof_bits`].
+fn default_proof_bits() -> f64 {
+    crate::evidence::DEFAULT_PROOF_BITS
 }
 
 impl Default for MatchConfig {
@@ -439,6 +455,7 @@ impl Default for MatchConfig {
             nickname_table: NicknameTable::empty(),
             gmail_dot_folding: false,
             phone_default_country: Some("GB".to_string()),
+            proof_bits: crate::evidence::DEFAULT_PROOF_BITS,
         }
     }
 }
@@ -595,6 +612,14 @@ pub struct MatchResult {
 
     /// Per-field score contributions for explainability.
     pub breakdown: MatchBreakdown,
+
+    /// How much the compared data proves, beside `score`: a
+    /// Fellegi–Sunter weight in bits, any hard contradictions, and the
+    /// resulting [`crate::MatchStrength`]. Defaults to an empty
+    /// [`Evidence`] (`NonMatch`) on JSON that pre-dates the field. See
+    /// `agents/share/match-evidence.md` and spec §12.7.
+    #[serde(default)]
+    pub evidence: Evidence,
 }
 
 /// Backstop for legacy `MatchResult` JSON payloads that lack the
@@ -887,12 +912,14 @@ impl MatchingEngine {
             above_threshold
         };
         let confidence = Confidence::from_score(score);
+        let evidence = evidence_from_breakdown(&breakdown, is_match, self.config.proof_bits);
 
         MatchResult {
             score,
             is_match,
             confidence,
             breakdown,
+            evidence,
         }
     }
 
@@ -3801,5 +3828,223 @@ mod tests {
         let p2 = Person::builder().given_name("X").family_name("Y").build();
         let r = MatchingEngine::default_config().match_persons(&p1, &p2);
         assert_eq!(r.breakdown.death_place_score, None);
+    }
+
+    // ── Match evidence (agents/share/match-evidence.md; spec §12.7) ──
+
+    use crate::evidence::MatchStrength;
+
+    /// The sparse demographic core: name + DOB + gender.
+    fn sparse_person() -> Person {
+        Person::builder()
+            .given_name("Bronwen")
+            .family_name("Tregarthen")
+            .date_of_birth(dob(1979, 3, 14))
+            .gender(Gender::Female)
+            .build()
+    }
+
+    #[test]
+    fn evidence_missing_component_adds_zero_and_is_not_counted() {
+        let engine = MatchingEngine::default_config();
+        let a = sparse_person();
+        let with_phone = Person {
+            phone: Some("+44 29 2000 0001".into()),
+            ..sparse_person()
+        };
+        let base = engine.match_persons(&a, &a).evidence;
+        // Phone present on one side only: breakdown None, evidence unchanged.
+        let one_sided = engine.match_persons(&a, &with_phone).evidence;
+        assert!((base.weight_bits - one_sided.weight_bits).abs() < 1e-12);
+        assert_eq!(base.fields_compared, one_sided.fields_compared);
+    }
+
+    #[test]
+    fn evidence_identical_sparse_records_are_consistent_not_proven() {
+        // Twins could share all of this, and the deterministic demographic
+        // tuple fires — but that tuple is not an identifier, so it adds no
+        // identifier bits and the pair stays short of the 30-bit bar.
+        let engine = MatchingEngine::default_config();
+        let a = sparse_person();
+        assert!(engine.deterministic_match(&a, &a));
+        let r = engine.match_persons(&a, &a);
+        assert!(r.is_match);
+        assert_eq!(r.evidence.strength, MatchStrength::Consistent);
+        assert!(r.evidence.contradictions.is_empty());
+        // given + family + DOB + gender + phonetic bonus.
+        assert_eq!(r.evidence.fields_compared, 5);
+        assert!(
+            r.evidence.weight_bits > 25.0 && r.evidence.weight_bits < 30.0,
+            "got {}",
+            r.evidence.weight_bits
+        );
+    }
+
+    #[test]
+    fn evidence_shared_unique_identifier_is_proven() {
+        let a = Person::builder().us_ssn("123-45-6789").build();
+        let b = Person::builder().us_ssn("123456789").build();
+        let e = MatchingEngine::default_config()
+            .match_persons(&a, &b)
+            .evidence;
+        assert_eq!(e.strength, MatchStrength::Proven);
+        assert!((e.weight_bits - crate::evidence::IDENTIFIER_BITS).abs() < 1e-9);
+        assert_eq!(e.fields_compared, 1);
+    }
+
+    #[test]
+    fn evidence_shared_passport_is_proven_but_disjoint_passports_do_not_contradict() {
+        let a = Person {
+            passport_books: vec![PassportBook::new("GB", "123456789").unwrap()],
+            ..sparse_person()
+        };
+        let b = Person {
+            passport_books: vec![PassportBook::new("GB", "123456789").unwrap()],
+            ..sparse_person()
+        };
+        let engine = MatchingEngine::default_config();
+        assert_eq!(
+            engine.match_persons(&a, &b).evidence.strength,
+            MatchStrength::Proven
+        );
+        // A renewed book carries a new number: not a contradiction.
+        let renewed = Person {
+            passport_books: vec![PassportBook::new("GB", "987654321").unwrap()],
+            ..sparse_person()
+        };
+        let e = engine.match_persons(&a, &renewed).evidence;
+        assert!(e.contradictions.is_empty());
+        assert_ne!(e.strength, MatchStrength::Contradicted);
+    }
+
+    #[test]
+    fn evidence_conflicting_same_scheme_identifiers_contradict() {
+        let a = Person {
+            us_ssn: Some("123-45-6789".into()),
+            ..sparse_person()
+        };
+        let b = Person {
+            us_ssn: Some("234-56-7890".into()),
+            ..sparse_person()
+        };
+        let r = MatchingEngine::default_config().match_persons(&a, &b);
+        assert_eq!(r.evidence.strength, MatchStrength::Contradicted);
+        assert_eq!(
+            r.evidence.contradictions,
+            vec![crate::Contradiction {
+                field: "identifier:us_ssn".into()
+            }]
+        );
+        let clean = MatchingEngine::default_config()
+            .match_persons(&sparse_person(), &sparse_person())
+            .evidence;
+        assert!(
+            (r.evidence.weight_bits - clean.weight_bits - crate::evidence::CONTRADICTION_BITS)
+                .abs()
+                < 1e-9
+        );
+    }
+
+    #[test]
+    fn evidence_contradiction_beats_a_shared_identifier_elsewhere() {
+        let a = Person {
+            us_ssn: Some("123-45-6789".into()),
+            passport_books: vec![PassportBook::new("GB", "123456789").unwrap()],
+            ..sparse_person()
+        };
+        let b = Person {
+            us_ssn: Some("234-56-7890".into()),
+            passport_books: vec![PassportBook::new("GB", "123456789").unwrap()],
+            ..sparse_person()
+        };
+        let e = MatchingEngine::default_config()
+            .match_persons(&a, &b)
+            .evidence;
+        assert!(e.weight_bits > 30.0);
+        assert_eq!(e.strength, MatchStrength::Contradicted);
+    }
+
+    #[test]
+    fn evidence_richly_identical_record_without_identifier_is_proven() {
+        let rich = Person {
+            address: Some(
+                Address::new()
+                    .with_line1("12 Heol y Felin")
+                    .with_city("Cardiff")
+                    .with_postcode("CF14 7AB"),
+            ),
+            email: Some("b.tregarthen@example.org".into()),
+            ..sparse_person()
+        };
+        let e = MatchingEngine::default_config()
+            .match_persons(&rich, &rich)
+            .evidence;
+        assert_eq!(e.strength, MatchStrength::Proven);
+        assert!(e.weight_bits >= 30.0, "got {}", e.weight_bits);
+    }
+
+    #[test]
+    fn evidence_clear_disagreement_is_negative_non_match() {
+        let a = sparse_person();
+        let b = Person::builder()
+            .given_name("Hamish")
+            .family_name("Okonkwo")
+            .date_of_birth(dob(2001, 11, 2))
+            .gender(Gender::Male)
+            .build();
+        let r = MatchingEngine::default_config().match_persons(&a, &b);
+        assert!(
+            r.evidence.weight_bits < 0.0,
+            "got {}",
+            r.evidence.weight_bits
+        );
+        assert_eq!(r.evidence.strength, MatchStrength::NonMatch);
+    }
+
+    #[test]
+    fn evidence_proof_bits_is_configurable() {
+        let engine = MatchingEngine::new(MatchConfig {
+            proof_bits: 20.0,
+            ..MatchConfig::default()
+        });
+        let a = sparse_person();
+        assert_eq!(
+            engine.match_persons(&a, &a).evidence.strength,
+            MatchStrength::Proven
+        );
+    }
+
+    #[test]
+    fn evidence_does_not_change_score_is_match_or_confidence() {
+        let a = sparse_person();
+        let r = MatchingEngine::default_config().match_persons(&a, &a);
+        let r20 = MatchingEngine::new(MatchConfig {
+            proof_bits: 1.0,
+            ..MatchConfig::default()
+        })
+        .match_persons(&a, &a);
+        assert!((r.score - r20.score).abs() < f64::EPSILON);
+        assert_eq!(r.is_match, r20.is_match);
+        assert_eq!(r.confidence, r20.confidence);
+    }
+
+    #[test]
+    fn match_result_without_evidence_field_deserialises() {
+        let a = sparse_person();
+        let r = MatchingEngine::default_config().match_persons(&a, &a);
+        let mut v = serde_json::to_value(&r).unwrap();
+        v.as_object_mut().unwrap().remove("evidence");
+        let back: MatchResult = serde_json::from_value(v).unwrap();
+        assert_eq!(back.evidence, Evidence::default());
+        assert_eq!(back.evidence.strength, MatchStrength::NonMatch);
+        assert!((back.score - r.score).abs() < 1e-12);
+    }
+
+    #[test]
+    fn config_without_proof_bits_defaults_to_thirty() {
+        let mut v = serde_json::to_value(MatchConfig::default()).unwrap();
+        v.as_object_mut().unwrap().remove("proof_bits");
+        let back: MatchConfig = serde_json::from_value(v).unwrap();
+        assert!((back.proof_bits - 30.0).abs() < 1e-12);
     }
 }

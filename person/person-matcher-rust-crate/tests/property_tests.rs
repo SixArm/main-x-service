@@ -12,7 +12,9 @@
 //! `#[test]` in `tests/integration_tests.rs` so it lives forever.
 
 use chrono::NaiveDate;
-use person_matcher::{Confidence, Gender, MatchConfig, MatchingEngine, Normalizer, Person};
+use person_matcher::{
+    Confidence, Gender, MatchConfig, MatchStrength, MatchingEngine, Normalizer, Person,
+};
 use proptest::prelude::*;
 
 // ---------- Strategies ----------
@@ -117,6 +119,38 @@ proptest! {
         let r = engine.match_persons(&p1, &p2);
         prop_assert!(r.score >= 0.0, "score < 0.0: {}", r.score);
         prop_assert!(r.score <= 1.0, "score > 1.0: {}", r.score);
+    }
+
+    /// Evidence (agents/share/match-evidence.md) MUST be finite, and the
+    /// strength MUST agree with the contradictions, the bar and
+    /// `is_match`, in that order. A random identifier on each side makes
+    /// contradictions (and shared-identifier proof) reachable.
+    #[test]
+    fn evidence_is_finite_and_strength_is_consistent(
+        p1 in person_strategy(),
+        p2 in person_strategy(),
+        ssn1 in prop::option::of(prop::sample::select(vec!["123-45-6789", "234-56-7890"])),
+        ssn2 in prop::option::of(prop::sample::select(vec!["123-45-6789", "234-56-7890"])),
+    ) {
+        let mut p1 = p1;
+        let mut p2 = p2;
+        p1.us_ssn = ssn1.map(str::to_owned);
+        p2.us_ssn = ssn2.map(str::to_owned);
+        let config = MatchConfig::default();
+        let proof_bits = config.proof_bits;
+        let r = MatchingEngine::new(config).match_persons(&p1, &p2);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "weight_bits: {}", e.weight_bits);
+        let expected = if !e.contradictions.is_empty() {
+            MatchStrength::Contradicted
+        } else if e.weight_bits >= proof_bits {
+            MatchStrength::Proven
+        } else if r.is_match {
+            MatchStrength::Consistent
+        } else {
+            MatchStrength::NonMatch
+        };
+        prop_assert_eq!(e.strength, expected);
     }
 
     /// Self-match MUST produce `is_match == true` for any `Person` that

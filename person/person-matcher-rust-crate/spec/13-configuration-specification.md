@@ -15,7 +15,9 @@ Weights (all renormalised against participating fields):
 - `0.10` — `death_date_weight`.
 - `0.05` — `gender_weight`, `blood_type_weight`, `multiple_birth_weight`, `address_weight`, `birth_place_weight`, `death_place_weight`, `phone_weight`, `email_weight`, `relationships_weight`, `tags_weight` (the last two join the supporting-signal cluster at `0.05` each — §23 T-33/T-34).
 
-Other defaults: `use_phonetic_matching = true`; `name_algorithm = Combined`; `nickname_table = NicknameTable::empty()`; `gmail_dot_folding = false`; `phone_default_country = Some("GB")`.
+Other defaults: `use_phonetic_matching = true`; `name_algorithm = Combined`; `nickname_table = NicknameTable::empty()`; `gmail_dot_folding = false`; `phone_default_country = Some("GB")`; `proof_bits = 30.0` (all presets).
+
+`proof_bits` is the evidence bar for `MatchStrength::Proven` (§12.7, [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md) §4): `log2(N) + log2(1/α)` bits for `N` records at false-merge rate `α`; it must be finite and positive, and it never affects `score`, `is_match` or `confidence`. The crate has no config validator, so the constraint is documented rather than enforced.
 
 ### 13.2 `strict_mode` Semantics
 
