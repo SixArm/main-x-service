@@ -2584,6 +2584,16 @@
   gate** (framed in `agents/share/security.md` §4 from SEC-I4). The generic
   flag-off `enforce` pin already exists family-wide; this adds the explicit,
   sensitive-path-named form on the flagged services. Feeds OPS-1 runbook.
+- [x] **SEC-G9 (S) 🟠** Masking left emergency contacts' phone numbers
+  whole. *(found and done 2026-11-09)* Person's and worker's
+  `mask_person` / `mask_worker` mask the subject's phone, SMS and fax
+  values but never looked at `emergency_contacts`, so the masked view,
+  and every list, search and export that masks, showed a third party's
+  phone number beside the subject's masked one. Each now masks every
+  emergency contact's telecom through the same helper; names, addresses
+  and e-mail stay as the subject's do. A unit test in each crate fails
+  with the emergency-contact loop removed. Found while reading worker's
+  masking for T-5.
 
 ### F-data — bulk / linking / concurrency integrity
 

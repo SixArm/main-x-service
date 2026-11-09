@@ -10,6 +10,9 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- The masked view masks emergency contacts' phone, SMS and fax numbers,
+  as it does the record's own; they were shown whole (repo `tasks.md`
+  SEC-G9).
 - `POST /api/persons/deduplicate` honours a `threshold` below the
   configured one; a lower request threshold used to change nothing
   (T-38).

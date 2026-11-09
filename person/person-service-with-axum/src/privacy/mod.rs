@@ -63,7 +63,21 @@ pub fn mask_person(person: &Person) -> Person {
     }
 
     // Mask phone numbers: show only last 4 digits
-    for cp in &mut masked.telecom {
+    mask_phone_numbers(&mut masked.telecom);
+    // An emergency contact is a third party: their numbers are masked as
+    // the record's own are. They were left whole, so the masked view
+    // showed a stranger's phone number beside the subject's masked one.
+    for contact in &mut masked.emergency_contacts {
+        mask_phone_numbers(&mut contact.telecom);
+    }
+
+    masked
+}
+
+/// Mask phone, SMS and fax values to their last four characters, leaving
+/// e-mail and other systems as they are.
+fn mask_phone_numbers(telecom: &mut [crate::models::ContactPoint]) {
+    for cp in telecom {
         match cp.system {
             crate::models::ContactPointSystem::Phone
             | crate::models::ContactPointSystem::Sms
@@ -73,8 +87,6 @@ pub fn mask_person(person: &Person) -> Person {
             _ => {}
         }
     }
-
-    masked
 }
 
 /// Mask a string, keeping only its last `visible_chars` characters.
@@ -308,5 +320,42 @@ mod tests {
             !has_active_consent(&[expired_consent], &ConsentType::Marketing),
             "Expired consent should not be considered active"
         );
+    }
+
+    /// An emergency contact's phone number is masked like the subject's
+    /// own; it was returned whole in the masked view. Their e-mail is left,
+    /// as the subject's is.
+    #[test]
+    fn emergency_contact_phone_numbers_are_masked() {
+        use crate::models::*;
+
+        let mut subject = Person::new(
+            HumanName {
+                use_type: None,
+                family: "Smith".into(),
+                given: vec!["John".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Male,
+        );
+        subject.emergency_contacts.push(
+            serde_json::from_value(serde_json::json!({
+                "name": "Jane Smith",
+                "relationship": "spouse",
+                "telecom": [
+                    { "system": "phone", "value": "+44 7700 900123" },
+                    { "system": "email", "value": "jane@example.org" }
+                ],
+                "is_primary": true
+            }))
+            .expect("an emergency contact"),
+        );
+
+        let masked = mask_person(&subject);
+        let telecom = &masked.emergency_contacts[0].telecom;
+        assert_eq!(telecom[0].value, "+** **** **0123");
+        assert_eq!(telecom[1].value, "jane@example.org");
+        assert_eq!(masked.emergency_contacts[0].name, "Jane Smith");
     }
 }
