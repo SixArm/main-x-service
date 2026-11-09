@@ -61,6 +61,7 @@ impl utoipa::Modify for SecurityAddon {
         handlers::review_decision,
         handlers::export_place_data,
         handlers::masked_place,
+        handlers::place_geojson,
         handlers::audit_for_place,
         handlers::audit_recent,
     ),
@@ -140,6 +141,7 @@ pub fn places_routes() -> axa::routes::Routes {
         )
         .add("/places/{id}/export", get(handlers::export_place_data))
         .add("/places/{id}/masked", get(handlers::masked_place))
+        .add("/places/{id}/geojson", get(handlers::place_geojson))
         .add("/places/{id}/audit", get(handlers::audit_for_place))
         .add("/audit/recent", get(handlers::audit_recent))
         // Both registration surfaces carry these: this crate is
@@ -174,11 +176,16 @@ mod tests {
 
     /// The generated `OpenAPI` document advertises the T-9 geo-radius
     /// `GET /api/places/nearby` and the paginated
-    /// `GET /api/places/search` routes (DB-free — built from `ApiDoc`).
+    /// `GET /api/places/search` routes, and the T-7
+    /// `GET /api/places/{id}/geojson` (DB-free — built from `ApiDoc`).
     #[test]
     fn openapi_includes_nearby_and_search_paths() {
         let doc = ApiDoc::openapi();
-        for path in ["/api/places/nearby", "/api/places/search"] {
+        for path in [
+            "/api/places/nearby",
+            "/api/places/search",
+            "/api/places/{id}/geojson",
+        ] {
             assert!(
                 doc.paths.paths.contains_key(path),
                 "OpenAPI paths missing {path}: {:?}",

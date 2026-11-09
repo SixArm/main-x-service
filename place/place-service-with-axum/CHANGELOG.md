@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added
+
+- `GET /api/places/{id}/geojson` answers the place as an RFC 7946
+  `Feature`, as `application/geo+json`: a `Point` geometry, longitude
+  first, and the other fields as properties. A place with no
+  coordinates has a `null` geometry. The coordinates keep their stored
+  decimal digits (T-7, first half; the bounding-box `FeatureCollection`
+  is still open).
+
 ### Fixed
 
 - Two concurrent edits can no longer close a containment cycle between

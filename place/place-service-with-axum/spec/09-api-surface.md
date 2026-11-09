@@ -4,7 +4,7 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 17 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
+| REST (Axum) | 18 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | Integrity verification (Axum) | `GET /api/records/verify`, `GET /api/audit/verify` — keyed-MAC + digest checks over place records / the audit log (§13; default `mac_absent` with no key configured) |
 | FHIR R5 (Axum) | `Location` resource — `GET/POST/PUT/DELETE /fhir/Location{,/{id}}`, `GET /fhir/metadata` (`CapabilityStatement`) — see §13 T-11 |
@@ -13,7 +13,7 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` |
 
-The 17 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
+The 18 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 `GET`/`PUT`/`DELETE /api/places/{id}`; `GET /api/places/search`;
 `GET /api/places/nearby`; `POST /api/places/match`;
 `POST /api/places/check-duplicates`;
@@ -21,9 +21,18 @@ The 17 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 `GET /api/places/review-queue`;
 `POST /api/places/review-queue/{id}/decision`;
 `GET /api/places/{id}/export`; `GET /api/places/{id}/masked`;
+`GET /api/places/{id}/geojson`;
 `GET /api/places/{id}/audit`; `GET /api/audit/recent`
 (plus `GET /api/whoami` and the integrity-verify pair listed above as
 their own tiers). Full table: [`agents/restful.md`](../agents/restful.md).
+
+`GET /api/places/{id}/geojson` answers the place as an RFC 7946
+`Feature`, as `application/geo+json`: the coordinates are a `Point`
+geometry, longitude first, with elevation third when there is one, and
+the other fields are `properties`. A place with no coordinates has a
+`null` geometry rather than an invented point. The coordinates are the
+stored decimal digits, not an `f64` rounding of them. It discloses
+exactly what `GET /api/places/{id}` does (§13 T-7).
 
 Search query parameters are `q`, `limit`, `cursor`, `fuzzy`,
 `mask_sensitive`; `GET /api/places/nearby?lat=&lon=&radius_km=&limit=

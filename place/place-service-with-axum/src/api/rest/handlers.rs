@@ -1131,6 +1131,40 @@ pub async fn export_place_data(
     }
 }
 
+/// One place as a `GeoJSON` `Feature` (RFC 7946), served as
+/// `application/geo+json`.
+///
+/// It discloses what `GET /api/places/{id}` does, in another shape: the
+/// coordinates become the `Point` geometry and the other fields become
+/// properties. A place with no coordinates has a `null` geometry. The
+/// path is `/geojson` rather than the `.geojson` suffix first written in
+/// spec §13 T-7, because the router matches a parameter only as a whole
+/// path segment.
+#[utoipa::path(get, path = "/api/places/{id}/geojson", tag = "places",
+    params(("id" = Uuid, Path, description = "Place id")),
+    responses((status = 200, description = "GeoJSON Feature", content_type = "application/geo+json"),
+        (status = 404, description = "Not found")))]
+pub async fn place_geojson(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    match state.place_repository.get_by_id(&id).await {
+        Ok(Some(p)) => match crate::geojson::place_feature(&p) {
+            Ok(feature) => {
+                let mut response = ok(StatusCode::OK, feature);
+                response.headers_mut().insert(
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::HeaderValue::from_static(crate::geojson::MEDIA_TYPE),
+                );
+                response
+            }
+            Err(e) => fail(&crate::Error::Api(e.to_string())),
+        },
+        Ok(None) => fail(&crate::Error::NotFound),
+        Err(e) => fail(&e),
+    }
+}
+
 /// Masked place view.
 #[utoipa::path(get, path = "/api/places/{id}/masked", tag = "privacy",
     params(("id" = Uuid, Path, description = "Place id")),

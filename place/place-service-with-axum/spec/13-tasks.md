@@ -124,8 +124,15 @@ clearly described manual check confirms the acceptance criterion.
   - **Acceptance:** known NYC coords return the corresponding
     administrative-area place.
 - [ ] **T-7 — GeoJSON export.**
-  - [ ] `GET /api/places/{id}.geojson` (Feature with point geometry +
-    properties).
+  - [x] `GET /api/places/{id}/geojson` (Feature with point geometry +
+    properties). *(2026-11-09.)* A path segment rather than the
+    `.geojson` suffix first written here, because the router matches a
+    parameter only as a whole segment, and it sits beside the existing
+    `/export` and `/masked` views. Served as `application/geo+json`;
+    longitude first; the stored decimal digits copied rather than
+    rounded through `f64`; a place with no coordinates gets a `null`
+    geometry (RFC 7946 §3.2). Unit tests in `src/geojson.rs`; DB test
+    `tests/geojson_endpoint.rs`.
   - [ ] `GET /api/places/search.geojson?bbox=` (FeatureCollection).
   - **Acceptance:** `jq -e '.type == "Feature"'` passes.
 - [ ] **T-8 — Authentication / authorisation.**

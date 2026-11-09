@@ -63,6 +63,8 @@ pub mod error;
 /// HL7 FHIR R5 interop: the `Location` resource conversions, wire
 /// types, and search-parameter parsing for the mounted `/fhir` endpoints.
 pub mod fhir;
+/// `GeoJSON` (RFC 7946) rendering of a place, for `GET /api/places/{id}/geojson`.
+pub mod geojson;
 pub mod matching;
 pub mod metrics;
 pub mod models;
