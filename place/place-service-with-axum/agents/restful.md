@@ -191,6 +191,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | POST   | `/api/places/review-queue/{id}/decision` | Decide a pending review item (`confirmed` / `rejected`) |
 | GET    | `/api/places/{id}/export` | GDPR data export      |
 | GET    | `/api/places/{id}/masked` | Masked place view     |
+| GET    | `/api/places/search.geojson?bbox=` | Places in a box as a GeoJSON `FeatureCollection`, paged |
 | GET    | `/api/places/{id}/geojson` | The place as a GeoJSON `Feature` (`application/geo+json`) |
 | GET    | `/api/places/{id}/audit`  | Audit logs            |
 | GET    | `/api/audit/recent`       | Recent audit activity |

@@ -123,7 +123,7 @@ clearly described manual check confirms the acceptance criterion.
   - [ ] `GET /api/places/reverse-geocode?lat=&lon=`.
   - **Acceptance:** known NYC coords return the corresponding
     administrative-area place.
-- [ ] **T-7 — GeoJSON export.**
+- [x] **T-7 — GeoJSON export.** *(Both halves 2026-11-09.)*
   - [x] `GET /api/places/{id}/geojson` (Feature with point geometry +
     properties). *(2026-11-09.)* A path segment rather than the
     `.geojson` suffix first written here, because the router matches a
@@ -133,7 +133,18 @@ clearly described manual check confirms the acceptance criterion.
     rounded through `f64`; a place with no coordinates gets a `null`
     geometry (RFC 7946 §3.2). Unit tests in `src/geojson.rs`; DB test
     `tests/geojson_endpoint.rs`.
-  - [ ] `GET /api/places/search.geojson?bbox=` (FeatureCollection).
+  - [x] `GET /api/places/search.geojson?bbox=` (FeatureCollection).
+    `bbox` is `west,south,east,north` (RFC 7946 §5), edges inclusive;
+    `west > east` crosses the antimeridian rather than being refused or
+    read as the whole globe. Places come in `id` order, paged in the
+    database by signed cursor (default 10, at most 100), so every place
+    in the box is reachable and none is lost to a scan cap. A
+    malformed or out-of-range `bbox` is a `400` `invalid_bbox`; a bad
+    `limit` or cursor a `422`. DB test: a box walked two features a
+    page finds every seeded place once, an edge point included, and
+    neither a place outside nor a soft-deleted one; an antimeridian box
+    finds both sides and not the prime meridian. It fails when the
+    antimeridian branch is broken.
   - **Acceptance:** `jq -e '.type == "Feature"'` passes.
 - [ ] **T-8 — Authentication / authorisation.**
   - [x] Peer PASETO verification *(done 2026-07-04)* — offline PASETO
@@ -632,3 +643,16 @@ clearly described manual check confirms the acceptance criterion.
   maximum is a `422`, and a DB test walks a queue of more than 500 rows
   to its end. Check the other six crates with a review queue for the
   same cap.
+- [ ] **T-21 (S) — Order the nearby candidate scan.**
+  `GET /api/places/nearby` reads at most 5 000 bounding-box candidates
+  (`NEARBY_BBOX_SCAN_CAP`) through `list_in_bbox`, whose `LIMIT` has no
+  `ORDER BY`. Past 5 000 places in the box, which candidates are read
+  is up to the planner: places nearer the centre than the ones returned
+  can be left out, and two fetches of the same page can disagree, so a
+  walk by cursor can skip or repeat. Found 2026-11-09 while adding
+  T-7's box query, which pages in the database instead. **Acceptance:**
+  every place within the radius is reachable by following `next`, in
+  nearest-first order, however many share the box — by ordering and
+  paging the candidates in SQL (distance, then `id`), or by refusing a
+  radius whose box holds more than the cap rather than answering from
+  an arbitrary subset. A DB test seeds more than the cap.

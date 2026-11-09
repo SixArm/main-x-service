@@ -121,6 +121,21 @@ pub trait PlaceRepository: Send + Sync {
         lon_max: f64,
         cap: u64,
     ) -> Result<Vec<Place>>;
+    /// One page of the active places whose coordinates fall inside the
+    /// box, in `id` order: `limit` rows after skipping `offset`. The edges
+    /// are inclusive. When `lon_west > lon_east` the box crosses the
+    /// antimeridian (RFC 7946 §5.2), so it covers longitudes at or east of
+    /// `lon_west` and at or west of `lon_east`. A place with no
+    /// coordinates is never inside a box.
+    ///
+    /// # Errors
+    /// Propagates any database error from the query.
+    async fn page_in_bbox(
+        &self,
+        bbox: crate::geojson::BoundingBox,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<Place>>;
     /// Record a merge of `duplicate` into `main` in the merge-history table.
     ///
     /// # Errors
@@ -606,6 +621,51 @@ impl PlaceRepository for PgPlaceRepository {
             bbox_decimal(lon_min),
             bbox_decimal(lon_max),
             to_i64(cap),
+        )
+        .fetch_all(&self.db)
+        .await?;
+        self.hydrate_all(rows).await
+    }
+
+    async fn page_in_bbox(
+        &self,
+        bbox: crate::geojson::BoundingBox,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<Place>> {
+        // Ordered by the primary key, so a page is the same rows on every
+        // fetch and the signed offset in a cursor lands where it left off.
+        let rows = sqlx::query_as!(
+            PlaceRow,
+            "SELECT id, name, alternate_name, description, place_type, place_type_custom,
+                    address_street_address, address_locality, address_region,
+                    address_country, address_postal_code,
+                    geo_latitude_as_decimal_degrees, geo_longitude_as_decimal_degrees,
+                    geo_elevation_as_decimal_metres,
+                    telephone, fax_number, url, global_location_number, branch_code,
+                    contained_in_place, is_accessible_for_free, public_access,
+                    smoking_allowed, maximum_attendee_capacity, is_deleted,
+                    content_hash, content_hash_sha3, content_mac,
+                    deleted_at, created_at, updated_at
+             FROM places
+             WHERE is_deleted = false
+               AND geo_latitude_as_decimal_degrees >= $1
+               AND geo_latitude_as_decimal_degrees <= $2
+               AND CASE WHEN $3::numeric <= $4::numeric
+                        THEN geo_longitude_as_decimal_degrees >= $3
+                             AND geo_longitude_as_decimal_degrees <= $4
+                        ELSE geo_longitude_as_decimal_degrees >= $3
+                             OR geo_longitude_as_decimal_degrees <= $4
+                   END
+             ORDER BY id
+             OFFSET $5
+             LIMIT $6",
+            bbox_decimal(bbox.south),
+            bbox_decimal(bbox.north),
+            bbox_decimal(bbox.west),
+            bbox_decimal(bbox.east),
+            to_i64(offset),
+            to_i64(limit),
         )
         .fetch_all(&self.db)
         .await?;

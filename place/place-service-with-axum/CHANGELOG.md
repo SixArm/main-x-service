@@ -14,8 +14,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   `Feature`, as `application/geo+json`: a `Point` geometry, longitude
   first, and the other fields as properties. A place with no
   coordinates has a `null` geometry. The coordinates keep their stored
-  decimal digits (T-7, first half; the bounding-box `FeatureCollection`
-  is still open).
+  decimal digits (T-7).
+- `GET /api/places/search.geojson?bbox=west,south,east,north` answers
+  the places inside a box as a `FeatureCollection`, paged by signed
+  cursor in `id` order. A box with `west > east` crosses the
+  antimeridian. A malformed `bbox` is a `400` (T-7).
 
 ### Fixed
 

@@ -601,6 +601,79 @@ pub async fn nearby_places(
     )
 }
 
+/// Query for `GET /api/places/search.geojson`.
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+pub struct BboxQuery {
+    /// `west,south,east,north` in degrees (RFC 7946 §5). `west > east`
+    /// crosses the antimeridian.
+    pub bbox: String,
+    /// Page size: default [`GEOJSON_DEFAULT_LIMIT`], at most
+    /// [`GEOJSON_MAX_LIMIT`]. A string, so an unparseable value reaches
+    /// [`CursorPage::new`] and is a `422`, not an extractor `400`.
+    #[param(value_type = Option<u64>)]
+    pub limit: Option<String>,
+    /// The signed position from a previous page's `Link: rel="next"`.
+    pub cursor: Option<String>,
+}
+
+/// Default page size for `GET /api/places/search.geojson`.
+pub const GEOJSON_DEFAULT_LIMIT: u64 = 10;
+
+/// Largest page `GET /api/places/search.geojson` serves in one call.
+pub const GEOJSON_MAX_LIMIT: u64 = 100;
+
+/// The active places inside a bounding box, as a `GeoJSON`
+/// `FeatureCollection` (RFC 7946), served as `application/geo+json`.
+///
+/// `GET /api/places/search.geojson?bbox=west,south,east,north&limit=&cursor=`.
+/// The box's edges are inclusive, and `west > east` crosses the
+/// antimeridian. Places come in `id` order, paged in the database, so
+/// every place in the box is reached by following `Link: rel="next"` and
+/// none is skipped by a scan cap. A malformed or out-of-range `bbox` is a
+/// `400`; a bad `limit` or cursor is a `422`. Each feature discloses what
+/// `GET /api/places/{id}` does.
+#[utoipa::path(get, path = "/api/places/search.geojson", tag = "search",
+    params(BboxQuery),
+    responses(
+        (status = 200, description = "GeoJSON FeatureCollection", content_type = "application/geo+json"),
+        (status = 400, description = "invalid bbox"),
+        (status = 422, description = "invalid limit or cursor")
+    ))]
+pub async fn places_in_bbox_geojson(
+    State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
+    Query(q): Query<BboxQuery>,
+) -> impl IntoResponse {
+    let bbox = match crate::geojson::BoundingBox::parse(&q.bbox) {
+        Ok(bbox) => bbox,
+        Err(why) => return bad_request("invalid_bbox", why),
+    };
+    let page = match page_of(&uri, limits(GEOJSON_DEFAULT_LIMIT, GEOJSON_MAX_LIMIT)) {
+        Ok(page) => page,
+        Err(refused) => return invalid_page(&refused),
+    };
+    let rows = match state
+        .place_repository
+        .page_in_bbox(bbox, page.offset(), page.limit() + 1)
+        .await
+    {
+        Ok(rows) => rows,
+        Err(e) => return fail(&e),
+    };
+    let (places, more_follow) = page.split(rows);
+    match crate::geojson::feature_collection(&places) {
+        Ok(collection) => {
+            let mut response = ok(StatusCode::OK, collection);
+            response.headers_mut().insert(
+                axum::http::header::CONTENT_TYPE,
+                axum::http::HeaderValue::from_static(crate::geojson::MEDIA_TYPE),
+            );
+            with_next(&page, more_follow, response)
+        }
+        Err(e) => fail(&crate::Error::Api(e.to_string())),
+    }
+}
+
 /// A scored candidate place returned by match / duplicate endpoints.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct ScoredCandidate {

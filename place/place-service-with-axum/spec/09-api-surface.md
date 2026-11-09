@@ -4,7 +4,7 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 18 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
+| REST (Axum) | 19 endpoints under `/api/places/*` + `/api/audit/recent` + `/api/health` |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | Integrity verification (Axum) | `GET /api/records/verify`, `GET /api/audit/verify` — keyed-MAC + digest checks over place records / the audit log (§13; default `mac_absent` with no key configured) |
 | FHIR R5 (Axum) | `Location` resource — `GET/POST/PUT/DELETE /fhir/Location{,/{id}}`, `GET /fhir/metadata` (`CapabilityStatement`) — see §13 T-11 |
@@ -13,9 +13,10 @@ Complete reference: [`agents/restful.md`](../agents/restful.md).
 | Web UI | Full set documented in project-root [`spec.md`](../../spec/index.md) |
 | Docs | Swagger UI at `/swagger-ui` |
 
-The 18 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
+The 19 `/api` REST endpoints are: `GET /api/health`; `POST /api/places`;
 `GET`/`PUT`/`DELETE /api/places/{id}`; `GET /api/places/search`;
-`GET /api/places/nearby`; `POST /api/places/match`;
+`GET /api/places/nearby`; `GET /api/places/search.geojson`;
+`POST /api/places/match`;
 `POST /api/places/check-duplicates`;
 `POST /api/places/merge`; `POST /api/places/deduplicate`;
 `GET /api/places/review-queue`;
@@ -33,6 +34,16 @@ the other fields are `properties`. A place with no coordinates has a
 `null` geometry rather than an invented point. The coordinates are the
 stored decimal digits, not an `f64` rounding of them. It discloses
 exactly what `GET /api/places/{id}` does (§13 T-7).
+
+`GET /api/places/search.geojson?bbox=west,south,east,north&limit=&cursor=`
+answers the active places inside the box as a `FeatureCollection` of
+the same features, as `application/geo+json`. The edges are inclusive,
+and `west > east` is a box across the antimeridian. Places come in `id`
+order and page by signed cursor like the lists below (default 10, at
+most 100), paged in the database, so following `next` reaches every
+place in the box. A `bbox` that is not four finite numbers, has a
+coordinate out of range, or has `south` above `north` is a `400`
+`invalid_bbox`.
 
 Search query parameters are `q`, `limit`, `cursor`, `fuzzy`,
 `mask_sensitive`; `GET /api/places/nearby?lat=&lon=&radius_km=&limit=

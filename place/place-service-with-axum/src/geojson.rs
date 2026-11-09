@@ -41,6 +41,76 @@ pub fn place_feature(place: &Place) -> Result<Value, serde_json::Error> {
     }))
 }
 
+/// Render `places` as a `GeoJSON` `FeatureCollection`, one `Feature` each.
+///
+/// # Errors
+///
+/// As [`place_feature`].
+pub fn feature_collection(places: &[Place]) -> Result<Value, serde_json::Error> {
+    let features = places
+        .iter()
+        .map(place_feature)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(json!({ "type": "FeatureCollection", "features": features }))
+}
+
+/// A two-dimensional `GeoJSON` bounding box (RFC 7946 §5), in degrees.
+///
+/// `west > east` is a box that crosses the antimeridian (§5.2), not an
+/// error.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoundingBox {
+    /// Westernmost longitude, `-180..=180`.
+    pub west: f64,
+    /// Southernmost latitude, `-90..=90`.
+    pub south: f64,
+    /// Easternmost longitude, `-180..=180`.
+    pub east: f64,
+    /// Northernmost latitude, `-90..=90`, at least `south`.
+    pub north: f64,
+}
+
+impl BoundingBox {
+    /// Parse `west,south,east,north`, the RFC 7946 §5 order.
+    ///
+    /// # Errors
+    ///
+    /// Says what is wrong: not exactly four finite numbers, a latitude or
+    /// longitude out of range, or `south` above `north`. A three-dimensional
+    /// box, with six numbers, is refused rather than read as a flat one.
+    pub fn parse(text: &str) -> Result<Self, &'static str> {
+        let numbers = text
+            .split(',')
+            .map(|part| part.trim().parse::<f64>().ok().filter(|n| n.is_finite()))
+            .collect::<Option<Vec<f64>>>()
+            .ok_or("bbox must be four comma-separated finite numbers")?;
+        let [west, south, east, north] = numbers[..] else {
+            return Err("bbox must be four comma-separated numbers: west,south,east,north");
+        };
+        if ![west, east]
+            .iter()
+            .all(|lon| (-180.0..=180.0).contains(lon))
+        {
+            return Err("bbox longitudes must be in -180..=180");
+        }
+        if ![south, north]
+            .iter()
+            .all(|lat| (-90.0..=90.0).contains(lat))
+        {
+            return Err("bbox latitudes must be in -90..=90");
+        }
+        if south > north {
+            return Err("bbox south must not be above north");
+        }
+        Ok(Self {
+            west,
+            south,
+            east,
+            north,
+        })
+    }
+}
+
 /// A `Point` from a place's serialized `geo`, or `None` when it has none.
 fn point(geo: &Value) -> Option<Value> {
     let geo: &Map<String, Value> = geo.as_object()?;
@@ -121,5 +191,65 @@ mod tests {
         let properties = feature["properties"].as_object().unwrap();
         assert!(!properties.contains_key("geo"));
         assert!(!properties.contains_key("id"));
+    }
+
+    #[test]
+    fn a_feature_collection_holds_one_feature_per_place() {
+        let places = [located("1", "2", None), Place::new("Nowhere")];
+        let collection = feature_collection(&places).unwrap();
+        assert_eq!(collection["type"], "FeatureCollection");
+        let features = collection["features"].as_array().unwrap();
+        assert_eq!(features.len(), 2);
+        assert_eq!(features[0]["id"], places[0].id.to_string());
+        assert!(features[1]["geometry"].is_null());
+    }
+
+    #[test]
+    fn an_empty_collection_is_still_a_collection() {
+        let collection = feature_collection(&[]).unwrap();
+        assert_eq!(
+            collection.to_string(),
+            r#"{"features":[],"type":"FeatureCollection"}"#
+        );
+    }
+
+    #[test]
+    fn a_bbox_is_west_south_east_north() {
+        let bbox = BoundingBox::parse("-74.1, 40.6,-73.8,40.9").unwrap();
+        assert_eq!(
+            bbox,
+            BoundingBox {
+                west: -74.1,
+                south: 40.6,
+                east: -73.8,
+                north: 40.9
+            }
+        );
+    }
+
+    #[test]
+    fn a_bbox_across_the_antimeridian_is_accepted() {
+        let bbox = BoundingBox::parse("170,-20,-170,-10").unwrap();
+        assert!(bbox.west > bbox.east);
+    }
+
+    #[test]
+    fn a_malformed_bbox_is_refused() {
+        for bad in [
+            "",
+            "1,2,3",
+            "1,2,3,4,5,6",
+            "a,2,3,4",
+            "NaN,2,3,4",
+            "inf,2,3,4",
+            "-181,0,0,1",
+            "0,-91,1,0",
+            "0,10,1,5",
+        ] {
+            assert!(
+                BoundingBox::parse(bad).is_err(),
+                "{bad:?} should be refused"
+            );
+        }
     }
 }

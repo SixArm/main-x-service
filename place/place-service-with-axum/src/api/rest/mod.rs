@@ -62,6 +62,7 @@ impl utoipa::Modify for SecurityAddon {
         handlers::export_place_data,
         handlers::masked_place,
         handlers::place_geojson,
+        handlers::places_in_bbox_geojson,
         handlers::audit_for_place,
         handlers::audit_recent,
     ),
@@ -124,6 +125,10 @@ pub fn places_routes() -> axa::routes::Routes {
         )
         .add("/places/search", get(handlers::search_places))
         .add("/places/nearby", get(handlers::nearby_places))
+        .add(
+            "/places/search.geojson",
+            get(handlers::places_in_bbox_geojson),
+        )
         .add("/places/match", post(handlers::match_place))
         .add("/places/check-duplicates", post(handlers::check_duplicates))
         .add("/places/merge", post(handlers::merge_places))
@@ -185,6 +190,7 @@ mod tests {
             "/api/places/nearby",
             "/api/places/search",
             "/api/places/{id}/geojson",
+            "/api/places/search.geojson",
         ] {
             assert!(
                 doc.paths.paths.contains_key(path),
