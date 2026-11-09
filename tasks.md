@@ -6180,6 +6180,20 @@ running one.
   *Measured:* care-pathway's `validation/oversized_arrays` benchmark went
   **112 µs → 4.9 µs** (~96%).
 
+- [x] **SEC-M9 (S)** Masking panicked on a value with a multi-byte
+  character. *(found and done 2026-11-09)* Event's and worker's
+  `mask_value`, thing's `mask_value` and place's `mask_phone` cut the
+  string at a byte offset (`value.len() - 4`, `&v[v.len() - 4..]`), which
+  panics when the offset falls inside a character: `"€€€€€€"`, a
+  fullwidth-digit number, an accented e-mail. They run on the masked
+  view, on `mask_sensitive` lists and searches, and on masked export, so
+  one stored record with such a value turned every masked page that held
+  it into a `500` (axa's panic guard kept the process up). Invariant 2 of
+  [`security.md`](agents/share/security.md) §3. Each now counts
+  characters, as person's, organization's and care-pathway's copies
+  already did; each crate has a unit test that panics on the old code.
+  Found while writing event T-5's privacy tests.
+
 - [x] **DOC-9 (M)** The agents directory name is lowercase.
   *(done 2026-08-21)* Git tracked the agent reference docs under an
   uppercase directory while **878 files referenced the lowercase

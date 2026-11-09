@@ -33,6 +33,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- Masking no longer panics on a value with a multi-byte character.
+  `mask_phone`, which masks telephone and fax numbers, cut the string at a byte offset, so a value such as `"€€€€€€"`
+  made the masked view, and any masked list or search holding that
+  record, answer `500`. It now counts characters (repo `tasks.md`
+  SEC-M9).
 - A database failure on `GET /api/places` and
   `POST /api/places/deduplicate` answers `500`. Both answered `200`
   with nothing in it, as if there were no places (T-22).

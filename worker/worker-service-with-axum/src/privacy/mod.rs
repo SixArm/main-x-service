@@ -79,17 +79,24 @@ pub fn mask_worker(worker: &Worker) -> Worker {
 /// (so "123-45-6789" becomes "***-**-6789"). Values no longer than
 /// `visible_chars` are returned unchanged.
 fn mask_value(value: &str, visible_chars: usize) -> String {
-    if value.len() <= visible_chars {
+    // Counted in `char`s, not bytes: slicing by byte length panicked on a
+    // value with a multi-byte character near the cut.
+    let char_count = value.chars().count();
+    if char_count <= visible_chars {
         return value.to_string();
     }
-
-    let visible_start = value.len() - visible_chars;
-    let masked_part: String = value[..visible_start]
+    let hidden = char_count - visible_chars;
+    value
         .chars()
-        .map(|c| if c.is_alphanumeric() { '*' } else { c })
-        .collect();
-
-    format!("{}{}", masked_part, &value[visible_start..])
+        .enumerate()
+        .map(|(i, c)| {
+            if i < hidden && c.is_alphanumeric() {
+                '*'
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// Returns `true` when `consents` contains an entry of the given type that is
@@ -121,6 +128,16 @@ pub fn export_worker_data(worker: &Worker) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Multi-byte characters are counted as characters, and never sliced
+    /// through: this panicked when the cut fell inside one.
+    #[test]
+    fn mask_value_is_char_safe() {
+        assert_eq!(mask_value("€€€€€€", 4), "€€€€€€");
+        assert_eq!(mask_value("1é345", 4), "*é345");
+        assert_eq!(mask_value("josé@ex.com", 4), "****@**.com");
+        assert_eq!(mask_value("naïve12", 4), "***ve12");
+    }
 
     /// Masking keeps the last N chars and leaves punctuation in place.
     #[test]

@@ -45,15 +45,24 @@ fn mask_parties(parties: &mut [Party]) {
 /// Mask a value, keeping only the last `visible_chars` characters
 /// visible. Non-alphanumeric characters are preserved as separators.
 fn mask_value(value: &str, visible_chars: usize) -> String {
-    if value.len() <= visible_chars {
+    // Counted in `char`s, not bytes: slicing by byte length panicked on a
+    // value with a multi-byte character near the cut.
+    let char_count = value.chars().count();
+    if char_count <= visible_chars {
         return value.to_string();
     }
-    let visible_start = value.len() - visible_chars;
-    let masked_part: String = value[..visible_start]
+    let hidden = char_count - visible_chars;
+    value
         .chars()
-        .map(|c| if c.is_alphanumeric() { '*' } else { c })
-        .collect();
-    format!("{masked_part}{}", &value[visible_start..])
+        .enumerate()
+        .map(|(i, c)| {
+            if i < hidden && c.is_alphanumeric() {
+                '*'
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 /// Whether `consents` contains an active, non-expired consent of the
@@ -82,6 +91,16 @@ mod tests {
     use super::*;
     use crate::models::{Identifier, IdentifierType, Party, PartyKind};
     use chrono::TimeZone;
+
+    /// Multi-byte characters are counted as characters, and never sliced
+    /// through: this panicked when the cut fell inside one.
+    #[test]
+    fn mask_value_is_char_safe() {
+        assert_eq!(mask_value("€€€€€€", 4), "€€€€€€");
+        assert_eq!(mask_value("1é345", 4), "*é345");
+        assert_eq!(mask_value("josé@ex.com", 4), "****@**.com");
+        assert_eq!(mask_value("naïve12", 4), "***ve12");
+    }
 
     /// Only the last 4 chars stay visible; separators are preserved and
     /// short values pass through unchanged.

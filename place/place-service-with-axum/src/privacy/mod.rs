@@ -92,13 +92,14 @@ pub fn mask_place(place: &Place) -> Place {
 /// Numbers of four characters or fewer are fully redacted to `"****"` so no
 /// digits leak from very short inputs.
 fn mask_phone(phone: &str) -> String {
+    // Counted in `char`s, not bytes: slicing by byte length panicked on a
+    // number with a multi-byte character near the cut.
+    let count = phone.chars().count();
     // Too short to reveal any prefix without exposing most of the number.
-    if phone.len() <= 4 {
+    if count <= 4 {
         return "****".to_string();
     }
-    // `saturating_sub` is defensive; the length guard above already ensures
-    // a non-empty visible prefix.
-    let visible = &phone[..phone.len().saturating_sub(4)];
+    let visible: String = phone.chars().take(count - 4).collect();
     format!("{visible}****")
 }
 
@@ -127,6 +128,16 @@ mod tests {
     use super::*;
     use crate::models::geo::GeoCoordinates;
     use bigdecimal::BigDecimal;
+
+    /// Multi-byte characters are counted as characters, and never sliced
+    /// through: this panicked when the cut fell inside one.
+    #[test]
+    fn mask_phone_is_char_safe() {
+        assert_eq!(mask_phone("+44 20 7946 0958"), "+44 20 7946 ****");
+        assert_eq!(mask_phone("０１２３４５"), "０１****");
+        assert_eq!(mask_phone("1€234"), "1****");
+        assert_eq!(mask_phone("€€€€"), "****");
+    }
 
     /// Telephone is masked, hiding the trailing digits.
     #[test]

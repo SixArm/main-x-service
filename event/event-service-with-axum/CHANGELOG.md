@@ -10,6 +10,11 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ### Fixed
 
+- Masking no longer panics on a value with a multi-byte character.
+  `mask_value`, which masks identifier values and party e-mails, cut the string at a byte offset, so a value such as `"€€€€€€"`
+  made the masked view, and any masked list or search holding that
+  record, answer `500`. It now counts characters (repo `tasks.md`
+  SEC-M9).
 - The outbox relay's ack stamps `published_at` from this process's clock,
   the clock `purge_published` builds its retention cutoff on. It took
   Postgres `CURRENT_TIMESTAMP`, so drift between the two clocks purged

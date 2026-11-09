@@ -55,10 +55,13 @@ pub fn mask_thing(thing: &Thing) -> Thing {
 /// `****` prefix. Values of four characters or fewer are fully redacted to
 /// `"****"` so nothing identifying leaks from short strings.
 fn mask_value(v: &str) -> String {
-    if v.len() <= 4 {
+    // Counted in `char`s, not bytes: slicing by byte length panicked on a
+    // value with a multi-byte character near the cut.
+    let count = v.chars().count();
+    if count <= 4 {
         return "****".to_string();
     }
-    let tail = &v[v.len() - 4..];
+    let tail: String = v.chars().skip(count - 4).collect();
     format!("****{tail}")
 }
 
@@ -72,6 +75,16 @@ pub fn gdpr_export(thing: &Thing) -> Value {
 mod tests {
     use super::*;
     use crate::models::identifier::ThingIdentifier;
+
+    /// Multi-byte characters are counted as characters, and never sliced
+    /// through: this panicked when the cut fell inside one.
+    #[test]
+    fn mask_value_is_char_safe() {
+        assert_eq!(mask_value("ISBN-é12345"), "****2345");
+        assert_eq!(mask_value("abc€€"), "****bc€€");
+        assert_eq!(mask_value("€€€€"), "****");
+        assert_eq!(mask_value("x€€€€"), "****€€€€");
+    }
 
     /// A present `owner` is replaced with the withheld placeholder.
     #[test]
