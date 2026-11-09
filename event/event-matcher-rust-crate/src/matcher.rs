@@ -35,6 +35,7 @@
 //! assert!(result.is_match);
 //! ```
 
+use crate::evidence::{self, DEFAULT_PROOF_BITS, Evidence};
 use crate::models::{Address, Event, Location, RelationKind, RelationshipRef};
 use crate::normalizer::Normalizer;
 use crate::scorer::{Scorer, SimilarityAlgorithm};
@@ -79,6 +80,7 @@ use std::collections::HashSet;
 ///     use_phonetic_matching: true,
 ///     name_algorithm: SimilarityAlgorithm::Combined,
 ///     strict_mode: false,
+///     proof_bits: 30.0,
 /// };
 /// assert_eq!(custom.match_threshold, 0.80);
 /// ```
@@ -164,6 +166,18 @@ pub struct MatchConfig {
     /// `is_match` requires both a probabilistic score above the threshold
     /// *and* a deterministic match.
     pub strict_mode: bool,
+
+    /// Evidence bar, in bits, for [`crate::MatchStrength::Proven`]
+    /// (see [`crate::evidence`] and `agents/share/match-evidence.md`).
+    /// Defaults to `30.0`: a million records at one false merge in a
+    /// thousand. Does not affect `score`, `is_match`, or `confidence`.
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
+}
+
+/// Serde default for [`MatchConfig::proof_bits`].
+fn default_proof_bits() -> f64 {
+    DEFAULT_PROOF_BITS
 }
 
 impl Default for MatchConfig {
@@ -195,6 +209,7 @@ impl Default for MatchConfig {
             use_phonetic_matching: false,
             name_algorithm: SimilarityAlgorithm::Combined,
             strict_mode: false,
+            proof_bits: DEFAULT_PROOF_BITS,
         }
     }
 }
@@ -314,6 +329,13 @@ pub struct MatchResult {
 
     /// Per-field score contributions for explainability.
     pub breakdown: MatchBreakdown,
+
+    /// Fellegi–Sunter evidence beside the similarity score: how much the
+    /// compared data **proves**, plus hard contradictions and the
+    /// [`crate::MatchStrength`] verdict. Defaults to [`Evidence::default`] on
+    /// JSON written before the field existed. See [`crate::evidence`].
+    #[serde(default)]
+    pub evidence: Evidence,
 }
 
 /// Serde default for [`MatchResult::confidence`].
@@ -442,12 +464,15 @@ impl MatchingEngine {
             above_threshold
         };
         let confidence = Confidence::from_score(score);
+        let evidence =
+            evidence::compute(event1, event2, &breakdown, is_match, self.config.proof_bits);
 
         MatchResult {
             score,
             is_match,
             confidence,
             breakdown,
+            evidence,
         }
     }
 

@@ -19,7 +19,7 @@ Removing fields or variants is breaking.
 
 ### 9.2 JSON shape stability
 
-Every public data type derives `serde::{Serialize, Deserialize}`. `MatchConfig` carries `#[serde(default)]` at struct level so partial documents inherit defaults from `MatchConfig::default()`. `MatchResult::confidence` carries `#[serde(default)]` to allow legacy payloads predating the field to round-trip.
+Every public data type derives `serde::{Serialize, Deserialize}`. `MatchConfig` carries `#[serde(default)]` at struct level so partial documents inherit defaults from `MatchConfig::default()`. `MatchResult::confidence` carries `#[serde(default)]` to allow legacy payloads predating the field to round-trip. `MatchResult::evidence` (§5.5) likewise carries `#[serde(default)]`, so a payload written before it deserialises to `Evidence::default()` (`weight_bits = 0`, `strength = NonMatch`), and `MatchConfig::proof_bits` defaults to `30.0`. `MatchStrength` serialises in `snake_case` (`"contradicted"`, `"proven"`, `"consistent"`, `"non_match"`). `Evidence`, `Contradiction`, and `MatchStrength` are re-exported from the crate root.
 
 Renaming a JSON key or changing its type is breaking.
 

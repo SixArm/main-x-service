@@ -22,6 +22,8 @@ pub struct MatchConfig {
     pub use_phonetic_matching: bool,
     pub name_algorithm: SimilarityAlgorithm,
     pub strict_mode: bool,
+    #[serde(default = "default_proof_bits")]
+    pub proof_bits: f64,
 }
 ```
 
@@ -49,6 +51,7 @@ pub struct MatchConfig {
 | `use_phonetic_matching` | `false` | Compute Soundex-bonus (§6.2). |
 | `name_algorithm` | `SimilarityAlgorithm::Combined` | Algorithm used by `name_score`. |
 | `strict_mode` | `false` | Tighten `is_match` to also require `deterministic_match` (§5.2.3). |
+| `proof_bits` | `30.0` | Evidence bar for `MatchStrength::Proven` (§5.5; [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md) §4): `log2(N) + log2(1/α)` for a million records at one false merge in a thousand. Affects only `MatchResult::evidence`, never `score`/`is_match`/`confidence`. The crate has no config validator; callers should keep it finite and positive. |
 
 ### 7.2 Strict — `MatchConfig::strict()`
 

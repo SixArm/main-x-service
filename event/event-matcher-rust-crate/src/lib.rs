@@ -25,6 +25,7 @@
 //! | [`normalizer`]   | Text and ISO 8601 normalisation: names, postcodes, addresses, phonetic codes, date-times. |
 //! | [`scorer`]       | String, geographic, and temporal similarity primitives (Jaro-Winkler, Levenshtein, Haversine, Gaussian decay). |
 //! | [`matcher`]      | Orchestration: [`MatchingEngine`], [`MatchConfig`], [`MatchResult`]. |
+//! | [`evidence`]     | Fellegi–Sunter match evidence beside the score: [`Evidence`], [`Contradiction`], [`MatchStrength`]. |
 //! | [`error`]        | Error enum [`MatchingError`] and [`Result`] alias. |
 //!
 //! ## Quick start — probabilistic match
@@ -105,12 +106,14 @@
 #![warn(clippy::pedantic)]
 
 pub mod error;
+pub mod evidence;
 pub mod matcher;
 pub mod models;
 pub mod normalizer;
 pub mod scorer;
 
 pub use error::{MatchingError, Result};
+pub use evidence::{Contradiction, Evidence, MatchStrength};
 pub use matcher::{Confidence, MatchBreakdown, MatchConfig, MatchResult, MatchingEngine};
 pub use models::{
     Address, Event, EventAttendanceMode, EventBuilder, EventCategory, EventId, EventIdScheme,

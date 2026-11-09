@@ -36,6 +36,11 @@ fuzz_target!(|data: &[u8]| {
             "score must be in [0,1], got {}",
             result.score
         );
+        assert!(
+            result.evidence.weight_bits.is_finite(),
+            "evidence weight_bits must be finite, got {}",
+            result.evidence.weight_bits
+        );
     }
 
     // `deterministic_match` never panics on the same fuzzed pair, in

@@ -21,12 +21,13 @@ Otherwise returns `false`. Boolean result; no score. A missing or unparseable `s
 fn match_events(&self, e1: &Event, e2: &Event) -> MatchResult;
 ```
 
-Produces a `MatchResult { score, is_match, confidence, breakdown }`:
+Produces a `MatchResult { score, is_match, confidence, breakdown, evidence }`:
 
 - `breakdown: MatchBreakdown` — per-field `Option<f64>` contributions (§6).
 - `score: f64` — weight-renormalised sum across components that scored (§5.2.2).
 - `is_match: bool` — `score >= MatchConfig::match_threshold` under default mode; under strict mode (§5.2.3) the boolean additionally requires `deterministic_match` to return `true`.
 - `confidence: Confidence` — fixed-band derivative of `score` (§3.9).
+- `evidence: Evidence` — Fellegi–Sunter log-likelihood evidence beside the score (§5.5). It never changes `score`, `is_match`, or `confidence`.
 
 #### 5.2.1 Per-field scoring
 
@@ -66,5 +67,40 @@ fn rank_one_to_many(&self, query: &Event, candidates: &[Event]) -> Vec<(usize, M
 If a field is `None` on either side — or, for `start_date` / `end_date`, fails to parse as ISO 8601 on either side — the corresponding `MatchBreakdown` entry is `None` and the field is skipped by the weighted-sum reducer. This is the renormalisation rule: missing data is treated as "no information", not as "disagreement".
 
 The single exception is `name_phonetic_score`: when `MatchConfig::use_phonetic_matching = false`, it is always `None` regardless of input data.
+
+### 5.5 Match evidence
+
+`MatchResult::evidence` follows the family contract in [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md): `score` says how alike the present data is; `evidence` says how much it **proves**. Implementation: `src/evidence.rs`.
+
+```rust
+pub struct Evidence {
+    pub weight_bits: f64,            // sum of log-likelihood weights, in bits
+    pub fields_compared: u32,        // components both records held (identifiers count as one)
+    pub contradictions: Vec<Contradiction>, // { field: "identifier:<scheme>" }
+    pub strength: MatchStrength,     // Contradicted | Proven | Consistent | NonMatch
+}
+```
+
+- **Components.** Each `Some` breakdown component adds `component_bits(s, m, u)`: the agreement weight `log2(m/u)` at `s >= 0.95`, the disagreement weight `log2((1−m)/(1−u))` at `s <= 0.60`, linear between. A `None` component adds `0` and is not counted. The neutral `0.5` that §6.4 returns for a present-but-empty `Location`/`Address` (OQ-J) therefore weighs as a disagreement here.
+- **Per-component `m`/`u`** (informed estimates, not measurements; each constant's doc comment says where its `u` comes from):
+
+  | Component | `m` | `u` | Agree bits | Disagree bits |
+  |---|---|---|---|---|
+  | `name_score` | 0.95 | 0.005 | +7.57 | −4.31 |
+  | `start_date_score` | 0.90 | 0.001 | +9.81 | −3.32 |
+  | `end_date_score` | 0.85 | 0.01 | +6.41 | −2.72 |
+  | `location_score` | 0.85 | 0.01 | +6.41 | −2.72 |
+  | `category_score` | 0.90 | 0.10 | +3.17 | −3.17 |
+  | `country_code_score` | 0.98 | 0.20 | +2.29 | −5.32 |
+  | `organizer_score` | 0.85 | 0.01 | +6.41 | −2.72 |
+  | `performers_score` | 0.80 | 0.01 | +6.32 | −2.31 |
+  | `url_score` | 0.90 | 0.0001 | +13.14 | −3.32 |
+  | `relationships_score` | 0.70 | 0.05 | +3.81 | −1.66 |
+  | `tags_score` | 0.60 | 0.10 | +2.58 | −1.17 |
+
+  `name_phonetic_score` is not weighed (it is derived from the same names as `name_score`). `event_ids_score` is not weighed as a component; the identifier rule replaces it.
+- **Identifiers.** Every `EventIdScheme`, `Other(_)` included, is identity, because §5.1 rule 1 short-circuits on any shared `(scheme, value)`. A non-blank shared pair adds `IDENTIFIER_BITS = log2(0.99/1e-12) ≈ 39.85` once. Per scheme, when both records hold at least one non-blank value and the sets are disjoint, a `Contradiction { field: "identifier:<scheme>" }` is recorded (`wikidata`, `eventbrite`, …, `googlecalendar`, `icalendaruid`, `other:<name>`) and `log2(0.01/(1−1e-12)) ≈ −6.64` bits added. Different schemes neither share nor contradict. The §5.1 rule 2 (name + start instant) is **not** an identifier.
+- **Strength**, checked in order: any contradiction → `Contradicted`; `weight_bits >= MatchConfig::proof_bits` (default `30`, §7) → `Proven`; `is_match` → `Consistent`; else `NonMatch`.
+- **Reference points.** Identical name + start date only: `17.38` bits, `Consistent` (it is `is_match` and satisfies §5.1 rule 2, yet is not proof). All eleven weighed components identical, no identifier: `67.92` bits, `Proven`; it stays `Proven` without the URL (`54.78`).
 
 ---

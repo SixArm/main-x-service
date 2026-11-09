@@ -9,7 +9,7 @@
 
 use event_matcher::{
     Address, Confidence, Event, EventCategory, EventId, EventIdScheme, Location, MatchConfig,
-    MatchingEngine, Normalizer, RelationKind, RelationshipRef,
+    MatchStrength, MatchingEngine, Normalizer, RelationKind, RelationshipRef,
 };
 use proptest::prelude::*;
 
@@ -303,6 +303,30 @@ proptest! {
         let r = engine.match_events(&p1, &p2);
         prop_assert!(r.score >= 0.0, "score < 0.0: {}", r.score);
         prop_assert!(r.score <= 1.0, "score > 1.0: {}", r.score);
+    }
+
+    /// Evidence MUST be finite, and its strength MUST agree with its
+    /// contradictions and `is_match` (agents/share/match-evidence.md §4).
+    #[test]
+    fn evidence_is_finite_and_strength_is_consistent(p1 in event_strategy(), p2 in event_strategy()) {
+        let r = MatchingEngine::default_config().match_events(&p1, &p2);
+        let e = &r.evidence;
+        prop_assert!(e.weight_bits.is_finite(), "weight_bits not finite: {}", e.weight_bits);
+        if e.contradictions.is_empty() {
+            prop_assert_ne!(e.strength, MatchStrength::Contradicted);
+            if e.weight_bits >= MatchConfig::default().proof_bits {
+                prop_assert_eq!(e.strength, MatchStrength::Proven);
+            } else if r.is_match {
+                prop_assert_eq!(e.strength, MatchStrength::Consistent);
+            } else {
+                prop_assert_eq!(e.strength, MatchStrength::NonMatch);
+            }
+        } else {
+            prop_assert_eq!(e.strength, MatchStrength::Contradicted);
+        }
+        // Self-match never contradicts itself.
+        let s = MatchingEngine::default_config().match_events(&p1, &p1);
+        prop_assert!(s.evidence.contradictions.is_empty());
     }
 
     /// Self-match MUST produce `is_match == true` for any validating `Event`.

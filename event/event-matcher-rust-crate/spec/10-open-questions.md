@@ -125,4 +125,20 @@ AGENTS.md guidance to prefer Open Questions over a unilateral decision.
     now states this explicitly under `[Unreleased]` and cross-references
     it from the `[0.8.0]` entry.
 
+- [x] **T-6 (M)** *(resolved 2026-11-09.)* Adopt the family match-evidence
+  contract ([`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)):
+  `src/evidence.rs` with this crate's `m`/`u` table, `MatchResult::evidence`,
+  `MatchConfig::proof_bits` (default `30`), identifier bits and per-scheme
+  contradictions over `event_ids`. Spec §5.5, §7.1, §9.2.
+  **Acceptance:** `score`, `is_match`, `confidence` and every existing test
+  unchanged; identical name + start-date pair is `Consistent`; a shared
+  event id is `Proven`; disjoint same-scheme ids are `Contradicted`; a
+  richly identical record with no id is `Proven`; old JSON without
+  `evidence` deserialises; a property pins finite bits and a strength
+  consistent with contradictions.
+  - **Resolved.** As specified; event-service adopting `evidence` (gating
+    auto-merge on `Proven`, closing its T-16) is the service's own task.
+    The neutral `0.5` for a present-but-empty `Location` (OQ-J) weighs as
+    a disagreement under §5.5; resolving OQ-J to `None` would remove that.
+
 ---

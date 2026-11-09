@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — match evidence (T-6, 2026-11-09)
+
+- `MatchResult::evidence: Evidence` (`#[serde(default)]`): Fellegi–Sunter
+  log-likelihood `weight_bits`, `fields_compared`, `contradictions`, and a
+  `MatchStrength` verdict (`Contradicted` / `Proven` / `Consistent` /
+  `NonMatch`), per the family contract `agents/share/match-evidence.md`.
+  New module `evidence` with this crate's per-component `m`/`u` table;
+  `Evidence`, `Contradiction`, `MatchStrength` re-exported from the root.
+- `MatchConfig::proof_bits` (default `30.0`): the bar for `Proven`.
+- A shared `event_ids` value adds identifier bits once; disjoint values
+  under the same scheme on both sides are a contradiction
+  (`identifier:<scheme>`). Identical name + start date alone is
+  `Consistent`, not `Proven`. Spec §5.5, §7.1, §9.2; T-6.
+- `score`, `is_match` and `confidence` are unchanged.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).
