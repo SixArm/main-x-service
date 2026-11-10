@@ -911,6 +911,16 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **CS-RQ1 (S) — Page the review queue.** *(Done 2026-11-10.)*
+  `GET /api/cases/review-queue` returned at most 500 rows with no
+  cursor, so a longer queue could not be read past its first page, and
+  a larger `limit` was quietly clamped where `agents/share/restful.md`
+  §Pagination refuses it (found by place T-20). It now pages through
+  `axa::cursor_pagination` like `GET /api/cases`: `?limit=&cursor=`,
+  default 100, at most 500, a `422` above that or on an unsigned cursor,
+  `Link: rel="next"` while more follow; whether more follow is decided
+  before any record id is concealed. `tests/requests/review_queue_paging.rs`
+  seeds 520 pairs and walks them to the end, each seen once.
 - [x] **CS-M1 (S) — merge locks both rows under both transports.**
   *(Done 2026-11-08; repo `tasks.md` CS-M1, the same fix as
   care-pathway's CP-M1.)* `streaming::merge_and_emit` took its SEC-B5

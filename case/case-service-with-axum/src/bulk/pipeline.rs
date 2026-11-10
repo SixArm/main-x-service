@@ -918,7 +918,9 @@ mod db_tests {
             "the likely duplicate is queued for review"
         );
 
-        let queued = review_queue::list(&db, Some("pending"), 50).await.unwrap();
+        let queued = review_queue::list(&db, Some("pending"), 0, 50)
+            .await
+            .unwrap();
         let pair = queued
             .iter()
             .find(|r| r.record_id_a == existing.pid || r.record_id_b == existing.pid)

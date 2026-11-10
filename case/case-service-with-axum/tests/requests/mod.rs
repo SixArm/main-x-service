@@ -6,6 +6,7 @@ mod cases;
 mod entity_links;
 mod event_outbox;
 mod review_queue;
+mod review_queue_paging;
 
 use std::sync::Once;
 

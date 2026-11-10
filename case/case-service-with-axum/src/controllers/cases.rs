@@ -1559,31 +1559,37 @@ fn review_row_to_item(
     }
 }
 
-/// Query parameters for the review-queue list endpoint.
+/// Query parameters for the review-queue list endpoint. The page,
+/// `limit` and `cursor`, is read from the URI by [`CursorPage::new`], and
+/// ignored here.
 #[derive(Debug, Deserialize)]
 struct ReviewQueueListQuery {
     /// Optional status-token filter (`pending` / `confirmed` /
     /// `rejected` / `automerged`).
     status: Option<String>,
-    /// Maximum items to return (default 100, capped at 500).
-    limit: Option<u64>,
 }
 
 /// Response for the review-queue list endpoint.
 #[derive(Debug, Serialize)]
 struct ReviewQueueListResponse {
-    /// The stored review-queue items (newest first).
+    /// The stored review-queue items on this page (newest first).
     items: Vec<ReviewQueueItem>,
-    /// Number of items returned.
+    /// Number of items on this page, not in the queue: whether more
+    /// follow is the `Link: rel="next"` header's answer.
     total: usize,
 }
 
 /// List the stored duplicate review queue (newest first).
 ///
-/// `GET /api/cases/review-queue[?status=&limit=]`. An unknown status
-/// token is `422`.
+/// `GET /api/cases/review-queue[?status=&limit=&cursor=]`, one page at a
+/// time by signed cursor like `GET /api/cases`: a `Link: rel="next"`
+/// header while more rows follow, and a `422` for a `limit` above
+/// [`MAX_LIMIT`], a cursor this service did not sign, or an unknown
+/// status token. Whether more follow is decided before any record id is
+/// concealed.
 #[debug_handler]
 async fn get_review_queue(
+    OriginalUri(uri): OriginalUri,
     Query(query): Query<ReviewQueueListQuery>,
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
@@ -1599,19 +1605,28 @@ async fn get_review_queue(
             ),
         ));
     }
+    let page = CursorPage::new(crate::cursor_key::key(), limits(LIST_DEFAULT_LIMIT), &uri)?;
     let rows = crate::models::review_queue::list(
         &ctx.db,
         query.status.as_deref(),
-        query.limit.unwrap_or(100),
+        page.offset(),
+        page.limit() + 1,
     )
     .await?;
+    let (rows, more_follow) = page.split(rows);
     let hidden = hidden_pids_from_db(&ctx.db, &caller, &rows).await?;
     let items: Vec<ReviewQueueItem> = rows
         .iter()
         .map(|row| review_row_to_item(row, &hidden))
         .collect();
     let total = items.len();
-    format::json(ReviewQueueListResponse { items, total })
+    let mut response = Json(ReviewQueueListResponse { items, total }).into_response();
+    if more_follow && let Some(link) = page.next_link() {
+        response
+            .headers_mut()
+            .insert(axum::http::header::LINK, link);
+    }
+    Ok(response)
 }
 
 /// One operator verdict for a `pending` review item.

@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — review queue paging (CS-RQ1)
+
+- `GET /api/cases/review-queue` pages by signed cursor: `?limit=&cursor=`
+  and `Link: rel="next"` while more follow, like `GET /api/cases`. A
+  `limit` above 500 is a `422` where it used to be clamped to 500, so a
+  queue longer than 500 can now be read to its end. `total` counts the
+  page, as before.
+
 ### Changed — axa 0.11
 
 - `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before
