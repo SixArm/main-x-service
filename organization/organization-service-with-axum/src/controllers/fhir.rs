@@ -70,7 +70,11 @@ fn fhir_error(status: StatusCode, code: &str, message: impl Into<String>) -> Res
 
 /// `GET /fhir/Organization/{id}` — render a stored organization as a FHIR
 /// `Organization`, or a `404` `OperationOutcome` when the id is unknown.
-async fn read(Path(id): Path<String>, State(ctx): State<AppContext>) -> Response {
+async fn read(
+    Path(id): Path<String>,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Response {
     let Ok(model) = OrgModel::find_by_pid(&ctx.db, &id).await else {
         return fhir_error(
             StatusCode::NOT_FOUND,
@@ -87,6 +91,30 @@ async fn read(Path(id): Path<String>, State(ctx): State<AppContext>) -> Response
                 e.to_string(),
             );
         }
+    };
+    // The same record-level decision `GET /api/organizations/{pid}` takes
+    // (ORG-T6, `agents/share/fhir.md` §8): a denial is the REST read's
+    // `403` (`401` with no token), and a `mask` obligation serves the
+    // masked record. A no-op with ORGANIZATION_REQUIRE_AUTH off.
+    let obligations = match crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &crate::auth::organization_resource_attrs(&org),
+    ) {
+        Ok(obligations) => obligations,
+        Err((status, reason)) => {
+            let code = if status == StatusCode::UNAUTHORIZED {
+                "login"
+            } else {
+                "forbidden"
+            };
+            return fhir_error(status, code, reason);
+        }
+    };
+    let org = if obligations.iter().any(|o| o == "mask") {
+        crate::privacy::mask_organization(&org)
+    } else {
+        org
     };
     let resource = to_fhir_organization(
         &org,
@@ -247,6 +275,7 @@ async fn remove(
 async fn search(
     Query(params): Query<FhirOrgSearchParams>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Response {
     let query_text = params
         .name
@@ -324,6 +353,19 @@ async fn search(
     for model in &rows {
         let Ok(org) = model.to_org() else { continue };
         let pid = model.pid.to_string();
+        // ORG-T6: a record the caller may not read is left out, so the
+        // Bundle's `total` counts only what is shown; a `mask` obligation
+        // serves the masked record. A masked record is matched as shown,
+        // not as stored, or a search on a masked field (an address, a
+        // telephone) would confirm the hidden value.
+        let Some(obligations) = crate::auth::read_visibility(&caller, &org) else {
+            continue;
+        };
+        let org = if obligations.iter().any(|o| o == "mask") {
+            crate::privacy::mask_organization(&org)
+        } else {
+            org
+        };
         if params.matches(&org, &pid) {
             resources.push(to_fhir_organization(
                 &org,

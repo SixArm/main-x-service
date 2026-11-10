@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — FHIR reads take the record-level decision (ORG-T6)
+
+- `GET /fhir/Organization/{id}` answers a denied record with the REST
+  read's `403` (`OperationOutcome`, code `forbidden`) and serves the
+  masked record under a `mask` obligation; `GET /fhir/Organization?…`
+  leaves denied records out of the Bundle and its `total`, and matches a
+  masked record as shown. With `ORGANIZATION_REQUIRE_AUTH` off, nothing
+  changes.
+
 ### Security — record-level reads on every collection read (ORG-T2)
 
 - With `ORGANIZATION_REQUIRE_AUTH` on, `list`, `search`,

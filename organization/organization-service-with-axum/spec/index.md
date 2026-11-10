@@ -543,8 +543,19 @@ organization is not a data subject.
 
 ## 13. Tasks (live work queue)
 
-- [ ] **ORG-T6 (S, security) — Record-level reads on the FHIR surface.**
-  *(Found 2026-11-10 while closing ORG-T2.)* `GET /fhir/Organization/{id}`
+- [x] **ORG-T6 (S, security) — Record-level reads on the FHIR surface.**
+  *(Found and done 2026-11-10, after ORG-T2.)* `GET /fhir/Organization/{id}`
+  now takes the REST read's `authorize_record` decision: a denial is the
+  REST read's `403`, as an `OperationOutcome` with code `forbidden`
+  (`login` with no token), and a `mask` obligation serves
+  `privacy::mask_organization`'s record. `GET /fhir/Organization?…` runs
+  `auth::read_visibility` per row: a denied record is left out, so the
+  Bundle's `total` counts only what is shown, and a masked one is matched
+  **as shown**, so a search on a masked field cannot confirm the hidden
+  value. FHIR update and delete stay behind the blanket guard only, as
+  REST `PUT` and `DELETE` do. `tests/visibility.rs` covers the `403`, the
+  masked read and the search omission, and fails with either check
+  disabled. The original finding: `GET /fhir/Organization/{id}`
   and `GET /fhir/Organization?…` (`src/controllers/fhir.rs` `read`,
   `search`) return records with no `authorize_record` decision, while
   `GET /api/organizations/{pid}` and, since ORG-T2, the REST collection

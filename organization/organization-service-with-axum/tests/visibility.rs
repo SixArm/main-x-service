@@ -311,6 +311,65 @@ async fn collection_reads_omit_hidden_and_reduce_masked_records() {
                 .is_none_or(Vec::is_empty),
             "{stored}"
         );
+
+        // ORG-T6: the FHIR surface takes the REST read's decision. A
+        // denied record is the REST read's `403`, as an OperationOutcome.
+        let denied = request
+            .get(&format!("/fhir/Organization/{hidden}"))
+            .add_header(rk.clone(), rv.clone())
+            .await;
+        assert_eq!(denied.status_code(), 403, "a denied FHIR read is refused");
+        let outcome: Value = denied.json();
+        assert_eq!(outcome["resourceType"], "OperationOutcome", "{outcome}");
+        assert_eq!(outcome["issue"][0]["code"], "forbidden", "{outcome}");
+
+        // A `mask` obligation serves the masked record over FHIR too.
+        let phone = "+44 1624 555 0199";
+        let with_phone: organization_matcher::Organization = serde_json::from_value(json!({
+            "name": format!("{token} Telephony"),
+            "jurisdiction": "IM",
+            "telephone": phone,
+        }))
+        .unwrap();
+        let phoned = organization_service::streaming::create_and_emit(&ctx.db, &with_phone, None)
+            .await
+            .expect("seed")
+            .pid
+            .to_string();
+        let read: Value = request
+            .get(&format!("/fhir/Organization/{phoned}"))
+            .add_header(rk.clone(), rv.clone())
+            .await
+            .json();
+        let shown = read.to_string();
+        assert!(!shown.contains(phone), "the FHIR read must mask: {read}");
+        assert!(
+            shown.contains("0199"),
+            "masking keeps the last four: {read}"
+        );
+
+        // FHIR search leaves the denied record out of the Bundle, and its
+        // `total` counts only what is shown.
+        let bundle: Value = request
+            .get(&format!("/fhir/Organization?name={token}%20Holdings"))
+            .add_header(rk.clone(), rv.clone())
+            .await
+            .json();
+        let ids: Vec<String> = bundle["entry"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|e| e["resource"]["id"].as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(ids.contains(&full), "{bundle}");
+        assert!(ids.contains(&masked), "{bundle}");
+        assert!(
+            !ids.contains(&hidden),
+            "FHIR search must omit the hidden record: {bundle}"
+        );
+        assert_eq!(bundle["total"].as_u64(), Some(ids.len() as u64), "{bundle}");
     })
     .await;
 }
