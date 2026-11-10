@@ -66,7 +66,7 @@ prometheus = { version = "0.14" }
 lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"] }
 # The deliberately slow hash for SEC-A5, and CSRF token generation.
 argon2 = { version = "0.5", features = ["std"] }
-rand = "0.9"
+rand = "0.10"
 
 [features]
 # PASETO v4.public token issuance (`POST /api/auth/token`), the published
