@@ -67,7 +67,7 @@ so the audit trail keeps working when upstreams are down.
 
 - **API contract**: [spec/api-contract.md](spec/api-contract.md), [spec/examples.md](spec/examples.md); [`src/responses/mod.rs`](src/responses/mod.rs)
 - **Architecture**: [spec/architecture.md](spec/architecture.md); [`src/app.rs`](src/app.rs)
-- **Configuration**: [spec/database.md](spec/database.md); [`config/`](config/)
+- **Configuration**: [spec/database.md](spec/database.md); defaults in [`src/app.rs`](src/app.rs)
 - **Domain model**: [spec/domain-model.md](spec/domain-model.md)
 - **Examples (curl + Rust)**: [spec/examples.md](spec/examples.md)
 - **File layout**: [spec/architecture.md](spec/architecture.md); [README.md](README.md) §"Layout"

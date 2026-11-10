@@ -2,26 +2,14 @@
 
 > Part of the [Axum edition specification](index.md).
 
-## Connection string
+## No database
 
-`config/development.yaml`:
-
-```yaml
-database:
-  uri: postgres://postgres:postgres@localhost:5432/case_folder_development
-  auto_migrate: true
-```
-
-Override at runtime with `DB_URL`. In production set
-`auto_migrate: false` and run `cargo run --release -- db migrate` from a
-controlled release step (currently a no-op because there are no
-migrations, but the wiring stays).
-
-## Migrations
-
-No migration files. `migration/src/lib.rs` declares
-`Migrator::migrations() -> vec![]`. The DB connection is opened at boot
-so axa can populate `AppContext::db` but no schema is created or read.
+The tracker owns no tables. Its `axa` dependency has no database feature,
+so it opens no connection, needs no `DB_URL`, and has no migrations.
+`db` commands answer "this service has no database" (`src/app.rs`).
+Settings come from the environment, as for every axa service
+([`agents/share/axa.md`](../../../agents/share/axa.md)); there are no
+config files.
 
 ## Stub mode for offline / e2e runs
 

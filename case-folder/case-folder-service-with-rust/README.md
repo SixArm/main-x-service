@@ -24,8 +24,8 @@ label (patient details, cabinet labels, worker name + role) so the
 audit log remains useful even when the upstream services rename
 records or go offline.
 
-- **[Loco](https://axa)** 0.16 — Rails-style Rust web framework on Axum
-- **PostgreSQL** dependency is currently *vestigial* — axa still needs a database connection at boot, but the tracker has zero local tables.
+- **Axum** on **[axa](https://github.com/publicprojects-io/axa)** 0.11 — the shared routes, middleware, health checks, configuration and command line
+- **No database** — the tracker owns no tables, and axa is built without a database feature, so it boots with no Postgres.
 - **[person-service-with-axum](../../person/person-service-with-axum)** — Main Patient Service backend
 - **[place-service-with-axum](../../place/place-service-with-axum)** — Main Place Service backend
 - **[worker-service-with-axum](../../worker/worker-service-with-axum)** — Main Worker Service backend
@@ -184,14 +184,10 @@ case-folder-service-with-rust/
 ├── index.md                        ← documentation landing page
 ├── rust-toolchain.toml
 ├── spec/                           ← full specification (topic files + SDD)
-├── config/
-│   ├── development.yaml
-│   ├── test.yaml
-│   └── production.yaml
 └── src/
     ├── bin/main.rs                 ← cli::main entrypoint
     ├── lib.rs
-    ├── app.rs                      ← impl Hooks for App
+    ├── app.rs                      ← defaults, routes, the CLI and the test boot
     ├── nhs.rs                      ← Modulus 11 validator + formatter
     ├── controllers/
     │   ├── mod.rs

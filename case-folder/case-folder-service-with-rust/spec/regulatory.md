@@ -20,9 +20,7 @@ two operational concerns:
 
 Same checklist as the root spec, plus axa-specifics:
 
-- [ ] Replace the dev `DB_URL` credentials with secrets-manager values.
-- [ ] Set `auto_migrate: false` in `config/production.yaml`.
-- [ ] Set `dangerously_truncate: false` and `dangerously_recreate: false`.
+- [ ] Set `AUTH_SECRET` from a secrets manager (the service has no database, so no `DB_URL`).
 - [ ] Use the `--release` profile.
 - [ ] Run behind a reverse proxy that enforces HTTPS, HSTS, and rate limits.
 - [ ] Wire CIS2 / OIDC via axa's auth layer (or external middleware).

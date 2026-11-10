@@ -61,17 +61,10 @@ case-folder-service-with-rust/
 ├── index.md
 ├── rust-toolchain.toml
 ├── spec/                       ← this specification
-├── config/
-│   ├── development.yaml
-│   ├── test.yaml
-│   └── production.yaml
-├── migration/
-│   ├── Cargo.toml
-│   └── src/lib.rs               MigratorTrait → vec![]
 └── src/
-    ├── bin/main.rs              cli::main::<App, Migrator>()
+    ├── bin/main.rs              calls app::run
     ├── lib.rs
-    ├── app.rs                   impl Hooks for App
+    ├── app.rs                   defaults, routes, CLI, test boot
     ├── nhs.rs                   Modulus 11 + formatter + unit tests
     ├── controllers/
     │   ├── mod.rs
@@ -96,7 +89,6 @@ case-folder-service-with-rust/
     ├── main_worker_service/     Client + Http + Stub
     ├── main_thing_service/      Client + Http + Stub
     ├── main_event_service/      Client + Http + Stub
-    ├── models/                  empty
     └── tasks/
         ├── mod.rs
         └── seed.rs              registers seed data with all five services

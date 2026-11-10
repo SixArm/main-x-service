@@ -14,7 +14,6 @@
 | Metrics                | Prometheus                                  |                       |
 
 **axa-version caveat.** axa's public Rust API moves between minor
-releases. This spec describes the project as written for `0.16`. If the
-crate has moved on (e.g. the `Routes` builder or `create_app` signature
-has changed), `app.rs` and the controllers will need small adjustments —
-the domain model and JSON shapes are stable.
+releases. This spec describes the project as written for `0.11`. A later
+release may need small adjustments to `app.rs` and the controllers; the
+domain model and JSON shapes are stable.

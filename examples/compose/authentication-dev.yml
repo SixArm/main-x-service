@@ -5,10 +5,9 @@
 #
 # This is deliberately a SEPARATE file from single-service.yml's
 # case-service example, not a `<- swap` copy of it: the whole point
-# here is the environment override. `config/development.yaml`
-# (authentication-service-with-axum/config/) sets `auto_migrate: true`
-# (no separate migrate step needed, unlike every production-mode
-# service in this directory) and is what makes
+# here is the environment override. In development axa migrates at
+# boot (no separate migrate step needed, unlike every production-mode
+# service in this directory), and development is what makes
 # `deliver_magic_link` (src/controllers/auth.rs) write the magic-link
 # URL to the console log — SEC-A3 (agents/share/security.md) makes
 # that ONLY happen in `Environment::Development`, by design, so a
@@ -72,41 +71,24 @@ services:
     image: mxi-example-authentication-dev-service
     container_name: mxi-example-authentication-dev-service
     # COMPOSE-WORKER: matches every other file in this directory — the
-    # Dockerfile's own CMD is server-only, which never registers
-    # loco's background-queue worker.
-    #
-    # config/development.yaml (unlike production.yaml) hardcodes
-    # `server.binding: localhost` — reasonable for a bare `cargo run`
-    # on a laptop (nothing else on the LAN can reach it), but inside a
-    # container that means the process listens only on ITS OWN loopback,
-    # unreachable through the compose port-forward no matter what
-    # `ports:` says (confirmed live: the container's own internal
-    # HEALTHCHECK curl succeeds while a host-side curl against the
-    # published port gets a connection with no response). The binding
-    # is a literal in the YAML, not one of the file's `{{ get_env(...) }}`
-    # templated fields, so there is no env var to override it with.
-    # Patching the one line at container start (rather than committing
-    # a second copy of the whole file here, which could drift from the
-    # real one) is the smallest fix that keeps `cargo run`'s own
-    # loopback-only default untouched for every non-container dev user.
-    command:
-      - sh
-      - -c
-      - |
-        sed -i 's/binding: localhost/binding: 0.0.0.0/' /app/config/development.yaml
-        exec /app/authentication-service-cli start --server-and-worker
+    # Dockerfile's own CMD is server-only, and `--all` also runs the job
+    # worker.
+    command: ["/app/authentication-service-cli", "start", "--all"]
     restart: unless-stopped
     environment:
       # Overrides the image's baked-in `APP_ENV=production` — this is
       # the entire point of this file (see header comment).
       APP_ENV: development
+      # Development binds to localhost by default, which inside a
+      # container is the container's own loopback and unreachable
+      # through the port forward. Listen on every interface instead.
+      BINDING: 0.0.0.0
       DB_URL: postgresql://loco:loco@postgres:5432/authentication_service_development
       AUTH_ALLOWED_FRONTENDS: ${AUTH_ALLOWED_FRONTENDS:-http://localhost:4173}
       RUST_LOG: ${RUST_LOG:-info}
-      # No TOKEN_PRIVATE_KEY_SEED here: config/development.yaml carries
-      # no `auth.jwt` block requiring one, and SEC-A1's fail-closed
-      # dev-seed refusal only fires outside an explicitly
-      # non-production environment — Development is exempt by design.
+      # No TOKEN_PRIVATE_KEY_SEED here: SEC-A1's fail-closed dev-seed
+      # refusal fires only outside an explicitly non-production
+      # environment, and development is exempt by design.
     ports:
       - "5150:5150"
     depends_on:

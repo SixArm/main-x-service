@@ -43,11 +43,6 @@
 
 x-common-env: &common-env
   RUST_LOG: ${RUST_LOG:-info}
-  # Required by loco's config schema (auth.jwt.secret has no default,
-  # except link-graph which has no auth.jwt block at all); unused by
-  # any of these crates' actual auth flow, which is offline PASETO
-  # verification (see agents/share/jwt.md), not JWT sessions.
-  JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
 
 services:
   postgres:
@@ -92,14 +87,13 @@ services:
   person-service:
     build: { context: ../.., dockerfile: person/person-service-with-axum/Dockerfile }
     image: mxi-family-person-service
-    # COMPOSE-WORKER: the Dockerfile's own CMD is server-only ("start"),
-    # which never registers BulkJobWorker (loco's connect_workers only
-    # runs under `start --server-and-worker`) — so a bulk import/export
-    # job would accept a 202 and then sit in "queued" forever. No
+    # COMPOSE-WORKER: `start` runs only the server, so the job worker
+    # that drains bulk import/export jobs needs `start --all`; without it
+    # a job accepts a 202 and then sits in "queued" forever. No
     # ENTRYPOINT is set in the image, so the full argv is repeated here
-    # (a bare `command: ["start", "--server-and-worker"]` would try to
-    # exec "start" as a binary path and fail).
-    command: ["/app/person-service", "start", "--server-and-worker"]
+    # (a bare `command: ["start", "--all"]` would try to exec "start"
+    # as a binary path and fail).
+    command: ["/app/person-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -138,7 +132,7 @@ services:
     build: { context: ../.., dockerfile: worker/worker-service-with-axum/Dockerfile }
     image: mxi-family-worker-service
     # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/worker-service", "start", "--server-and-worker"]
+    command: ["/app/worker-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -177,7 +171,7 @@ services:
     build: { context: ../.., dockerfile: place/place-service-with-axum/Dockerfile }
     image: mxi-family-place-service
     # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/place-service", "start", "--server-and-worker"]
+    command: ["/app/place-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -216,7 +210,7 @@ services:
     build: { context: ../.., dockerfile: thing/thing-service-with-axum/Dockerfile }
     image: mxi-family-thing-service
     # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/thing-service", "start", "--server-and-worker"]
+    command: ["/app/thing-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -255,7 +249,7 @@ services:
     build: { context: ../.., dockerfile: event/event-service-with-axum/Dockerfile }
     image: mxi-family-event-service
     # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/event-service", "start", "--server-and-worker"]
+    command: ["/app/event-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -294,7 +288,7 @@ services:
     build: { context: ../.., dockerfile: course/course-service-with-axum/Dockerfile }
     image: mxi-family-course-service
     # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/course-service", "start", "--server-and-worker"]
+    command: ["/app/course-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -333,7 +327,7 @@ services:
     build: { context: ../.., dockerfile: organization/organization-service-with-axum/Dockerfile }
     image: mxi-family-organization-service
     # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/organization-service", "start", "--server-and-worker"]
+    command: ["/app/organization-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -372,7 +366,7 @@ services:
     build: { context: ../.., dockerfile: care-pathway/care-pathway-service-with-axum/Dockerfile }
     image: mxi-family-care-pathway-service
     # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/care-pathway-service", "start", "--server-and-worker"]
+    command: ["/app/care-pathway-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -411,7 +405,7 @@ services:
     build: { context: ../.., dockerfile: case/case-service-with-axum/Dockerfile }
     image: mxi-family-case-service
     # COMPOSE-WORKER — see person-service's comment above.
-    command: ["/app/case-service", "start", "--server-and-worker"]
+    command: ["/app/case-service", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -458,7 +452,7 @@ services:
     image: mxi-family-authentication-service
     # COMPOSE-WORKER — see person-service's comment above (this crate's
     # binary is authentication-service-cli, matching its Dockerfile CMD).
-    command: ["/app/authentication-service-cli", "start", "--server-and-worker"]
+    command: ["/app/authentication-service-cli", "start", "--all"]
     restart: unless-stopped
     environment:
       <<: *common-env
@@ -479,19 +473,20 @@ services:
     networks: [mxi-family]
 
   # ---- link-graph (read-model aggregator) ------------------------------
-  # No separate migrate step: this crate's own production.yaml sets
-  # `auto_migrate: true` (unlike every other crate here), so `start`
-  # applies pending migrations itself.
+  # No separate migrate step: `DB_AUTO_MIGRATE` below makes `start`
+  # apply pending migrations itself, which axa does not do in
+  # production unless told to.
   link-graph-service:
     build: { context: ../.., dockerfile: link/link-graph-service-with-axum/Dockerfile }
     image: mxi-family-link-graph-service
     # COMPOSE-WORKER — see person-service's comment above. This crate
     # registers no workers today (connect_workers is a no-op), so this
     # is a no-op in practice, kept for uniformity across the family.
-    command: ["/app/link-graph-service", "start", "--server-and-worker"]
+    command: ["/app/link-graph-service", "start", "--all"]
     restart: unless-stopped
     environment:
       DB_URL: postgresql://loco:loco@postgres:5432/link_graph
+      DB_AUTO_MIGRATE: "true"
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
       RUST_LOG: ${RUST_LOG:-info}

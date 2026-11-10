@@ -55,14 +55,15 @@ themselves regardless of `require_session`.
 
 ## Dependencies
 
-- `jsonwebtoken = "9"` (HS256). No SMTP crate yet — `LogMailer` writes
+- `jsonwebtoken = "11"` (HS256). No SMTP crate yet — `LogMailer` writes
   the link to the tracing log; a real `SmtpMailer` is a production task.
 
 ## Config
 
-`settings.auth` in `config/{development,test,production}.yaml`; see the
+Per-environment defaults in `src/auth/mod.rs`, overridden by `AUTH_SECRET`,
+`AUTH_ALLOWLIST` (JSON) and `FRONTEND_URL`; see the
 [root config matrix](../../spec/auth.md#configuration-per-environment).
-The `secret` must be overridden in production (env `AUTH_SECRET`).
+The `secret` must be overridden in production (`AUTH_SECRET`).
 
 ## Tests
 

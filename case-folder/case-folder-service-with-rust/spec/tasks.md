@@ -118,10 +118,10 @@
 
 ## Production gates
 
-- [ ] **LT-G1** Auth (CIS2 / OIDC) + ABAC via Loco auth layer (P0)
+- [ ] **LT-G1** Auth (CIS2 / OIDC) + ABAC via the family's PASETO guard (`authentication-verifier`) (P0)
 - [ ] **LT-G2** Append-only chained-signature audit storage on a worker (P0)
 - [ ] **LT-G3** API versioning via `Accept` mediatype (P0)
-- [ ] **LT-G4** `auto_migrate: false`, no dangerous truncate/recreate, `--release`, secrets manager, reverse-proxy TLS/HSTS — see [regulatory.md](regulatory.md)
+- [ ] **LT-G4** `--release`, secrets manager, reverse-proxy TLS/HSTS — see [regulatory.md](regulatory.md)
 
 ## Recipe: add an endpoint
 

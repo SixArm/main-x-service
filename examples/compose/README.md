@@ -67,10 +67,10 @@ podman compose -f examples/compose/authentication-dev.yml down -v
 
 ## Why a migrate-then-start step per service
 
-Every crate's `config/production.yaml` sets `auto_migrate: false`
-(link-graph is the one exception — see its comment in
-`full-family.yml`), so a container that jumped straight to `start`
-would serve against an empty schema. Each service therefore has a
+In production axa migrates at boot only when `DB_AUTO_MIGRATE=true`
+(link-graph sets it — see its comment in `full-family.yml`), so a
+container that jumped straight to `start` would serve against an empty
+schema. Each service therefore has a
 one-shot `<service>-migrate` container (`command: ["db", "migrate",
 "-e", "production"]`, same image, no port) that `depends_on:
 condition: service_completed_successfully` gates the real service on.

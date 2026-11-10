@@ -6,7 +6,7 @@ subproject. Read this **before** opening a PR.
 ## What this project is
 
 A **back-end JSON API**, written in Rust on
-[Loco](https://axa)/Axum, that tracks the physical location of
+Axum on [axa](https://github.com/publicprojects-io/axa), that tracks the physical location of
 paper case-note folders for a UK NHS hospital setting. There is **no
 built-in UI** — front-ends live elsewhere and consume this service
 over HTTP.
@@ -24,14 +24,13 @@ inferring from the code.
 
 | Where                          | What                                                      |
 | ------------------------------ | --------------------------------------------------------- |
-| `src/app.rs`                   | `impl Hooks for App` — initializers + route composition   |
+| `src/app.rs`                   | Defaults, initializers + route composition, CLI, test boot |
 | `src/controllers/`             | Axum handlers, one module per resource                    |
 | `src/responses/mod.rs`         | Every wire struct + error helpers (404/422/503)           |
 | `src/main_*_service/`          | Client trait + `http::HttpClient` + `stub::StubClient`    |
 | `src/initializers/`            | Wires upstream clients into the Axum extension layer      |
 | `src/nhs.rs`                   | Modulus 11 NHS Number validator + formatter               |
 | `tests/requests/`              | Request-level integration tests (stub upstreams)          |
-| `config/`                      | Dev / test / production YAML                              |
 
 ## Working rules
 

@@ -275,3 +275,22 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX idx_audit_log_entity_id  ON audit_log (entity_id);
 CREATE INDEX idx_audit_log_created_at ON audit_log (created_at);
+
+-- ----------------------------------------------------------------------------
+-- Transactional outbox (agents/share/event-bus.md §3): one row written in
+-- the same transaction as the course change; the relay ships rows in id
+-- order and stamps published_at.
+-- ----------------------------------------------------------------------------
+CREATE TABLE course_outbox (
+    id                  BIGSERIAL PRIMARY KEY,
+    event_id            UUID                     NOT NULL UNIQUE,
+    entity              TEXT                     NOT NULL,
+    entity_pid          UUID                     NOT NULL,
+    kind                TEXT                     NOT NULL,  -- created|updated|deleted|merged
+    occurred_at         TIMESTAMP WITH TIME ZONE NOT NULL,
+    actor               TEXT,
+    schema_version      INT                      NOT NULL DEFAULT 1,
+    payload             JSONB                    NOT NULL,
+    published_at        TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX course_outbox_unpublished ON course_outbox (id) WHERE published_at IS NULL;
