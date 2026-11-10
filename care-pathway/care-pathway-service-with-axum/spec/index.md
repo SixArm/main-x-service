@@ -1215,6 +1215,23 @@ the evidence bundle.
 
 ## 13. Tasks (live work queue)
 
+- [x] **CP-FH1 (S, security) — Record-level reads on the FHIR surface.**
+  *(Done 2026-11-10; organization's ORG-T6 survey found it.)*
+  `GET /fhir/PlanDefinition/{id}` and FHIR search returned pathways with
+  no `authorize_record` decision, though `GET /api/care-pathways/{pid}`
+  and, since CP-T2, the REST collection reads take one
+  (`agents/share/fhir.md` §8). With `CARE_PATHWAY_REQUIRE_AUTH` on, the
+  FHIR read takes the REST read's decision before it is recorded as a
+  disclosure: a denial is a `403` `OperationOutcome` (`forbidden`; `401`
+  `login` with no token), as REST answers `403`, and a `mask` obligation
+  serves `privacy::mask_pathway`'s view. FHIR search decides each row
+  with the new `auth::read_visibility`: a denied pathway is left out and
+  the Bundle's `total` counts only what is shown, and a masked pathway is
+  matched as shown, not as stored (no search parameter reads the masked
+  provider fields today, so this is a guard for later ones). Update and
+  delete are unchanged, as REST's take no record-level decision.
+  `tests/fhir_record_level.rs` (its own binary) fails at the read and
+  the search assertion with each check disabled.
 - [x] **CP-RQ1 (S) — Page the review queue.** *(Done 2026-11-10.)*
   `GET /api/care-pathways/review-queue` returned at most 500 rows with
   no cursor, so a longer queue could not be read past its first page,

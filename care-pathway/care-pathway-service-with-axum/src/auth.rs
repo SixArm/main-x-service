@@ -578,6 +578,19 @@ pub fn authorize_record(
     }
 }
 
+/// The obligations `caller` reads `pathway` under, or `None` when the
+/// record-level policy denies the read: the decision
+/// [`authorize_record`] takes for `GET /api/care-pathways/{pid}`, for a
+/// path that shows many records and leaves a denied one out rather than
+/// failing. Always `Some(vec![])` with `CARE_PATHWAY_REQUIRE_AUTH` off.
+#[must_use]
+pub fn read_visibility(
+    caller: &MaybeAuthUser,
+    pathway: &care_pathway_matcher::CarePathway,
+) -> Option<Vec<String>> {
+    authorize_record(caller, Action::Read, &care_pathway_resource_attrs(pathway)).ok()
+}
+
 /// The blanket guard the middleware runs: like [`enforce`], but the caller
 /// is authenticated through every credential type this build accepts
 /// (PASETO with `paseto`, a Keycloak access token with `keycloak`) via

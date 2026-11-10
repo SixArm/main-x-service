@@ -115,6 +115,9 @@ fn validate_fhir(
 
 /// `GET /fhir/PlanDefinition/{id}` — render a stored care pathway as a FHIR
 /// `PlanDefinition`, or a `404` `OperationOutcome` when the id is unknown.
+/// With `CARE_PATHWAY_REQUIRE_AUTH` on it takes the REST read's
+/// record-level decision: `403` on a denial, the masked pathway under a
+/// `mask` obligation.
 ///
 /// Audited as a read (HIPAA §164.312(b)) when `CARE_PATHWAY_AUDIT_READS`
 /// is on — the FHIR surface is a second representation, not a second,
@@ -141,6 +144,31 @@ async fn read(
                 e.to_string(),
             );
         }
+    };
+    // The same record-level decision `GET /api/care-pathways/{pid}` takes
+    // (CP-FH1, `agents/share/fhir.md` §8), before the read is recorded as
+    // a disclosure: a denial is the REST read's `403` (`401` with no
+    // token), and a `mask` obligation serves the masked pathway. A no-op
+    // with CARE_PATHWAY_REQUIRE_AUTH off.
+    let obligations = match crate::auth::authorize_record(
+        &caller,
+        authentication_verifier::Action::Read,
+        &crate::auth::care_pathway_resource_attrs(&pathway),
+    ) {
+        Ok(obligations) => obligations,
+        Err((status, reason)) => {
+            let code = if status == StatusCode::UNAUTHORIZED {
+                "login"
+            } else {
+                "forbidden"
+            };
+            return fhir_error(status, code, reason);
+        }
+    };
+    let pathway = if obligations.iter().any(|o| o == "mask") {
+        crate::privacy::mask_pathway(&pathway)
+    } else {
+        pathway
     };
     if disclosure::record_access(
         &ctx.db,
@@ -382,6 +410,10 @@ async fn search(
         let Ok(pathway) = model.to_pathway() else {
             continue;
         };
+        // CP-FH1: matched as shown, not as stored (see `as_shown`).
+        let Some(pathway) = as_shown(&caller, pathway) else {
+            continue;
+        };
         let pid = model.pid.to_string();
         let status = status_for(model.active);
         if params.matches(&pathway, &pid, status) {
@@ -409,6 +441,24 @@ async fn search(
         return audit_unavailable();
     }
     fhir_json(StatusCode::OK, &FhirBundle::searchset(resources))
+}
+
+/// `pathway` as `caller` may see it in a search: `None` when the
+/// record-level policy denies the read (CP-FH1), so a Bundle leaves it out
+/// and its `total` counts only what is shown, and the masked pathway under
+/// a `mask` obligation. A search matches the pathway as shown, not as
+/// stored, or a search on a masked field (the provider) would confirm the
+/// hidden value. The pathway itself with `CARE_PATHWAY_REQUIRE_AUTH` off.
+fn as_shown(
+    caller: &MaybeAuthUser,
+    pathway: care_pathway_matcher::CarePathway,
+) -> Option<care_pathway_matcher::CarePathway> {
+    let obligations = crate::auth::read_visibility(caller, &pathway)?;
+    Some(if obligations.iter().any(|o| o == "mask") {
+        crate::privacy::mask_pathway(&pathway)
+    } else {
+        pathway
+    })
 }
 
 /// The search parameters this service actually filters on. The

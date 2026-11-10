@@ -9,6 +9,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — record-level reads on FHIR (CP-FH1)
+
+- With `CARE_PATHWAY_REQUIRE_AUTH` on, `GET /fhir/PlanDefinition/{id}`
+  takes the REST read's record-level decision: a denied pathway is a
+  `403` `OperationOutcome`, and a `mask` obligation serves the masked
+  pathway. FHIR search leaves a denied pathway out of the Bundle, and
+  `total` counts only what is shown. Nothing changes with the flag off.
+
 ### Changed — review queue paging (CP-RQ1)
 
 - `GET /api/care-pathways/review-queue` pages by signed cursor:
