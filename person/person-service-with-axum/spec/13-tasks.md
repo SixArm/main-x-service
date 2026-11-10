@@ -1404,8 +1404,26 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   masking hides (`query_touches_masked_value`: an identifier value
   `mask_person` changed, compared on letters and digits, four characters
   or more), so a search on an SSN cannot confirm it. No change with the
-  flag off. FHIR reads still write no disclosure audit row, where the
-  REST read does. Tests: `query_touching_a_masked_identifier_is_caught`,
+  flag off. FHIR reads are audited as REST reads are since T-44. Tests: `query_touching_a_masked_identifier_is_caught`,
   and `tests/fhir_sec_g3.rs` (DB, its own binary), which fails at the
   matching assertion with the read check, the search visibility check or
   the masked-value check disabled.
+- [x] **T-44 (S, compliance) — Audit FHIR reads as REST reads are.**
+  *(Done 2026-11-10; found while doing T-43.)* REST `GET
+  /api/persons/{id}` and REST search write a read-audit row through
+  `compliance::disclosure::record_access`; `GET /fhir/Patient/{id}`, the
+  `/fhir/Person` alias and FHIR search wrote none, so a read through FHIR
+  left no trace (HIPAA §164.312(b): reads are activity). They now take an
+  `AccessContext` and call the same helper under the same condition: a
+  no-op unless `PERSON_AUDIT_READS` is on (independent of
+  `PERSON_REQUIRE_AUTH`); a read is recorded as `read` against the
+  person, after the record-level decision allows it (a denied read
+  disclosed nothing, as REST); a search as one `search` row against the
+  nil id, before the index is asked; and a refused write under
+  `PERSON_AUDIT_FAIL_CLOSED` refuses the read with a `503`
+  `OperationOutcome` (`transient`), as REST refuses with a `503`.
+  `tests/fhir_read_audit.rs` (DB, its own binary) shows a FHIR read and
+  an alias read each write the row the REST read writes, and a FHIR
+  search one `search` row; it fails at the read assertion with the read
+  call disabled and at the search assertion with the search call
+  disabled.

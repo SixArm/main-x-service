@@ -30,6 +30,7 @@ use person_service::api::fhir::handlers::{
 };
 use person_service::api::rest::AppState;
 use person_service::api::rest::auth::{MaybeAuthUser, claims_from_token};
+use person_service::compliance::disclosure::AccessContext;
 use person_service::db::AuditContext;
 use person_service::models::{Gender, HumanName, Identifier, Person};
 use rusty_paseto::core::{Footer, Key, Paseto, PasetoAsymmetricPrivateKey, Payload, Public, V4};
@@ -192,6 +193,7 @@ async fn fhir_read_and_search_take_the_record_level_decision() {
             State(state.clone()),
             Path(denied_id.clone()),
             caller().await,
+            AccessContext::from_parts(None, None, None),
         )
         .await,
     )
@@ -204,6 +206,7 @@ async fn fhir_read_and_search_take_the_record_level_decision() {
             State(state.clone()),
             Path(denied_id.clone()),
             caller().await,
+            AccessContext::from_parts(None, None, None),
         )
         .await,
     )
@@ -216,6 +219,7 @@ async fn fhir_read_and_search_take_the_record_level_decision() {
             State(state.clone()),
             Path(masked_id.clone()),
             caller().await,
+            AccessContext::from_parts(None, None, None),
         )
         .await,
     )
@@ -232,6 +236,7 @@ async fn fhir_read_and_search_take_the_record_level_decision() {
             State(state.clone()),
             Query(search(Some(family.clone()), None)),
             caller().await,
+            AccessContext::from_parts(None, None, None),
         )
         .await,
     )
@@ -256,6 +261,7 @@ async fn fhir_read_and_search_take_the_record_level_decision() {
             State(state.clone()),
             Query(search(None, Some(ssn.clone()))),
             caller().await,
+            AccessContext::from_parts(None, None, None),
         )
         .await,
     )

@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Compliance — FHIR reads are audited (T-44)
+
+- `GET /fhir/Patient/{id}`, `GET /fhir/Person/{id}` and FHIR search now
+  write the read-audit row their REST equivalents write, through the
+  same `disclosure::record_access` and under the same condition
+  (`PERSON_AUDIT_READS` on; a denied read is not recorded; a refused
+  write under `PERSON_AUDIT_FAIL_CLOSED` is a `503` `OperationOutcome`).
+  Before, a read through FHIR left no audit row.
+
 ### Security — record-level reads on the FHIR surface (T-43)
 
 - With `PERSON_REQUIRE_AUTH` on, `GET /fhir/Patient/{id}` and

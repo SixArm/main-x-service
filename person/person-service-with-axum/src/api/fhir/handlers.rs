@@ -37,6 +37,7 @@ use crate::api::rest::auth::{
     MaybeAuthUser, audit_context_of, authorize_record, person_resource_attrs, read_visibility,
 };
 use crate::api::rest::handlers::{ResultDisposition, search_result_disposition};
+use crate::compliance::disclosure::{self, AccessContext};
 use authentication_verifier::Action;
 
 /// Max search hits requested from the index when `_count` is unset.
@@ -118,8 +119,9 @@ pub async fn get_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> Response {
-    read_resource(&state, &caller, &id, "Patient").await
+    read_resource(&state, &caller, &access, &id, "Patient").await
 }
 
 /// `GET /fhir/Person/{id}` — the demographic `Person` alias view.
@@ -127,8 +129,9 @@ pub async fn get_fhir_person_alias(
     State(state): State<AppState>,
     Path(id): Path<String>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> Response {
-    read_resource(&state, &caller, &id, "Person").await
+    read_resource(&state, &caller, &access, &id, "Person").await
 }
 
 /// Shared read: fetch by id and render as `resource_type` (`Patient` /
@@ -141,9 +144,16 @@ pub async fn get_fhir_person_alias(
 /// credential) as an `OperationOutcome`, and a `mask` obligation renders
 /// the masked person. With the flag off, [`authorize_record`] allows
 /// every read with no obligation, as before.
+///
+/// An allowed read is recorded as REST's is
+/// ([`disclosure::record_access`], `READ` against the person's id, a no-op
+/// unless `PERSON_AUDIT_READS` is on), after the decision: a denied read
+/// disclosed nothing and is not recorded. A refused audit write refuses
+/// the read with a `503`, as REST does.
 async fn read_resource(
     state: &AppState,
     caller: &MaybeAuthUser,
+    access: &AccessContext,
     id: &str,
     resource_type: &str,
 ) -> Response {
@@ -154,6 +164,19 @@ async fn read_resource(
         Ok(Some(person)) => {
             match authorize_record(caller, Action::Read, &person_resource_attrs(&person)) {
                 Ok(obligations) => {
+                    if disclosure::record_access(
+                        &state.audit_log,
+                        "Person",
+                        id,
+                        disclosure::action::READ,
+                        caller.claims().map(|c| c.sub.as_str()),
+                        access,
+                    )
+                    .await
+                    .is_err()
+                    {
+                        return audit_unavailable();
+                    }
                     let shown = if obligations.iter().any(|o| o == "mask") {
                         crate::privacy::mask_person(&person)
                     } else {
@@ -182,6 +205,16 @@ async fn read_resource(
             &e.to_string(),
         ),
     }
+}
+
+/// A `503` `OperationOutcome` for a read the audit trail could not record
+/// (only when `PERSON_AUDIT_FAIL_CLOSED` is on), as REST answers.
+fn audit_unavailable() -> Response {
+    fhir_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "transient",
+        "the access could not be recorded in the audit trail, so the read was refused",
+    )
 }
 
 /// Render a domain person as the requested FHIR resource type.
@@ -317,8 +350,9 @@ pub async fn search_fhir_patients(
     State(state): State<AppState>,
     Query(params): Query<FhirSearchParams>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> Response {
-    search_resource(&state, &caller, &params, "Patient").await
+    search_resource(&state, &caller, &access, &params, "Patient").await
 }
 
 /// `GET /fhir/Person?<params>` — a `searchset` `Bundle` of `Person`s.
@@ -326,8 +360,9 @@ pub async fn search_fhir_person_alias(
     State(state): State<AppState>,
     Query(params): Query<FhirSearchParams>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> Response {
-    search_resource(&state, &caller, &params, "Person").await
+    search_resource(&state, &caller, &access, &params, "Person").await
 }
 
 /// Shared search: run the free-text index over the first supplied
@@ -341,9 +376,15 @@ pub async fn search_fhir_person_alias(
 /// shown. A hit the caller sees masked is kept only when the query does
 /// not touch a value masking hides ([`query_touches_masked_value`]), or
 /// the hit itself would confirm that value.
+///
+/// The search is recorded as REST search's is: one `SEARCH` row against
+/// the nil id, since it discloses many records rather than one, written
+/// before the index is asked (a no-op unless `PERSON_AUDIT_READS` is on;
+/// a refused write is a `503`).
 async fn search_resource(
     state: &AppState,
     caller: &MaybeAuthUser,
+    access: &AccessContext,
     params: &FhirSearchParams,
     resource_type: &str,
 ) -> Response {
@@ -364,6 +405,19 @@ async fn search_resource(
         .count
         .unwrap_or(DEFAULT_SEARCH_COUNT)
         .min(MAX_SEARCH_COUNT);
+    if disclosure::record_access(
+        &state.audit_log,
+        "Person",
+        Uuid::nil(),
+        disclosure::action::SEARCH,
+        caller.claims().map(|c| c.sub.as_str()),
+        access,
+    )
+    .await
+    .is_err()
+    {
+        return audit_unavailable();
+    }
     let ids = match state.search_engine.search(query, limit) {
         Ok(ids) => ids,
         Err(e) => {
