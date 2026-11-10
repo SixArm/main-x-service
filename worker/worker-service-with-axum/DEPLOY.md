@@ -67,7 +67,7 @@ podman compose logs -f worker-server
 podman compose exec worker-server bash
 
 # Inside the container, run migrations
-/app/worker-service db migrate   # uses $DATABASE_URL
+/app/worker-service db migrate   # uses $DB_URL
 
 # Exit the container
 exit
@@ -113,7 +113,7 @@ nano .env.production
 
 **IMPORTANT**: Update the following in `.env.production`:
 
-- `DATABASE_URL` - Use strong password and SSL connection
+- `DB_URL` - Use strong password and SSL connection
 - `POSTGRES_PASSWORD` - Use cryptographically strong password
 - `RUST_LOG` - Set to `info` for production
 
@@ -201,7 +201,7 @@ All configuration is done via environment variables. See `.env.example` for comp
 #### Database
 
 ```bash
-DATABASE_URL=postgresql://user:password@host:5432/database
+DB_URL=postgresql://user:password@host:5432/database
 DATABASE_MAX_CONNECTIONS=10
 DATABASE_MIN_CONNECTIONS=2
 ```
@@ -277,7 +277,7 @@ worker-migrations:
     postgres:
       condition: service_healthy
   environment:
-    DATABASE_URL: ${DATABASE_URL}
+    DB_URL: ${DB_URL}
   command: ["/app/worker-service", "db", "migrate"]
   networks:
     - worker-network
@@ -381,7 +381,7 @@ podman compose exec postgres psql -U worker_user -d worker_service -c "SELECT 1;
 
 **Common issues**:
 
-- Wrong credentials: Check `DATABASE_URL` matches PostgreSQL settings
+- Wrong credentials: Check `DB_URL` matches PostgreSQL settings
 - Network issues: Ensure containers are on same network
 - PostgreSQL not ready: Check PostgreSQL health status
 

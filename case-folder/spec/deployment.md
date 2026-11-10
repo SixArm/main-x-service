@@ -37,7 +37,7 @@ a single, hardened, same-origin deployment.
 These mirror the [security checklists](regulatory.md); this is the deployment
 view of them.
 
-- [ ] **Secrets** from a secrets manager — `AUTH_SECRET`, `DATABASE_URL`
+- [ ] **Secrets** from a secrets manager — `AUTH_SECRET`, `DB_URL`
       credentials, signing keys ([audit-integrity.md](audit-integrity.md)).
       Nothing in committed config.
 - [ ] **Auth config** for production: `auth.cookie_secure: true`,

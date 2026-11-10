@@ -1,12 +1,12 @@
 //! DB-gated request-level integration tests (spec §11.2). They boot the
 //! app against the `test` environment (needs a reachable PostgreSQL,
-//! named by `DATABASE_URL`; there are no config files), drive the internal
+//! named by `DB_URL`; there are no config files), drive the internal
 //! [`apply_event`] seam to populate the read-model, and assert on the
 //! read endpoints. `#[ignore]`d so the default `cargo test` stays green
 //! on a database-less machine:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/link_graph_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/link_graph_service_test \
 //!   cargo test -- --ignored
 //! ```
 
@@ -66,7 +66,7 @@ fn linked_env(
 /// `edges`; every graph response carries an `as_of` watermark.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn linked_edge_is_projected_and_readable() {
     request::<App, _, _>(|request, ctx| async move {
         let person = format!("person:{}", u(1));
@@ -99,7 +99,7 @@ async fn linked_edge_is_projected_and_readable() {
 /// the smaller URN as `from_ref` regardless of assertion order.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn same_identity_is_canonicalised_once() {
     request::<App, _, _>(|request, ctx| async move {
         let person = format!("person:{}", u(1));
@@ -129,7 +129,7 @@ async fn same_identity_is_canonicalised_once() {
 /// verified; deleting an endpoint flips the edge to dangling.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn presence_drives_status_lifecycle() {
     request::<App, _, _>(|request, ctx| async move {
         let person = format!("person:{}", u(1));
@@ -172,7 +172,7 @@ async fn presence_drives_status_lifecycle() {
 /// the worker's employer for the unified identity.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn single_view_unifies_and_derives_employer() {
     request::<App, _, _>(|request, ctx| async move {
         let person = format!("person:{}", u(1));
@@ -208,7 +208,7 @@ async fn single_view_unifies_and_derives_employer() {
 /// `unlinked` removes the edge (idempotently).
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn unlinked_removes_the_edge() {
     request::<App, _, _>(|request, ctx| async move {
         let person = format!("person:{}", u(1));
@@ -241,7 +241,7 @@ async fn unlinked_removes_the_edge() {
 /// The freshness endpoint reports a per-topic watermark after events.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn freshness_reports_consumed_topics() {
     request::<App, _, _>(|request, ctx| async move {
         apply_event(&ctx.db, presence_env("person", u(1), "created", 1))
@@ -261,7 +261,7 @@ async fn freshness_reports_consumed_topics() {
 /// Malformed refs, unknown kinds, and over-cap depth are `400`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn bad_requests_are_rejected() {
     request::<App, _, _>(|request, _ctx| async move {
         assert_eq!(
@@ -305,7 +305,7 @@ fn merged_env(entity: &str, survivor_pid: Uuid, merged_from: Uuid, seq: i64) -> 
 /// survivor surfaces it while the merged-away ref has none.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn merged_repoints_edges_onto_the_survivor() {
     request::<App, _, _>(|request, ctx| async move {
         let dup = format!("person:{}", u(1)); // the duplicate
@@ -349,7 +349,7 @@ async fn merged_repoints_edges_onto_the_survivor() {
 /// have the same affiliation, the merge leaves exactly one edge.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn merged_dedups_a_colliding_edge() {
     request::<App, _, _>(|request, ctx| async move {
         let dup = format!("person:{}", u(1));
@@ -390,7 +390,7 @@ async fn merged_dedups_a_colliding_edge() {
 /// edge-status gauge refreshed from the DB at scrape time.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test -- --ignored`"]
 async fn metrics_endpoint_reports_edge_status_gauge() {
     request::<App, _, _>(|request, ctx| async move {
         let person = format!("person:{}", u(1));

@@ -51,11 +51,11 @@ EOF
 fi
 echo "ok"
 
-printf 'Health-checking authentication-service at %s/_health ... ' "$AUTH_BASE_URL"
-if ! curl -fsS --max-time 5 "$AUTH_BASE_URL/_health" > /dev/null; then
+printf 'Health-checking authentication-service at %s/_health/live ... ' "$AUTH_BASE_URL"
+if ! curl -fsS --max-time 5 "$AUTH_BASE_URL/_health/live" > /dev/null; then
     printf '\n' >&2
     cat >&2 <<EOF
-ERROR: authentication-service is not reachable at $AUTH_BASE_URL/_health.
+ERROR: authentication-service is not reachable at $AUTH_BASE_URL/_health/live.
 
 Start it (in DEVELOPMENT mode — see the note at the top of this
 script and examples/compose/authentication-dev.yml for why it must be

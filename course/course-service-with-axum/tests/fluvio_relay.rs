@@ -11,7 +11,7 @@
 //!
 //! ```sh
 //! podman compose -f compose.fluvio.yaml up -d
-//! DATABASE_URL=postgres://course:course@localhost:5434/course \
+//! DB_URL=postgres://course:course@localhost:5434/course \
 //!   COURSE_FLUVIO_ENDPOINT=127.0.0.1:9103 \
 //!   cargo test --features fluvio --test fluvio_relay -- --ignored
 //! podman compose -f compose.fluvio.yaml down -v
@@ -29,10 +29,10 @@
 //!
 //! This crate has no axa `request::<App, _, _>` test harness (course's
 //! integration suite drives the router directly via `tower::oneshot`
-//! against an env-configured `DATABASE_URL`, see `tests/common/mod.rs`
+//! against an env-configured `DB_URL`, see `tests/common/mod.rs`
 //! and `src/db/mod.rs`'s `outbox_atomicity_tests`), so this test follows
 //! that same shape rather than case's loco-request pattern: connect via
-//! `DATABASE_URL`, drive the entity write through `PgCourseRepository`
+//! `DB_URL`, drive the entity write through `PgCourseRepository`
 //! directly (which enqueues the outbox row in the same transaction under
 //! the outbox transport), then drain to a real `FluvioSink`.
 #![cfg(feature = "fluvio")]
@@ -45,14 +45,14 @@ use course_service::streaming::EventTransport;
 #[tokio::test]
 #[ignore = "requires PostgreSQL AND a live Fluvio broker; see this file's module docs"]
 async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("set DATABASE_URL to a running, migrated Postgres for this test");
+    let database_url =
+        std::env::var("DB_URL").expect("set DB_URL to a running, migrated Postgres for this test");
     let endpoint = std::env::var("COURSE_FLUVIO_ENDPOINT")
         .expect("set COURSE_FLUVIO_ENDPOINT to the broker's SC address (e.g. 127.0.0.1:9103)");
 
     let db = sqlx::PgPool::connect(&database_url)
         .await
-        .expect("connect to DATABASE_URL");
+        .expect("connect to DB_URL");
 
     // Durable transport, so `create` writes an outbox row in the same
     // transaction as the course insert.

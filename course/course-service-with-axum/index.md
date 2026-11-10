@@ -63,9 +63,9 @@ podman run -d --name course-postgres -p 5434:5432 \
   -e POSTGRES_PASSWORD=course_password \
   postgres:18-alpine
 
-# Build and run (axa): point DATABASE_URL at the database, then
+# Build and run (axa): point DB_URL at the database, then
 # start. Migrations run automatically in development (config auto_migrate).
-export DATABASE_URL=postgres://course_user:course_password@localhost:5434/course
+export DB_URL=postgres://course_user:course_password@localhost:5434/course
 cargo run -- start            # or: cargo run -- start
 
 # Migrations can also be run explicitly:
@@ -77,7 +77,7 @@ cargo run -- db migrate
 Persistence is sqlx with no ORM; every statement is a `query!` literal
 in `src/db/`, and spec §10 has the rules. The macros check queries
 against the committed `.sqlx/` data, so build with `SQLX_OFFLINE=true`
-(CI does) unless `DATABASE_URL` points at a **migrated** database: with
+(CI does) unless `DB_URL` points at a **migrated** database: with
 it set and the schema missing, the build fails with "relation does not
 exist".
 
@@ -183,13 +183,13 @@ It emits no sample line until the first request is served.
 
 Server binding, logger, database pool, and the background queue are
 owned by the axa environment config in `config/<environment>.yaml`
-(development binds `localhost:8084`; `DATABASE_URL` is interpolated
+(development binds `localhost:8084`; `DB_URL` is interpolated
 into the `database` and `queue` blocks). Domain knobs still come
 from the environment via `Config::from_env`:
 
 | Variable                   | Description                | Default                 |
 | -------------------------- | -------------------------- | ----------------------- |
-| `DATABASE_URL`             | Postgres connection string | —                       |
+| `DB_URL`             | Postgres connection string | —                       |
 | `SEARCH_INDEX_PATH`        | Tantivy index directory    | `./data/search_index`   |
 | `MATCHING_THRESHOLD`       | Probabilistic match cutoff | `0.85`                  |
 | `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | `512` |
@@ -236,7 +236,7 @@ cargo test --test duplicate_detection
 
 # 12 DB-backed integration tests. Skipped by default — opt in with
 # `--ignored` after the Postgres bring-up below.
-DATABASE_URL=postgres://course_user:course_password@localhost:5434/course \
+DB_URL=postgres://course_user:course_password@localhost:5434/course \
   cargo test --test api_integration_test -- --ignored
 
 # Three criterion benches (matching, search, validation).

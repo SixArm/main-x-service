@@ -59,7 +59,7 @@ scripts/test-db.sh up person/person-service-with-axum
 scripts/ci-check.sh test-db person/person-service-with-axum
 
 # Locally (requires running PostgreSQL)
-DATABASE_URL=postgres://user:pass@localhost/person_service_test cargo test --test api_integration_test
+DB_URL=postgres://user:pass@localhost/person_service_test cargo test --test api_integration_test
 ```
 
 ## Benchmark Tests

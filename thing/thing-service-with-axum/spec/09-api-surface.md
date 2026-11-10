@@ -58,7 +58,7 @@ Either way the service **always boots**.
 Blanket enforcement is implemented **default-off**: when
 `THING_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 case-insensitive), every `/api/*` route requires a valid bearer token
-except the public `/api/health`. Root-level `/_health`, `/_ping`,
+except the public `/api/health`. Root-level `/_health/live`, `/_health/ready`, `/_health/startup`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom` sit
 outside the `/api` scope and stay public. The flag is read once at
 construction — restart to change. Family contract:

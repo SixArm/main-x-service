@@ -98,16 +98,17 @@ connectivity?) probes, and for container `HEALTHCHECK` directives.
 
 | Endpoint | Provided by | Purpose |
 |---|---|---|
-| `GET /_health` | controller-style services (organization, care-pathway, case, portfolio, authentication, link-graph-service) | axa's built-in readiness check (verifies DB/queue) |
-| `GET /_ping` | controller-style services | axa's lightweight liveness ping |
+| `GET /_health/live` | every axa service (all thirteen, since axa 0.11) | liveness: answers with no checks, for the container `HEALTHCHECK` and a liveness probe |
+| `GET /_health/ready` | every axa service | readiness: the database, the queue and named checks; `503` (`shutting_down`) once shutdown begins |
+| `GET /_health/startup` | every axa service | startup: the database, and passes for good once it has |
 | `GET /api/health` | legacy Axum services (Dockerfile `HEALTHCHECK`) | service health check |
 | `GET /api/health` | event-service and some compose health probes | versioned health check |
 
-This split is **accepted drift**: the controller-style services use axa's
-conventional `/_health` + `/_ping`; the older Axum services predate the
-conversion and keep `/api/health` (the event-service mounts under
-`/api`). Orchestrator probes and load-balancer checks must target
-the endpoint the specific service actually exposes.
+Every service serves axa's three probes. The older Axum services also
+keep their own `/api/health`, which predates the conversion (the
+event-service mounts it under `/api`). Point liveness, readiness and
+startup probes at axa's three; `/_ping`, `/_health` and `/_readiness`
+answer `404` since axa 0.11.
 
 The container `HEALTHCHECK` runs `curl --fail` against the health
 endpoint on an interval (person-service: `--interval=30s --timeout=3s
@@ -237,7 +238,7 @@ the stateless service processes.
 |---|---|
 | Stateless services + horizontal scaling | **Implemented** |
 | Per-service connection pooling (config / env) | **Implemented** |
-| Health checks (`/_health` + `/_ping`; `/api/health` legacy) | **Implemented** |
+| Health checks (`/_health/live`, `/_health/ready`, `/_health/startup`; `/api/health` legacy) | **Implemented** |
 | Graceful shutdown | **Implemented** |
 | Non-root, multi-stage Podman / Debian 13-slim images | **Implemented** |
 | MiMalloc for MUSL static builds | **Implemented** |

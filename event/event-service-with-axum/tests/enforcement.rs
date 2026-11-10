@@ -136,7 +136,7 @@ async fn post_event(server: &TestServer, token: Option<&str>) -> StatusCode {
 /// while requiring `access=write` to write.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test enforcement -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test enforcement -- --ignored`"]
 async fn enforcement_on_gates_the_real_router() {
     let (keys, kid) = keys_and_kid();
     let index =

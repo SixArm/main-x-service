@@ -1,7 +1,7 @@
 //! REST API integration tests requiring a running `PostgreSQL`.
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test api_nearby_and_search_cursor -- --ignored`.
+//! `DB_URL=… cargo test --test api_nearby_and_search_cursor -- --ignored`.
 //!
 //! This file's reason to exist is **T-9**
 //! (`spec/13-tasks.md`): the geo-radius `GET /api/places/nearby` HTTP
@@ -65,7 +65,7 @@ async fn test_router() -> (axum::Router, TempDir) {
     }
     let app = App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router");
     (app, index_dir)
@@ -162,7 +162,7 @@ async fn create_place_at(app: &axum::Router, name: &str, lat: f64, lon: f64) -> 
 /// of `(lat, lon)` — the T-9 acceptance test verbatim: post places, then
 /// confirm `nearby` filters to the ones actually inside the radius.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn nearby_returns_only_places_within_radius() {
     let _guard = search_index_lock().lock().await;
     let (app, _index_dir) = test_router().await;
@@ -210,7 +210,7 @@ async fn nearby_returns_only_places_within_radius() {
 /// rounding in the way, by
 /// `matching::geo::tests::within_radius_boundary_is_inclusive`.)
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn nearby_near_the_edge_of_the_radius() {
     let _guard = search_index_lock().lock().await;
     let (app, _index_dir) = test_router().await;
@@ -259,7 +259,7 @@ async fn nearby_near_the_edge_of_the_radius() {
 /// Out-of-range `lat`/`lon`/`radius_km` on `nearby` is a `400`, not a
 /// silently-empty result.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn nearby_rejects_out_of_range_coordinates() {
     let _guard = search_index_lock().lock().await;
     let (app, _index_dir) = test_router().await;
@@ -272,7 +272,7 @@ async fn nearby_rejects_out_of_range_coordinates() {
 /// the other T-9 acceptance test, rewritten for cursors — and sends no
 /// total; the last page says so by having no link.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn search_pages_by_following_the_next_link() {
     let _guard = search_index_lock().lock().await;
     let (app, _index_dir) = test_router().await;
@@ -318,7 +318,7 @@ async fn search_pages_by_following_the_next_link() {
 /// `GET /api/places/nearby` pages nearest-first by following the next
 /// link, every in-radius row once.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn nearby_pages_by_following_the_next_link() {
     let _guard = search_index_lock().lock().await;
     let (app, _index_dir) = test_router().await;
@@ -348,7 +348,7 @@ async fn nearby_pages_by_following_the_next_link() {
 /// A `limit` past the maximum, or a cursor this service did not sign, is
 /// a `422` on both endpoints — never clamped, never read as an offset.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_bad_limit_or_cursor_is_refused_on_both_endpoints() {
     let _guard = search_index_lock().lock().await;
     let (app, _index_dir) = test_router().await;

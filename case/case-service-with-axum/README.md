@@ -48,7 +48,7 @@ opened date, subjects, keywords, identifiers, sameAs, languages).
 Requires PostgreSQL.
 
 ```bash
-export DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_development
+export DB_URL=postgres://loco:loco@localhost:5432/case_service_development
 export SQLX_OFFLINE=true  # the query! macros read .sqlx/, not the database
 cargo run -- start        # migrations auto-run in development
 
@@ -61,7 +61,7 @@ curl -s localhost:5150/api/cases -H 'content-type: application/json' \
 Persistence is sqlx with no ORM; every statement is a `query!` literal
 in `src/models/`, and spec §10 has the rules. The macros check queries
 against the committed `.sqlx/` data, so build with `SQLX_OFFLINE=true`
-(CI and the image do) unless `DATABASE_URL` points at a **migrated**
+(CI and the image do) unless `DB_URL` points at a **migrated**
 database: with it set and the schema missing, the build fails with
 "relation does not exist".
 
@@ -81,7 +81,7 @@ SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets
 ```bash
 cargo test                   # DB-free: matcher embedding, JSON round-trip,
                              # validation / merge / auth / openapi / streaming
-cargo test -- --ignored      # request-level tests (need Postgres DATABASE_URL)
+cargo test -- --ignored      # request-level tests (need Postgres DB_URL)
 cargo clippy --all-targets
 ```
 

@@ -13,7 +13,7 @@ license = "MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { version = "0.10", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
+axa = { version = "0.11", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -146,14 +146,14 @@ s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa-test = "0.1"
+axa-test = "0.2"
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
 # Temp dirs for the artifact-store tests (SEC-B4 confinement).
 tempfile = "3"
-axa = { version = "0.10", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
+axa = { version = "0.11", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 # The `TestServer` axa's testing harness hands to a request test. Named
 # explicitly so request tests can factor out helpers that take one (axa
 # re-exports the type, `axa::TestServer`, but not the `multipart`

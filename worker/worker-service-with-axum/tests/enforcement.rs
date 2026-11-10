@@ -128,7 +128,7 @@ async fn post_worker(app: &axum::Router, token: Option<&str>) -> StatusCode {
 /// while requiring `access=write` to write.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test enforcement -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test enforcement -- --ignored`"]
 async fn enforcement_on_gates_the_real_router() {
     let (keys, kid) = keys_and_kid();
     // Set BEFORE the router is built — the flag, the key set and the

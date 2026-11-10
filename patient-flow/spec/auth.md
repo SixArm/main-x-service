@@ -20,8 +20,7 @@ Patient Flow adopts the family stack unchanged
 `PATIENT_FLOW_REQUIRE_AUTH` (default **off**, per the family
 activation-gate posture — see security.md §4; activation is a
 release gate for any real deployment). Guard-all /
-deny-unless-public; public allow-list: `/api/health`, `/_health`,
-`/_ping`, docs, `/metrics.prom`.
+deny-unless-public; public allow-list: `/api/health`, `/_health/live`, `/_health/ready`, `/_health/startup`, docs, `/metrics.prom`.
 
 ## ABAC
 

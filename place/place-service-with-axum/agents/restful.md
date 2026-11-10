@@ -245,7 +245,7 @@ bearer token on **every** route except the public allow-list:
 | Public path | Why |
 | --- | --- |
 | `/api/health` | Liveness probe (this crate's surface) |
-| `/_health`, `/_ping` | axa default health routes |
+| `/_health/live`, `/_health/ready`, `/_health/startup` | axa default health routes |
 | `/api-docs/openapi.json` | Raw OpenAPI document |
 | `/swagger-ui*` (prefix) | Swagger UI + static assets |
 | `/metrics.prom` | Prometheus scrape (root-mounted, outside `/api`) |

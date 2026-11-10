@@ -26,7 +26,7 @@
 
 
 ### Health check
-GET {{baseUrl}}/_health
+GET {{baseUrl}}/_health/live
 
 
 ### Neighbors of a record, both directions, depth 1 (default)
@@ -58,7 +58,7 @@ GET {{baseUrl}}/api/single-view/{{personRef}}
 
 ### Consumer freshness — per-entity lag; NOT a public/liveness endpoint
 # despite the "/health/" path segment (curl-verified: distinct from
-# /_health; gated like every other /api/* route once
+# /_health/live; gated like every other /api/* route once
 # LINK_GRAPH_REQUIRE_AUTH is on).
 GET {{baseUrl}}/api/health/freshness
 

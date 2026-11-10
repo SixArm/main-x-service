@@ -8,7 +8,7 @@
 //! with what the run seeded even though the database is shared.
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test nearby_paging -- --ignored`.
+//! `DB_URL=… cargo test --test nearby_paging -- --ignored`.
 
 use std::str::FromStr;
 
@@ -32,7 +32,7 @@ async fn setup() -> (axum::Router, PgPlaceRepository) {
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     let app = App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router");
     let db = create_connection(&config.database)
@@ -101,7 +101,7 @@ fn unit() -> f64 {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test nearby_paging -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test nearby_paging -- --ignored"]
 async fn following_next_reaches_every_place_in_the_radius_nearest_first() {
     let (app, repo) = setup().await;
     let lat = round6(-50.0 + 100.0 * unit());
@@ -153,7 +153,7 @@ async fn following_next_reaches_every_place_in_the_radius_nearest_first() {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test nearby_paging -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test nearby_paging -- --ignored"]
 async fn a_circle_across_the_antimeridian_finds_both_sides() {
     let (app, repo) = setup().await;
     // A random latitude, so each run's places are its own.

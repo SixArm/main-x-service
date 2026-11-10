@@ -160,7 +160,7 @@ validation contract has coverage even when the database is absent.
 ### 2.2 `#[serial]` for env / DB ordering
 
 Request tests share one process-wide resource: the test database (and,
-for some, process environment such as `DATABASE_URL`). Running them
+for some, process environment such as `DB_URL`). Running them
 concurrently would let one test's truncate or insert race another's
 reads. They are therefore annotated `#[serial]` (from `serial_test`) so
 the gated suite runs one test at a time against the shared database.
@@ -173,7 +173,7 @@ Each service owns its own test database, named per service
 (`person_service_test`, `worker_service_test`,
 `care_pathway_service_test`, …) so concurrent CI jobs never collide.
 In CI a `postgres` service container is started and the database URL is
-handed to the test job via `DATABASE_URL` (§6). Locally the same URL is
+handed to the test job via `DB_URL` (§6). Locally the same URL is
 exported by hand. Connection / pool sizing and the PostgreSQL version
 baseline (18) are covered in
 [postgresql §12](../postgresql/index.md).
@@ -345,7 +345,7 @@ four jobs:
 | `rustfmt` | `cargo fmt --all -- --check` | §4 formatting |
 | `clippy` | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | §4 lints |
 | `migration` | `cargo clippy --manifest-path migration/Cargo.toml --all-targets --all-features -- -D warnings` | §4 lints, migration crate |
-| `test` | `cargo test --all-features --all`, with a `postgres` **service container** and `DATABASE_URL` in the job env | §1–§2 (un-gated + DB-gated together) |
+| `test` | `cargo test --all-features --all`, with a `postgres` **service container** and `DB_URL` in the job env | §1–§2 (un-gated + DB-gated together) |
 
 The `clippy` job uses `--workspace` so workspace members are linted in
 one shot; on the controller-style services that already pulls in the `migration`
@@ -360,7 +360,7 @@ matcher/verifier libraries ship a lighter `quality.yml` with just the
 
 The `test` job is where the gating pays off: because CI provisions a
 Postgres service (with a `pg_isready` health check) and exports
-`DATABASE_URL` for the named per-service test database, the full run
+`DB_URL` for the named per-service test database, the full run
 (plain tests **plus** the `#[ignore]`d request tests when invoked with
 `--ignored`, or all when wired that way) executes against real
 persistence — while local `cargo test` without that container stays

@@ -37,20 +37,20 @@ these are **dev/demo** stacks that run the actual service binaries.
 # One service
 podman compose -f examples/compose/single-service.yml build
 podman compose -f examples/compose/single-service.yml up -d
-curl http://localhost:8089/_health
+curl http://localhost:8089/_health/live
 podman compose -f examples/compose/single-service.yml down -v
 
 # The full family (default-open auth, matching every crate's shipped default)
 podman compose -f examples/compose/full-family.yml build
 podman compose -f examples/compose/full-family.yml up -d
 curl http://localhost:8081/api/health   # person
-curl http://localhost:8091/_health      # authentication
+curl http://localhost:8091/_health/live      # authentication
 podman compose -f examples/compose/full-family.yml down -v
 
 # The enforced variant (ABAC guard on, same full family underneath)
 podman compose -f examples/compose/full-family.yml -f examples/compose/enforced.yml build
 podman compose -f examples/compose/full-family.yml -f examples/compose/enforced.yml up -d
-curl http://localhost:8089/_health              # 200 — health stays public
+curl http://localhost:8089/_health/live              # 200 — health stays public
 curl http://localhost:8089/api/cases            # 401 — no bearer token
 podman compose -f examples/compose/full-family.yml -f examples/compose/enforced.yml down -v
 

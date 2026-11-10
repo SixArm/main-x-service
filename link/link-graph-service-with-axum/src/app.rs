@@ -2,8 +2,8 @@
 //! registers routes and the truncate lifecycle for `link-graph-service`.
 //!
 //! Read-only to the world: the graph read controllers, `OpenAPI`/Swagger,
-//! and Prometheus metrics are mounted (plus axa's default `/_health` /
-//! `/_ping`); `after_routes` adds the blanket read guard and spawns the
+//! and Prometheus metrics are mounted (plus axa's `/_health/live`,
+//! `/_health/ready` and `/_health/startup`); `after_routes` adds the blanket read guard and spawns the
 //! periodic reconciliation worker when a source is configured. The live
 //! **Fluvio bus consumer** is the remaining v1-deferred piece (spec §13).
 
@@ -128,8 +128,7 @@ impl App {
         }
     }
 
-    /// Assemble the route table: axa's default routes (`/_health`,
-    /// `/_ping`, …) plus the read-only graph controller (spec §9).
+    /// Assemble the route table: axa's default routes (`/_health/live`, `/_health/ready`, `/_health/startup`) plus the read-only graph controller (spec §9).
     #[must_use]
     pub fn routes(_ctx: &AppContext) -> AppRoutes {
         AppRoutes::with_default_routes()

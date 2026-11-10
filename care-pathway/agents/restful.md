@@ -11,8 +11,9 @@ Base URL in development: `http://localhost:5150`.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/_health` | Health check |
-| GET | `/_ping` | Liveness ping |
+| GET | `/_health/live` | Liveness |
+| GET | `/_health/ready` | Readiness (DB + queue) |
+| GET | `/_health/startup` | Startup |
 
 ### Care pathway CRUD
 

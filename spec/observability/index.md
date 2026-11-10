@@ -145,7 +145,7 @@ Histogram buckets are tuned per metric:
 
 Every service exposes the Prometheus surface at the root path
 `/metrics.prom` (public, `text/plain; version=0.0.4`) alongside axa's
-default `/_health` and `/_ping`. The two generations differ only in how
+default `/_health/live`, `/_health/ready`, `/_health/startup`. The two generations differ only in how
 the route is wired (an Axum `metrics_prom` handler vs. an axa controller
 `Routes`), not in the exposition format.
 
@@ -300,7 +300,7 @@ is visible.
 | Generation | Endpoint |
 |---|---|
 | Older Axum services | `GET /api/health` |
-| axa-native services | `GET /_health`, `GET /_ping` |
+| axa-native services | `GET /_health/live`, `GET /_health/ready`, `GET /_health/startup` |
 
 These back container/orchestrator liveness and readiness probes (Podman
 health checks, non-root execution, graceful shutdown). The full
@@ -319,7 +319,7 @@ where geo is modeled) are catalogued in the same postgresql spec.
 
 ### 5.3 First places to look
 
-1. `GET /api/health` (or `/_health`) — is the process up?
+1. `GET /api/health` (or `/_health/live`) — is the process up?
 2. `/metrics.prom` `http_requests_total{status=~"5.."}` — error rate (older services).
 3. `http_request_duration_seconds` p95/p99 — latency SLO.
 4. `pg_stat_statements` — slow queries / DB pressure.

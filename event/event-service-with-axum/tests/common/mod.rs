@@ -1,6 +1,6 @@
 //! Shared helpers for integration tests.
 //!
-//! These tests need a real `PostgreSQL` — point `DATABASE_URL` at one
+//! These tests need a real `PostgreSQL` — point `DB_URL` at one
 //! before running `cargo test --test api_integration_test`. The
 //! helpers are async because [`event_service::db::create_connection`]
 //! is.
@@ -50,7 +50,7 @@ pub async fn create_test_router() -> Router {
     std::mem::forget(index);
     App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router")
 }

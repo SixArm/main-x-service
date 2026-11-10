@@ -12,8 +12,8 @@ axa is a library, not a framework. Each service's `src/app.rs` holds ordinary
 functions, and its `main.rs` calls them. axa's own specification is
 [`spec/index.md`](https://github.com/publicprojects-io/axa/blob/main/spec/index.md).
 
-Services take it from crates.io, as `axa = "0.10"`. The request-level test
-helpers are a separate crate, `axa-test = "0.1"`, taken as a dev-dependency:
+Services take it from crates.io, as `axa = "0.11"`. The request-level test
+helpers are a separate crate, `axa-test = "0.2"`, taken as a dev-dependency:
 import `axa_test::prelude::*` in a test, since `axa::prelude` does not bring in
 `request`, `boot_test`, `TestApp`, or `TestServer`.
 
@@ -46,7 +46,24 @@ in `src/app.rs`. There are no config files. The variables are listed in the
 `axa::config` rustdoc, and [configuration.md](configuration.md) covers the
 service-specific ones.
 
-The environment is `APP_ENV`. `LOCO_ENV` is still read.
+The environment is `APP_ENV`; `LOCO_ENV` is no longer read. The database is
+`DB_URL`, not `DATABASE_URL`, which only sqlx-cli (`cargo sqlx prepare`) still
+reads. Since axa 0.11 the HTTP limits are `HTTP_REQUEST_BODY_LIMIT_BYTE_COUNT`
+and `HTTP_REQUEST_HEADER_READ_TIMEOUT_SECONDS`, and the CSP is
+`HTTP_CONTENT_SECURITY_POLICY`. The old names are not read, so a deployment
+still setting one gets the default.
+
+## Health routes
+
+Every service answers axa's three probes, which every auth guard leaves public:
+`/_health/live` asks nothing, `/_health/ready` asks the database, the queue and
+named checks and answers `503` once shutdown begins, and `/_health/startup` asks
+the database until it first passes. `/_ping`, `/_health` and `/_readiness`
+answer `404`. An image whose `HEALTHCHECK` used `/_health` now uses
+`/_health/live`; the older services' images keep their own `/api/health`.
+
+A database that cannot serve, from a full pool to a read-only server, answers
+`503` with `code` `unavailable` and `Retry-After: 5`, not `500`.
 
 ## Background jobs
 
@@ -63,7 +80,7 @@ after seven days.
 
 ## Production database
 
-In production `DATABASE_URL` must set `sslmode` to `require`, `verify-ca`, or
+In production `DB_URL` must set `sslmode` to `require`, `verify-ca`, or
 `verify-full`, or the service refuses to start. `require` encrypts without checking
 who answers, so use `verify-full` across a network. A loopback address or socket is
 exempt. `DB_ALLOW_INSECURE=true` is the way out for a network that protects its own
@@ -120,5 +137,6 @@ version with integrity hashes and sends `PAGE_CSP`, because axa's production def
 ## Limits
 
 Keep the service-wide body limit small. A route that needs more, such as a bulk
-import, sets its own with `axa::middleware::body_limit`, and its own timeout
+import, wraps its method router in `axa::middleware::body_limit(post(h), bytes)`,
+which binds a handler that reads the body itself too, and sets its own timeout
 through `Http::timeout_overrides`.

@@ -123,7 +123,7 @@ async fn every_path_records(
 /// A caller that is not a listed proxy cannot choose the address on the trail.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test client_address -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test client_address -- --ignored`"]
 async fn a_forged_header_reaches_no_audit_row() {
     every_path_records(None, "6.6.6.6", "127.0.0.1").await;
 }
@@ -131,7 +131,7 @@ async fn a_forged_header_reaches_no_audit_row() {
 /// Behind a listed proxy, the row names the entry that proxy appended.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test client_address -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test client_address -- --ignored`"]
 async fn a_listed_proxy_is_believed_for_the_entry_it_wrote() {
     every_path_records(Some("127.0.0.0/8"), "6.6.6.6, 198.51.100.7", "198.51.100.7").await;
 }

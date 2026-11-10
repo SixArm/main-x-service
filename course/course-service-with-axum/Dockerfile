@@ -92,7 +92,7 @@ COPY --from=builder --chown=course:course \
 
 # Migrations are NOT auto-applied on boot; keep the raw SQL in the
 # image so an operator can shell in and run them against the
-# configured `DATABASE_URL` without re-mounting.
+# configured `DB_URL` without re-mounting.
 COPY --chown=course:course course/course-service-with-axum/migrations ./migrations
 
 

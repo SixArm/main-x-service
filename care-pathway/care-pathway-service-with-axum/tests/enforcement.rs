@@ -10,7 +10,7 @@
 //! 2026-07-18).
 //!
 //! `#[ignore]`d: boots the app (needs PostgreSQL via
-//! `config/test.yaml` / `DATABASE_URL`). Run with
+//! `config/test.yaml` / `DB_URL`). Run with
 //! `cargo test --test enforcement -- --ignored`.
 
 use axa_test::prelude::*;

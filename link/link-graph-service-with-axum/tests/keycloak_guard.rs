@@ -63,7 +63,7 @@ async fn a_keycloak_token_is_authenticated_and_authorized_through_the_real_guard
 
     // No credential, and public paths stay open.
     assert_eq!(read_status(edges, &none).await, 401);
-    assert_eq!(read_status("/_health", &none).await, 200);
+    assert_eq!(read_status("/_health/live", &none).await, 200);
 
     // Any authenticated caller may read under the default policy,
     // including one whose roles all go unmapped.

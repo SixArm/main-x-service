@@ -8,7 +8,7 @@
 //! database-less machine:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/link_graph_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/link_graph_service_test \
 //!   cargo test --test idempotency -- --ignored
 //! ```
 
@@ -59,7 +59,7 @@ fn presence_env_no_event_id(entity: &str, pid: Uuid, kind: &str, seq: i64) -> En
 /// second call is a no-op, not a duplicate edge and not an error.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test idempotency -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test idempotency -- --ignored`"]
 async fn redelivered_linked_event_does_not_duplicate() {
     request::<App, _, _>(|_request, ctx| async move {
         let event_id = u(500);
@@ -98,7 +98,7 @@ async fn redelivered_linked_event_does_not_duplicate() {
 /// `edge_id`.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test idempotency -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test idempotency -- --ignored`"]
 async fn distinct_event_ids_are_not_deduplicated_against_each_other() {
     request::<App, _, _>(|_request, ctx| async move {
         let edge_id = u(601);
@@ -131,7 +131,7 @@ async fn distinct_event_ids_are_not_deduplicated_against_each_other() {
 /// harmless rather than corrupting.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test idempotency -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test idempotency -- --ignored`"]
 async fn envelope_with_no_event_id_applies_every_time() {
     request::<App, _, _>(|_request, ctx| async move {
         let pid = u(700);
@@ -167,7 +167,7 @@ async fn envelope_with_no_event_id_applies_every_time() {
 /// rebuild the graph.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test idempotency -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test idempotency -- --ignored`"]
 async fn truncate_clears_processed_events_so_a_replay_reapplies() {
     request::<App, _, _>(|_request, ctx| async move {
         let event_id = u(801);

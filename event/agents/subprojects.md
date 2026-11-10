@@ -28,7 +28,7 @@ Rules of the road:
 
 ```bash
 cd event-service-with-axum
-cp .env.example .env            # set DATABASE_URL
+cp .env.example .env            # set DB_URL
 cargo run -- db migrate
 cargo run --release             # http://localhost:8080/api, /swagger-ui
 cargo test --lib                # unit tests

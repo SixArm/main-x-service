@@ -230,8 +230,8 @@ cd main-x-service/event/event-service-with-axum
 # Set up database
 createdb event_service
 cp .env.example .env
-# Set DATABASE_URL (axa reads it via config/development.yaml)
-export DATABASE_URL=postgres://localhost/event_service_development
+# Set DB_URL (axa reads it via config/development.yaml)
+export DB_URL=postgres://localhost/event_service_development
 
 # Build and run (axa). Migrations run automatically in development
 # (auto_migrate); or run them explicitly with `cargo run -- db migrate`.
@@ -421,7 +421,7 @@ cargo fix --allow-dirty
 Persistence is sqlx with no ORM; every statement is a `query!` literal
 in `src/db/`, and spec §10 has the rules. The macros check queries
 against the committed `.sqlx/` data, so build with `SQLX_OFFLINE=true`
-(CI does) unless `DATABASE_URL` points at a **migrated** database: with
+(CI does) unless `DB_URL` points at a **migrated** database: with
 it set and the schema missing, the build fails with "relation does not
 exist".
 
@@ -527,7 +527,7 @@ Configuration via environment variables or `.env` file:
 
 | Variable                   | Description                  | Default        | Required |
 | -------------------------- | ---------------------------- | -------------- | -------- |
-| `DATABASE_URL`             | PostgreSQL connection string | -              | Yes      |
+| `DB_URL`             | PostgreSQL connection string | -              | Yes      |
 | `DATABASE_MAX_CONNECTIONS` | Max connection pool size     | 10             | No       |
 | `DATABASE_MIN_CONNECTIONS` | Min connection pool size     | 2              | No       |
 | `SERVER_HOST`              | Server bind address          | 0.0.0.0        | No       |
@@ -596,7 +596,7 @@ scripts/test-db.sh up event/event-service-with-axum --build
 - Bridge Tests: `tests/duplicate_detection.rs` pins the
   `to_matcher_event` → `MatchingEngine::match_events` contract
 - Integration Tests: `tests/api_integration_test.rs` (require a running
-  PostgreSQL via `DATABASE_URL`)
+  PostgreSQL via `DB_URL`)
 
 See [agents/testing.md](agents/testing.md) for the full layout and counts.
 

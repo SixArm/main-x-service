@@ -20,7 +20,7 @@ two operational concerns:
 
 Same checklist as the root spec, plus axa-specifics:
 
-- [ ] Replace the dev `DATABASE_URL` credentials with secrets-manager values.
+- [ ] Replace the dev `DB_URL` credentials with secrets-manager values.
 - [ ] Set `auto_migrate: false` in `config/production.yaml`.
 - [ ] Set `dangerously_truncate: false` and `dangerously_recreate: false`.
 - [ ] Use the `--release` profile.

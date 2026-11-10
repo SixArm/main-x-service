@@ -44,7 +44,7 @@ services:
         condition: service_healthy
     environment:
       # Database configuration
-      DATABASE_URL: postgresql://${POSTGRES_USER:-event_user}:${POSTGRES_PASSWORD:-event_password}@postgres:5432/${POSTGRES_DB:-event_service}
+      DB_URL: postgresql://${POSTGRES_USER:-event_user}:${POSTGRES_PASSWORD:-event_password}@postgres:5432/${POSTGRES_DB:-event_service}
       DATABASE_MAX_CONNECTIONS: ${DATABASE_MAX_CONNECTIONS:-10}
       DATABASE_MIN_CONNECTIONS: ${DATABASE_MIN_CONNECTIONS:-2}
 

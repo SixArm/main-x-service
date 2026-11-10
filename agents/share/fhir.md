@@ -200,7 +200,7 @@ FHIR endpoints are **not** a backdoor around the security posture:
 - **Blanket guard.** `/fhir/*` sits behind the same
   `<ENTITY>_REQUIRE_AUTH` blanket middleware as `/api/*`
   ([jwt-enforcement.md](jwt-enforcement.md)); it is **not** on the public
-  allow-list (which stays `/api/health`, `/_health`, `/_ping`, the docs,
+  allow-list (which stays `/api/health`, `/_health/live`, `/_health/ready`, `/_health/startup`, the docs,
   and `/metrics.prom`). `GET /fhir/metadata` is the one FHIR path that MAY
   be public (capability discovery), at the service's discretion.
 - **ABAC.** The guard derives the action from the HTTP method exactly as

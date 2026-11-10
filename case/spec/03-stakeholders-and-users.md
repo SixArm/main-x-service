@@ -12,7 +12,7 @@ span the trio:
 | Oversight bodies / regulators / ombudsmen | Who changed what, when; explainable match decisions; compliance evidence | Audit endpoints (`/audit/recent`, `/{pid}/audit`), soft-delete history |
 | Integrators (court systems, EHR, benefits platforms, downstream case-handling systems) | Stable REST surface; linkage via deterministic identifiers (docket, external case id, URI) | Service `/api/*`, OpenAPI / Swagger |
 | Auditors / information-governance officers | HIPAA/GDPR-grade audit trail; replayable match rationale; lawful-basis evidence | `audit_logs`, event stream, soft-delete timestamps |
-| Operations / DBA / SRE | Schema + migration discipline, backups, health checks, scaling | Service deployment artefacts, `/_health`, `/_ping` |
+| Operations / DBA / SRE | Schema + migration discipline, backups, health checks, scaling | Service deployment artefacts, `/_health/live`, `/_health/ready`, `/_health/startup` |
 | Developers / AI agents | Clear SDD contracts; which spec governs what | This spec + the three crate specs |
 | Other Main X Index entities | Cross-references via `pid`; subjects resolve in the [person entity](../../person/) / [organization entity](../../organization/); handling agencies resolve in the organization entity | Service REST API |
 

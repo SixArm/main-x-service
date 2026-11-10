@@ -10,7 +10,7 @@
 //! database-less machine:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/link_graph_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/link_graph_service_test \
 //!   cargo test --test audit_verify -- --ignored
 //! ```
 

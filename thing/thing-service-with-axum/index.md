@@ -43,9 +43,9 @@ Prerequisites: Rust 1.97+ (2024 edition), PostgreSQL 18+.
 ```bash
 cd thing/thing-service-with-axum   # within the main-x-service monorepo
 
-# Build and run (axa): point DATABASE_URL at the database, then
+# Build and run (axa): point DB_URL at the database, then
 # start. Migrations run automatically in development (auto_migrate).
-export DATABASE_URL=postgres://localhost/thing_service_development
+export DB_URL=postgres://localhost/thing_service_development
 cargo run -- start            # or: cargo run -- start
 
 # Service binds on the configured port (config/development.yaml):
@@ -57,7 +57,7 @@ curl http://localhost:5150/api/health
 Persistence is sqlx with no ORM; every statement is a `query!` literal
 in `src/db/`, and spec §10 has the rules. The macros check queries
 against the committed `.sqlx/` data, so build with `SQLX_OFFLINE=true`
-(CI does) unless `DATABASE_URL` points at a **migrated** database: with
+(CI does) unless `DB_URL` points at a **migrated** database: with
 it set and the schema missing, the build fails with "relation does not
 exist".
 
@@ -154,7 +154,7 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 | Variable             | Description                | Default                 |
 | -------------------- | -------------------------- | ----------------------- |
 | `PORT`               | REST bind port — read by `config/production.yaml` only; `development.yaml` hardcodes `5150` (see the quick start above) | `8080` (production) |
-| `DATABASE_URL`       | Postgres connection string | per config file         |
+| `DB_URL`       | Postgres connection string | per config file         |
 | `SEARCH_INDEX_PATH`  | Tantivy index directory    | `./data/search_index`   |
 | `MATCHING_THRESHOLD` | Probabilistic match cutoff | `0.7`                   |
 | `SEARCH_CACHE_SIZE_MB` | Tantivy cache budget in MB | `512` |

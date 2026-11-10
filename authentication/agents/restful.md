@@ -105,4 +105,4 @@ BFF client/repository specifics.
 | `TOKEN_AUDIENCE` | `main-x-service` | `aud` claim |
 | `TOKEN_EXPIRATION` | `300` | PASETO TTL (seconds) |
 | `FRONTEND_URL` | `http://localhost:5173` | Magic-link base |
-| `DATABASE_URL` | axa config default | PostgreSQL |
+| `DB_URL` | axa config default | PostgreSQL |

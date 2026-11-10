@@ -336,7 +336,7 @@ mod tests {
 
 /// DB-gated (`#[ignore]`) proof of the relay poll's lock behaviour:
 /// rows one relay holds are invisible to a second relay polling at the
-/// same time (SEC-B6). Needs a migrated `PostgreSQL` via `DATABASE_URL`.
+/// same time (SEC-B6). Needs a migrated `PostgreSQL` via `DB_URL`.
 #[cfg(test)]
 mod relay_poll {
     use super::{OutboxInsert, unpublished};
@@ -345,9 +345,9 @@ mod relay_poll {
     use chrono::{TimeZone, Utc};
 
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn the_poll_skips_rows_another_relay_holds() {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
         let pool = sqlx::PgPool::connect(&url).await.expect("connect");
         let start = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
         let event = Event::new("Relay Poll Lock Fixture", start);

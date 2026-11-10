@@ -433,10 +433,10 @@ clearly described manual check confirms the acceptance criterion.
     `tests/fluvio_relay.rs` is a `#![cfg(feature = "fluvio")]`-gated,
     `#[ignore]`d round-trip (create under outbox transport →
     `FluvioSink` → `drain_once` → assert `published_at`), connecting
-    directly via `DATABASE_URL` rather than through
+    directly via `DB_URL` rather than through
     `loco_rs::testing::prelude::request` — this crate's dev-dependencies
     do not enable loco's `testing` feature (unlike case's), so the test
-    follows the same direct-`DATABASE_URL` pattern this crate's own
+    follows the same direct-`DB_URL` pattern this crate's own
     DB-gated outbox atomicity tests already use
     (`src/db/repositories.rs::tests`) rather than introducing the loco
     harness for one file. It needs a live broker, which no automated run
@@ -504,7 +504,7 @@ clearly described manual check confirms the acceptance criterion.
     present when empty, deterministic recency ordering) — plus five
     validation tests and a DB-gated round-trip
     (`round_trip_insert_find_update_delete`, `#[ignore]`, needs
-    `DATABASE_URL`). Met: `cargo test --lib` green (225 passed, 5
+    `DB_URL`). Met: `cargo test --lib` green (225 passed, 5
     ignored); `cargo clippy --all-targets` clean; `cargo test --doc`
     green.
   - **Follow-ups (not queued):** front-end views for the profile, and a
@@ -565,7 +565,7 @@ clearly described manual check confirms the acceptance criterion.
   doc audit — T-11 was already taken by the bulk import/export task
   above)* The function was a stub that returned `Config::default()`
   and ignored the process environment, so every documented variable
-  (`DATABASE_URL`, `SERVER_PORT`, `SEARCH_INDEX_PATH`, …) was inert —
+  (`DB_URL`, `SERVER_PORT`, `SEARCH_INDEX_PATH`, …) was inert —
   the integration-test harness, which builds its state from
   `Config::from_env()`, could never be pointed at a test database.
   - Env → `.env` (best-effort) → default precedence, over the 14
@@ -653,7 +653,7 @@ clearly described manual check confirms the acceptance criterion.
   byte-identical family-wide"). "Byte-identical to a tested module
   elsewhere" is not "tested here": a worker-specific migration drift
   would go undetected by this crate's own suite.
-  - **Acceptance:** a new `#[ignore]`d, `DATABASE_URL`-gated
+  - **Acceptance:** a new `#[ignore]`d, `DB_URL`-gated
     `tests/review_queue_db.rs` inserts a pair, upserts a re-scan (score
     refreshed, decision preserved), lists pending rows, and exercises the
     first-writer-wins decision path against a real migrated Postgres;
@@ -665,8 +665,8 @@ clearly described manual check confirms the acceptance criterion.
     column, unboxed `DecideOutcome::Decided`), confirming the "byte-
     identical" premise this task questioned no longer held even before
     this test existed to prove it. Connects via the family-standard
-    `DATABASE_URL` env var (not person's bespoke
-    `REVIEW_QUEUE_TEST_DATABASE_URL` + inline migration application),
+    `DB_URL` env var (not person's bespoke
+    `REVIEW_QUEUE_TEST_DB_URL` + inline migration application),
     matching this crate's own `tests/gender_normalization_db.rs`
     pattern — migrations are applied by `scripts/ci-check.sh test-db`
     before the suite runs. Covers insert, pair-order normalization,

@@ -12,7 +12,7 @@
 //!
 //! ```sh
 //! podman compose -f compose.fluvio.yaml up -d
-//! DATABASE_URL=postgres://loco:loco@127.0.0.1:5432/worker_service_test \
+//! DB_URL=postgres://loco:loco@127.0.0.1:5432/worker_service_test \
 //!   WORKER_FLUVIO_ENDPOINT=127.0.0.1:9103 \
 //!   cargo test --features fluvio --test fluvio_relay -- --ignored
 //! podman compose -f compose.fluvio.yaml down -v
@@ -32,7 +32,7 @@
 //! dev-dependencies enable axa's `testing` feature. This crate's
 //! dev-dependencies do not, and its own DB-gated outbox atomicity tests
 //! (`src/db/repositories.rs::tests::create_enqueues_a_created_outbox_row`)
-//! already establish the alternative: connect directly via `DATABASE_URL`
+//! already establish the alternative: connect directly via `DB_URL`
 //! and drive the repository. This test follows that established local
 //! pattern instead of introducing the axa test harness for one file.
 #![cfg(feature = "fluvio")]
@@ -55,16 +55,15 @@ fn a_worker(family: &str) -> Worker {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL) AND a live Fluvio broker; see this file's module docs"]
+#[ignore = "requires PostgreSQL (DB_URL) AND a live Fluvio broker; see this file's module docs"]
 async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
-    let database_url =
-        std::env::var("DATABASE_URL").expect("set DATABASE_URL to a migrated test database");
+    let database_url = std::env::var("DB_URL").expect("set DB_URL to a migrated test database");
     let endpoint = std::env::var("WORKER_FLUVIO_ENDPOINT")
         .expect("set WORKER_FLUVIO_ENDPOINT to the broker's SC address (e.g. 127.0.0.1:9103)");
 
     let db = sqlx::PgPool::connect(&database_url)
         .await
-        .expect("connect to DATABASE_URL");
+        .expect("connect to DB_URL");
 
     // Durable transport, so `create` writes an outbox row in the same
     // transaction as the worker insert.

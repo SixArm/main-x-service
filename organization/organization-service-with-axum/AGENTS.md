@@ -56,7 +56,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/swagger-ui` · `/api-docs/openapi.json` | API docs |
 | GET | `/metrics.prom` | Prometheus metrics (text-exposition; root path, public) |
 
-Plus axa's default `/_health`, `/_ping`.
+Plus axa's default `/_health/live`, `/_health/ready`, `/_health/startup`.
 
 **FHIR R5 — family reference implementation.** `GET`/`POST`/`PUT`/`DELETE
 /fhir/Organization{,/{id}}`, `GET /fhir/Organization?<params>` (a
@@ -280,7 +280,7 @@ podman build -f organization/organization-service-with-axum/Dockerfile \
 ```
 
 Verified end-to-end (2026-08-03): builds clean, boots against a real
-Postgres, and `GET /_health` returns `200`. This exercise found and
+Postgres, and `GET /_health/live` returns `200`. This exercise found and
 fixed a real bug: `config/production.yaml`'s `mailer.smtp.auth.user`/
 `password` used an unquoted Tera `{{ get_env(name="…", default="") }}`
 call, which renders as YAML `null` (not `""`) when the env var is

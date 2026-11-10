@@ -18,7 +18,7 @@ remains the complete inbound surface.
 | Tier | Surface |
 |---|---|
 | REST (axa controllers on Axum) | Read endpoints under `/api/*`, registered as an axa `Routes` table. |
-| Ops (axa built-ins) | `GET /_health` (DB + queue readiness) and `GET /_ping` (liveness), for orchestration probes, outside `/api`. |
+| Ops (axa built-ins) | `GET /_health/live` (liveness), `GET /_health/ready` (DB + queue readiness) and `GET /_health/startup`, for orchestration probes, outside `/api`. |
 | gRPC (Tonic) | Out of MVP scope. |
 | Docs | Swagger UI at `/swagger-ui`, raw OpenAPI 3 JSON at `/api-docs/openapi.json` (utoipa). |
 | Metrics | `GET /metrics.prom` — Prometheus text-exposition format, mounted at the application **root**, public. Gauges/counters: per-entity consumer lag, edge counts by `status`, reconciliation divergence, `linked` / `unlinked` / `merged` processed totals, `http_requests_total{path,status}`. |
@@ -67,7 +67,7 @@ GET /api/health/freshness
 ### 9.3 Health
 
 `GET /api/health/freshness` is the service's own freshness endpoint (the eventual-consistency window made queryable);
-the axa `/_health` / `/_ping` pair serves container orchestration.
+the axa `/_health/live`, `/_health/ready`, `/_health/startup` pair serves container orchestration.
 
 ### 9.4 Authorisation
 

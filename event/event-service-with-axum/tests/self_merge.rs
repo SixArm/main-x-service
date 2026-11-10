@@ -68,7 +68,7 @@ async fn two_different_records_reach_the_database() {
 /// leaves the event readable. Before the guard, the same request
 /// soft-deleted it and answered `500`.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_refused_self_merge_leaves_the_event_in_place() {
     use axa_test::TestApp;
     use axum::body::Body;
@@ -83,7 +83,7 @@ async fn a_refused_self_merge_leaves_the_event_in_place() {
     }
     let app = event_service::app::App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router");
     let config = Config::from_env().expect("config");

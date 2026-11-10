@@ -68,8 +68,8 @@ cargo run --release
 
 # Tests
 cargo test --lib                                # unit
-cargo test --tests                              # integration (needs DATABASE_URL)
-DATABASE_URL=… cargo test --test api_integration_test
+cargo test --tests                              # integration (needs DB_URL)
+DB_URL=… cargo test --test api_integration_test
 
 # Benchmarks
 cargo bench

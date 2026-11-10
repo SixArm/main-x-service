@@ -134,7 +134,7 @@ async fn find_cross_service_review_row(
 /// `provenance = "matcher_suggested"`, `status = "pending"`, and the
 /// T-29 score breakdown mapped verbatim.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
 async fn matcher_suggested_same_identity_link_creates_a_review_row() {
     let app = common::create_test_router().await;
     let family = common::unique_person_name("XSvcReview");
@@ -190,7 +190,7 @@ async fn matcher_suggested_same_identity_link_creates_a_review_row() {
 /// `operator`/`1.0` — idempotent on the existing `entity_links` key, so
 /// there is still exactly one active edge afterward, not a second one.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
 async fn confirming_promotes_the_edge_without_duplicating_it() {
     let app = common::create_test_router().await;
     let family = common::unique_person_name("XSvcConfirm");
@@ -236,7 +236,7 @@ async fn confirming_promotes_the_edge_without_duplicating_it() {
 
 /// Rejecting a suggested pair withdraws (soft-deletes) the edge.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
 async fn rejecting_withdraws_the_edge() {
     let app = common::create_test_router().await;
     let family = common::unique_person_name("XSvcReject");
@@ -284,7 +284,7 @@ async fn rejecting_withdraws_the_edge() {
 /// `worker:<person B's id>` — exactly what this test's final assertion
 /// rules out.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
 async fn ordinary_review_decision_is_unaffected_by_t32() {
     let app = common::create_test_router().await;
     let db = common::db().await;
@@ -364,7 +364,7 @@ async fn ordinary_review_decision_is_unaffected_by_t32() {
 /// `CREATE`/`person_link` row naming the same link id, carrying
 /// `provenance = "matcher_suggested"` in its `new_values` snapshot.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test cross_service_link_review -- --ignored`"]
 async fn matcher_suggested_link_creation_is_audited() {
     let app = common::create_test_router().await;
     let db = common::db().await;

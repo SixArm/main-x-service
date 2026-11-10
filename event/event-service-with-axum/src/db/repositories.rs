@@ -1691,9 +1691,9 @@ impl EventRepository for PgEventRepository {
 }
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path.
-/// They require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped
+/// They require a migrated `PostgreSQL` via `DB_URL` and are skipped
 /// by a bare `cargo test`; run with
-/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
+/// `DB_URL=… cargo test --lib -- --ignored`. They must COMPILE
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
@@ -1705,17 +1705,17 @@ mod tests {
     use chrono::{TimeZone, Utc};
 
     async fn connect() -> sqlx::PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
         sqlx::PgPool::connect(&url)
             .await
-            .expect("connect to DATABASE_URL")
+            .expect("connect to DB_URL")
     }
 
     /// Merge writes, in one transaction: a `merged` outbox row for the
     /// survivor carrying the duplicate's pid in `merged_from`, plus a
     /// `deleted` outbox row for the duplicate.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
         let repo = PgEventRepository::new(db.clone()).with_transport(EventTransport::Outbox);
@@ -1753,7 +1753,7 @@ mod tests {
     /// answers `Conflict` without writing the survivor. Without the lock
     /// it applied the survivor and "deleted" an already-deleted row.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_merge_waits_for_a_concurrent_delete_and_then_refuses() {
         let db = connect().await;
         let repo = PgEventRepository::new(db.clone());
@@ -1813,7 +1813,7 @@ mod tests {
     /// The frequency scan's name listing pages by id, carries alternate
     /// names in order, and skips deleted events.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn list_active_names_pages_by_id_with_alternates() {
         let db = connect().await;
         let repo = PgEventRepository::new(db.clone());
@@ -1855,7 +1855,7 @@ mod tests {
     /// A scan over fewer than `MIN_FREQUENCY_POPULATION` records knows no
     /// shares.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_small_population_scans_to_no_frequencies() {
         let db = connect().await;
         let repo = PgEventRepository::new(db.clone());

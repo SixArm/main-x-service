@@ -93,7 +93,7 @@ jobs:
 
       - name: Run database migrations
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/event_service_test
+          DB_URL: postgresql://test_user:test_password@localhost:5432/event_service_test
         run: cargo run --bin event-service -- db migrate
 
       # `--include-ignored` runs BOTH the default (DB-free) tests and the
@@ -103,7 +103,7 @@ jobs:
       # and other test binaries.
       - name: Run tests (incl. DB-gated + enforcement)
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/event_service_test
+          DB_URL: postgresql://test_user:test_password@localhost:5432/event_service_test
           SEARCH_INDEX_PATH: /tmp/test_index
           MATCHING_THRESHOLD: 0.7
           RUST_LOG: info

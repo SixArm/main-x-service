@@ -48,10 +48,10 @@ TEST_DB_PORT=5434 scripts/test-db.sh up case/case-service-with-axum
 
 ```
 test-db: mxi-authentication-test-db ready
-  DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_test
+  DB_URL=postgres://loco:loco@localhost:5432/authentication_service_test
 
 test-db: mxi-case-test-db ready
-  DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test
+  DB_URL=postgres://loco:loco@localhost:5434/case_service_test
 ```
 
 Migrate both (same `cargo run -- db migrate` pattern TUT-2 established —
@@ -61,7 +61,7 @@ generator CLI, confirmed again for this tutorial):
 
 ```sh
 cd authentication/authentication-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
+DB_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
   cargo run -- db migrate
 ```
 
@@ -72,7 +72,7 @@ Migration 'm20260728_000001_add_auth_event_mac' has been applied
 
 ```sh
 cd case/case-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test \
+DB_URL=postgres://loco:loco@localhost:5434/case_service_test \
   cargo run -- db migrate
 ```
 
@@ -105,7 +105,7 @@ Start authentication-service (default port, default environment —
 
 ```sh
 cd authentication/authentication-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
+DB_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
   cargo run -- start
 ```
 
@@ -120,7 +120,7 @@ that baseline):
 
 ```sh
 cd case/case-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test \
+DB_URL=postgres://loco:loco@localhost:5434/case_service_test \
   cargo run -- start
 ```
 
@@ -132,8 +132,8 @@ listening on http://localhost:5180
 Verify both are actually up:
 
 ```sh
-curl -s http://localhost:5150/_health
-curl -s http://localhost:5180/_health
+curl -s http://localhost:5150/_health/live
+curl -s http://localhost:5180/_health/live
 ```
 
 ```json
@@ -295,7 +295,7 @@ at authentication-service's published keys:
 
 ```sh
 cd case/case-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test \
+DB_URL=postgres://loco:loco@localhost:5434/case_service_test \
   CASE_REQUIRE_AUTH=true \
   CASE_PASETO_KEYS_URL=http://localhost:5150/.well-known/paseto-keys \
   cargo run -- start
@@ -358,7 +358,7 @@ here:
 
 ```sh
 cd authentication/authentication-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
+DB_URL=postgres://loco:loco@localhost:5432/authentication_service_test \
   cargo run -- task user_attributes op:set email:demo@example.com key:access values:write
 ```
 
@@ -530,7 +530,7 @@ Restart case-service once more with this policy wired in:
 
 ```sh
 cd case/case-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5434/case_service_test \
+DB_URL=postgres://loco:loco@localhost:5434/case_service_test \
   CASE_REQUIRE_AUTH=true \
   CASE_PASETO_KEYS_URL=http://localhost:5150/.well-known/paseto-keys \
   CASE_ABAC_POLICY_FILE=/tmp/tut3-scratch/case-abac-policy.json \

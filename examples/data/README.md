@@ -72,7 +72,7 @@ else (`Task::development_only`), so made-up records cannot reach a real
 database, and a container built with `APP_ENV=production` will not run it.
 
 Run from each service crate's own directory, against its own database
-(`DATABASE_URL` as usual):
+(`DB_URL` as usual):
 
 ```sh
 cd person/person-service-with-axum       && cargo run -- task seed_examples

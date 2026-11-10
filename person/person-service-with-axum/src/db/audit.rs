@@ -890,7 +890,7 @@ pub async fn count_unscrubbable_addresses(db: &PgPool, days: i32) -> Result<i64>
 /// Database-backed pins for the tamper-evident audit chain
 /// ([`crate::compliance::audit_chain`]).
 ///
-/// These need a migrated `PostgreSQL` via `DATABASE_URL` and are
+/// These need a migrated `PostgreSQL` via `DB_URL` and are
 /// `#[ignore]`d, matching this crate's other DB tests. They exist because
 /// the chain's riskiest property cannot be checked without a database: a
 /// digest computed in Rust before an `INSERT` must still match after
@@ -945,10 +945,8 @@ mod chain_tests {
     use uuid::Uuid;
 
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL")
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        PgPool::connect(&url).await.expect("connect to DB_URL")
     }
 
     /// Remove every audit row, so a run starts from an empty chain.
@@ -972,7 +970,7 @@ mod chain_tests {
     /// and `timestamptz` conversion included.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn chain_survives_a_jsonb_round_trip() {
         let db = connect().await;
         clear(&db).await;
@@ -1018,7 +1016,7 @@ mod chain_tests {
     /// property the chain exists to provide.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn tampering_with_a_row_breaks_verification() {
         let db = connect().await;
         clear(&db).await;
@@ -1059,7 +1057,7 @@ mod chain_tests {
     /// with its content still checked, which `redacted_at` would not.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn an_old_address_goes_and_the_chain_still_verifies() {
         use crate::compliance::address_retention::{scrub, unscrubbable};
 
@@ -1103,7 +1101,7 @@ mod chain_tests {
     /// chain binds a predecessor at all.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn deleting_a_row_breaks_linkage() {
         let db = connect().await;
         clear(&db).await;
@@ -1138,7 +1136,7 @@ mod chain_tests {
     /// with `disclosure` set — the §164.528 distinction, persisted.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn read_access_is_chained_and_flagged_as_a_disclosure() {
         use crate::compliance::disclosure::AccessContext;
 
@@ -1181,7 +1179,7 @@ mod chain_tests {
     /// which is what makes the digest reproducible.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn stored_timestamp_is_microsecond_exact() {
         let db = connect().await;
         clear(&db).await;

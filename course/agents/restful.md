@@ -23,7 +23,7 @@ the normative summary is entity spec [§9](../spec/09-api-surface.md).
 
 | Group | Endpoints |
 |---|---|
-| Health | `GET /api/health`; axa `/_health`, `/_ping` |
+| Health | `GET /api/health`; axa `/_health/live`, `/_health/ready`, `/_health/startup` |
 | Course CRUD | `POST/GET/PUT/DELETE /api/courses[/{id}]` |
 | Search | `GET /api/courses/search` (`q`, `limit`, `offset`, `fuzzy`, `phonetic`, `educational_level`, `language`, `provider_id`, `mask_sensitive`) |
 | Match / dedup | `POST /api/courses/{match,check-duplicates,merge,deduplicate}` |

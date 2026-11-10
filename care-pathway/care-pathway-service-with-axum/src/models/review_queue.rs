@@ -235,12 +235,10 @@ mod evidence_tests {
     use sqlx::PgPool;
     use uuid::Uuid;
 
-    /// A pool on `DATABASE_URL`, migrated.
+    /// A pool on `DB_URL`, migrated.
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        let db = PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        let db = PgPool::connect(&url).await.expect("connect to DB_URL");
         crate::models::MIGRATOR
             .run(&db)
             .await
@@ -266,7 +264,7 @@ mod evidence_tests {
     /// back with `evidence = None`; one written with it round-trips, and
     /// a re-scan upsert refreshes it.
     #[tokio::test]
-    #[ignore = "requires PostgreSQL (DATABASE_URL); run with: cargo test -- --ignored"]
+    #[ignore = "requires PostgreSQL (DB_URL); run with: cargo test -- --ignored"]
     async fn old_rows_read_null_and_new_rows_round_trip() {
         let db = connect().await;
         let (a, b) = (Uuid::new_v4(), Uuid::new_v4());

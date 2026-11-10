@@ -101,14 +101,12 @@ mod db_tests {
     use crate::models::bulk_jobs::{Model, NewBulkJob};
 
     fn url() -> String {
-        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests")
+        std::env::var("DB_URL").expect("DB_URL must be set for DB tests")
     }
 
     /// The real queue, so these tests pin the table axa actually writes.
     async fn connect() -> (PgPool, Queue) {
-        let db = PgPool::connect(&url())
-            .await
-            .expect("connect to DATABASE_URL");
+        let db = PgPool::connect(&url()).await.expect("connect to DB_URL");
         crate::models::MIGRATOR
             .run(&db)
             .await
@@ -173,7 +171,7 @@ mod db_tests {
     /// The bug: axa gives up on a job, and `bulk_jobs` must follow it.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_job_axa_gave_up_on_moves_to_failed() {
         let (db, queue) = connect().await;
         let id = new_job(&db).await;
@@ -194,7 +192,7 @@ mod db_tests {
     /// the last one is used up.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_requeued_job_is_not_failed_while_it_has_attempts() {
         let (db, queue) = connect().await;
         let id = new_job(&db).await;
@@ -216,7 +214,7 @@ mod db_tests {
     /// queue row is mid-request. An old one will never run.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_job_with_no_queue_row_is_lost_only_after_the_grace() {
         let (db, _queue) = connect().await;
         let young = new_job(&db).await;
@@ -235,7 +233,7 @@ mod db_tests {
     /// hands: heartbeats touch `axa_queue`, not `bulk_jobs`.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_long_job_with_a_live_queue_row_is_left_alone() {
         let (db, queue) = connect().await;
         let waiting = new_job(&db).await;
@@ -260,7 +258,7 @@ mod db_tests {
     /// A finished job keeps its outcome, even if its queue row failed.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_terminal_job_is_never_moved() {
         let (db, queue) = connect().await;
         let id = new_job(&db).await;
@@ -281,7 +279,7 @@ mod db_tests {
     /// Other workers carry a `job_id` too, so the link includes the name.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_failed_row_from_another_worker_is_no_link() {
         let (db, queue) = connect().await;
         let id = new_job(&db).await;
@@ -302,7 +300,7 @@ mod db_tests {
     /// recovers what its predecessor lost without waiting for the timer.
     #[tokio::test]
     #[serial]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn the_loop_reconciles_on_its_first_pass() {
         let (db, _queue) = connect().await;
         let id = new_job(&db).await;

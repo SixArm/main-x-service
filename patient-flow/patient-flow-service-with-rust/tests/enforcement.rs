@@ -7,7 +7,7 @@
 //! tokens + the matching key set in-process (no auth service needed).
 //!
 //! `#[ignore]`d: boots the app (needs PostgreSQL via
-//! `DATABASE_URL`). Run with
+//! `DB_URL`). Run with
 //! `cargo test --test enforcement -- --ignored`.
 
 #![cfg(feature = "paseto")]
@@ -83,7 +83,7 @@ fn test_policy() -> String {
 /// read returns the **redacted** whiteboard.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test --test enforcement -- --ignored`"]
+#[ignore = "requires PostgreSQL via DB_URL; run with `cargo test --test enforcement -- --ignored`"]
 async fn enforcement_on_gates_and_masks_the_real_stack() {
     let (keys, kid) = keys_and_kid();
     // The auth OnceLocks read these on first use — set before boot.
@@ -101,7 +101,7 @@ async fn enforcement_on_gates_and_masks_the_real_stack() {
         let bearer = |token: &str| format!("Bearer {token}");
 
         // Public allow-list stays open without a token.
-        assert_eq!(request.get("/_health").await.status_code(), 200);
+        assert_eq!(request.get("/_health/live").await.status_code(), 200);
         assert_eq!(request.get("/metrics.prom").await.status_code(), 200);
 
         // Protected: no token ⇒ 401; junk token ⇒ 401.

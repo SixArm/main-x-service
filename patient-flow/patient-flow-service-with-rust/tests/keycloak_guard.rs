@@ -51,7 +51,7 @@ async fn a_keycloak_token_is_authenticated_and_authorized_through_the_real_guard
     // No credential, and public paths stay open.
     assert_eq!(status(&Method::GET, list, &HeaderMap::new()).await, 401);
     assert_eq!(
-        status(&Method::GET, "/_health", &HeaderMap::new()).await,
+        status(&Method::GET, "/_health/live", &HeaderMap::new()).await,
         200
     );
 

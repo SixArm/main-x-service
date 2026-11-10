@@ -41,8 +41,7 @@ migrations/                  # hand-written SQL <version>_<name>.up.sql / .down.
 development, PostgreSQL `database` + Postgres-backed `queue`,
 `auto_migrate: true` — then:
 
-1. `App::routes` registers axa's default routes (`/_health`,
-   `/_ping`) plus `courses_routes()`, an axa `Routes` table with
+1. `App::routes` registers axa's default routes (`/_health/live`, `/_health/ready`, `/_health/startup`) plus `courses_routes()`, an axa `Routes` table with
    prefix `/api`.
 2. `App::after_routes` builds the boot-time singletons — domain
    `Config::from_env` → `SearchEngine::new` → `CourseMatcher::new` →

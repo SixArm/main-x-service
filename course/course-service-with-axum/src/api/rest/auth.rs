@@ -173,8 +173,8 @@ pub fn require_auth_from_env() -> bool {
 }
 
 /// Paths that stay public even when blanket enforcement is on (SEC-G5,
-/// deny-by-default): axa's liveness/readiness probes (`/_health`,
-/// `/_ping`), the `OpenAPI` doc (`/api-docs/openapi.json`) and Swagger UI
+/// deny-by-default): axa's liveness/readiness probes (`/_health/live`,
+/// `/_health/ready`, `/_health/startup`), the `OpenAPI` doc (`/api-docs/openapi.json`) and Swagger UI
 /// (`/swagger-ui*`), the Prometheus scrape (`/metrics.prom`), the API
 /// health check (`/api/health`), and the FHIR `CapabilityStatement`
 /// (`/fhir/metadata`, capability discovery — fhir.md §8). This is the
@@ -182,8 +182,9 @@ pub fn require_auth_from_env() -> bool {
 /// token when enforcement is on, whether or not it is under `/api` or
 /// `/fhir`.
 fn is_public_path(path: &str) -> bool {
-    path == "/_health"
-        || path == "/_ping"
+    path == "/_health/live"
+        || path == "/_health/ready"
+        || path == "/_health/startup"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
         || path == "/metrics.prom"
@@ -811,8 +812,9 @@ mod tests {
         for path in [
             "/api/health",    // allow-listed inside /api
             "/fhir/metadata", // FHIR capability discovery (fhir.md §8)
-            "/_health",       // loco default, outside /api
-            "/_ping",         // loco default, outside /api
+            "/_health/live",
+            "/_health/ready",
+            "/_health/startup",
             "/api-docs/openapi.json",
             "/swagger-ui",
             "/swagger-ui/index.html",

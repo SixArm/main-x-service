@@ -1591,7 +1591,7 @@ async fn test_out_of_band_edit_to_an_assessment_score_is_detected() {
 /// an axum `Router` and once as an axa `Routes`, so a handler added to
 /// only one of them compiles and serves 404 from the other.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_compliance_identification_is_mounted() {
     let app = common::create_test_router().await;
 
@@ -1621,7 +1621,7 @@ async fn test_compliance_identification_is_mounted() {
 /// it needs a verified caller even with `WORKER_REQUIRE_AUTH` off. The
 /// document itself is checked in `tests/enforcement.rs`, which has a token.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_compliance_sbom_needs_a_caller_with_enforcement_off() {
     let app = common::create_test_router().await;
 

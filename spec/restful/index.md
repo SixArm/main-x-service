@@ -198,7 +198,7 @@ e.g. `ORGANIZATION_REQUIRE_AUTH`) turns on a middleware layer
 (`enforce`, wired in `src/app.rs`) that requires a valid PASETO bearer
 token (service-to-service) or a valid session (BFF/browser) on
 **every route except** the public health/ping and OpenAPI/Swagger paths
-(`is_public_path`: `/_health`, `/_ping`, `/api-docs/openapi.json`,
+(`is_public_path`: `/_health/live`, `/_health/ready`, `/_health/startup`, `/api-docs/openapi.json`,
 `/swagger-ui*`). It is **off by default** (`1`/`true`/`yes`/`on`,
 case-insensitive, are the only truthy values); unset/blank/junk leaves
 today's opt-in-per-handler behaviour. This is **implemented and shipped

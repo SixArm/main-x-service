@@ -93,7 +93,7 @@ jobs:
 
       - name: Run database migrations
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/person_service_test
+          DB_URL: postgresql://test_user:test_password@localhost:5432/person_service_test
           SQLX_OFFLINE: "true"
         run: cargo run --bin person-service -- db migrate
 
@@ -104,7 +104,7 @@ jobs:
       # and other test binaries.
       - name: Run tests (incl. DB-gated + enforcement)
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/person_service_test
+          DB_URL: postgresql://test_user:test_password@localhost:5432/person_service_test
           SQLX_OFFLINE: "true"
           SEARCH_INDEX_PATH: /tmp/test_index
           MATCHING_THRESHOLD: 0.7

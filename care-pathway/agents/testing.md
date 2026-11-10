@@ -13,7 +13,7 @@ Entity-level view; normative inventory in entity spec
 | matcher | Doctests | `cargo test` | rustdoc examples |
 | service | DB-free embedding tests | `cargo test --test matching` | Matcher embedding + `CarePathway` JSON round-trip (the DTO/JSONB contract) |
 | service | Controller validation units | `cargo test --lib` | Blank-name → `422` pin (DB-free) |
-| service | Request-level tests (`tests/requests/care_pathways.rs`) | `cargo test -- --ignored` + Postgres `DATABASE_URL` | All seven endpoints: create, 422 on blank name (create/update), get 200/404, list, `/match`, `/check-duplicates` round-trip. `#[ignore]`-gated so default `cargo test` is DB-free |
+| service | Request-level tests (`tests/requests/care_pathways.rs`) | `cargo test -- --ignored` + Postgres `DB_URL` | All seven endpoints: create, 422 on blank name (create/update), get 200/404, list, `/match`, `/check-duplicates` round-trip. `#[ignore]`-gated so default `cargo test` is DB-free |
 | front-end | Type-level check | `pnpm run check` | svelte-check strict, 0 errors / 0 warnings |
 | front-end | Build | `pnpm run build` | Production build |
 
@@ -57,7 +57,7 @@ and its test edit in the same PR.
   library's own rules (no clocks, no RNG seeds that matter).
 - Service: prefer DB-free tests where the behaviour allows;
   request-level tests are `#[ignore]`-gated (need Postgres — run
-  with `cargo test -- --ignored` and a `DATABASE_URL`).
+  with `cargo test -- --ignored` and a `DB_URL`).
 - Construct minimal records with `CarePathway::new("…")` and set
   only the fields under test — renormalisation means absent
   components simply drop out of the score.

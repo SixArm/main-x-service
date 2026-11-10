@@ -25,7 +25,7 @@
 //! polluting the other suites.
 //!
 //! `#[ignore]`d: boots the app (needs PostgreSQL via `config/test.yaml` /
-//! `DATABASE_URL`). Run with `cargo test --test masking -- --ignored`.
+//! `DB_URL`). Run with `cargo test --test masking -- --ignored`.
 #![cfg(feature = "paseto")]
 
 use axa_test::prelude::*;

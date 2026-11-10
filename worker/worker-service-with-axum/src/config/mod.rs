@@ -54,11 +54,11 @@ pub struct ServerConfig {
 
 /// `PostgreSQL` connection-pool configuration.
 ///
-/// Maps to env vars `DATABASE_URL` / `DATABASE_MAX_CONNECTIONS` /
+/// Maps to env vars `DB_URL` / `DATABASE_MAX_CONNECTIONS` /
 /// `DATABASE_MIN_CONNECTIONS`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
-    /// `PostgreSQL` connection URL. Env `DATABASE_URL`; default points
+    /// `PostgreSQL` connection URL. Env `DB_URL`; default points
     /// at a local `worker_service` database.
     pub url: String,
     /// Maximum number of pooled connections. Env
@@ -147,7 +147,7 @@ impl Default for Config {
                 grpc_port: 50051,
             },
             database: DatabaseConfig {
-                // DATABASE_URL default: local Postgres `worker_service` db.
+                // DB_URL default: local Postgres `worker_service` db.
                 url: "postgres://localhost/worker_service".to_string(),
                 // DATABASE_MAX_CONNECTIONS default.
                 max_connections: 10,
@@ -199,7 +199,7 @@ impl Config {
     ///
     /// | Env var | Field | Type |
     /// |---|---|---|
-    /// | `DATABASE_URL` | `database.url` | string |
+    /// | `DB_URL` | `database.url` | string |
     /// | `DATABASE_MAX_CONNECTIONS` | `database.max_connections` | `u32` |
     /// | `DATABASE_MIN_CONNECTIONS` | `database.min_connections` | `u32` |
     /// | `SERVER_HOST` | `server.host` | string |
@@ -246,7 +246,7 @@ impl Config {
         // A blank value is treated as unset throughout.
         let get = |name: &str| lookup(name).filter(|v| !v.trim().is_empty());
 
-        if let Some(v) = get("DATABASE_URL") {
+        if let Some(v) = get("DB_URL") {
             config.database.url = v;
         }
         if let Some(v) =
@@ -368,7 +368,7 @@ mod tests {
     #[test]
     fn every_variable_overrides_its_field() {
         let config = Config::from_source(source(&[
-            ("DATABASE_URL", "postgres://db/app"),
+            ("DB_URL", "postgres://db/app"),
             ("DATABASE_MAX_CONNECTIONS", "42"),
             ("DATABASE_MIN_CONNECTIONS", "7"),
             ("SERVER_HOST", "127.0.0.1"),
@@ -408,7 +408,7 @@ mod tests {
     fn blank_values_are_treated_as_unset() {
         let defaults = Config::default();
         let config = Config::from_source(source(&[
-            ("DATABASE_URL", ""),
+            ("DB_URL", ""),
             ("SERVER_HOST", "   "),
             ("SERVER_PORT", ""),
         ]))

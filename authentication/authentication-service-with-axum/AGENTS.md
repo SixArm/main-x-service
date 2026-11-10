@@ -226,7 +226,7 @@ config/                    development/production/test yaml (keys/ holds only a 
 | `AUTH_INTEGRITY_MAC_KEY_ID` | — | Key id stamped into new MACs, for rotation. |
 | `AUTH_INTEGRITY_MAC_KEYS_RETIRED` | — | Comma-separated retired key material, still verifiable, no longer used to sign. |
 | `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs; also the redirect target after a successful OIDC sign-in. |
-| `DATABASE_URL` | axa config default | Postgres connection. |
+| `DB_URL` | axa config default | Postgres connection. |
 | `AUTH_OIDC_ISSUER_URL` | — | **EV-2** (`oidc` Cargo feature, off by default). The IdP's issuer URL, used for OIDC discovery. Unset ⇒ `/api/auth/oidc/*` is `404` — federation is opt-in per deployment even with the feature compiled in. |
 | `AUTH_OIDC_CLIENT_ID` | — | This service's registered OAuth2 client id at the IdP. |
 | `AUTH_OIDC_CLIENT_SECRET` | — | This service's client secret, inline. `AUTH_OIDC_CLIENT_SECRET_FILE` takes precedence when both are set. |
@@ -257,7 +257,7 @@ podman build -f authentication/authentication-service-with-axum/Dockerfile \
 Verified end-to-end (2026-08-03): builds clean, boots against a real
 Postgres (with `TOKEN_PRIVATE_KEY_SEED` and `JWT_SECRET` supplied — see
 Configuration above; `TOKEN_PRIVATE_KEY_SEED` is required in
-production per SEC-A1's fail-closed guard), and `GET /_health` returns
+production per SEC-A1's fail-closed guard), and `GET /_health/live` returns
 `200`. This exercise found and fixed a real bug:
 `config/production.yaml`'s `mailer.smtp.auth.user`/`password` used an
 unquoted Tera `{{ get_env(name="…", default="") }}` call, which renders

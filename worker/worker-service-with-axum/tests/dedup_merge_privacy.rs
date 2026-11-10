@@ -7,7 +7,7 @@
 //! records among whatever earlier runs left in a shared database.
 //!
 //! `#[ignore]`d — run with
-//! `DATABASE_URL=… cargo test --test dedup_merge_privacy -- --ignored`.
+//! `DB_URL=… cargo test --test dedup_merge_privacy -- --ignored`.
 
 mod common;
 
@@ -68,7 +68,7 @@ fn worker(family: &str, mrn: &str) -> Value {
 /// the MRN routes to no unique scheme and a name and birth date are not
 /// proof (`agents/share/match-evidence.md`).
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn creating_the_same_worker_twice_is_a_409() {
     let app = common::create_test_router().await;
     let family = format!("Dedupe{}", Uuid::new_v4().simple());
@@ -104,7 +104,7 @@ async fn creating_the_same_worker_twice_is_a_409() {
 /// A different worker carrying an identifier another worker already holds
 /// is a `409` naming the key, not a `500`.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn an_identifier_another_worker_holds_is_a_409_not_a_500() {
     let app = common::create_test_router().await;
     let mrn = format!("MRN-{}", Uuid::new_v4().simple());
@@ -120,7 +120,7 @@ async fn an_identifier_another_worker_holds_is_a_409_not_a_500() {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn the_batch_scan_finds_a_pair_and_merge_folds_one_into_the_other() {
     let app = common::create_test_router().await;
     let state = common::create_test_app_state().await;
@@ -200,7 +200,7 @@ async fn the_batch_scan_finds_a_pair_and_merge_folds_one_into_the_other() {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn the_masked_view_hides_what_the_export_returns_whole() {
     let app = common::create_test_router().await;
     let state = common::create_test_app_state().await;

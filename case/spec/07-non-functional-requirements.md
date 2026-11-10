@@ -13,7 +13,7 @@ tracked in §15.
   at target volumes *(roadmap: requires candidate blocking via
   search)*.
 - **NFR-3 — Availability.** Stateless app tier, horizontal scaling,
-  PostgreSQL replication, health checks (`/_health`, `/_ping`),
+  PostgreSQL replication, health checks (`/_health/live`, `/_health/ready`, `/_health/startup`),
   graceful shutdown, non-root containers. See
   [`agents/share/availability.md`](../../agents/share/availability.md).
 - **NFR-4 — i18n / locales.** Case titles and keywords are

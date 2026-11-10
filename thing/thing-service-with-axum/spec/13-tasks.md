@@ -272,7 +272,7 @@ clearly described manual check confirms the acceptance criterion.
     (`envelope`, `outbox::from_envelope`, transport parse) pass
     (`cargo test --lib`: 171; `clippy --lib --tests` clean); DB-gated
     `#[ignore]` atomicity tests (create + merge) compile and run under
-    `DATABASE_URL=… cargo test --lib -- --ignored`.
+    `DB_URL=… cargo test --lib -- --ignored`.
   - **Phase 3 — Done (2026-07-08):** the relay + retention loop landed
     in `src/relay.rs` (copy-adapted from the finished **organization**
     reference; paths retargeted to thing's `crate::db::...` outbox and
@@ -316,7 +316,7 @@ clearly described manual check confirms the acceptance criterion.
   `tests/fluvio_relay.rs` is a `#![cfg(feature = "fluvio")]`-gated,
   `#[ignore]`d round-trip (create under outbox transport → `FluvioSink` →
   `drain_once` → assert `published_at`), following this crate's own
-  DB-gated-test convention (direct `DATABASE_URL` connect +
+  DB-gated-test convention (direct `DB_URL` connect +
   `SeaOrmThingRepository` (now `PgThingRepository`), not case's `loco_rs::testing::request`
   harness, which this crate does not use elsewhere) — its run command is
   documented inline. It needs a live broker, which no automated run in

@@ -24,7 +24,7 @@ Endpoint detail: [`agents/restful.md`](../agents/restful.md); source:
 | GET | `/api-docs/openapi.json` | OpenAPI 3 document for the API | `OpenAPI` JSON |
 | GET | `/swagger-ui` | Swagger UI rendering the spec (CDN assets) | HTML |
 
-Plus axa's built-in `/_health` and `/_ping`.
+Plus axa's built-in `/_health/live`, `/_health/ready`, `/_health/startup`.
 
 Every create / update / delete / merge writes a best-effort `audit_logs`
 row (action + JSON snapshot, durable in Postgres) and publishes a

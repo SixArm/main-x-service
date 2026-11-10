@@ -11,7 +11,7 @@ governmental system. Stakeholders span the trio:
 | Procurement / grants / licensing systems | Supplier and counterparty identity resolution; duplicate detection before onboarding | `/check-duplicates`, `/match`, `/search` |
 | Data subjects (sole traders, named contacts) | Accuracy of records that are personal data; GDPR / UK DPA rights | Service privacy endpoints (deferred — §13, §12) |
 | Auditors / regulators | Who changed what, when; explainable match decisions; compliance evidence | `/api/organizations/audit/*` + `audit_logs` table; per-component score breakdowns |
-| Operations / DBA / SRE | Schema + migration discipline, backups, health checks, scaling | axa `/_health`, `/_ping`; `migrations/` (plain SQL) |
+| Operations / DBA / SRE | Schema + migration discipline, backups, health checks, scaling | axa `/_health/live`, `/_health/ready`, `/_health/startup`; `migrations/` (plain SQL) |
 | Compliance / privacy officers | Soft-delete retention, audit trail; masking + export when the privacy layer lands | Service audit endpoints; §12 |
 | Developers / AI agents | Clear SDD contracts; which spec governs what | This spec + the three subproject specs |
 | Other Main X Index entities | Cross-references via organization `pid` (e.g. a person's managing organization, an event's organizer) | Service REST API |

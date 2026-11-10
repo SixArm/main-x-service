@@ -140,7 +140,7 @@ async function requestMagicLinkToken(
   throw new Error(
     `Timed out waiting for authentication-service to log a magic-link ` +
       `token for ${email}. Confirm the service is running with ` +
-      `LOCO_ENV=development (examples/compose/authentication-dev.yml) — ` +
+      `APP_ENV=development (examples/compose/authentication-dev.yml) — ` +
       `a production-mode container never logs the link (SEC-A3).`,
   );
 }

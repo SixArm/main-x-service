@@ -65,7 +65,7 @@ service: a plain `cargo test` reports them as ignored rather than
 failing on a machine with no `case_folder_test` database. Run them with
 
 ```sh
-DATABASE_URL=postgres://…/case_folder_test cargo test -- --ignored
+DB_URL=postgres://…/case_folder_test cargo test -- --ignored
 ```
 
 Each test marks `#[serial]` and calls `clean_db()` at
@@ -117,7 +117,7 @@ cargo check
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 cargo test                               # unit tests; request tests report as ignored
-DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test \
+DB_URL=postgres://postgres@localhost:5432/case_folder_test \
   cargo test -- --ignored                # the 50 request tests
 ```
 
@@ -128,13 +128,13 @@ Postgres only needs to be reachable — no tables exist.
 ```bash
 # First-time setup
 createdb case_folder_development
-export DATABASE_URL=postgres://postgres:postgres@localhost:5432/case_folder_development
+export DB_URL=postgres://postgres:postgres@localhost:5432/case_folder_development
 
 # Iterate
 cargo run -- start                       # dev server (JSON API on :5150)
 cargo run -- routes                      # print route table
 cargo test                               # unit tests (request tests are #[ignore]d)
-DATABASE_URL=… cargo test -- --ignored   # the DB-backed request tests
+DB_URL=… cargo test -- --ignored   # the DB-backed request tests
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 

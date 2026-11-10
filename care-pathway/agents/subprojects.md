@@ -31,7 +31,7 @@ cargo run                    # demo binary (not SemVer surface)
 
 # Service — needs PostgreSQL; port 5150
 cd care-pathway-service-with-axum
-export DATABASE_URL=postgres://loco:loco@localhost:5432/care_pathway_service_development
+export DB_URL=postgres://loco:loco@localhost:5432/care_pathway_service_development
 cargo run -- start             # migrations auto-run in development
 cargo test --test matching   # DB-free tests
 

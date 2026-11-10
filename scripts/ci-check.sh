@@ -322,10 +322,11 @@ run_stage() {
         # The service's own `db migrate`, i.e. `sqlx::migrate!`, so the
         # `_sqlx_migrations` table its tests' boot checks is the real one.
         ( cd "${crate}" \
-          && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
+          && DB_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
              cargo run --quiet $(locked_flag "${crate}") -- db migrate )
         echo "  ran sqlx migrations"
         # The committed `.sqlx/` must describe this schema, or the offline
+        # (`cargo sqlx` reads DATABASE_URL; the service, through axa, reads DB_URL.)
         # build checks queries against a schema that no longer exists.
         if [[ -d "${crate}/.sqlx" ]]; then
           ( cd "${crate}" \
@@ -335,7 +336,7 @@ run_stage() {
         fi
       elif [[ -d "${crate}/migration" ]] && ls "${crate}"/migrations/*/up.sql >/dev/null 2>&1; then
         ( cd "${crate}" \
-          && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
+          && DB_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
              cargo run --quiet $(locked_flag "${crate}") -- db migrate )
         echo "  ran the migrator"
       elif ls "${crate}"/migrations/*/up.sql >/dev/null 2>&1; then
@@ -358,7 +359,7 @@ run_stage() {
       # or run under `--ignored` either — the same AV-1 gap `parquet`
       # and `oidc` exist in that function to close.
       ( cd "${crate}" \
-        && DATABASE_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
+        && DB_URL="postgres://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${db}" \
            cargo test $(locked_flag "${crate}") $(extra_test_features_for "${crate}") -- --ignored --test-threads=1 )
       ;;
     deny)

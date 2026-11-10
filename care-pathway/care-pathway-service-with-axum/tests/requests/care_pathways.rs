@@ -4,11 +4,11 @@
 //!
 //! These boot the app against the `test` environment, which needs a
 //! reachable PostgreSQL (`config/test.yaml`; override with
-//! `DATABASE_URL`). They are `#[ignore]`d so the default `cargo test`
+//! `DB_URL`). They are `#[ignore]`d so the default `cargo test`
 //! stays green on a database-less machine. Run them with:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/care_pathway_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/care_pathway_service_test \
 //!   cargo test -- --ignored
 //! ```
 //!

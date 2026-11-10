@@ -248,7 +248,7 @@ the default `memory` transport never starts it.
 relay poll interval. `CASE_EVENT_RETENTION_DAYS` (default `7`) — outbox
 row TTL, **enforced by the relay**: it periodically deletes rows with
 `published_at < now() - INTERVAL '<n>'` (§3). Plus axa's own
-`DATABASE_URL` etc.
+`DB_URL` etc.
 
 ## 8. Architecture
 
@@ -514,7 +514,7 @@ an Axum `from_fn` middleware wired in `App::after_routes` (delegating to
 the pure `auth::enforce(require_auth, method, path, headers, verifier,
 policy)`) rejects
 every non-public request lacking a valid bearer token with `401`;
-`/_health`, `/_ping`, `/api-docs/openapi.json`, `/swagger-ui*` and
+`/_health/live`, `/_health/ready`, `/_health/startup`, `/api-docs/openapi.json`, `/swagger-ui*` and
 `/metrics.prom` stay public. The flag is read once per process and the layer is always wired,
 so it is a near-noop when off. Enforcement is **off by default**;
 because case data is personal data, this blanket gate is the
@@ -736,7 +736,7 @@ harness) cover the CRUD + match endpoints, the audit/event trail
 `CASE_REQUIRE_AUTH=1` set in-test: un-authed `GET /api/cases` → `401`,
 public `GET /api-docs/openapi.json` → `200`; `#[serial]`), and
 OpenAPI/Swagger but require Postgres, so they are `#[ignore]`-gated —
-run with `cargo test -- --ignored` and a `DATABASE_URL`.
+run with `cargo test -- --ignored` and a `DB_URL`.
 
 ## 12. Compliance
 

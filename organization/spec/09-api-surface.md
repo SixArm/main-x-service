@@ -31,7 +31,7 @@ machine-readable form at `/api-docs/openapi.json`
 | GET | `/api/organizations/bulk-jobs` | — | `[bulk_job]` | List/filter bulk jobs; `.../{id}` for one. Not yet implemented |
 | GET | `/api-docs/openapi.json` | — | OpenAPI 3 document | Hand-written |
 | GET | `/swagger-ui` | — | HTML | Interactive docs |
-| GET | `/_health`, `/_ping` | — | — | axa defaults |
+| GET | `/_health/live`, `/_health/ready`, `/_health/startup` | — | — | axa defaults |
 
 ### 9.2 Conventions
 

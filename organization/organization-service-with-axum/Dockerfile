@@ -98,7 +98,7 @@ USER organization
 
 EXPOSE 5150
 
-# Loco's default `/_health` (this crate mounts no bespoke health route
+# axa's liveness route `/_health/live` (this crate mounts no bespoke health route
 # — see spec/index.md §9). NOTE: Podman's default OCI image format
 # silently drops HEALTHCHECK ("HEALTHCHECK is not supported for OCI
 # image format and will be ignored" — build with `--format docker` to
@@ -107,7 +107,7 @@ EXPOSE 5150
 # so this instruction is kept for direct `docker build`/`docker run`
 # users rather than relied on as the only health signal.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl --silent --fail http://localhost:5150/_health || exit 1
+    CMD curl --silent --fail http://localhost:5150/_health/live || exit 1
 
 # Runtime defaults; override at `podman run -e …`. APP_ENV selects
 # config/production.yaml — a container with no override boots safely

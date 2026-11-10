@@ -12,7 +12,7 @@
 //! database-less machine:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/place_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/place_service_test \
 //!   cargo test --test audit_verify -- --ignored
 //! ```
 
@@ -45,16 +45,16 @@ async fn verify(app: &axum::Router) -> Value {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test audit_verify -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test audit_verify -- --ignored`"]
 async fn verify_examines_the_newest_rows_and_catches_a_tampered_newest_row() {
     let config = place_service::config::Config::from_env().expect("load config from env");
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     let app = place_service::app::App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router");
-    let db = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+    let db = sqlx::PgPool::connect(&std::env::var("DB_URL").expect("DB_URL"))
         .await
         .expect("connect");
     let audit_log = place_service::db::audit::AuditLogRepository::new(db.clone());

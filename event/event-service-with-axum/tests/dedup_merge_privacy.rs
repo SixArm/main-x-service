@@ -25,7 +25,7 @@
 //! create path's `409`, as a legacy import would leave them.
 //!
 //! `#[ignore]`d — run with
-//! `DATABASE_URL=… cargo test --test dedup_merge_privacy -- --ignored`.
+//! `DB_URL=… cargo test --test dedup_merge_privacy -- --ignored`.
 
 mod common;
 
@@ -118,7 +118,7 @@ fn realtime_body(name: &str) -> Value {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn creating_a_near_identical_event_is_a_409_naming_the_match() {
     let app = common::create_test_router().await;
     // No identifier: before T-16 this pair scored 0.75 and was let through.
@@ -170,7 +170,7 @@ async fn creating_a_near_identical_event_is_a_409_naming_the_match() {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_shared_ticket_number_is_a_409_with_proven_evidence() {
     let app = common::create_test_router().await;
     let mut body = realtime_body(&format!("T5 Ticket {}", Uuid::new_v4()));
@@ -215,7 +215,7 @@ async fn scan_pair(app: &axum::Router, request: &Value, a: Uuid, b: Uuid) -> Val
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn the_batch_scan_finds_a_pair_and_merge_folds_one_into_the_other() {
     let app = common::create_test_router().await;
     let repo = repository().await;
@@ -289,7 +289,7 @@ async fn the_batch_scan_finds_a_pair_and_merge_folds_one_into_the_other() {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn agreeing_on_name_and_start_alone_stays_pending_as_consistent() {
     let app = common::create_test_router().await;
     let repo = repository().await;
@@ -307,7 +307,7 @@ async fn agreeing_on_name_and_start_alone_stays_pending_as_consistent() {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_shared_ticket_is_automerged_as_proven() {
     let app = common::create_test_router().await;
     let repo = repository().await;
@@ -325,7 +325,7 @@ async fn a_shared_ticket_is_automerged_as_proven() {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn two_tickets_from_one_system_stay_pending_as_contradicted() {
     let app = common::create_test_router().await;
     let repo = repository().await;
@@ -349,7 +349,7 @@ async fn two_tickets_from_one_system_stay_pending_as_contradicted() {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn the_masked_view_hides_what_the_export_returns_whole() {
     let app = common::create_test_router().await;
     let repo = repository().await;

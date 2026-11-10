@@ -24,7 +24,7 @@ only the design-only production gates in
 
 ```bash
 # Postgres 18 with an axa user, then:
-export DATABASE_URL=postgres://loco:loco@localhost:5432/patient_flow_service_development
+export DB_URL=postgres://loco:loco@localhost:5432/patient_flow_service_development
 cargo run -- db migrate       # create the schema
 cargo run -- task seed        # synthetic demo hospital (5 wards, 76 beds)
 cargo run -- start            # serve on :5150

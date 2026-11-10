@@ -13,7 +13,7 @@
 //! worker/worker-service-with-axum`, or directly):
 //!
 //! ```text
-//! DATABASE_URL=postgres://…/worker_service_test cargo test --test review_queue_db -- --ignored
+//! DB_URL=postgres://…/worker_service_test cargo test --test review_queue_db -- --ignored
 //! ```
 
 use sqlx::PgPool;
@@ -21,9 +21,9 @@ use uuid::Uuid;
 use worker_service::db::review_queue::{self, DecideOutcome, NewReviewItem};
 
 #[tokio::test]
-#[ignore = "requires DATABASE_URL to a migrated Postgres"]
+#[ignore = "requires DB_URL to a migrated Postgres"]
 async fn review_queue_round_trip() {
-    let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+    let url = std::env::var("DB_URL").expect("DB_URL");
     let db = PgPool::connect(&url).await.expect("connect");
 
     let a = Uuid::new_v4();

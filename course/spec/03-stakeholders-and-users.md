@@ -13,7 +13,7 @@ programmes. Stakeholders span the trio:
 | Data integration engineers | Bulk import from LMS / OER repositories with deduplication; stable identifiers (DOI, Wikidata, LMS id) | Service `/api/*`, OpenAPI at `/swagger-ui` |
 | Auditors / regulators | Who changed what, when; explainable match decisions; compliance evidence | Audit endpoints + audit-log table; match score breakdowns |
 | Compliance / privacy officers | Masking of instructor / provider personal data, GDPR export, retention via soft delete | Service privacy endpoints |
-| Operations / DBA / SRE | Migration discipline, backups, health checks, scaling | Service deployment artefacts, axa `/_health` |
+| Operations / DBA / SRE | Migration discipline, backups, health checks, scaling | Service deployment artefacts, axa `/_health/live`, `/_health/ready`, `/_health/startup` |
 | Developers / AI agents | Clear SDD contracts; which spec governs what | This spec + the three crate specs |
 | Other Main X Index entities | Cross-references: instances may eventually reference [event](../../event/) records; providers may link to the [organization](../../organization/) registry (§16) | Service REST API |
 

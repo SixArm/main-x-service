@@ -495,8 +495,9 @@ pub fn conceal_governed<T>(
 /// Prometheus metrics.
 #[must_use]
 pub fn is_public_path(path: &str) -> bool {
-    path == "/_health"
-        || path == "/_ping"
+    path == "/_health/live"
+        || path == "/_health/ready"
+        || path == "/_health/startup"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
         || path == "/metrics.prom"
@@ -685,7 +686,7 @@ mod tests {
         // Flag off ⇒ allow (dev default), even a protected path, no token.
         assert!(enforce(false, "/api/edges", &empty, &v, &p).is_ok());
         // Flag on but a public path ⇒ allow without a token.
-        assert!(enforce(true, "/_health", &empty, &v, &p).is_ok());
+        assert!(enforce(true, "/_health/live", &empty, &v, &p).is_ok());
     }
 
     #[test]

@@ -1688,9 +1688,9 @@ mod tests {
 }
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path.
-/// They require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped
+/// They require a migrated `PostgreSQL` via `DB_URL` and are skipped
 /// by a bare `cargo test`; run with
-/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
+/// `DB_URL=… cargo test --lib -- --ignored`. They must COMPILE
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod outbox_atomicity_tests {
@@ -1700,16 +1700,16 @@ mod outbox_atomicity_tests {
     use crate::streaming::EventTransport;
 
     async fn connect() -> sqlx::PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
         sqlx::PgPool::connect(&url)
             .await
-            .expect("connect to DATABASE_URL")
+            .expect("connect to DB_URL")
     }
 
     /// Create writes a `created` outbox row in the same transaction as the
     /// entity insert (under the outbox transport).
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
         let repo = PgCourseRepository::new(db.clone()).with_transport(EventTransport::Outbox);
@@ -1724,7 +1724,7 @@ mod outbox_atomicity_tests {
     /// survivor carrying the duplicate's pid in `merged_from`, plus a
     /// `deleted` outbox row for the duplicate.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
         let repo = PgCourseRepository::new(db.clone()).with_transport(EventTransport::Outbox);

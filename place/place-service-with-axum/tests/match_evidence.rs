@@ -14,7 +14,7 @@
 //! pair with these.
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test match_evidence -- --ignored`.
+//! `DB_URL=… cargo test --test match_evidence -- --ignored`.
 
 use axa_test::TestApp;
 use axum::body::Body;
@@ -42,7 +42,7 @@ async fn test_router() -> axum::Router {
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router")
 }
@@ -149,7 +149,7 @@ async fn scan_pair(app: &axum::Router, a: &Place, b: &Place) -> (Value, Value) {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test match_evidence -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test match_evidence -- --ignored"]
 async fn a_name_only_pair_above_auto_merge_stays_pending_and_consistent() {
     let app = test_router().await;
     let name = unique_name("Consistent");
@@ -172,7 +172,7 @@ async fn a_name_only_pair_above_auto_merge_stays_pending_and_consistent() {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test match_evidence -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test match_evidence -- --ignored"]
 async fn a_shared_gln_pair_is_automerged_and_proven() {
     let app = test_router().await;
     let name = unique_name("Proven");
@@ -190,7 +190,7 @@ async fn a_shared_gln_pair_is_automerged_and_proven() {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test match_evidence -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test match_evidence -- --ignored"]
 async fn conflicting_osm_ids_stay_pending_and_contradicted() {
     let app = test_router().await;
     let name = unique_name("Contradicted");
@@ -230,7 +230,7 @@ async fn conflicting_osm_ids_stay_pending_and_contradicted() {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test match_evidence -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test match_evidence -- --ignored"]
 async fn check_duplicates_and_the_409_carry_value_free_evidence() {
     let app = test_router().await;
     let name = unique_name("Probe");

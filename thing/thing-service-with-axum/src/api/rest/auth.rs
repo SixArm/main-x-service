@@ -369,8 +369,9 @@ pub async fn request_claims(headers: &HeaderMap) -> Result<Claims, (StatusCode, 
 /// This is the complete allow-list; everything else requires a valid
 /// bearer token when enforcement is on.
 fn is_public_path(path: &str) -> bool {
-    path == "/_health"
-        || path == "/_ping"
+    path == "/_health/live"
+        || path == "/_health/ready"
+        || path == "/_health/startup"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
         || path == "/metrics.prom"
@@ -807,10 +808,11 @@ mod tests {
     fn test_enforce_on_allows_public_and_out_of_scope_paths() {
         let (verifier, policy) = (verifier(), policy());
         for path in [
-            "/api/health",            // allow-listed inside /api
-            "/fhir/metadata",         // FHIR capability discovery, allow-listed
-            "/_health",               // loco default, outside /api
-            "/_ping",                 // loco default, outside /api
+            "/api/health",    // allow-listed inside /api
+            "/fhir/metadata", // FHIR capability discovery, allow-listed
+            "/_health/live",
+            "/_health/ready",
+            "/_health/startup",
             "/api-docs/openapi.json", // /api-docs is not under /api/
             "/swagger-ui",
             "/swagger-ui/index.html",

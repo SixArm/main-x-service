@@ -473,7 +473,7 @@ mod tests {
 }
 
 /// DB-gated (`#[ignore]`) tests for the bulk-jobs helpers. They need a
-/// migrated `PostgreSQL` via `DATABASE_URL`; a bare `cargo test` skips them
+/// migrated `PostgreSQL` via `DB_URL`; a bare `cargo test` skips them
 /// but they MUST compile under `cargo test --no-run`.
 #[cfg(test)]
 mod db_tests {
@@ -483,10 +483,8 @@ mod db_tests {
     use uuid::Uuid;
 
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        let db = PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        let db = PgPool::connect(&url).await.expect("connect to DB_URL");
         // Unlike the request-level suites under `tests/requests/`, which
         // boot the axa `App` (auto-migrating), these tests connect
         // directly — so migrations are applied here explicitly. Idempotent:
@@ -502,7 +500,7 @@ mod db_tests {
     /// SEC-B9: re-submitting with the same idempotency key returns the same
     /// job (reused) and creates no second row; a different key is a new job.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn idempotent_resubmit_returns_the_same_job() {
         let db = connect().await;
         let key = format!("idem-{}", Uuid::new_v4());
@@ -541,7 +539,7 @@ mod db_tests {
 
     /// A key-less submit always creates a fresh job (never deduped).
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn keyless_submit_is_never_deduped() {
         let db = connect().await;
         let (a, _) = create_or_get_idempotent(

@@ -67,7 +67,7 @@ API URLs are version-free; select the version with the `Accepts-version` header 
 | GET | `/api-docs/openapi.json` · `/swagger-ui` | OpenAPI 3 doc + Swagger UI |
 | GET | `/metrics.prom` | Prometheus metrics (text-exposition; root path, public under auth enforcement) |
 
-Plus axa's default `/_health`, `/_ping`. Every CRUD action writes an
+Plus axa's default `/_health/live`, `/_health/ready`, `/_health/startup`. Every CRUD action writes an
 `audit_logs` row and publishes a `created`/`updated`/`deleted` event.
 `GET /api/care-pathways` and `GET /api/care-pathways/search` are paged
 by `?limit=` and a signed `?cursor=`, with `Link: rel="next"` and no
@@ -557,7 +557,7 @@ podman build -f care-pathway/care-pathway-service-with-axum/Dockerfile \
 ```
 
 Verified end-to-end (2026-08-03): builds clean, boots against a real
-Postgres, and `GET /_health` returns `200`. This exercise found and
+Postgres, and `GET /_health/live` returns `200`. This exercise found and
 fixed two real bugs: (1) `src/compliance/soup.rs` embeds the IEC 62304
 SOUP register via a relative `include_str!` from `compliance/soup.tsv`
 at the crate root — the Dockerfile now copies that directory

@@ -1545,9 +1545,9 @@ pub async fn set_content_mac(db: &PgPool, id: Uuid, mac: Option<String>) -> Resu
 }
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path. They
-/// require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped by a
+/// require a migrated `PostgreSQL` via `DB_URL` and are skipped by a
 /// bare `cargo test`; run with
-/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE under a
+/// `DB_URL=… cargo test --lib -- --ignored`. They must COMPILE under a
 /// bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
@@ -1603,10 +1603,8 @@ mod tests {
     use sqlx::PgPool;
 
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL")
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        PgPool::connect(&url).await.expect("connect to DB_URL")
     }
 
     fn a_worker(family: &str) -> Worker {
@@ -1623,7 +1621,7 @@ mod tests {
     /// A merge's audit rows carry the caller's context on both records, rather
     /// than the `system` default the repository used to build for itself.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn merge_audit_rows_carry_the_callers_context() {
         use crate::db::audit::AuditLogRepository;
 
@@ -1661,7 +1659,7 @@ mod tests {
     /// Create writes, in one transaction: exactly one `created` outbox row
     /// for the new worker under the outbox transport.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
         let repo = PgWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
@@ -1682,7 +1680,7 @@ mod tests {
     /// survivor carrying the duplicate's pid in `merged_from`, plus a
     /// `deleted` outbox row for the duplicate.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
         let repo = PgWorkerRepository::new(db.clone()).with_transport(EventTransport::Outbox);
@@ -1729,7 +1727,7 @@ mod tests {
     /// row; the merge waits for it, then finds the duplicate gone and
     /// answers `Conflict` without writing the survivor.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_merge_waits_for_a_concurrent_delete_and_then_refuses() {
         let db = connect().await;
         let repo = PgWorkerRepository::new(db.clone());

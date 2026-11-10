@@ -49,4 +49,4 @@ jobs:
           command: test
           args: --all-features --all -- --include-ignored
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/thing_service_test
+          DB_URL: postgres://postgres:postgres@localhost:5432/thing_service_test

@@ -448,8 +448,9 @@ pub fn parse_bool(value: &str) -> bool {
 /// emitted only when the deployment has configured an authorization server
 /// and merely names its already-public endpoints.
 fn is_public_path(path: &str) -> bool {
-    path == "/_health"
-        || path == "/_ping"
+    path == "/_health/live"
+        || path == "/_health/ready"
+        || path == "/_health/startup"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
         || path == "/metrics.prom"
@@ -985,8 +986,9 @@ mod tests {
         let verifier = Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE).unwrap();
         let policy = policy();
         for path in [
-            "/_health",
-            "/_ping",
+            "/_health/live",
+            "/_health/ready",
+            "/_health/startup",
             "/api-docs/openapi.json",
             "/swagger-ui",
             "/swagger-ui/index.html",

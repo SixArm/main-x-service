@@ -27,7 +27,7 @@ here — file a follow-up if this doc needs to cover them too.
 
 **Every crate** (all twelve) boots through **axa's own Tera-templated
 YAML** (`config/{development,production,test}.yaml`), which is where
-`DATABASE_URL`, `PORT`, `HOST`, `JWT_SECRET`, and the `DB_*`/`SMTP_*`
+`DB_URL`, `PORT`, `HOST`, `JWT_SECRET`, and the `DB_*`/`SMTP_*`
 variables in §2 are actually consumed (`{{ get_env(name="...",
 default="...") }}` calls in the YAML, not a `std::env::var` in Rust —
 easy for a naive grep to miss entirely).
@@ -35,7 +35,7 @@ easy for a naive grep to miss entirely).
 **Six of them** — person, worker, place, thing, event, course, the
 older "person-style" layout (`agents/share/architecture.md`) — **also**
 run a second, independent `Config::from_env()` (`src/config/mod.rs`)
-for their own `AppState`, with its **own** `SERVER_PORT`/`DATABASE_URL`
+for their own `AppState`, with its **own** `SERVER_PORT`/`DB_URL`
 reads (§3). The two paths can disagree — e.g. axa's yaml binds the
 Axum server on `PORT` while these six crates' own state-config also
 reads `SERVER_PORT` for a value that, in the shipped Dockerfiles, only
@@ -52,8 +52,8 @@ table).
 
 | Variable | Default | Effect |
 |---|---|---|
-| `DATABASE_URL` | **none in production** (boot fails if unset); dev/test default to `postgres://localhost/<entity>_service_{development,test}` | `database.uri` (and `queue.uri`, where the crate uses the Postgres-backed job queue) |
-| `DB_ALLOW_INSECURE` | `false` | Lets production reach a database without demanding TLS, for a network that protects its own traffic. Otherwise `DATABASE_URL` must set `sslmode` |
+| `DB_URL` | **none in production** (boot fails if unset); dev/test default to `postgres://localhost/<entity>_service_{development,test}` | `database.uri` (and `queue.uri`, where the crate uses the Postgres-backed job queue) |
+| `DB_ALLOW_INSECURE` | `false` | Lets production reach a database without demanding TLS, for a network that protects its own traffic. Otherwise `DB_URL` must set `sslmode` |
 | `TRUSTED_PROXIES` | unset | **Set it in production behind a proxy.** Comma-separated addresses or CIDR ranges of the proxies in front of the service. `X-Forwarded-For` is believed only from these, reading from the right, and audit rows take the client's address from the result (`axa::client::ClientAddr`). Unset, the header is ignored and every row records the proxy's address. A list with any bad entry trusts none. Person and worker read it for gRPC as well. There is no safe default, because the value is each deployment's own |
 | `RATE_LIMIT_PER_MINUTE` | unset (off) | Requests one client may make per minute before `429` (`axa::ratelimit::by_client`, `src/client_limits.rs`, every service). A client is the address axa resolved, so behind a proxy `TRUSTED_PROXIES` must list it or every client shares one limit. Each process counts for itself. Anything but a whole number above zero stops the service at boot |
 | `CURSOR_KEY` | **none in production** (boot fails if unset); elsewhere a random key per process | organization, care-pathway, case, place and thing: the secret that signs `?cursor=` on list and search (`axa::cursor_pagination`, `src/cursor_key.rs`). At least 32 bytes, e.g. `openssl rand -base64 48`, and **the same on every replica**, or a cursor from one is a `422` on the next. Rotating it makes every cursor in flight a `422`, so a client restarts from the first page. See [restful.md](restful.md) §Pagination |
@@ -79,7 +79,7 @@ default.
 
 | Variable | Default | Effect |
 |---|---|---|
-| `DATABASE_URL` | `postgres://localhost/<entity>_service` | `database.url` on this crate's own `AppState` — a second, separate consumer of the same var name as §2 |
+| `DB_URL` | `postgres://localhost/<entity>_service` | `database.url` on this crate's own `AppState` — a second, separate consumer of the same var name as §2 |
 | `DATABASE_MAX_CONNECTIONS` | `10` | Pool ceiling (this surface) |
 | `DATABASE_MIN_CONNECTIONS` | `2` | Pool floor (this surface) |
 | `SERVER_HOST` | `0.0.0.0` | Bind host (this surface) |
@@ -349,7 +349,7 @@ plan/task/goal/burndown surface):
 
 ## 12. Boot-fails-if-unset, in one place
 
-- `DATABASE_URL` — every crate, production only (no Tera default).
+- `DB_URL` — every crate, production only (no Tera default).
 - `JWT_SECRET` — every crate except course and link-graph, production
   only.
 - `<P>_BULK_S3_BUCKET` — only when `<P>_BULK_ARTIFACT_BACKEND=s3`.

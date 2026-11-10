@@ -74,15 +74,16 @@ pub const ENTITY: &str = "worker";
 pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/import", "/erase"];
 
 /// Exact-match paths that stay public even when blanket enforcement is
-/// on: axa's default health probes (`/_health`, `/_ping`), this crate's
+/// on: axa's default health probes (`/_health/live`, `/_health/ready`, `/_health/startup`), this crate's
 /// own health endpoint (`/api/health` — orchestration probes carry no
 /// token), the served `OpenAPI` document, and the Prometheus scrape
 /// endpoint (`/metrics.prom` — scrapers carry no token). Everything else
 /// — the whole `/api` surface and the `/fhir` surface (worker PII) —
 /// requires a valid bearer token when enforcement is on.
-pub const PUBLIC_PATHS: [&str; 5] = [
-    "/_health",
-    "/_ping",
+pub const PUBLIC_PATHS: [&str; 6] = [
+    "/_health/live",
+    "/_health/ready",
+    "/_health/startup",
     "/api/health",
     "/api-docs/openapi.json",
     "/metrics.prom",

@@ -95,7 +95,7 @@ impl App {
     /// The service's route table.
     #[must_use]
     pub fn routes(_ctx: &AppContext) -> AppRoutes {
-        AppRoutes::with_default_routes() // loco /_health, /_ping
+        AppRoutes::with_default_routes() // axa /_health/live, /ready, /startup
             .add_route(courses_routes())
             .add_route(fhir_routes()) // /fhir/Basic{,/{id}} + /fhir/metadata (non-standard)
             .add_route(metrics_routes()) // GET /metrics.prom (root, public)

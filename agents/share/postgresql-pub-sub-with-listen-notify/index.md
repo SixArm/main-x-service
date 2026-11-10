@@ -8,7 +8,7 @@ PostgreSQL Pub/Sub
 -- Publisher
 NOTIFY notifications, '{"userId": 123, "msg": "Hello"}';
 // Subscriber (Node.js with pg)
-const client = new Client({ connectionString: process.env.DATABASE_URL });
+const client = new Client({ connectionString: process.env.DB_URL });
 await client.connect();
 
 await client.query('LISTEN notifications');

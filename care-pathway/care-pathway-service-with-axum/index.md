@@ -75,7 +75,7 @@ verified offline against its published Ed25519 key) and `whoami` echoes
 the verified claims (`401` without one), while every other handler stamps
 the token `sub` as the audit `actor`. Flip `CARE_PATHWAY_REQUIRE_AUTH=1`
 to require that bearer token on every `/api/*` route (`/metrics.prom`,
-`/api-docs/openapi.json`, `/swagger-ui`, `/_health`, `/_ping` stay
+`/api-docs/openapi.json`, `/swagger-ui`, `/_health/live`, `/_health/ready`, `/_health/startup` stay
 public).
 
 Auth pivot done in this crate (RS256 JWT + JWKS decommissioned in favour

@@ -199,11 +199,11 @@ cd main-x-service/person/person-service-with-axum
 # Set up database
 createdb person_service
 cp .env.example .env
-# Edit .env and set DATABASE_URL
+# Edit .env and set DB_URL
 
 # Build and run (axa). Migrations run automatically in development
 # (auto_migrate); or run them explicitly with `cargo run -- db migrate`.
-export DATABASE_URL=postgres://localhost/person_service_development
+export DB_URL=postgres://localhost/person_service_development
 cargo run -- start            # or: cargo run -- start
 ```
 
@@ -553,7 +553,7 @@ Configuration via environment variables or `.env` file:
 
 | Variable                   | Description                  | Default        | Required |
 | -------------------------- | ---------------------------- | -------------- | -------- |
-| `DATABASE_URL`             | PostgreSQL connection string | -              | Yes      |
+| `DB_URL`             | PostgreSQL connection string | -              | Yes      |
 | `DATABASE_MAX_CONNECTIONS` | Max connection pool size     | 10             | No       |
 | `DATABASE_MIN_CONNECTIONS` | Min connection pool size     | 2              | No       |
 | `SERVER_HOST`              | Server bind address          | 0.0.0.0        | No       |

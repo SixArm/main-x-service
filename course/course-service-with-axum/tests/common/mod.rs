@@ -3,7 +3,7 @@
 //! The tests are driven through `tower::ServiceExt::oneshot` against
 //! the full Axum router with real `PostgreSQL` + Tantivy + the in-memory
 //! event publisher. They require a running Postgres reachable via
-//! `DATABASE_URL` (the rest of the env-var table from
+//! `DB_URL` (the rest of the env-var table from
 //! `Config::from_env` applies). All integration tests are tagged with
 //! `#[ignore]` so `cargo test --lib` stays fast; opt in via
 //! `cargo test --test api_integration_test -- --ignored`.
@@ -38,7 +38,7 @@ pub async fn boot() -> (Router, AppState) {
     }
     let boot = App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL");
+        .expect("boot the app: set DB_URL to a running PostgreSQL");
     let state = boot
         .app_context
         .shared_store

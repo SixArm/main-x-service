@@ -52,8 +52,7 @@
   horizontally scalable behind a load balancer. The consumer / relay /
   reconciliation workers are the only stateful-position components
   (offsets), tracked durably.
-- **NFR-12** — Health endpoints for orchestration (axa `/_health`,
-  `/_ping`); graceful shutdown; Podman health checks; non-root
+- **NFR-12** — Health endpoints for orchestration (axa `/_health/live`, `/_health/ready`, `/_health/startup`); graceful shutdown; Podman health checks; non-root
   container.
 - **NFR-13** — Database connection pooling with configurable limits.
 

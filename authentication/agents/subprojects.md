@@ -54,7 +54,7 @@ authentication-verifier ──────► authentication-service
 
 ```bash
 cd authentication-service-with-axum
-export DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_development
+export DB_URL=postgres://loco:loco@localhost:5432/authentication_service_development
 cargo run -- start          # http://localhost:5150 (auto-migrates in dev)
 cargo test --lib          # DB-free unit tests
 cargo clippy --bins

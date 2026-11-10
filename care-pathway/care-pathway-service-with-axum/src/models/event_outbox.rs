@@ -390,7 +390,7 @@ mod tests {
 /// DB-gated (`#[ignore]`) proof of the relay poll's lock behaviour: rows
 /// one relay holds are invisible to a second relay polling at the same
 /// time (SEC-B6). Replaces a check on the SQL text `SeaORM` generated.
-/// Needs a migrated `PostgreSQL` via `DATABASE_URL`.
+/// Needs a migrated `PostgreSQL` via `DB_URL`.
 #[cfg(test)]
 mod relay_poll {
     use super::{Model, OutboxInsert};
@@ -398,9 +398,9 @@ mod relay_poll {
     use uuid::Uuid;
 
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn the_poll_skips_rows_another_relay_holds() {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
         let pool = sqlx::PgPool::connect(&url).await.expect("connect");
         crate::models::MIGRATOR.run(&pool).await.expect("migrate");
         let env = Envelope {

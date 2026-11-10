@@ -862,15 +862,15 @@ mod tests {
         assert!(validate_edge("befriends", WORKER).is_err());
     }
 
-    /// DB-gated round-trip against a real Postgres (set `DATABASE_URL`):
+    /// DB-gated round-trip against a real Postgres (set `DB_URL`):
     /// upsert an edge → `list_all_active` projects the canonical
     /// `edge_id` / `edge_kind` / `from_ref = person:<id>` shape → the
     /// idempotent re-upsert keeps the same id → soft-delete removes it
     /// from the active set.
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL to a migrated Postgres"]
+    #[ignore = "requires DB_URL to a migrated Postgres"]
     async fn round_trip_upsert_bulk_list_delete() {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL");
         let db = sqlx::PgPool::connect(&url).await.expect("connect");
         let from_pid = Uuid::new_v4();
         let to_ref = format!("worker:{}", Uuid::new_v4());
@@ -922,12 +922,12 @@ mod tests {
     /// the §4.2 edge detail in the envelope payload's `data` — the shape the
     /// link-graph aggregator consumes off the bus.
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL to a migrated Postgres"]
+    #[ignore = "requires DB_URL to a migrated Postgres"]
     async fn linked_event_is_enqueued_to_the_outbox() {
         use crate::db::outbox::Model as OutboxRow;
         use crate::models::{Gender, HumanName};
 
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL");
         let db = sqlx::PgPool::connect(&url).await.expect("connect");
         let from_pid = Uuid::new_v4();
         let to_ref = format!("worker:{}", Uuid::new_v4());

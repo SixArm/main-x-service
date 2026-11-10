@@ -13,7 +13,7 @@ Normative strategy: entity spec [§11](../spec/11-testing-strategy.md).
 | Matcher unit | `cargo test` | full crate suite (short-circuits, ordering, normalisation) |
 | Service unit | `cargo test --lib` | 35 |
 | **Bridge (S↔M pin)** | `cargo test --test duplicate_detection` | 14 |
-| Service integration | `cargo test --test api_integration_test -- --ignored` (needs migrated Postgres via `DATABASE_URL`) | 12 |
+| Service integration | `cargo test --test api_integration_test -- --ignored` (needs migrated Postgres via `DB_URL`) | 12 |
 | Service bench | `cargo bench` | 3 Criterion suites |
 | Front-end unit (F↔S pin) | `pnpm test` (Vitest, mocked `fetch`) | 9 |
 | Front-end e2e | `pnpm test:e2e` (Playwright, API-down resilient) | 5 |

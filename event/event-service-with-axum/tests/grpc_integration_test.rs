@@ -76,7 +76,7 @@ fn new_event_request(name: String) -> proto::CreateEventRequest {
 /// uses. Proves the wire conversion and the shared domain logic both
 /// work end to end, not just that the code compiles.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test grpc_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test grpc_integration_test -- --ignored`"]
 async fn create_get_list_delete_round_trip_over_real_grpc() {
     let mut client = start_test_server().await;
     let name = common::unique_event_name("Grpc");
@@ -146,7 +146,7 @@ async fn create_get_list_delete_round_trip_over_real_grpc() {
 /// rule (a blank name) and getting `INVALID_ARGUMENT`, not a panic or a
 /// silently accepted row.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test grpc_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test grpc_integration_test -- --ignored`"]
 async fn create_event_rejects_a_blank_name() {
     let mut client = start_test_server().await;
 
@@ -160,7 +160,7 @@ async fn create_event_rejects_a_blank_name() {
 /// A malformed `event_status` wire token is a client-input error
 /// (`INVALID_ARGUMENT`), never silently coerced to the default.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test grpc_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test grpc_integration_test -- --ignored`"]
 async fn create_event_rejects_an_unrecognised_event_status() {
     let mut client = start_test_server().await;
     let mut req = new_event_request(common::unique_event_name("GrpcBadStatus"));
@@ -176,7 +176,7 @@ async fn create_event_rejects_an_unrecognised_event_status() {
 /// A malformed id is a client-input error (`INVALID_ARGUMENT`), not a
 /// database miss (`NOT_FOUND`) or an unhandled panic (`INTERNAL`).
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test grpc_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test grpc_integration_test -- --ignored`"]
 async fn get_event_with_a_malformed_id_is_invalid_argument() {
     let mut client = start_test_server().await;
 

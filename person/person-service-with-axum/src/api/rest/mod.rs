@@ -170,8 +170,10 @@ pub fn persons_routes() -> axa::routes::Routes {
         // shadowed. `/persons/import` is a declared destructive POST.
         .add(
             "/persons/import",
-            post(crate::bulk::handlers::import_person)
-                .layer(axa::middleware::body_limit(crate::bulk::IMPORT_BODY_LIMIT)),
+            axa::middleware::body_limit(
+                post(crate::bulk::handlers::import_person),
+                crate::bulk::IMPORT_BODY_LIMIT,
+            ),
         )
         .add(
             "/persons/export",

@@ -15,7 +15,7 @@
 //! it.
 //!
 //! `#[ignore]`d — boots the app, so it needs PostgreSQL via
-//! `config/test.yaml` / `DATABASE_URL`. Run with
+//! `config/test.yaml` / `DB_URL`. Run with
 //! `cargo test --test enforcement -- --ignored`.
 #![cfg(feature = "paseto")]
 
@@ -118,7 +118,7 @@ async fn enforcement_on_gates_the_real_router() {
 
     request::<App, _, _>(|request, _ctx| async move {
         assert_eq!(
-            request.get("/_health").await.status_code(),
+            request.get("/_health/live").await.status_code(),
             200,
             "a public path stays open with enforcement on"
         );

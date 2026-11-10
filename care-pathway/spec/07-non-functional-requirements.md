@@ -14,7 +14,7 @@ the Main X Index aims at. Items the MVP does not yet meet are marked
   p99 at target volumes *(roadmap: requires candidate blocking via
   search)*.
 - **NFR-3 — Availability.** Stateless app tier, horizontal scaling,
-  PostgreSQL replication, health checks (`/_health`, `/_ping`),
+  PostgreSQL replication, health checks (`/_health/live`, `/_health/ready`, `/_health/startup`),
   graceful shutdown, non-root containers. See
   [`agents/share/availability.md`](../../agents/share/availability.md).
 - **NFR-4 — i18n / locales.** Pathway names and keywords are

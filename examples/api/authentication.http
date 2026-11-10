@@ -22,7 +22,7 @@
 
 
 ### Health check
-GET {{baseUrl}}/_health
+GET {{baseUrl}}/_health/live
 
 
 ### Sign up — creates the account (if new) and issues a magic link.

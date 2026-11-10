@@ -28,7 +28,7 @@ fn defaults() -> Defaults {
 
 /// The service's route table.
 ///
-/// Starts from the shared `/_ping`, `/_health`, and `/_readiness` routes and
+/// Starts from the shared `/_health/live`, `/_health/ready`, and `/_health/startup` routes and
 /// mounts each controller:
 ///
 /// - `healthz` — `GET /healthz` liveness probe (no downstream calls).

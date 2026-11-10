@@ -35,8 +35,9 @@ The binary boots through the axa CLI (`cargo run -- start`); the
 |---|---|---|
 | GET | `/api/health` | Service health check (`HealthResponse`) |
 | GET | `/api/whoami` | Echoes the verified bearer's claims (T-15) — public when `COURSE_REQUIRE_AUTH` is off. |
-| GET | `/_health` | axa built-in readiness (DB + queue) |
-| GET | `/_ping` | axa built-in liveness |
+| GET | `/_health/live` | axa built-in liveness |
+| GET | `/_health/ready` | axa built-in readiness (DB + queue) |
+| GET | `/_health/startup` | axa built-in startup (DB, once) |
 | GET | `/metrics.prom` | Prometheus metrics (T-16) — mounted at the application **root** (not under `/api`), public, `text/plain; version=0.0.4`. |
 
 `GET /metrics.prom` worked example:

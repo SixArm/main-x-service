@@ -11,7 +11,7 @@
 //! earlier runs left in a shared database.
 //!
 //! `#[ignore]`d — run with
-//! `DATABASE_URL=… cargo test --test match_evidence_db -- --ignored`.
+//! `DB_URL=… cargo test --test match_evidence_db -- --ignored`.
 
 mod common;
 
@@ -104,7 +104,7 @@ async fn scan_for(app: &axum::Router, body: &Value, a: &Worker, b: &Worker) -> V
 /// A pair sharing a unique identifier is proven, and over the threshold
 /// it is marked auto-merged.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_pair_sharing_a_unique_identifier_is_automerged_as_proven() {
     let app = common::create_test_router().await;
     let family = format!("Proven{}", Uuid::new_v4().simple());
@@ -128,7 +128,7 @@ async fn a_pair_sharing_a_unique_identifier_is_automerged_as_proven() {
 /// A pair holding two different values under one unique scheme is
 /// contradicted, and stays pending even over the auto-merge threshold.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_pair_with_conflicting_identifiers_stays_pending_as_contradicted() {
     let app = common::create_test_router().await;
     let family = format!("Contra{}", Uuid::new_v4().simple());
@@ -160,7 +160,7 @@ async fn a_pair_with_conflicting_identifiers_stays_pending_as_contradicted() {
 /// `check-duplicates` carries evidence beside each candidate, and that
 /// evidence holds no value either worker holds.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn check_duplicates_carries_evidence_without_values() {
     let app = common::create_test_router().await;
     // Under 40 characters: the search index drops a longer token, and the

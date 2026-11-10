@@ -13,7 +13,7 @@ Strategy rationale: entity spec
 # Service
 (cd event-service-with-axum && cargo test --lib)                          # 62+ unit tests
 (cd event-service-with-axum && cargo test --test duplicate_detection)     # 16 seam tests
-(cd event-service-with-axum && DATABASE_URL=… cargo test --test api_integration_test)
+(cd event-service-with-axum && DB_URL=… cargo test --test api_integration_test)
 (cd event-service-with-axum && cargo bench)                               # Criterion
 
 # Front-end

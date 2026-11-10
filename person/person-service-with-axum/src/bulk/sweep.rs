@@ -244,7 +244,7 @@ mod tests {
 }
 
 /// DB-gated (`#[ignore]`) tests for the full sweep pass. They need a
-/// migrated `PostgreSQL` via `DATABASE_URL`; a bare `cargo test` skips
+/// migrated `PostgreSQL` via `DB_URL`; a bare `cargo test` skips
 /// them but they MUST compile under `cargo test --no-run`.
 #[cfg(test)]
 mod db_tests {
@@ -257,10 +257,8 @@ mod db_tests {
     use crate::db::convert::offset_to_ts;
 
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL")
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        PgPool::connect(&url).await.expect("connect to DB_URL")
     }
 
     /// Insert a bulk job row directly (bypassing `db::bulk_jobs::create`,
@@ -297,7 +295,7 @@ mod db_tests {
     /// non-expired job's artifact survives; and re-running the sweep is
     /// a safe no-op (the swept row no longer qualifies).
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn sweep_deletes_only_expired_unswept_artifacts_and_is_idempotent() {
         let db = connect().await;
         let dir = tempfile::tempdir().unwrap();

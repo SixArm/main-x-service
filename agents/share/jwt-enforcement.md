@@ -83,8 +83,9 @@ without booting the app or a database:
 /// the OpenAPI doc + Swagger UI. Everything else under `/api` requires a
 /// valid bearer token.
 fn is_public_path(path: &str) -> bool {
-    path == "/_health"
-        || path == "/_ping"
+    path == "/_health/live"
+        || path == "/_health/ready"
+        || path == "/_health/startup"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
 }

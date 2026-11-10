@@ -8,7 +8,7 @@
 //! an identifier another person holds answered `500` the same way.
 //!
 //! `#[ignore]`d — run with
-//! `DATABASE_URL=… cargo test --test merge_identifiers -- --ignored`.
+//! `DB_URL=… cargo test --test merge_identifiers -- --ignored`.
 
 mod common;
 
@@ -49,7 +49,7 @@ async fn call(
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn merging_a_duplicate_with_an_identifier_moves_it_to_the_survivor() {
     let state = common::create_test_app_state().await;
     let app = common::create_test_router().await;
@@ -104,7 +104,7 @@ async fn merging_a_duplicate_with_an_identifier_moves_it_to_the_survivor() {
 /// A person carrying an identifier another person already holds is a
 /// `409` naming the key, not a `500`.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn an_identifier_another_person_holds_is_a_409_not_a_500() {
     let app = common::create_test_router().await;
     let mrn = format!("MRN-{}", uuid::Uuid::new_v4().simple());

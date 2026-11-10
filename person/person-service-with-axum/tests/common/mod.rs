@@ -53,7 +53,7 @@ pub async fn create_test_router() -> Router {
         .expect("Failed to create the search index directory");
     App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router")
 }

@@ -125,7 +125,7 @@ router construction** — changing the flag requires a process restart.
 The public allow-list (`PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES` in
 `src/api/rest/auth.rs`) stays token-free even when enforcement is on:
 
-- `/_health`, `/_ping` (axa health probes)
+- `/_health/live`, `/_health/ready`, `/_health/startup` (axa health probes)
 - `/api/health` (this crate's health endpoint)
 - `/api-docs/openapi.json` (OpenAPI document)
 - `/swagger-ui*` (Swagger UI + assets)

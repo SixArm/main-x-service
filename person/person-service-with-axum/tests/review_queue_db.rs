@@ -1,7 +1,7 @@
 //! DB-backed round-trip for the stored review queue
 //! (`db::review_queue` upsert / list / decide) — the raw-SQL layer the
 //! four registry services share verbatim. Gated on
-//! `REVIEW_QUEUE_TEST_DATABASE_URL` pointing at a Postgres the test may
+//! `REVIEW_QUEUE_TEST_DB_URL` pointing at a Postgres the test may
 //! create tables in; without it the test exits trivially so default
 //! `cargo test` runs stay DB-free.
 
@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 #[tokio::test]
 async fn review_queue_round_trip() {
-    let Ok(url) = std::env::var("REVIEW_QUEUE_TEST_DATABASE_URL") else {
-        eprintln!("REVIEW_QUEUE_TEST_DATABASE_URL unset; skipping DB round-trip");
+    let Ok(url) = std::env::var("REVIEW_QUEUE_TEST_DB_URL") else {
+        eprintln!("REVIEW_QUEUE_TEST_DB_URL unset; skipping DB round-trip");
         return;
     };
     use sqlx::Executor as _;

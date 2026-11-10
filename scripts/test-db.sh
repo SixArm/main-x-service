@@ -14,7 +14,7 @@
 #   scripts/test-db.sh down    <crate-path>   stop and remove it
 #   scripts/test-db.sh psql    <crate-path>   open a psql shell on it
 #   scripts/test-db.sh logs    <crate-path>   tail the container log
-#   scripts/test-db.sh url     <crate-path>   print the DATABASE_URL
+#   scripts/test-db.sh url     <crate-path>   print the DB_URL
 #   scripts/test-db.sh status                 list every running test database
 #   scripts/test-db.sh down-all               stop every one of them
 #
@@ -106,7 +106,7 @@ case "${CMD}" in
       fi
     fi
     echo "test-db: ${NAME} ready"
-    echo "  DATABASE_URL=postgres://loco:loco@localhost:${PORT}/${DB}"
+    echo "  DB_URL=postgres://loco:loco@localhost:${PORT}/${DB}"
     echo "  next: scripts/ci-check.sh test-db ${2%/}"
     ;;
 

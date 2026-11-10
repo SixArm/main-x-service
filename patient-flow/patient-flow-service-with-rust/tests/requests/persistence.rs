@@ -40,7 +40,7 @@ fn assert_moved(row: &Value, what: &str) {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DB_URL; run with `cargo test -- --ignored`"]
 // PF-U1: an UPDATE stamps `updated_at`, so it no longer always equals
 // `created_at`. One update per kind of statement: a COALESCE edit
 // (ward, bay) and a state transition (bed).
@@ -77,7 +77,7 @@ async fn an_update_moves_updated_at_forward() {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DB_URL; run with `cargo test -- --ignored`"]
 // PF-R1: two writers for one stay and day give one row and no error —
 // the second updates the day instead of tripping `red_green_stay_day`.
 // Deterministic rather than timing-based: both transactions are open
@@ -120,7 +120,7 @@ async fn two_same_day_red_green_writes_give_one_row() {
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL via DATABASE_URL; run with `cargo test -- --ignored`"]
+#[ignore = "requires PostgreSQL via DB_URL; run with `cargo test -- --ignored`"]
 // PF-O1: rows one relay holds are invisible to a second relay polling at
 // the same time, so two relays never ship one event twice (SEC-B6).
 async fn a_second_relay_does_not_see_rows_the_first_holds() {

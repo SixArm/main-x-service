@@ -12,7 +12,7 @@
 //!
 //! ```sh
 //! podman compose -f compose.fluvio.yaml up -d
-//! THING_FLUVIO_ENDPOINT=127.0.0.1:9103 DATABASE_URL=… \
+//! THING_FLUVIO_ENDPOINT=127.0.0.1:9103 DB_URL=… \
 //!   cargo test --features fluvio --test fluvio_relay -- --ignored
 //! podman compose -f compose.fluvio.yaml down -v
 //! ```
@@ -28,7 +28,7 @@
 //! Unlike case-service's `axa_test::request` harness, this crate
 //! has no such helper wired up (its DB-gated tests, e.g.
 //! `src/db/mod.rs`'s `outbox_tests` and `tests/enforcement.rs`, connect
-//! directly via `DATABASE_URL`), so this test follows that same
+//! directly via `DB_URL`), so this test follows that same
 //! convention rather than importing a pattern this crate does not use
 //! elsewhere.
 #![cfg(feature = "fluvio")]
@@ -39,10 +39,10 @@ use thing_service::relay::{self, FluvioSink};
 use thing_service::streaming::EventTransport;
 
 async fn connect() -> sqlx::PgPool {
-    let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+    let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
     sqlx::PgPool::connect(&url)
         .await
-        .expect("connect to DATABASE_URL")
+        .expect("connect to DB_URL")
 }
 
 #[tokio::test]

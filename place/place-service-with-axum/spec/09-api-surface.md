@@ -134,7 +134,7 @@ Blanket enforcement: when the default-off `PLACE_REQUIRE_AUTH` env
 flag is truthy (`1`/`true`/`yes`/`on`, case-insensitive; read at
 router construction — restart to change), an Axum middleware on both
 router surfaces requires a valid bearer token on **every** route
-except the public allow-list — `/api/health`, `/_health`, `/_ping`,
+except the public allow-list — `/api/health`, `/_health/live`, `/_health/ready`, `/_health/startup`,
 `/api-docs/openapi.json`, `/swagger-ui*`, `/metrics.prom` (constants
 `auth::PUBLIC_PATHS` / `PUBLIC_PATH_PREFIXES`). Unauthenticated
 requests to any other path get `401`.

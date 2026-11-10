@@ -71,14 +71,15 @@ pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 3] = ["/merge", "/deduplicate", "/im
 
 /// Exact paths that stay public even when blanket enforcement is on:
 /// the health probes (`/api/health` on this crate's surface, plus
-/// axa's default `/_health` / `/_ping`), the raw `OpenAPI` document,
+/// axa's probe routes `/_health/live`, `/_health/ready`, `/_health/startup`), the raw `OpenAPI` document,
 /// and the root-mounted Prometheus scrape path (outside `/api`, so a
 /// scraper needs no bearer token). Everything else requires a valid
 /// bearer token when `PLACE_REQUIRE_AUTH` is on.
-pub const PUBLIC_PATHS: [&str; 5] = [
+pub const PUBLIC_PATHS: [&str; 6] = [
     "/api/health",
-    "/_health",
-    "/_ping",
+    "/_health/live",
+    "/_health/ready",
+    "/_health/startup",
     "/api-docs/openapi.json",
     "/metrics.prom",
 ];
@@ -843,8 +844,9 @@ mod tests {
         let (verifier, policy) = (verifier(), policy());
         for path in [
             "/api/health",
-            "/_health",
-            "/_ping",
+            "/_health/live",
+            "/_health/ready",
+            "/_health/startup",
             "/api-docs/openapi.json",
             "/swagger-ui",
             "/swagger-ui/index.html",

@@ -9,12 +9,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use worker_service::db::repositories::rows_for_verification;
 
-/// A pool on `DATABASE_URL`, migrated.
+/// A pool on `DB_URL`, migrated.
 async fn connect() -> PgPool {
-    let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-    let db = PgPool::connect(&url)
-        .await
-        .expect("connect to DATABASE_URL");
+    let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+    let db = PgPool::connect(&url).await.expect("connect to DB_URL");
     worker_service::db::MIGRATOR
         .run(&db)
         .await
@@ -31,7 +29,7 @@ async fn connect() -> PgPool {
 /// id order, the opposite of the order asked for, so a sort that leaves
 /// ties in an unspecified order does not pass by accident.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn tied_updated_at_rows_are_read_in_id_order() {
     let db = connect().await;
     let mut ids: Vec<Uuid> = (0..12).map(|_| Uuid::new_v4()).collect();

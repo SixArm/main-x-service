@@ -800,7 +800,7 @@ published Ed25519 key); handlers take `MaybeAuthUser` to stamp the audit
 middleware calling `auth::enforce`) but **off by default** — gated by
 `CARE_PATHWAY_REQUIRE_AUTH` (`1`/`true`/`yes`/`on` ⇒ on). When on, any
 `/api/*` route without a valid token is `401`; the public paths
-`/_health`, `/_ping`, `/api-docs/openapi.json`, `/swagger-ui*`, and
+`/_health/live`, `/_health/ready`, `/_health/startup`, `/api-docs/openapi.json`, `/swagger-ui*`, and
 `/metrics.prom` stay open (matching §6.12 and
 `src/auth.rs::is_public_path`). The paseto-keys / issuer / audience come
 from `CARE_PATHWAY_PASETO_KEYS` / `CARE_PATHWAY_TOKEN_ISSUER` /
@@ -906,7 +906,7 @@ trail, `whoami` (no token → `401`), blanket enforcement (with
 /api/care-pathways` → `401`, public `GET /api-docs/openapi.json` →
 `200`; `#[serial]`), and OpenAPI/Swagger but require
 Postgres, so they are `#[ignore]`-gated — run with
-`cargo test -- --ignored` and a `DATABASE_URL`.
+`cargo test -- --ignored` and a `DB_URL`.
 
 **Compliance tests.** DB-free unit tests cover the pure cores: the hash
 chain (determinism, per-field coverage, and the four break scenarios —
@@ -1634,7 +1634,7 @@ the evidence bundle.
     path, headers, verifier)` + an `axum::middleware::from_fn` layer in
     `app.rs after_routes`, wired unconditionally and gated per-request by
     `CARE_PATHWAY_REQUIRE_AUTH` (`auth::require_auth`, off by default;
-    `1`/`true`/`yes`/`on` ⇒ on). Public paths (`/_health`, `/_ping`,
+    `1`/`true`/`yes`/`on` ⇒ on). Public paths (`/_health/live`, `/_health/ready`, `/_health/startup`,
     `/api-docs/openapi.json`, `/swagger-ui*`) stay open. Family contract:
     `agents/share/jwt-enforcement.md` (credential now PASETO, semantics
     unchanged). Activation is an operations decision once the SSO token

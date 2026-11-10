@@ -10,7 +10,7 @@
 //! enforcement-**off** request suite in `tests/requests/`.
 //!
 //! `#[ignore]`d: it boots the app (needs PostgreSQL via `config/test.yaml`
-//! / `DATABASE_URL`). Run with `cargo test --test enforcement -- --ignored`.
+//! / `DB_URL`). Run with `cargo test --test enforcement -- --ignored`.
 #![cfg(feature = "paseto")]
 
 use axa_test::prelude::*;
@@ -116,7 +116,7 @@ async fn enforcement_on_gates_the_real_stack() {
     request::<App, _, _>(|request, _ctx| async move {
         // Public path: open even with enforcement on, no token.
         assert_eq!(
-            request.get("/_health").await.status_code(),
+            request.get("/_health/live").await.status_code(),
             200,
             "public health path stays open"
         );

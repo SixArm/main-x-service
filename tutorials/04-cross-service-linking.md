@@ -166,7 +166,7 @@ against the now-migrated schema.
 
 Verify every health endpoint — the six person-style crates answer on
 `/api/health`, the five controller-style registries plus link-graph on
-`/_health`:
+`/_health/live`:
 
 ```sh
 curl -s http://localhost:8081/api/health    # person
@@ -175,12 +175,12 @@ curl -s http://localhost:8083/api/health    # place
 curl -s http://localhost:8084/api/health    # thing
 curl -s http://localhost:8085/api/health    # event
 curl -s http://localhost:8086/api/health    # course
-curl -s http://localhost:8087/_health       # organization
-curl -s http://localhost:8088/_health       # care-pathway
-curl -s http://localhost:8089/_health       # case
-curl -s http://localhost:8090/_health       # portfolio
-curl -s http://localhost:8091/_health       # authentication
-curl -s http://localhost:8092/_health       # link-graph
+curl -s http://localhost:8087/_health/live       # organization
+curl -s http://localhost:8088/_health/live       # care-pathway
+curl -s http://localhost:8089/_health/live       # case
+curl -s http://localhost:8090/_health/live       # portfolio
+curl -s http://localhost:8091/_health/live       # authentication
+curl -s http://localhost:8092/_health/live       # link-graph
 ```
 
 ```json

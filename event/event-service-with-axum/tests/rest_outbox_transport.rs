@@ -20,7 +20,7 @@ use tower::ServiceExt;
 /// A REST create under the outbox transport writes one `created` outbox
 /// row for the new event, committed with it.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_rest_create_writes_its_outbox_row() {
     // SAFETY: DB-gated suites run with `--test-threads=1`, and this is the
     // only test in this binary, so nothing reads the environment
@@ -63,7 +63,7 @@ async fn a_rest_create_writes_its_outbox_row() {
     let created: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let id = uuid::Uuid::parse_str(created["id"].as_str().expect("an id")).unwrap();
 
-    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+    let pool = sqlx::PgPool::connect(&std::env::var("DB_URL").expect("DB_URL"))
         .await
         .expect("connect to check the outbox");
     let rows: i64 = sqlx::query_scalar(

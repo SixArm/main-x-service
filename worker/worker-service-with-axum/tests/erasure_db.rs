@@ -44,12 +44,10 @@ fn with_mac_key() {
     );
 }
 
-/// A pool on `DATABASE_URL`, migrated.
+/// A pool on `DB_URL`, migrated.
 async fn connect() -> PgPool {
-    let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-    let db = PgPool::connect(&url)
-        .await
-        .expect("connect to DATABASE_URL");
+    let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+    let db = PgPool::connect(&url).await.expect("connect to DB_URL");
     worker_service::db::MIGRATOR
         .run(&db)
         .await
@@ -97,7 +95,7 @@ async fn purge(db: &PgPool, id: Uuid) {
 /// WK-E1: erasure leaves no keyed digest of the erased content. It nulls
 /// the MAC as it nulls the two hashes.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn erasure_nulls_the_mac_with_the_hashes() {
     with_mac_key();
     let db = connect().await;
@@ -150,7 +148,7 @@ async fn waits_on_advisory_lock(db: &PgPool, pid: i32) -> bool {
 /// committed, and redacts it. Taking it after (in the `erased` append)
 /// means the sweep has already run, and the row survives unredacted.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn erasure_redacts_an_audit_row_appended_while_it_waits() {
     with_mac_key();
     let db = connect().await;
@@ -247,7 +245,7 @@ async fn erasure_redacts_an_audit_row_appended_while_it_waits() {
 /// returns the tombstone rather than failing with "Worker has no primary
 /// name". The erased content stays gone and the digests stay NULL (WK-E1).
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn an_erased_record_reassembles_as_its_tombstone() {
     with_mac_key();
     let db = connect().await;
@@ -304,7 +302,7 @@ async fn an_erased_record_reassembles_as_its_tombstone() {
 /// is simulated by un-flagging a fresh tombstone; the migration's SQL is
 /// then run again (it is idempotent and narrow).
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn the_backfill_flags_an_old_non_primary_tombstone() {
     with_mac_key();
     let db = connect().await;

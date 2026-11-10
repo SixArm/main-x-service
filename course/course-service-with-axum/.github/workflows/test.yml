@@ -49,7 +49,7 @@ jobs:
           command: test
           args: --all-features --all -- --include-ignored
         env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/course_service_test
+          DB_URL: postgres://postgres:postgres@localhost:5432/course_service_test
           # The `query!` macros read the committed `.sqlx/` data rather than
           # the (not yet migrated) database; the test boot migrates it.
           SQLX_OFFLINE: "true"

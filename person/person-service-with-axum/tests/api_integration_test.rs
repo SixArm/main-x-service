@@ -24,7 +24,7 @@ use person_service::{api::rest::links::LinkView, models::Person};
 
 /// `GET /api/health` returns 200 and identifies the service.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_health_check() {
     let app = common::create_test_router().await;
 
@@ -52,7 +52,7 @@ async fn test_health_check() {
 /// `POST /api/persons` creates a person and assigns a fresh UUID
 /// (ignoring the all-zero id in the payload).
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_create_person() {
     let app = common::create_test_router().await;
 
@@ -98,7 +98,7 @@ async fn test_create_person() {
 /// Create a person, then `GET /api/persons/{id}` returns the same
 /// record.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_create_and_get_person() {
     let app = common::create_test_router().await;
 
@@ -166,7 +166,7 @@ async fn test_create_and_get_person() {
 /// Create a person, then `PUT /api/persons/{id}` persists a changed
 /// given-name list.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_update_person() {
     let app = common::create_test_router().await;
 
@@ -234,7 +234,7 @@ async fn test_update_person() {
 /// Create a person, soft-delete it (204), then confirm a subsequent GET
 /// returns 404.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_delete_person() {
     let app = common::create_test_router().await;
 
@@ -305,7 +305,7 @@ async fn test_delete_person() {
 /// Create a person, then `GET /api/persons/search` finds it by family
 /// name (after a brief indexing delay).
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_search_persons() {
     let app = common::create_test_router().await;
 
@@ -379,7 +379,7 @@ async fn test_search_persons() {
 /// pagination, not an unordered `LIMIT`/`OFFSET` that could duplicate
 /// rows across pages under concurrent writes).
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_list_persons_paginates_every_created_record_exactly_once() {
     let app = common::create_test_router().await;
 
@@ -489,7 +489,7 @@ async fn test_list_persons_paginates_every_created_record_exactly_once() {
 /// SEC-G7: `GET /api/persons` with an out-of-bound pagination `offset` is
 /// rejected with `400`, mirroring `/persons/search`'s own bound.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_list_persons_rejects_out_of_bound_offset() {
     let app = common::create_test_router().await;
 
@@ -514,7 +514,7 @@ async fn test_list_persons_rejects_out_of_bound_offset() {
 /// `offset` is rejected with `400` — the search engine is never asked to
 /// materialise `offset + limit` hits for an unbounded offset.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_search_rejects_out_of_bound_offset() {
     let app = common::create_test_router().await;
 
@@ -547,7 +547,7 @@ async fn test_search_rejects_out_of_bound_offset() {
 /// `axa::extract::Json`, and quotes nothing the caller sent. Axum's own
 /// extractor answered with a bare status.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_a_malformed_body_is_a_problem_saying_what_was_wrong() {
     let app = common::create_test_router().await;
 
@@ -585,7 +585,7 @@ async fn test_a_malformed_body_is_a_problem_saying_what_was_wrong() {
 
 /// `GET /api/persons/{id}` for an unknown id returns 404.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_get_person_not_found() {
     let app = common::create_test_router().await;
 
@@ -607,7 +607,7 @@ async fn test_get_person_not_found() {
 /// then soft-delete the same id, destroying the record. The guard runs
 /// before any fetch, so no rows need to exist.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_merge_into_self_is_rejected() {
     let app = common::create_test_router().await;
 
@@ -692,7 +692,7 @@ async fn create_minimal_person(
 /// succeeding at all) and the read side (the stored lowercase tags
 /// deserializing back to the right enum variants) together.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_merge_two_persons_round_trips_alias_name_and_replaces_link() {
     let app = common::create_test_router().await;
 
@@ -798,7 +798,7 @@ async fn test_merge_two_persons_round_trips_alias_name_and_replaces_link() {
 /// read (the stored `'replaced_by'` tag deserializing back to
 /// `LinkType::ReplacedBy`).
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_replaced_by_link_round_trips() {
     use person_service::models::{LinkType, PersonLink};
 
@@ -873,7 +873,7 @@ async fn test_replaced_by_link_round_trips() {
 /// only via the merge path above (which exercises `NameUse`/`LinkType`
 /// but not `ContactPointSystem`/`ContactPointUse`/`IdentifierUse`).
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_create_person_with_telecom_and_identifier_use_type_round_trips() {
     use person_service::models::{ContactPointSystem, ContactPointUse, IdentifierUse};
 
@@ -1819,7 +1819,7 @@ async fn test_a_recorded_checkpoint_detects_wholesale_deletion() {
 /// whose handlers existed but whose routes were never wired, so a route
 /// test earns its keep.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_compliance_identification_is_mounted() {
     let app = common::create_test_router().await;
 
@@ -1849,7 +1849,7 @@ async fn test_compliance_identification_is_mounted() {
 /// it needs a verified caller even with `PERSON_REQUIRE_AUTH` off. The
 /// document itself is checked in `tests/enforcement.rs`, which has a token.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_compliance_sbom_needs_a_caller_with_enforcement_off() {
     let app = common::create_test_router().await;
 
@@ -1870,7 +1870,7 @@ async fn test_compliance_sbom_needs_a_caller_with_enforcement_off() {
 /// like every other person REST endpoint (`spec/restful` §1.3): a created
 /// link is the `LinkView`, a list is the array, and a withdrawal is `{}`.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn test_links_endpoints_answer_bare_json() {
     let app = common::create_test_router().await;
 

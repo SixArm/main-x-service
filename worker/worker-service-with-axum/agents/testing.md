@@ -59,7 +59,7 @@ scripts/test-db.sh up worker/worker-service-with-axum
 scripts/ci-check.sh test-db worker/worker-service-with-axum
 
 # Locally (requires running PostgreSQL)
-DATABASE_URL=postgres://user:pass@localhost/worker_service_test cargo test --test api_integration_test
+DB_URL=postgres://user:pass@localhost/worker_service_test cargo test --test api_integration_test
 ```
 
 ## Benchmark Tests

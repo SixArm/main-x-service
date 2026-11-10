@@ -75,12 +75,12 @@ scripts/test-db.sh up case/case-service-with-axum
 
 ```
 test-db: mxi-case-test-db ready
-  DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_test
+  DB_URL=postgres://loco:loco@localhost:5432/case_service_test
 ```
 
 ```sh
 cd case/case-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_test cargo run -- db migrate
+DB_URL=postgres://loco:loco@localhost:5432/case_service_test cargo run -- db migrate
 ```
 
 ```
@@ -94,7 +94,7 @@ The transport (`CASE_EVENT_TRANSPORT`, default `memory`) and the relay
 this tutorial, so both go on the environment:
 
 ```sh
-DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_test \
+DB_URL=postgres://loco:loco@localhost:5432/case_service_test \
   CASE_EVENT_TRANSPORT=outbox \
   CASE_EVENT_RELAY=true \
   CASE_EVENT_RELAY_INTERVAL_SECS=5 \
@@ -127,7 +127,7 @@ worker alongside. The `starting event-outbox relay` log line above,
 present on this boot, is the confirmation that matters.
 
 ```sh
-curl -s http://localhost:5150/_health
+curl -s http://localhost:5150/_health/live
 ```
 
 ```json

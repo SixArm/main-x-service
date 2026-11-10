@@ -15,7 +15,7 @@
 
 
 ### Health check
-GET {{baseUrl}}/_health
+GET {{baseUrl}}/_health/live
 
 
 ### Who am I — always requires a valid bearer token (curl-verified 401

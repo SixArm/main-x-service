@@ -6,7 +6,7 @@
 //! default unit-test run. Activate with:
 //!
 //! ```bash
-//! DATABASE_URL=postgres://course:course@localhost:5434/course \
+//! DB_URL=postgres://course:course@localhost:5434/course \
 //!   cargo test --test api_integration_test -- --ignored
 //! ```
 //!
@@ -57,7 +57,7 @@ async fn send(
 
 /// Health probe returns `200` with the `healthy` body.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn health_returns_ok() {
     let app = common::create_test_router().await;
     let (status, body) = send(&app, Method::GET, "/api/health", None).await;
@@ -68,7 +68,7 @@ async fn health_returns_ok() {
 
 /// Full CRUD lifecycle: create → get → update → soft-delete → 404.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn create_get_update_softdelete_lifecycle() {
     let app = common::create_test_router().await;
     let body = common::course_json("Lifecycle");
@@ -114,7 +114,7 @@ async fn create_get_update_softdelete_lifecycle() {
 
 /// Invalid create body yields a `422` problem with a field-scoped `errors` array.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn validation_failure_returns_422_with_details() {
     let app = common::create_test_router().await;
     let bad = json!({
@@ -142,7 +142,7 @@ async fn validation_failure_returns_422_with_details() {
 
 /// A freshly created course is discoverable via the search endpoint.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn search_finds_created_record() {
     let app = common::create_test_router().await;
     let body = common::course_json("Search");
@@ -163,7 +163,7 @@ async fn search_finds_created_record() {
 
 /// The check-duplicates endpoint flags an identical-shape probe.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn check_duplicates_flags_a_clone() {
     let app = common::create_test_router().await;
     let body = common::course_json("DupCheck");
@@ -189,7 +189,7 @@ async fn check_duplicates_flags_a_clone() {
 
 /// The match endpoint returns the existing record among ranked candidates.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn match_endpoint_returns_ranked_candidates() {
     let app = common::create_test_router().await;
     let body = common::course_json("Match");
@@ -209,7 +209,7 @@ async fn match_endpoint_returns_ranked_candidates() {
 
 /// Merge completes and soft-deletes the duplicate (subsequent GET → 404).
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn merge_folds_duplicate_into_main() {
     let app = common::create_test_router().await;
     let body_a = common::course_json("MergeMain");
@@ -240,7 +240,7 @@ async fn merge_folds_duplicate_into_main() {
 
 /// Batch dedup returns the full counter + review-items response shape.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn batch_dedup_returns_response_shape() {
     let app = common::create_test_router().await;
     let req = json!({
@@ -264,7 +264,7 @@ async fn batch_dedup_returns_response_shape() {
 /// exactly once (first-writer-wins), and a re-scan upserts — refreshing
 /// the stored score while leaving a decided row's `status` untouched.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored"]
 async fn review_queue_persists_across_a_rescan_and_decides_once() {
     let (app, state) = common::boot().await;
 
@@ -380,7 +380,7 @@ async fn review_queue_persists_across_a_rescan_and_decides_once() {
 
 /// `CourseInstance` sub-resource: create → list → soft-delete round trip.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn instance_subresource_round_trips() {
     let app = common::create_test_router().await;
     let course_body = common::course_json("InstanceParent");
@@ -430,7 +430,7 @@ async fn instance_subresource_round_trips() {
 
 /// Create + update produce `CREATE` and `UPDATE` audit-log entries.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn audit_log_records_create_then_update() {
     let app = common::create_test_router().await;
     let body = common::course_json("Audit");
@@ -468,7 +468,7 @@ async fn audit_log_records_create_then_update() {
 
 /// The masked view nulls out provider (and other sensitive) fields.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn masked_view_clears_provider_and_instructors() {
     let app = common::create_test_router().await;
     let body = common::course_json("Masked");
@@ -489,7 +489,7 @@ async fn masked_view_clears_provider_and_instructors() {
 
 /// The GDPR export wraps the record in the source/schema envelope.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn gdpr_export_envelopes_the_record() {
     let app = common::create_test_router().await;
     let body = common::course_json("Export");
@@ -531,7 +531,7 @@ async fn is_mismatched(app: &axum::Router, id: &str) -> bool {
 /// since the pre-image covers them and the database decides their order
 /// on read-back.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn a_written_record_verifies() {
     let app = common::create_test_router().await;
 
@@ -583,7 +583,7 @@ async fn a_written_record_verifies() {
 
     // And verification still catches a change made behind the service's
     // back, so the two checks above cannot pass by verifying nothing.
-    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+    let pool = sqlx::PgPool::connect(&std::env::var("DB_URL").expect("DB_URL"))
         .await
         .expect("connect for the tamper step");
     sqlx::query("UPDATE courses SET name = name || ' (edited in SQL)' WHERE id = $1")
@@ -641,7 +641,7 @@ fn find_pair(items: &[Value], a: uuid::Uuid, b: uuid::Uuid) -> Option<&Value> {
 /// scan leaves them `Pending`, stores the evidence and returns it from
 /// the list endpoint.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn batch_dedup_keeps_a_name_only_pair_pending_as_consistent() {
     let (app, state) = common::boot().await;
     let name = common::unique_name("EvidenceNameOnly");
@@ -680,7 +680,7 @@ async fn batch_dedup_keeps_a_name_only_pair_pending_as_consistent() {
 /// A pair sharing a DOI is `proven`: the scan merges it and stores the
 /// pair as `AutoMerged` with its evidence.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn batch_dedup_auto_merges_a_proven_pair() {
     let (app, state) = common::boot().await;
     let name = common::unique_name("EvidenceProven");
@@ -711,7 +711,7 @@ async fn batch_dedup_auto_merges_a_proven_pair() {
 /// Two different DOIs contradict: the pair stays `Pending` as
 /// `contradicted`, whatever its name score.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn batch_dedup_keeps_a_contradicted_pair_pending() {
     let (app, state) = common::boot().await;
     let name = common::unique_name("EvidenceContradicted");
@@ -740,7 +740,7 @@ async fn batch_dedup_keeps_a_contradicted_pair_pending() {
 
 /// `check-duplicates` and the create-time `409` both carry evidence.
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test api_integration_test -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test api_integration_test -- --ignored`"]
 async fn check_duplicates_and_409_carry_evidence() {
     let app = common::create_test_router().await;
     let body = common::course_json("EvidenceCheck");

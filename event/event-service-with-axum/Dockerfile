@@ -88,7 +88,7 @@ COPY --from=builder --chown=event:event \
 
 # Migrations are NOT auto-applied on boot; keep the raw SQL in the
 # image so an operator can shell in and run them against the
-# configured `DATABASE_URL` without re-mounting.
+# configured `DB_URL` without re-mounting.
 COPY --chown=event:event event/event-service-with-axum/migrations ./migrations
 
 

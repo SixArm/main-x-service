@@ -59,7 +59,7 @@ freshness, so a UI can show "graph as of 10:42:05".
 Requires PostgreSQL.
 
 ```bash
-export DATABASE_URL=postgres://loco:loco@localhost:5432/link_graph_service_development
+export DB_URL=postgres://loco:loco@localhost:5432/link_graph_service_development
 cargo run -- start        # migrations auto-run in development
 
 # Edges incident to a record (both directions, depth-capped)

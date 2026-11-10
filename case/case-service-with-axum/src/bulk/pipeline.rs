@@ -713,9 +713,9 @@ mod unit_tests {
 }
 
 /// DB-gated (`#[ignore]`) tests for the import/export pipeline. They
-/// require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped by
+/// require a migrated `PostgreSQL` via `DB_URL` and are skipped by
 /// a bare `cargo test`; run with
-/// `DATABASE_URL=… cargo test --lib -- --ignored`. They MUST compile
+/// `DB_URL=… cargo test --lib -- --ignored`. They MUST compile
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod db_tests {
@@ -731,10 +731,8 @@ mod db_tests {
     use uuid::Uuid;
 
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        let db = PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        let db = PgPool::connect(&url).await.expect("connect to DB_URL");
         // Unlike the request-level suites under `tests/requests/`, which
         // boot the axa `App` (auto-migrating), these tests connect
         // directly — so migrations are applied here explicitly. Idempotent:
@@ -759,7 +757,7 @@ mod db_tests {
     /// and re-running the identical file upserts the same row in place
     /// (idempotent re-import).
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn import_is_idempotent_on_the_agency_case_number_key() {
         let db = connect().await;
         let agency = format!("agency-{}", Uuid::new_v4());
@@ -806,7 +804,7 @@ mod db_tests {
     /// A row that fails validation (blank title) lands in the error
     /// report and never aborts a load carrying other valid rows.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn invalid_row_is_reported_not_fatal() {
         let db = connect().await;
         let good =
@@ -841,7 +839,7 @@ mod db_tests {
     /// `dry_run` classifies rows (create vs upsert vs review) but writes
     /// nothing.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn dry_run_commits_nothing() {
         let db = connect().await;
         let agency = format!("agency-{}", Uuid::new_v4());
@@ -873,7 +871,7 @@ mod db_tests {
     /// created** (never silently withheld) **and** queued in the stored
     /// review queue with `provenance = "import"`.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn keyless_row_with_a_likely_duplicate_creates_and_queues_for_review() {
         use crate::models::review_queue;
         use crate::streaming;
@@ -938,7 +936,7 @@ mod db_tests {
     /// The CSV import path creates a keyed row, matching the JSONL
     /// path's semantics with a different wire format.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn csv_import_creates_a_keyed_row() {
         let db = connect().await;
         let agency = format!("agency-{}", Uuid::new_v4());
@@ -961,7 +959,7 @@ mod db_tests {
 
     /// JSONL export round-trips a created record.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn export_round_trips_through_jsonl() {
         use crate::streaming;
 
@@ -994,7 +992,7 @@ mod db_tests {
 
     /// CSV export round-trips a created record.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn export_round_trips_through_csv() {
         use crate::streaming;
 
@@ -1030,7 +1028,7 @@ mod db_tests {
     /// `case_number` via `mask_case`; a **full** export leaves them
     /// intact.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn export_masks_by_default_and_full_is_unmasked() {
         use crate::streaming;
 
@@ -1099,7 +1097,7 @@ mod db_tests {
     /// `include_soft_deleted=true` is rejected as not-yet-supported
     /// rather than leaking or silently ignoring the flag (§8).
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn export_rejects_include_soft_deleted() {
         let db = connect().await;
         let err = process_export_job(
@@ -1125,12 +1123,10 @@ mod stable_key_lock_tests {
     use std::time::{Duration, Instant};
     use uuid::Uuid;
 
-    /// A pool on `DATABASE_URL`, migrated.
+    /// A pool on `DB_URL`, migrated.
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        let db = PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        let db = PgPool::connect(&url).await.expect("connect to DB_URL");
         crate::models::MIGRATOR
             .run(&db)
             .await
@@ -1162,7 +1158,7 @@ mod stable_key_lock_tests {
     /// the lock the second finishes at once, misses the uncommitted row,
     /// and creates a second one.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn two_upserts_of_one_stable_key_give_one_row() {
         let db = connect().await;
         let agency = format!("sec-b3-{}", Uuid::new_v4());

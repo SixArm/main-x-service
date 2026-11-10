@@ -607,7 +607,7 @@ clearly described manual check confirms the acceptance criterion.
 - [x] **T-CFG — `Config::from_env` loads the environment.** *(done
   2026-07-23)* The function was a stub that returned `Config::default()`
   and ignored the process environment, so every documented variable
-  (`DATABASE_URL`, `SERVER_PORT`, `SEARCH_INDEX_PATH`, …) was inert —
+  (`DB_URL`, `SERVER_PORT`, `SEARCH_INDEX_PATH`, …) was inert —
   the integration-test harness, which builds its state from
   `Config::from_env()`, could never be pointed at a test database.
   - Env → `.env` (best-effort) → default precedence, over the 14

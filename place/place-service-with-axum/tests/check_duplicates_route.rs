@@ -12,7 +12,7 @@
 //! could silently drift again. This closes that gap.
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test check_duplicates_route -- --ignored`.
+//! `DB_URL=… cargo test --test check_duplicates_route -- --ignored`.
 
 use axa_test::TestApp;
 use axum::body::Body;
@@ -30,13 +30,13 @@ async fn test_router() -> axum::Router {
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router")
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test check_duplicates_route -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test check_duplicates_route -- --ignored"]
 async fn check_duplicates_is_served_at_the_documented_path() {
     let app = test_router().await;
 

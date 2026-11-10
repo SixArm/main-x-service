@@ -452,8 +452,7 @@ pub fn routes() -> Routes {
         .prefix("/api/organizations")
         .add(
             "/import",
-            post(import_organizations)
-                .layer(axa::middleware::body_limit(crate::bulk::IMPORT_BODY_LIMIT)),
+            axa::middleware::body_limit(post(import_organizations), crate::bulk::IMPORT_BODY_LIMIT),
         )
         .add("/import/{id}", get(get_import_job))
         .add("/export", post(export_organizations))

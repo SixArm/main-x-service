@@ -49,12 +49,12 @@ scripts/test-db.sh up person/person-service-with-axum
 
 ```
 test-db: mxi-person-test-db ready
-  DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test
+  DB_URL=postgres://loco:loco@localhost:5432/person_service_test
 ```
 
 ```sh
 cd person/person-service-with-axum
-export DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test
+export DB_URL=postgres://loco:loco@localhost:5432/person_service_test
 cargo run -- db migrate
 ```
 
@@ -381,12 +381,12 @@ holds 5150 for its own server):
 ```sh
 TEST_DB_PORT=5433 scripts/test-db.sh up authentication/authentication-service-with-axum
 cd authentication/authentication-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5433/authentication_service_test cargo run -- db migrate
+DB_URL=postgres://loco:loco@localhost:5433/authentication_service_test cargo run -- db migrate
 cat > config/development.local.yaml <<'EOF'
 server:
   port: 5151
 EOF
-DATABASE_URL=postgres://loco:loco@localhost:5433/authentication_service_test cargo run -- start
+DB_URL=postgres://loco:loco@localhost:5433/authentication_service_test cargo run -- start
 ```
 
 ```
@@ -401,7 +401,7 @@ authentication-service's published keys:
 
 ```sh
 cd person/person-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test \
+DB_URL=postgres://loco:loco@localhost:5432/person_service_test \
   PERSON_REQUIRE_AUTH=true \
   PERSON_PASETO_KEYS_URL=http://localhost:5151/.well-known/paseto-keys \
   cargo run -- start --server-and-worker
@@ -412,7 +412,7 @@ PASETO key set fetched at boot; fetched set overrides PERSON_PASETO_KEYS
   url=http://localhost:5151/.well-known/paseto-keys key_count=1
 ```
 
-The 94 persons from before are untouched (same `DATABASE_URL`; only the
+The 94 persons from before are untouched (same `DB_URL`; only the
 process restarted). **No token, either profile:**
 
 ```sh
@@ -468,7 +468,7 @@ fresh sign-in is required for a new token, same as TUT-3):**
 
 ```sh
 cd authentication/authentication-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5433/authentication_service_test \
+DB_URL=postgres://loco:loco@localhost:5433/authentication_service_test \
   cargo run -- task user_attributes op:set email:tut5@example.com key:access values:write
 # … fresh magic-link sign-in + new TOKEN …
 curl -s -i -X POST http://localhost:5150/api/persons/export \
@@ -496,7 +496,7 @@ profile instead of an HTTP verb.
 
 ```sh
 cd authentication/authentication-service-with-axum
-DATABASE_URL=postgres://loco:loco@localhost:5433/authentication_service_test \
+DB_URL=postgres://loco:loco@localhost:5433/authentication_service_test \
   cargo run -- task user_attributes op:set email:tut5@example.com key:access values:admin
 # … fresh magic-link sign-in + new TOKEN …
 curl -s -X POST http://localhost:5150/api/persons/export \

@@ -1359,9 +1359,9 @@ fn bbox_decimal(value: f64) -> bigdecimal::BigDecimal {
 pub use audit::AuditLogRepository;
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path. They
-/// require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped by a
+/// require a migrated `PostgreSQL` via `DB_URL` and are skipped by a
 /// bare `cargo test`; run with
-/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE under
+/// `DB_URL=… cargo test --lib -- --ignored`. They must COMPILE under
 /// a bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
@@ -1371,15 +1371,15 @@ mod tests {
     use crate::streaming::envelope::EventTransport;
 
     async fn connect() -> sqlx::PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
         sqlx::PgPool::connect(&url)
             .await
-            .expect("connect to DATABASE_URL")
+            .expect("connect to DB_URL")
     }
 
     /// Create writes, in one transaction, a `created` outbox row.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
         let repo = PgPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);
@@ -1398,7 +1398,7 @@ mod tests {
     /// survivor carrying the duplicate's pid in `merged_from`, plus a
     /// `deleted` outbox row for the duplicate.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
         let repo = PgPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);
@@ -1434,7 +1434,7 @@ mod tests {
     /// direct self-reference case is covered by `validate_place`'s pure
     /// unit tests; this is the repository-level ancestor-chain walk.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn update_rejects_a_cycle_through_an_existing_ancestor() {
         let db = connect().await;
         let repo = PgPlaceRepository::new(db.clone());
@@ -1461,7 +1461,7 @@ mod tests {
     /// T-2: the recursive walk finds a cycle four levels up, where the
     /// old loop took a round trip per level.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn update_rejects_a_cycle_four_levels_up() {
         let db = connect().await;
         let repo = PgPlaceRepository::new(db.clone());
@@ -1485,7 +1485,7 @@ mod tests {
     /// A cycle already in the table that does not involve the place being
     /// written ends the walk: the write is allowed, not looped on.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_pre_existing_unrelated_cycle_does_not_stop_a_write() {
         let db = connect().await;
         let repo = PgPlaceRepository::new(db.clone());
@@ -1520,7 +1520,7 @@ mod tests {
     /// transaction, as it was, the edit saw B as a root and both writes
     /// committed a cycle.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_concurrent_hierarchy_edit_cannot_close_a_cycle() {
         let db = connect().await;
         let repo = PgPlaceRepository::new(db.clone());
@@ -1574,7 +1574,7 @@ mod tests {
     /// answers `Conflict` without deleting the duplicate. Without the lock
     /// "B into A" racing "A into B" deleted both.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn a_merge_waits_for_a_concurrent_delete_and_then_refuses() {
         let db = connect().await;
         let repo = PgPlaceRepository::new(db.clone());

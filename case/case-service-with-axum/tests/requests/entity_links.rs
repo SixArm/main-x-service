@@ -3,7 +3,7 @@
 //! `subject_of` (case → person) edge the case service originates.
 //!
 //! These boot the app against the `test` environment (needs PostgreSQL;
-//! `config/test.yaml` / `DATABASE_URL`) and so are `#[ignore]`d. They
+//! `config/test.yaml` / `DB_URL`) and so are `#[ignore]`d. They
 //! drive the real HTTP surface: create a case, `POST` a `subject_of`
 //! link, `GET` it back, `DELETE` it, and assert that a `linked` then an
 //! `unlinked` event surface on `/api/cases/events/recent` (the default

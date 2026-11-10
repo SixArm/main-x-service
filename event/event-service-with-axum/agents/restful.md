@@ -79,7 +79,7 @@ truthy (`1`/`true`/`yes`/`on`, case-insensitive; anything else
 including unset/blank ⇒ off), the `auth::require_auth_mw` middleware
 requires a valid bearer token on **every** `/api/*` and `/fhir/*`
 route except the public `/api/health` and `/fhir/metadata`.
-Root-level `/_health`, `/_ping`, `/api-docs/openapi.json`,
+Root-level `/_health/live`, `/_health/ready`, `/_health/startup`, `/api-docs/openapi.json`,
 `/swagger-ui*`, and `/metrics.prom` sit outside the enforced scope and
 stay public. The flag is read once at `AppState` construction —
 restart the service to change it. Wired in `App::after_routes`. Family

@@ -48,7 +48,7 @@ Requires a PostgreSQL instance.
 
 ```bash
 # 1. Point at a database (or use the axa config default).
-export DATABASE_URL=postgres://loco:loco@localhost:5432/authentication_service_development
+export DB_URL=postgres://loco:loco@localhost:5432/authentication_service_development
 
 # 2. Run (auto-migrates in development).
 cargo run -- start

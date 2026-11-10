@@ -12,7 +12,7 @@
 //!
 //! ```sh
 //! podman compose -f compose.fluvio.yaml up -d
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/place_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/place_service_test \
 //!   PLACE_FLUVIO_ENDPOINT=127.0.0.1:9103 \
 //!   cargo test --features fluvio --test fluvio_relay -- --ignored
 //! podman compose -f compose.fluvio.yaml down -v
@@ -35,13 +35,13 @@ use place_service::streaming::envelope::EventTransport;
 #[tokio::test]
 #[ignore = "requires PostgreSQL AND a live Fluvio broker; see this file's module docs"]
 async fn fluvio_relay_publishes_an_outbox_row_to_a_real_topic() {
-    let db_url = std::env::var("DATABASE_URL").expect("set DATABASE_URL to a migrated Postgres");
+    let db_url = std::env::var("DB_URL").expect("set DB_URL to a migrated Postgres");
     let endpoint = std::env::var("PLACE_FLUVIO_ENDPOINT")
         .expect("set PLACE_FLUVIO_ENDPOINT to the broker's SC address (e.g. 127.0.0.1:9103)");
 
     let db = sqlx::PgPool::connect(&db_url)
         .await
-        .expect("connect to DATABASE_URL");
+        .expect("connect to DB_URL");
 
     // Durable transport, so `create` writes an outbox row.
     let repo = PgPlaceRepository::new(db.clone()).with_transport(EventTransport::Outbox);

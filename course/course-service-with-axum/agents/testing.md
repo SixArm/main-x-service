@@ -76,7 +76,7 @@ Run with:
 # manual psql loop; auto-migrate is out of scope for MVP).
 podman compose up -d postgres
 
-DATABASE_URL=postgres://course_user:course_password@localhost:5434/course \
+DB_URL=postgres://course_user:course_password@localhost:5434/course \
   cargo test --test api_integration_test -- --ignored
 ```
 
@@ -117,7 +117,7 @@ no automated run in this repo stands up a broker. Run against
 
 ```bash
 podman compose -f compose.fluvio.yaml up -d
-DATABASE_URL=postgres://course:course@localhost:5434/course \
+DB_URL=postgres://course:course@localhost:5434/course \
   COURSE_FLUVIO_ENDPOINT=127.0.0.1:9103 \
   cargo test --features fluvio --test fluvio_relay -- --ignored
 podman compose -f compose.fluvio.yaml down -v

@@ -1554,9 +1554,9 @@ pub async fn person_ids_with_identifier(
 }
 
 /// DB-gated (`#[ignore]`) atomicity tests for the outbox write path.
-/// They require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped
+/// They require a migrated `PostgreSQL` via `DB_URL` and are skipped
 /// by a bare `cargo test`; run with
-/// `DATABASE_URL=… cargo test --lib -- --ignored`. They must COMPILE
+/// `DB_URL=… cargo test --lib -- --ignored`. They must COMPILE
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod tests {
@@ -1579,10 +1579,8 @@ mod tests {
     }
 
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL")
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        PgPool::connect(&url).await.expect("connect to DB_URL")
     }
 
     fn a_person(family: &str) -> Person {
@@ -1601,7 +1599,7 @@ mod tests {
     /// Create writes a `created` outbox row in the same transaction as the
     /// entity rows.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn create_enqueues_a_created_outbox_row() {
         let db = connect().await;
         let repo = PgPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
@@ -1622,7 +1620,7 @@ mod tests {
     /// survivor carrying the duplicate's pid in `merged_from`, plus a
     /// `deleted` outbox row for the duplicate.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn merge_enqueues_merged_with_merged_from_and_deleted() {
         let db = connect().await;
         let repo = PgPersonRepository::new(db.clone()).with_transport(EventTransport::Outbox);
@@ -1670,7 +1668,7 @@ mod tests {
     /// best-effort post-commit). SEC-B8: both rows carry the real actor who
     /// initiated the merge, not the hard-coded `"system"` default.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn merge_writes_the_audit_rows_in_transaction() {
         use crate::db::audit::AuditLogRepository;
 
@@ -1729,7 +1727,7 @@ mod tests {
     /// into the per-row `CREATE`/`UPDATE` audit rows, instead of the
     /// previously-hard-coded `"system"` actor built inside the repository.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn create_and_update_audit_rows_carry_the_real_actor() {
         use crate::db::audit::AuditLogRepository;
 

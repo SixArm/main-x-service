@@ -18,7 +18,7 @@
 # Usage (from anywhere):
 #   podman compose -f examples/compose/single-service.yml build
 #   podman compose -f examples/compose/single-service.yml up -d
-#   curl http://localhost:8089/_health
+#   curl http://localhost:8089/_health/live
 #   podman compose -f examples/compose/single-service.yml down -v
 #
 # NOTE: run `build` and `up` as two separate steps. `up -d --build` was
@@ -64,7 +64,7 @@ services:
     entrypoint: ["/app/case-service"] # <- swap
     command: ["db", "migrate", "-e", "production"]
     environment:
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/case # <- swap
+      DB_URL: postgresql://loco:loco@postgres:5432/case # <- swap
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
       JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
@@ -89,7 +89,7 @@ services:
     command: ["/app/case-service", "start", "--server-and-worker"] # <- swap
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/case # <- swap
+      DB_URL: postgresql://loco:loco@postgres:5432/case # <- swap
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
       # Required by loco's config schema (auth.jwt.secret has no
@@ -103,7 +103,7 @@ services:
       case-migrate: # <- swap
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"] # <- swap
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health/live"] # <- swap
       interval: 30s
       timeout: 3s
       retries: 3

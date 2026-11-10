@@ -109,7 +109,7 @@ seeding logic or the Client traits.
 cargo check
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
-DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test cargo test
+DB_URL=postgres://postgres@localhost:5432/case_folder_test cargo test
 ```
 
 Postgres only needs to be reachable — no tables exist.

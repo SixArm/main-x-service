@@ -6,7 +6,7 @@
 //! a lower one (the documented default is `0.7`) changed nothing.
 //!
 //! `#[ignore]`d — run with
-//! `DATABASE_URL=… cargo test --test batch_threshold -- --ignored`.
+//! `DB_URL=… cargo test --test batch_threshold -- --ignored`.
 
 mod common;
 
@@ -31,7 +31,7 @@ fn named(family: &str, given: &str) -> Worker {
 }
 
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_pair_under_the_configured_threshold_is_found_at_a_lower_request_threshold() {
     let state = common::create_test_app_state().await;
     let app = common::create_test_router().await;

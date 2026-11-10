@@ -271,7 +271,7 @@ async fn page_at(
 /// with its `tax_id` redacted, and the full one appears unchanged.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test grpc_sec_g3 -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test grpc_sec_g3 -- --ignored`"]
 async fn list_persons_over_grpc_applies_sec_g3_disposition() {
     let (keys, kid) = keys_and_kid();
     let denied_org = uuid::Uuid::new_v4();

@@ -34,11 +34,11 @@ prior RS256 JWT model is decommissioned), not the database.
 - **Naming.** `<entity>_service_<env>` for development and test
   (`person_service_development`, `organization_service_test`, …);
   `case_folder_<env>` for the case-folder app. Production names come from
-  `DATABASE_URL`.
+  `DB_URL`.
 - **Roles (dev defaults).** controller-style services default to `loco`/`loco`;
   case-folder to `postgres`/`postgres`; the older Axum services to peer
   auth as `$USER` (`postgres://localhost/<db>`). All overridable via
-  `DATABASE_URL`.
+  `DB_URL`.
 - The full database list and a provisioning script are maintained with the
   service configs; each `config/{development,test}.yaml` carries the
   canonical default.
@@ -50,7 +50,7 @@ The controller-style services configure the connection in `config/*.yaml` under
 
 | Key | Dev default | Notes |
 |---|---|---|
-| `uri` | `DATABASE_URL` or the per-service default | Postgres connection string. |
+| `uri` | `DB_URL` or the per-service default | Postgres connection string. |
 | `enable_logging` | `false` | Logs every SQL statement when `true`. |
 | `connect_timeout` | `500` (ms) | Acquire-connection timeout. |
 | `idle_timeout` | `500` | Idle duration before a pooled connection closes. |
@@ -190,7 +190,7 @@ queue tables there. Config lives under `queue:` in `config/*.yaml`. See
 
 - DB-backed tests are `#[ignore]`d so a checkout without Postgres keeps
   `cargo test` green; run them with `cargo test -- --ignored` and a
-  `DATABASE_URL` (or `config/test.yaml`).
+  `DB_URL` (or `config/test.yaml`).
 - CI provisions a `postgres` service container with the **per-service** test
   database (`<entity>_service_test`); `dangerously_truncate` resets state
   between tests. See [testing](../testing/index.md).

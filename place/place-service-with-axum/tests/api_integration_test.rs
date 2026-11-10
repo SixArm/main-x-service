@@ -1,7 +1,7 @@
 //! REST API integration tests requiring a running `PostgreSQL`.
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test api_integration_test -- --ignored`.
+//! `DB_URL=… cargo test --test api_integration_test -- --ignored`.
 //!
 //! This file's reason to exist is **QA-SERVER-FIELDS**: `POST /api/places`
 //! used to require every field the [`Place`] model declared without a
@@ -31,7 +31,7 @@ async fn test_router() -> axum::Router {
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router")
 }
@@ -65,7 +65,7 @@ async fn post_places(app: &axum::Router, body: &Value) -> (StatusCode, Value) {
 /// extractor (`422 missing field id`, the first field it hit) without
 /// the handler, validation, or the repository ever running.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn create_place_from_a_minimal_hand_written_body_succeeds() {
     let app = test_router().await;
     // A pure random token, no fixed literal words: a shared literal
@@ -119,7 +119,7 @@ async fn create_place_from_a_minimal_hand_written_body_succeeds() {
 /// trusted it verbatim the second create would collide on the same
 /// primary key instead of getting a fresh one.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn two_consecutive_hand_written_creates_do_not_collide() {
     let app = test_router().await;
     // Two fully independent random names, no shared literal prefix and no
@@ -149,7 +149,7 @@ async fn two_consecutive_hand_written_creates_do_not_collide() {
 /// (`422 validation`, field `name`), not via the JSON extractor's
 /// generic "missing field" error before any handler code runs.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn omitting_name_fails_validation_not_the_json_extractor() {
     let app = test_router().await;
 
@@ -194,7 +194,7 @@ async fn get_places(app: &axum::Router, uri: &str) -> (StatusCode, axum::http::H
 /// three just-seeded rows land on the first two pages of two regardless
 /// of how many other fixtures the rest of this suite has created.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn listing_with_no_query_term_enumerates_seeded_places() {
     let app = test_router().await;
     let names: Vec<String> = (0..3)
@@ -245,7 +245,7 @@ async fn listing_with_no_query_term_enumerates_seeded_places() {
 /// A `limit` past `LIST_MAX_LIMIT` (100) is refused rather than clamped,
 /// and so is a cursor this service did not sign: both `422`.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn listing_with_a_bad_limit_or_cursor_is_refused() {
     let app = test_router().await;
     for uri in ["/api/places?limit=500", "/api/places?cursor=AQAAAAAAAAAK"] {
@@ -260,7 +260,7 @@ async fn listing_with_a_bad_limit_or_cursor_is_refused() {
 /// a value other than the one stored, for instance before Postgres rounds
 /// a timestamp to microseconds, flags every fresh record.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_written_record_verifies() {
     let app = test_router().await;
     let name = uuid::Uuid::new_v4().simple().to_string();
@@ -314,7 +314,7 @@ async fn a_written_record_verifies() {
         "an updated record must verify: {report}"
     );
 
-    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+    let pool = sqlx::PgPool::connect(&std::env::var("DB_URL").expect("DB_URL"))
         .await
         .expect("connect for the tamper step");
     sqlx::query("UPDATE places SET name = name || ' (edited in SQL)' WHERE id = $1")

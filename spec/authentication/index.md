@@ -379,7 +379,7 @@ including unset, ⇒ disabled). `src/auth.rs` exposes
 - The decision is a **pure, unit-testable** function
   `enforce(require_auth, path, headers, verifier)`: `Ok(())` lets the
   request through; `Err((401, msg))` rejects. Public paths stay open even
-  when enforcement is on: `/_health`, `/_ping`,
+  when enforcement is on: `/_health/live`, `/_health/ready`, `/_health/startup`,
   `/api-docs/openapi.json`, `/swagger-ui*`.
 - It is wired **unconditionally** as an `axum::middleware::from_fn` layer
   in the app's `after_routes` hook; the layer reads `require_auth()` per

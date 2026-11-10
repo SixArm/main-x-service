@@ -19,7 +19,7 @@ include = ["src/**/*", "README.md"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axa = { version = "0.10", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
+axa = { version = "0.11", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 # CSV codec for the bulk import/export operator/spreadsheet format
@@ -117,13 +117,13 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
-axa-test = "0.1"
+axa-test = "0.2"
 axum-test = "21"
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
 criterion = { version = "0.8", features = ["html_reports"] }
-axa = { version = "0.10", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
+axa = { version = "0.11", features = ["sqlx", "queue", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 # `#[tokio::test]` + a local ephemeral-port HTTP listener for the boot-time key-set fetch tests.
 # `time` also lets tests/otlp_collector's `wait_for` poll with
 # `tokio::time::sleep` instead of busy-waiting.

@@ -4,7 +4,7 @@
 //! (spec §13 T-7).
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test geojson_endpoint -- --ignored`.
+//! `DB_URL=… cargo test --test geojson_endpoint -- --ignored`.
 
 use std::str::FromStr;
 
@@ -25,7 +25,7 @@ async fn test_router() -> axum::Router {
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router")
 }
@@ -90,7 +90,7 @@ async fn get(app: &axum::Router, uri: &str) -> (StatusCode, Option<String>, Valu
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test geojson_endpoint -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test geojson_endpoint -- --ignored"]
 async fn a_stored_place_is_served_as_a_point_feature() {
     let app = test_router().await;
     let config = Config::from_env().expect("load config from env");
@@ -152,7 +152,7 @@ async fn a_stored_place_is_served_as_a_point_feature() {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test geojson_endpoint -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test geojson_endpoint -- --ignored"]
 async fn a_bbox_pages_every_place_inside_it_and_none_outside() {
     let app = test_router().await;
     let config = Config::from_env().expect("load config from env");

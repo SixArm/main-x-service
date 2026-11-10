@@ -66,7 +66,7 @@ Default base URL: `http://localhost:5150` (axa default port).
 |---|---|---|
 | GET | `/api-docs/openapi.json` | Hand-written OpenAPI 3 (the matcher crate has no `utoipa`; the doc is authored in `src/openapi.rs` — keep it in sync by hand) |
 | GET | `/swagger-ui` | Interactive docs |
-| GET | `/_health`, `/_ping` | axa defaults |
+| GET | `/_health/live`, `/_health/ready`, `/_health/startup` | axa defaults |
 
 ## Worked example
 

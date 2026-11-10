@@ -16,7 +16,7 @@
 //! database. Run with:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/care_pathway_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/care_pathway_service_test \
 //!   cargo test -- --ignored
 //! ```
 
@@ -1022,7 +1022,7 @@ async fn a_written_record_verifies() {
 
         // An edit made behind the service's back, through a raw pool of
         // its own, must still be caught.
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL");
         let raw = sqlx::PgPool::connect(&url).await.expect("raw pool");
         sqlx::query!(
             "UPDATE care_pathways SET name = name || ' (edited in SQL)' WHERE pid = $1",

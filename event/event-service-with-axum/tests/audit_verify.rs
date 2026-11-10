@@ -12,7 +12,7 @@
 //! database-less machine:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/event_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/event_service_test \
 //!   cargo test --test audit_verify -- --ignored
 //! ```
 
@@ -46,10 +46,10 @@ async fn verify(app: &axum::Router) -> Value {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test audit_verify -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test audit_verify -- --ignored`"]
 async fn verify_examines_the_newest_rows_and_catches_a_tampered_newest_row() {
     let app = common::create_test_router().await;
-    let db = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+    let db = sqlx::PgPool::connect(&std::env::var("DB_URL").expect("DB_URL"))
         .await
         .expect("connect");
     let audit_log = event_service::db::AuditLogRepository::new(db.clone());

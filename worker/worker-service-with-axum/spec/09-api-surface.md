@@ -37,7 +37,7 @@ implemented and **off by default**: when `WORKER_REQUIRE_AUTH` is truthy
 (`1`/`true`/`yes`/`on`; read once at router construction — restart to
 change), every route on both router surfaces requires a valid bearer
 token and returns `401` otherwise, except the public allow-list:
-`/_health`, `/_ping`, `/api/health`, `/api-docs/openapi.json`,
+`/_health/live`, `/_health/ready`, `/_health/startup`, `/api/health`, `/api-docs/openapi.json`,
 `/metrics.prom`, and `/swagger-ui*`. The `/fhir` surface is deliberately
 protected (worker PII).
 

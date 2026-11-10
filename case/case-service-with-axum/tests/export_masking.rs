@@ -17,7 +17,7 @@
 //! organization and care-pathway services' `tests/masking.rs`.
 //!
 //! `#[ignore]`d — boots the app, so it needs PostgreSQL via
-//! `config/test.yaml` / `DATABASE_URL`. Run with
+//! `config/test.yaml` / `DB_URL`. Run with
 //! `cargo test --test export_masking -- --ignored`.
 #![cfg(feature = "paseto")]
 

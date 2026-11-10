@@ -7,7 +7,7 @@
 //! still recover it by posting a near-duplicate probe.
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test masking_check_duplicates -- --ignored`.
+//! `DB_URL=… cargo test --test masking_check_duplicates -- --ignored`.
 
 use axa_test::TestApp;
 use axum::body::Body;
@@ -26,7 +26,7 @@ async fn test_router() -> axum::Router {
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router")
 }
@@ -65,7 +65,7 @@ fn phoned_place(name: &str) -> Place {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test masking_check_duplicates -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test masking_check_duplicates -- --ignored"]
 async fn check_duplicates_masks_candidates_when_requested() {
     let app = test_router().await;
 
@@ -114,7 +114,7 @@ async fn check_duplicates_masks_candidates_when_requested() {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test masking_check_duplicates -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test masking_check_duplicates -- --ignored"]
 async fn create_409_masks_the_duplicate_candidate_when_requested() {
     let app = test_router().await;
 

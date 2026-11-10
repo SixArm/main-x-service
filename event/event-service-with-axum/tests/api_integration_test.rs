@@ -1,11 +1,11 @@
 #![warn(clippy::pedantic)]
 
 //! REST API integration tests. Requires a running `PostgreSQL`
-//! reachable via `DATABASE_URL`.
+//! reachable via `DB_URL`.
 //!
-//! All tests are marked `#[ignore = "requires a running PostgreSQL via DATABASE_URL"]` so they are skipped by a bare
+//! All tests are marked `#[ignore = "requires a running PostgreSQL via DB_URL"]` so they are skipped by a bare
 //! `cargo test`; run them explicitly with
-//! `DATABASE_URL=… cargo test --test api_integration_test -- --ignored`.
+//! `DB_URL=… cargo test --test api_integration_test -- --ignored`.
 
 mod common;
 
@@ -19,7 +19,7 @@ use tower::ServiceExt;
 
 /// `GET /api/health` returns 200 and names the service.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn health_check_returns_healthy() {
     let app = common::create_test_router().await;
     let response = app
@@ -43,7 +43,7 @@ async fn health_check_returns_healthy() {
 /// Creating an event mints a fresh id and the record reads back
 /// identically via `GET /api/events/{id}`.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn create_event_round_trip() {
     let app = common::create_test_router().await;
     let title = common::unique_event_name("CreateRoundTrip");
@@ -112,7 +112,7 @@ async fn create_event_round_trip() {
 /// `CapabilityStatement`, and an unknown `GET /fhir/Appointment/{id}`
 /// returns `404` with an `OperationOutcome` body — no more `501` stub.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn fhir_appointment_surface_is_live() {
     let app = common::create_test_router().await;
 
@@ -160,7 +160,7 @@ async fn fhir_appointment_surface_is_live() {
 
 /// An empty `name` is rejected with `422 Unprocessable Entity`.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn validation_rejects_missing_name() {
     let app = common::create_test_router().await;
     let payload = json!({
@@ -197,7 +197,7 @@ async fn validation_rejects_missing_name() {
 /// class as the person/thing/place/worker services' own
 /// QA-SERVER-FIELDS fix, just never landed here.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn create_event_from_a_minimal_hand_written_body_succeeds() {
     let app = common::create_test_router().await;
     let title = common::unique_event_name("MinimalBody");
@@ -294,7 +294,7 @@ async fn is_mismatched(app: &axum::Router, id: &str) -> bool {
 /// rows and a numeric price are included, since the database normalises
 /// both.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_written_record_verifies() {
     let app = common::create_test_router().await;
     let title = common::unique_event_name("VerifiesWhenWritten");
@@ -350,7 +350,7 @@ async fn a_written_record_verifies() {
 
     // And verification still catches a change made behind the service's
     // back, so the two checks above cannot pass by verifying nothing.
-    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").expect("DATABASE_URL"))
+    let pool = sqlx::PgPool::connect(&std::env::var("DB_URL").expect("DB_URL"))
         .await
         .expect("connect for the tamper step");
     sqlx::query("UPDATE events SET name = name || ' (edited in SQL)' WHERE id = $1")

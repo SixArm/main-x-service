@@ -694,9 +694,9 @@ pub async fn process_export_job(
 }
 
 /// DB-gated (`#[ignore]`) tests for the import/export pipeline. They
-/// require a migrated `PostgreSQL` via `DATABASE_URL` and are skipped by a
+/// require a migrated `PostgreSQL` via `DB_URL` and are skipped by a
 /// bare `cargo test`; run with
-/// `DATABASE_URL=… cargo test --lib -- --ignored`. They MUST compile
+/// `DB_URL=… cargo test --lib -- --ignored`. They MUST compile
 /// under a bare `cargo test --lib`.
 #[cfg(test)]
 mod db_tests {
@@ -712,10 +712,10 @@ mod db_tests {
     use crate::search::SearchEngine;
 
     async fn connect() -> sqlx::PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
         sqlx::PgPool::connect(&url)
             .await
-            .expect("connect to DATABASE_URL")
+            .expect("connect to DB_URL")
     }
 
     fn search_engine() -> (tempfile::TempDir, SearchEngine) {
@@ -742,7 +742,7 @@ mod db_tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn import_creates_then_upserts_idempotently_with_error_report() {
         let db = connect().await;
         let repo = PgPersonRepository::new(db.clone());
@@ -817,7 +817,7 @@ mod db_tests {
     /// find→create/update so the second importer upserts the first's row
     /// instead of racing it into a duplicate.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn concurrent_imports_of_one_stable_key_yield_one_record() {
         let db = connect().await;
         let system = "http://hl7.org/fhir/sid/us-ssn".to_string();
@@ -891,15 +891,15 @@ mod db_tests {
     /// failed. The audit log shares the pool, so the post-commit audit row
     /// is on it too.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn import_on_a_one_connection_pool_completes() {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
         let db = sqlx::postgres::PgPoolOptions::new()
             .max_connections(1)
             .acquire_timeout(std::time::Duration::from_secs(5))
             .connect(&url)
             .await
-            .expect("connect to DATABASE_URL");
+            .expect("connect to DB_URL");
         let audit = std::sync::Arc::new(crate::db::AuditLogRepository::new(db.clone()));
         let repo = PgPersonRepository::new(db.clone()).with_audit_log(audit);
         let (_dir, search) = search_engine();
@@ -950,7 +950,7 @@ mod db_tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn dry_run_commits_nothing() {
         let db = connect().await;
         let repo = PgPersonRepository::new(db.clone());
@@ -979,7 +979,7 @@ mod db_tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn export_round_trips_through_jsonl() {
         let db = connect().await;
         let repo = PgPersonRepository::new(db.clone());
@@ -1023,7 +1023,7 @@ mod db_tests {
     /// worker's audit path writes an export audit row (§8). A **full**
     /// export (privileged) leaves the field intact.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn export_masks_by_default_and_full_is_unmasked_and_audited() {
         use crate::db::{AuditContext, AuditLogRepository};
         use crate::models::{Identifier, IdentifierType};
@@ -1115,7 +1115,7 @@ mod db_tests {
     /// `include_soft_deleted=true` is rejected as not-yet-supported rather
     /// than leaking or silently ignoring the flag (§8).
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn export_rejects_include_soft_deleted() {
         let db = connect().await;
         let repo = PgPersonRepository::new(db.clone());
@@ -1137,7 +1137,7 @@ mod db_tests {
     /// **and** queued in the stored review queue with `provenance =
     /// "import"`, so an operator sees it flagged.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn keyless_row_with_a_likely_duplicate_creates_and_queues_for_review() {
         use crate::db::audit::AuditLogRepository;
         use crate::db::review_queue;
@@ -1235,7 +1235,7 @@ mod db_tests {
     /// creates, matching the JSONL path's semantics with a different wire
     /// format.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn csv_import_creates_a_keyed_row() {
         let db = connect().await;
         let repo = PgPersonRepository::new(db.clone());
@@ -1271,7 +1271,7 @@ mod db_tests {
     /// rows are genuinely assembled across boundaries against a real
     /// database.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn streaming_an_artifact_from_the_store_imports_every_row() {
         use crate::bulk::store::{ArtifactStore, LocalFsArtifactStore};
 
@@ -1345,7 +1345,7 @@ mod db_tests {
     /// The CSV export path round-trips a created record through
     /// `process_export_job` with `format: BulkFormat::Csv`.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn csv_export_round_trips() {
         let db = connect().await;
         let repo = PgPersonRepository::new(db.clone());
@@ -1382,7 +1382,7 @@ mod db_tests {
     /// `name.family` column.
     #[tokio::test]
     #[cfg(feature = "parquet")]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn parquet_export_round_trips() {
         use ::bytes::Bytes;
         use arrow::array::Array;

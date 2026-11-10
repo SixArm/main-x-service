@@ -29,7 +29,7 @@ front-end  ──HTTP /api/*──▶  service  ──Cargo path dep──▶  m
 ```bash
 # Service (Postgres + API at :8080; Swagger at /swagger-ui)
 cd person-service-with-axum
-podman compose up -d            # or: cargo run --release (needs DATABASE_URL + migrations)
+podman compose up -d            # or: cargo run --release (needs DB_URL + migrations)
 cargo test --lib                # unit tests
 cargo test --test duplicate_detection   # adapter↔matcher bridge tests
 

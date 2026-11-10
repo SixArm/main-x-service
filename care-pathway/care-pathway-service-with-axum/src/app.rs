@@ -127,8 +127,7 @@ impl App {
         }
     }
 
-    /// Assemble the route table: axa's default routes (`/_health`,
-    /// `/_ping`, …) plus the care-pathway controller, the API-docs
+    /// Assemble the route table: axa's default routes (`/_health/live`, `/_health/ready`, `/_health/startup`) plus the care-pathway controller, the API-docs
     /// controller, and the root-level Prometheus `/metrics.prom` endpoint.
     #[must_use]
     pub fn routes(_ctx: &AppContext) -> AppRoutes {

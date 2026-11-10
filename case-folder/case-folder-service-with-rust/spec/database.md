@@ -12,7 +12,7 @@ database:
   auto_migrate: true
 ```
 
-Override at runtime with `DATABASE_URL`. In production set
+Override at runtime with `DB_URL`. In production set
 `auto_migrate: false` and run `cargo run --release -- db migrate` from a
 controlled release step (currently a no-op because there are no
 migrations, but the wiring stays).

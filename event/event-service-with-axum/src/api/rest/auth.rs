@@ -163,8 +163,8 @@ pub async fn claims_from_token(token: &str) -> Result<Claims, (StatusCode, Strin
 }
 
 /// Paths that stay public even when blanket enforcement is on
-/// (**deny-unless-public**): axa's `/_health` and `/_ping` liveness
-/// probes, the `OpenAPI` doc `/api-docs/openapi.json`, the Swagger UI at
+/// (**deny-unless-public**): axa's `/_health/live`,
+/// `/_health/ready` and `/_health/startup` probes, the `OpenAPI` doc `/api-docs/openapi.json`, the Swagger UI at
 /// `/swagger-ui*`, the Prometheus scrape `/metrics.prom`, the
 /// `/api/health` check, and the FHIR `CapabilityStatement`
 /// `/fhir/metadata` (capability discovery, fhir.md §8). Every **other**
@@ -172,8 +172,9 @@ pub async fn claims_from_token(token: &str) -> Result<Claims, (StatusCode, Strin
 /// enforcement is on; the FHIR write path carries PHI, so it must not be
 /// public.
 fn is_public_path(path: &str) -> bool {
-    path == "/_health"
-        || path == "/_ping"
+    path == "/_health/live"
+        || path == "/_health/ready"
+        || path == "/_health/startup"
         || path == "/api-docs/openapi.json"
         || path.starts_with("/swagger-ui")
         || path == "/metrics.prom"
@@ -821,8 +822,9 @@ mod tests {
         for path in [
             "/api/health",    // allow-listed inside /api
             "/fhir/metadata", // FHIR capability discovery (fhir.md §8)
-            "/_health",       // loco default, outside /api
-            "/_ping",         // loco default, outside /api
+            "/_health/live",
+            "/_health/ready",
+            "/_health/startup",
             "/api-docs/openapi.json",
             "/swagger-ui",
             "/swagger-ui/index.html",

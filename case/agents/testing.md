@@ -13,7 +13,7 @@ Entity-level view; normative inventory in entity spec
 | matcher | Doctests | `cargo test` | rustdoc examples |
 | service | DB-free embedding tests | `cargo test --test matching` | Matcher embedding + `Case` JSON round-trip (the DTO/JSONB contract) |
 | service | Module unit tests | `cargo test --lib` | Blank-title → `422` pin, validation cases, `merge`, `streaming` publish/read-back, `auth` crypto, `openapi` well-formedness, `CHECK_DUPLICATES_SCAN_CAP` value — all DB-free |
-| service | Request-level tests (`tests/requests/cases.rs`) | `cargo test -- --ignored` + Postgres `DATABASE_URL` | CRUD, 422s, 404, `/search`, `/match`, `/check-duplicates` round-trip, `/merge`, audit/events, `whoami` 401, OpenAPI/Swagger. `#[ignore]`-gated so default `cargo test` is DB-free |
+| service | Request-level tests (`tests/requests/cases.rs`) | `cargo test -- --ignored` + Postgres `DB_URL` | CRUD, 422s, 404, `/search`, `/match`, `/check-duplicates` round-trip, `/merge`, audit/events, `whoami` 401, OpenAPI/Swagger. `#[ignore]`-gated so default `cargo test` is DB-free |
 | front-end | Type-level check | `pnpm run check` | svelte-check strict, 0 errors / 0 warnings |
 | front-end | Build | `pnpm run build` | Production build |
 | front-end | vitest units | `pnpm test` | `ApiClient` + `CaseRepository` (incl. `check-duplicates` path regression) |
@@ -58,7 +58,7 @@ its test edit in the same PR.
   library's own rules (no clocks, no RNG seeds that matter).
 - Service: prefer DB-free tests where the behaviour allows; the
   request-level tests are `#[ignore]`-gated (need Postgres — run with
-  `cargo test -- --ignored` and a `DATABASE_URL`). Auth/crypto tests
+  `cargo test -- --ignored` and a `DB_URL`). Auth/crypto tests
   mint a token + matching public key in-process, so they stay DB-free.
   (Auth pivot: the credential is a PASETO v4.public token + published
   Ed25519 key, replacing RS256 JWT + JWKS — see

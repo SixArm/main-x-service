@@ -4,11 +4,11 @@
 //!
 //! These boot the app against the `test` environment, which needs a
 //! reachable PostgreSQL (`config/test.yaml`; override with
-//! `DATABASE_URL`). They are `#[ignore]`d so the default `cargo test`
+//! `DB_URL`). They are `#[ignore]`d so the default `cargo test`
 //! stays green on a database-less machine. Run them with:
 //!
 //! ```sh
-//! DATABASE_URL=postgres://loco:loco@localhost:5432/case_service_test \
+//! DB_URL=postgres://loco:loco@localhost:5432/case_service_test \
 //!   cargo test -- --ignored
 //! ```
 //!
@@ -1751,7 +1751,7 @@ async fn truncate_clears_outbox_bulk_jobs_and_review_queue() {
 /// row and so never return it.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with: cargo test -- --ignored"]
+#[ignore = "requires PostgreSQL (DB_URL); run with: cargo test -- --ignored"]
 async fn erasure_removes_the_case_from_the_search_index() {
     super::isolate_search_index();
     request::<App, _, _>(|request, _ctx| async move {

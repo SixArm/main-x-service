@@ -4,7 +4,7 @@
 //! Run with a migrated Postgres:
 //!
 //! ```text
-//! DATABASE_URL=postgres://…/worker_service_test cargo test --test gender_normalization_db -- --ignored
+//! DB_URL=postgres://…/worker_service_test cargo test --test gender_normalization_db -- --ignored
 //! ```
 //!
 //! The legacy rows this migration repairs **cannot be created on a
@@ -41,9 +41,9 @@ async fn exec(db: &PgPool, sql: &'static str) {
 /// A legacy capitalized row is normalized, and the result is provably
 /// constraint-legal.
 #[tokio::test]
-#[ignore = "requires DATABASE_URL to a migrated Postgres"]
+#[ignore = "requires DB_URL to a migrated Postgres"]
 async fn normalizes_legacy_capitalized_gender_rows() {
-    let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+    let url = std::env::var("DB_URL").expect("DB_URL");
     let db = PgPool::connect(&url).await.expect("connect");
     let planted = Uuid::new_v4();
 

@@ -74,7 +74,7 @@ pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/im
 /// what the crate actually serves without a token:
 ///
 /// - `/api/health` — this service's own health endpoint (under `/api`);
-/// - `/_health` / `/_ping` — axa's default health/ping routes (present
+/// - `/_health/live` / `/_health/ready` / `/_health/startup` — axa's probe routes (present
 ///   on the loco-mounted surface only);
 /// - `/api-docs/openapi.json` — the `OpenAPI` 3 document;
 /// - `/metrics.prom` — the root-mounted Prometheus scrape path (outside
@@ -84,10 +84,11 @@ pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/im
 /// The Swagger UI (`/swagger-ui` + everything under `/swagger-ui/`) is
 /// also public, matched by prefix in [`is_public_path`]. Everything
 /// else requires a valid bearer token when enforcement is on.
-pub const PUBLIC_PATHS: [&str; 5] = [
+pub const PUBLIC_PATHS: [&str; 6] = [
     "/api/health",
-    "/_health",
-    "/_ping",
+    "/_health/live",
+    "/_health/ready",
+    "/_health/startup",
     "/api-docs/openapi.json",
     "/metrics.prom",
 ];

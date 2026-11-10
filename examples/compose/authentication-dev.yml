@@ -25,7 +25,7 @@
 # Usage (from anywhere):
 #   podman compose -f examples/compose/authentication-dev.yml build
 #   podman compose -f examples/compose/authentication-dev.yml up -d
-#   curl http://localhost:5150/_health
+#   curl http://localhost:5150/_health/live
 #   # trigger a magic link (POST /api/auth/magic-link or /signup), then:
 #   podman compose -f examples/compose/authentication-dev.yml logs authentication-service | grep 'magic link issued'
 #   podman compose -f examples/compose/authentication-dev.yml down -v
@@ -100,7 +100,7 @@ services:
       # Overrides the image's baked-in `APP_ENV=production` — this is
       # the entire point of this file (see header comment).
       APP_ENV: development
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication_service_development
+      DB_URL: postgresql://loco:loco@postgres:5432/authentication_service_development
       AUTH_ALLOWED_FRONTENDS: ${AUTH_ALLOWED_FRONTENDS:-http://localhost:4173}
       RUST_LOG: ${RUST_LOG:-info}
       # No TOKEN_PRIVATE_KEY_SEED here: config/development.yaml carries
@@ -113,7 +113,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health/live"]
       interval: 5s
       timeout: 3s
       retries: 10

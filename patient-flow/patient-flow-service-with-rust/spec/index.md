@@ -21,7 +21,7 @@ tracing + OTLP, Podman.
 ## Edition-specific decisions (so far)
 
 - **Config**: the environment only — there are no config files (axa
-  reads none). `APP_ENV`, `PORT`, `DATABASE_URL` and the rest of
+  reads none). `APP_ENV`, `PORT`, `DB_URL` and the rest of
   `axa::config`, over the defaults in `src/app.rs` (`defaults()`). In
   every environment the upstream clients default to `stub`
   (`PATIENT_FLOW_UPSTREAM_MODE`) and events to

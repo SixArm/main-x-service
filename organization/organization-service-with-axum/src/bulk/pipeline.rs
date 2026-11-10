@@ -752,12 +752,10 @@ mod stable_key_lock_tests {
     use std::time::{Duration, Instant};
     use uuid::Uuid;
 
-    /// A pool on `DATABASE_URL`, migrated.
+    /// A pool on `DB_URL`, migrated.
     async fn connect() -> PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set for DB tests");
-        let db = PgPool::connect(&url)
-            .await
-            .expect("connect to DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL must be set for DB tests");
+        let db = PgPool::connect(&url).await.expect("connect to DB_URL");
         crate::models::MIGRATOR
             .run(&db)
             .await
@@ -793,7 +791,7 @@ mod stable_key_lock_tests {
     /// the lock the second finishes at once, misses the uncommitted row,
     /// and creates a second one.
     #[tokio::test]
-    #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+    #[ignore = "requires a running PostgreSQL via DB_URL"]
     async fn two_upserts_of_one_stable_key_give_one_row() {
         let db = connect().await;
         let duns = format!("sec-b3-{}", Uuid::new_v4());

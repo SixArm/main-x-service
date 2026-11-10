@@ -956,7 +956,7 @@ organization is not a data subject.
   - [x] Blanket `/api/*` enforcement — `auth::enforce` (pure, unit-tested)
     wired as an `axum::middleware::from_fn` layer in `App::after_routes`,
     gated by `ORGANIZATION_REQUIRE_AUTH` (lenient bool, **default off**).
-    Public paths (`/_health`, `/_ping`, `/api-docs/openapi.json`,
+    Public paths (`/_health/live`, `/_health/ready`, `/_health/startup`, `/api-docs/openapi.json`,
     `/swagger-ui*`) stay open; everything else needs a valid bearer token
     when the flag is on. Off by default keeps current behaviour and the
     existing DB-gated tests green. Family contract:

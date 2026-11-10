@@ -90,7 +90,7 @@ fn linked_env_kind(edge_id: Uuid, from: &str, to: &str, edge_kind: &str) -> Enve
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test reconcile -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test reconcile -- --ignored`"]
 async fn reconcile_adds_missing_and_removes_extra() {
     request::<App, _, _>(|request, ctx| async move {
         // Read-model starts with edge A (case:1 → person:2).
@@ -132,7 +132,7 @@ async fn reconcile_adds_missing_and_removes_extra() {
 /// deleted every person edge (the graph never converged).
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test reconcile -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test reconcile -- --ignored`"]
 async fn reconcile_is_scoped_to_the_source_entity() {
     request::<App, _, _>(|request, ctx| async move {
         // Read-model holds a case edge AND a person (same_identity) edge.
@@ -186,7 +186,7 @@ async fn reconcile_is_scoped_to_the_source_entity() {
 /// single unlabeled gauge could not distinguish.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test reconcile -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test reconcile -- --ignored`"]
 async fn reconciliation_divergence_gauge_is_independent_per_entity() {
     use link_graph_service::metrics::Metrics;
 
@@ -231,7 +231,7 @@ async fn reconciliation_divergence_gauge_is_independent_per_entity() {
 /// to "never run".
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test reconcile -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test reconcile -- --ignored`"]
 async fn reconciliation_last_success_gauge_is_unchanged_by_a_failed_pass() {
     use link_graph_service::metrics::Metrics;
 

@@ -36,7 +36,7 @@ everywhere).
 
 | Control | Default | Consequence |
 |---|---|---|
-| `<E>_REQUIRE_AUTH` | **off** | `/api/*` (and `/fhir/*` where mounted) are open to any caller; only `/_health`, `/_ping`, the docs, and `/metrics.prom` are *meant* to be public — with the flag off, everything is |
+| `<E>_REQUIRE_AUTH` | **off** | `/api/*` (and `/fhir/*` where mounted) are open to any caller; only `/_health/live`, `/_health/ready`, `/_health/startup`, the docs, and `/metrics.prom` are *meant* to be public — with the flag off, everything is |
 | ABAC policy | the built-in default | applies only once `<E>_REQUIRE_AUTH` is on; until then it is inert |
 | `<E>_PASETO_KEYS_URL` | unset | the peer falls back to a static `<E>_PASETO_KEYS` env value, or (if that's unset too) trusts no token at all — every request is then unauthenticated regardless of `REQUIRE_AUTH` |
 | `<E>_EVENT_TRANSPORT` | `memory` | events are lost on restart; no durable outbox |
@@ -55,7 +55,7 @@ everywhere).
    policy configured does not fail loud — it just uses the default.
 2. **`<E>_REQUIRE_AUTH=1`.** Second, not first: turning this on with no
    PASETO key source configured (step 3) makes every request 401,
-   including your own health checks against `/api/*` — `/_health` stays
+   including your own health checks against `/api/*` — `/_health/live` stays
    exempt, everything else does not.
 3. **A PASETO key source** — `<E>_PASETO_KEYS_URL` pointed at
    authentication-service's `/.well-known/paseto-keys` (preferred; the
@@ -98,7 +98,7 @@ how long you wait, unless you confirmed hot-reload applies.
 |---|---|---|---|
 | Gate off (baseline) | `curl -s -o /dev/null -w '%{http_code}' http://<host>/api/<plural>` | `200` (open) | — |
 | Gate on | same command, no `Authorization` header | — | `401` |
-| Health stays public | `curl -s -o /dev/null -w '%{http_code}' http://<host>/_health` | `200` | `200` — unchanged either way |
+| Health stays public | `curl -s -o /dev/null -w '%{http_code}' http://<host>/_health/live` | `200` | `200` — unchanged either way |
 | Metrics stays public | `curl -s -o /dev/null -w '%{http_code}' http://<host>/metrics.prom` | `200` | `200` — unchanged either way |
 | A valid token is accepted | `curl -H "Authorization: Bearer <token>" http://<host>/api/<plural>/whoami` | `401` (no token concept without the gate meaning anything) | verified claims body, not `401`/`403` |
 | ABAC policy loaded, not the default | attempt a mutating call with a token carrying only `access=write` against a rule your policy denies but the *default* policy would allow (or vice versa) | — | the response matches **your** policy's decision, not the built-in default's |
@@ -108,7 +108,7 @@ The auth + gate checks above were run against a real container for
 `project-portfolio-management-service` while writing this runbook (not
 merely read from source): `GET /api/plans` returned `200` with the gate
 off and no token, then `401` with `PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH=1`
-set and no token, while `/_health` and `/metrics.prom` stayed `200` in
+set and no token, while `/_health/live` and `/metrics.prom` stayed `200` in
 both cases — exactly as the table above states.
 
 ## What "verified against a fresh container" found

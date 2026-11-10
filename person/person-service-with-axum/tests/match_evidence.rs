@@ -6,7 +6,7 @@
 //! and `check-duplicates` / the create-time `409` carry evidence.
 //!
 //! `#[ignore]`d — run with
-//! `DATABASE_URL=… cargo test --test match_evidence -- --ignored`.
+//! `DB_URL=… cargo test --test match_evidence -- --ignored`.
 
 mod common;
 
@@ -139,7 +139,7 @@ async fn scan_item(app: &axum::Router, a: Uuid, b: Uuid, threshold: f64, auto: f
 /// auto-merge score, and still stay `pending`: that is what twins look
 /// like. The evidence is stored and comes back from the list endpoint.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_name_and_birth_date_pair_above_the_auto_merge_score_stays_pending() {
     let state = common::create_test_app_state().await;
     let app = common::create_test_router().await;
@@ -199,7 +199,7 @@ async fn a_name_and_birth_date_pair_above_the_auto_merge_score_stays_pending() {
 /// The registry refuses two persons one `(system, value)` identifier, so
 /// the tax id is how two stored records can share one.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_pair_sharing_a_unique_identifier_is_automerged_and_proven() {
     let state = common::create_test_app_state().await;
     let app = common::create_test_router().await;
@@ -221,7 +221,7 @@ async fn a_pair_sharing_a_unique_identifier_is_automerged_and_proven() {
 /// Two different NHS numbers contradict: the pair stays `pending` even at
 /// a score above the request's auto-merge threshold.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn a_pair_with_conflicting_identifiers_stays_pending_and_contradicted() {
     let state = common::create_test_app_state().await;
     let app = common::create_test_router().await;
@@ -251,7 +251,7 @@ async fn a_pair_with_conflicting_identifiers_stays_pending_and_contradicted() {
 /// `check-duplicates` and the create-time `409` carry evidence for every
 /// candidate, with no field value in it.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn check_duplicates_and_the_409_carry_evidence() {
     let app = common::create_test_router().await;
     let family = run_family();
@@ -289,7 +289,7 @@ async fn check_duplicates_and_the_409_carry_evidence() {
 /// the population floor: a table only from `MIN_FREQUENCY_POPULATION`
 /// records up, and then it knows a freshly stored family name.
 #[tokio::test]
-#[ignore = "requires a running PostgreSQL via DATABASE_URL"]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
 async fn the_frequency_scan_counts_the_stored_population() {
     use person_matcher::evidence::{ValueFrequencies, frequency_key};
     use person_service::matching::evidence::{MIN_FREQUENCY_POPULATION, scan_frequencies};

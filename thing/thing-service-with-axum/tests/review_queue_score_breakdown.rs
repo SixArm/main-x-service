@@ -10,7 +10,7 @@
 //! read it.
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test review_queue_score_breakdown -- --ignored`.
+//! `DB_URL=… cargo test --test review_queue_score_breakdown -- --ignored`.
 
 use axa_test::TestApp;
 use axum::body::Body;
@@ -30,7 +30,7 @@ async fn test_router() -> axum::Router {
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router")
 }
@@ -88,7 +88,7 @@ fn is_pair(item: &Value, a: &str, b: &str) -> bool {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test review_queue_score_breakdown -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test review_queue_score_breakdown -- --ignored"]
 async fn deduplicate_persists_and_review_queue_returns_the_score_breakdown() {
     let app = test_router().await;
 

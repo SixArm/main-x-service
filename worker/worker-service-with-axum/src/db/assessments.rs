@@ -548,11 +548,11 @@ mod tests {
     /// statement hashed a value that had itself already round-tripped
     /// once.
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL to a migrated Postgres"]
+    #[ignore = "requires DB_URL to a migrated Postgres"]
     async fn stored_row_hash_survives_a_jsonb_round_trip() {
         use crate::compliance::record_integrity::{assessment_hash, verify_assessments};
 
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL");
         let db = sqlx::PgPool::connect(&url).await.expect("connect");
         let worker_id = Uuid::new_v4();
 
@@ -627,15 +627,15 @@ mod tests {
         );
     }
 
-    /// DB-gated round-trip against a real Postgres (set `DATABASE_URL`):
+    /// DB-gated round-trip against a real Postgres (set `DB_URL`):
     /// insert → the worker-scoped list and find return it → an update
     /// applies the scoring and clears a field → a find scoped to a
     /// *different* worker misses → soft-delete removes it from the live
     /// set.
     #[tokio::test]
-    #[ignore = "requires DATABASE_URL to a migrated Postgres"]
+    #[ignore = "requires DB_URL to a migrated Postgres"]
     async fn round_trip_insert_find_update_delete() {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+        let url = std::env::var("DB_URL").expect("DB_URL");
         let db = sqlx::PgPool::connect(&url).await.expect("connect");
         let worker_id = Uuid::new_v4();
 

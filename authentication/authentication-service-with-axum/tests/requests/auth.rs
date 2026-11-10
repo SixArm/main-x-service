@@ -8,7 +8,7 @@
 //! - `GET  /.well-known/jwks.json`      — public keys
 //!
 //! The HTTP tests boot the axa app and therefore need the PostgreSQL
-//! instance from `config/test.yaml` (DATABASE_URL overridable). They
+//! instance from `config/test.yaml` (DB_URL overridable). They
 //! are `#[ignore]`d so a checkout without Postgres keeps `cargo test`
 //! green; run them with:
 //!

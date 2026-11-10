@@ -359,7 +359,7 @@ fixed here. Repo `tasks.md` carries the same IDs.
   file; the (git-ignored) file is deleted, and the edition spec's
   "Config" line now describes the environment and `src/app.rs`
   defaults. The tests' `#[ignore]` reasons and doc comments that named
-  `config/test.yaml` now name `DATABASE_URL`.
+  `config/test.yaml` now name `DB_URL`.
 - [x] PF-D1 **Stale counts and ignores.** README: 75 unit tests (was
   64), 12 DB tests. `deny.toml`: all 12 advisory ignores were
   `advisory-not-detected` on the axa + sqlx tree and are removed

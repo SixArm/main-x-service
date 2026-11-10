@@ -70,8 +70,8 @@ and treats every request as the current version.
 # 1) Create the database (boot-time dependency only)
 createdb case_folder_development
 
-# 2) Set DATABASE_URL (or accept the default)
-export DATABASE_URL=postgres://postgres:postgres@localhost:5432/case_folder_development
+# 2) Set DB_URL (or accept the default)
+export DB_URL=postgres://postgres:postgres@localhost:5432/case_folder_development
 
 # 3) Point at your external services (defaults shown)
 export MAIN_PATIENT_SERVICE_BASE_URL=http://localhost:5151
@@ -163,7 +163,7 @@ cargo run -- task seed         # populate demo records across all services
 
 # Tests (use stub clients — no real services needed)
 cargo test                     # 23 unit tests; the 50 request tests report as ignored
-DATABASE_URL=postgres://postgres@localhost:5432/case_folder_test \
+DB_URL=postgres://postgres@localhost:5432/case_folder_test \
   cargo test -- --ignored      # the 50 request tests
 ```
 

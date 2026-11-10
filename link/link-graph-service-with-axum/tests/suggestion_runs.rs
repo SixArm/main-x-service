@@ -16,7 +16,7 @@ use serial_test::serial;
 
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test suggestion_runs -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test suggestion_runs -- --ignored`"]
 async fn record_durably_persists_one_row_per_completed_pass() {
     request::<App, _, _>(|_request, ctx| async move {
         let started_at = Utc::now().fixed_offset();

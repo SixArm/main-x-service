@@ -67,7 +67,7 @@ successfully before it starts).
 Don't take "started" on faith — check it.
 
 ```sh
-curl http://localhost:8089/_health
+curl http://localhost:8089/_health/live
 ```
 
 ```json

@@ -12,7 +12,7 @@ governmental health system. Stakeholders span the trio:
 | Clinicians (consumers) | Find the canonical pathway for a condition / care setting via downstream catalogues that resolve against this registry | Service read API (via integrators) |
 | Integrators (EHR, CDS, pathway-execution platforms) | Stable REST surface; linkage via deterministic identifiers to FHIR `PlanDefinition` / BPM+ Health artefacts | Service `/api/*` |
 | Auditors / information-governance officers | Who changed what, when; explainable match decisions; compliance evidence | Soft-delete timestamps today; audit endpoints on the roadmap (§15) |
-| Operations / DBA / SRE | Schema + migration discipline, backups, health checks, scaling | Service deployment artefacts, `/_health` |
+| Operations / DBA / SRE | Schema + migration discipline, backups, health checks, scaling | Service deployment artefacts, `/_health/live`, `/_health/ready`, `/_health/startup` |
 | Developers / AI agents | Clear SDD contracts; which spec governs what | This spec + the three crate specs |
 | Other Main X Index entities | Cross-references via `pid`; provider organisations resolve in the [organization entity](../../organization/) | Service REST API |
 

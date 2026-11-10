@@ -6,7 +6,7 @@ Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 |---|---|
 | REST (axa controllers on Axum) | endpoints under `/api/courses/*` + `/api/courses/{id}/instances/*` + `/api/audit/*` + `/api/records/verify` + `/api/audit/verify` + `/api/health` + `/api/whoami`, registered as an axa `Routes` table with prefix `/api`; version-negotiated via `Accepts-version` (T-25, [`api-versioning.md`](../../../agents/share/api-versioning.md)) |
 | FHIR (deliberately non-standard) | `/fhir/Basic{,/{id}}` + `/fhir/metadata` (T-20) — no FHIR R5 resource models a course, so this wraps the course DTO as a `Basic` resource; see [`agents/restful.md`](../agents/restful.md) §FHIR and [`fhir.md`](../../../agents/share/fhir.md) §3 |
-| Ops (axa built-ins) | `GET /_health` (DB + queue readiness) and `GET /_ping` (liveness), from axa's default routes — for orchestration probes, outside `/api` |
+| Ops (axa built-ins) | `GET /_health/live` (liveness), `GET /_health/ready` (DB + queue readiness) and `GET /_health/startup`, from axa's default routes — for orchestration probes, outside `/api` |
 | gRPC | Out of scope entirely — no `tonic`/`prost` dependency, not even a stub (§2.2). |
 | Docs | Swagger UI at `/swagger-ui`, raw OpenAPI 3 JSON at `/api-docs/openapi.json` (utoipa). |
 | Metrics | `GET /metrics.prom` — Prometheus text-exposition format (`text/plain; version=0.0.4`), mounted at the application **root** (not under `/api`), public (no bearer token needed). Counters: `course_created_total`, `course_updated_total`, `course_deleted_total`, `course_merged_total`, plus a labelled `http_requests_total{path,status}`. |
@@ -30,7 +30,7 @@ empty `q` for the same effect).
 
 `GET /api/health` is the service's own health
 endpoint (kept for front-end and API-client parity); the axa
-`/_health` / `/_ping` pair serves container orchestration.
+`/_health/live`, `/_health/ready`, `/_health/startup` pair serves container orchestration.
 
 ### 9.2 Bulk import / export
 

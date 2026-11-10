@@ -48,7 +48,7 @@ Blanket enforcement is implemented **default-off**: when
 `EVENT_REQUIRE_AUTH` is truthy (`1`/`true`/`yes`/`on`,
 case-insensitive), every `/api/*` **and** `/fhir/*` route requires a
 valid bearer token except the public `/api/health` and
-`GET /fhir/metadata`. Root-level `/_health`, `/_ping`,
+`GET /fhir/metadata`. Root-level `/_health/live`, `/_health/ready`, `/_health/startup`,
 `/api-docs/openapi.json`, `/swagger-ui*`, and `/metrics.prom` sit
 outside the enforced scope and stay public. The flag is read once at
 construction — restart to change. Family contract:

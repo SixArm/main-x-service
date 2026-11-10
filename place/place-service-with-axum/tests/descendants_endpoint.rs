@@ -3,7 +3,7 @@
 //! cursor (spec §13 T-2).
 //!
 //! `#[ignore]`d — run explicitly with
-//! `DATABASE_URL=… cargo test --test descendants_endpoint -- --ignored`.
+//! `DB_URL=… cargo test --test descendants_endpoint -- --ignored`.
 
 use axa_test::TestApp;
 use axum::body::Body;
@@ -21,7 +21,7 @@ async fn setup() -> (axum::Router, PgPlaceRepository) {
     std::fs::create_dir_all(&config.search.index_path).expect("create search index dir");
     let app = App::boot_test()
         .await
-        .expect("boot the app: set DATABASE_URL to a running PostgreSQL")
+        .expect("boot the app: set DB_URL to a running PostgreSQL")
         .router
         .expect("boot_test builds the router");
     let db = create_connection(&config.database)
@@ -70,7 +70,7 @@ async fn walk(app: &axum::Router, uri: &str) -> (StatusCode, Vec<Uuid>) {
 }
 
 #[tokio::test]
-#[ignore = "requires PostgreSQL; run with DATABASE_URL=… cargo test --test descendants_endpoint -- --ignored"]
+#[ignore = "requires PostgreSQL; run with DB_URL=… cargo test --test descendants_endpoint -- --ignored"]
 async fn every_level_below_a_place_is_listed_and_nothing_else() {
     let (app, repo) = setup().await;
 

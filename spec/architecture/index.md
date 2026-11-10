@@ -77,7 +77,7 @@ under the hood). Characteristics:
   request. See `organization/organization-service-with-axum/src/app.rs`.
 - Endpoints are **axa controllers** (`src/controllers/*.rs`) registered
   via `AppRoutes::with_default_routes().add_route(...)`. axa supplies
-  default `/_health` and `/_ping`.
+  default `/_health/live`, `/_health/ready`, `/_health/startup`.
 - Migrations are `sea-orm-migration` migrations under `migration/`.
 - Persistence is **DTO-as-JSONB**: the matcher's domain type *is* the
   API DTO, stored verbatim in a `data` JSONB column alongside denormalised

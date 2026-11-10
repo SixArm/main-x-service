@@ -9,6 +9,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — axa 0.11
+
+- `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before
+  the new binary goes out**: the database is `DB_URL`, not `DATABASE_URL`
+  (production refuses to boot without it), and the test suites read `DB_URL`
+  too. `HTTP_CSP`, `BODY_LIMIT_BYTES` and `HEADER_READ_TIMEOUT_SECONDS` are now
+  `HTTP_CONTENT_SECURITY_POLICY`, `HTTP_REQUEST_BODY_LIMIT_BYTE_COUNT` and
+  `HTTP_REQUEST_HEADER_READ_TIMEOUT_SECONDS`, and `LOCO_ENV` is not read.
+- The health routes are `/_health/live`, `/_health/ready` and
+  `/_health/startup`; `/_ping`, `/_health` and `/_readiness` answer `404`. The
+  auth guard's public allow-list moved with them, and now also leaves
+  readiness and startup public, so a probe needs no token.
+- A database that cannot serve answers `503` with `Retry-After: 5`, not `500`.
+  Responses carry `cross-origin-opener-policy`, `cross-origin-resource-policy`
+  and `permissions-policy`, and a response that sets a cookie is `no-store`.
+
 ### Changed — axa 0.10
 
 - `axa` 0.9 → 0.10. Its `testing` feature is gone: the test helpers come from

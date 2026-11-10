@@ -123,7 +123,7 @@ impl App {
     }
 
     /// Register the controller route trees on top of axa's defaults
-    /// (`/_health`, `/_ping`): the bulk import/export routes (BLK-5), the
+    /// (`/_health/live`, `/_health/ready`, `/_health/startup`): the bulk import/export routes (BLK-5), the
     /// organization CRUD/match/audit routes, the OpenAPI/Swagger docs
     /// routes, and the Prometheus metrics route (`/metrics.prom`,
     /// mounted at root like the docs).

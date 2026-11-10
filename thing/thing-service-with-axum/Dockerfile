@@ -97,7 +97,7 @@ USER thing
 EXPOSE 8080
 
 # This crate mounts an explicit /api/health route (unlike the
-# controller-style crates, which rely on /_health) — see
+# controller-style crates, which rely on /_health/live) — see
 # src/api/rest/handlers.rs. NOTE: Podman's default OCI image format
 # silently drops HEALTHCHECK ("HEALTHCHECK is not supported for OCI
 # image format and will be ignored" — build with `--format docker` to

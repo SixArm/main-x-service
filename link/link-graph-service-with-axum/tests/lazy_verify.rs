@@ -60,7 +60,7 @@ fn status_count(body: &Value) -> usize {
 /// Both endpoints resolve alive ⇒ the unverified edge settles to verified.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test lazy_verify -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test lazy_verify -- --ignored`"]
 async fn alive_endpoints_settle_the_edge_to_verified() {
     request::<App, _, _>(|request, ctx| async move {
         let (person, org) = (format!("person:{}", u(1)), format!("organization:{}", u(2)));
@@ -95,7 +95,7 @@ async fn alive_endpoints_settle_the_edge_to_verified() {
 /// An endpoint resolved absent (404 at the source) dangles the edge.
 #[tokio::test]
 #[serial]
-#[ignore = "requires PostgreSQL (DATABASE_URL); run with `cargo test --test lazy_verify -- --ignored`"]
+#[ignore = "requires PostgreSQL (DB_URL); run with `cargo test --test lazy_verify -- --ignored`"]
 async fn an_absent_endpoint_dangles_the_edge() {
     request::<App, _, _>(|request, ctx| async move {
         let (person, org) = (format!("person:{}", u(1)), format!("organization:{}", u(2)));

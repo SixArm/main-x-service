@@ -57,7 +57,7 @@ scripts/test-db.sh up person/person-service-with-axum
  Container mxi-person-test-db Started
 test-db: waiting for mxi-person-test-db...
 test-db: mxi-person-test-db ready
-  DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test
+  DB_URL=postgres://loco:loco@localhost:5432/person_service_test
 ```
 
 person-service's own [`README.md`](../person/person-service-with-axum/README.md)
@@ -75,13 +75,13 @@ what actually works, so that's what this tutorial uses throughout
 (`cargo run -- <subcommand>` for everything — `start`, `db migrate`,
 `task ...`).
 
-Point `DATABASE_URL` at the test Postgres and apply migrations
+Point `DB_URL` at the test Postgres and apply migrations
 (`development.yaml`'s `auto_migrate` would also do this on `start`, but
 running it explicitly first makes the empty-database state visible):
 
 ```sh
 cd person/person-service-with-axum
-export DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test
+export DB_URL=postgres://loco:loco@localhost:5432/person_service_test
 cargo run -- db migrate
 ```
 
@@ -125,7 +125,7 @@ curl -s http://localhost:5150/api/health
 
 ```sh
 cd person/person-service-with-axum   # if not already there
-DATABASE_URL=postgres://loco:loco@localhost:5432/person_service_test \
+DB_URL=postgres://loco:loco@localhost:5432/person_service_test \
   cargo run -- task seed_examples
 ```
 

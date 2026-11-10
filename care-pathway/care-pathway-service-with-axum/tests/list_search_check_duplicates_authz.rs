@@ -14,7 +14,7 @@
 //! Its **own test binary**, same reason as `tests/masking.rs`:
 //! `require_auth`/`policy`/`verifier` are process-wide `OnceLock`s.
 //! `#[ignore]`d — boots the app, so it needs PostgreSQL via
-//! `config/test.yaml` / `DATABASE_URL`. Run with
+//! `config/test.yaml` / `DB_URL`. Run with
 //! `cargo test --test list_search_check_duplicates_authz -- --ignored`.
 
 #![cfg(feature = "paseto")]

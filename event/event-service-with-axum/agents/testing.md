@@ -3,7 +3,7 @@
 Three layers:
 
 - **Unit tests** in `#[cfg(test)] mod tests { ... }` at the bottom of source files. No external dependencies.
-- **Integration tests** in `tests/` against a real PostgreSQL via `DATABASE_URL`.
+- **Integration tests** in `tests/` against a real PostgreSQL via `DB_URL`.
 - **Benchmarks** in `benches/` using Criterion.
 
 ## Unit tests
@@ -30,7 +30,7 @@ for the live count):
 ## Integration tests
 
 ```bash
-DATABASE_URL=postgres://… cargo test --test api_integration_test
+DB_URL=postgres://… cargo test --test api_integration_test
 ```
 
 Or against the containerised Postgres (Podman):

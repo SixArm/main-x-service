@@ -196,7 +196,7 @@ podman build -f link/link-graph-service-with-axum/Dockerfile \
 ```
 
 Verified end-to-end (2026-08-03): builds clean, boots against a real
-Postgres, and `GET /_health` returns `200`. See `.containerignore` at
+Postgres, and `GET /_health/live` returns `200`. See `.containerignore` at
 the repository root (excludes every crate's `target/`, or the build
 context would try to copy hundreds of GB of build artifacts). The wired
 multi-service `examples/compose/` stacks (DEP-1) that build on this are

@@ -25,7 +25,7 @@
 # they compile in release mode):
 #   podman compose -f examples/compose/full-family.yml build
 #   podman compose -f examples/compose/full-family.yml up -d
-#   curl http://localhost:8089/_health   # case-service, for example
+#   curl http://localhost:8089/_health/live   # case-service, for example
 #   podman compose -f examples/compose/full-family.yml down -v
 #
 # NOTE: run `build` and `up` as two separate steps, not `up -d --build`
@@ -81,7 +81,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/person
+      DB_URL: postgresql://loco:loco@postgres:5432/person
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -103,7 +103,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/person
+      DB_URL: postgresql://loco:loco@postgres:5432/person
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8081:8080"]
@@ -126,7 +126,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/worker
+      DB_URL: postgresql://loco:loco@postgres:5432/worker
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -142,7 +142,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/worker
+      DB_URL: postgresql://loco:loco@postgres:5432/worker
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8082:8080"]
@@ -165,7 +165,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/place
+      DB_URL: postgresql://loco:loco@postgres:5432/place
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -181,7 +181,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/place
+      DB_URL: postgresql://loco:loco@postgres:5432/place
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8083:8080"]
@@ -204,7 +204,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/thing
+      DB_URL: postgresql://loco:loco@postgres:5432/thing
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -220,7 +220,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/thing
+      DB_URL: postgresql://loco:loco@postgres:5432/thing
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8084:8080"]
@@ -243,7 +243,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/event
+      DB_URL: postgresql://loco:loco@postgres:5432/event
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -259,7 +259,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/event
+      DB_URL: postgresql://loco:loco@postgres:5432/event
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8085:8080"]
@@ -282,7 +282,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/course
+      DB_URL: postgresql://loco:loco@postgres:5432/course
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -298,7 +298,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/course
+      DB_URL: postgresql://loco:loco@postgres:5432/course
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8086:8080"]
@@ -321,7 +321,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/organization
+      DB_URL: postgresql://loco:loco@postgres:5432/organization
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -337,7 +337,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/organization
+      DB_URL: postgresql://loco:loco@postgres:5432/organization
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8087:5150"]
@@ -345,7 +345,7 @@ services:
       organization-migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health/live"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -360,7 +360,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/care_pathway
+      DB_URL: postgresql://loco:loco@postgres:5432/care_pathway
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -376,7 +376,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/care_pathway
+      DB_URL: postgresql://loco:loco@postgres:5432/care_pathway
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8088:5150"]
@@ -384,7 +384,7 @@ services:
       care-pathway-migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health/live"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -399,7 +399,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/case
+      DB_URL: postgresql://loco:loco@postgres:5432/case
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -415,7 +415,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/case
+      DB_URL: postgresql://loco:loco@postgres:5432/case
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8089:5150"]
@@ -423,7 +423,7 @@ services:
       case-migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health/live"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -438,7 +438,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication
+      DB_URL: postgresql://loco:loco@postgres:5432/authentication
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
       # SEC-A1 fail-closed: APP_ENV=production (baked into the image)
@@ -462,7 +462,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/authentication
+      DB_URL: postgresql://loco:loco@postgres:5432/authentication
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
       TOKEN_PRIVATE_KEY_SEED: ${TOKEN_PRIVATE_KEY_SEED:-dv-Nv3h-Q3THpU3sgs5VvzwuWe4MbHy7uEjNjNLGEws}
@@ -471,7 +471,7 @@ services:
       authentication-migrate:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health"]
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5150/_health/live"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -491,7 +491,7 @@ services:
     command: ["/app/link-graph-service", "start", "--server-and-worker"]
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://loco:loco@postgres:5432/link_graph
+      DB_URL: postgresql://loco:loco@postgres:5432/link_graph
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
       RUST_LOG: ${RUST_LOG:-info}
@@ -500,7 +500,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5160/_health"]
+      test: ["CMD", "curl", "--silent", "--fail", "http://localhost:5160/_health/live"]
       interval: 30s
       timeout: 3s
       retries: 3
