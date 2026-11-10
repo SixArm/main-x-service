@@ -1450,7 +1450,10 @@ impl MatchingEngine {
         // Gender is permissive: it only ever vetoes a match when BOTH sides
         // record a gender and they disagree. A missing gender on either side
         // yields `true` so sparse records still match on name + DOB alone.
-        let gender_match = match (person1.gender, person2.gender) {
+        let gender_match = match (
+            recorded_gender(person1.gender),
+            recorded_gender(person2.gender),
+        ) {
             (Some(g1), Some(g2)) => g1 == g2,
             _ => true,
         };
@@ -2043,7 +2046,10 @@ impl MatchingEngine {
     /// Score gender as `1.0` for an exact match and `0.0` otherwise, or
     /// `None` if either side is missing.
     fn score_gender(&self, person1: &Person, person2: &Person) -> Option<f64> {
-        match (person1.gender, person2.gender) {
+        match (
+            recorded_gender(person1.gender),
+            recorded_gender(person2.gender),
+        ) {
             (Some(g1), Some(g2)) => Some(if g1 == g2 { 1.0 } else { 0.0 }),
             _ => None,
         }
@@ -2438,6 +2444,15 @@ fn score_dob_pair(dob1: NaiveDate, dob2: NaiveDate) -> f64 {
     0.0
 }
 
+/// A recorded gender, or `None` for one that is absent or
+/// [`Gender::Unknown`]. `Unknown` means no gender was recorded, so two
+/// `Unknown`s are not an agreement and `Unknown` against `Male` is not a
+/// disagreement: missing data is neither (`agents/share/match-evidence.md`
+/// §1).
+fn recorded_gender(gender: Option<crate::models::Gender>) -> Option<crate::models::Gender> {
+    gender.filter(|g| *g != crate::models::Gender::Unknown)
+}
+
 #[cfg(test)]
 mod tests {
     //! Unit tests for the matching engine.
@@ -2754,6 +2769,42 @@ mod tests {
         assert!(
             result.is_match,
             "strong name+DOB match should still clear the default 0.85 threshold"
+        );
+    }
+
+    // ---------- unknown gender ----------
+
+    /// `Gender::Unknown` means no gender was recorded, so it scores as
+    /// missing: two `Unknown`s are not an agreement, and `Unknown` against
+    /// `Male` is not a disagreement that vetoes the name + birth date rule.
+    #[test]
+    fn unknown_gender_is_missing_data() {
+        let with = |g: Gender| {
+            Person::builder()
+                .given_name("Avery")
+                .family_name("Quinlan")
+                .date_of_birth(dob(1984, 2, 29))
+                .gender(g)
+                .build()
+        };
+        let engine = MatchingEngine::default_config();
+        let both_unknown = engine.match_persons(&with(Gender::Unknown), &with(Gender::Unknown));
+        assert_eq!(both_unknown.breakdown.gender_score, None);
+        let one_unknown = engine.match_persons(&with(Gender::Unknown), &with(Gender::Male));
+        assert_eq!(one_unknown.breakdown.gender_score, None);
+        assert!(
+            one_unknown.is_match,
+            "Unknown does not veto name + birth date"
+        );
+        let recorded = engine.match_persons(&with(Gender::Male), &with(Gender::Female));
+        assert_eq!(recorded.breakdown.gender_score, Some(0.0));
+        assert!(
+            both_unknown.evidence.weight_bits
+                < engine
+                    .match_persons(&with(Gender::Male), &with(Gender::Male))
+                    .evidence
+                    .weight_bits,
+            "two Unknowns prove less than two recorded, agreeing genders"
         );
     }
 

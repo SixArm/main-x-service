@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — gender `Unknown` is missing data
+
+- `Gender::Unknown` ("no gender recorded") scored as a value: two
+  `Unknown`s agreed, adding the gender component's agreement bits, and
+  `Unknown` against `Male` disagreed, which also vetoed the name + date
+  of birth + gender short-circuit. It now scores as missing (`None`, no
+  bits) in both places, as `agents/share/match-evidence.md` §1 requires.
+
 ### Changed
 
 - MSRV raised 1.96 → 1.97 (current stable 1.99 minus two; `ci/msrv.txt`).

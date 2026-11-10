@@ -1151,7 +1151,10 @@ impl MatchingEngine {
             _ => false,
         };
 
-        let gender_match = match (worker1.gender, worker2.gender) {
+        let gender_match = match (
+            recorded_gender(worker1.gender),
+            recorded_gender(worker2.gender),
+        ) {
             (Some(g1), Some(g2)) => g1 == g2,
             _ => true,
         };
@@ -1720,7 +1723,10 @@ impl MatchingEngine {
     }
 
     fn score_gender(worker1: &Worker, worker2: &Worker) -> Option<f64> {
-        match (worker1.gender, worker2.gender) {
+        match (
+            recorded_gender(worker1.gender),
+            recorded_gender(worker2.gender),
+        ) {
             (Some(g1), Some(g2)) => Some(if g1 == g2 { 1.0 } else { 0.0 }),
             _ => None,
         }
@@ -2144,6 +2150,15 @@ fn score_dob_pair(dob1: NaiveDate, dob2: NaiveDate) -> f64 {
         return 0.5;
     }
     0.0
+}
+
+/// A recorded gender, or `None` for one that is absent or
+/// [`Gender::Unknown`]. `Unknown` means no gender was recorded, so two
+/// `Unknown`s are not an agreement and `Unknown` against `Male` is not a
+/// disagreement: missing data is neither (`agents/share/match-evidence.md`
+/// §1).
+fn recorded_gender(gender: Option<crate::models::Gender>) -> Option<crate::models::Gender> {
+    gender.filter(|g| *g != crate::models::Gender::Unknown)
 }
 
 #[cfg(test)]
@@ -3550,5 +3565,41 @@ mod tests {
         assert_eq!(plain.evidence, none.evidence);
         assert!((plain.score - none.score).abs() < f64::EPSILON);
         assert_eq!(plain.is_match, none.is_match);
+    }
+
+    // ---------- unknown gender ----------
+
+    /// `Gender::Unknown` means no gender was recorded, so it scores as
+    /// missing: two `Unknown`s are not an agreement, and `Unknown` against
+    /// `Male` is not a disagreement that vetoes the name + birth date rule.
+    #[test]
+    fn unknown_gender_is_missing_data() {
+        let with = |g: Gender| {
+            Worker::builder()
+                .given_name("Avery")
+                .family_name("Quinlan")
+                .date_of_birth(dob(1984, 2, 29))
+                .gender(g)
+                .build()
+        };
+        let engine = MatchingEngine::default_config();
+        let both_unknown = engine.match_workers(&with(Gender::Unknown), &with(Gender::Unknown));
+        assert_eq!(both_unknown.breakdown.gender_score, None);
+        let one_unknown = engine.match_workers(&with(Gender::Unknown), &with(Gender::Male));
+        assert_eq!(one_unknown.breakdown.gender_score, None);
+        assert!(
+            one_unknown.is_match,
+            "Unknown does not veto name + birth date"
+        );
+        let recorded = engine.match_workers(&with(Gender::Male), &with(Gender::Female));
+        assert_eq!(recorded.breakdown.gender_score, Some(0.0));
+        assert!(
+            both_unknown.evidence.weight_bits
+                < engine
+                    .match_workers(&with(Gender::Male), &with(Gender::Male))
+                    .evidence
+                    .weight_bits,
+            "two Unknowns prove less than two recorded, agreeing genders"
+        );
     }
 }

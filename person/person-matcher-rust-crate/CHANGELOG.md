@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — gender `Unknown` is missing data
+
+- `Gender::Unknown` ("no gender recorded") scored as a value: two
+  `Unknown`s agreed, adding the gender component's agreement bits, and
+  `Unknown` against `Male` disagreed, which also vetoed the name + date
+  of birth + gender short-circuit. It now scores as missing (`None`, no
+  bits) in both places, as `agents/share/match-evidence.md` §1 requires.
+
 ### Added — correlated groups, value frequencies and per-term evidence (T-41)
 
 Per `agents/share/match-evidence.md` §6–§8 (spec §12.7):
