@@ -543,6 +543,18 @@ organization is not a data subject.
 
 ## 13. Tasks (live work queue)
 
+- [ ] **ORG-T6 (S, security) — Record-level reads on the FHIR surface.**
+  *(Found 2026-11-10 while closing ORG-T2.)* `GET /fhir/Organization/{id}`
+  and `GET /fhir/Organization?…` (`src/controllers/fhir.rs` `read`,
+  `search`) return records with no `authorize_record` decision, while
+  `GET /api/organizations/{pid}` and, since ORG-T2, the REST collection
+  reads take one. `agents/share/fhir.md` §8 requires a FHIR read to
+  reveal no more than the REST read. **Acceptance:** with
+  `ORGANIZATION_REQUIRE_AUTH` on, a denied record is a FHIR `404`
+  `OperationOutcome` on read and absent from a searchset `Bundle` (its
+  `total` counting only what is shown), and a `mask` obligation returns
+  the masked view; a DB test in `tests/visibility.rs` style proves both
+  and fails without the check.
 - [x] **ORG-RQ1 (S) — Page the review queue.** *(Done 2026-11-10.)*
   `GET /api/organizations/review-queue` returned at most 500 rows with
   no cursor, so a longer queue could not be read past its first page,
