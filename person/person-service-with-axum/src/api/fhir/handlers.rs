@@ -33,7 +33,11 @@ use uuid::Uuid;
 
 use super::{FhirOperationOutcome, FhirPerson, from_fhir_person, to_fhir_patient, to_fhir_person};
 use crate::api::rest::AppState;
-use crate::api::rest::auth::{MaybeAuthUser, audit_context_of};
+use crate::api::rest::auth::{
+    MaybeAuthUser, audit_context_of, authorize_record, person_resource_attrs, read_visibility,
+};
+use crate::api::rest::handlers::{ResultDisposition, search_result_disposition};
+use authentication_verifier::Action;
 
 /// Max search hits requested from the index when `_count` is unset.
 const DEFAULT_SEARCH_COUNT: usize = 10;
@@ -110,29 +114,62 @@ fn bad_id() -> Response {
 }
 
 /// `GET /fhir/Patient/{id}` — render a stored person as a FHIR `Patient`.
-pub async fn get_fhir_patient(State(state): State<AppState>, Path(id): Path<String>) -> Response {
-    read_resource(&state, &id, "Patient").await
+pub async fn get_fhir_patient(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    caller: MaybeAuthUser,
+) -> Response {
+    read_resource(&state, &caller, &id, "Patient").await
 }
 
 /// `GET /fhir/Person/{id}` — the demographic `Person` alias view.
 pub async fn get_fhir_person_alias(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    caller: MaybeAuthUser,
 ) -> Response {
-    read_resource(&state, &id, "Person").await
+    read_resource(&state, &caller, &id, "Person").await
 }
 
 /// Shared read: fetch by id and render as `resource_type` (`Patient` /
 /// `Person`), or an `OperationOutcome` (`400` bad id, `404` unknown,
 /// `500` repository error).
-async fn read_resource(state: &AppState, id: &str, resource_type: &str) -> Response {
+///
+/// The record-level decision is REST `GET /api/persons/{id}`'s
+/// (`agents/share/fhir.md` §8): with `PERSON_REQUIRE_AUTH` on, a denied
+/// read answers with the status REST answers (`403`, or `401` with no
+/// credential) as an `OperationOutcome`, and a `mask` obligation renders
+/// the masked person. With the flag off, [`authorize_record`] allows
+/// every read with no obligation, as before.
+async fn read_resource(
+    state: &AppState,
+    caller: &MaybeAuthUser,
+    id: &str,
+    resource_type: &str,
+) -> Response {
     let Some(id) = parse_id(id) else {
         return bad_id();
     };
     match state.person_repository.get_by_id(&id).await {
         Ok(Some(person)) => {
-            let resource = render(&person, resource_type);
-            fhir_json(StatusCode::OK, &resource)
+            match authorize_record(caller, Action::Read, &person_resource_attrs(&person)) {
+                Ok(obligations) => {
+                    let shown = if obligations.iter().any(|o| o == "mask") {
+                        crate::privacy::mask_person(&person)
+                    } else {
+                        person
+                    };
+                    fhir_json(StatusCode::OK, &render(&shown, resource_type))
+                }
+                Err((status, reason)) => {
+                    let code = if status == StatusCode::UNAUTHORIZED {
+                        "login"
+                    } else {
+                        "forbidden"
+                    };
+                    fhir_error(status, code, &reason)
+                }
+            }
         }
         Ok(None) => fhir_error(
             StatusCode::NOT_FOUND,
@@ -279,24 +316,34 @@ pub async fn delete_fhir_patient(
 pub async fn search_fhir_patients(
     State(state): State<AppState>,
     Query(params): Query<FhirSearchParams>,
+    caller: MaybeAuthUser,
 ) -> Response {
-    search_resource(&state, &params, "Patient").await
+    search_resource(&state, &caller, &params, "Patient").await
 }
 
 /// `GET /fhir/Person?<params>` — a `searchset` `Bundle` of `Person`s.
 pub async fn search_fhir_person_alias(
     State(state): State<AppState>,
     Query(params): Query<FhirSearchParams>,
+    caller: MaybeAuthUser,
 ) -> Response {
-    search_resource(&state, &params, "Person").await
+    search_resource(&state, &caller, &params, "Person").await
 }
 
 /// Shared search: run the free-text index over the first supplied
 /// name-ish criterion, render each hit as `resource_type`, and wrap in a
 /// `searchset` Bundle. An empty result is an empty Bundle, not a `404`.
 /// `400` only when no usable search parameter is supplied.
+///
+/// Each hit takes [`read_visibility`]'s decision through
+/// [`search_result_disposition`], as REST search does: a record the
+/// caller may not read is left out, and `total` counts only what is
+/// shown. A hit the caller sees masked is kept only when the query does
+/// not touch a value masking hides ([`query_touches_masked_value`]), or
+/// the hit itself would confirm that value.
 async fn search_resource(
     state: &AppState,
+    caller: &MaybeAuthUser,
     params: &FhirSearchParams,
     resource_type: &str,
 ) -> Response {
@@ -334,7 +381,19 @@ async fn search_resource(
         };
         match state.person_repository.get_by_id(&id).await {
             Ok(Some(person)) => {
-                let resource = render(&person, resource_type);
+                let visibility = read_visibility(caller, &person);
+                let shown = match search_result_disposition(visibility.as_deref(), false) {
+                    ResultDisposition::Omit => continue,
+                    ResultDisposition::Full => person,
+                    ResultDisposition::Masked => {
+                        let masked = crate::privacy::mask_person(&person);
+                        if query_touches_masked_value(query, &person, &masked) {
+                            continue;
+                        }
+                        masked
+                    }
+                };
+                let resource = render(&shown, resource_type);
                 entries.push(serde_json::json!({
                     "fullUrl": format!("{resource_type}/{id}"),
                     "resource": resource,
@@ -353,6 +412,43 @@ async fn search_resource(
         "entry": entries,
     });
     fhir_json(StatusCode::OK, &bundle)
+}
+
+/// Whether `query` touches a value that masking hides in `masked`: a
+/// search hit on such a value, even shown masked, would confirm the value
+/// the caller is not allowed to see. The index holds identifiers, so the
+/// hidden values are the identifier values [`crate::privacy::mask_person`]
+/// changed. Compared on letters and digits only, case-folded, so
+/// `123-45-6789` and `123456789` are one value; a query token of four or
+/// more characters contained in a hidden value counts.
+fn query_touches_masked_value(
+    query: &str,
+    original: &crate::models::Person,
+    masked: &crate::models::Person,
+) -> bool {
+    let fold = |s: &str| -> String {
+        s.chars()
+            .filter(char::is_ascii_alphanumeric)
+            .flat_map(char::to_lowercase)
+            .collect()
+    };
+    let hidden: Vec<String> = original
+        .identifiers
+        .iter()
+        .zip(&masked.identifiers)
+        .filter(|(o, m)| o.value != m.value)
+        .map(|(o, _)| fold(&o.value))
+        .filter(|v| !v.is_empty())
+        .collect();
+    if hidden.is_empty() {
+        return false;
+    }
+    let whole = fold(query);
+    std::iter::once(whole.as_str())
+        .chain(query.split(|c: char| !c.is_ascii_alphanumeric()))
+        .map(fold)
+        .filter(|t| t.chars().count() >= 4)
+        .any(|t| hidden.iter().any(|v| v.contains(&t)))
 }
 
 /// `GET /fhir/metadata` — the `CapabilityStatement` declaring exactly the
@@ -599,6 +695,28 @@ mod tests {
     }
 
     /// `render` picks the resource type by view string.
+    /// A query that touches a value masking hides is caught, in any
+    /// punctuation; one that touches only shown data is not.
+    #[test]
+    fn query_touching_a_masked_identifier_is_caught() {
+        let mut person = sample_person();
+        person
+            .identifiers
+            .push(crate::models::Identifier::ssn("551-23-4567".to_string()));
+        let masked = crate::privacy::mask_person(&person);
+        assert!(query_touches_masked_value("551234567", &person, &masked));
+        assert!(query_touches_masked_value("551-23-4567", &person, &masked));
+        assert!(query_touches_masked_value("SSN 5512", &person, &masked));
+        assert!(!query_touches_masked_value(
+            &person.name.family,
+            &person,
+            &masked
+        ));
+        assert!(!query_touches_masked_value("456", &person, &masked));
+        // Nothing hidden: nothing to touch.
+        assert!(!query_touches_masked_value("551234567", &person, &person));
+    }
+
     #[test]
     fn test_render_selects_resource_type() {
         let person = sample_person();

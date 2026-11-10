@@ -1389,3 +1389,23 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   `redact_evidence` precedent). No change with `PERSON_REQUIRE_AUTH` off.
   Tests: `readable_candidates_drops_denied_and_marks_masked`, and
   `tests/dedup_sec_g3.rs` (DB), which fails with the filter disabled.
+- [x] **T-43 (S, security) — Record-level reads on the FHIR surface.**
+  *(Done 2026-11-10; organization's ORG-T6 is the reference.)*
+  `GET /fhir/Patient/{id}`, `GET /fhir/Person/{id}` and both FHIR searches
+  returned records with no record-level decision, though REST
+  `GET /api/persons/{id}` takes one (`agents/share/fhir.md` §8). With
+  `PERSON_REQUIRE_AUTH` on, a FHIR read now takes REST's decision: a
+  denial answers REST's status (`403`, or `401` with no credential) as an
+  `OperationOutcome` (`forbidden` / `login`), and a `mask` obligation
+  renders the masked person. FHIR search runs each hit through
+  `read_visibility` and `search_result_disposition`, as REST search does:
+  a denied record is left out and `total` counts only what is shown. A
+  hit shown masked is also left out when the query touches a value
+  masking hides (`query_touches_masked_value`: an identifier value
+  `mask_person` changed, compared on letters and digits, four characters
+  or more), so a search on an SSN cannot confirm it. No change with the
+  flag off. FHIR reads still write no disclosure audit row, where the
+  REST read does. Tests: `query_touching_a_masked_identifier_is_caught`,
+  and `tests/fhir_sec_g3.rs` (DB, its own binary), which fails at the
+  matching assertion with the read check, the search visibility check or
+  the masked-value check disabled.

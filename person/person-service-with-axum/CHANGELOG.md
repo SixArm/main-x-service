@@ -8,6 +8,16 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security — record-level reads on the FHIR surface (T-43)
+
+- With `PERSON_REQUIRE_AUTH` on, `GET /fhir/Patient/{id}` and
+  `GET /fhir/Person/{id}` take REST's record-level decision: a denial is
+  a `403` (or `401`) `OperationOutcome`, and a `mask` obligation renders
+  the masked person. FHIR search leaves out records the caller may not
+  read (`total` counts only what is shown), and leaves out a masked
+  record when the query touches a value masking hides, so a search
+  cannot confirm it. Nothing changes with the flag off.
+
 ### Security — SEC-G3 on the duplicate paths (T-42)
 
 - `match`, `check-duplicates` and the create-time `409` (REST and gRPC)
