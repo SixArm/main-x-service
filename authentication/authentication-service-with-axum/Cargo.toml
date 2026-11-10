@@ -131,7 +131,7 @@ insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }
 # for exactly that advisory — see `security.md` §7's 2026-08-21 entry).
 # Dev-only: never shipped in the service itself.
 p256 = { version = "0.14", features = ["ecdsa"] }
-axum-test = { version = "17.3.0" }
+axum-test = { version = "21.1.0" }
 
 # Proc macros and build scripts are not stripped. When stripping reaches
 # them, macOS refuses to load the stripped `sqlx-macros` dylib
