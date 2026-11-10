@@ -722,6 +722,21 @@ pub fn authorize_record(
     }
 }
 
+/// The record-level read decision for one organization on a collection
+/// read (list, search, `check-duplicates`, the batch scan, the review
+/// queue): `None` when the caller may not read it, so the caller omits it
+/// rather than answering `403` for the whole collection; otherwise the
+/// allow's obligations (`["mask"]` asks for the masked view). Always
+/// `Some(vec![])` while `ORGANIZATION_REQUIRE_AUTH` is off, like
+/// [`authorize_record`] (ORG-T2, `agents/share/security.md` invariant 5).
+#[must_use]
+pub fn read_visibility(
+    caller: &MaybeAuthUser,
+    org: &organization_matcher::Organization,
+) -> Option<Vec<String>> {
+    authorize_record(caller, Action::Read, &organization_resource_attrs(org)).ok()
+}
+
 /// Like [`AuthUser`], but never rejects: yields `Some(claims)` when a
 /// valid bearer token is present and `None` otherwise. Handlers use it to
 /// stamp the caller identity (e.g. the audit `actor`) without requiring

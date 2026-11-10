@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — record-level reads on every collection read (ORG-T2)
+
+- With `ORGANIZATION_REQUIRE_AUTH` on, `list`, `search`,
+  `check-duplicates`, the create-time `409`, the batch scan's response and
+  `GET /review-queue` take the same record-level read decision as
+  `GET /{pid}`: an organization the caller may not read is left out (a
+  review item naming one is left out, so its id is not disclosed), and a
+  `mask` obligation keeps only the evidence's aggregate. A candidate the
+  caller may not read no longer turns a create into a `409`. Counts in
+  those responses count what is shown. Nothing changes with the flag
+  off.
+
 ### Changed — review queue paging (ORG-RQ1)
 
 - `GET /api/organizations/review-queue` pages by signed cursor:

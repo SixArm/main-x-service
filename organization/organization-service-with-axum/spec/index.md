@@ -1220,8 +1220,30 @@ organization is not a data subject.
     --lib`: 203 passed (unchanged), 0 failed; `cargo build`/`clippy
     --all-targets -- -D warnings` clean.
 
-- [ ] **ORG-T2 (M) Extend the ABAC `mask` obligation to `list`, `search`,
-  `check-duplicates`, and `deduplicate`.** Only the single-record `GET
+- [x] **ORG-T2 (M) Extend the ABAC `mask` obligation to `list`, `search`,
+  `check-duplicates`, and `deduplicate`.** *(Done 2026-11-10.)* With
+  `ORGANIZATION_REQUIRE_AUTH` on, each collection read now takes the
+  record-level read decision `GET /{pid}` takes
+  (`auth::read_visibility`, over `authorize_record`): a denied record is
+  **omitted**, and a `mask` obligation keeps only the evidence's
+  aggregate (bits, fields compared, strength), as case-service's
+  `redact_evidence` does. `list` and `search` return `OrgRef`s, whose pid
+  and name the masked view keeps, so masking changes nothing there; they
+  decide whether more follow before concealment, as
+  `agents/share/restful.md` requires. `check-duplicates` and the
+  create-time `409` drop a candidate the caller may not read before
+  scoring, so it never appears, never counts and never turns a create
+  into a `409`. The batch scan stores every pair, but its response and
+  `GET /review-queue` leave out any item naming an organization the
+  caller may not read (so its id is not disclosed, and a record no
+  longer stored counts as unreadable), reduce the evidence of one naming
+  a masked organization, and count only what they show. Nothing changes
+  with the flag off. Tests: unit tests `visibility_follows_the_record_level_decision`
+  and `review_items_hide_and_mask_by_visibility`, and the DB-gated
+  `tests/visibility.rs` (its own binary), which fails with each of the
+  four concealments disabled in turn. The FHIR `read` and `search`
+  handlers take no record-level decision yet; that is a separate gap.
+  Original note: Only the single-record `GET
   /{pid}` and `GET /{pid}/export` handlers call
   `crate::auth::authorize_record`/honour the `mask` obligation; `list`,
   `search`, `check_duplicates`, and `deduplicate` return the raw stored

@@ -89,6 +89,114 @@ struct ScoredRef {
     evidence: Evidence,
 }
 
+// ─── Record-level read visibility on collection reads (ORG-T2) ──────────
+
+/// What a collection read may show of one organization, from its
+/// record-level read decision ([`crate::auth::read_visibility`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Visibility {
+    /// The caller may not read it: omit it, so it cannot be inferred.
+    Hidden,
+    /// An allow carrying the `mask` obligation: the masked view.
+    Masked,
+    /// An allow with no `mask` obligation: the whole record.
+    Full,
+}
+
+impl Visibility {
+    /// The visibility a record-level decision grants: a denial
+    /// (`None`) hides, a `mask` obligation masks, any other allow shows.
+    fn of(decision: Option<&[String]>) -> Self {
+        match decision {
+            None => Self::Hidden,
+            Some(obligations) if obligations.iter().any(|o| o == "mask") => Self::Masked,
+            Some(_) => Self::Full,
+        }
+    }
+
+    /// The caller's visibility of `org`. Always [`Self::Full`] while
+    /// `ORGANIZATION_REQUIRE_AUTH` is off.
+    fn for_caller(caller: &MaybeAuthUser, org: &Organization) -> Self {
+        Self::of(crate::auth::read_visibility(caller, org).as_deref())
+    }
+}
+
+/// The caller's visibility of a stored row. A row whose payload no longer
+/// decodes is hidden while enforcement is on, since no policy can be
+/// evaluated on it, and shown while it is off, as before.
+fn row_visibility(caller: &MaybeAuthUser, row: &OrgModel) -> Visibility {
+    if !crate::auth::require_auth() {
+        return Visibility::Full;
+    }
+    row.to_org().map_or(Visibility::Hidden, |org| {
+        Visibility::for_caller(caller, &org)
+    })
+}
+
+/// Evidence reduced to its aggregate for a masked record: the bits,
+/// the number of fields compared and the strength stay; the per-term
+/// listing and the contradictions, which name the components that agreed
+/// or conflicted (a fiscal identifier among them), go. As case-service
+/// does.
+fn redact_evidence(evidence: &Evidence) -> Evidence {
+    Evidence {
+        weight_bits: evidence.weight_bits,
+        fields_compared: evidence.fields_compared,
+        contradictions: Vec::new(),
+        strength: evidence.strength,
+        components: Vec::new(),
+    }
+}
+
+/// The stored review rows as wire items, with each item's two
+/// organizations judged by `visibility`: an item naming one the caller
+/// may not read is left out, so its id is not disclosed, and an item
+/// naming a masked one keeps only its evidence's aggregate.
+fn visible_review_items(
+    rows: &[crate::models::review_queue::ReviewQueueRow],
+    visibility: impl Fn(uuid::Uuid) -> Visibility,
+) -> Vec<ReviewQueueItem> {
+    rows.iter()
+        .filter_map(|row| {
+            let (a, b) = (visibility(row.record_id_a), visibility(row.record_id_b));
+            if a == Visibility::Hidden || b == Visibility::Hidden {
+                return None;
+            }
+            let mut item = review_row_to_item(row);
+            if a == Visibility::Masked || b == Visibility::Masked {
+                item.evidence = item.evidence.as_ref().map(redact_evidence);
+            }
+            Some(item)
+        })
+        .collect()
+}
+
+/// [`visible_review_items`] for rows whose organizations are not loaded
+/// yet: one batch fetch of every organization they name, skipped while
+/// enforcement is off. A record that no longer exists (merged away,
+/// deleted) is hidden, since nothing can show the caller may read it.
+async fn visible_review_items_from_db(
+    db: &sqlx::PgPool,
+    caller: &MaybeAuthUser,
+    rows: &[crate::models::review_queue::ReviewQueueRow],
+) -> Result<Vec<ReviewQueueItem>> {
+    if !crate::auth::require_auth() {
+        return Ok(rows.iter().map(review_row_to_item).collect());
+    }
+    let pids: Vec<uuid::Uuid> = rows
+        .iter()
+        .flat_map(|r| [r.record_id_a, r.record_id_b])
+        .collect();
+    let seen: std::collections::HashMap<uuid::Uuid, Visibility> = OrgModel::find_by_pids(db, &pids)
+        .await?
+        .iter()
+        .map(|row| (row.pid, row_visibility(caller, row)))
+        .collect();
+    Ok(visible_review_items(rows, |pid| {
+        seen.get(&pid).copied().unwrap_or(Visibility::Hidden)
+    }))
+}
+
 /// Validate an incoming `Organization` payload.
 ///
 /// Family convention: validation failures are `422 Unprocessable
@@ -150,7 +258,7 @@ async fn create(
 ) -> Result<Response> {
     validate(&org)?;
     if let Some(index) = crate::search::engine() {
-        let candidates = score_against_index(&ctx, index, &org).await?;
+        let candidates = score_against_index(&ctx, &caller, index, &org).await?;
         if !candidates.is_empty() {
             return Err(Error::CustomError(
                 StatusCode::CONFLICT,
@@ -334,12 +442,27 @@ async fn remove(
 /// (`agents/share/restful.md`). Omitting `limit` returns the first
 /// [`LIST_DEFAULT_LIMIT`] rows. A `limit` above [`MAX_LIMIT`], or a
 /// cursor this service did not sign for this query, is a `422`.
+///
+/// With `ORGANIZATION_REQUIRE_AUTH` on, a row the caller may not read is
+/// left out (ORG-T2). Whether more follow is decided first, so a page
+/// shortened by concealment does not end the walk. A `mask` obligation
+/// changes nothing here: an `OrgRef` carries only the pid and name, which
+/// the masked view keeps.
 #[debug_handler]
-async fn list(OriginalUri(uri): OriginalUri, State(ctx): State<AppContext>) -> Result<Response> {
+async fn list(
+    OriginalUri(uri): OriginalUri,
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+) -> Result<Response> {
     let page = CursorPage::new(crate::cursor_key::key(), limits(LIST_DEFAULT_LIMIT), &uri)?;
     let rows = OrgModel::list_paged(&ctx.db, page.limit() + 1, page.offset()).await?;
-    let refs: Vec<OrgRef> = rows.iter().map(OrgRef::of).collect();
-    Ok(page.respond(refs))
+    let (rows, more_follow) = page.split(rows);
+    let refs: Vec<OrgRef> = rows
+        .iter()
+        .filter(|row| row_visibility(&caller, row) != Visibility::Hidden)
+        .map(OrgRef::of)
+        .collect();
+    Ok(with_next(&page, more_follow, refs))
 }
 
 // ─── Pagination (agents/share/restful.md) ───────────────────────────────
@@ -411,8 +534,14 @@ pub const CHECK_DUPLICATES_CANDIDATE_LIMIT: usize = 200;
 /// check is not folded into this helper: `check_duplicates` refuses
 /// (`503`), while `create` degrades to "no duplicates found" (see
 /// `create`'s own doc comment for why).
+///
+/// With `ORGANIZATION_REQUIRE_AUTH` on, a candidate the caller may not
+/// read is dropped before scoring, so it never appears, never counts, and
+/// never turns a create into a `409`; a masked candidate's evidence keeps
+/// only its aggregate (ORG-T2).
 async fn score_against_index(
     ctx: &AppContext,
+    caller: &MaybeAuthUser,
     index: &crate::search::SearchEngine,
     query: &Organization,
 ) -> Result<Vec<ScoredRef>> {
@@ -425,6 +554,10 @@ async fn score_against_index(
     let mut hits: Vec<ScoredRef> = Vec::new();
     for row in &rows {
         let candidate = row.to_org()?;
+        let visibility = Visibility::for_caller(caller, &candidate);
+        if visibility == Visibility::Hidden {
+            continue;
+        }
         let r = engine.match_organizations_with_frequencies(query, &candidate, &*freqs);
         if r.is_match {
             hits.push(ScoredRef {
@@ -433,7 +566,11 @@ async fn score_against_index(
                 score: r.score,
                 confidence: format!("{:?}", r.confidence),
                 is_match: r.is_match,
-                evidence: r.evidence,
+                evidence: if visibility == Visibility::Masked {
+                    redact_evidence(&r.evidence)
+                } else {
+                    r.evidence
+                },
             });
         }
     }
@@ -455,6 +592,7 @@ async fn score_against_index(
 #[debug_handler]
 async fn check_duplicates(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(query): Json<Organization>,
 ) -> Result<Response> {
     // Blocking, not scanning. An unavailable index is surfaced rather
@@ -469,7 +607,7 @@ async fn check_duplicates(
             ),
         ));
     };
-    format::json(score_against_index(&ctx, index, &query).await?)
+    format::json(score_against_index(&ctx, &caller, index, &query).await?)
 }
 
 // ─── Batch deduplication + stored review queue ──────────────────────────────
@@ -636,6 +774,7 @@ struct BatchDeduplicationResponse {
 #[debug_handler]
 async fn deduplicate(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Json(req): Json<BatchDeduplicationRequest>,
 ) -> Result<Response> {
     let engine = MatchingEngine::new(MatchConfig::default());
@@ -683,7 +822,15 @@ async fn deduplicate(
         }
     }
     let stored = crate::models::review_queue::upsert(&ctx.db, &new_items).await?;
-    let review_items: Vec<ReviewQueueItem> = stored.iter().map(review_row_to_item).collect();
+    // ORG-T2: every pair is stored, but the response shows only what the
+    // caller may read, and the counts below are counted from that.
+    let seen: std::collections::HashMap<uuid::Uuid, Visibility> = orgs
+        .iter()
+        .map(|(pid, org)| (*pid, Visibility::for_caller(&caller, org)))
+        .collect();
+    let review_items = visible_review_items(&stored, |pid| {
+        seen.get(&pid).copied().unwrap_or(Visibility::Hidden)
+    });
     let queued_for_review = review_items
         .iter()
         .filter(|i| i.status == ReviewStatus::Pending)
@@ -733,6 +880,7 @@ async fn get_review_queue(
     OriginalUri(uri): OriginalUri,
     Query(query): Query<ReviewQueueListQuery>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Result<Response> {
     if let Some(status) = query.status.as_deref()
         && !matches!(status, "pending" | "confirmed" | "rejected" | "automerged")
@@ -754,7 +902,9 @@ async fn get_review_queue(
     )
     .await?;
     let (rows, more_follow) = page.split(rows);
-    let items: Vec<ReviewQueueItem> = rows.iter().map(review_row_to_item).collect();
+    // ORG-T2: an item naming an organization the caller may not read is
+    // left out, after `more` was decided; `total` counts what is shown.
+    let items = visible_review_items_from_db(&ctx.db, &caller, &rows).await?;
     let total = items.len();
     let mut response = Json(ReviewQueueListResponse { items, total }).into_response();
     if more_follow && let Some(link) = page.next_link() {
@@ -867,6 +1017,7 @@ async fn search(
     OriginalUri(uri): OriginalUri,
     Query(params): Query<SearchParams>,
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
 ) -> Result<Response> {
     let q = params.q.clone().unwrap_or_default();
     let q = q.trim();
@@ -900,7 +1051,13 @@ async fn search(
     // page (see `find_by_pids`), and a short page must not end the walk.
     let (pids, more_follow) = page.split(pids);
     let rows = OrgModel::find_by_pids(&ctx.db, &parse_pids(&pids)).await?;
-    let refs: Vec<OrgRef> = rows.iter().map(OrgRef::of).collect();
+    // ORG-T2: a hit the caller may not read is left out, after `more`
+    // was decided, like a hit whose row was deleted.
+    let refs: Vec<OrgRef> = rows
+        .iter()
+        .filter(|row| row_visibility(&caller, row) != Visibility::Hidden)
+        .map(OrgRef::of)
+        .collect();
     Ok(with_next(&page, more_follow, refs))
 }
 
@@ -1091,6 +1248,105 @@ pub fn routes() -> Routes {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// ORG-T2: a denial hides, a `mask` obligation masks, any other allow
+    /// shows the whole record.
+    #[test]
+    fn visibility_follows_the_record_level_decision() {
+        assert_eq!(Visibility::of(None), Visibility::Hidden);
+        assert_eq!(Visibility::of(Some(&[])), Visibility::Full);
+        assert_eq!(
+            Visibility::of(Some(&["audit".to_string()])),
+            Visibility::Full
+        );
+        assert_eq!(
+            Visibility::of(Some(&["audit".to_string(), "mask".to_string()])),
+            Visibility::Masked
+        );
+    }
+
+    /// One stored review row naming `a` and `b`, with per-term evidence.
+    fn review_row(a: uuid::Uuid, b: uuid::Uuid) -> crate::models::review_queue::ReviewQueueRow {
+        let evidence = Evidence {
+            weight_bits: 12.5,
+            fields_compared: 2,
+            components: vec![organization_matcher::ComponentBits {
+                component: "identifier:vat".to_string(),
+                bits: 12.5,
+                correlated: false,
+                frequency_adjusted: false,
+            }],
+            ..Evidence::default()
+        };
+        crate::models::review_queue::ReviewQueueRow {
+            id: uuid::Uuid::new_v4(),
+            record_id_a: a,
+            record_id_b: b,
+            match_score: 0.9,
+            match_quality: "probable".to_string(),
+            detection_method: "batch_deduplication".to_string(),
+            score_breakdown: None,
+            status: "pending".to_string(),
+            provenance: "operator".to_string(),
+            evidence: serde_json::to_value(&evidence).ok(),
+            reviewed_by: None,
+            created_at: chrono::Utc::now(),
+            reviewed_at: None,
+        }
+    }
+
+    /// ORG-T2: a review item naming a hidden organization is left out, so
+    /// its id is not disclosed; one naming a masked organization keeps
+    /// only its evidence's aggregate; one naming two readable ones is
+    /// whole.
+    #[test]
+    fn review_items_hide_and_mask_by_visibility() {
+        let (full, masked, hidden) = (
+            uuid::Uuid::new_v4(),
+            uuid::Uuid::new_v4(),
+            uuid::Uuid::new_v4(),
+        );
+        let other = uuid::Uuid::new_v4();
+        let rows = vec![
+            review_row(full, other),
+            review_row(masked, other),
+            review_row(hidden, other),
+        ];
+        let items = visible_review_items(&rows, |pid| {
+            if pid == hidden {
+                Visibility::Hidden
+            } else if pid == masked {
+                Visibility::Masked
+            } else {
+                Visibility::Full
+            }
+        });
+        assert_eq!(items.len(), 2, "the hidden pair is left out");
+        assert!(
+            items
+                .iter()
+                .all(|i| i.organization_id_a != hidden.to_string()
+                    && i.organization_id_b != hidden.to_string())
+        );
+        let whole = items
+            .iter()
+            .find(|i| i.organization_id_a == full.to_string())
+            .unwrap();
+        assert_eq!(whole.evidence.as_ref().unwrap().components.len(), 1);
+        let reduced = items
+            .iter()
+            .find(|i| i.organization_id_a == masked.to_string())
+            .unwrap();
+        let e = reduced.evidence.as_ref().unwrap();
+        assert!(
+            e.components.is_empty(),
+            "a masked pair loses its per-term listing"
+        );
+        assert!(
+            (e.weight_bits - 12.5).abs() < f64::EPSILON,
+            "but keeps its bits"
+        );
+    }
 
     /// DB-free pin: blank-name validation must map to HTTP 422
     /// (family convention; spec §6/§9, entity spec T-2).
