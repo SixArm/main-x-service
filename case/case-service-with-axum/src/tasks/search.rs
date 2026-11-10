@@ -52,8 +52,8 @@ pub async fn reindex(db: &PgPool, batch: u64) -> Result<ReindexReport> {
 
     let mut report = ReindexReport::default();
     // Paginate rather than read everything: the table can be far larger
-    // than the process's memory budget. Offset pages in id order, as the
-    // `SeaORM` paginator did, until a page comes back empty.
+    // than the process's memory budget. Offset pages in id order,
+    // until a page comes back empty.
     let batch = batch.max(1);
     let mut offset = 0u64;
     loop {

@@ -1,7 +1,7 @@
 // TypeScript domain types mirroring the Rust Person Service models.
 // Reference: person-service-with-axum/agents/models.md.
 // Field names use snake_case to match the JSON wire format produced by
-// the Axum/SeaORM stack.
+// the Axum/sqlx stack.
 
 // ─── Errors ──────────────────────────────────────────────────────────
 

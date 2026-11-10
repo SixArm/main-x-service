@@ -9,8 +9,8 @@ use uuid::Uuid;
 use super::{ModelError, ModelResult};
 
 /// One `bed_requests` row, serialized as-is (flattened into the list
-/// view) by the bed-request endpoints (the wire shape the `SeaORM`
-/// entity had).
+/// view) by the bed-request endpoints; the field order is a fixed
+/// wire shape.
 #[allow(missing_docs)] // the columns are documented by the migration
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {

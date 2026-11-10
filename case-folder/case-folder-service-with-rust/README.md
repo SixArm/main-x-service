@@ -2,7 +2,8 @@
 
 A back-end **JSON API** that tracks the physical location of paper
 case-note folders in a UK NHS hospital setting. Implemented in Rust on
-[Loco](https://axa) (Axum + SeaORM). There is no built-in user
+[axa](https://github.com/publicprojects-io/axa) over Axum, with no
+database of its own. There is no built-in user
 interface — front-ends consume this service over HTTP.
 
 **Domain.** Case Tracking is a **pure aggregator API** — it
@@ -187,9 +188,6 @@ case-folder-service-with-rust/
 │   ├── development.yaml
 │   ├── test.yaml
 │   └── production.yaml
-├── migration/                      ← SeaORM migrations — intentionally empty
-│   ├── Cargo.toml
-│   └── src/lib.rs                  (Migrator::migrations() returns vec![])
 └── src/
     ├── bin/main.rs                 ← cli::main entrypoint
     ├── lib.rs

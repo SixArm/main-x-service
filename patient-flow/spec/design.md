@@ -90,6 +90,5 @@ service would have four near-identical impls. (→ PF-R15)
 ## PF-D12 — Controller-style layout
 
 `src/controllers/` shape (organization/case template), crate-root
-`migrations/` (plain SQL, sqlx; was a `migration/` SeaORM crate until
-2026-11-08), family fixtures (`#![forbid(unsafe_code)]`, thiserror,
+`migrations/` (plain SQL, sqlx), family fixtures (`#![forbid(unsafe_code)]`, thiserror,
 OTLP, OpenAPI, `Accepts-version`, Podman). (→ PF-R15)

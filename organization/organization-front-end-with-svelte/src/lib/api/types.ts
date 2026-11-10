@@ -143,7 +143,7 @@ export interface MergeResponse {
 /**
  * One row of merge history from `GET /api/organizations/merges/recent`.
  *
- * Serialized straight from the `merge_records` SeaORM entity, so the
+ * Serialized straight from the service's `merge_records` row, so the
  * field names and types are the table's: `id` is the auto-increment
  * `i64` surrogate key (a JSON number), the timestamps are RFC 3339
  * strings, and `transferred` is the JSON snapshot of the duplicate's
@@ -265,7 +265,7 @@ export interface BatchDeduplicationResponse {
 }
 
 /// One audit-log row from `GET /api/organizations/{pid}/audit`.
-/// Mirrors the service's `audit_logs` SeaORM model (serialized field
+/// Mirrors the service's `audit_logs` row (serialized field
 /// names): `action` (created/updated/deleted/merged/exported), nullable
 /// `actor` (the caller's user pid when a verified token was presented,
 /// else `null`), an optional JSON `snapshot`, and the `created_at`

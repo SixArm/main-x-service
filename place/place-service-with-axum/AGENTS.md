@@ -108,8 +108,8 @@ test binary (`E0464: multiple candidates for rlib dependency tonic`).
 
 ## Database: sqlx, all SQL in `src/db/`
 
-Since 2026-11-07 this crate is the family's pilot of the move from
-SeaORM to sqlx (spec §10, §13 T-18; the repo's
+This crate is on sqlx, since 2026-11-07, and was the family's pilot
+(spec §10, §13 T-18; the repo's
 `spec/tech-stack/index.md` §5). The rules that keep it reviewable:
 
 - Every statement is a `sqlx::query!` / `query_as!` / `query_scalar!`

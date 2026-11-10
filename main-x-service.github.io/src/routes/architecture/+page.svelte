@@ -3,8 +3,8 @@
 <h1>Architecture</h1>
 
 <p>
-    Every service boots on <strong>loco.rs</strong> (Axum + SeaORM +
-    PostgreSQL); the differences are which internal shape a crate uses and
+    Every service is plain <strong>Axum</strong> on <strong>axa</strong>, with
+    PostgreSQL through <strong>sqlx</strong>; the differences are which internal shape a crate uses and
     which capabilities it carries.
 </p>
 
@@ -48,7 +48,7 @@
 +---------------------------------+--------------------------------+
                                   |
 +---------------------------------v--------------------------------+
-|  API layer (Axum, mounted by loco)                               |
+|  API layer (Axum, on axa)                                        |
 |   REST + OpenAPI/Swagger  ·  FHIR R5 (8 crates)  ·  gRPC (3)      |
 |   blanket ABAC guard (<ENTITY>_REQUIRE_AUTH, default-off)         |
 +---------------------------------+--------------------------------+
@@ -64,8 +64,8 @@
         |                         |                         |
 +-------v--------+   +------------v-----------+  +----------v---------+
 | PostgreSQL     |   | Tantivy full-text      |  | Event transport    |
-| (SeaORM +      |   | index (all ten         |  | in-memory (default)|
-|  migrations)   |   | registries)            |  | or Postgres outbox |
+| (sqlx, plain   |   | index (all ten         |  | in-memory (default)|
+|  SQL migr.)    |   | registries)            |  | or Postgres outbox |
 | entity rows,   |   |                        |  | -> relay -> Fluvio |
 | audit, outbox, |   +------------------------+  +----------+---------+
 | entity_links   |                                          |
@@ -81,7 +81,7 @@
 <h2>Two internal shapes</h2>
 
 <p>
-    Both boot identically through a loco <code>Hooks</code> impl in
+    Both boot the same way, through plain functions in
     <code>src/app.rs</code>; they differ in how routes and persistence are
     organised.
 </p>
@@ -89,15 +89,15 @@
 <h3>person-style (<code>src/api/rest/</code>)</h3>
 
 <p>
-    The older hand-rolled Axum layout, now mounted under loco. Used by
+    The older hand-rolled Axum layout. Used by
     person, worker, course (and place / thing / event, mid-conversion). A
     rich domain model with per-field tables.
 </p>
 
-<h3>loco-style (<code>src/controllers/</code>)</h3>
+<h3>controller-style (<code>src/controllers/</code>)</h3>
 
 <p>
-    The newer loco-idiomatic layout. Used by organization, care-pathway,
+    The newer controller-style layout. Used by organization, care-pathway,
     case, portfolio (and link-graph, authentication). The API DTO
     <strong>is</strong> the matcher type, stored verbatim as JSONB — no
     separate model to drift.

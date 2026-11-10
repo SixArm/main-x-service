@@ -86,8 +86,8 @@ impl Direction {
     }
 }
 
-/// An `UPDATE` that matched no row is an error, as the `SeaORM` era's
-/// "record not updated" was: the caller read the row a moment before.
+/// An `UPDATE` that matched no row is an error: the caller read the row a
+/// moment before, so a missing row means it was removed in between.
 fn require_updated(done: &sqlx::postgres::PgQueryResult) -> ModelResult<()> {
     if done.rows_affected() == 0 {
         return Err(ModelError::Any("edge not updated: no such row".into()));

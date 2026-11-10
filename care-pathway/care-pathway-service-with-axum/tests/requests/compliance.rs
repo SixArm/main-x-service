@@ -965,8 +965,7 @@ async fn mismatched_pids(request: &TestServer) -> Vec<String> {
 /// updated one verifies, and a row edited behind the service's back
 /// through a raw pool is flagged.
 ///
-/// Care pathway is not affected by INT-V1 (this test passed on the
-/// `SeaORM` code before the move): the payload holds no floats, and its
+/// Care pathway is not affected by INT-V1: the payload holds no floats, and its
 /// canonical JSON is key-sorted, so the stored `jsonb` reproduces it
 /// byte for byte. The test stays as a guard.
 #[tokio::test]

@@ -31,7 +31,7 @@ crate (older Axum services vs. controller-style services — see §2).
 
 | Pillar | Crate / mechanism | Where | Status |
 |---|---|---|---|
-| **Logging / tracing** | `tracing` + `tracing-subscriber` (JSON or compact); axa's `LOG_*` settings; SeaORM SQL query logging via `DB_LOGGING` | every service | implemented |
+| **Logging / tracing** | `tracing` + `tracing-subscriber` (JSON or compact); axa's `LOG_*` settings; sqlx statement logging on the `sqlx::query` target | every service | implemented |
 | **Metrics** | Prometheus text exposition at `GET /metrics.prom` (the `prometheus` crate registry in `src/metrics.rs`) | every service | implemented (all 10 services) |
 | **Distributed tracing** | OpenTelemetry OTLP/gRPC export through `axa::opentelemetry` (axa's `opentelemetry` feature) | `App::init_logger` and `App::with_telemetry` in each service's `src/app.rs` | **implemented in 10 services**: link-graph and the nine registries in this repo (person, worker, event, course, place, thing, organization, care-pathway, case). Off unless `OTLP_ENDPOINT` is set (§3.4). |
 
@@ -59,9 +59,10 @@ axa reads its settings from the environment; there are no config files.
 
 #### 1.1.2 SQL query logging
 
-SeaORM statement logging is gated by axa's `DB_LOGGING` setting
-(default off). Enable it to surface every SQL statement on the
-`tracing` stream during development; leave it **off** in production —
+sqlx logs every statement on the `sqlx::query` tracing target, at
+`debug`, and a slow one at `warn`. Turn it on with
+`RUST_LOG=info,sqlx::query=debug` during development; leave it **off** in
+production — axa's `DB_LOGGING` setting has no effect on a sqlx pool —
 query-level statistics belong to PostgreSQL `pg_stat_statements`
 instead (see [`../postgresql/index.md`](../postgresql/index.md) §13 and
 §5 below).
@@ -199,7 +200,7 @@ when present in the process environment. Examples:
 
 ```bash
 RUST_LOG=info cargo run --release
-RUST_LOG=debug,sea_orm=warn cargo run    # quiet the ORM
+RUST_LOG=debug,sqlx::query=warn cargo run    # quiet the SQL
 ```
 
 ### 3.4 OTLP exporter and `Resource`
@@ -313,7 +314,7 @@ Enable the `pg_stat_statements` extension for execution-statistics and
 slow-query analysis, as specified in
 [`../postgresql/index.md`](../postgresql/index.md) §13 (Operations).
 This is the canonical source for per-statement latency — prefer it over
-SeaORM `DB_LOGGING` in production (§1.1.2). Other relevant
+`sqlx::query` statement logging in production (§1.1.2). Other relevant
 extensions (`pg_trgm` for the `ILIKE` name/title search, `postgis`
 where geo is modeled) are catalogued in the same postgresql spec.
 
@@ -341,7 +342,7 @@ where geo is modeled) are catalogued in the same postgresql spec.
   `http_requests_total`, latency + match-score histograms.
 - **OpenTelemetry OTLP export on 10 services** (§1.3) through
   `axa::opentelemetry`, each proved against an in-process collector.
-- SeaORM SQL query logging toggle (`DB_LOGGING`).
+- SQL statement logging on the `sqlx::query` tracing target.
 - Health endpoints on every service; audit-log table + query API;
   event stream (in-memory by default, durable outbox + Fluvio relay
   shipped default-off on all ten registries — §4.5).

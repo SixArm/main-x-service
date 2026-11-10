@@ -134,8 +134,8 @@ impl Model {
     /// The newest `limit` rows, for `GET /api/compliance/audit/verify`.
     ///
     /// Newest is `occurred_at` descending: the table has no sequence
-    /// column, and `id` is a random UUID, so ordering by `id` alone (as
-    /// the `SeaORM` query did) picked an arbitrary sample (LG-A1). `id`
+    /// column, and `id` is a random UUID, so ordering by `id` alone would
+    /// pick an arbitrary sample (LG-A1). `id`
     /// breaks ties between rows stamped in the same microsecond, so the
     /// sample is deterministic. `audit_log_occurred` serves the sort.
     ///
@@ -158,8 +158,8 @@ impl Model {
         Ok(rows)
     }
 
-    /// Every audit row, in no particular order (the order the `SeaORM`
-    /// `find().all()` gave). The DB-gated tests read the trail with it.
+    /// Every audit row, in no particular order. The DB-gated tests read the
+    /// trail with it.
     ///
     /// # Errors
     ///

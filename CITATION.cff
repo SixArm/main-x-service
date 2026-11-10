@@ -17,7 +17,7 @@ identifiers:
 repository-code: 'https://github.com/sixarm/main-x-service/'
 abstract: >-
   Main X Index: a federated identity index implemented as a family of
-  Rust services (loco.rs, Axum, SeaORM, PostgreSQL) — entity
+  Rust services (Axum, axa, sqlx, PostgreSQL) — entity
   registries with probabilistic and deterministic matching, full-text
   search, record merge, audit trails, event streaming, and SvelteKit
   operator front-ends.

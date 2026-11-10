@@ -11,8 +11,7 @@ use uuid::Uuid;
 use super::{ModelError, ModelResult};
 
 /// One `beds` row, serialized as-is by the bed endpoints. The `virtual`
-/// column is `is_virtual` here and on the wire, as it was in the
-/// `SeaORM` entity.
+/// column is `is_virtual` here and on the wire.
 #[allow(missing_docs)] // the columns are documented by the migration
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {

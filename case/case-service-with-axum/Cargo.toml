@@ -47,7 +47,7 @@ tantivy = { version = "0.27" }
 # feature on as well, sqlx 0.9.0's macros warn on every timestamp column.
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "macros", "migrate", "uuid", "chrono", "json"] }
 # `serde` for the timestamps the audit, merge and link endpoints
-# serialize; `SeaORM` used to turn it on.
+# serialize.
 chrono = { version = "0.4", features = ["serde"] }
 validator = { version = "0.21" }
 uuid = { version = "1.29", features = ["v4", "serde"] }

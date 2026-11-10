@@ -45,9 +45,8 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.
 ///
-/// The variants are the ones the `SeaORM` era's `axa::model::ModelError`
-/// was used for here, and each converts into the [`axa::Error`] the old
-/// one became, so every HTTP answer is unchanged: a missing row is
+/// The variant names are stable, so a caller's match does not move, and each
+/// converts into an [`axa::Error`] with a fixed status: a missing row is
 /// `404`, a database error is axa's own mapping (a broken constraint is
 /// `409`, anything else `500`), and any other failure is `500`.
 #[derive(Debug)]
@@ -105,10 +104,8 @@ pub(crate) fn to_i64(n: u64) -> i64 {
     i64::try_from(n).unwrap_or(i64::MAX)
 }
 
-/// The check `SeaORM` made on every `ActiveModel::update`: an update
-/// that matched no row is an error (its `RecordNotUpdated`, a `500`),
-/// not a silent success. Here it is `RowNotFound`, which axa also
-/// answers with `500`.
+/// An update that matched no row is an error, not a silent success:
+/// `RowNotFound`, which axa answers with `500`.
 pub(crate) fn updated_one(rows_affected: u64) -> ModelResult<()> {
     if rows_affected == 0 {
         Err(ModelError::Sqlx(sqlx::Error::RowNotFound))
@@ -120,8 +117,8 @@ pub(crate) fn updated_one(rows_affected: u64) -> ModelResult<()> {
 /// Delete every row from the service's tables, for `db truncate` and the
 /// test harness.
 ///
-/// `DELETE`, not `TRUNCATE`: exactly what the `SeaORM` era's
-/// `truncate_table` did, on the same eleven tables in the same order.
+/// `DELETE`, not `TRUNCATE`, on all eleven tables, children before
+/// parents.
 ///
 /// # Errors
 ///

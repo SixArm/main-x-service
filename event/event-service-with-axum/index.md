@@ -741,7 +741,7 @@ event-service-with-axum/
 This project was developed in 11 comprehensive phases:
 
 1. **Phase 1-6**: Core infrastructure, models, configuration
-2. **Phase 7**: Database Integration (SeaORM, PostgreSQL)
+2. **Phase 7**: Database Integration (PostgreSQL, sqlx)
 3. **Phase 8**: Event Streaming & Audit Logging
 4. **Phase 9**: REST API Implementation
 5. **Phase 10**: Integration Testing

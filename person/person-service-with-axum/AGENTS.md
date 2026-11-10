@@ -85,7 +85,7 @@ cargo bench
 
 ## Database: sqlx, all SQL in `src/db/`
 
-Since 2026-11-08 this crate is on sqlx, not SeaORM (spec §10, §13 SQ-1;
+This crate is on sqlx, since 2026-11-08 (spec §10, §13 SQ-1;
 the repo's `spec/tech-stack/index.md` §5; event-service was the
 person-style template, case and care-pathway the templates for the hash
 chain and erasure). The rules that keep it reviewable:

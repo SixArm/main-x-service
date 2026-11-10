@@ -30,7 +30,7 @@ pub struct Model {
     /// Row creation timestamp.
     pub created_at: DateTime<FixedOffset>,
     /// Row last-update timestamp: the column default, never bumped by a
-    /// statement here, exactly as under `SeaORM`.
+    /// statement here.
     pub updated_at: DateTime<FixedOffset>,
     /// The edge id (also the `linked`/`unlinked` event's `edge_id`).
     pub id: Uuid,
@@ -210,7 +210,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails, including when the row is gone
-    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    /// (`RowNotFound`).
     pub async fn soft_delete(self, db: impl Into<Db<'_>>) -> ModelResult<Self> {
         let stamp: DateTime<FixedOffset> = chrono::Utc::now().into();
         let mut conn = db.into().acquire().await?;

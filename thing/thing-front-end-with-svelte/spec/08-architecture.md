@@ -39,7 +39,7 @@ never sees a token or calls the Thing Service directly.
                               v
                 +-----------------------------+   +--------------------------+
                 |   thing-service-with-axum    |   |  authentication-service   |
-                |   Axum + SeaORM + Tantivy     |   |  magic-link, sessions,    |
+                |   Axum + sqlx + Tantivy       |   |  magic-link, sessions,    |
                 |                                |   |  PASETO issuance          |
                 +-----------------------------+   +--------------------------+
 ```

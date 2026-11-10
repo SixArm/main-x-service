@@ -109,7 +109,7 @@ exported trace. axa tests its own pipeline. None of this needs a database.
 
 ## Database: sqlx, all SQL in `src/db/`
 
-Since 2026-11-07 this crate is on sqlx, not SeaORM (spec §10, §13 T-16;
+This crate is on sqlx, since 2026-11-07 (spec §10, §13 T-16;
 the repo's `spec/tech-stack/index.md` §5; place-service was the pilot).
 The rules that keep it reviewable:
 

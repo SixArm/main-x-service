@@ -31,7 +31,7 @@
         <tr><th>Front-end projects</th><td>11 SvelteKit operator SPAs, one per service</td></tr>
         <tr><th>Consumer applications</th><td>5 (each with its own service + front-end edition)</td></tr>
         <tr><th>Cross-cutting services</th><td>1 (the read-model link-graph aggregator)</td></tr>
-        <tr><th>Stack</th><td>Rust + loco.rs (Axum, SeaORM, PostgreSQL 18) · SvelteKit 2 + Svelte 5 runes + Lily Design System</td></tr>
+        <tr><th>Stack</th><td>Rust + Axum on axa (sqlx, PostgreSQL 18) · SvelteKit 2 + Svelte 5 runes + Lily Design System</td></tr>
     </tbody>
 </table>
 

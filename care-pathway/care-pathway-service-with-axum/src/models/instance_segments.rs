@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use super::{ModelError, ModelResult, to_i64};
 
-/// One journey segment. Serialized as-is by the segment endpoints, in the
-/// `SeaORM` entity's field order.
+/// One journey segment. Serialized as-is by the segment endpoints, in
+/// column order, a fixed wire shape.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row creation timestamp (column default).
@@ -217,7 +217,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails, including `RowNotFound` when the row is
-    /// gone (as `SeaORM`'s `RecordNotUpdated` was).
+    /// gone.
     pub async fn close(self, db: &PgPool, ended_at: DateTime<FixedOffset>) -> ModelResult<Self> {
         let row = sqlx::query_as!(
             Self,

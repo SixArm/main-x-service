@@ -12,8 +12,8 @@ use super::ModelResult;
 /// successful merge for auditability.
 ///
 /// Serialized as-is by `GET /api/organizations/merges/recent`, so the
-/// field order and the `DateTime<FixedOffset>` timestamps are the wire
-/// shape the `SeaORM` entity had.
+/// field order and the `DateTime<FixedOffset>` timestamps are a fixed wire
+/// shape.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row insert time (UTC) — when the merge happened.

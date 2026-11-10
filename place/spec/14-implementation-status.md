@@ -6,7 +6,7 @@ Honest snapshot per subproject. Aspirational items live in
 ### 14.1 place-service-with-axum (v0.5.0)
 
 Delivered (service [spec §14](../place-service-with-axum/spec/14-implementation-status.md)):
-full schema.org/Place domain model; 13-table SeaORM schema; 15 REST
+full schema.org/Place domain model; 13-table sqlx schema; 15 REST
 endpoints + Swagger; Tantivy search + app-side geo-radius; matching
 (in-service scorer + embedded canonical matcher via adapter);
 real-time / explicit / batch duplicate detection with review queue;

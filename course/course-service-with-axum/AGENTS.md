@@ -86,7 +86,7 @@ this crate declares no other `tonic`.
 
 ## Database: sqlx, all SQL in `src/db/`
 
-Since 2026-11-07 this crate is on sqlx, not SeaORM (spec §10, §13 T-31;
+This crate is on sqlx, since 2026-11-07 (spec §10, §13 T-31;
 the repo's `spec/tech-stack/index.md` §5; place-service was the pilot).
 The rules that keep it reviewable:
 
@@ -99,7 +99,7 @@ The rules that keep it reviewable:
 - A helper running several statements takes `&mut PgConnection`, so the
   outbox row and the child rows commit in the caller's transaction.
 - Course and instance updates write every column, `created_at`
-  included, as the SeaORM full-row update did. Keep it that way unless
+  included. Keep it that way unless
   the spec changes; an update or soft delete that matches no row is
   an error.
 - Builds read `.sqlx/` with `SQLX_OFFLINE=true`. After changing a query

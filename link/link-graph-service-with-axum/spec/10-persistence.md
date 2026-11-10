@@ -22,15 +22,7 @@ reversible `<version>_<name>.up.sql` / `.down.sql` pairs (edges, entity
 presence, consumer offsets, audit log, the audit digests and MAC,
 processed events, suggestion runs), embedded by `sqlx::migrate!` and
 recorded in `_sqlx_migrations`. `db migrate | down [steps] | reset |
-status` run through `axa::sqlx`. Six of the pairs are the SQL the
-SeaORM `migration/` bridge already wrapped, moved unchanged; the
-seventh (`2026072800000001_add_audit_mac`) was SeaORM schema-builder
-Rust and is now written out from a `pg_dump` of what it built. A
-`pg_dump --schema-only` of a database migrated by the old code and one
-migrated by the new differs only in the bookkeeping table
-(`seaql_migrations` vs `_sqlx_migrations`), so a database the old code
-migrated must be recreated rather than migrated in place (there is no
-deployed data).
+status` run through `axa::sqlx`.
 
 All tables here hold a **derived read-model**; none is a system of
 record. The whole schema is reconstructable from a topic replay
@@ -149,8 +141,9 @@ request exists.
 `chrono`, through sqlx's `chrono` feature (never its `time` feature:
 with both on, sqlx 0.9.0's macros warn on every timestamp column).
 Timestamps are `DateTime<FixedOffset>` and dates `NaiveDate`, read with
-`"col: _"` overrides, so the rows the graph endpoints serialize keep
-the JSON shape they had under SeaORM's `with-chrono` (OQ-5, resolved).
+`"col: _"` overrides, so the rows the graph endpoints serialize carry
+RFC 3339 timestamps with an explicit offset and ISO dates (OQ-5,
+resolved).
 
 ### 10.6 What is NOT persisted here
 

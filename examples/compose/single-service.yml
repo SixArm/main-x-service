@@ -51,11 +51,11 @@ services:
     networks:
       - mxi-example
 
-  # One-shot: applies pending sea-orm-migration migrations, then exits.
-  # loco's config has `auto_migrate: false` in production.yaml for
-  # every crate but link-graph, so this step is not optional — a
-  # container that boots straight to `start` would serve against an
-  # empty schema.
+  # One-shot: the service's `db migrate` applies its pending plain-SQL
+  # migrations (`sqlx::migrate!`), then exits. In production axa does
+  # not migrate at boot unless `DB_AUTO_MIGRATE` is set, so this step
+  # is not optional — a container that boots straight to `start` would
+  # serve against an empty schema.
   case-migrate: # <- swap
     build:
       context: ../..

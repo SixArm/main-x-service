@@ -206,7 +206,7 @@ The `transferred` snapshot is the one place JSONB is used to capture a
 point-in-time payload; this is consistent with the monorepo
 [data-modeling](../data-modeling.md) JSONB policy (snapshots and verbatim
 payloads, not normalized child data). See
-[postgresql](../postgresql/index.md) for the SeaORM / migration
+[postgresql](../postgresql/index.md) for the sqlx / migration
 conventions all these tables follow.
 
 ---
@@ -342,7 +342,7 @@ differ only in persistence shape and surrounding plumbing.
 - [`agents/share/match.md`](../../agents/share/match.md) — matching algorithms & confidence bands.
 - [`agents/share/search.md`](../../agents/share/search.md) — search / candidate generation.
 - [`agents/share/auditability.md`](../../agents/share/auditability.md) — audit + event taxonomy.
-- [postgresql](../postgresql/index.md) — DB / SeaORM / migration conventions.
+- [postgresql](../postgresql/index.md) — DB / sqlx / migration conventions.
 - [data-modeling](../data-modeling.md) — JSONB & child-table policy.
 - Entity specs: [person](../../person/spec/index.md) ·
   [care-pathway](../../care-pathway/spec/index.md) ·

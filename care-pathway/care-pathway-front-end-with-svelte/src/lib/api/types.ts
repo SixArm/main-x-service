@@ -164,10 +164,10 @@ export interface MergeResult {
 
 /**
  * One audit-log row from `GET /api/care-pathways/{pid}/audit`. Mirrors the
- * service's `audit_logs` SeaORM model serialized field names.
+ * service's `audit_logs` row (`src/models/audit_logs.rs`) field names.
  */
 /// One audit-log row from `GET /api/care-pathways/{pid}/audit`.
-/// Mirrors the service's `audit_logs` SeaORM model (serialized field
+/// Mirrors the service's `audit_logs` row (serialized field
 /// names): `action` (created/updated/deleted/merged), nullable `actor`
 /// (the caller's user pid when a verified token was presented, else
 /// `null`), an optional JSON `snapshot`, and the `created_at` timestamp.

@@ -650,13 +650,8 @@ The schema is the plain SQL under `migrations/`, thirteen reversible
 `2026080300000012_review_queue`, `…13_bulk_jobs`), embedded by
 `sqlx::migrate!` and recorded in `_sqlx_migrations`. `db migrate | down
 [steps] | reset | status` run through `axa::sqlx`; `auto_migrate` is on
-in development. They replace the SeaORM `migration/` crate one for one,
-in the same order (including the BLAKE3 columns added and then
-dropped), and produce the same schema: a `pg_dump --schema-only` of a
-database migrated by each differs only in the bookkeeping table
-(`seaql_migrations` vs `_sqlx_migrations`). A database migrated by the
-old code has no `_sqlx_migrations`, so it must be recreated rather than
-migrated in place (there is no deployed data).
+in development. The BLAKE3 columns are added and then dropped, so the
+sequence replays the schema's history in order.
 
 The `entity_links` table is **separate** from the within-entity `Case`
 payload (the partition rule, §5) and is the **outbound** edges only — the

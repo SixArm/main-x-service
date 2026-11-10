@@ -63,8 +63,8 @@ uuid = { version = "1.29", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 # The audit trail, the outbox, the entity links, the review queue and the
 # assessments keep `time` types at the edges of the database layer.
-# `serde` keeps the timestamps of rows serialized on the wire in the form
-# they had, which SeaORM had been enabling for this crate.
+# `serde` serializes those rows' timestamps on the wire in the form
+# clients already read.
 time = { version = "0.3", features = ["serde"] }
 thiserror = "2.0"
 dotenvy = "0.15"

@@ -358,12 +358,6 @@ logs, merge records, event outbox, review queue, integrity digests,
 review-queue provenance, bulk jobs, review-queue evidence), embedded by `sqlx::migrate!` and
 recorded in `_sqlx_migrations`. `db migrate | down [steps] | reset |
 status` run through `axa::sqlx`; `auto_migrate` is on in development.
-They replace the SeaORM `migration/` crate one for one, in the same
-order, and produce the same schema: a `pg_dump --schema-only` of a
-database migrated by each differs only in the bookkeeping table
-(`seaql_migrations` vs `_sqlx_migrations`). A database migrated by the
-old code has no `_sqlx_migrations`, so it must be recreated rather than
-migrated in place (there is no deployed data).
 
 ### 10.7 Bulk import/export (BLK-5) — per-entity adoption
 

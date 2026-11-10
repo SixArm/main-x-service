@@ -1,7 +1,6 @@
 ## 10. Persistence
 
-PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-08; SeaORM
-before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
+PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-08). The rules, from the family's `spec/tech-stack/index.md` §5.2:
 
 - **All SQL is in `src/db/`.** `repositories.rs` (the worker repository,
   the record-integrity reads and the `integrity_resign` MAC writes),
@@ -31,8 +30,7 @@ before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
   merge's survivor update, duplicate soft delete and both outbox rows
   commit together; an erasure commits whole. The audit chain's advisory
   lock, head read and insert run on one connection. An update or soft
-  delete that matches no row is an error, as it was under SeaORM, with
-  the same message.
+  delete that matches no row is an error.
 - **Record digests are stamped over the record as stored** (INT-V1),
   read back inside the write's transaction, so a fresh or updated record
   verifies. Before, they covered the value the caller sent, which
@@ -42,7 +40,7 @@ before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
   writes, in the same statement, and comes back through `RETURNING`.
 - **Timestamps** are `chrono` in the worker rows, as in the domain
   model. The audit trail, the assessments, the outbox, the entity links
-  and the review queue keep the `time` types they had as SeaORM models,
+  and the review queue hand `time` types to the code above `src/db/`,
   filled from `chrono` twins (`*Raw`) at the edge of `src/db/`, so the
   audit chain's and the assessment digest's pre-images and every
   serialized row are unchanged. Every sqlx error is `Error::Database`
@@ -51,11 +49,8 @@ before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
   `migrations/<version>_<name>.up.sql` / `.down.sql`, embedded by
   `sqlx::migrate!` (`db::MIGRATOR`) and tracked in `_sqlx_migrations`.
   `worker-service db migrate | down [steps] | reset | status` and the
-  boot auto-migrate run them through `axa::sqlx`. The 24 files are the
-  same SQL the SeaORM `migration/` wrapper crate ran, version prefixes
-  and names kept. A `pg_dump --schema-only` of a database migrated each
-  way is identical apart from the bookkeeping table (`seaql_migrations`
-  → `_sqlx_migrations`), so a database the old code migrated must be
+  boot auto-migrate run them through `axa::sqlx`. A database migrated
+  before 2026-11-08 tracks its migrations in another table and must be
   recreated.
 
 ### 10.1 Tables

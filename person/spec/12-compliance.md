@@ -296,7 +296,7 @@ defects had to be fixed first, none of them from the compliance work:
   index expressions to be IMMUTABLE and that function is not. No fuzzy
   matching is lost: it happens in `person-matcher` and Tantivy.
 - The rename-to-`person` migration renamed the tables but not their
-  `patient_id` foreign-key columns, which the SeaORM entities declare as
+  `patient_id` foreign-key columns, which the service's row types name
   `person_id`. Fixed by a **new forward migration**
   (`m20260726_000002_rename_patient_id_columns`), not by editing the
   original — that rename *can* have applied successfully, so its history

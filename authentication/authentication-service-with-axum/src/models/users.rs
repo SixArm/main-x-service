@@ -23,7 +23,7 @@
 //! (`MAGIC_LINK_EXPIRATION_MIN`) and single-use (cleared on redemption).
 //!
 //! Every write validates the row's name and email first, on insert and on
-//! every update, as the `SeaORM` era's `before_save` hook did; an insert
+//! every update; an insert
 //! also assigns the `pid` and `api_key` there, never the caller. An update
 //! writes only the columns it changes, keyed by `id`, and a write that
 //! matches no row is [`ModelError::RecordNotUpdated`].
@@ -687,8 +687,9 @@ impl Model {
 
     /// Creates a magic link token for passwordless authentication.
     ///
-    /// Generates a random token with a specified length and sets an expiration time
-    /// for the magic link. This method is used to initiate the magic link authentication flow.
+    /// Generates a random token with a specified length and sets an
+    /// expiration time for the magic link. This method is used to initiate
+    /// the magic link authentication flow.
     ///
     /// # Errors
     /// - Returns an error if database update fails

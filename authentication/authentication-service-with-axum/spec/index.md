@@ -417,8 +417,7 @@ the migrated schema. Nothing builds SQL from text.
 The schema is the plain SQL under `migrations/`, run by
 `sqlx::migrate!` through `axa::sqlx` (`db migrate | down | reset |
 status`, and the test boot). One reversible
-`<version>_<name>.up.sql` / `.down.sql` pair per former `SeaORM`
-migration, in the same order: `2022010100000001_users`,
+`<version>_<name>.up.sql` / `.down.sql` pair per change, in order: `2022010100000001_users`,
 `2022010100000002_sessions`, `2022010100000003_auth_events`,
 `2022010100000004_users_deleted_at` (the GDPR-erasure soft-delete
 column), `2022010100000005_auth_rate_limits` (the magic-link
@@ -433,11 +432,7 @@ rest; its down is a no-op), `2026072800000001_add_auth_event_mac`
 (adds `auth_events.hash` / `hash_sha3` / `mac` — the keyed-integrity
 columns §6.13 verifies), and the two T-14 `source_ip` columns
 (`2026090600000001_sessions_source_ip`,
-`2026090600000002_auth_events_source_ip`). A `pg_dump --schema-only`
-of a database the old `SeaORM` migrator built and one these files built
-is identical apart from the bookkeeping table (`seaql_migrations` →
-`_sqlx_migrations`), so a database the old build migrated must be
-recreated, not upgraded in place.
+`2026090600000002_auth_events_source_ip`).
 
 `auto_migrate` is on in development, off in production.
 

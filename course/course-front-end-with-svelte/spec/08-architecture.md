@@ -24,7 +24,7 @@
                               v
                 +-----------------------------+
                 |   course-service-with-axum |
-                |   Axum + SeaORM + Tantivy   |
+                |   Axum + sqlx + Tantivy     |
                 +-----------------------------+
 ```
 

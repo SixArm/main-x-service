@@ -68,8 +68,8 @@ pub async fn create_connection(config: &DatabaseConfig) -> Result<PgPool> {
         .map_err(|e| crate::Error::Pool(e.to_string()))
 }
 
-/// "No row matched" on an update or soft delete, worded as `SeaORM`'s
-/// `RecordNotUpdated` was, so the error a caller sees is unchanged.
+/// "No row matched" on an update or soft delete. The wording is fixed, so
+/// the error a caller sees stays the same.
 pub(crate) fn not_updated() -> crate::Error {
     crate::Error::Database("None of the records are updated".to_string())
 }

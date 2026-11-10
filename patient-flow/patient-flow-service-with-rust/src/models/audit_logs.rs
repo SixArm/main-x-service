@@ -13,8 +13,8 @@ use uuid::Uuid;
 use super::ModelResult;
 
 /// One audit row: who did what to which record, with a snapshot.
-/// Serialized as-is by the audit endpoints (the wire shape the `SeaORM`
-/// entity had).
+/// Serialized as-is by the audit endpoints; the field order is a fixed
+/// wire shape.
 #[allow(missing_docs)] // the columns are documented by the migration
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {

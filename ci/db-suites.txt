@@ -99,8 +99,8 @@ thing/thing-service-with-axum
 #     chain stopped there and `audit_log.seq` / `workers.worker_type` never
 #     existed.
 #   * person's rename-to-`person` migration renamed the tables but not
-#     their `patient_id` foreign-key columns, which the SeaORM entities
-#     declare as `person_id`.
+#     their `patient_id` foreign-key columns, which the service's code
+#     names `person_id`.
 #   * person's bulk-import advisory-lock key embedded a literal NUL as a
 #     field separator. Postgres `text` cannot hold one, so every
 #     identifier-keyed import row failed with `invalid byte sequence for

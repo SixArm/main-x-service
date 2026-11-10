@@ -25,7 +25,7 @@ competing source.
 | matcher | Deterministic matching | R-0 identifier schemes (`Docket`/`ExternalCaseId`/`Uri`/`Uuid`), R-1 agency + `case_number`, R-2 `same_as` overlap → 1.0 |
 | matcher | Probabilistic matching | Title (Jaro-Winkler + Soundex bonus), subjects Jaccard, case number, case type, status, keywords Jaccard; renormalised weights; presets strict/default/lenient |
 | matcher | Quality bar | No `unsafe`/`unwrap`/`panic`; deterministic; diacritic-preserving; unit + public-API tests + doctests; demo binary; a `proptest` harness + `cargo-fuzz` targets since the family-wide SEC-M6/FUZZ-2 rounds |
-| service | axa chassis | axa (Axum 0.8) with sqlx and no ORM since 2026-11-08 (SeaORM 2.0 before); `cargo run -- start`; config yamls; port 5150 |
+| service | axa chassis | axa (Axum 0.8) with sqlx and no ORM; `cargo run -- start`; config yamls; port 5150 |
 | service | Persistence | `cases`, `audit_logs`, `merge_records`, `entity_links`, `event_outbox`, `review_queue`, `bulk_jobs` tables; plain-SQL `sqlx::migrate!` migrations; every statement a `query!` literal in `src/models/`; auto-migrate in dev |
 | service | CRUD | Create / list / read / replace / soft-delete; `404` unknown pid; `?limit=`/`?offset=` pagination with `X-Total-Count`/`X-Limit`/`X-Offset` headers (2026-08-01) |
 | service | Validation | Blank `title` → `422` (create + update); `opened_date` ISO check; blank identifier value / subject / keyword → `422`; per-field/array size caps (SEC-M1); all problems in one response (`src/validation.rs`) |

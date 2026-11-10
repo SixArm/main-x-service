@@ -14,8 +14,8 @@
 //! `TIMESTAMPTZ` to and what the domain uses, so they are filled by
 //! `query_as!` directly.
 //!
-//! Four rows leave this layer and keep the `time` types they had under
-//! `SeaORM`: [`audit_log::Model`] (the hash chain binds its timestamp, and
+//! Four rows leave this layer as `time` types, which the code above
+//! `src/db/` is written against: [`audit_log::Model`] (the hash chain binds its timestamp, and
 //! the audit endpoints serialize it), [`bulk_jobs::Model`],
 //! [`entity_links::Model`] and [`event_outbox::Model`]. Each is filled from
 //! a `chrono` twin (`*Raw`, crate-private) that `query_as!` fills, converted

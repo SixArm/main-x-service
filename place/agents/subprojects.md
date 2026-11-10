@@ -9,7 +9,7 @@ place-front-end-with-svelte --HTTP--> place-service-with-axum --Cargo dep--> pla
 
 | Subproject | Kind | Responsibility |
 |---|---|---|
-| [place-service-with-axum](../place-service-with-axum/) | Rust service (axa / Axum, SeaORM, Tantivy) | System of record: CRUD, search, geo-radius, duplicate detection, merge, review queue, validation, privacy, audit, events, REST API |
+| [place-service-with-axum](../place-service-with-axum/) | Rust service (axa / Axum, sqlx, Tantivy) | System of record: CRUD, search, geo-radius, duplicate detection, merge, review queue, validation, privacy, audit, events, REST API |
 | [place-matcher-rust-crate](../place-matcher-rust-crate/) | Rust library (pure, no IO, no `unsafe`) | Canonical pairwise matching: deterministic + probabilistic scoring with per-field breakdown; normalisation primitives; usable standalone |
 | [place-front-end-with-svelte](../place-front-end-with-svelte/) | SvelteKit 2 SPA (Svelte 5 runes, SVAR DataGrid, Lily Headless) | Operator UI over the service's REST API: list/search, create with 409 surfacing, detail/edit, match, merge, audit |
 

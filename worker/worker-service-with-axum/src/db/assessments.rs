@@ -191,8 +191,8 @@ async fn write_hashed(
             .await?,
         )
     } else {
-        // Every column but the key, as the `SeaORM` full-row update wrote
-        // them. A row that is gone is an error, as it was there.
+        // Every column but the key: a full-row update. A row that is gone
+        // is an error.
         sqlx::query_as!(
             AssessmentRaw,
             "UPDATE worker_assessments

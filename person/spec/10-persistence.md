@@ -33,8 +33,7 @@ fully-normalized target schema — former JSONB child collections
 JSONB retained only for audit snapshots and match-score breakdowns.
 
 Relationship to the migrations: the service crate's
-`migrations/*.up.sql` files (run by `sqlx::migrate!`; until
-2026-11-08 they were wrapped by a SeaORM `migration/` crate) are the
+`migrations/*.up.sql` files (run by `sqlx::migrate!`) are the
 **operative** DDL. The migration chain (create
 `patient_*` → rename to `person_*` → 2026-06 child-table additions)
 converges on the same shape for 16 of the 17 tables. Known

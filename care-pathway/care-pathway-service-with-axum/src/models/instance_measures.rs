@@ -9,7 +9,7 @@ use uuid::Uuid;
 use super::ModelResult;
 
 /// One recorded measure. Serialized as-is by the instance endpoints, in
-/// the `SeaORM` entity's field order.
+/// column order, a fixed wire shape.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Model {
     /// Row creation timestamp (column default).

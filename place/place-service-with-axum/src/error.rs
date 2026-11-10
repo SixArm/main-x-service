@@ -56,8 +56,8 @@ pub enum Error {
 /// message, so `?` on a query reads the same everywhere in `src/db/`.
 ///
 /// A violated unique constraint is not singled out: it is a database
-/// error like any other, exactly as it was under `SeaORM`. A caller that
-/// wants it as a `409` checks it first with `axa::sqlx::is_unique_violation`.
+/// error like any other. A caller that wants it as a `409` checks it
+/// first with `axa::sqlx::is_unique_violation`.
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
         Self::Database(e.to_string())

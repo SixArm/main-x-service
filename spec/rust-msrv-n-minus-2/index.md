@@ -144,14 +144,14 @@ first; CI installs it in the job.
 ### The dependency floor is the binding constraint
 
 Our own code compiles far below 1.97. What does not is the dependency
-graph: as of this change the loco-based services transitively require
+graph: the axa services transitively require
 
 ```
-loco-rs 1.0.1, loco-gen 1.0.0        → rustc 1.94
-sea-orm 2.0.0, sqlx 0.9.0            → rustc 1.94
+axa 0.11                             → rustc 1.97
+sqlx 0.9.0                           → rustc 1.94
 ```
 
-so **1.94 is the true floor and 1.97 clears it by three releases.** This is
+so **axa's 1.97 is the true floor, and it equals the MSRV with no headroom.** This is
 worth watching rather than assuming: a dependency bump can raise the
 floor above N-2 without a single line of our code changing, and the
 `msrv` stage is what turns that into a red build instead of a surprise

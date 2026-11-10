@@ -51,6 +51,5 @@ shapes, JSON contracts, upstream-service client interfaces.
 ## References
 
 - [axa docs](https://axa/docs) · [axa GitHub](https://github.com/axa/loco)
-- [SeaORM book](https://www.sea-ql.org/SeaORM/docs/)
 - [Root specification](../../spec/index.md) · [Svelte sibling](../../case-folder-front-end-with-svelte/spec/index.md)
 - [UK NHS Number](https://en.wikipedia.org/wiki/NHS_number) · [NHS Synthetic Data](https://digital.nhs.uk/services/synthetic-data)

@@ -15,14 +15,14 @@ follow the conventions below.
 
 - **PostgreSQL 18** is the target. (A few older crate docs still say 14/15/17;
   18 is canonical — treat those as drift.)
-- Access is always via **SeaORM 2.0** over `sqlx-postgres`
-  (`runtime-tokio-rustls`); no service issues hand-rolled libpq calls. The
-  controller-style services additionally lean on axa (`with-db`, `worker`).
-- SeaORM date/uuid/json features in use: `with-uuid`, `with-json`, and
-  `with-time` or `with-chrono` depending on the crate (the authentication
-  service uses chrono; the constraint in
-  [`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md) prefers
-  `with-chrono`/`with-time` for new work).
+- Access is always via **sqlx 0.9** (`postgres`, `runtime-tokio`,
+  `tls-rustls-ring-webpki`), through literal `query!` statements checked at
+  compile time against the committed `.sqlx/`
+  ([tech-stack](../tech-stack/index.md) §5); no service issues hand-rolled
+  libpq calls. axa's `sqlx` feature opens the pool and its `queue` feature
+  runs the job queue.
+- sqlx type features in use: `uuid`, `json` and `chrono`. `chrono` only,
+  never `time` ([`rust-axum-stack.md`](../../agents/share/rust-axum-stack.md)).
 
 ## 2. One database per service
 
@@ -97,10 +97,9 @@ Fully normalized SQL per [data-modeling.md](../data-modeling.md):
   goal for these services (matching reads the payload into the matcher).
 - Side tables are normal columns: `audit_logs`, `merge_records`, and (for
   authentication) `users`, `sessions`, `auth_events`, `auth_rate_limits`.
-- Migrations use **`sea-orm-migration`** (axa's `create_table` helper),
-  named `m20220101_0000NN_<name>`, registered in a `migration/` subcrate —
-  except the **authentication** service, which embeds the migrator in-crate
-  under `src/migration/`.
+- Migrations are plain SQL, `migrations/<version>_<name>.up.sql` with a
+  `.down.sql`, embedded by `sqlx::migrate!` and run by the service's
+  `db migrate` command (§11).
 
 ## 5. Extensions
 
@@ -177,12 +176,12 @@ queue tables there. Config lives under `queue:` in `config/*.yaml`. See
 
 ## 11. Migrations workflow
 
-- **controller-style services:** `sea-orm-migration`; `cargo run -- db migrate` /
-  `auto_migrate` on boot in dev. Each migration has `up` + `down`; new
-  tables register in `migration/mod.rs` (or `src/migration/mod.rs` for
-  authentication) at the `inject-above` marker.
-- **Normalized services:** raw `up.sql`/`down.sql` applied by `sea-orm-cli`,
-  with a `schema.sql` snapshot kept in sync.
+- **Every service:** plain-SQL `migrations/<version>_<name>.up.sql` and
+  `.down.sql`, embedded by `sqlx::migrate!` and applied by
+  `cargo run -- db migrate`, which records them in `_sqlx_migrations`. A new
+  migration is a new file; sqlx checksums applied ones, so an applied file is
+  never edited. After a schema change, regenerate `.sqlx/` with
+  `cargo sqlx prepare -- --all-targets` (sqlx-cli reads `DATABASE_URL`).
 - **Production:** `auto_migrate: false`; run migrations as an explicit,
   reviewed deploy step, never implicitly on boot.
 
@@ -202,8 +201,8 @@ queue tables there. Config lives under `queue:` in `config/*.yaml`. See
 - **Health checks** verify DB connectivity for orchestration.
 - **Backups:** `pg_dump` per database; restore into the matching
   per-service name.
-- **Observability:** enable `pg_stat_statements`; SeaORM query logging via
-  `enable_logging`; correlate with the tracing/OTLP stack
+- **Observability:** enable `pg_stat_statements`; sqlx logs statements on
+  the `sqlx::query` tracing target (`RUST_LOG=sqlx::query=debug`); correlate with the tracing/OTLP stack
   ([observability](../observability/index.md)).
 
 ## 14. Compliance notes

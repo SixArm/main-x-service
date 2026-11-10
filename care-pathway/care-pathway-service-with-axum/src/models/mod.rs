@@ -62,11 +62,10 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.
 ///
-/// The variants are the three the `SeaORM` era's `axa::model::ModelError`
-/// was used for here, and each converts into the [`axa::Error`] the old
-/// one became, so every HTTP answer is unchanged: a missing row is `404`,
-/// a database error is axa's own mapping (a violated unique constraint is
-/// `409`, anything else `500`), and any other failure is `500`.
+/// The variant names are stable, so a caller's match does not move, and each
+/// converts into an [`axa::Error`] with a fixed status: a missing row is
+/// `404`, a database error is axa's own mapping (a violated unique constraint
+/// is `409`, anything else `500`), and any other failure is `500`.
 #[derive(Debug)]
 pub enum ModelError {
     /// The row does not exist (or is soft-deleted).
@@ -116,10 +115,9 @@ impl From<ModelError> for axa::Error {
     }
 }
 
-/// A whole-row update of a row already in hand hit no row. `SeaORM`
-/// answered `RecordNotUpdated` there, a database error (`500`); this
-/// keeps it a database error (`RowNotFound`, also `500`) rather than
-/// turning it into a `404`.
+/// A whole-row update of a row already in hand hit no row: a database
+/// error (`RowNotFound`, `500`), not a `404`, since the caller had just
+/// read the row.
 pub(crate) fn updated(rows_affected: u64) -> ModelResult<()> {
     if rows_affected == 0 {
         Err(ModelError::Sqlx(sqlx::Error::RowNotFound))
@@ -137,14 +135,13 @@ pub(crate) fn to_i64(n: u64) -> i64 {
 /// Delete every row from the service's tables, for `db truncate` and the
 /// request-suite setup.
 ///
-/// `DELETE`, not `TRUNCATE`, and identities are not restarted: what the
-/// `SeaORM` era's `truncate_table` did on `merge_records`, `audit_logs`
-/// and `care_pathways`. CP-T1 (case's CS-T1): the other ten tables are
-/// cleared too. They were not before, so a truncated database still held
-/// the instances with their steps, team, events, measures and segments,
-/// the `continues_as` links, unsent outbox events the relay would go on
-/// shipping, bulk jobs and duplicate-review pairs, all for pathways it no
-/// longer had.
+/// `DELETE`, not `TRUNCATE`, and identities are not restarted, on
+/// `merge_records`, `audit_logs` and `care_pathways`. CP-T1 (case's CS-T1):
+/// the other ten tables are cleared too. They were not before, so a truncated
+/// database still held the instances with their steps, team, events, measures
+/// and segments, the `continues_as` links, unsent outbox events the relay
+/// would go on shipping, bulk jobs and duplicate-review pairs, all for
+/// pathways it no longer had.
 ///
 /// None of the thirteen tables declares a foreign key, so any order is
 /// safe today. The order is still children before parents (an

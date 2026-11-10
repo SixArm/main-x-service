@@ -399,7 +399,7 @@ async fn delete_children(conn: &mut PgConnection, id: Uuid) -> Result<()> {
 /// child row for the worker, then re-inserts them from the domain model.
 /// Runs on the caller's transaction so it shares that commit boundary.
 ///
-/// An id that matches no row is an error, as it was under `SeaORM`.
+/// An id that matches no row is an error.
 async fn apply_update_rows(conn: &mut PgConnection, worker: &Worker) -> Result<()> {
     let done = sqlx::query!(
         "UPDATE workers
@@ -510,7 +510,7 @@ async fn lock_merge_participants(
 /// (the row was gone before we looked) there is nothing to rehash and the
 /// columns are left as they were.
 ///
-/// An id that matches no row is an error, as it was under `SeaORM`.
+/// An id that matches no row is an error.
 async fn apply_soft_delete_row(
     conn: &mut PgConnection,
     id: &Uuid,
@@ -1528,7 +1528,7 @@ pub async fn rows_with_content_mac(db: &PgPool, limit: u64) -> Result<Vec<Stored
 }
 
 /// Replace one worker's MAC, the only column `integrity_resign` writes.
-/// No matching row is an error, as it was under `SeaORM`.
+/// No matching row is an error.
 ///
 /// # Errors
 ///

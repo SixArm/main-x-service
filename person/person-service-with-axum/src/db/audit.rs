@@ -779,7 +779,7 @@ impl AuditLogRepository {
     }
 
     /// Replace one row's MAC, the only column `integrity_resign` writes.
-    /// No matching row is an error, as it was under `SeaORM`.
+    /// No matching row is an error.
     ///
     /// # Errors
     ///

@@ -13,8 +13,8 @@
 //! in `api::rest::links`; this layer never touches the far service.
 //!
 //! Domain dates are `chrono::NaiveDate` (matching the rest of the domain
-//! layer); the row handed back stores `time::Date`, as it did under
-//! `SeaORM`, bridged via [`crate::db::convert`].
+//! layer); the row handed back stores `time::Date`, which the code above
+//! `src/db/` expects, bridged via [`crate::db::convert`].
 
 use axa::sqlx::Db;
 use chrono::NaiveDate;
@@ -208,8 +208,8 @@ pub async fn list_all_active(
 
 /// Soft-delete (withdraw) an edge: stamp `deleted_at = now()`.
 ///
-/// Only `deleted_at` is written, as `SeaORM`'s update of the loaded model
-/// did, and an id that matches no row is an error.
+/// Only `deleted_at` is written, and an id that matches no row is an
+/// error.
 ///
 /// # Errors
 ///

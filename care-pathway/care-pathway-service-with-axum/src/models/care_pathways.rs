@@ -23,14 +23,14 @@ use crate::compliance::record_integrity;
 /// for lookup.
 ///
 /// Timestamps are `DateTime<FixedOffset>` (always `+00:00` from
-/// Postgres), the type the `SeaORM` entity used, so anything that
-/// serializes a row keeps its exact wire form.
+/// Postgres), so anything that serializes a row
+/// writes the offset too, a fixed wire form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row creation timestamp.
     pub created_at: DateTime<FixedOffset>,
     /// Row last-update timestamp: the column default, never bumped by a
-    /// statement here, exactly as under `SeaORM`.
+    /// statement here.
     pub updated_at: DateTime<FixedOffset>,
     /// Internal auto-increment primary key.
     pub id: i64,
@@ -455,7 +455,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails, including when the row is gone
-    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    /// (`RowNotFound`).
     pub async fn set_content_mac(db: &PgPool, id: i64, mac: Option<&str>) -> ModelResult<()> {
         let done = sqlx::query!(
             "UPDATE care_pathways SET content_mac = $2 WHERE id = $1",
@@ -509,7 +509,7 @@ impl Model {
     /// # Errors
     ///
     /// When serialization or the update fails, including when the row is
-    /// gone (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    /// gone (`RowNotFound`).
     pub async fn update_data(
         self,
         db: impl Into<Db<'_>>,
@@ -556,7 +556,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails, including when the row is gone
-    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    /// (`RowNotFound`).
     pub async fn soft_delete(self, db: impl Into<Db<'_>>) -> ModelResult<Self> {
         // Truncated to microseconds so the value hashed here is the value
         // Postgres returns (see `compliance::record_integrity`).
@@ -597,7 +597,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails, including when the row is gone
-    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    /// (`RowNotFound`).
     pub async fn erase_payload(
         self,
         db: impl Into<Db<'_>>,

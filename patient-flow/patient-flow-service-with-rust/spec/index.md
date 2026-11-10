@@ -53,22 +53,18 @@ tracing + OTLP, Podman.
   `SQLX_OFFLINE=true`. There is no `QueryBuilder`, `raw_sql` or
   `AssertSqlSafe`: the whiteboard's `IN` lists are `= ANY($1)`, and
   the partial `PUT` updates are `COALESCE($n, col)`, which leaves an
-  absent field as it was, the way the `SeaORM` `ActiveModel` did.
+  absent field as it was.
 - **Migrations**: five plain-SQL pairs under `migrations/`
   (`<version>_<name>.up.sql` / `.down.sql`), run by `sqlx::migrate!`
   through `axa::sqlx` for `db migrate | down | reset | status` and the
-  boot auto-migrate. They were written from a `pg_dump --schema-only`
-  of the database the old `SeaORM` schema-builder migrations produced,
-  and a dump of the new schema is identical apart from the bookkeeping
-  table (`_sqlx_migrations` for `seaql_migrations`), so a database the
-  old build migrated must be recreated. `event_outbox` keeps its
+  boot auto-migrate. `event_outbox` keeps its
   `SERIAL` (`integer`) id; every other table has a `bigint` identity.
 - **`updated_at` is stamped in the SQL** (PF-U1): every `UPDATE` that
   changes a row — partial `PUT`s, transitions, soft deletes, the relay
   ack — sets `updated_at = now()` itself, and the `Red2Green` upsert
   does the same on its conflict branch. There is no trigger, so a
-  statement that leaves it out leaves it unchanged; under `SeaORM` (and
-  the first sqlx cut) none set it and it always equalled `created_at`.
+  statement that leaves it out leaves it unchanged. Before PF-U1 none
+  set it, and it always equalled `created_at`.
 - **`Red2Green` is one upsert** (PF-R1): `POST /api/stays/{pid}/red-green`
   writes `INSERT … ON CONFLICT (stay_pid, day) DO UPDATE` on the
   `red_green_stay_day` key, inside the handler's transaction with its

@@ -27,8 +27,7 @@ lines, 23 `CREATE TABLE`s) is a **hand-written, point-in-time
 reading aid** at the entity root: a fully-normalised PostgreSQL
 rendition of the service schema (JSONB kept only for audit snapshots
 and match-score breakdowns; word lists as `TEXT[]`). The service
-crate's migrations (`migrations/*.up.sql`, run by `sqlx::migrate!`;
-until 2026-11-08 wrapped by a SeaORM `migration/` crate) are
+crate's migrations (`migrations/*.up.sql`, run by `sqlx::migrate!`) are
 **authoritative**; the snapshot is not executed, not
 generated, and not checked by anything.
 

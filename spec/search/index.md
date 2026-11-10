@@ -61,19 +61,25 @@ every create/update alongside the JSONB `data` payload:
 | care-pathway-service | `name` | [`src/models/care_pathways.rs`](../../care-pathway/care-pathway-service-with-axum/src/models/care_pathways.rs) |
 | case-service | `title` | [`src/models/cases.rs`](../../case/case-service-with-axum/src/models/cases.rs) |
 
-The SeaORM query is uniform across the three:
+In care-pathway and case it is a `query_as!` literal (organization's was
+removed when its search moved to Tantivy):
 
 ```rust
 // care-pathway-service: src/models/care_pathways.rs
-pub async fn search(db: &DatabaseConnection, q: &str, limit: u64) -> ModelResult<Vec<Self>> {
+pub async fn search_paged(db: &PgPool, q: &str, limit: u64, offset: u64) -> ModelResult<Vec<Self>> {
     let pattern = format!("%{}%", escape_like(q));
-    let rows = care_pathways::Entity::find()
-        .filter(care_pathways::Column::DeletedAt.is_null())  // active rows only
-        .filter(Expr::col(care_pathways::Column::Name).ilike(pattern))
-        .order_by_desc(care_pathways::Column::Id)            // newest first
-        .limit(limit)                                        // controller passes 50
-        .all(db)
-        .await?;
+    let rows = sqlx::query_as!(
+        Self,
+        r#"SELECT … FROM care_pathways
+           WHERE deleted_at IS NULL AND name ILIKE $1   -- active rows only
+           ORDER BY id DESC                             -- newest first
+           LIMIT $2 OFFSET $3"#,
+        pattern,
+        to_i64(limit),
+        to_i64(offset),
+    )
+    .fetch_all(db)
+    .await?;
     Ok(rows)
 }
 ```
@@ -117,7 +123,7 @@ char `\` are escaped so a user typing `100%` searches for the literal
 string `100%`, not "anything starting with `100`". This is both a
 **correctness** fix (no surprise wildcard matches) and a **defence-in-depth
 security** measure (a user cannot smuggle wildcard semantics into the
-pattern; SeaORM still parameterises the value, so this is not the SQLi
+pattern; sqlx still binds the value as a parameter, so this is not the SQLi
 boundary — it is the wildcard-injection boundary).
 
 ```rust

@@ -7,5 +7,5 @@ projects it down to the matcher's `Course` and back-fills missing
 fields with defaults.
 
 The adapter lives in the service crate (not here). This crate has no
-SeaORM / Axum / Tantivy dependencies.
+sqlx / Axum / Tantivy dependencies.
 

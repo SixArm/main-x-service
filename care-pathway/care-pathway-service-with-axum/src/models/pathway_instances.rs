@@ -4,10 +4,8 @@
 //!
 //! Operational state, deliberately **not** part of the matcher payload:
 //! an instance references the template by `pathway_pid` and the subject
-//! by a `person:` URN. Every update writes exactly the columns the
-//! `SeaORM` era's partial `ActiveModel` updates wrote, keyed on `id`, and
-//! a row that has gone is `RowNotFound` (`500`), as `RecordNotUpdated`
-//! was.
+//! by a `person:` URN. Every update writes only the columns it changes,
+//! keyed on `id`, and a row that has gone is `RowNotFound` (`500`).
 
 use axa::sqlx::Db;
 use chrono::{DateTime, FixedOffset, NaiveDate};
@@ -18,8 +16,8 @@ use uuid::Uuid;
 use super::{ModelError, ModelResult, to_i64};
 
 /// One enrolment row. Serialized as-is by the instance endpoints, so the
-/// field order and the `DateTime<FixedOffset>` timestamps are the wire
-/// shape the `SeaORM` entity had.
+/// field order and the `DateTime<FixedOffset>` timestamps are a fixed wire
+/// shape.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row creation timestamp (column default).

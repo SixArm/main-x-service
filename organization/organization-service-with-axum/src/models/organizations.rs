@@ -18,14 +18,14 @@ use super::{ModelError, ModelResult};
 /// for lookup.
 ///
 /// Timestamps are `DateTime<FixedOffset>` (always `+00:00` from
-/// Postgres), the type the `SeaORM` entity used, so anything that
-/// serializes a row keeps its exact wire form.
+/// Postgres), so anything that serializes a row
+/// writes the offset too, a fixed wire form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row insert time (UTC), the column default.
     pub created_at: DateTime<FixedOffset>,
     /// Set to the insert time by the column default. No statement here
-    /// bumps it on update, exactly as under `SeaORM`.
+    /// bumps it on update.
     pub updated_at: DateTime<FixedOffset>,
     /// Auto-increment surrogate primary key (internal; never exposed on
     /// the wire — used for stable `ORDER BY id` listing).

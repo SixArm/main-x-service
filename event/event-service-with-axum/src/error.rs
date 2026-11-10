@@ -77,7 +77,7 @@ pub enum Error {
 /// message, so `?` on a query reads the same everywhere in `src/db/`.
 ///
 /// A violated unique constraint is not singled out: it is a database
-/// error like any other, exactly as it was under `SeaORM`.
+/// error like any other.
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
         Self::Database(e.to_string())
@@ -85,8 +85,8 @@ impl From<sqlx::Error> for Error {
 }
 
 impl Error {
-    /// Build a [`Error::Database`] from a free-text message, worded as
-    /// it was under `SeaORM` (`Custom Error: …`).
+    /// Build a [`Error::Database`] from a free-text message, prefixed
+    /// `Custom Error: `, the wording callers and logs already match on.
     pub fn database(msg: impl Into<String>) -> Self {
         Error::Database(format!("Custom Error: {}", msg.into()))
     }

@@ -54,7 +54,7 @@ log: all twelve "Building" / "Sending build context" lines interleaved
 from the first second). On this machine — `podman machine` at the
 documented 8 CPU / 12 GB allocation, **no swap configured** — that is
 twelve simultaneous heavy Rust release compiles (LTO, several crates
-pulling in `tantivy`/`sea-orm`/`opentelemetry`/`arrow`) competing for 12 GB
+pulling in `tantivy`/`sqlx`/`opentelemetry`/`arrow`) competing for 12 GB
 with nothing to fall back on. The build log grew normally for the first
 few minutes, then went completely silent — no error, no OOM message, no
 "Successfully built" — for the better part of ten minutes with the host
@@ -420,7 +420,7 @@ podman compose -f examples/compose/full-family.yml \
 (Every other container stays `Running` — only link-graph-service is
 recreated, since it's the only service the override touches. The twelve
 `*-migrate` one-shot containers also re-run on this `up`, harmlessly —
-sea-orm-migration tracks applied migrations, so a second `db migrate`
+sqlx records applied migrations in `_sqlx_migrations`, so a second `db migrate`
 against an already-migrated schema is a no-op.)
 
 ## 6. Query the aggregator: neighbors, single-view, and status settling to `verified`

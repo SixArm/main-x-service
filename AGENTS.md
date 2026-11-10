@@ -200,8 +200,9 @@ N-2 the MSRV's minor version now coincides with the
 carries a patch version the MSRV does not, so the two remain distinct
 numbers with distinct jobs (§3 of the policy doc), they simply moved
 closer together than they were at N-3. The binding constraint is still
-the dependency graph, not our code: axa / sqlx require
-1.94, so 1.97 clears it with three releases of headroom. See
+the dependency graph, not our code: axa 0.11 requires 1.97 (sqlx 0.9
+requires 1.94), so the MSRV meets the floor with no headroom, and an axa
+release that raises its `rust-version` raises ours with it. See
 [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md) for the
 policy and the bump procedure.
 

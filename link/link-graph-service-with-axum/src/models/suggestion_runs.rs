@@ -120,8 +120,7 @@ impl Model {
         Ok(())
     }
 
-    /// Every recorded pass, in no particular order (the order the
-    /// `SeaORM` `find().all()` gave).
+    /// Every recorded pass, in no particular order.
     ///
     /// # Errors
     ///

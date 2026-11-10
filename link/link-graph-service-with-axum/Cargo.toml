@@ -40,7 +40,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # feature on as well, sqlx 0.9.0's macros warn on every timestamp column.
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "macros", "migrate", "uuid", "chrono", "json"] }
 # `serde` for the timestamps and dates the graph and audit endpoints
-# serialize; `SeaORM` used to turn it on.
+# serialize.
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.29", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }

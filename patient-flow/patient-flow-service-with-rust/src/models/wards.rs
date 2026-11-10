@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 use super::{ModelError, ModelResult};
 
-/// One `wards` row, serialized as-is by the ward endpoints (the wire
-/// shape the `SeaORM` entity had).
+/// One `wards` row, serialized as-is by the ward endpoints; the field order
+/// is a fixed wire shape.
 #[allow(missing_docs)] // the columns are documented by the migration
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
@@ -45,8 +45,8 @@ pub struct NewWard<'a> {
     pub place_ref: Option<&'a str>,
 }
 
-/// A partial ward update: `None` leaves the column as it is, which is
-/// what the `SeaORM` era's `ActiveModel` update did with an unset field.
+/// A partial ward update: `None` leaves the column as it
+/// is.
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Default)]
 pub struct WardChanges {

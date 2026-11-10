@@ -123,7 +123,7 @@ not a gap).
         │                    │                     │
 ┌───────▼──────┐    ┌────────▼────────┐   ┌────────▼────────┐
 │ PostgreSQL   │    │ Tantivy index   │   │ Event stream    │
-│ (SeaORM)     │    │ (full-text +    │   │ (Fluvio /       │
+│ (sqlx)       │    │ (full-text +    │   │ (Fluvio /       │
 │              │    │  fuzzy/phonetic)│   │  in-memory)     │
 └──────────────┘    └─────────────────┘   └─────────────────┘
 ```

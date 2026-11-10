@@ -51,7 +51,7 @@ should not be configured.
 
 ## 2. Database connection pooling
 
-Each service holds a SeaORM/`sqlx` connection pool to its own database.
+Each service holds a `sqlx` connection pool to its own database.
 Pooling plus statelessness is what makes horizontal scaling safe — see
 [postgresql §3](../postgresql/index.md) for the authoritative table.
 

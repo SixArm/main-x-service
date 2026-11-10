@@ -9,7 +9,7 @@ beyond transient page state; front-end
 
 ### 10.1 Service: PostgreSQL
 
-PostgreSQL 18+ via SeaORM. 13 tables (service
+PostgreSQL 18+ via sqlx. 13 tables (service
 [spec §10](../place-service-with-axum/spec/10-persistence.md)):
 `places`, `place_addresses`, `place_geo_coordinates`,
 `place_identifiers`, `place_amenities`, `place_opening_hours`,

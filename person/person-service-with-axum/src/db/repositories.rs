@@ -353,7 +353,7 @@ async fn delete_children(conn: &mut PgConnection, id: Uuid) -> Result<()> {
 /// from the domain model. Runs on the caller's transaction so it shares
 /// that commit boundary.
 ///
-/// An id that matches no row is an error, as it was under `SeaORM`.
+/// An id that matches no row is an error.
 async fn apply_update_rows(
     conn: &mut PgConnection,
     person: &Person,
@@ -434,7 +434,7 @@ async fn stamp_digests(conn: &mut PgConnection, id: Uuid) -> Result<()> {
 /// [`stamp_digests`] now writes all three over the stored row, on `conn`,
 /// so a caller passing its transaction gets them in the same write.
 ///
-/// An id that matches no row is an error, as it was under `SeaORM`.
+/// An id that matches no row is an error.
 async fn apply_soft_delete_row(
     conn: &mut PgConnection,
     id: &Uuid,
@@ -1502,7 +1502,7 @@ pub async fn rows_with_content_mac(db: &PgPool, limit: u64) -> Result<Vec<Stored
 }
 
 /// Replace one person's MAC, the only column `integrity_resign` writes.
-/// No matching row is an error, as it was under `SeaORM`.
+/// No matching row is an error.
 ///
 /// # Errors
 ///

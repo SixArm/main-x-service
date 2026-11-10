@@ -42,7 +42,7 @@ and §13 T-23a/T-23b (CSRF not yet done).
                           v         v
         +-----------------------------+   +-----------------------------+
         |   event-service-with-axum   |   |   authentication-service    |
-        |   Axum + SeaORM + Tantivy   |   |   (SSO, magic-link, PASETO) |
+        |   Axum + sqlx + Tantivy     |   |   (SSO, magic-link, PASETO) |
         +-----------------------------+   +-----------------------------+
 ```
 

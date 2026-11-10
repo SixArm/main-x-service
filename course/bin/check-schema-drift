@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # check-schema-drift — detect table-name drift between the hand-maintained
-# `course-service-schema.sql` reference and the authoritative SeaORM
-# migrations' `up.sql` files, WITHOUT needing a live database.
+# `course-service-schema.sql` reference and the authoritative sqlx
+# migrations' `*.up.sql` files, WITHOUT needing a live database.
 #
 # It extracts the set of CREATE TABLE names from each side and diffs them.
 # Migrations are authoritative; the hand-written schema.sql must match.
@@ -44,9 +44,9 @@ extract_tables() {
         | sort -u
 }
 
-MIG_UPS=$(find "$MIGRATIONS_DIR" -name up.sql | sort)
+MIG_UPS=$(find "$MIGRATIONS_DIR" -name '*.up.sql' | sort)
 if [ -z "$MIG_UPS" ]; then
-    echo "error: no up.sql files under $MIGRATIONS_DIR" >&2
+    echo "error: no *.up.sql files under $MIGRATIONS_DIR" >&2
     exit 2
 fi
 

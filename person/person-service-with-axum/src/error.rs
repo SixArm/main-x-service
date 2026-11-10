@@ -75,7 +75,8 @@ pub enum Error {
 
 impl Error {
     /// Build a [`Database`](Error::Database) error from a custom message,
-    /// worded as it was under `SeaORM` (`Custom Error: …`).
+    /// prefixed `Custom Error: `, the wording callers and logs already
+    /// match on.
     pub fn database(msg: impl Into<String>) -> Self {
         Error::Database(format!("Custom Error: {}", msg.into()))
     }

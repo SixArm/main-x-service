@@ -65,8 +65,7 @@ uuid = { version = "1.29", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 # The audit trail, the bulk jobs, the outbox and the entity links keep
 # `time` types at the edges of the database layer. `serde` keeps the audit
-# endpoints' timestamp in the tuple form it had, which SeaORM had been
-# enabling for this crate.
+# endpoints' timestamp in the tuple form clients already read.
 time = { version = "0.3", features = ["serde"] }
 thiserror = "2.0"
 dotenvy = "0.15"

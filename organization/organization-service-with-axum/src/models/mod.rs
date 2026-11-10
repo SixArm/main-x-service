@@ -42,11 +42,10 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.
 ///
-/// The variants are the three the `SeaORM` era's `axa::model::ModelError`
-/// was used for here, and each converts into the [`axa::Error`] the old
-/// one became, so every HTTP answer is unchanged: a missing row is `404`,
-/// a database error is axa's own mapping (a violated unique constraint is
-/// `409`, anything else `500`), and any other failure is `500`.
+/// The variant names are stable, so a caller's match does not move, and each
+/// converts into an [`axa::Error`] with a fixed status: a missing row is
+/// `404`, a database error is axa's own mapping (a violated unique constraint
+/// is `409`, anything else `500`), and any other failure is `500`.
 #[derive(Debug)]
 pub enum ModelError {
     /// The row does not exist (or is soft-deleted).
@@ -99,8 +98,8 @@ impl From<ModelError> for axa::Error {
 /// Delete every row from the service's tables, for `db truncate` and the
 /// request-suite setup.
 ///
-/// `DELETE`, not `TRUNCATE`, and identities are not restarted: exactly
-/// what the `SeaORM` era's `truncate_table` did. Children-before-parent
+/// `DELETE`, not `TRUNCATE`, and identities are not restarted.
+/// Children-before-parent
 /// order is kept by convention, though no table has a foreign key:
 /// outbox, merge and audit rows and bulk jobs, then the organizations they
 /// reference. The review queue is left alone, as it always was.

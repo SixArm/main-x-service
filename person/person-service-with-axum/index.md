@@ -772,7 +772,7 @@ spec-driven work (see [spec/13-tasks.md](spec/13-tasks.md) for what has
 landed since):
 
 1. **Phase 1-6**: Core infrastructure, models, configuration
-2. **Phase 7**: Database Integration (PostgreSQL; SeaORM then, sqlx since 2026-11-08)
+2. **Phase 7**: Database Integration (PostgreSQL, sqlx)
 3. **Phase 8**: Event Streaming & Audit Logging
 4. **Phase 9**: REST API Implementation
 5. **Phase 10**: Integration Testing

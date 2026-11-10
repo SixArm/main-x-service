@@ -30,7 +30,7 @@ API or the authentication service.
                  v                           v
    +-----------------------------+  +-----------------------------+
    |   worker-service-with-axum  |  |   authentication-service     |
-   |   Axum + SeaORM + Tantivy   |  |   (central SSO, PASETO mint) |
+   |   Axum + sqlx + Tantivy     |  |   (central SSO, PASETO mint) |
    +-----------------------------+  +-----------------------------+
 ```
 

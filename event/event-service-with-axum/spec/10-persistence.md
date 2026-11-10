@@ -1,7 +1,6 @@
 ## 10. Persistence
 
-PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-07; SeaORM
-before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
+PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-07). The rules, from the family's `spec/tech-stack/index.md` §5.2:
 
 - **All SQL is in `src/db/`.** `repositories.rs` (the event repository
   and the record-integrity read), `audit.rs` (the audit log, including
@@ -26,26 +25,21 @@ before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
   the same transaction as the `events` row; a merge's survivor update,
   child replacement, duplicate soft delete and both outbox rows commit
   together. An update or soft delete that matches no `events` row is an
-  error, as it was under SeaORM, with the same message.
+  error.
 - **Timestamps** are `chrono::DateTime<Utc>` in the row structs, as in
   the domain model. axa enables sqlx's `chrono`, and enabling `time` as
   well makes sqlx 0.9.0's macros warn on every timestamp column. The
-  audit endpoints still serialize `audit_log.timestamp` in the `time`
-  crate's form, as they did when the row was a SeaORM model, so the wire
-  is unchanged. Every sqlx error is `Error::Database` carrying sqlx's
-  message; a unique violation is not singled out, as it was not before.
+  audit endpoints serialize `audit_log.timestamp` in the `time` crate's
+  form, which clients read. Every sqlx error is `Error::Database`
+  carrying sqlx's message; a unique violation is not singled out.
 - **Migrations** are plain SQL in sqlx's reversible flat layout,
   `migrations/<version>_<name>.up.sql` / `.down.sql`, embedded by
   `sqlx::migrate!` (`db::MIGRATOR`) and tracked in `_sqlx_migrations`.
   `event-service db migrate | down [steps] | reset | status` and the
-  boot auto-migrate run them through `axa::sqlx`. The SQL is the same
-  SQL the SeaORM `migration/` wrapper crate ran, version prefixes and
-  names kept, including the legacy `create_organizations`; the last
-  migration, `drop_dead_organizations`, whose SQL used to live inline in
-  its Rust wrapper, is now its own pair of files. A `pg_dump
-  --schema-only` of a database migrated each way is identical apart
-  from the bookkeeping table (`seaql_migrations` → `_sqlx_migrations`),
-  so a database the old code migrated must be recreated.
+  boot auto-migrate run them through `axa::sqlx`. The history keeps the
+  legacy `create_organizations` and `drop_dead_organizations` pair. A
+  database migrated before 2026-11-07 tracks its migrations in another
+  table and must be recreated.
 
 ### 10.1 Tables
 

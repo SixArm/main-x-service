@@ -78,7 +78,8 @@ under the hood). Characteristics:
 - Endpoints are **axa controllers** (`src/controllers/*.rs`) registered
   via `AppRoutes::with_default_routes().add_route(...)`. axa supplies
   default `/_health/live`, `/_health/ready`, `/_health/startup`.
-- Migrations are `sea-orm-migration` migrations under `migration/`.
+- Migrations are plain SQL under `migrations/`, embedded by `sqlx::migrate!`;
+  every statement is a `query!` literal in `src/models/`.
 - Persistence is **DTO-as-JSONB**: the matcher's domain type *is* the
   API DTO, stored verbatim in a `data` JSONB column alongside denormalised
   handles (`pid`, `name`, `active`, soft-delete). The service matches with
@@ -103,7 +104,7 @@ master-patient-index-style layout with explicit layered modules. From
 ```
 src/
 ├── api/        REST (Axum) + FHIR R5 + gRPC (stub) + ok/ApiProblem responses
-├── db/         SeaORM entities, repositories, audit log
+├── db/         sqlx `query!` statements: rows, repositories, audit log
 ├── matching/   probabilistic + deterministic matchers, algorithms, scoring, phonetic
 ├── search/     Tantivy index + query builder
 ├── streaming/  event producer/consumer (in-memory)
@@ -144,7 +145,7 @@ left their idiomatic-controller rewrite deferred.)
 | Entities | authentication, organization, care-pathway, case, portfolio, link-graph-service | person, worker, place, thing, event, course |
 | Framework seam | axa `Hooks` + `AppContext` | hand-built Axum `Router` + `AppState` |
 | Endpoints | axa controllers | `api/rest` handlers (+ `api/fhir`, `api/grpc`) |
-| Migrations | `sea-orm-migration` | SeaORM migrations |
+| Migrations | plain SQL, `sqlx::migrate!` | plain SQL, `sqlx::migrate!` |
 | Persistence | matcher DTO as JSONB (+ denormalised handles) | normalized child tables |
 | Matching | embedded matcher crate, same type stored & matched | embedded matcher + service-side adapter |
 | Search | Tantivy full-text (live on every entity registry) | Tantivy full-text |
@@ -174,7 +175,7 @@ Rules:
 - **`models` are leaves.** Domain models depend on nothing in the crate;
   every layer may depend on them.
 - **Engines are trait-abstracted** so implementations swap: `*Repository`
-  (SeaORM), `*Matcher` (probabilistic/deterministic), `EventProducer`
+  (sqlx), `*Matcher` (probabilistic/deterministic), `EventProducer`
   (in-memory now, Kafka/NATS/Fluvio later), `EventConsumer` (stub).
 
 Shared-services wiring differs by style but plays the same role:
@@ -297,7 +298,7 @@ both styles.
 
 ## 7. Technology stack
 
-The full dependency stack (Rust 2024, Tokio, Axum/loco, SeaORM,
+The full dependency stack (Rust 2024, Tokio, Axum on axa, sqlx,
 PostgreSQL 18, Tantivy, Utoipa, OpenTelemetry, strsim, geo/haversine,
 Podman, …) and its hard constraints (Podman not Docker, PostgreSQL not
 SQLite, chrono, MiMalloc not jemalloc) are specified in:

@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 use super::{ModelError, ModelResult};
 
-/// One checklist step. Serialized as-is by the instance endpoints, in the
-/// `SeaORM` entity's field order.
+/// One checklist step. Serialized as-is by the instance endpoints, in
+/// column order, a fixed wire shape.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row creation timestamp (column default).
@@ -174,7 +174,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails, including `RowNotFound` when the row is
-    /// gone (as `SeaORM`'s `RecordNotUpdated` was).
+    /// gone.
     pub async fn complete(self, db: &PgPool, done_on: NaiveDate) -> ModelResult<Self> {
         let row = sqlx::query_as!(
             Self,

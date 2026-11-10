@@ -9,8 +9,7 @@ use uuid::Uuid;
 use super::{ModelError, ModelResult};
 
 /// One `sites` row. Serialized as-is by `GET /api/sites`, so the field
-/// order and the `DateTime<FixedOffset>` timestamps are the wire shape
-/// the `SeaORM` entity had.
+/// order and the `DateTime<FixedOffset>` timestamps are a fixed wire shape.
 #[allow(missing_docs)] // the columns are documented by the migration
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {

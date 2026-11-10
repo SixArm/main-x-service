@@ -344,7 +344,6 @@ mod tests {
 /// DB-gated (`#[ignore]`) proof of the relay poll's lock behaviour:
 /// rows one relay holds are invisible to a second relay polling at the
 /// same time (SEC-B6). Needs a migrated `PostgreSQL` via `DB_URL`.
-/// It replaces a pin on the SQL text `SeaORM` generated.
 #[cfg(test)]
 mod relay_poll {
     use super::{Model, OutboxInsert};

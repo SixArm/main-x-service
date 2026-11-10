@@ -1,7 +1,6 @@
 ## 10. Persistence
 
-PostgreSQL via sqlx 0.9 with no ORM (controller-style; SeaORM until
-2026-11-07).
+PostgreSQL via sqlx 0.9 with no ORM (controller-style).
 Family-wide database conventions:
 [`agents/share/postgresql.md`](../../agents/share/postgresql.md).
 
@@ -43,8 +42,7 @@ removed — this is the entity's GDPR-balancing retention mechanism
   by `sqlx::migrate!` (`db migrate | down | reset | status`); new tables
   MUST be added the same way. Every statement the service runs is a
   `sqlx::query!` literal in `src/models/`, checked against the committed
-  `.sqlx/` (service spec §10). They replaced the SeaORM `migration/`
-  crate on 2026-11-07 with an identical schema.
+  `.sqlx/` (service spec §10).
 - `auto_migrate: true` in `config/development.yaml`; production
   applies migrations explicitly.
 - Extensions: none required by the current schema beyond stock

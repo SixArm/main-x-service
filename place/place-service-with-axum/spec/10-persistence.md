@@ -1,7 +1,6 @@
 ## 10. Persistence
 
-PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-07; SeaORM
-before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
+PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-07). The rules, from the family's `spec/tech-stack/index.md` §5.2:
 
 - **All SQL is in `src/db/`.** `mod.rs` (the place repository, the pool,
   the migrator, integrity-verification reads), `audit.rs`, `outbox.rs`,
@@ -33,10 +32,7 @@ before). The rules, from the family's `spec/tech-stack/index.md` §5.2:
   `migrations/<version>_<name>.up.sql` / `.down.sql`, embedded by
   `sqlx::migrate!` (`db::MIGRATOR`) and tracked in `_sqlx_migrations`.
   `place-service db migrate | down [steps] | reset | status` and the
-  boot auto-migrate run them through `axa::sqlx`. The SQL is the same
-  SQL the SeaORM `migration/` wrapper crate ran; a `pg_dump
-  --schema-only` of a database migrated each way differs only in the
-  bookkeeping table (`seaql_migrations` → `_sqlx_migrations`).
+  boot auto-migrate run them through `axa::sqlx`.
 
 ### 10.1 Tables (13)
 

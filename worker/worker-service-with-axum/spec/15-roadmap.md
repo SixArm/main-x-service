@@ -45,7 +45,7 @@
   operative date periods) plus new domain models for
   `OrganizationRole`, `OrganizationRelationship`,
   `OrganizationSuccession`, `PostcodeGeography`, and ODS `CodeSystem`
-  reference data — each with a domain model, migration, SeaORM entity,
+  reference data — each with a domain model, migration, sqlx row struct,
   and tests. (Detailed task breakdown was folded here from a former
   `docs/superpowers/plans/2026-03-22-nhs-ods-organizations*.md`
   implementation plan, now removed.)

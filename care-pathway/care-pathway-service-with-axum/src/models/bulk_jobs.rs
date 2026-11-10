@@ -2,8 +2,8 @@
 //! operation.
 //!
 //! Replaces the process-local export registry that
-//! [`crate::compliance::bulk`] used to keep, so a job survives a restart
-//! and is visible to every replica. Follows the family contract in
+//! [`crate::compliance::bulk`] used to keep, so a job survives a restart and
+//! is visible to every replica. Follows the family contract in
 //! [`agents/share/bulk-import-export.md`](../../../../agents/share/bulk-import-export.md)
 //! §3.
 //!
@@ -39,8 +39,8 @@ use super::{ModelError, ModelResult, to_i64};
 
 /// One bulk job row.
 ///
-/// Timestamps are `DateTime<FixedOffset>`, the type the `SeaORM` entity
-/// used, so anything that serializes a row keeps its exact wire form.
+/// Timestamps are `DateTime<FixedOffset>`, so anything that serializes a row
+/// writes the offset too, a fixed wire form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Job id (application-assigned).
@@ -92,8 +92,8 @@ fn now() -> DateTime<FixedOffset> {
     chrono::Utc::now().trunc_subsecs(6).into()
 }
 
-/// A whole-row `RETURNING` that matched no row: `RowNotFound`, as
-/// `SeaORM`'s `RecordNotUpdated` was.
+/// A whole-row `RETURNING` that matched no row: `RowNotFound`, a database error
+/// (`500`), not a `404`.
 fn gone(row: Option<Model>) -> ModelResult<Model> {
     row.ok_or(ModelError::Sqlx(sqlx::Error::RowNotFound))
 }
@@ -467,8 +467,7 @@ impl Model {
         rows: Option<i64>,
     ) -> ModelResult<Self> {
         // An absent value keeps the column as it is: `COALESCE` writes
-        // back the stored value, which is what leaving the column out of
-        // the `SeaORM` update did.
+        // back the stored value.
         let row = sqlx::query_as!(
             Self,
             r#"UPDATE bulk_jobs

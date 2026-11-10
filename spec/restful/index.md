@@ -124,7 +124,7 @@ repo-accurate; behaviour noted per generation where it differs.
 | `201` | Created | Create success in the older Axum services |
 | `204` | No Content | Delete success in the older Axum services (axa delete returns `200` with empty JSON) |
 | `400` | Bad Request | Malformed request: a blank/missing `q` on `/search` (an empty search would match everything); an invalid-UUID `pid` on `/{pid}/audit`; malformed FHIR in the older services |
-| `404` | Not Found | Unknown `pid` on get/update/delete/merge; in the controller-style services a soft-deleted or malformed pid also maps to not-found (`http_err` remaps SeaORM `EntityNotFound`, which axa would otherwise surface as `500`) |
+| `404` | Not Found | Unknown `pid` on get/update/delete/merge; in the controller-style services a soft-deleted or malformed pid also maps to not-found (`http_err` remaps the model's `ModelError::EntityNotFound`, which axa would otherwise surface as `500`) |
 | `409` | Conflict | Duplicate detected during create (real-time duplicate detection); body carries the candidate matches |
 | `422` | Unprocessable Entity | Validation failure — e.g. a blank `name`/`title`, or `main_pid == duplicate_pid` on merge. **All validation problems are reported together**, not just the first. `422` is reserved for semantic validation; `400` is for malformed requests (see [`../validation/index.md`](../validation/index.md)) |
 | `429` | Too Many Requests | Rate limit on the authentication-service magic-link endpoints (see [`../authentication/index.md`](../authentication/index.md)); and, in every service when configured, a client past `RATE_LIMIT_PER_MINUTE` or `LOCKOUT_AFTER_FAILURES` (`axa::ratelimit`), as a problem with `Retry-After` and `RateLimit-*` headers |
@@ -236,7 +236,7 @@ removed, not merely deprecated (see
 - **Error handling** is centralized. Controller-style services map domain errors to
   HTTP via small helpers — `validate()` returns `422`
   (`Error::CustomError(UNPROCESSABLE_ENTITY, …)`), `http_err()` remaps
-  SeaORM `EntityNotFound` to `404` (axa's default would be `500`), and
+  the model's `ModelError::EntityNotFound` to `404` (axa's default would be `500`), and
   `bad_request()` returns `400`. The older services convert their
   `Error` enum (11 variants, `thiserror`-derived) into an RFC 9457
   problem (`ApiProblem`) with the appropriate status code (§1.3).

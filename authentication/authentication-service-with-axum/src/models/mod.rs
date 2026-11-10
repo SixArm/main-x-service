@@ -32,11 +32,9 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.
 ///
-/// The variants are the ones the `SeaORM` era's `axa::model::ModelError`
-/// (and `DbErr`) were used for here, with the same names, so a caller's
-/// match and a snapshot of the `Debug` text are unchanged. Each converts
-/// into the [`axa::Error`] the old one became, so every HTTP answer is
-/// unchanged too: a missing row is `404`, an existing one `409`, a
+/// The variant names are stable, so a caller's match and a snapshot of
+/// the `Debug` text do not move. Each converts into an [`axa::Error`]
+/// with a fixed status: a missing row is `404`, an existing one `409`, a
 /// database error is axa's own mapping, and anything else is `500`.
 #[derive(Debug)]
 pub enum ModelError {
@@ -45,11 +43,9 @@ pub enum ModelError {
     /// The row does not exist. `404`.
     EntityNotFound,
     /// A `users` row failed validation. Carries the JSON map of field name
-    /// to error list that `SeaORM`'s `DbErr::Custom` carried, and is a
-    /// `500` as that was.
+    /// to error list. `500`.
     Custom(String),
-    /// An update by primary key matched no row, as `SeaORM`'s
-    /// `DbErr::RecordNotUpdated` reported. `500`.
+    /// An update by primary key matched no row. `500`.
     RecordNotUpdated,
     /// A free-form failure. `500`.
     Message(String),
@@ -125,12 +121,12 @@ pub(crate) fn to_i64(n: u64) -> i64 {
 /// Delete every row from the service's tables, for `db truncate` and the
 /// test harness.
 ///
-/// `DELETE`, not `TRUNCATE`, and identities are not restarted: what the
-/// `SeaORM` era's `truncate_table` did on `auth_events`, `sessions` and
-/// `users`, in that order. AU-T1: `auth_rate_limits` is cleared too. It
-/// was not before, so a truncated database still rate-limited addresses
-/// it no longer had any record of; its rows are keyed by email, not by a
-/// foreign key, so nothing else would ever clear them.
+/// `DELETE`, not `TRUNCATE`, and identities are not restarted, on
+/// `auth_events`, `sessions` and `users`, in that order. AU-T1:
+/// `auth_rate_limits` is cleared too. It was not before, so a truncated
+/// database still rate-limited addresses it no longer had any record of; its
+/// rows are keyed by email, not by a foreign key, so nothing else would ever
+/// clear them.
 ///
 /// # Errors
 ///

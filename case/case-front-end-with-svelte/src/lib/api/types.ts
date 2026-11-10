@@ -172,8 +172,8 @@ export interface MergeResponse {
 
 /**
  * One row of `GET /api/cases/merges/recent` — the raw `merge_records`
- * table row, mirroring the SeaORM entity in
- * `src/models/_entities/merge_records.rs`.
+ * table row, mirroring the service's row struct in
+ * `src/models/merge_records.rs`.
  */
 export interface MergeRecordRow {
   /** When the merge row was written (RFC 3339 with offset). */
@@ -291,7 +291,7 @@ export interface SearchParams {
 /**
  * One audit-log row from `GET /api/cases/{pid}/audit` or
  * `GET /api/cases/audit/recent`. Mirrors the service's `audit_logs`
- * SeaORM entity (`src/models/_entities/audit_logs.rs`) — only the fields
+ * row (`src/models/audit_logs.rs`) — only the fields
  * the UI renders are modelled here; the tamper-evidence columns
  * (`hash`/`prev_hash`/`mac`/…) are opaque to this front-end.
  */

@@ -20,5 +20,5 @@
 | **Stub mode**     | `USE_UPSTREAM_STUBS=1` — in-process fake upstreams seeded with demo data; the shared test harness. |
 | **Status**        | A folder is `in-cabinet` or `in-transit`. No other states exist.                               |
 
-Edition-specific terms (axa, SeaORM, runes, SVAR Grid, etc.) live in
+Edition-specific terms (axa, runes, SVAR Grid, etc.) live in
 each subproject's `spec/glossary.md`.

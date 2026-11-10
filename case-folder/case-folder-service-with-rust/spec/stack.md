@@ -4,11 +4,9 @@
 
 | Layer                  | Choice                                      | Pin                   |
 | ---------------------- | ------------------------------------------- | --------------------- |
-| Web framework          | [Loco](https://axa) (on Axum 0.8)       | `axa = "0.16"`    |
+| Web framework          | [axa](https://github.com/publicprojects-io/axa) (on Axum 0.8) | `axa = "0.11"` |
 | Serialization          | `serde` + `serde_json`                      | `serde = "1"`         |
-| Database               | PostgreSQL 14+ (boot-time only — no tables) | server-side           |
-| ORM                    | [SeaORM](https://www.sea-ql.org/SeaORM/)    | `sea-orm = "1.1"`     |
-| Migrations             | `sea-orm-migration`                         | `1.1`                 |
+| Database               | none — the service owns no tables           | —                     |
 | Async runtime          | Tokio (rustls)                              | `1.45`                |
 | HTTP client (upstream) | `reqwest` (rustls)                          | `0.12`                |
 | Rust toolchain         | stable                                      | `rust-toolchain.toml` |

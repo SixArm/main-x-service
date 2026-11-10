@@ -5,8 +5,7 @@
 
 | Term           | Meaning                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------- |
-| axa           | Rust web framework, "Rails for Rust"; ships with Axum, SeaORM, workers, tasks.              |
-| SeaORM         | Async ORM for Rust; axa's default DB layer.                                                |
+| axa            | Rust library over Axum: routes, middleware, health routes, configuration, jobs, CLI.       |
 | AppContext     | axa's per-request struct that bundles the DB connection, config, etc.                      |
 | `Routes`       | axa's wrapper around an Axum router with prefix + add helpers.                             |
 | Modulus 11     | Check-digit algorithm used by NHS Numbers.                                                  |

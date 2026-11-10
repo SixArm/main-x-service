@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use super::ModelResult;
 
-/// One recorded event. Serialized as-is by the instance endpoints, in the
-/// `SeaORM` entity's field order.
+/// One recorded event. Serialized as-is by the instance endpoints, in
+/// column order, a fixed wire shape.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row creation timestamp (column default).

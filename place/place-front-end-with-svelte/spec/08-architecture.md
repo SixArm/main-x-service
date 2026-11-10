@@ -42,7 +42,7 @@ the session and injects a short-lived PASETO (see `AGENTS.md`
                               v
                 +-----------------------------+
                 |   place-service-with-axum |
-                |   Axum + SeaORM + Tantivy   |
+                |   Axum + sqlx + Tantivy     |
                 +-----------------------------+
 ```
 

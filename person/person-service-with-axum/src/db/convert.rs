@@ -4,8 +4,8 @@
 //! (`DateTime<Utc>`, `NaiveDate`), which is what sqlx maps `TIMESTAMPTZ`
 //! and `DATE` to, so they need no conversion. The audit trail, the bulk
 //! jobs, the outbox and the entity links still hand `time` values
-//! (`OffsetDateTime`, `Date`) to the code above `src/db/`, as they did
-//! under `SeaORM`; these helpers translate at that edge.
+//! (`OffsetDateTime`, `Date`) to the code above `src/db/`, which is
+//! written against those types; these helpers translate at that edge.
 
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use time::{Date as TimeDate, Month, OffsetDateTime};

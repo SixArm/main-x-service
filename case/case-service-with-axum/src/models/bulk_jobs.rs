@@ -10,9 +10,8 @@
 //! implementation), adapted to this crate's model-error conventions and
 //! `chrono` timestamps.
 //!
-//! A partial update first looked the row up under `SeaORM`, so an
-//! unknown id is still [`super::ModelError::EntityNotFound`]; each update
-//! is now one statement that checks it hit a row.
+//! Each partial update is one statement that checks it hit a row, so an
+//! unknown id is [`super::ModelError::EntityNotFound`].
 
 use chrono::{DateTime, FixedOffset, SubsecRound as _, Utc};
 use serde::{Deserialize, Serialize};
@@ -26,8 +25,8 @@ use crate::bulk::{BulkFormat, BulkKind, JobStatus};
 /// One bulk job: its kind, status, counters, and artifact references.
 /// Mirrors the `bulk_jobs` table.
 ///
-/// Timestamps are `DateTime<FixedOffset>`, the type the `SeaORM` entity
-/// used, so anything that serializes a row keeps its exact wire form.
+/// Timestamps are `DateTime<FixedOffset>`, so anything that serializes a row
+/// writes the offset too, a fixed wire form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Job id.

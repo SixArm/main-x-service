@@ -8,8 +8,8 @@ use uuid::Uuid;
 
 use super::{ModelError, ModelResult};
 
-/// One `bays` row, serialized as-is by `PUT /api/bays/{pid}` (the wire
-/// shape the `SeaORM` entity had).
+/// One `bays` row, serialized as-is by `PUT /api/bays/{pid}`; the field order
+/// is a fixed wire shape.
 #[allow(missing_docs)] // the columns are documented by the migration
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {

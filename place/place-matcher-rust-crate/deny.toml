@@ -57,7 +57,7 @@ confidence-threshold = 0.8
 private = { ignore = true }
 
 [bans]
-# Duplicate versions are a warning (the loco/sea-orm stack pulls a few);
+# Duplicate versions are a warning (the dependency graph pulls a few);
 # not a hard failure, so the gate stays green while still surfacing bloat.
 multiple-versions = "warn"
 wildcards = "warn"

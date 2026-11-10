@@ -12,8 +12,8 @@ use super::ModelResult;
 /// what / when + a snapshot).
 ///
 /// Serialized as-is by the audit endpoints, so the field order and the
-/// `DateTime<FixedOffset>` timestamps (`+00:00`) are the wire shape the
-/// `SeaORM` entity had.
+/// `DateTime<FixedOffset>` timestamps (`+00:00`) are a fixed
+/// wire shape.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row insert time (UTC) — effectively the "when" of the action.

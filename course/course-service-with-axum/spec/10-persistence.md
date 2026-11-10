@@ -1,16 +1,12 @@
 ## 10. Persistence
 
-PostgreSQL via **sqlx**, with no ORM (since 2026-11-07, T-31; SeaORM
-before). The schema source of truth is the hand-written, numbered SQL
+PostgreSQL via **sqlx**, with no ORM (since 2026-11-07, T-31). The schema source of truth is the hand-written, numbered SQL
 under `migrations/`, in sqlx's reversible flat layout
 (`<version>_<name>.up.sql` / `.down.sql`), embedded by
 `sqlx::migrate!` as `db::MIGRATOR` and tracked in `_sqlx_migrations`.
 `course-service db migrate | down [steps] | reset | status` and the
 boot auto-migrate (`auto_migrate`, on by default in development) run
-them through `axa::sqlx`. The SQL is the same SQL the former SeaORM
-`migration/` wrapper crate ran; a `pg_dump --schema-only` of a database
-migrated each way is identical apart from the bookkeeping table
-(`seaql_migrations` → `_sqlx_migrations`).
+them through `axa::sqlx`.
 
 The rules, from the family's `spec/tech-stack/index.md` §5.2:
 
@@ -41,8 +37,7 @@ The rules, from the family's `spec/tech-stack/index.md` §5.2:
   replacement, duplicate soft delete and both outbox rows commit
   together.
 - **Full-row updates stay full-row.** A course or instance update
-  writes every column, `created_at` included, as the SeaORM full-row
-  `ActiveModel` update did; a soft delete writes only its tombstone
+  writes every column, `created_at` included; a soft delete writes only its tombstone
   columns. An update or soft delete that matches no row is still an
   error (`Error::Database`, `500`).
 - **Timestamps** are `chrono::DateTime<Utc>` in the row structs, as in
@@ -79,9 +74,7 @@ Tables (9 core + 7 collection child tables from the
 
 ### Time types
 
-Until T-31 this section recorded why `sea-orm` ran with `with-time`
-rather than `with-chrono` (T-17). With SeaORM gone the question is
-closed: the row structs use `chrono`, the same type as the domain
+The row structs use `chrono`, the same type as the domain
 model, and sqlx's `time` feature stays off (see the timestamp rule
 above). The `time` crate remains a direct dependency only for the
 outbox mapping's `OffsetDateTime` argument.

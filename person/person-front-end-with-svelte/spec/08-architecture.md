@@ -34,7 +34,7 @@ the implementation.
                            v                           v
                 +-----------------------+   +-----------------------+
                 | authentication-service|   | person-service-with-axum|
-                | magic-link + sessions |   | Axum/loco + SeaORM +   |
+                | magic-link + sessions |   | Axum/axa + sqlx +      |
                 | + POST /api/auth/token|   | Tantivy                |
                 +-----------------------+   +-----------------------+
 ```

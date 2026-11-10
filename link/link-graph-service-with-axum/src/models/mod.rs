@@ -31,11 +31,10 @@ pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.
 ///
-/// The variants are the ones the `SeaORM` era's `axa::model::ModelError`
-/// was used for here, and each converts into the [`axa::Error`] the old
-/// one became, so every HTTP answer is unchanged: a missing row is `404`,
-/// a database error is axa's own mapping, and any other failure (an
-/// upstream fetch in reconciliation or the suggestion job) is `500`.
+/// Each variant converts into an [`axa::Error`] with a fixed status: a
+/// missing row is `404`, a database error is axa's own mapping, and any other
+/// failure (an upstream fetch in reconciliation or the suggestion job) is
+/// `500`.
 #[derive(Debug)]
 pub enum ModelError {
     /// The row does not exist.
@@ -93,12 +92,11 @@ pub(crate) fn to_i64(n: u64) -> i64 {
 /// Delete every row from the read-model tables, for `db truncate` and the
 /// test harness.
 ///
-/// `DELETE`, not `TRUNCATE`: what the `SeaORM` era's `truncate_table`
-/// did. `processed_events`, the consumer's dedupe table, is cleared with
-/// the rest (LG-T1): left behind, it would make a truncated database skip
-/// a replayed event whose effect it no longer holds, so a replay from
-/// offset 0 (`consumer_offsets` is cleared too) could not rebuild the
-/// graph.
+/// `DELETE`, not `TRUNCATE`. `processed_events`, the consumer's dedupe table,
+/// is cleared with the rest (LG-T1): left behind, it would make a truncated
+/// database skip a replayed event whose effect it no longer holds, so a
+/// replay from offset 0 (`consumer_offsets` is cleared too) could not rebuild
+/// the graph.
 ///
 /// # Errors
 ///

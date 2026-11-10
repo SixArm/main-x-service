@@ -32,7 +32,6 @@ inferring from the code.
 | `src/nhs.rs`                   | Modulus 11 NHS Number validator + formatter               |
 | `tests/requests/`              | Request-level integration tests (stub upstreams)          |
 | `config/`                      | Dev / test / production YAML                              |
-| `migration/`                   | Empty SeaORM migrator (kept so axa's boot still works)   |
 
 ## Working rules
 

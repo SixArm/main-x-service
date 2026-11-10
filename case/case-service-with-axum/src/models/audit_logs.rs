@@ -41,8 +41,8 @@ const CHAIN_LOCK_KEY: i64 = 0x6D78_695F_6175_6469; // "mxi_audi"
 /// One persisted audit row: one CRUD/read action on a case (who / what /
 /// when + a snapshot), chained onto its predecessor.
 ///
-/// Timestamps are `DateTime<FixedOffset>`, the type the `SeaORM` entity
-/// used, so the audit endpoints serialize them exactly as before.
+/// Timestamps are `DateTime<FixedOffset>`, so the audit
+/// endpoints serialize them with an explicit offset, a fixed wire form.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Model {
     /// Row creation timestamp: stamped by the writer, truncated to
@@ -292,10 +292,11 @@ impl Model {
     /// Disclosure entries for one case, most-recent first — the
     /// HIPAA §164.528 accounting of disclosures.
     ///
-    /// Only rows the access context classified as an outward disclosure
-    /// are returned (see [`crate::compliance::disclosure::AccessContext::is_disclosure`]);
-    /// ordinary internal accesses are excluded, which is the whole point
-    /// of the distinction.
+    /// Only rows the access context classified as an outward disclosure are
+    /// returned (see
+    /// [`crate::compliance::disclosure::AccessContext::is_disclosure`]);
+    /// ordinary internal accesses are excluded, which is the whole point of
+    /// the distinction.
     ///
     /// # Errors
     ///
@@ -432,7 +433,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails, including when the row is gone
-    /// (`RowNotFound`, as `SeaORM`'s `RecordNotUpdated` was).
+    /// (`RowNotFound`).
     pub async fn set_mac(db: &PgPool, id: i64, mac: Option<&str>) -> ModelResult<()> {
         let done = sqlx::query!("UPDATE audit_logs SET mac = $2 WHERE id = $1", id, mac)
             .execute(db)

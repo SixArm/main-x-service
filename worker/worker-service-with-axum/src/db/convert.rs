@@ -5,8 +5,8 @@
 //! and `DATE` to, so they need no conversion. The audit trail, the
 //! assessments, the outbox, the entity links and the review queue still
 //! hand `time` values (`OffsetDateTime`, `Date`) to the code above
-//! `src/db/`, as they did under `SeaORM`; these helpers translate at that
-//! edge.
+//! `src/db/`, which is written against those types; these helpers
+//! translate at that edge.
 //!
 //! All four helpers convert via nanosecond / calendar-component round-trips
 //! and assume the values originate from the other library's own valid range,
