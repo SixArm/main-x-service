@@ -8591,7 +8591,12 @@ through `axa::cursor_pagination` (`agents/share/restful.md`
 - [ ] **CUR-1 (M)** Move person, worker, event and course list and
   search to cursor paging, with `CURSOR_KEY` and their front-ends, as
   organization did. Their bounded `?offset=` goes, and so does the
-  offset cap, which a signed position no longer needs.
+  offset cap, which a signed position no longer needs. Person's and
+  worker's `GET /review-queue` belong here too: each still returns at
+  most 500 rows with no cursor and clamps a larger `limit` (found
+  2026-11-10 by place T-20), which place, thing, organization, case and
+  care-pathway fixed once they paged by cursor; their
+  `review_queue_paging` tests are the pattern.
 - [ ] **CUR-2 (S)** `src/cursor_key.rs` is copied into each crate, like
   `src/client_limits.rs`. Reading `CURSOR_KEY` with the production rule
   belongs in axa, as one `CursorKey::from_env`.
