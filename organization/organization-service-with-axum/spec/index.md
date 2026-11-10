@@ -117,9 +117,12 @@ are never fed to the matcher. See §8 and
    pair `automerged` only when its score clears it **and** its evidence
    is `proven`; absent, no pair is marked (§6.15). Nothing is merged by
    the scan itself.
-9. `GET /api/organizations/review-queue[?status=&limit=]` — list the
-   stored review queue, newest first (limit cap 500; unknown status
-   token → `422`). Each item carries the `evidence` stored with it
+9. `GET /api/organizations/review-queue[?status=&limit=&cursor=]` — list
+   the stored review queue, newest first, one page at a time by signed
+   cursor like `GET /api/organizations` (default 100, at most 500; a
+   `limit` above that, a cursor this service did not sign, or an unknown
+   status token → `422`; `Link: rel="next"` while more follow; `total`
+   counts the page). Each item carries the `evidence` stored with it
    (`null` for a row queued before evidence was recorded).
 10. `POST /api/organizations/review-queue/{id}/decision` — decide a
     `pending` item (`{"status": "confirmed" | "rejected"}`);
@@ -540,6 +543,15 @@ organization is not a data subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **ORG-RQ1 (S) — Page the review queue.** *(Done 2026-11-10.)*
+  `GET /api/organizations/review-queue` returned at most 500 rows with
+  no cursor, so a longer queue could not be read past its first page,
+  and a larger `limit` was quietly clamped where
+  `agents/share/restful.md` §Pagination refuses it (found by place
+  T-20). It now pages through `axa::cursor_pagination` like
+  `GET /api/organizations`. `tests/requests/review_queue_paging.rs`
+  seeds 520 pairs and walks them to the end, each seen once, and checks
+  the `422`s.
 - [x] **ORG-EV1 — carry match evidence through the service.** *(Done
   2026-11-09; [`agents/share/match-evidence.md`](../../../agents/share/match-evidence.md)
   §10 step 4.)* §6.15: `evidence` on `check-duplicates` hits, the

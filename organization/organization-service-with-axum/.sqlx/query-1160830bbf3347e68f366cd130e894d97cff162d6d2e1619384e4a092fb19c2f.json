@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, record_id_a, record_id_b, match_score, match_quality,\n                detection_method, score_breakdown, status, provenance, evidence,\n                reviewed_by, created_at, reviewed_at\n         FROM review_queue\n         WHERE ($1::text IS NULL OR status = $1)\n         ORDER BY created_at DESC, id\n         LIMIT $2",
+  "query": "SELECT id, record_id_a, record_id_b, match_score, match_quality,\n                detection_method, score_breakdown, status, provenance, evidence,\n                reviewed_by, created_at, reviewed_at\n         FROM review_queue\n         WHERE ($1::text IS NULL OR status = $1)\n         ORDER BY created_at DESC, id\n         LIMIT $2 OFFSET $3",
   "describe": {
     "columns": [
       {
@@ -150,6 +150,7 @@
     "parameters": {
       "Left": [
         "Text",
+        "Int8",
         "Int8"
       ]
     },
@@ -169,5 +170,5 @@
       true
     ]
   },
-  "hash": "c4cc824792b0a14d62a08f0f32e34a6a6269acf735337fad221781bf0aac1c4f"
+  "hash": "1160830bbf3347e68f366cd130e894d97cff162d6d2e1619384e4a092fb19c2f"
 }

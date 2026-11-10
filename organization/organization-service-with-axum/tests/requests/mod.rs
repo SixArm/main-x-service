@@ -12,6 +12,7 @@ mod event_outbox;
 mod evidence;
 mod fhir;
 mod organizations;
+mod review_queue_paging;
 
 /// Seed an organization **directly through the model layer**
 /// (`streaming::create_and_emit`), bypassing `POST /api/organizations`'s
