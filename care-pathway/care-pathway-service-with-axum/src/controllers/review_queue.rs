@@ -23,10 +23,11 @@
 //! here performs a merge: `automerged` is a disposition, as in the
 //! sibling registries, and the merge itself stays `POST /merge`.
 
+use axa::cursor_pagination::{CursorLimits, CursorPage};
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
-use axum::extract::State;
+use axum::extract::{OriginalUri, State};
 use axum::http::StatusCode;
 use care_pathway_matcher::{Evidence, MatchConfig, MatchStrength, MatchingEngine};
 use serde::{Deserialize, Serialize};
@@ -276,30 +277,43 @@ async fn deduplicate(
     })
 }
 
-/// Query parameters for the review-queue list endpoint.
+/// Query parameters for the review-queue list endpoint. The page,
+/// `limit` and `cursor`, is read from the URI by [`CursorPage::new`], and
+/// ignored here.
 #[derive(Debug, Deserialize)]
 struct ReviewQueueListQuery {
     /// Optional status-token filter (`pending` / `confirmed` /
     /// `rejected` / `automerged`).
     status: Option<String>,
-    /// Maximum items to return (default 100, capped at 500).
-    limit: Option<u64>,
 }
+
+/// Review-queue page sizes: 100 when none is asked for, and a `limit`
+/// above [`MAX_LIMIT`](crate::controllers::care_pathways::MAX_LIMIT)
+/// refused with a `422`, never clamped (`agents/share/restful.md`).
+const REVIEW_QUEUE_LIMITS: CursorLimits = CursorLimits {
+    default_limit: 100,
+    max_limit: crate::controllers::care_pathways::MAX_LIMIT,
+};
 
 /// Response for the review-queue list endpoint.
 #[derive(Debug, Serialize)]
 struct ReviewQueueListResponse {
-    /// The stored review-queue items (newest first).
+    /// The stored review-queue items on this page (newest first).
     items: Vec<ReviewQueueItem>,
-    /// Number of items returned.
+    /// Number of items on this page, not in the queue: whether more
+    /// follow is the `Link: rel="next"` header's answer.
     total: usize,
 }
 
 /// List the stored duplicate review queue (newest first).
 ///
-/// `GET /api/care-pathways/review-queue[?status=&limit=]`. An unknown
-/// status token is `422`.
+/// `GET /api/care-pathways/review-queue[?status=&limit=&cursor=]`, one
+/// page at a time by signed cursor like `GET /api/care-pathways`: a
+/// `Link: rel="next"` header while more rows follow, and a `422` for a
+/// `limit` above 500, a cursor this service did not sign, or an unknown
+/// status token.
 async fn get_review_queue(
+    OriginalUri(uri): OriginalUri,
     Query(query): Query<ReviewQueueListQuery>,
     State(ctx): State<AppContext>,
 ) -> Result<Response> {
@@ -314,15 +328,24 @@ async fn get_review_queue(
             ),
         ));
     }
+    let page = CursorPage::new(crate::cursor_key::key(), REVIEW_QUEUE_LIMITS, &uri)?;
     let rows = crate::models::review_queue::list(
         &ctx.db,
         query.status.as_deref(),
-        query.limit.unwrap_or(100),
+        page.offset(),
+        page.limit() + 1,
     )
     .await?;
+    let (rows, more_follow) = page.split(rows);
     let items: Vec<ReviewQueueItem> = rows.iter().map(review_row_to_item).collect();
     let total = items.len();
-    format::json(ReviewQueueListResponse { items, total })
+    let mut response = Json(ReviewQueueListResponse { items, total }).into_response();
+    if more_follow && let Some(link) = page.next_link() {
+        response
+            .headers_mut()
+            .insert(axum::http::header::LINK, link);
+    }
+    Ok(response)
 }
 
 /// One operator verdict for a `pending` review item.

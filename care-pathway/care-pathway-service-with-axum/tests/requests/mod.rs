@@ -13,6 +13,7 @@ mod instances;
 mod journeys_seed;
 mod links;
 mod review_queue;
+mod review_queue_paging;
 mod stalled;
 mod tba;
 

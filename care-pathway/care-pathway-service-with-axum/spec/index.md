@@ -1215,6 +1215,17 @@ the evidence bundle.
 
 ## 13. Tasks (live work queue)
 
+- [x] **CP-RQ1 (S) — Page the review queue.** *(Done 2026-11-10.)*
+  `GET /api/care-pathways/review-queue` returned at most 500 rows with
+  no cursor, so a longer queue could not be read past its first page,
+  and a larger `limit` was quietly clamped where
+  `agents/share/restful.md` §Pagination refuses it (found by place
+  T-20). It now pages through `axa::cursor_pagination` like
+  `GET /api/care-pathways`: `?limit=&cursor=`, default 100, at most
+  500, a `422` above that or on an unsigned cursor, `Link: rel="next"`
+  while more follow; `total` counts the page.
+  `tests/requests/review_queue_paging.rs` seeds 520 pairs and walks them
+  to the end, each seen once.
 - [x] **SQLX-1: SeaORM to sqlx (2026-11-08).** Persistence moved off
   SeaORM onto sqlx directly (`spec/tech-stack/index.md` §5). Every
   statement is a `query!` / `query_as!` / `query_scalar!` literal in
