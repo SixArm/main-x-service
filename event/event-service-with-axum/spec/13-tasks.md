@@ -579,8 +579,26 @@ clearly described manual check confirms the acceptance criterion.
   `cargo clippy --all-targets -- -D warnings`, and `cargo fmt --check`
   all clean.
 
-- [ ] **T-15 — Persist the dedup review queue (promotes OQ-4 to a
-  task).** `POST /api/events/deduplicate` computes `ReviewQueueItem`s
+- [x] **T-15 — Persist the dedup review queue (promotes OQ-4 to a
+  task).** *(Done 2026-11-10.)* Migration
+  `2026111000000001_create_review_queue` (normalized pair, `UNIQUE`,
+  `evidence` JSONB); `src/db/review_queue.rs` (upsert that keeps a
+  stored status, list, first-writer-wins `decide`, `mark_automerged`);
+  the scan stores every pair `pending` and returns the stored rows;
+  `GET /api/events/review-queue` (default 100, at most 500, `422` above
+  it or at `0`; cursor paging waits on repo `tasks.md` CUR-1) and
+  `POST /api/events/review-queue/{id}/decision`. A still-`pending`
+  pair that `permits_auto_merge` passes is merged through
+  `handlers::merge_by_id`, the body of `POST /api/events/merge` lifted
+  out so both take one path, into the older event (earlier
+  `created_at`, then the lower id); a failed merge leaves the row
+  `pending` and counts in `auto_merge_failed`. A pair a person decided
+  is never merged by a later scan. Tests in
+  `tests/dedup_merge_privacy.rs`: the proven pair is really merged (the
+  newer event `404`s, the survivor holds the ticket, the row is
+  `automerged`), a consistent pair merges nothing, the scan persists
+  pairs with stable ids and a confirmed decision survives a re-scan,
+  and the queue's `422`s and `404`. `POST /api/events/deduplicate` computes `ReviewQueueItem`s
   on the fly and returns them in the response body; there is no
   `review_queue` table, no `GET .../review-queue` listing endpoint, and
   no `POST .../review-queue/{id}/decision` endpoint — unlike person /

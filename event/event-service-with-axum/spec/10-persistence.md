@@ -62,9 +62,14 @@ PostgreSQL 18+ via **sqlx**, with no ORM (since 2026-11-07). The rules, from the
 - `organizations`, `organization_addresses`,
   `organization_contacts`, `organization_identifiers`.
 - `audit_log`.
-- **No `review_queue` table.** Unlike person / worker / place / thing /
-  organization, event's dedup review queue is not persisted — see §6.4
-  and §16 OQ-4.
+- `review_queue` (T-15, migration `2026111000000001_create_review_queue`):
+  one row per candidate pair from the batch scan, `record_id_a <
+  record_id_b` under `UNIQUE (record_id_a, record_id_b)`, so a re-scan
+  upserts in place; `score_breakdown` and `evidence` are JSONB; `status`
+  is the lowercase wire token (`pending` / `confirmed` / `rejected` /
+  `automerged`), indexed. No foreign key to `events`: a merged-away
+  event stays soft-deleted, and its row stays for the record. Every
+  statement is in `src/db/review_queue.rs`.
 
 ### 10.2 Extensions
 

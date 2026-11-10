@@ -22,6 +22,7 @@ pub mod convert;
 pub mod models;
 pub mod outbox;
 pub mod repositories;
+pub mod review_queue;
 
 pub use audit::AuditLogRepository;
 pub use repositories::{

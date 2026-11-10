@@ -43,6 +43,8 @@ pub use state::AppState;
         handlers::check_duplicates,
         handlers::merge_events,
         handlers::batch_deduplicate,
+        handlers::get_review_queue,
+        handlers::review_decision,
         handlers::export_event_data,
         handlers::get_event_masked,
         handlers::get_event_audit_logs,
@@ -81,6 +83,9 @@ pub use state::AppState;
             crate::models::BatchDeduplicationResponse,
             crate::models::ReviewQueueItem,
             crate::models::ReviewStatus,
+            handlers::ReviewQueueListResponse,
+            handlers::ReviewDecision,
+            handlers::ReviewDecisionRequest,
             crate::models::Consent,
             crate::models::ConsentType,
             crate::models::ConsentStatus,
@@ -136,6 +141,11 @@ pub fn events_routes() -> axa::routes::Routes {
         .add("/events/check-duplicates", post(handlers::check_duplicates))
         .add("/events/merge", post(handlers::merge_events))
         .add("/events/deduplicate", post(handlers::batch_deduplicate))
+        .add("/events/review-queue", get(handlers::get_review_queue))
+        .add(
+            "/events/review-queue/{id}/decision",
+            post(handlers::review_decision),
+        )
         .add("/events/{id}/export", get(handlers::export_event_data))
         .add("/events/{id}/masked", get(handlers::get_event_masked))
         .add("/events/{id}/audit", get(handlers::get_event_audit_logs))

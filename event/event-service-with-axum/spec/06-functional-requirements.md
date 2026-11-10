@@ -165,25 +165,35 @@ sensitive identifiers or party emails.
   are caught too.
 - Explicit `POST /api/events/check-duplicates`.
 - Batch `POST /api/events/deduplicate`.
-- Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`) —
-  **ephemeral by design, not persisted.** `POST /api/events/deduplicate`
-  computes candidate pairs on the fly and returns them as
-  `ReviewQueueItem`s in the same response; each gets a fresh random
-  `id` that names nothing durable. There is no `review_queue` table
-  (§10.1), no `GET /api/events/review-queue` listing endpoint, and no
-  `POST .../review-queue/{id}/decision` endpoint — unlike person /
-  worker / place / thing / organization, which persist candidate pairs
-  and support a confirm/reject decision workflow (see
-  [match-search-merge.md](../../../agents/share/match-search-merge.md)).
-  `AutoMerged` on a scanned pair is a **label only**: the batch scan
-  does not itself perform a merge. Each item carries the pair's
-  `evidence`, and an item is `AutoMerged` only when its score clears
-  `auto_merge_threshold` **and** its evidence is `proven`
-  ([match-evidence.md](../../../agents/share/match-evidence.md) §4);
-  `consistent` and `contradicted` pairs stay `Pending` whatever their
-  score. When T-15 makes `AutoMerged` execute a merge, the same gate
-  (`matching::permits_auto_merge`) applies to it. Rerunning the scan re-discovers and
-  re-scores the same pairs from scratch. See §16 OQ-4.
+- Review queue (`Pending` / `Confirmed` / `Rejected` / `AutoMerged`),
+  **persisted** since T-15 (2026-11-10) in the `review_queue` table
+  (§10.1), as the family does
+  ([match-search-merge.md](../../../agents/share/match-search-merge.md)).
+  `POST /api/events/deduplicate` stores every pair it finds, in
+  normalized order under a `UNIQUE` pair: a new pair is `pending`, and a
+  re-scan refreshes the score and evidence of a stored pair but never
+  its status, so a person's decision stands. The response returns the
+  stored rows, whose ids are stable. `GET /api/events/review-queue`
+  lists them newest first (`?status=`, `?limit=` default 100, at most
+  500; a `limit` of `0` or above 500 is a `422`, not clamped; cursor
+  paging comes with repo `tasks.md` CUR-1), and
+  `POST /api/events/review-queue/{id}/decision` with `{"status":
+  "confirmed" | "rejected"}` decides a `pending` item, first writer
+  wins in SQL (`404` unknown id, `422` already decided). A decision
+  records the verdict only; merging stays `POST /api/events/merge`.
+- **Automatic merge.** A still-`pending` pair whose score clears
+  `auto_merge_threshold` **and** whose evidence is `proven`
+  ([match-evidence.md](../../../agents/share/match-evidence.md) §4,
+  `matching::permits_auto_merge`) is merged by the scan through the same
+  path as `POST /api/events/merge` (`handlers::merge_by_id`: the same
+  row locks, self-merge refusal, audit and outbox rows and index
+  updates, both events read fresh), into the **older** event (earlier
+  `created_at`, then the lower id), and its row becomes `automerged`.
+  `consistent` and `contradicted` pairs stay `pending` whatever their
+  score. A merge that fails (an event already merged away earlier in
+  the scan, a concurrent merge, a database error) leaves the row
+  `pending`, is counted in the response's `auto_merge_failed`, and does
+  not stop the scan.
 - Merge picks the surviving record; transfers identifiers, alternate
   names, keywords, locations, parties, and `same_as` URLs; appends the
   duplicate's primary name as an `alternate_name` on the survivor;

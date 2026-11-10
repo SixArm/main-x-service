@@ -141,7 +141,9 @@ credential, policy denied (the body names the deciding rule).
 | POST | `/events/match` | Find candidate matches for a request event |
 | POST | `/events/check-duplicates` | Real-time duplicate check (used internally by `POST /events`) |
 | POST | `/events/merge` | Merge two events (surviving record + duplicate) |
-| POST | `/events/deduplicate` | Batch dedup scan; returns `ReviewQueueItem`s |
+| POST | `/events/deduplicate` | Batch dedup scan; stores pairs, merges proven ones into the older event, returns the stored `ReviewQueueItem`s |
+| GET | `/events/review-queue` | Stored review queue, newest first (`?status=`, `?limit=` ≤ 500) |
+| POST | `/events/review-queue/{id}/decision` | Confirm or reject a `pending` item (first writer wins) |
 
 Blocking strategy for `POST /events/match` and `POST /events/check-duplicates`:
 the search index is queried for events with similar names whose

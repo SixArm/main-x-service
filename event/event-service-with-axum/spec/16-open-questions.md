@@ -10,7 +10,10 @@
 - **OQ-3 — `previous_start_date` semantics.** Required when
   `event_status == Rescheduled`? Today: not required, but consumers
   expect it.
-- **OQ-4 — Persist the dedup review queue?** Investigated 2026-08-29
+- ~~**OQ-4 — Persist the dedup review queue?**~~ — RESOLVED 2026-11-10
+  by §13 T-15: the queue is persisted, listed and decided, and a proven
+  pair is really merged (§6.4). The original note follows.
+  Investigated 2026-08-29
   (repo `tasks.md` PRO-P7): `POST /api/events/deduplicate` computes
   `ReviewQueueItem`s on the fly and returns them in the response; there
   is no `review_queue` table (§10.1), no listing endpoint, and no

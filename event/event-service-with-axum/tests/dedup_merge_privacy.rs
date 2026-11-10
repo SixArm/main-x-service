@@ -24,6 +24,9 @@
 //! The batch scan's events are seeded through the repository, past the
 //! create path's `409`, as a legacy import would leave them.
 //!
+//! Since T-15 the scan stores every pair in the review queue and really
+//! merges a proven one, into the older event.
+//!
 //! `#[ignore]`d — run with
 //! `DB_URL=… cargo test --test dedup_merge_privacy -- --ignored`.
 
@@ -304,6 +307,11 @@ async fn agreeing_on_name_and_start_alone_stays_pending_as_consistent() {
     assert!(pair["match_score"].as_f64().unwrap() > 0.9, "{pair}");
     assert_eq!(pair["evidence"]["strength"], "consistent", "{pair}");
     assert_eq!(pair["status"], "pending", "{pair}");
+    // Nothing was merged: both events are still there.
+    for id in [a.id, b.id] {
+        let (status, _) = call(&app, "GET", &format!("/api/events/{id}"), None).await;
+        assert_eq!(status, StatusCode::OK, "{id} survives a consistent pair");
+    }
 }
 
 #[tokio::test]
@@ -322,6 +330,122 @@ async fn a_shared_ticket_is_automerged_as_proven() {
     let pair = scan_pair(&app, &request, a.id, b.id).await;
     assert_eq!(pair["evidence"]["strength"], "proven", "{pair}");
     assert_eq!(pair["status"], "automerged", "{pair}");
+
+    // The merge really ran (T-15): the newer event is gone and the older
+    // one survives, holding the ticket.
+    let (status, _) = call(&app, "GET", &format!("/api/events/{}", b.id), None).await;
+    assert_eq!(
+        status,
+        StatusCode::NOT_FOUND,
+        "the duplicate is merged away"
+    );
+    let (status, survivor) = call(&app, "GET", &format!("/api/events/{}", a.id), None).await;
+    assert_eq!(status, StatusCode::OK, "{survivor}");
+    assert!(
+        survivor["identifiers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["value"] == ticket.as_str()),
+        "{survivor}"
+    );
+
+    // The stored row says so.
+    let (status, queue) = call(
+        &app,
+        "GET",
+        "/api/events/review-queue?status=automerged&limit=500",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{queue}");
+    assert!(
+        queue["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["id"] == pair["id"]),
+        "{queue}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
+async fn the_scan_persists_pairs_and_a_decision_survives_a_rescan() {
+    let app = common::create_test_router().await;
+    let repo = repository().await;
+    let start = Utc.with_ymd_and_hms(2031, 3, 14, 9, 0, 0).unwrap();
+    let name = format!("T15 Queue {}", Uuid::new_v4());
+    let a = repo.create(&Event::new(name.clone(), start)).await.unwrap();
+    let b = repo.create(&Event::new(name, start)).await.unwrap();
+    let request = json!({ "max_candidates": 1000 });
+
+    // The scan stores the pair pending, with its evidence.
+    let pair = scan_pair(&app, &request, a.id, b.id).await;
+    assert_eq!(pair["status"], "pending", "{pair}");
+    let (status, queue) = call(
+        &app,
+        "GET",
+        "/api/events/review-queue?status=pending&limit=500",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{queue}");
+    let stored = queue["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == pair["id"])
+        .cloned()
+        .unwrap_or_else(|| panic!("the pair is stored: {queue}"));
+    assert_eq!(stored["evidence"], pair["evidence"], "{stored}");
+
+    // A re-scan refreshes the same row, under the same id.
+    let again = scan_pair(&app, &request, a.id, b.id).await;
+    assert_eq!(again["id"], pair["id"], "ids are stable across scans");
+
+    // A person confirms it; a second decision is refused.
+    let id = pair["id"].as_str().unwrap();
+    let uri = format!("/api/events/review-queue/{id}/decision");
+    let (status, decided) = call(&app, "POST", &uri, Some(&json!({ "status": "confirmed" }))).await;
+    assert_eq!(status, StatusCode::OK, "{decided}");
+    assert_eq!(decided["status"], "confirmed", "{decided}");
+    assert!(decided["reviewed_at"].is_string(), "{decided}");
+    let (status, refused) = call(&app, "POST", &uri, Some(&json!({ "status": "rejected" }))).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+
+    // A later scan keeps the person's decision.
+    let after = scan_pair(&app, &request, a.id, b.id).await;
+    assert_eq!(after["id"], pair["id"]);
+    assert_eq!(after["status"], "confirmed", "{after}");
+}
+
+#[tokio::test]
+#[ignore = "requires a running PostgreSQL via DB_URL"]
+async fn the_review_queue_refuses_what_it_cannot_answer() {
+    let app = common::create_test_router().await;
+    for uri in [
+        "/api/events/review-queue?limit=501",
+        "/api/events/review-queue?limit=0",
+        "/api/events/review-queue?status=bogus",
+    ] {
+        let (status, body) = call(&app, "GET", uri, None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{uri}: {body}");
+    }
+    let (status, _) = call(&app, "GET", "/api/events/review-queue?limit=500", None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let unknown = format!("/api/events/review-queue/{}/decision", Uuid::new_v4());
+    let (status, body) = call(
+        &app,
+        "POST",
+        &unknown,
+        Some(&json!({ "status": "confirmed" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    let (status, body) = call(&app, "POST", &unknown, Some(&json!({ "status": "maybe" }))).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
 }
 
 #[tokio::test]

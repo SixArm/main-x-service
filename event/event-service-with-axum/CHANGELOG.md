@@ -8,6 +8,22 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — persisted review queue (T-15)
+
+- The batch `POST /api/events/deduplicate` stores every pair it finds in
+  a new `review_queue` table (migration
+  `2026111000000001_create_review_queue`) and returns the stored rows,
+  whose ids are stable across scans. A re-scan never changes a stored
+  pair's status, so a person's decision stands.
+- `GET /api/events/review-queue[?status=&limit=]` lists the queue newest
+  first (default 100, at most 500; `0` or more than 500 is a `422`), and
+  `POST /api/events/review-queue/{id}/decision` confirms or rejects a
+  `pending` item, first writer wins.
+- A proven pair is now really merged, where `automerged` used to be a
+  label: through the same path as `POST /api/events/merge`, into the
+  older event. A merge that fails leaves the pair `pending` and is
+  counted in the new `auto_merge_failed` response field.
+
 ### Changed — axa 0.11
 
 - `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before

@@ -790,6 +790,116 @@ fn merge_event_data(
     (merged, transferred)
 }
 
+/// Why [`merge_by_id`] did not merge.
+#[derive(Debug)]
+pub(crate) enum MergeRefused {
+    /// `main` and `duplicate` are the same id (SEC-B5).
+    SameRecord,
+    /// No active event has the `main` id.
+    MainMissing(Uuid),
+    /// No active event has the `duplicate` id.
+    DuplicateMissing(Uuid),
+    /// A concurrent merge or delete won the row lock first (SEC-B5).
+    Conflict(String),
+    /// A repository fetch or the merge transaction failed.
+    Database(String),
+}
+
+impl MergeRefused {
+    /// The HTTP answer `POST /api/events/merge` gives for this refusal.
+    fn respond(self) -> axum::response::Response {
+        match self {
+            Self::SameRecord => ApiProblem::new(
+                "invalid_merge",
+                "main_event_id and duplicate_event_id must differ".to_string(),
+            )
+            .respond(StatusCode::UNPROCESSABLE_ENTITY),
+            Self::MainMissing(id) => {
+                ApiProblem::new("not_found", format!("Main event {id} not found"))
+                    .respond(StatusCode::NOT_FOUND)
+            }
+            Self::DuplicateMissing(id) => {
+                ApiProblem::new("not_found", format!("Duplicate event {id} not found"))
+                    .respond(StatusCode::NOT_FOUND)
+            }
+            Self::Conflict(why) => {
+                ApiProblem::new("merge_conflict", why).respond(StatusCode::CONFLICT)
+            }
+            Self::Database(why) => {
+                ApiProblem::new("database_error", why).respond(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+}
+
+/// Merge the event `duplicate_id` into the event `main_id`: the one merge
+/// path, used by `POST /api/events/merge` and by the batch scan's
+/// automatic merge (spec §13 T-15), so both take the same row locks, the
+/// same self-merge refusal, the same audit and outbox rows and the same
+/// search-index updates.
+///
+/// Both events are read fresh here, never taken from a caller's copy, so
+/// a survivor that already absorbed one duplicate in this scan keeps
+/// what it absorbed. Returns the merged survivor, the duplicate as it
+/// was, and the snapshot of transferred data.
+pub(crate) async fn merge_by_id(
+    state: &AppState,
+    main_id: Uuid,
+    duplicate_id: Uuid,
+) -> Result<(Event, Event, serde_json::Map<String, serde_json::Value>), MergeRefused> {
+    // SEC-B5: a record cannot be merged into itself. With `main ==
+    // duplicate` the merge applies the survivor and then soft-deletes the
+    // same id, so the record is gone. Refused before any read, as person,
+    // course and the controller-style services already do.
+    if main_id == duplicate_id {
+        return Err(MergeRefused::SameRecord);
+    }
+    let main = match state.event_repository.get_by_id(&main_id).await {
+        Ok(Some(p)) => p,
+        Ok(None) => return Err(MergeRefused::MainMissing(main_id)),
+        Err(e) => {
+            return Err(MergeRefused::Database(format!(
+                "Failed to fetch main event: {e}"
+            )));
+        }
+    };
+    let duplicate = match state.event_repository.get_by_id(&duplicate_id).await {
+        Ok(Some(p)) => p,
+        Ok(None) => return Err(MergeRefused::DuplicateMissing(duplicate_id)),
+        Err(e) => {
+            return Err(MergeRefused::Database(format!(
+                "Failed to fetch duplicate event: {e}"
+            )));
+        }
+    };
+
+    let (merged, transferred) = merge_event_data(&main, &duplicate);
+
+    // Persist the survivor's updates and soft-delete the duplicate
+    // atomically in one transaction; the repository enqueues the `Merged`
+    // (+`merged_from`) and `Deleted` outbox rows and publishes the
+    // in-memory `Merged`/`Deleted` stream events.
+    match state.event_repository.merge(&merged, &duplicate.id).await {
+        Ok(_) => {}
+        Err(crate::Error::Conflict(why)) => return Err(MergeRefused::Conflict(why)),
+        Err(e) => {
+            return Err(MergeRefused::Database(format!(
+                "Failed to merge events: {e}"
+            )));
+        }
+    }
+
+    // Post-merge search-index updates are best-effort: the merge is
+    // already committed, so failures here are logged but do not fail it.
+    if let Err(e) = state.search_engine.delete_event(&duplicate.id.to_string()) {
+        tracing::warn!("Failed to remove duplicate from search index: {}", e);
+    }
+    if let Err(e) = state.search_engine.index_event(&merged) {
+        tracing::warn!("Failed to update search index for merged event: {}", e);
+    }
+    Ok((merged, duplicate, transferred))
+}
+
 #[utoipa::path(
     post,
     path = "/api/events/merge",
@@ -840,81 +950,11 @@ pub async fn merge_events(
     State(state): State<AppState>,
     Json(req): Json<crate::models::MergeRequest>,
 ) -> impl IntoResponse {
-    // SEC-B5: a record cannot be merged into itself. With `main ==
-    // duplicate` the merge applies the survivor and then soft-deletes the
-    // same id, so the record is gone. Refused before any read, as person,
-    // course and the controller-style services already do.
-    if req.main_event_id == req.duplicate_event_id {
-        return ApiProblem::new(
-            "invalid_merge",
-            "main_event_id and duplicate_event_id must differ".to_string(),
-        )
-        .respond(StatusCode::UNPROCESSABLE_ENTITY);
-    }
-    let main = match state.event_repository.get_by_id(&req.main_event_id).await {
-        Ok(Some(p)) => p,
-        Ok(None) => {
-            return ApiProblem::new(
-                "not_found",
-                format!("Main event {} not found", req.main_event_id),
-            )
-            .respond(StatusCode::NOT_FOUND);
-        }
-        Err(e) => {
-            return ApiProblem::new("database_error", format!("Failed to fetch main event: {e}"))
-                .respond(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
-
-    let duplicate = match state
-        .event_repository
-        .get_by_id(&req.duplicate_event_id)
-        .await
-    {
-        Ok(Some(p)) => p,
-        Ok(None) => {
-            return ApiProblem::new(
-                "not_found",
-                format!("Duplicate event {} not found", req.duplicate_event_id),
-            )
-            .respond(StatusCode::NOT_FOUND);
-        }
-        Err(e) => {
-            return ApiProblem::new(
-                "database_error",
-                format!("Failed to fetch duplicate event: {e}"),
-            )
-            .respond(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    };
-
-    let (merged, transferred) = merge_event_data(&main, &duplicate);
-
-    // Persist the survivor's updates and soft-delete the duplicate
-    // atomically in one transaction; the repository enqueues the `Merged`
-    // (+`merged_from`) and `Deleted` outbox rows and publishes the
-    // in-memory `Merged`/`Deleted` stream events.
-    match state.event_repository.merge(&merged, &duplicate.id).await {
-        Ok(_) => {}
-        // A concurrent merge or delete won the row lock first (SEC-B5).
-        Err(crate::Error::Conflict(why)) => {
-            return ApiProblem::new("merge_conflict", why).respond(StatusCode::CONFLICT);
-        }
-        Err(e) => {
-            return ApiProblem::new("database_error", format!("Failed to merge events: {e}"))
-                .respond(StatusCode::INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    // Post-merge search-index updates are best-effort: the merge is
-    // already committed, so failures here are logged but do not fail the
-    // merge response.
-    if let Err(e) = state.search_engine.delete_event(&duplicate.id.to_string()) {
-        tracing::warn!("Failed to remove duplicate from search index: {}", e);
-    }
-    if let Err(e) = state.search_engine.index_event(&merged) {
-        tracing::warn!("Failed to update search index for merged event: {}", e);
-    }
+    let (merged, duplicate, transferred) =
+        match merge_by_id(&state, req.main_event_id, req.duplicate_event_id).await {
+            Ok(done) => done,
+            Err(refused) => return refused.respond(),
+        };
 
     let merge_record = crate::models::MergeRecord {
         id: Uuid::new_v4(),
@@ -953,13 +993,19 @@ pub async fn merge_events(
 /// events that follow it (an upper-triangular pairwise sweep, so each
 /// unordered pair is considered once). A `seen` set keyed on the
 /// id pair sorted low→high additionally guards against emitting a pair
-/// twice. Pairs scoring at/above `threshold` become
-/// [`ReviewQueueItem`](crate::models::ReviewQueueItem)s carrying the
-/// matcher's evidence: `AutoMerged` only when the score also clears
-/// `auto_merge_threshold` **and** the evidence is `Proven`
+/// twice. Pairs scoring at/above `threshold` are stored in the
+/// `review_queue` table (spec §13 T-15) with the matcher's evidence, and
+/// the response carries the stored rows, whose ids are stable across
+/// scans. A new pair is stored `pending`; a pair already stored keeps its
+/// status, so a person's decision is never overridden. A still-`pending`
+/// pair whose score also clears `auto_merge_threshold` **and** whose
+/// evidence is `Proven`
 /// ([`permits_auto_merge`](crate::matching::permits_auto_merge),
-/// `agents/share/match-evidence.md` §4), otherwise `Pending` for human
-/// review, whatever the score. Value frequencies are counted from the
+/// `agents/share/match-evidence.md` §4) is merged through
+/// [`merge_by_id`], the same path as `POST /api/events/merge`, into the
+/// older event (earlier `created_at`, then the lower id), and its row
+/// becomes `automerged`. A merge that fails leaves its row `pending` and
+/// is counted in `auto_merge_failed`; the scan carries on. Value frequencies are counted from the
 /// events the scan loaded (none below
 /// [`MIN_FREQUENCY_POPULATION`](crate::matching::MIN_FREQUENCY_POPULATION)).
 /// Always returns `200` with a `BatchDeduplicationResponse` summary.
@@ -981,8 +1027,10 @@ pub async fn batch_deduplicate(
 
     let events_scanned = events.len();
     let frequencies = crate::matching::FrequencySource::from_events(&events);
-    let mut review_items = Vec::new();
-    let mut auto_merged = 0usize;
+    let created_at: std::collections::HashMap<Uuid, chrono::DateTime<chrono::Utc>> =
+        events.iter().map(|e| (e.id, e.created_at)).collect();
+    // Each candidate pair, and whether the gate lets it merge itself.
+    let mut found: Vec<(crate::db::review_queue::NewReviewItem, bool)> = Vec::new();
     let mut seen: std::collections::HashSet<(Uuid, Uuid)> = std::collections::HashSet::default();
 
     for (i, event) in events.iter().enumerate() {
@@ -1015,36 +1063,46 @@ pub async fn batch_deduplicate(
             if !seen.insert(pair) {
                 continue;
             }
-            let quality = m.quality();
             // Auto-merge only on proof: a high score with `consistent` or
             // `contradicted` evidence is a pair for a person to look at.
-            let status = if crate::matching::permits_auto_merge(
-                m.score,
-                req.auto_merge_threshold,
-                &m.evidence,
-            ) {
-                auto_merged += 1;
-                crate::models::ReviewStatus::AutoMerged
-            } else {
-                crate::models::ReviewStatus::Pending
-            };
-            review_items.push(crate::models::ReviewQueueItem {
-                id: Uuid::new_v4(),
-                event_id_a: event.id,
-                event_id_b: m.event.id,
-                match_score: m.score,
-                match_quality: quality.into(),
-                detection_method: "batch_deduplication".into(),
-                score_breakdown: serde_json::to_value(&m.breakdown).ok(),
-                evidence: Some(m.evidence),
-                status,
-                reviewed_by: None,
-                created_at: chrono::Utc::now(),
-                reviewed_at: None,
-            });
+            let mergeable =
+                crate::matching::permits_auto_merge(m.score, req.auto_merge_threshold, &m.evidence);
+            found.push((
+                crate::db::review_queue::NewReviewItem {
+                    record_id_a: event.id,
+                    record_id_b: m.event.id,
+                    match_score: m.score,
+                    match_quality: m.quality().into(),
+                    detection_method: "batch_deduplication".into(),
+                    score_breakdown: serde_json::to_value(&m.breakdown).ok(),
+                    evidence: serde_json::to_value(&m.evidence).ok(),
+                },
+                mergeable,
+            ));
         }
     }
 
+    // Store every pair `pending` first (T-15). A pair already stored keeps
+    // its status, so a person's earlier decision is never overridden by a
+    // later scan: only a row still `pending` may be merged below.
+    let new_items: Vec<_> = found.iter().map(|(item, _)| item.clone()).collect();
+    let mut rows = match crate::db::review_queue::upsert(&state.db, &new_items).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            return ApiProblem::new(
+                "database_error",
+                format!("Failed to store review queue: {e}"),
+            )
+            .respond(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let mergeable: Vec<bool> = found.iter().map(|(_, m)| *m).collect();
+    let (auto_merged, auto_merge_failed) =
+        merge_proven_pairs(&state, &mut rows, &mergeable, &created_at).await;
+
+    let review_items: Vec<crate::models::ReviewQueueItem> =
+        rows.iter().map(review_row_to_item).collect();
     let queued = review_items
         .iter()
         .filter(|r| r.status == crate::models::ReviewStatus::Pending)
@@ -1054,10 +1112,232 @@ pub async fn batch_deduplicate(
         events_scanned,
         duplicates_found: review_items.len(),
         auto_merged,
+        auto_merge_failed,
         queued_for_review: queued,
         review_items,
     };
     ok(StatusCode::OK, response)
+}
+
+/// Merge each proven pair of a batch scan through the one merge path
+/// ([`merge_by_id`]), returning how many merged and how many failed.
+///
+/// `rows[i]` is the stored row for a pair the gate let merge when
+/// `mergeable[i]`. Only a row still `pending` is merged, so a person's
+/// decision is never overridden. The survivor is the older event (earlier
+/// `created_at`, then the lower id), so the record people have had longest
+/// keeps its id. A merge that fails — an event already merged away earlier
+/// in this scan, a concurrent merge holding the row lock, a database
+/// error — leaves the row `pending` for a person, is counted, and does
+/// not stop the scan.
+async fn merge_proven_pairs(
+    state: &AppState,
+    rows: &mut [crate::db::review_queue::ReviewQueueRow],
+    mergeable: &[bool],
+    created_at: &std::collections::HashMap<Uuid, chrono::DateTime<chrono::Utc>>,
+) -> (usize, usize) {
+    let mut auto_merged = 0usize;
+    let mut auto_merge_failed = 0usize;
+    for (row, mergeable) in rows.iter_mut().zip(mergeable) {
+        if !*mergeable || row.status != "pending" {
+            continue;
+        }
+        let (a, b) = (row.record_id_a, row.record_id_b);
+        let a_first = (created_at.get(&a), a) <= (created_at.get(&b), b);
+        let (survivor, duplicate) = if a_first { (a, b) } else { (b, a) };
+        match merge_by_id(state, survivor, duplicate).await {
+            Ok(_) => {
+                auto_merged += 1;
+                match crate::db::review_queue::mark_automerged(&state.db, row.id).await {
+                    Ok(Some(updated)) => *row = updated,
+                    // Decided by a person while the scan ran: the merge
+                    // stands and the row keeps the person's status.
+                    Ok(None) => {}
+                    Err(e) => tracing::warn!(
+                        "merged {duplicate} into {survivor} but could not mark the row: {e}"
+                    ),
+                }
+            }
+            Err(refused) => {
+                tracing::warn!("auto-merge of {duplicate} into {survivor} refused: {refused:?}");
+                auto_merge_failed += 1;
+            }
+        }
+    }
+    (auto_merged, auto_merge_failed)
+}
+
+/// Map a stored review-queue row onto the wire item shape.
+fn review_row_to_item(
+    row: &crate::db::review_queue::ReviewQueueRow,
+) -> crate::models::ReviewQueueItem {
+    use crate::models::ReviewStatus;
+    crate::models::ReviewQueueItem {
+        id: row.id,
+        event_id_a: row.record_id_a,
+        event_id_b: row.record_id_b,
+        match_score: row.match_score,
+        match_quality: row.match_quality.clone(),
+        detection_method: row.detection_method.clone(),
+        score_breakdown: row.score_breakdown.clone(),
+        evidence: row
+            .evidence
+            .clone()
+            .and_then(|v| serde_json::from_value(v).ok()),
+        status: match row.status.as_str() {
+            "confirmed" => ReviewStatus::Confirmed,
+            "rejected" => ReviewStatus::Rejected,
+            "automerged" => ReviewStatus::AutoMerged,
+            _ => ReviewStatus::Pending,
+        },
+        reviewed_by: row.reviewed_by.clone(),
+        created_at: row.created_at,
+        reviewed_at: row.reviewed_at,
+    }
+}
+
+/// Default page size for `GET /api/events/review-queue`.
+pub const REVIEW_QUEUE_DEFAULT_LIMIT: u64 = 100;
+
+/// Largest review-queue page; a `limit` above it, or of zero, is a `422`,
+/// never clamped (`agents/share/restful.md`). Paging past it by signed
+/// cursor comes with repo `tasks.md` CUR-1.
+pub const REVIEW_QUEUE_MAX_LIMIT: u64 = 500;
+
+/// Query parameters for `GET /api/events/review-queue`.
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+pub struct ReviewQueueListQuery {
+    /// Optional status-token filter (`pending` / `confirmed` /
+    /// `rejected` / `automerged`).
+    pub status: Option<String>,
+    /// Page size (default 100, at most 500; anything else is a `422`).
+    pub limit: Option<u64>,
+}
+
+/// Response body for `GET /api/events/review-queue`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ReviewQueueListResponse {
+    /// The stored review-queue items (newest first).
+    pub items: Vec<crate::models::ReviewQueueItem>,
+    /// Number of items returned.
+    pub total: usize,
+}
+
+/// One operator verdict for a `pending` review item.
+#[derive(Debug, Clone, Copy, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReviewDecision {
+    /// Confirm the pair as a duplicate (ready for merge).
+    Confirmed,
+    /// Reject the pair (not a duplicate).
+    Rejected,
+}
+
+/// Request body for `POST /api/events/review-queue/{id}/decision`.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ReviewDecisionRequest {
+    /// The verdict (`confirmed` or `rejected`).
+    pub status: ReviewDecision,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/events/review-queue",
+    tag = "deduplication",
+    params(ReviewQueueListQuery),
+    responses(
+        (status = 200, description = "Stored review-queue items, newest first", body = ReviewQueueListResponse),
+        (status = 422, description = "Unknown status token, or a limit of 0 or above 500"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+/// `GET /events/review-queue` — list the stored review queue (T-15).
+///
+/// Newest first, optionally filtered to one status. A `limit` above
+/// [`REVIEW_QUEUE_MAX_LIMIT`] or of zero is refused with a `422`, not
+/// clamped; there is no cursor yet (repo `tasks.md` CUR-1).
+pub async fn get_review_queue(
+    State(state): State<AppState>,
+    Query(query): Query<ReviewQueueListQuery>,
+) -> impl IntoResponse {
+    if let Some(status) = query.status.as_deref()
+        && !matches!(status, "pending" | "confirmed" | "rejected" | "automerged")
+    {
+        return ApiProblem::new(
+            "invalid_status",
+            format!("unknown review status `{status}`"),
+        )
+        .respond(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    let limit = query.limit.unwrap_or(REVIEW_QUEUE_DEFAULT_LIMIT);
+    if limit == 0 || limit > REVIEW_QUEUE_MAX_LIMIT {
+        return ApiProblem::new(
+            "invalid_limit",
+            format!("limit must be between 1 and {REVIEW_QUEUE_MAX_LIMIT}"),
+        )
+        .respond(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    match crate::db::review_queue::list(&state.db, query.status.as_deref(), 0, limit).await {
+        Ok(rows) => {
+            let items: Vec<_> = rows.iter().map(review_row_to_item).collect();
+            let total = items.len();
+            ok(StatusCode::OK, ReviewQueueListResponse { items, total })
+        }
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to list review queue: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/events/review-queue/{id}/decision",
+    tag = "deduplication",
+    params(("id" = Uuid, Path, description = "Review item id")),
+    request_body = ReviewDecisionRequest,
+    responses(
+        (status = 200, description = "The decided item", body = crate::models::ReviewQueueItem),
+        (status = 404, description = "No review item with that id"),
+        (status = 422, description = "The item is not pending, or the body is invalid"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+/// `POST /events/review-queue/{id}/decision` — decide one `pending` item.
+///
+/// First writer wins, in SQL: only a `pending` item can be decided; an
+/// already-decided item is a `422`, an unknown id a `404`. A decision
+/// records the verdict only: confirming a pair does not merge it, which
+/// stays `POST /api/events/merge`.
+pub async fn review_decision(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<ReviewDecisionRequest>,
+) -> impl IntoResponse {
+    let token = match req.status {
+        ReviewDecision::Confirmed => "confirmed",
+        ReviewDecision::Rejected => "rejected",
+    };
+    match crate::db::review_queue::decide(&state.db, id, token, None).await {
+        Ok(crate::db::review_queue::DecideOutcome::Decided(row)) => {
+            ok(StatusCode::OK, review_row_to_item(&row))
+        }
+        Ok(crate::db::review_queue::DecideOutcome::NotFound) => {
+            ApiProblem::new("not_found", format!("Review item {id} not found"))
+                .respond(StatusCode::NOT_FOUND)
+        }
+        Ok(crate::db::review_queue::DecideOutcome::AlreadyDecided(current)) => ApiProblem::new(
+            "already_decided",
+            format!("item is `{current}`; only `pending` items can be decided"),
+        )
+        .respond(StatusCode::UNPROCESSABLE_ENTITY),
+        Err(e) => ApiProblem::new(
+            "database_error",
+            format!("Failed to decide review item: {e}"),
+        )
+        .respond(StatusCode::INTERNAL_SERVER_ERROR),
+    }
 }
 
 // ---------------------------------------------------------------------------

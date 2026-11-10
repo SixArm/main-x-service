@@ -4,7 +4,7 @@ Complete endpoint reference: [`agents/restful.md`](../agents/restful.md).
 
 | Tier | Surface |
 |---|---|
-| REST (Axum) | 18 endpoints under `/api/health`, `/api/whoami`, `/api/events/*`, `/api/audit/*`, and the compliance pair `/api/records/verify` + `/api/audit/verify` (§13, 2026-07-28) |
+| REST (Axum) | 20 endpoints under `/api/health`, `/api/whoami`, `/api/events/*`, `/api/audit/*`, and the compliance pair `/api/records/verify` + `/api/audit/verify` (§13, 2026-07-28) |
 | Auth (Axum) | `GET /api/whoami` — echo the verified PASETO bearer-token claims (`401` without a valid token) |
 | FHIR R5 (Axum) | Live `Appointment` surface — `/fhir/Appointment{,/{id}}` (read/create/update/delete/search) + `GET /fhir/metadata` (`CapabilityStatement`); `application/fhir+json`, `OperationOutcome` errors, searchset Bundle (see §6.8) |
 | gRPC (Tonic) | Real server (T-6, 2026-09-02): `CreateEvent` / `GetEvent` / `ListEvents` / `DeleteEvent` on `EventService`, generated from `proto/event.proto`, spawned on `grpc_port` alongside the REST router. No `UpdateEvent` RPC yet, and the proto `Event` message is a partial projection (identification + time-window fields only) — see spec §13 T-6 |
@@ -19,9 +19,15 @@ create; `422` on validation failure.
 Match results (`MatchResponse`, in the `409` body's
 `errors.potential_matches`, `POST /api/events/check-duplicates` and
 `POST /api/events/match`) carry `score`, `is_match`, `quality`,
-`score_breakdown` and `evidence` (`MatchEvidence`); batch
+`score_breakdown` and `evidence` (`MatchEvidence`); batch and stored
 `ReviewQueueItem`s carry `evidence` too, optional so an item without it
-still deserialises. All are in the OpenAPI schema. See §6.2 and
+still deserialises. The review queue (T-15, §6.4) is
+`GET /api/events/review-queue[?status=&limit=]` (default 100, at most
+500, a `limit` of `0` or above 500 or an unknown status a `422`; no
+cursor until repo `tasks.md` CUR-1) and
+`POST /api/events/review-queue/{id}/decision` (`404` unknown id, `422`
+already decided). Under ABAC the decision derives as `write`; the scan,
+which can now merge, stays `destructive`. All are in the OpenAPI schema. See §6.2 and
 [match-evidence.md](../../../agents/share/match-evidence.md).
 
 Authentication is opt-in per handler: taking an `AuthUser` argument

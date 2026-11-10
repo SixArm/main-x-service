@@ -7,11 +7,13 @@
 //! ([`ReviewStatus`]). The default thresholds are supplied by the
 //! private `default_*` helpers below.
 //!
-//! The queue is not persisted (spec §13 T-15): items live only in the
-//! batch scan's response, which is where their evidence is carried. An
-//! item is `AutoMerged` only when its score clears `auto_merge_threshold`
-//! **and** its evidence is `Proven` (`agents/share/match-evidence.md`
-//! §4); `Consistent` and `Contradicted` pairs stay `Pending`.
+//! The queue is persisted (spec §13 T-15) in the `review_queue` table
+//! ([`crate::db::review_queue`]), listed by `GET /api/events/review-queue`
+//! and decided by `POST /api/events/review-queue/{id}/decision`. A pair is
+//! merged and marked `AutoMerged` only when its score clears
+//! `auto_merge_threshold` **and** its evidence is `Proven`
+//! (`agents/share/match-evidence.md` §4); `Consistent` and `Contradicted`
+//! pairs stay `Pending`.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,8 +30,8 @@ pub enum ReviewStatus {
     Confirmed,
     /// Rejected — not a duplicate
     Rejected,
-    /// Auto-merge candidate: score at or above the auto-merge threshold
-    /// **and** evidence `proven`. A label only until T-15; no merge runs.
+    /// Merged by the batch scan: score at or above the auto-merge
+    /// threshold **and** evidence `proven` (T-15).
     AutoMerged,
 }
 
@@ -117,14 +119,20 @@ pub struct BatchDeduplicationResponse {
     /// Number of potential duplicates found
     pub duplicates_found: usize,
 
-    /// Number marked auto-merged (score at or above the auto-merge
+    /// Number merged by the scan (score at or above the auto-merge
     /// threshold and evidence proven)
     pub auto_merged: usize,
+
+    /// Number of proven pairs whose merge failed (an event already merged
+    /// away earlier in the scan, a concurrent merge, a database error);
+    /// each stays `pending` for a person
+    pub auto_merge_failed: usize,
 
     /// Number added to review queue
     pub queued_for_review: usize,
 
-    /// The review queue items created
+    /// The stored review-queue rows for the pairs found (ids are stable
+    /// across scans; a decided pair keeps its decision)
     pub review_items: Vec<ReviewQueueItem>,
 }
 
