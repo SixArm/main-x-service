@@ -63,9 +63,12 @@ narrative summary + the durable invariants those fixes establish.
   neutralised in the repo-based searches (SEC-G4, `escape_like`); the
   governed cross-service edges (`subject_of`) are concealed behind
   read-the-case authz (SEC-G1); the person `search_persons` offset is
-  bounded (SEC-G7). Remaining: record-level masking on person `list` /
-  `search` / `check_duplicates` paths (SEC-G3, partial) and the
-  **default-off exposure pin** (SEC-G8).
+  bounded (SEC-G7). Record-level masking (SEC-G3) holds on every person
+  and worker read path since 2026-11-10: list, search, `match`,
+  `check-duplicates`, the create-time `409` and gRPC list conceal a
+  record the caller may not read and mask one under a `mask`
+  obligation. The **default-off exposure pin** (SEC-G8) is closed too
+  (§7).
 - **F-data — bulk / linking / concurrency integrity.** Fixed: the
   **critical reconcile scoping bug** (link-graph diffed the *global*
   read-model against *one* entity's edges, so each pass deleted the others'

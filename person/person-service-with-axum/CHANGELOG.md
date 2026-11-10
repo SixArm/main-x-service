@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security — SEC-G3 on the duplicate paths (T-42)
+
+- `match`, `check-duplicates` and the create-time `409` (REST and gRPC)
+  apply the caller's record-level read visibility, as search does: a
+  candidate the policy denies is dropped before scoring, so it neither
+  appears nor makes a create a `409`, and a `mask`-obligated candidate is
+  masked, with only the evidence aggregate. No change with
+  `PERSON_REQUIRE_AUTH` off.
+
 ### Changed — axa 0.11
 
 - `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before

@@ -2544,7 +2544,13 @@
   `PERSON_REQUIRE_AUTH` is off. Pure `search_result_disposition` unit test
   pins the omit/mask/full matrix. (Person `check_duplicates`/`match` return
   match candidates, not a record dump; a concealment pass there is an optional
-  follow-up if a deployment needs it.)
+  follow-up if a deployment needs it.) **Residual closed 2026-11-10:** person
+  `match` / `check-duplicates` / the create-time `409` (REST and gRPC) and
+  worker list / search / `match` / `check-duplicates` / `409` / gRPC
+  `ListWorkers` now drop a candidate the caller may not read before it is
+  scored (so it neither appears, counts, nor makes a create a `409`) and mask
+  a `mask`-obligated one, with only the evidence aggregate. Person T-42,
+  worker T-25; `tests/dedup_sec_g3.rs` in each.
 - [x] **SEC-G4 (S) 🟡** `escape_like` in the repo-based searches. *(done 2026-07-13)*
   person / worker / event `db/repositories.rs::search` built `format!("%{}%",
   query.to_lowercase())` with no escaping (raw `%`/`_` = wildcard

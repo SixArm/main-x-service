@@ -317,7 +317,8 @@ impl proto::person_service_server::PersonService for PersonGrpcService {
             )));
         }
 
-        let duplicates = check_duplicates_internal(&self.state, &person).await;
+        let duplicates =
+            check_duplicates_internal(&self.state, &person, &MaybeAuthUser(claims.clone())).await;
         if !duplicates.is_empty() {
             return Err(Status::already_exists(format!(
                 "{} potential duplicate(s) found; review before creating",

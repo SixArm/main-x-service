@@ -713,6 +713,19 @@ pub fn authorize_record(
     }
 }
 
+/// SEC-G3 — **read visibility** of one worker for an aggregate read
+/// (list, search, match, check-duplicates and the create-time `409`),
+/// mirroring person's helper and the case service's reference. Returns
+/// `Some(obligations)` when the caller may read the record (with any
+/// `mask` obligation to honour), or `None` when the policy denies the read,
+/// in which case the record must be **omitted**, so an unauthorised caller
+/// never learns it exists. `Some(vec![])` when `WORKER_REQUIRE_AUTH` is
+/// off, so the aggregate paths keep their behaviour until enforcement is on.
+#[must_use]
+pub fn read_visibility(caller: &MaybeAuthUser, worker: &Worker) -> Option<Vec<String>> {
+    authorize_record(caller, Action::Read, &worker_resource_attrs(worker)).ok()
+}
+
 /// Build an [`AuditContext`](crate::db::AuditContext) for a request from the
 /// caller's verified claims and client address. `user_id` is the bearer `sub`
 /// when a valid token was presented, else the `"system"` actor. `client` is the

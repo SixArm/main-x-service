@@ -96,6 +96,24 @@ impl MatchEvidence {
     pub fn permits_auto_merge(&self) -> bool {
         self.strength == MatchStrength::Proven
     }
+
+    /// The aggregate only: `weight_bits`, `fields_compared` and
+    /// `strength`, with `contradictions` and `components` emptied (SEC-G3).
+    ///
+    /// For a candidate the caller may read only masked. The terms carry
+    /// component names, never values, but a name still says what the
+    /// masked view hides, e.g. a contradiction under an identifier scheme
+    /// says the hidden record holds one. The aggregate discloses no more
+    /// than the score. The case service's `redact_evidence` is the
+    /// reference.
+    #[must_use]
+    pub fn aggregate_only(self) -> Self {
+        Self {
+            contradictions: Vec::new(),
+            components: Vec::new(),
+            ..self
+        }
+    }
 }
 
 impl From<&matcher::Evidence> for MatchEvidence {

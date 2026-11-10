@@ -305,7 +305,8 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
             )));
         }
 
-        let duplicates = check_duplicates_internal(&self.state, &worker).await;
+        let duplicates =
+            check_duplicates_internal(&self.state, &worker, &MaybeAuthUser(claims.clone())).await;
         if !duplicates.is_empty() {
             return Err(Status::already_exists(format!(
                 "{} potential duplicate(s) found; review before creating",
@@ -369,7 +370,8 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
         &self,
         request: Request<proto::ListWorkersRequest>,
     ) -> Result<Response<proto::ListWorkersResponse>, Status> {
-        grpc_enforce(request.metadata(), Action::Read).await?;
+        let claims = grpc_enforce(request.metadata(), Action::Read).await?;
+        let caller = MaybeAuthUser(claims);
         let req = request.into_inner();
 
         if req.offset > MAX_LIST_OFFSET {
@@ -389,8 +391,20 @@ impl proto::worker_service_server::WorkerService for WorkerGrpcService {
             .list_active(u64::from(limit), u64::from(req.offset))
             .await
             .map_err(|e| Status::internal(format!("failed to list workers: {e}")))?;
+        // SEC-G3, as REST's `list_workers`: a denied record is omitted, a
+        // `mask` obligation masks it.
         Ok(Response::new(proto::ListWorkersResponse {
-            workers: workers.iter().map(worker_to_proto).collect(),
+            workers: workers
+                .iter()
+                .filter_map(|w| {
+                    crate::api::rest::handlers::shown(
+                        w,
+                        auth::read_visibility(&caller, w).as_deref(),
+                        false,
+                    )
+                })
+                .map(|w| worker_to_proto(&w))
+                .collect(),
         }))
     }
 

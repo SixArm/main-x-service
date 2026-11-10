@@ -151,6 +151,26 @@ pub struct MatchEvidence {
     pub components: Vec<EvidenceComponent>,
 }
 
+impl MatchEvidence {
+    /// The aggregate only: `weight_bits`, `fields_compared` and
+    /// `strength`, with `contradictions` and `components` emptied (SEC-G3).
+    ///
+    /// For a candidate the caller may read only masked. The terms carry
+    /// component names, never values, but a name still says what the
+    /// masked view hides, e.g. `contradiction:identifier:nhs` says the
+    /// hidden record holds an NHS number. The aggregate discloses no more
+    /// than the score, and keeps the strength a reviewer needs. The case
+    /// service's `redact_evidence` is the reference.
+    #[must_use]
+    pub fn aggregate_only(self) -> Self {
+        Self {
+            contradictions: Vec::new(),
+            components: Vec::new(),
+            ..self
+        }
+    }
+}
+
 impl From<&Evidence> for MatchEvidence {
     fn from(e: &Evidence) -> Self {
         Self {

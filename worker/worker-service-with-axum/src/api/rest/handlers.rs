@@ -26,7 +26,8 @@ use uuid::Uuid;
 use authentication_verifier::Action;
 
 use super::auth::{
-    AuthUser, MaybeAuthUser, audit_context_of, authorize_record, worker_resource_attrs,
+    AuthUser, MaybeAuthUser, audit_context_of, authorize_record, read_visibility,
+    worker_resource_attrs,
 };
 use super::state::AppState;
 use crate::compliance::disclosure::{self, AccessContext};
@@ -146,7 +147,7 @@ pub async fn create_worker(
     // candidate clears the review threshold we refuse the create with 409
     // Conflict and surface the matches in the problem's `errors` so the operator can
     // review/merge instead of silently creating a near-duplicate record.
-    let duplicates = check_duplicates_internal(&state, &payload).await;
+    let duplicates = check_duplicates_internal(&state, &payload, &caller).await;
     if !duplicates.is_empty() {
         // Carry the candidate matches in the problem's `errors` so the client can
         // render them and decide whether to merge or force-create.
@@ -294,11 +295,18 @@ pub async fn list_workers(
         .await
     {
         Ok(rows) => {
-            let workers: Vec<Worker> = if params.mask_sensitive {
-                rows.iter().map(crate::privacy::mask_worker).collect()
-            } else {
-                rows
-            };
+            // SEC-G3: each row through the caller's read visibility, as
+            // `GET /api/workers/{id}` decides it.
+            let workers: Vec<Worker> = rows
+                .into_iter()
+                .filter_map(|worker| {
+                    shown(
+                        &worker,
+                        read_visibility(&caller, &worker).as_deref(),
+                        params.mask_sensitive,
+                    )
+                })
+                .collect();
             let response = ListResponse {
                 total: workers.len(),
                 workers,
@@ -653,10 +661,14 @@ pub async fn search_workers(
 
                 match state.worker_repository.get_by_id(&worker_id).await {
                     Ok(Some(worker)) => {
-                        if params.mask_sensitive {
-                            workers.push(crate::privacy::mask_worker(&worker));
-                        } else {
-                            workers.push(worker);
+                        // SEC-G3: a denied hit is omitted, a `mask`
+                        // obligation masks it.
+                        if let Some(shown) = shown(
+                            &worker,
+                            read_visibility(&caller, &worker).as_deref(),
+                            params.mask_sensitive,
+                        ) {
+                            workers.push(shown);
                         }
                     }
                     Ok(None) => {
@@ -685,6 +697,89 @@ pub async fn search_workers(
             error.respond(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
+}
+
+/// How an aggregate read shows one stored worker (SEC-G3), from
+/// [`read_visibility`]'s answer and the client's `mask_sensitive`.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ResultDisposition {
+    /// The caller may not read the record: omit it, so its existence is
+    /// never revealed.
+    Omit,
+    /// Include it masked (a `mask` obligation or the client's request).
+    Masked,
+    /// Include the full record.
+    Full,
+}
+
+/// Decide a record's disposition. `None` (denied) omits it; a `mask`
+/// obligation or the client's `mask_sensitive` masks it. With
+/// `WORKER_REQUIRE_AUTH` off, `read_visibility` yields `Some(vec![])`, so
+/// this is "mask iff the client asked", as before SEC-G3.
+pub(crate) fn search_result_disposition(
+    visibility: Option<&[String]>,
+    mask_sensitive: bool,
+) -> ResultDisposition {
+    match visibility {
+        None => ResultDisposition::Omit,
+        Some(obligations) => {
+            if mask_sensitive || obligations.iter().any(|o| o == "mask") {
+                ResultDisposition::Masked
+            } else {
+                ResultDisposition::Full
+            }
+        }
+    }
+}
+
+/// `worker` as a list or search shows it, or `None` when it is omitted.
+pub(crate) fn shown(
+    worker: &Worker,
+    visibility: Option<&[String]>,
+    mask_sensitive: bool,
+) -> Option<Worker> {
+    match search_result_disposition(visibility, mask_sensitive) {
+        ResultDisposition::Omit => None,
+        ResultDisposition::Masked => Some(crate::privacy::mask_worker(worker)),
+        ResultDisposition::Full => Some(worker.clone()),
+    }
+}
+
+/// SEC-G3 for match candidates: the stored workers a caller may see in a
+/// `match`, `check-duplicates` or create-time `409` answer. A record the
+/// policy denies is dropped **before** it is scored, so it never reaches a
+/// match list, a count, or the decision to answer `409`. Returns the
+/// readable candidates and the ids of those to show masked.
+pub(crate) fn readable_candidates(
+    candidates: Vec<Worker>,
+    visibility_of: impl Fn(&Worker) -> Option<Vec<String>>,
+) -> (Vec<Worker>, std::collections::HashSet<Uuid>) {
+    let mut kept = Vec::with_capacity(candidates.len());
+    let mut masked = std::collections::HashSet::new();
+    for worker in candidates {
+        match search_result_disposition(visibility_of(&worker).as_deref(), false) {
+            ResultDisposition::Omit => {}
+            ResultDisposition::Masked => {
+                masked.insert(worker.id);
+                kept.push(worker);
+            }
+            ResultDisposition::Full => kept.push(worker),
+        }
+    }
+    (kept, masked)
+}
+
+/// One scored candidate as the caller may see it: masked, with only the
+/// evidence aggregate, when `masked` holds its id (SEC-G3).
+fn candidate_view(
+    mut response: MatchResponse,
+    masked: &std::collections::HashSet<Uuid>,
+) -> MatchResponse {
+    if masked.contains(&response.worker.id) {
+        response.worker = crate::privacy::mask_worker(&response.worker);
+        response.evidence = response.evidence.aggregate_only();
+    }
+    response
 }
 
 /// Body of `/workers/match`: the probe worker plus optional scoring controls.
@@ -776,6 +871,7 @@ pub struct MatchResultsResponse {
 )]
 pub async fn match_worker(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Json(payload): Json<MatchRequest>,
 ) -> impl IntoResponse {
     // Blocking step: narrow the universe to candidates sharing family name +
@@ -814,6 +910,10 @@ pub async fn match_worker(
                 }
             }
 
+            // SEC-G3: drop the candidates this caller may not read.
+            let (candidates, masked) =
+                readable_candidates(candidates, |w| read_visibility(&caller, w));
+
             // Run matcher on candidates, with the registry's value
             // frequencies for the evidence.
             let frequencies = state.value_frequencies();
@@ -837,7 +937,7 @@ pub async fn match_worker(
                 .into_iter()
                 .filter(|m| m.score >= threshold)
                 .take(payload.limit)
-                .map(|m| MatchResponse::from_result(m, "probabilistic"))
+                .map(|m| candidate_view(MatchResponse::from_result(m, "probabilistic"), &masked))
                 .collect();
 
             let response = MatchResultsResponse {
@@ -875,6 +975,7 @@ pub struct DuplicateCheckResponse {
 pub(crate) async fn check_duplicates_internal(
     state: &AppState,
     worker: &Worker,
+    caller: &MaybeAuthUser,
 ) -> Vec<MatchResponse> {
     let family_name = &worker.name.family;
     let birth_year = worker.birth_date.map(|d| d.year());
@@ -899,6 +1000,10 @@ pub(crate) async fn check_duplicates_internal(
         }
     }
 
+    // SEC-G3: a candidate this caller may not read neither appears nor
+    // makes a create a `409`.
+    let (candidates, masked) = readable_candidates(candidates, |w| read_visibility(caller, w));
+
     // On a matcher error, return no duplicates rather than failing the caller:
     // a detection failure must never block a create. The registry's value
     // frequencies feed the evidence only; they never change the score.
@@ -917,7 +1022,12 @@ pub(crate) async fn check_duplicates_internal(
         .into_iter()
         .filter(|m| m.score >= 0.7)
         .take(10)
-        .map(|m| MatchResponse::from_result(m, "duplicate_detection"))
+        .map(|m| {
+            candidate_view(
+                MatchResponse::from_result(m, "duplicate_detection"),
+                &masked,
+            )
+        })
         .collect()
 }
 
@@ -935,9 +1045,10 @@ pub(crate) async fn check_duplicates_internal(
 )]
 pub async fn check_duplicates(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Json(worker): Json<Worker>,
 ) -> impl IntoResponse {
-    let matches = check_duplicates_internal(&state, &worker).await;
+    let matches = check_duplicates_internal(&state, &worker, &caller).await;
     let response = DuplicateCheckResponse {
         has_duplicates: !matches.is_empty(),
         potential_matches: matches,
@@ -2298,5 +2409,74 @@ mod compliance_tests {
             "the absent safety classification must be stated, not merely omitted"
         );
         assert!(id.not_claimed.iter().any(|c| c.contains("R4 + US Core")));
+    }
+}
+
+#[cfg(test)]
+mod sec_g3_tests {
+    use super::{ResultDisposition, Uuid, Worker, readable_candidates, search_result_disposition};
+    use crate::models::{Gender, HumanName};
+
+    fn worker(family: &str) -> Worker {
+        Worker::new(
+            HumanName {
+                use_type: None,
+                family: family.to_string(),
+                given: vec!["Avery".to_string()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Female,
+        )
+    }
+
+    /// Denied ⇒ omitted whatever the client asked; a `mask` obligation
+    /// masks even when the client did not ask; with no obligation, mask
+    /// iff the client asked (the behaviour with enforcement off).
+    #[test]
+    fn search_result_disposition_conceals_masks_and_keeps_client_param() {
+        let mask = ["mask".to_string()];
+        assert_eq!(
+            search_result_disposition(None, false),
+            ResultDisposition::Omit
+        );
+        assert_eq!(
+            search_result_disposition(None, true),
+            ResultDisposition::Omit
+        );
+        assert_eq!(
+            search_result_disposition(Some(&[]), false),
+            ResultDisposition::Full
+        );
+        assert_eq!(
+            search_result_disposition(Some(&[]), true),
+            ResultDisposition::Masked
+        );
+        assert_eq!(
+            search_result_disposition(Some(&mask), false),
+            ResultDisposition::Masked
+        );
+    }
+
+    #[test]
+    fn readable_candidates_drops_denied_and_marks_masked() {
+        let (denied, masked, full) = (worker("Denied"), worker("Masked"), worker("Full"));
+        let (denied_id, masked_id, full_id) = (denied.id, masked.id, full.id);
+        let (kept, masked_ids) = readable_candidates(vec![denied, masked, full], |w| {
+            match w.name.family.as_str() {
+                "Denied" => None,
+                "Masked" => Some(vec!["mask".to_string()]),
+                _ => Some(vec![]),
+            }
+        });
+        let kept_ids: Vec<Uuid> = kept.iter().map(|w| w.id).collect();
+        assert_eq!(kept_ids, vec![masked_id, full_id]);
+        assert!(!kept_ids.contains(&denied_id));
+        assert!(masked_ids.contains(&masked_id) && !masked_ids.contains(&full_id));
+
+        let (kept, masked_ids) =
+            readable_candidates(vec![worker("A"), worker("B")], |_| Some(vec![]));
+        assert_eq!(kept.len(), 2);
+        assert!(masked_ids.is_empty());
     }
 }

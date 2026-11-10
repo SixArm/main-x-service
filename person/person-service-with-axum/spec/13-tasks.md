@@ -1375,3 +1375,17 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   less), `tests/match_evidence.rs` (the three scan cases, the `409` and
   `check-duplicates` bodies, the DB scan), `tests/review_queue_db.rs`
   (evidence round trip, the `automerged` → `pending` re-scan).
+- [x] **T-42 (S, security) — SEC-G3 on the duplicate paths.** *(Done
+  2026-11-10.)* `POST /api/persons/match`, `POST
+  /api/persons/check-duplicates` and the create-time `409` (and gRPC
+  `CreatePerson`, which shares `check_duplicates_internal`) returned
+  candidate records with no per-record read check, so a caller could
+  learn of, and read, a record search would conceal. Candidates now pass
+  through `readable_candidates`, the same `search_result_disposition`
+  search uses: a denied one is dropped before it is scored, so it neither
+  appears, counts in `total`, nor makes a create a `409`; a
+  `mask`-obligated one comes back through `mask_person` with only the
+  evidence aggregate (`MatchEvidence::aggregate_only`, case's
+  `redact_evidence` precedent). No change with `PERSON_REQUIRE_AUTH` off.
+  Tests: `readable_candidates_drops_denied_and_marks_masked`, and
+  `tests/dedup_sec_g3.rs` (DB), which fails with the filter disabled.

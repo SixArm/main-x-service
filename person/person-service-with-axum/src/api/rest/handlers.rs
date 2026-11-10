@@ -132,7 +132,7 @@ pub async fn create_person(
     }
 
     // Real-time duplicate detection before creation
-    let duplicates = check_duplicates_internal(&state, &payload).await;
+    let duplicates = check_duplicates_internal(&state, &payload, &caller).await;
     if !duplicates.is_empty() {
         let dup_response = DuplicateCheckResponse {
             has_duplicates: true,
@@ -593,6 +593,51 @@ pub(crate) fn search_result_disposition(
     }
 }
 
+/// SEC-G3 for match candidates: the stored records a caller may see in a
+/// `match`, `check-duplicates` or create-time `409` answer, by the same
+/// [`search_result_disposition`] search uses. A record the policy denies
+/// is dropped **before** it is scored, so it never reaches a match list,
+/// a count, or the decision to answer `409`, and a caller cannot learn it
+/// exists by probing for duplicates. Returns the readable candidates and
+/// the ids of those to show masked. `visibility_of` is
+/// [`read_visibility`] in production, so with `PERSON_REQUIRE_AUTH` off
+/// every candidate is kept whole, as before.
+pub(crate) fn readable_candidates(
+    candidates: Vec<Person>,
+    visibility_of: impl Fn(&Person) -> Option<Vec<String>>,
+) -> (Vec<Person>, std::collections::HashSet<Uuid>) {
+    let mut kept = Vec::with_capacity(candidates.len());
+    let mut masked = std::collections::HashSet::new();
+    for person in candidates {
+        match search_result_disposition(visibility_of(&person).as_deref(), false) {
+            ResultDisposition::Omit => {}
+            ResultDisposition::Masked => {
+                masked.insert(person.id);
+                kept.push(person);
+            }
+            ResultDisposition::Full => kept.push(person),
+        }
+    }
+    (kept, masked)
+}
+
+/// One scored candidate as the caller may see it: masked, with only the
+/// evidence aggregate, when `masked` holds its id (SEC-G3).
+fn candidate_view(
+    person: &Person,
+    evidence: crate::matching::evidence::MatchEvidence,
+    masked: &std::collections::HashSet<Uuid>,
+) -> (Person, crate::matching::evidence::MatchEvidence) {
+    if masked.contains(&person.id) {
+        (
+            crate::privacy::mask_person(person),
+            evidence.aggregate_only(),
+        )
+    } else {
+        (person.clone(), evidence)
+    }
+}
+
 /// Paginated search results body.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SearchResponse {
@@ -798,6 +843,7 @@ pub struct MatchResultsResponse {
 )]
 pub async fn match_person(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Json(payload): Json<MatchRequest>,
 ) -> impl IntoResponse {
     // Use search engine to get candidate persons (blocking)
@@ -835,6 +881,10 @@ pub async fn match_person(
                 }
             }
 
+            // SEC-G3: drop the candidates this caller may not read.
+            let (candidates, masked) =
+                readable_candidates(candidates, |p| read_visibility(&caller, p));
+
             // Run matcher on candidates
             let match_results = match state.matcher.find_matches(&payload.person, &candidates) {
                 Ok(results) => results,
@@ -860,9 +910,10 @@ pub async fn match_person(
                         &m.person,
                         freqs.as_ref(),
                     );
+                    let (person, evidence) = candidate_view(&m.person, evidence, &masked);
 
                     MatchResponse {
-                        person: m.person.clone(),
+                        person,
                         score: m.score,
                         quality: quality.to_string(),
                         detection_method: "probabilistic".to_string(),
@@ -908,6 +959,7 @@ pub struct DuplicateCheckResponse {
 pub(crate) async fn check_duplicates_internal(
     state: &AppState,
     person: &Person,
+    caller: &MaybeAuthUser,
 ) -> Vec<MatchResponse> {
     let family_name = &person.name.family;
     let birth_year = person.birth_date.map(|d| d.year());
@@ -932,6 +984,10 @@ pub(crate) async fn check_duplicates_internal(
         }
     }
 
+    // SEC-G3: a candidate this caller may not read neither appears nor
+    // makes a create a `409`.
+    let (candidates, masked) = readable_candidates(candidates, |p| read_visibility(caller, p));
+
     let Ok(match_results) = state.matcher.find_matches(person, &candidates) else {
         return Vec::new();
     };
@@ -948,9 +1004,10 @@ pub(crate) async fn check_duplicates_internal(
             let quality = crate::models::review_queue::match_quality_for_score(m.score);
             let evidence =
                 crate::matching::evidence::pair_evidence(person, &m.person, freqs.as_ref());
+            let (candidate, evidence) = candidate_view(&m.person, evidence, &masked);
 
             MatchResponse {
-                person: m.person.clone(),
+                person: candidate,
                 score: m.score,
                 quality: quality.to_string(),
                 detection_method: "duplicate_detection".to_string(),
@@ -974,9 +1031,10 @@ pub(crate) async fn check_duplicates_internal(
 )]
 pub async fn check_duplicates(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Json(person): Json<Person>,
 ) -> impl IntoResponse {
-    let matches = check_duplicates_internal(&state, &person).await;
+    let matches = check_duplicates_internal(&state, &person, &caller).await;
     let response = DuplicateCheckResponse {
         has_duplicates: !matches.is_empty(),
         potential_matches: matches,
@@ -2352,8 +2410,8 @@ pub async fn compliance_sbom(_caller: AuthUser) -> impl IntoResponse {
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplianceIdentification, MAX_SEARCH_OFFSET, ResultDisposition, search_offset_within_bound,
-        search_result_disposition,
+        ComplianceIdentification, MAX_SEARCH_OFFSET, Person, ResultDisposition, Uuid,
+        readable_candidates, search_offset_within_bound, search_result_disposition,
     };
 
     /// The identification names the service and carries build provenance.
@@ -2391,6 +2449,46 @@ mod tests {
     }
 
     /// SEC-G3: the per-result concealment/masking decision.
+    #[test]
+    fn readable_candidates_drops_denied_and_marks_masked() {
+        use crate::models::{Gender, HumanName};
+        let person = |family: &str| {
+            Person::new(
+                HumanName {
+                    use_type: None,
+                    family: family.to_string(),
+                    given: vec!["Avery".to_string()],
+                    prefix: vec![],
+                    suffix: vec![],
+                },
+                Gender::Female,
+            )
+        };
+        let (denied, masked, full) = (person("Denied"), person("Masked"), person("Full"));
+        let (denied_id, masked_id, full_id) = (denied.id, masked.id, full.id);
+        let (kept, masked_ids) = readable_candidates(vec![denied, masked, full], |p| {
+            match p.name.family.as_str() {
+                "Denied" => None,
+                "Masked" => Some(vec!["mask".to_string()]),
+                _ => Some(vec![]),
+            }
+        });
+        let kept_ids: Vec<Uuid> = kept.iter().map(|p| p.id).collect();
+        assert_eq!(
+            kept_ids,
+            vec![masked_id, full_id],
+            "the denied candidate is dropped"
+        );
+        assert!(!kept_ids.contains(&denied_id));
+        assert!(masked_ids.contains(&masked_id) && !masked_ids.contains(&full_id));
+
+        // With enforcement off every candidate reads as `Some(vec![])`.
+        let (kept, masked_ids) =
+            readable_candidates(vec![person("A"), person("B")], |_| Some(vec![]));
+        assert_eq!(kept.len(), 2);
+        assert!(masked_ids.is_empty());
+    }
+
     #[test]
     fn search_result_disposition_conceals_masks_and_preserves_client_param() {
         // Denied read ⇒ omit the record entirely (concealment), regardless

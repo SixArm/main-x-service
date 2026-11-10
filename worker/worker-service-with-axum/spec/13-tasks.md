@@ -936,7 +936,7 @@ clearly described manual check confirms the acceptance criterion.
   and scheme names and bits, never values: checked by a unit test over
   the matcher's output and by `check_duplicates_carries_evidence_without_values`.
   (The candidate `worker` beside it on `match` / `check-duplicates` / the
-  `409` is still unmasked; that is the SEC-G3 residual, not new here.)
+  `409` was unmasked then: the SEC-G3 residual, closed by T-25.)
   Tests: `tests/match_evidence_db.rs` (proven → `automerged`,
   contradicted → `pending`, evidence on `check-duplicates`),
   `tests/dedup_merge_privacy.rs` (a name + birth date pair at `1.0`
@@ -945,3 +945,21 @@ clearly described manual check confirms the acceptance criterion.
   refreshes), unit tests for the gate, the frequency source (no
   frequencies below the minimum; a common value weighs less than the
   table default) and old review-item JSON without `evidence`.
+- [x] **T-25 (S, security) — SEC-G3 on every aggregate read.** *(Done
+  2026-11-10.)* Worker had record-level ABAC on single-record reads only:
+  `GET /api/workers`, search, `match`, `check-duplicates`, the
+  create-time `409` and gRPC `ListWorkers` returned records whole (list
+  and search masked only on the client's `mask_sensitive`), so a bulk
+  read revealed more than the equivalent single read. A new
+  `auth::read_visibility` (person's semantics) feeds
+  `search_result_disposition`: list, search and gRPC `ListWorkers` omit a
+  denied record and mask a `mask`-obligated one; `match`,
+  `check-duplicates` and the `409` drop a denied candidate before it is
+  scored (so it neither appears, counts, nor makes a create a `409`) and
+  mask a `mask`-obligated one with only the evidence aggregate
+  (`MatchEvidence::aggregate_only`). No change with `WORKER_REQUIRE_AUTH`
+  off. Tests: `sec_g3_tests` (unit) and `tests/dedup_sec_g3.rs` (DB:
+  search, `match`, `check-duplicates`, the `409`), which fails with
+  either filter disabled. List concealment shares search's helper and is
+  covered by the unit tests; a DB walk of the shared, id-ordered list
+  would need SQL in a test.

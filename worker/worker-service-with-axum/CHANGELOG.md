@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security — SEC-G3 on every aggregate read (T-25)
+
+- List, search, gRPC `ListWorkers`, `match`, `check-duplicates` and the
+  create-time `409` apply the caller's record-level read visibility, as a
+  single `GET` does: a record the policy denies is omitted (a duplicate
+  candidate is dropped before scoring, so it never makes a create a
+  `409`), and a `mask`-obligated one is masked, duplicate candidates with
+  only the evidence aggregate. No change with `WORKER_REQUIRE_AUTH` off.
+
 ### Changed — axa 0.11
 
 - `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before
