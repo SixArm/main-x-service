@@ -177,8 +177,11 @@ with the deciding rule; see
 > constraint, so a re-scan upserts in place: score columns refresh,
 > decided rows keep their decision, and item ids are stable across
 > scans — the scan response reports the stored rows). Two endpoints:
-> `GET /api/places/review-queue[?status=&limit=]` lists the stored
-> queue (newest first, limit cap 500; unknown status token → `422`),
+> `GET /api/places/review-queue[?status=&limit=&cursor=]` lists the
+> stored queue newest first, one page at a time by signed cursor like
+> `GET /api/places` (default 100, at most 500; a `limit` above that, or a
+> cursor this service did not sign, is a `422`; `Link: rel="next"` while
+> more follow; `total` counts the page; unknown status token → `422`),
 > and `POST /api/places/review-queue/{id}/decision` with
 > `{"status": "confirmed" | "rejected"}` decides a `pending` item —
 > the transition guard is first-writer-wins in SQL (`404` unknown id,

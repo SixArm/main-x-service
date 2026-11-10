@@ -639,7 +639,7 @@ clearly described manual check confirms the acceptance criterion.
   (`id` is outside the pre-image), tampers with it in SQL, and asserts
   `?limit=3` reports it; it failed before the fix (`verified: true`,
   `mismatched: []`).
-- [ ] **T-20 (S) — Page the review queue.** `GET /api/places/review-queue`
+- [x] **T-20 (S) — Page the review queue.** *(Done 2026-11-10: `?limit=&cursor=` through `axa::cursor_pagination`, default 100, at most 500, `422` above it or on an unsigned cursor; `tests/review_queue_paging.rs` walks 520 seeded pairs to the end, each seen once. The other six crates with a review queue — person, worker, thing, organization, case and care-pathway — clamp at 500 the same way; thing, organization, case and care-pathway already page by cursor and take the same fix, while person and worker wait on repo `tasks.md` CUR-1.)* `GET /api/places/review-queue`
   returns at most 500 rows, newest first (`db::review_queue::list`
   clamps `limit` to 500), with no cursor, so a queue holding more cannot
   be read past its first page, and a `limit` above 500 is quietly
