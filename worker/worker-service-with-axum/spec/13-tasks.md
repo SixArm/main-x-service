@@ -963,3 +963,31 @@ clearly described manual check confirms the acceptance criterion.
   either filter disabled. List concealment shares search's helper and is
   covered by the unit tests; a DB walk of the shared, id-ordered list
   would need SQL in a test.
+- [x] **T-26 (S, security) — Record-level reads on the FHIR surface.**
+  *(Done 2026-11-10; organization ORG-T6's fix applied here.)*
+  `GET /fhir/Practitioner/{id}` and FHIR search took no record-level
+  decision, while `GET /api/workers/{id}` does (`agents/share/fhir.md`
+  §8: a FHIR read reveals no more than the REST read). With
+  `WORKER_REQUIRE_AUTH` on, FHIR read takes REST's `authorize_record`
+  decision: a denial is REST's status as an `OperationOutcome` (`403`
+  `forbidden`, `401` `login`), and a `mask` obligation returns the
+  masked worker. FHIR search checks each hit with `auth::read_visibility`:
+  a denied worker is left out and `total` counts what is shown; a masked
+  worker is kept only if every query token still appears in its masked
+  names and identifiers (`masked_still_matches`), so a search on a hidden
+  social security number cannot confirm it (a fuzzy hit on a masked
+  worker is refused too, failing closed). FHIR write paths are unchanged:
+  REST `PUT`/`DELETE` take no record-level decision either. The REST read
+  also writes a disclosure audit row; the FHIR read does not yet.
+  Tests: unit `a_masked_value_cannot_be_confirmed_by_search`;
+  `tests/fhir_sec_g3.rs` (its own binary) covers the read `403`, the
+  masked read, search omission and `total`, and SSN non-confirmation,
+  failing at the matching assertion with each of the three checks
+  disabled.
+- [ ] **T-27 (S, compliance) — Audit FHIR reads as REST reads are.**
+  *(Found 2026-11-10 while doing T-26.)* REST `GET /api/workers/{id}`
+  writes a disclosure audit row on every read; `GET
+  /fhir/Practitioner/{id}` and FHIR search write none, so a read through
+  FHIR leaves no trace (HIPAA §164.312(b): reads are activity).
+  **Acceptance:** a FHIR read and each FHIR search hit write the same
+  audit row the REST read does, and a DB test shows the row.

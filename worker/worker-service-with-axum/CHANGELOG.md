@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Security — record-level reads on the FHIR surface (T-26)
+
+- With `WORKER_REQUIRE_AUTH` on, `GET /fhir/Practitioner/{id}` takes the
+  REST read's record-level decision (a denial is a `403` `OperationOutcome`,
+  a `mask` obligation returns the masked worker), and FHIR search leaves
+  out a worker the caller may not read, counts only what it shows, and
+  drops a masked worker that only a masked value would match. Nothing
+  changes with the flag off.
+
 ### Security — SEC-G3 on every aggregate read (T-25)
 
 - List, search, gRPC `ListWorkers`, `match`, `check-duplicates` and the

@@ -21,7 +21,10 @@ use uuid::Uuid;
 
 use super::{FhirOperationOutcome, FhirWorker, from_fhir_worker, to_fhir_worker};
 use crate::api::rest::AppState;
-use crate::api::rest::auth::{MaybeAuthUser, audit_context_of};
+use crate::api::rest::auth::{
+    MaybeAuthUser, audit_context_of, authorize_record, read_visibility, worker_resource_attrs,
+};
+use authentication_verifier::Action;
 
 /// Builds an `application/fhir+json` [`Response`] with the given status and an
 /// optional `Location` header.
@@ -92,9 +95,39 @@ pub struct FhirSearchParams {
 /// `GET /fhir/Practitioner/{id}` — returns the worker as a FHIR
 /// `Practitioner`, a `not-found` outcome (`404`), or a `database-error`
 /// outcome (`500`).
-pub async fn get_fhir_worker(State(state): State<AppState>, Path(id): Path<Uuid>) -> Response {
+///
+/// With `WORKER_REQUIRE_AUTH` on, the read takes the same record-level
+/// decision as `GET /api/workers/{id}` (`authorize_record` over the
+/// worker's resource attributes): a denial is that status as an
+/// `OperationOutcome` (`401` `login`, `403` `forbidden`), and a `mask`
+/// obligation returns the masked worker. With the flag off the decision
+/// allows everything, as before.
+pub async fn get_fhir_worker(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    caller: MaybeAuthUser,
+) -> Response {
     match state.worker_repository.get_by_id(&id).await {
-        Ok(Some(worker)) => fhir_json(StatusCode::OK, &to_fhir_worker(&worker)),
+        Ok(Some(worker)) => {
+            let obligations =
+                match authorize_record(&caller, Action::Read, &worker_resource_attrs(&worker)) {
+                    Ok(obligations) => obligations,
+                    Err((status, reason)) => {
+                        let code = if status == StatusCode::UNAUTHORIZED {
+                            "login"
+                        } else {
+                            "forbidden"
+                        };
+                        return fhir_error(status, code, &reason);
+                    }
+                };
+            let worker = if obligations.iter().any(|o| o == "mask") {
+                crate::privacy::mask_worker(&worker)
+            } else {
+                worker
+            };
+            fhir_json(StatusCode::OK, &to_fhir_worker(&worker))
+        }
         Ok(None) => fhir_json(
             StatusCode::NOT_FOUND,
             &FhirOperationOutcome::not_found("Practitioner", &id.to_string()),
@@ -235,8 +268,16 @@ pub async fn delete_fhir_worker(
 /// `GET /fhir/Practitioner?...` — searches by the first provided name parameter
 /// (`name`, else `family`, else `given`; `400` if none), hydrates hits, and
 /// returns them as a FHIR `searchset` `Bundle`. `_count` caps the page (≤100).
+///
+/// With `WORKER_REQUIRE_AUTH` on, each hit takes the record-level read
+/// decision ([`read_visibility`]): a worker the caller may not read is left
+/// out, and `total` counts only what is shown. A masked worker is kept only
+/// if the query still matches its masked form ([`masked_still_matches`]),
+/// so a search on a masked value, such as a social security number, cannot
+/// confirm it.
 pub async fn search_fhir_workers(
     State(state): State<AppState>,
+    caller: MaybeAuthUser,
     Query(params): Query<FhirSearchParams>,
 ) -> Response {
     let search_query = if let Some(ref name) = params.name {
@@ -267,6 +308,18 @@ pub async fn search_fhir_workers(
                 };
                 match state.worker_repository.get_by_id(&worker_id).await {
                     Ok(Some(worker)) => {
+                        let Some(obligations) = read_visibility(&caller, &worker) else {
+                            continue;
+                        };
+                        let worker = if obligations.iter().any(|o| o == "mask") {
+                            let masked = crate::privacy::mask_worker(&worker);
+                            if !masked_still_matches(&search_query, &masked) {
+                                continue;
+                            }
+                            masked
+                        } else {
+                            worker
+                        };
                         let fhir_worker = to_fhir_worker(&worker);
                         fhir_entries.push(serde_json::json!({
                             "fullUrl": format!("Practitioner/{}", worker.id),
@@ -298,6 +351,35 @@ pub async fn search_fhir_workers(
             &e.to_string(),
         ),
     }
+}
+
+/// Lower-cased alphanumeric tokens of `text`, split as the search index's
+/// default tokenizer splits.
+fn search_tokens(text: &str) -> impl Iterator<Item = String> + '_ {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .map(str::to_lowercase)
+}
+
+/// Whether every token of `query` appears in what the index would hold for
+/// the already-masked `worker`: its names and its `TYPE:value` identifier
+/// tokens, the fields search queries. A hit that only a masked value
+/// explains, such as a search on a full social security number, is
+/// refused. Fuzzy hits on a masked worker are refused too, which fails
+/// closed.
+fn masked_still_matches(query: &str, worker: &crate::models::Worker) -> bool {
+    let mut held: std::collections::HashSet<String> = std::collections::HashSet::new();
+    held.extend(search_tokens(&worker.name.family));
+    for given in &worker.name.given {
+        held.extend(search_tokens(given));
+    }
+    for id in &worker.identifiers {
+        held.extend(search_tokens(&format!(
+            "{}:{}",
+            id.identifier_type, id.value
+        )));
+    }
+    search_tokens(query).all(|t| held.contains(&t))
 }
 
 /// `GET /fhir/metadata` — the `CapabilityStatement` declaring exactly the
@@ -336,4 +418,36 @@ pub async fn metadata() -> Response {
         }]
     });
     fhir_json(StatusCode::OK, &statement)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::masked_still_matches;
+    use crate::models::{Gender, HumanName, Identifier, Worker};
+
+    fn masked_worker() -> Worker {
+        let mut w = Worker::new(
+            HumanName {
+                use_type: None,
+                family: "Quinlan".into(),
+                given: vec!["Avery".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Female,
+        );
+        w.identifiers.push(Identifier::ssn("123-45-6789".into()));
+        crate::privacy::mask_worker(&w)
+    }
+
+    /// A query a masked worker still answers by name is kept; one that only
+    /// the hidden social security number explains is refused.
+    #[test]
+    fn a_masked_value_cannot_be_confirmed_by_search() {
+        let w = masked_worker();
+        assert!(masked_still_matches("Quinlan", &w));
+        assert!(masked_still_matches("avery quinlan", &w));
+        assert!(!masked_still_matches("123-45-6789", &w));
+        assert!(!masked_still_matches("Quinlan 123456789", &w));
+    }
 }
