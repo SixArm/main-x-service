@@ -705,3 +705,13 @@ clearly described manual check confirms the acceptance criterion.
   conflicting DOIs stay `pending` / `contradicted` with the auto-merge
   threshold under their score, and `check-duplicates` and the `409`
   carry evidence.
+- [x] **T-19 (S) — Page the review queue.** *(Done 2026-11-10.)*
+  `GET /api/things/review-queue` returned at most 500 rows, newest
+  first, with no cursor, so a longer queue could not be read past its
+  first page, and a `limit` above 500 was quietly clamped where
+  `agents/share/restful.md` §Pagination refuses it (found by place
+  T-20). It now pages through `axa::cursor_pagination` like
+  `GET /api/things`: `?limit=&cursor=`, default 100, at most 500, a
+  `422` above that or on an unsigned cursor, `Link: rel="next"` while
+  more follow. `tests/review_queue_paging.rs` seeds 520 pairs and walks
+  them to the end, each seen once.

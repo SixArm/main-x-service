@@ -131,8 +131,11 @@ pub async fn upsert(db: impl Into<Db<'_>>, items: &[NewReviewItem]) -> Result<Ve
     Ok(rows)
 }
 
-/// List stored review items, newest first, optionally filtered by
-/// status token. `limit` is capped at 500.
+/// One page of the review queue, newest first, optionally filtered to
+/// one status token: up to `limit` rows after skipping `offset`. The order
+/// ends in the unique `id`, so a page boundary is stable. The REST layer
+/// takes `offset` and `limit` from a cursor page it signed, so neither is
+/// bounded here.
 ///
 /// `None` lists every status: the filter is the one bound parameter
 /// `$1::text IS NULL OR status = $1`, so both cases are the same static
@@ -144,9 +147,11 @@ pub async fn upsert(db: impl Into<Db<'_>>, items: &[NewReviewItem]) -> Result<Ve
 pub async fn list(
     db: impl Into<Db<'_>>,
     status: Option<&str>,
+    offset: u64,
     limit: u64,
 ) -> Result<Vec<ReviewQueueRow>> {
-    let limit = i64::try_from(limit.min(500)).unwrap_or(500);
+    let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+    let offset = i64::try_from(offset).unwrap_or(i64::MAX);
     let mut conn = db.into().acquire().await?;
     let rows = sqlx::query_as!(
         ReviewQueueRow,
@@ -156,9 +161,10 @@ pub async fn list(
          FROM review_queue
          WHERE ($1::text IS NULL OR status = $1)
          ORDER BY created_at DESC, id
-         LIMIT $2",
+         LIMIT $2 OFFSET $3",
         status,
         limit,
+        offset,
     )
     .fetch_all(&mut *conn)
     .await?;

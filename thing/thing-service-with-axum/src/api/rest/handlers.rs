@@ -958,21 +958,35 @@ pub struct ReviewDecisionRequest {
 }
 
 /// Query parameters for the review-queue list endpoint.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, IntoParams)]
 pub struct ReviewQueueListQuery {
     /// Optional status-token filter (`pending` / `confirmed` /
     /// `rejected` / `automerged`).
     pub status: Option<String>,
-    /// Maximum items to return (default 100, capped at 500).
-    pub limit: Option<u64>,
+    /// Page size (default 100, at most 500; anything else is a `422`).
+    /// Read from the URI by [`CursorPage::new`], declared here for the
+    /// `OpenAPI` document.
+    #[param(value_type = Option<u64>)]
+    pub limit: Option<String>,
+    /// The signed position from a previous page's `Link: rel="next"`.
+    /// Read from the URI by [`CursorPage::new`].
+    pub cursor: Option<String>,
 }
+
+/// Review-queue page sizes: 100 when none is asked for, and a `limit`
+/// above 500 refused with a `422`, never clamped.
+const REVIEW_QUEUE_LIMITS: CursorLimits = CursorLimits {
+    default_limit: 100,
+    max_limit: 500,
+};
 
 /// Response body for `GET /api/things/review-queue`.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ReviewQueueListResponse {
-    /// The stored review-queue items (newest first).
+    /// The stored review-queue items on this page (newest first).
     pub items: Vec<ReviewQueueItem>,
-    /// Number of items returned.
+    /// Number of items on this page, not in the queue: whether more
+    /// follow is the `Link: rel="next"` header's answer.
     pub total: usize,
 }
 
@@ -1021,14 +1035,18 @@ fn review_row_to_item(row: &crate::db::review_queue::ReviewQueueRow) -> ReviewQu
     }
 }
 
-/// List the stored deduplication review queue (newest first).
+/// List the stored deduplication review queue (newest first), one page
+/// at a time: `?limit=&cursor=`, with a `Link: rel="next"` header while
+/// more rows follow (`agents/share/restful.md` §Pagination).
 #[utoipa::path(get, path = "/api/things/review-queue", tag = "matching",
+    params(ReviewQueueListQuery),
     responses(
         (status = 200, description = "Stored review-queue items", body = ReviewQueueListResponse),
-        (status = 422, description = "Unknown status token"),
+        (status = 422, description = "Unknown status token, or an invalid limit or cursor"),
         (status = 500, description = "Internal server error")))]
 pub async fn get_review_queue(
     State(state): State<AppState>,
+    OriginalUri(uri): OriginalUri,
     Query(query): Query<ReviewQueueListQuery>,
 ) -> axum::response::Response {
     if let Some(status) = query.status.as_deref()
@@ -1041,17 +1059,23 @@ pub async fn get_review_queue(
         .respond(StatusCode::UNPROCESSABLE_ENTITY)
         .into_response();
     }
+    let page = match CursorPage::new(crate::cursor_key::key(), REVIEW_QUEUE_LIMITS, &uri) {
+        Ok(page) => page,
+        Err(refused) => return invalid_page(refused),
+    };
     match crate::db::review_queue::list(
         &state.db,
         query.status.as_deref(),
-        query.limit.unwrap_or(100),
+        page.offset(),
+        page.limit() + 1,
     )
     .await
     {
         Ok(rows) => {
+            let (rows, more_follow) = page.split(rows);
             let items: Vec<ReviewQueueItem> = rows.iter().map(review_row_to_item).collect();
             let total = items.len();
-            ok(StatusCode::OK, ReviewQueueListResponse { items, total }).into_response()
+            with_next(&page, more_follow, ReviewQueueListResponse { items, total })
         }
         Err(e) => ApiProblem::new(
             "database_error",
