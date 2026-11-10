@@ -16,7 +16,7 @@
 //! `#[ignore]`d — run explicitly with
 //! `DATABASE_URL=… cargo test --test match_evidence -- --ignored`.
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use place_service::app::App;

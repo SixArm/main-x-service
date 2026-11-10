@@ -34,7 +34,7 @@
 
 use std::time::Duration;
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use fluvio::{Fluvio, FluvioConfig};
 use link_graph_service::app::App;
 use link_graph_service::consumer;

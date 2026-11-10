@@ -63,3 +63,4 @@ tonic	gRPC server transport for the same in-process test collector.	Test-only. N
 tokio-stream	Wraps a `TcpListener` as an incoming stream for the in-process test collector's tonic server.	Test-only. Not present in a release artefact.
 reqwest	HTTP client used only by tests/otlp_export.rs to make a real request against a served test router, proving the mounted OTLP middleware returns a traceparent header.	Test-only. Not present in a release artefact; unlike care-pathway (which has this as a main dependency for its journey traversal), this crate has no other use for it.
 axum-test	The `TestServer` the testing harness hands to a request test; used by the compliance request tests.	Test-only. Not present in a release artefact.
+axa-test	Request-level test helpers for axa services (boot_test, request, TestServer), split out of the axa testing feature in axa 0.10.	Test-only. Not present in a release artefact.

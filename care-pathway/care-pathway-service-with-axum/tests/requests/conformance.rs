@@ -15,8 +15,8 @@
 //! `tests/requests/compliance.rs` already set for a fixture the API
 //! itself cannot produce.
 
-use axa::TestServer;
 use axa::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

@@ -15,7 +15,7 @@
 //! The blank-name → 422 contract is additionally pinned DB-free by a
 //! unit test in `src/controllers/organizations.rs`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use organization_service::app::App;
 use serde_json::json;
 use serial_test::serial;
@@ -1067,7 +1067,7 @@ async fn deduplicate_review_queue_round_trip() {
 }
 
 /// `pid`s listed under `mismatched` by `GET /api/compliance/records/verify`.
-async fn mismatched_pids(request: &axa::testing::TestServer) -> Vec<String> {
+async fn mismatched_pids(request: &axa_test::TestServer) -> Vec<String> {
     let response = request
         .get("/api/compliance/records/verify?limit=1000")
         .await;

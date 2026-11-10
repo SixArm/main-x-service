@@ -11,7 +11,7 @@
 //! The pure envelope→row mapping and the transport-string parsing are
 //! pinned DB-free in `src/models/event_outbox.rs` and `src/streaming.rs`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
 use care_pathway_service::models::care_pathways::Model as PathwayModel;

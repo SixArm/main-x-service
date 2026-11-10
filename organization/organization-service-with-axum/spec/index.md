@@ -477,7 +477,7 @@ counter increment in `metrics::tests`, streaming, and `auth::tests` —
 `enforce`/`parse_bool` decision: off+no-token ⇒ ok, on+public ⇒ ok,
 on+protected without/expired/tampered ⇒ `401`, on+protected+valid ⇒
 ok). Request-level tests (`tests/requests/organizations.rs`): boot the
-real app via axa's `testing` harness and cover create round-trip,
+real app via the `axa-test` harness and cover create round-trip,
 blank-name `422` (create + update), unknown-pid `404`, search
 (keyword hit; index follows update + delete; fuzzy / phonetic modes),
 check-duplicates (including identifier-only blocking), merge, `whoami` `401`, the blanket-enforcement

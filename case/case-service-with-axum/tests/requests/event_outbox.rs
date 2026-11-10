@@ -11,7 +11,7 @@
 //! The pure envelope→row mapping and the transport-string parsing are
 //! pinned DB-free in `src/models/event_outbox.rs` and `src/streaming.rs`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use case_matcher::Case;
 use case_service::app::App;
 use case_service::models::cases::Model as CaseModel;

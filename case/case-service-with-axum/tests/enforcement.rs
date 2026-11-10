@@ -13,7 +13,7 @@
 //! / `DATABASE_URL`). Run with `cargo test --test enforcement -- --ignored`.
 #![cfg(feature = "paseto")]
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use case_service::app::App;

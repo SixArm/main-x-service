@@ -8,7 +8,7 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test suggestion_runs -- --ignored`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use chrono::Utc;
 use link_graph_service::app::App;
 use link_graph_service::models::suggestion_runs::{Model, SuggestionRunRecord};

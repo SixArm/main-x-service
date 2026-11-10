@@ -14,7 +14,7 @@
 //! already use.
 #![allow(dead_code)]
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::Router;
 use event_service::{
     api::rest::AppState, app::App, config::Config, db, matching::ProbabilisticMatcher,

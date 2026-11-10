@@ -16,7 +16,7 @@ use axum::Router;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use course_service::{api::rest::AppState, app::App};
 
 /// Held for the lifetime of the process so the search index dir

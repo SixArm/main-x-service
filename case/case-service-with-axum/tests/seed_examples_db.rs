@@ -12,7 +12,7 @@
 
 use std::path::Path;
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use case_service::app::App;
 use case_service::models::cases;
 use case_service::tasks::seed_examples::{FIXTURE_PATH, parse_fixture, seed};

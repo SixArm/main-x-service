@@ -16,7 +16,7 @@
 //!   cargo test --test audit_verify -- --ignored
 //! ```
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::{
     body::Body,
     http::{Request, StatusCode},

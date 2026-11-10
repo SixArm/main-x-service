@@ -28,7 +28,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # an advance against one design family does not transfer.
 sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
-axa = { version = "0.9", features = ["sqlx", "openapi", "versioning", "ratelimit"] }
+axa = { version = "0.10", features = ["sqlx", "openapi", "versioning", "ratelimit"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -114,13 +114,14 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
+axa-test = "0.1"
 # The peer-side verifier library (local path — the monorepo's 0.2 PASETO
 # verifier, not the published 0.1). Used by tests/sign_verify_contract.rs
 # to pin the duplicated-by-convention Claims shape and footer-kid contract:
 # this service signs PASETO v4.public, the verifier crate verifies, the
 # claims round-trip.
 authentication-verifier = { path = "../authentication-verifier-rust-crate", default-features = false, features = ["paseto"] }
-axa = { version = "0.9", features = ["sqlx", "testing", "openapi", "versioning", "ratelimit"] }
+axa = { version = "0.10", features = ["sqlx", "openapi", "versioning", "ratelimit"] }
 serial_test = { version = "4.0.1" }
 rstest = { version = "0.28" }
 insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }

@@ -28,7 +28,7 @@ sha3 = { version = "0.12" }
 # Async runtime
 tokio = { version = "1.54", features = ["full"] }
 
-axa = { version = "0.9", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit"] }
+axa = { version = "0.10", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 
 # Web framework (axum 0.8, matching axa)
 axum = { version = "0.8", features = ["macros"] }
@@ -110,7 +110,8 @@ keycloak = ["authentication-verifier/keycloak"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa = { version = "0.9", features = ["sqlx", "testing", "openapi", "opentelemetry", "versioning", "ratelimit"] }
+axa-test = "0.1"
+axa = { version = "0.10", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit"] }
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }

@@ -8,7 +8,7 @@
 //! no `rsa`/RUSTSEC-2023-0071 exposure, dev-dependency only.
 
 use authentication_service::app::App;
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use axum::Json;
 use axum::extract::State;
 use base64::Engine;

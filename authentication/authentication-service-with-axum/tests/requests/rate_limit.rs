@@ -10,7 +10,7 @@
 //! DB-free in the module itself.
 
 use authentication_service::{app::App, rate_limit};
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use chrono::{Duration, Utc};
 use serial_test::serial;
 

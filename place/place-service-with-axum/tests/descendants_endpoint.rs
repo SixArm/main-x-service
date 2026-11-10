@@ -5,7 +5,7 @@
 //! `#[ignore]`d — run explicitly with
 //! `DATABASE_URL=… cargo test --test descendants_endpoint -- --ignored`.
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use place_service::app::App;

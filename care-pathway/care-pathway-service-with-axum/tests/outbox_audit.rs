@@ -13,7 +13,7 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test outbox_audit -- --ignored`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
 use care_pathway_service::models::{audit_logs, care_pathways, event_outbox};

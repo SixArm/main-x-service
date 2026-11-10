@@ -7,7 +7,7 @@
 
 mod common;
 
-use axa::testing::request;
+use axa_test::request;
 use axum::http::{HeaderName, HeaderValue};
 use person_service::app::App;
 use person_service::compliance::{disclosure, erasure};

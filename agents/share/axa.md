@@ -12,7 +12,10 @@ axa is a library, not a framework. Each service's `src/app.rs` holds ordinary
 functions, and its `main.rs` calls them. axa's own specification is
 [`spec/index.md`](https://github.com/publicprojects-io/axa/blob/main/spec/index.md).
 
-Services take it from crates.io, as `axa = "0.9"`.
+Services take it from crates.io, as `axa = "0.10"`. The request-level test
+helpers are a separate crate, `axa-test = "0.1"`, taken as a dev-dependency:
+import `axa_test::prelude::*` in a test, since `axa::prelude` does not bring in
+`request`, `boot_test`, `TestApp`, or `TestServer`.
 
 ## Errors
 

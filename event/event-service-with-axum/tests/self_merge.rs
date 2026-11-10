@@ -70,7 +70,7 @@ async fn two_different_records_reach_the_database() {
 #[tokio::test]
 #[ignore = "requires a running PostgreSQL via DATABASE_URL"]
 async fn a_refused_self_merge_leaves_the_event_in_place() {
-    use axa::testing::TestApp;
+    use axa_test::TestApp;
     use axum::body::Body;
     use axum::http::Request;
     use event_service::db::EventRepository as _;

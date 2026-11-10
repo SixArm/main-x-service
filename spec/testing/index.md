@@ -194,7 +194,7 @@ database:
 These flags are guarded to `test`/`development` and must never appear in
 `production.yaml`. Combined with `#[serial]`, they give each request
 test a deterministic, isolated starting state. The axa request harness
-(`axa::testing::request::<App, _, _>`) boots the app against this
+(`axa_test::request::<App, _, _>`, from the `axa-test` crate) boots the app against this
 environment and yields a `request` client plus the `AppContext`.
 
 ---

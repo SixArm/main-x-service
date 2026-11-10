@@ -9,7 +9,7 @@
 //!     (default `http://localhost:5151`).
 //!
 //! Routing-at-request-time lets tests register their stub *after* the app
-//! has booted, which is what `axa::testing::request` needs: the app is
+//! has booted, which is what `axa_test::request` needs: the app is
 //! built before a test can reach it.
 
 use async_trait::async_trait;

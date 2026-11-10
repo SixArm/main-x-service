@@ -1,4 +1,4 @@
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use case_folder_service_with_rust::app::App;
 use serial_test::serial;
 
@@ -221,7 +221,7 @@ async fn move_volume_relocates_every_member() {
 /// A volume of two folders in `from`, for the failure tests below:
 /// `(volume id, [folder ids], from, to)`.
 async fn two_folder_volume(
-    request: &axa::testing::TestServer,
+    request: &axa_test::TestServer,
     tag: &str,
 ) -> (
     String,

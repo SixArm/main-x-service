@@ -23,7 +23,7 @@ use authentication_service::{
     app::App,
     models::{auth_events::Model as AuthEvent, sessions, users},
 };
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use serial_test::serial;
 
 #[cfg(feature = "paseto")]

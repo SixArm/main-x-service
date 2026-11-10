@@ -9,7 +9,8 @@
 //! not a defect worth deleting helpers over.
 #![allow(dead_code)]
 
-use axa::{AppContext, Environment, config::Defaults, testing::TestApp};
+use axa::{AppContext, Environment, config::Defaults};
+use axa_test::TestApp;
 use axum::Router;
 use worker_service::{
     api::rest::AppState, app::App, config::Config, db::create_connection,

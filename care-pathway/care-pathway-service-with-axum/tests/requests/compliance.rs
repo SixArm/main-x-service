@@ -20,8 +20,8 @@
 //!   cargo test -- --ignored
 //! ```
 
-use axa::TestServer;
-use axa::testing::prelude::*;
+use axa_test::TestServer;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

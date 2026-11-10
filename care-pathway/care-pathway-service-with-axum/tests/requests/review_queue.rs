@@ -6,7 +6,7 @@
 //! so they require a reachable PostgreSQL instance and are `#[ignore]`d
 //! (family convention; run with `cargo test -- --ignored`).
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;
@@ -170,7 +170,7 @@ async fn unrelated_pathways_are_not_queued() {
 
 /// Create two pathways from `a` and `b`, run the batch scan, and return
 /// the scan's item for that pair plus the same item as the list returns it.
-async fn scan_pair(request: &axa::testing::TestServer, a: Value, b: Value) -> (Value, Value) {
+async fn scan_pair(request: &axa_test::TestServer, a: Value, b: Value) -> (Value, Value) {
     let a: Value = request.post("/api/care-pathways").json(&a).await.json();
     let b: Value = request.post("/api/care-pathways").json(&b).await.json();
     let pid_a = a["pid"].as_str().expect("pid a").to_string();

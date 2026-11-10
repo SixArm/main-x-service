@@ -11,7 +11,7 @@
 //! The pure envelope→row mapping and the transport-string parsing are
 //! pinned DB-free in `src/models/event_outbox.rs` and `src/streaming.rs`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use organization_matcher::Organization;
 use organization_service::app::App;
 use organization_service::models::event_outbox::Model as OutboxRow;

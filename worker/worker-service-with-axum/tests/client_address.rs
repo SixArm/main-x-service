@@ -9,7 +9,7 @@
 
 mod common;
 
-use axa::testing::{TestServer, request};
+use axa_test::{TestServer, request};
 use axum::http::{HeaderName, HeaderValue};
 use serde_json::{Value, json};
 use serial_test::serial;

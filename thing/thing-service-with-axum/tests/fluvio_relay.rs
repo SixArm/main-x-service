@@ -25,7 +25,7 @@
 //! posture as person's `s3_round_trip_against_a_live_endpoint`
 //! (`person/person-service-with-axum/src/bulk/store.rs`, BLK-4).
 //!
-//! Unlike case-service's `axa::testing::request` harness, this crate
+//! Unlike case-service's `axa_test::request` harness, this crate
 //! has no such helper wired up (its DB-gated tests, e.g.
 //! `src/db/mod.rs`'s `outbox_tests` and `tests/enforcement.rs`, connect
 //! directly via `DATABASE_URL`), so this test follows that same

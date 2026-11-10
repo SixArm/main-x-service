@@ -13,7 +13,7 @@
 //! id, the position a newest-first list scan would reach last) and is
 //! still found ahead of several newer distractors.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

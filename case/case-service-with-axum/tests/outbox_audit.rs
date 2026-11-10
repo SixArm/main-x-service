@@ -13,7 +13,7 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test outbox_audit -- --ignored`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use case_matcher::Case;
 use case_service::app::App;
 use case_service::models::{audit_logs, cases, event_outbox};

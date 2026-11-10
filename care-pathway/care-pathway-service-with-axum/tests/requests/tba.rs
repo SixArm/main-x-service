@@ -2,8 +2,8 @@
 //! and read the derived per-instance, timeline, cohort, constraint and
 //! flow views. Pins the contract in `spec/time-based-analysis.md` §14.3.
 
-use axa::TestServer;
-use axa::testing::prelude::*;
+use axa_test::TestServer;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use care_pathway_service::tba::DAY_MS;
 use serde_json::{Value, json};

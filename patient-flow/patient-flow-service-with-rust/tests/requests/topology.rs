@@ -1,7 +1,7 @@
 //! Topology CRUD request tests (PF-T17): happy paths + the `422`
 //! validation contract over the live routes.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use patient_flow_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

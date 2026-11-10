@@ -28,7 +28,7 @@
 //! `s3_round_trip_against_a_live_endpoint` (`src/bulk/store.rs`, BLK-4).
 //!
 //! **Deviation from the case template:** case drives this test through
-//! `axa::testing::prelude::request::<App, _, _>` because that crate's
+//! `axa_test::prelude::request::<App, _, _>` because that crate's
 //! dev-dependencies enable axa's `testing` feature. This crate's
 //! dev-dependencies do not, and its own DB-gated outbox atomicity tests
 //! (`src/db/repositories.rs::tests::create_enqueues_a_created_outbox_row`)

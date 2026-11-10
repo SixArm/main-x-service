@@ -21,7 +21,7 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test merge_event_carries_merged_from -- --ignored`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use organization_matcher::Organization;
 use organization_service::app::App;
 use organization_service::models::event_outbox;

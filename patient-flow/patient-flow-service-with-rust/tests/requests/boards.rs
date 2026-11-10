@@ -3,7 +3,7 @@
 //! a fresh tag after a change), the at-a-glance arithmetic, and the
 //! locate read-audit pin.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use patient_flow_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

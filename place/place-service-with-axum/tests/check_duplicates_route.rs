@@ -14,7 +14,7 @@
 //! `#[ignore]`d — run explicitly with
 //! `DATABASE_URL=… cargo test --test check_duplicates_route -- --ignored`.
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use place_service::app::App;

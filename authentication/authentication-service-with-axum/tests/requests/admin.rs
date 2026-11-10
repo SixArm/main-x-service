@@ -13,8 +13,9 @@ use authentication_service::{
     app::App,
     models::{auth_events, users},
 };
-use axa::testing::prelude::*;
-use axa::{AppContext, TestServer};
+use axa::AppContext;
+use axa_test::TestServer;
+use axa_test::prelude::*;
 use serial_test::serial;
 
 use super::prepare_data::auth_header;

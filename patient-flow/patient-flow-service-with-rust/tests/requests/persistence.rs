@@ -3,7 +3,7 @@
 //! upsert under two writers (PF-R1), and the outbox relay poll's
 //! `FOR UPDATE SKIP LOCKED` (PF-O1).
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use chrono::{DateTime, FixedOffset};
 use patient_flow_service::app::App;
 use patient_flow_service::models::event_outbox::{self, OutboxInsert};

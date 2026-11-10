@@ -27,7 +27,7 @@
 //! (`person/person-service-with-axum/src/bulk/store.rs`, BLK-4).
 #![cfg(feature = "fluvio")]
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_matcher::CarePathway;
 use care_pathway_service::app::App;
 use care_pathway_service::models::event_outbox;

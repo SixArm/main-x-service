@@ -4,8 +4,8 @@
 //! reaches the database as the requested conditions, and a bad
 //! argument is refused rather than silently defaulted.
 
-use axa::TestServer;
 use axa::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use care_pathway_service::data::journeys::DEFECT_CODES;
 use care_pathway_service::models::{instance_segments, instance_team, pathway_instances};

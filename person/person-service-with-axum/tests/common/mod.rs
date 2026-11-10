@@ -11,7 +11,7 @@
 //! a property of the layout, not a defect worth deleting helpers over.
 #![allow(dead_code)]
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::Router;
 use chrono::Utc;
 use person_service::{

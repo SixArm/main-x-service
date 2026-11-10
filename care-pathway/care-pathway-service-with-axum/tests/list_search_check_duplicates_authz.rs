@@ -19,7 +19,7 @@
 
 #![cfg(feature = "paseto")]
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use care_pathway_service::app::App;

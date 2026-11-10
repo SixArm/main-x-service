@@ -3,7 +3,7 @@
 //! team, and the derived caseload / overdue-reviews / cohort /
 //! care-team-load views.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

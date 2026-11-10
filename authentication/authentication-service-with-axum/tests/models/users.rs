@@ -7,7 +7,7 @@ use authentication_service::{
     app::App,
     models::users::{self, Model, NewUser, RegisterParams},
 };
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use chrono::Duration;
 use insta::assert_debug_snapshot;
 use serial_test::serial;

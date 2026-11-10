@@ -14,7 +14,7 @@
 //! demanded was discarded. Same defect, same fix, as the event service's
 //! `created_at`/`updated_at` fix (2026-08-01).
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use place_service::app::App;

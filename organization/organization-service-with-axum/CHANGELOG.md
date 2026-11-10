@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — axa 0.10
+
+- `axa` 0.9 → 0.10. Its `testing` feature is gone: the test helpers come from
+  the new `axa-test` 0.1 dev-dependency, imported as `axa_test::prelude` or
+  `axa_test::TestServer`. Test code only; nothing at run time changes.
+
 ### Added — match evidence
 
 - Match results carry the matcher's `evidence` (`weight_bits`,

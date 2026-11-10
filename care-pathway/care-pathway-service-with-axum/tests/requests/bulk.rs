@@ -11,7 +11,7 @@
 //! returns `202`, the job has already reached its terminal status. No
 //! polling is needed; the very next `GET .../{id}` observes the result.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_matcher::{CarePathway, IdentifierScheme, PathwayIdentifier};
 use care_pathway_service::app::App;
 use care_pathway_service::bulk::{csv, jsonl};

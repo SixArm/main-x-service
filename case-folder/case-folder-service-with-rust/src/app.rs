@@ -130,7 +130,7 @@ pub async fn run(cli: Cli) -> Result<()> {
     }
 }
 
-/// The application type tests boot through `axa::testing`.
+/// The application type tests boot through `axa_test`.
 pub struct App;
 
 impl TestApp for App {

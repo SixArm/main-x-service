@@ -7,7 +7,7 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test reconcile -- --ignored`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use entity_ref::{EdgeKind, EntityRef, EntityType};
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, LinkedEvent, apply_event};

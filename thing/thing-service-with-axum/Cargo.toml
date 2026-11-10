@@ -44,7 +44,7 @@ serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precis
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "macros", "migrate", "uuid", "chrono", "json"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 
-axa = { version = "0.9", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
+axa = { version = "0.10", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 
 # Search Engine
 tantivy = "0.27"
@@ -114,7 +114,8 @@ keycloak = ["authentication-verifier/keycloak"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa = { version = "0.9", features = ["sqlx", "testing", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
+axa-test = "0.1"
+axa = { version = "0.10", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }

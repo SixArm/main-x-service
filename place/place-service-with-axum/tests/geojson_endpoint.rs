@@ -8,7 +8,7 @@
 
 use std::str::FromStr;
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
 use bigdecimal::BigDecimal;

@@ -25,7 +25,7 @@
 //! (`person/person-service-with-axum/src/bulk/store.rs`, BLK-4).
 #![cfg(feature = "fluvio")]
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use case_matcher::Case;
 use case_service::app::App;
 use case_service::models::event_outbox;

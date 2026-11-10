@@ -12,7 +12,7 @@
 //! `#[ignore]`d — run explicitly with
 //! `DATABASE_URL=… cargo test --test review_queue_score_breakdown -- --ignored`.
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use serde_json::{Value, json};

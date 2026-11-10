@@ -4,7 +4,7 @@
 //! review-queue rows. `#[ignore]`d on PostgreSQL like the rest of the
 //! suite.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use organization_service::app::App;
 use serde_json::json;
 use serial_test::serial;
@@ -15,7 +15,7 @@ const LEI_A: &str = "5493001KJTIIGC8Y1R12";
 const LEI_B: &str = "529900T8BM49AURSDO55";
 
 /// Run `deduplicate` with an auto-merge threshold and return the report.
-async fn scan(request: &axa::testing::TestServer) -> serde_json::Value {
+async fn scan(request: &axa_test::TestServer) -> serde_json::Value {
     let response = request
         .post("/api/organizations/deduplicate")
         .json(&json!({ "auto_merge_threshold": 0.9 }))

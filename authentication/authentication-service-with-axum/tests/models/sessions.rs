@@ -6,7 +6,7 @@ use authentication_service::{
     models::sessions::{self, session_data},
     secret_hash,
 };
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use serial_test::serial;
 use uuid::Uuid;
 

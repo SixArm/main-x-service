@@ -10,7 +10,7 @@
 //! `tests/integration_geo_radius.rs` pins the `within_radius` primitive
 //! in isolation, this file pins the wired HTTP surface.
 
-use axa::testing::TestApp;
+use axa_test::TestApp;
 use std::sync::OnceLock;
 
 use axum::body::Body;

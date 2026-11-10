@@ -10,8 +10,8 @@
 //! rather than a small hand-built fixture, per this report's own
 //! acceptance text naming it directly.
 
-use axa::TestServer;
 use axa::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use care_pathway_service::data::journeys::DEFECT_CODES;
 use care_pathway_service::tasks::journeys_seed::JourneysSeed;

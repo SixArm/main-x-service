@@ -12,7 +12,7 @@
 //! `#[ignore]`d: boots the app against Postgres. Run with
 //! `cargo test --test governance -- --ignored`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event};
 use link_graph_service::models::audit_log;

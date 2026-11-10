@@ -15,7 +15,7 @@
 //! several newer distractors, and `address-city` search stays
 //! field-precise (a distractor sharing no city must not appear).
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use organization_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

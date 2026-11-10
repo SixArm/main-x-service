@@ -2,7 +2,7 @@
 //! variants / providers / languages derived views over a seeded set
 //! of pathways.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

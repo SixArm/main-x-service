@@ -1,4 +1,4 @@
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use case_folder_service_with_rust::app::App;
 use serial_test::serial;
 

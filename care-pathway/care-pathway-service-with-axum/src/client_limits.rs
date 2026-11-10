@@ -76,7 +76,7 @@ fn limit(lookup: &dyn Fn(&str) -> Option<String>, name: &str) -> axa::Result<Opt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axa::testing::TestServer;
+    use axa_test::TestServer;
     use axum::{http::StatusCode, routing::get};
 
     fn lookup(pairs: &'static [(&'static str, &'static str)]) -> impl Fn(&str) -> Option<String> {

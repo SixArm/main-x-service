@@ -10,7 +10,7 @@
 //!   cargo test -- --ignored
 //! ```
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use link_graph_service::app::App;
 use link_graph_service::events::{Envelope, apply_event};
 use serde_json::{Value, json};

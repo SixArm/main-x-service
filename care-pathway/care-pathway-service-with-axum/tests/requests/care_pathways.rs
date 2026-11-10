@@ -1,6 +1,6 @@
 //! Request-level integration tests over the seven `/api/care-pathways`
 //! endpoints (spec §6 / §11; entity spec T-4), in the axa testing style
-//! (`axa::testing`, as in the authentication-service sibling).
+//! (`axa_test`, as in the authentication-service sibling).
 //!
 //! These boot the app against the `test` environment, which needs a
 //! reachable PostgreSQL (`config/test.yaml`; override with
@@ -15,7 +15,7 @@
 //! The blank-name → `422` contract is additionally pinned un-gated by
 //! the DB-free unit tests in `src/controllers/care_pathways.rs`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;
@@ -965,7 +965,7 @@ async fn truncate_clears_every_service_table() {
 
 /// Create two distinct pathways through the API and load both rows.
 async fn two_pathways(
-    request: &axa::TestServer,
+    request: &axa_test::TestServer,
     db: &sqlx::PgPool,
 ) -> (
     care_pathway_service::models::care_pathways::Model,

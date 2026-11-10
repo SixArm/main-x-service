@@ -1,6 +1,6 @@
 //! Request-level integration tests over the `/api/cases` endpoints
 //! (spec §6 / §11; entity spec T-4), in the axa testing style
-//! (`axa::testing`, as in the authentication-service sibling).
+//! (`axa_test`, as in the authentication-service sibling).
 //!
 //! These boot the app against the `test` environment, which needs a
 //! reachable PostgreSQL (`config/test.yaml`; override with
@@ -15,7 +15,7 @@
 //! The blank-title → `422` contract is additionally pinned un-gated by
 //! the DB-free unit tests in `src/controllers/cases.rs`.
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use case_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;
@@ -1059,7 +1059,7 @@ async fn erasure_failing_late_leaves_nothing_changed() {
 async fn record_integrity_covers_every_write_path_and_catches_tampering() {
     super::isolate_search_index();
     request::<App, _, _>(|request, ctx| async move {
-        async fn verify(request: &axa::TestServer) -> Value {
+        async fn verify(request: &axa_test::TestServer) -> Value {
             let response = request.get("/api/cases/records/verify?limit=500").await;
             assert_eq!(response.status_code(), 200);
             response.json()
@@ -1529,7 +1529,7 @@ async fn sbom_needs_a_caller_with_enforcement_off() {
 }
 
 /// `pid`s listed under `mismatched` by `GET /api/cases/records/verify`.
-async fn mismatched_pids(request: &axa::TestServer) -> Vec<String> {
+async fn mismatched_pids(request: &axa_test::TestServer) -> Vec<String> {
     let response = request.get("/api/cases/records/verify?limit=1000").await;
     assert_eq!(response.status_code(), 200, "records verify should answer");
     let report: Value = response.json();
@@ -1782,7 +1782,7 @@ async fn erasure_removes_the_case_from_the_search_index() {
 
 /// Create two distinct cases through the API and load both rows.
 async fn two_cases(
-    request: &axa::TestServer,
+    request: &axa_test::TestServer,
     db: &sqlx::PgPool,
 ) -> (
     case_service::models::cases::Model,

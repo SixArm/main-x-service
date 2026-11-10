@@ -76,3 +76,4 @@ bytes	Reads encoded Parquet bytes back in src/bulk/parquet_format.rs's round-tri
 opentelemetry-proto	Generated OTLP/gRPC protobuf types (TraceServiceServer, MetricsServiceServer) backing the in-process collector in tests/otlp_collector/, proving real export (PRO-H9).	Test-only. Not present in a release artefact.
 tokio-stream	Wraps the collector's TcpListener as an incoming connection stream for tonic's transport server in tests/otlp_collector/.	Test-only. Not present in a release artefact.
 reqwest	Makes the real HTTP request in tests/otlp_export.rs that proves the mounted OTLP middleware returns a traceparent header.	Test-only. Not present in a release artefact.
+axa-test	Request-level test helpers for axa services (boot_test, request, TestServer), split out of the axa testing feature in axa 0.10.	Test-only. Not present in a release artefact.

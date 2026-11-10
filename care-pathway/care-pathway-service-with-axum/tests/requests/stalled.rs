@@ -16,8 +16,8 @@
 //! `closed_instance` helper already relies on), so this test needs no
 //! bypass for those.
 
-use axa::TestServer;
 use axa::prelude::*;
+use axa_test::prelude::*;
 use care_pathway_service::app::App;
 use serde_json::{Value, json};
 use serial_test::serial;

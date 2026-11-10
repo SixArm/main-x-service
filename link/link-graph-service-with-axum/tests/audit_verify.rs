@@ -14,7 +14,7 @@
 //!   cargo test --test audit_verify -- --ignored
 //! ```
 
-use axa::testing::prelude::*;
+use axa_test::prelude::*;
 use link_graph_service::app::App;
 use link_graph_service::models::audit_log::{self, AuditContext};
 use serde_json::Value;

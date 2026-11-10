@@ -8,6 +8,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — axa 0.10
+
+- `axa` 0.9 → 0.10. Its `testing` feature is gone: the test helpers come from
+  the new `axa-test` 0.1 dev-dependency, imported as `axa_test::prelude` or
+  `axa_test::TestServer`. Test code only; nothing at run time changes.
+
 ### Changed
 
 - Matching defers to the `event-matcher` crate: score, `is_match`,
