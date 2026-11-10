@@ -24,6 +24,7 @@ use crate::api::rest::AppState;
 use crate::api::rest::auth::{
     MaybeAuthUser, audit_context_of, authorize_record, read_visibility, worker_resource_attrs,
 };
+use crate::compliance::disclosure::{self, AccessContext};
 use authentication_verifier::Action;
 
 /// Builds an `application/fhir+json` [`Response`] with the given status and an
@@ -106,6 +107,7 @@ pub async fn get_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
+    access: AccessContext,
 ) -> Response {
     match state.worker_repository.get_by_id(&id).await {
         Ok(Some(worker)) => {
@@ -121,6 +123,21 @@ pub async fn get_fhir_worker(
                         return fhir_error(status, code, &reason);
                     }
                 };
+            // Audited as `GET /api/workers/{id}` is (T-27): once the read is
+            // allowed, a READ row for this worker, under `WORKER_AUDIT_READS`.
+            if disclosure::record_access(
+                &state.audit_log,
+                "Worker",
+                id,
+                disclosure::action::READ,
+                caller.claims().map(|c| c.sub.as_str()),
+                &access,
+            )
+            .await
+            .is_err()
+            {
+                return audit_unavailable();
+            }
             let worker = if obligations.iter().any(|o| o == "mask") {
                 crate::privacy::mask_worker(&worker)
             } else {
@@ -278,6 +295,7 @@ pub async fn delete_fhir_worker(
 pub async fn search_fhir_workers(
     State(state): State<AppState>,
     caller: MaybeAuthUser,
+    access: AccessContext,
     Query(params): Query<FhirSearchParams>,
 ) -> Response {
     let search_query = if let Some(ref name) = params.name {
@@ -294,6 +312,22 @@ pub async fn search_fhir_workers(
     };
 
     let limit = params.count.unwrap_or(10).min(100);
+
+    // Audited as `GET /api/workers/search` is (T-27): one SEARCH row against
+    // the nil id, because a search discloses many records rather than one.
+    if disclosure::record_access(
+        &state.audit_log,
+        "Worker",
+        Uuid::nil(),
+        disclosure::action::SEARCH,
+        caller.claims().map(|c| c.sub.as_str()),
+        &access,
+    )
+    .await
+    .is_err()
+    {
+        return audit_unavailable();
+    }
 
     match state.search_engine.search(&search_query, limit) {
         Ok(worker_ids) => {
@@ -380,6 +414,16 @@ fn masked_still_matches(query: &str, worker: &crate::models::Worker) -> bool {
         )));
     }
     search_tokens(query).all(|t| held.contains(&t))
+}
+
+/// The read could not be recorded and fail-closed auditing is on, so it is
+/// refused, as the REST reads refuse it: a `503` `exception` outcome.
+fn audit_unavailable() -> Response {
+    fhir_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "exception",
+        "the access could not be recorded in the audit trail, so the read was refused",
+    )
 }
 
 /// `GET /fhir/metadata` — the `CapabilityStatement` declaring exactly the

@@ -984,8 +984,14 @@ clearly described manual check confirms the acceptance criterion.
   masked read, search omission and `total`, and SSN non-confirmation,
   failing at the matching assertion with each of the three checks
   disabled.
-- [ ] **T-27 (S, compliance) — Audit FHIR reads as REST reads are.**
-  *(Found 2026-11-10 while doing T-26.)* REST `GET /api/workers/{id}`
+- [x] **T-27 (S, compliance) — Audit FHIR reads as REST reads are.**
+  *(Found and done 2026-11-10, after T-26: under `WORKER_AUDIT_READS`, the
+  same gate as REST, `GET /fhir/Practitioner/{id}` writes the REST read's
+  `READ` row once the read is allowed and FHIR search one `SEARCH` row
+  against the nil id, through `disclosure::record_access`; a refused write
+  under fail-closed auditing is a `503` `exception` outcome.
+  `tests/fhir_read_audit.rs` fails at each assertion with its call
+  removed.)* REST `GET /api/workers/{id}`
   writes a disclosure audit row on every read; `GET
   /fhir/Practitioner/{id}` and FHIR search write none, so a read through
   FHIR leaves no trace (HIPAA §164.312(b): reads are activity).

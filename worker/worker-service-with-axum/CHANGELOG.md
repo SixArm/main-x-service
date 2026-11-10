@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — FHIR reads are audited (T-27)
+
+- With `WORKER_AUDIT_READS` on, `GET /fhir/Practitioner/{id}` writes the
+  same `READ` audit row `GET /api/workers/{id}` writes, once the read is
+  allowed, and a FHIR search writes one `SEARCH` row against the nil id,
+  as REST search does. A read through FHIR used to leave no trace. With
+  `WORKER_AUDIT_FAIL_CLOSED` on, a refused audit write is a `503`
+  `OperationOutcome`.
+
 ### Security — record-level reads on the FHIR surface (T-26)
 
 - With `WORKER_REQUIRE_AUTH` on, `GET /fhir/Practitioner/{id}` takes the

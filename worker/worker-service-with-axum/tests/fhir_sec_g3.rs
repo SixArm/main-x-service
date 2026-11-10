@@ -31,6 +31,7 @@ use uuid::Uuid;
 use worker_service::api::fhir::handlers::{get_fhir_worker, search_fhir_workers};
 use worker_service::api::rest::AppState;
 use worker_service::api::rest::auth::{MaybeAuthUser, token_claims};
+use worker_service::compliance::disclosure::AccessContext;
 use worker_service::db::AuditContext;
 use worker_service::models::{Gender, HumanName, Identifier, Worker};
 
@@ -127,6 +128,7 @@ async fn search(state: &AppState, caller: MaybeAuthUser, name: &str) -> (StatusC
         search_fhir_workers(
             State(state.clone()),
             caller,
+            AccessContext::internal(),
             Query(serde_json::from_value(json!({ "name": name })).expect("search params")),
         )
         .await,
@@ -178,15 +180,31 @@ async fn fhir_reads_take_the_record_level_decision() {
     let masked_id = seed(&state, &masked).await;
 
     // Read: a denied worker is the REST read's 403, as an OperationOutcome.
-    let (status, body) =
-        body_of(get_fhir_worker(State(state.clone()), Path(denied_id), caller().await).await).await;
+    let (status, body) = body_of(
+        get_fhir_worker(
+            State(state.clone()),
+            Path(denied_id),
+            caller().await,
+            AccessContext::internal(),
+        )
+        .await,
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
     assert_eq!(body["resourceType"], "OperationOutcome", "{body}");
     assert_eq!(body["issue"][0]["code"], "forbidden", "{body}");
 
     // Read: a mask obligation returns the masked identifier.
-    let (status, body) =
-        body_of(get_fhir_worker(State(state.clone()), Path(masked_id), caller().await).await).await;
+    let (status, body) = body_of(
+        get_fhir_worker(
+            State(state.clone()),
+            Path(masked_id),
+            caller().await,
+            AccessContext::internal(),
+        )
+        .await,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let shown = body.to_string();
     assert!(
