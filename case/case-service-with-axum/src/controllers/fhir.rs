@@ -305,17 +305,19 @@ async fn search(
         let Ok(case) = model.to_case() else { continue };
         // SEC-G2: drop cases the caller may not read (a denied record is
         // omitted, not surfaced), and honour the `mask` obligation on the
-        // rest — the search matched on the real fields, then renders masked.
+        // rest. CS-FH1: the parameters are matched against what the caller
+        // sees, the masked form when masked, so an `identifier` search
+        // cannot confirm an identifier the masked view hides.
         let Some(obligations) = crate::auth::read_visibility(&caller, &case) else {
             continue;
         };
         let pid = model.pid.to_string();
-        if params.matches(&case, &pid) {
-            let rendered = if obligations.iter().any(|o| o == "mask") {
-                mask_case(&case)
-            } else {
-                case
-            };
+        let rendered = if obligations.iter().any(|o| o == "mask") {
+            mask_case(&case)
+        } else {
+            case
+        };
+        if params.matches(&rendered, &pid) {
             resources.push(to_fhir_task(
                 &rendered,
                 &pid,

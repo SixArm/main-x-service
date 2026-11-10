@@ -659,14 +659,25 @@ async fn search(
     .await
     .map_err(audit_unavailable)?;
     // SEC-G3: drop rows the caller may not read (same concealment as `list`).
-    let refs: Vec<CaseRef> = rows
-        .iter()
-        .filter(|row| {
-            row.to_case()
-                .is_ok_and(|c| crate::auth::read_visibility(&caller, &c).is_some())
-        })
-        .map(CaseRef::of)
-        .collect();
+    // CS-FH1: a row the caller sees only masked stays only when the query
+    // is answered by the fields the masked view keeps; an exact search also
+    // reads identifiers and subjects, so the hit alone would confirm a
+    // hidden value. Fuzzy and phonetic search read only kept fields.
+    let mut refs: Vec<CaseRef> = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let Ok(case) = row.to_case() else { continue };
+        let Some(obligations) = crate::auth::read_visibility(&caller, &case) else {
+            continue;
+        };
+        let masked = obligations.iter().any(|o| o == "mask");
+        if masked
+            && matches!(mode, crate::search::SearchMode::Exact)
+            && !engine.masked_view_matches(q.trim(), &row.pid.to_string())?
+        {
+            continue;
+        }
+        refs.push(CaseRef::of(row));
+    }
     Ok(with_next(&page, more_follow, refs))
 }
 

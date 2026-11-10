@@ -911,6 +911,25 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **CS-FH1 (S, security) — Masked readers cannot search on hidden values.**
+  *(Done 2026-11-10; found by the survey after organization ORG-T6.)*
+  A caller who may read a case only masked could still learn a value
+  the masked view hides from whether a search returned the case. FHIR
+  `GET /fhir/Task?identifier=` matched the real record and then rendered
+  it masked, and REST exact search (`GET /api/cases/search`) reads the
+  identifiers and subjects fields, which `mask_case` removes. FHIR
+  search now matches its parameters against the masked form for such a
+  caller. REST exact search keeps a masked caller's hit only when every
+  query token occurs in a field the masked view keeps (title, alternate
+  titles, agency name, keywords: `SearchEngine::masked_view_matches`);
+  requiring every token closes a `+title +hidden` conjunction, at the
+  cost that a masked caller's looser query can miss a case it could
+  read. Fuzzy and phonetic search already read only kept fields. No
+  change with `CASE_REQUIRE_AUTH` off or for a caller with no `mask`
+  obligation. Tests: `search::tests::masked_view_matches_only_the_kept_fields`
+  and `tests/masked_search.rs` (its own binary), which fails at the
+  REST assertion with the REST check removed and at the FHIR assertion
+  with the FHIR change removed.
 - [x] **CS-RQ1 (S) — Page the review queue.** *(Done 2026-11-10.)*
   `GET /api/cases/review-queue` returned at most 500 rows with no
   cursor, so a longer queue could not be read past its first page, and

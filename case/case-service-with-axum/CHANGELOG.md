@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Security — masked readers cannot search on hidden values (CS-FH1)
+
+- A caller who reads a case only masked could learn a hidden identifier
+  or subject from whether a search returned the case. FHIR search now
+  matches against the masked form for such a caller, and REST exact
+  search keeps such a hit only when every query token occurs in a field
+  the masked view keeps. Nothing changes with `CASE_REQUIRE_AUTH` off or
+  for a caller with no `mask` obligation.
+
 ### Changed — review queue paging (CS-RQ1)
 
 - `GET /api/cases/review-queue` pages by signed cursor: `?limit=&cursor=`

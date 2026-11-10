@@ -511,6 +511,55 @@ impl SearchEngine {
         Ok((pids, total))
     }
 
+    /// Whether every token of `query_str` occurs in a field the masked
+    /// view keeps (title, alternate titles, agency name, keywords) of the
+    /// case `pid`.
+    ///
+    /// An exact search also reads identifiers and subjects, which
+    /// the controllers' `mask_case` removes. A caller who sees
+    /// a case only masked must not learn a hidden value from whether the
+    /// case came back, so such a hit is kept only when the query is
+    /// answered by the kept fields alone. Requiring every token, rather
+    /// than any, closes the `+title +hidden` conjunction too; the cost is
+    /// that a masked caller's looser query can miss a case it could read.
+    ///
+    /// # Errors
+    ///
+    /// When the search fails.
+    pub fn masked_view_matches(&self, query_str: &str, pid: &str) -> Result<bool> {
+        let tokens = tokenise(query_str);
+        if tokens.is_empty() {
+            return Ok(false);
+        }
+        let s = self.index.schema();
+        let kept = [s.title, s.alternate_titles, s.agency_name, s.keywords];
+        let mut must: Vec<(Occur, Box<dyn Query>)> = vec![(
+            Occur::Must,
+            Box::new(TermQuery::new(
+                Term::from_field_text(s.pid, pid),
+                IndexRecordOption::Basic,
+            )),
+        )];
+        for t in &tokens {
+            let any_kept: Vec<(Occur, Box<dyn Query>)> = kept
+                .iter()
+                .map(|f| {
+                    let q: Box<dyn Query> = Box::new(TermQuery::new(
+                        Term::from_field_text(*f, t),
+                        IndexRecordOption::Basic,
+                    ));
+                    (Occur::Should, q)
+                })
+                .collect();
+            must.push((Occur::Must, Box::new(BooleanQuery::new(any_kept))));
+        }
+        let searcher = self.index.reader().searcher();
+        let hits = searcher
+            .search(&BooleanQuery::new(must), &tantivy::collector::Count)
+            .map_err(|e| err(&format!("search: {e}")))?;
+        Ok(hits > 0)
+    }
+
     /// Build the query for one retrieval mode, or `None` when the input
     /// tokenises to nothing (an empty query matches nothing rather than
     /// everything).
@@ -703,6 +752,23 @@ mod tests {
             }],
             ..Case::new("Housing benefit appeal")
         }
+    }
+
+    /// The masked view's kept fields answer only their own tokens: a
+    /// docket number or subject reference (hidden by the masked view) is
+    /// not answered, nor is a conjunction that needs one, while a title or
+    /// keyword query is (CS-FH1).
+    #[test]
+    fn masked_view_matches_only_the_kept_fields() {
+        let (engine, _dir) = engine_in_temp();
+        let pid = index(&engine, &housing_case()).to_string();
+        assert!(engine.masked_view_matches("housing appeal", &pid).unwrap());
+        assert!(engine.masked_view_matches("benefit", &pid).unwrap());
+        assert!(!engine.masked_view_matches("CV-2024-001234", &pid).unwrap());
+        assert!(!engine.masked_view_matches("person:abc", &pid).unwrap());
+        assert!(!engine.masked_view_matches("+housing +cv", &pid).unwrap());
+        assert!(!engine.masked_view_matches("housing", "not-a-pid").unwrap());
+        assert!(!engine.masked_view_matches("  ", &pid).unwrap());
     }
 
     /// An indexed case is found by an exact full-text query.
