@@ -896,6 +896,12 @@ it — the lean stands.
   insight endpoints are not in `openapi.json`; TBA now is. Close the gap
   by documenting the others rather than by undocumenting this.
 
+- **Window standards.** Every catalogue entry is an upper bound. NICE
+  QS158 s4 (follow-up 2–3 months after critical-care discharge) also
+  needs a lower bound, or a review at one week reads as compliant.
+  Tracked as [§13 T-15f](13-tasks.md). Eligibility the instance cannot
+  see is [OQ-11](16-open-questions.md).
+
 ## 18. References
 
 ### Time-based analysis

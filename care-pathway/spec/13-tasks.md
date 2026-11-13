@@ -1486,3 +1486,196 @@ manual check confirms it. Split tasks too big for one PR
       integration and the README statement are follow-ups, not done in
       this change (this crate's own `README.md`/`AGENTS.md` document it
       instead — see their `journeys:seed` entries).
+
+- [ ] **T-15 — Trauma-informed recovery pathways: what to borrow from
+  an ICU psychology pathway and the ROOTS framework.**
+  *(Triaged 2026-11-13 against two sources. Citations in
+  [§17.5](17-references.md).)*
+
+  **The two sources.**
+
+  | Source | What it is | State |
+  |---|---|---|
+  | *From Survival to Recovery* — Critical Care Psychology Service, Cwm Taf Morgannwg UHB (lead: Dr Michelle Smalley) | A tiered, end-to-end psychological pathway for ICU survivors. It has universal early screening and preventive input during the ICU stay, targeted then specialist therapy after discharge (CBT, ACT, EMDR), consultation and training for ward staff, and staff-wellbeing work. It was co-produced with survivors and families over five years of PDSA cycles. The reported result is that "trauma symptoms" fell from 38% to 12%. | Known only from secondary summaries. No primary publication, protocol, instrument, threshold, timepoint or denominator was found (2026-11-13). The service itself is confirmed: a consultant psychologist and two assistant psychologists covering admission to outpatient recovery, plus CTM research on delirium, self-compassion and VR. The award claim is unverified. |
+  | [ROOTS](https://healthinnovationnenc.org.uk/wp-content/uploads/2023/04/The-ROOTS-Framework-User-Manual-29-03-21-1.pdf) — Thirkle, Kennedy, Patel, Sice (Northumbria University, Tees, Esk and Wear Valleys NHS FT), 2021 | A facilitated, reflective framework for mapping a team's implementation of trauma-informed care. It has 7 domains (Safety, Language, Social, Trauma-specific interventions, Empowerment, Whole system, Compassionate leadership) of practice points, with two parallel forms, **staff** and **service-user**. Each item records *Applicable to service* (with a reason), an *Implementation* RAG agreed by consensus, and an *Example* justifying it. It is meant to be used cyclically. | Free to copy and distribute with or without modification, provided the notice is kept. It is unvalidated: a doctoral project with no published reliability. The manual says the process matters as much as the report, and that the facilitator must "resist a pull to using this as a performance tool". It has two form defects: service-user item 11 repeats item 1 ("I feel safe from physical harm in this service"), and the staff form's item numbering restarts at 1 in domain 7. |
+
+  **Evidence context the triage relied on.** POPPI (Wade et al., *JAMA*
+  2019; a 24-ICU cluster RCT) found that a nurse-led preventive
+  psychological intervention in the ICU did **not** reduce PTSD symptom
+  severity at six months. The IPAT screen (Wade et al., *Crit Care*
+  2014; 10 items, cut-off ≥7) detects *current* distress well
+  (sensitivity about 80%) but *predicts* later morbidity poorly
+  (sensitivity 57%, specificity 69%, AUC 0.7). NICE QS158 statement 4
+  (from CG83) asks for a review 2–3 months after critical-care discharge
+  for adults who stayed more than 4 days and are at risk. That is the
+  one national standard this pathway can be scored against. Taken
+  together, a 38%→12% before/after figure is a reason to measure
+  carefully, not evidence the service can restate as an effect.
+
+  **Triage.** The baseline is what T-14 judged against: the instance
+  layer, TBA, `continues_as`, and the insight lenses. Plus
+  `sensitive_setting` (§13 2026-08-02 privacy entry) and the
+  `instance_measures` table (free-named, no instrument, no range).
+
+  | Concept | From | Decision |
+  |---|---|---|
+  | Psychological content inside a non-mental-health setting (a critical-care pathway is `Inpatient`, yet its instances carry PTSD / anxiety / depression scores) | CTM | **Adopt** → T-15a. A real gap today: `sensitive_setting` is false for this pathway. |
+  | Validated screening instruments (IPAT in the ICU, then PCL-5 / IES-R / HADS / PHQ-9 / GAD-7 at follow-up; CAM-ICU delirium as a risk marker) | CTM, literature | **Adopt** → T-15b (instrument catalogue for `instance_measures`) |
+  | "Proactive, not reactive": everyone screened early, in the ICU | CTM | **Adopt** → T-15c (screening reach and timing, with a disclosed denominator) |
+  | Outcome claim 38% → 12%, delivered through PDSA | CTM | **Adapt** → T-15d: a run chart of screen-positive share by enrolment period, with the denominator, response rate and loss to follow-up shown. **Never** a "reduction" headline or a causal claim. |
+  | Tiered stepped care (universal → targeted → specialist) | CTM | **Adopt** → T-15e (audited `tier` on the instance, distinct from `urgency`) |
+  | End-to-end continuity ICU → ward → home → follow-up clinic | CTM | **Already met** by `continues_as` + `GET /api/instances/{pid}/journey`. The ICU stay is a `patient_flow_stay` leg, and it stays `not_configured` until patient-flow serves a timeline (§14.2). |
+  | NICE QS158 s4: 2–3-month follow-up review | NICE | **Adopt with a mechanism change** → T-15f: a catalogue standard needs a **lower bound** as well as a threshold |
+  | Families as people affected (PICS-F); co-production with families | CTM | **Open** → [OQ-10](16-open-questions.md) |
+  | Therapy modalities (CBT / ACT / EMDR / VR), ICU diaries | CTM | **No change.** Template `interventions` strings and segment `label`s already carry them. Coded interventions (SNOMED procedures) belong to §15's terminology-services item, because they are a matcher DTO change. |
+  | Psychology consultation to ward staff about a patient | CTM | **No code.** The existing `instance_team` roster (a `psychology` role) plus an instance event. The convention is documented in the service README alongside T-15b. |
+  | Repeated, facilitated reflection on how a pathway is delivered (PDSA cycles; ROOTS reviews from two perspectives) | CTM, ROOTS | **Adapt, gated** → T-15g: build only when a deployment asks, and with the refusals listed in T-15g |
+  | Per-person staff wellbeing measures; ranking teams by RAG | CTM, ROOTS | **Refuse.** [Family TBA §7](../../agents/share/time-based-analysis.md) forbids measuring people. ROOTS itself refuses the league table. |
+  | Staff training / education attendance | CTM | **Refuse here.** No patient and no instance is involved. It is workforce-planning-management's talent-development module (repo `tasks.md` TI-4). |
+  | A patient's trauma history / adverse-experience narrative (ROOTS safety item 4: "risks … formulated in the context of previous experience and trauma") | ROOTS | **Refuse.** The formulation belongs in the clinical record. A registry holding trauma narratives would become the most sensitive store in the family, for no analysis it performs. |
+  | Trial arm allocation, RCT / feasibility-study management (VR, trauma-focused CBT) | CTM | **Refuse.** Research uses the `journey_features` export (T-14a) in a secure processing environment ([privacy.md](../../agents/share/privacy.md)). |
+  | "Co-produced" as a field on the template | CTM | **Refuse as a field.** How a template was made is recorded by its review cycles (T-15g), never as a matching signal. |
+
+  **Suggested order.** T-15a first: it closes a live confidentiality
+  gap and needs no new data. Then T-15b, which T-15c and T-15d both
+  depend on. Then T-15e and T-15f, which are independent. T-15g only on
+  demand. Each sub-task is one three-part PR (spec + code + test).
+
+  - [ ] **T-15a — Sensitivity follows content, not only setting.**
+    `care_pathway_resource_attrs` sets `sensitive_setting=true` for a
+    `mental_health` or `palliative` `care_setting` **or** when any
+    `condition_codes` entry is ICD-10 chapter V (`F00`–`F99`) or
+    ICD-11 chapter 06 (mental, behavioural or neurodevelopmental
+    disorders). SNOMED CT codes cannot be placed in the mental-disorder
+    hierarchy without a terminology server. That limit is stated in
+    §12.5 and not guessed at.
+    - **Widen the existing attribute; do not add a new one.**
+      Deployed policies already key on `resource.sensitive_setting`. A
+      new `sensitive_content` attribute would leave every one of them
+      silently not covering the new case, which is fail-open. Widening
+      makes them cover it on the next deploy. The meaning changes from
+      "sensitive setting" to "special-category content". That is
+      documented in the doc comment and §12, and the name is kept for
+      compatibility.
+    - Instance measures from a T-15b instrument whose category is
+      `mental_health` are masked under a `mask` obligation on every
+      read path (instance detail, `outcomes`, `event_log` /
+      `journey_features`, FHIR), per security invariant 5.
+    - **Acceptance:** an `Inpatient` pathway coded ICD-10 `F43.1`
+      reports `sensitive_setting=true`, and a policy denying it to
+      `dept=outsider` denies; an orthopaedic `Inpatient` pathway
+      reports false as before; every existing setting-only pin is
+      unchanged; the coarse no-record guard path is unaffected
+      (SEC-V2).
+
+  - [ ] **T-15b — Instrument catalogue for `instance_measures`.** An
+    optional `instrument` column, validated against a closed,
+    code-reviewed catalogue in `src/instruments.rs`. Each entry
+    carries: id, display name, score range, administration
+    (clinician / self-report), category (`mental_health` /
+    `delirium` / `function` / `experience`), an optional **screen
+    threshold** with its direction and a citation, a LOINC code where
+    one is published (checked at seeding, never typed from memory),
+    and a **licence note**. A value outside the range is a `422`.
+    Free-named measures keep working.
+    - Seed only instruments whose licence permits it, each checked
+      before it is added. IPAT, PCL-5, IES-R, PHQ-9, GAD-7, CAM-ICU
+      are candidates. HADS and EQ-5D are licensed commercially, so
+      they get a catalogue entry with `licence: restricted` and no
+      threshold until a deployment confirms it holds a licence.
+    - **A screen is not a diagnosis.** A score at or above threshold
+      is reported as `screen_positive`, never `case` or `ptsd`, and is
+      derived on read rather than stored. A corrected score therefore
+      corrects every view (the TBA "derived, never asserted" rule).
+    - **Acceptance:** a range violation is a `422`; the threshold
+      direction is honoured (IPAT ≥7 positive); an unknown instrument
+      id is a `422`, not a free name; a measure without `instrument`
+      round-trips exactly as today; the catalogue test asserts every
+      entry has a citation and a licence note.
+
+  - [ ] **T-15c — Screening reach and timing.** Per template, the
+    share of instances with a screening measure recorded, the time
+    from clock start (or a named anchor, T-14d) to the first screen,
+    and the screen-positive share. Every figure carries its
+    denominator and the T-14g attrition record, and goes through T-14k
+    suppression. This is the TBA coverage rule restated: a low
+    positive rate over a fifth of the cohort is not a low positive
+    rate, and the response must make that visible.
+    - **Acceptance:** an unscreened instance counts in the denominator,
+      not out of it; reach and positive share are suppressed together
+      when either cell is small (secondary suppression); the response
+      echoes the window and anchor used.
+
+  - [ ] **T-15d — Before/after as a run chart, not a headline.** The
+    screen-positive share at a named follow-up timepoint, by enrolment
+    period, as a run chart with Shewhart p-chart limits. Each period
+    shows `eligible`, `measured`, `positive`, and the response rate.
+    The response is labelled `design: "uncontrolled_before_after"`,
+    and it never computes a "reduction" or attributes a change to the
+    pathway.
+    - **Why.** Response at follow-up is informative: survivors who are
+      doing worse are less likely to attend. A falling positive share
+      with a falling response rate is the commonest false improvement
+      there is. The one RCT in this area was null (POPPI). Case mix
+      and secular trends move too.
+    - The before/after split uses T-14f's rule-based split, extended
+      with an enrolment-date rule if it has none. Missing follow-up
+      measures are a finding, never imputed (the T-14 imputation
+      refusal).
+    - **Acceptance:** a period whose response rate falls while its
+      positive share falls is flagged; small periods are suppressed;
+      the design label is always present.
+
+  - [ ] **T-15e — Stepped-care tier on the instance.** A nullable
+    `pathway_instances.tier` over a closed vocabulary (`universal`,
+    `targeted`, `specialist`), changed through an audited
+    `POST /api/instances/{pid}/tier` that writes a `tier_stepped_up` or
+    `tier_stepped_down` event, exactly as urgency escalation does. It
+    is distinct from `urgency`: urgency is how soon, tier is how much.
+    It is never in the `CarePathway` DTO and never a matching signal.
+    The transitions reach `event_log` (T-14a), so the
+    directly-follows map (T-14b) shows tier flow without new analytics.
+    - **Acceptance:** a lifecycle pure test (no tier change on a
+      terminal instance); every change audited; the existing caseload
+      view gains a per-tier count.
+
+  - [ ] **T-15f — NICE QS158 s4 in the standards catalogue.** Add a
+    `not_before_ms` lower bound to `Standard`, defaulting to none so
+    every existing entry scores exactly as before (a regression pin).
+    Add `nice_qs158_s4` with `from_anchor: discharge` and
+    `to_anchor: follow_up`, and a 60–90-day window, so a review at one
+    week does not count as compliant.
+    - **Eligibility is not checked, and the response says so.** "More
+      than 4 days in critical care and at risk of morbidity" needs the
+      ICU length of stay, which only a patient-flow leg can supply. The
+      entry's `note` says to filter the cohort first. See OQ-11.
+    - **Acceptance:** an existing standard's scores are byte-identical;
+      a review at day 30 and at day 120 both breach; day 75 meets.
+
+  - [ ] **T-15g — Pathway review cycles (PDSA, ROOTS) — gated on a
+    deployment asking.** A sidecar `pathway_reviews` on the template
+    `pid` (never the DTO). Each row records: cycle phase
+    (`plan`/`do`/`study`/`act`), `held_on`, a `framework` id from a
+    data catalogue (`roots-2021` first, with its notice kept as its
+    licence requires), a **perspective** (`staff` / `service_user` /
+    `joint`), a participant **count** (no identities), an optional
+    `organization:` ref for the team, and per item: applicable (with a
+    reason), rating (`red`/`amber`/`green`/`not_applicable`), example
+    text, and action items.
+    - **Refusals built in.** Perspectives are never averaged into one
+      score: ROOTS's two forms exist to show where staff and service
+      users disagree. There is no endpoint that ranks teams or
+      pathways by rating; a review compares only to the same subject's
+      previous cycle. Example text is treated as possibly personal
+      data, because the manual's own worked example quotes identifiable
+      situations. It is read under record-level authorisation, audited,
+      and never in an aggregate or bulk export.
+    - **Catalogue fidelity.** Items get stable ids (`safety.1`), not
+      the manual's printed numbers, which restart in domain 7. The
+      duplicated service-user item is kept and marked as a duplicate,
+      not silently dropped.
+    - **Why gated.** ROOTS says the facilitated discussion is the
+      outcome. A digital RAG store invites the dashboard it warns
+      against, and the framework has no published reliability. Build
+      it when a deployment wants its review cycles beside the pathway
+      they changed, not before. See OQ-12.

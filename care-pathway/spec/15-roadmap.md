@@ -43,3 +43,9 @@ and accept. Ordered roughly by intent.
 - **gRPC.** Tonic stub once a high-throughput consumer exists. (The
   OpenAPI 3 doc + Swagger UI for the REST surface shipped under T-9 —
   hand-written `src/openapi.rs`, not utoipa-derived.)
+- **Trauma-informed recovery pathways.** Make an ICU-psychology-style
+  pathway measurable without overstating it. That means sensitivity
+  driven by content, validated screening instruments, screening reach,
+  stepped-care tiers, the NICE QS158 follow-up window, and a run-chart
+  before/after with its denominator. Family support (OQ-10) and stored
+  review cycles (OQ-12) stay open. (Seed: T-15.)

@@ -333,6 +333,29 @@ pipeline language (Dagger/Nix/`act` were considered and rejected).
 **Not goals:** removing `.github/workflows/ci.yml` or `.woodpecker.yml`;
 moving the code host. Tasks: `LCI-*` in [tasks.md](tasks.md) Phase 12.
 
+### Theme H — Trauma-informed recovery pathways
+
+**Why.** An NHS Wales ICU psychology pathway (*From Survival to
+Recovery*) showed what a tiered, screened, end-to-end recovery pathway
+looks like. The care-pathway instance layer can already hold most of
+it, but it has two gaps. A critical-care pathway with mental-health
+content is not treated as sensitive. Recorded measures have no
+instrument, range or threshold, so "everyone is screened" and "symptoms
+fell" cannot be checked.
+
+**What.** Close the sensitivity gap first. Then add an instrument
+catalogue, screening reach, a before/after shown as a run chart with
+its denominator and response rate, stepped-care tiers, and the NICE
+QS158 follow-up window.
+
+**Not goals.** A causal "the pathway reduced trauma" figure (the one
+RCT in this area, POPPI, was null); per-person staff wellbeing
+measures; trauma histories in a registry; a league table of teams. The
+ROOTS reflective framework is adopted only as a gated review-cycle
+record, because its own manual refuses use as a performance tool.
+Tasks: `TI-*` in [tasks.md](tasks.md) Phase 14; care-pathway
+[`spec/13-tasks.md`](care-pathway/spec/13-tasks.md) T-15.
+
 ## 3. Sequencing
 
 **Phase 1 — Truth & hygiene (do first, cheap, unblocks everything):**
@@ -373,6 +396,12 @@ themselves immediately; do them before any further large dependency or
 front-end sweep. LCI-4 (attestation) needs the trust decision in
 `spec/local-ci` §4.3 first. The self-hosted runner (LCI-7) is last and
 needs a machine and an owner.
+
+**Phase 14 — Trauma-informed recovery pathways (Theme H).** TI-2 and
+care-pathway T-15a go first and together, because they close a
+confidentiality gap. The rest follows T-15b, which every measurement
+task depends on. TI-3 is independent and also unblocks stitched
+journeys generally.
 
 ## 4. Working agreements (for the executing session)
 

@@ -8828,3 +8828,49 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
   **Done 2026-11-08** (with WK-E3 and WK-F1): the tombstone is inserted
   primary, with a backfill migration; FHIR link codes are mapped per
   variant (`replaced-by`); verify orders `updated_at DESC, id DESC`.
+
+## Phase 14 — Trauma-informed recovery pathways triage (2026-11-13)
+
+> **Provenance.** Two sources were triaged against the care-pathway
+> instance layer, TBA, and `continues_as` journeys. The first is an
+> award-reported ICU psychology pathway (*From Survival to Recovery*,
+> Cwm Taf Morgannwg UHB). It is known only from secondary summaries, so
+> its 38% → 12% figure is recorded as a claim. The second is the
+> [ROOTS](https://healthinnovationnenc.org.uk/wp-content/uploads/2023/04/The-ROOTS-Framework-User-Manual-29-03-21-1.pdf)
+> reflective framework for trauma-informed care (Northumbria, TEWV,
+> 2021). The full triage table and the seven resulting sub-tasks
+> (T-15a … T-15g) live in
+> [`care-pathway/spec/13-tasks.md`](care-pathway/spec/13-tasks.md)
+> T-15, which is the single source of truth for them. Only the
+> consequences that cross a subproject boundary are listed here.
+
+- [ ] **TI-1 (L)** care-pathway **T-15a … T-15g**, the entity-level
+  queue. It is tracked there, not here. Order: T-15a (a live
+  confidentiality gap), then T-15b, then T-15c / T-15d, then T-15e /
+  T-15f; T-15g only on a deployment's request.
+- [ ] **TI-2 (S)** Write the rule T-15a settles into
+  [`agents/share/privacy.md`](agents/share/privacy.md):
+  **special-category status follows content, not only setting.** A
+  record whose condition codes or recorded instruments are mental
+  health is sensitive whatever its care setting. Widen an existing
+  attribute rather than add a parallel one, so deployed policies cover
+  the new case (fail-closed). case and patient-flow should check
+  whether they derive sensitivity from a setting-like field alone.
+  Depends: care-pathway T-15a.
+- [ ] **TI-3 (M)** patient-flow: serve the stay timeline that
+  `src/journey.rs` already expects (care-pathway §14.2 gap). Beyond
+  completing stitched journeys, it is the only source of the
+  critical-care length of stay that NICE QS158 eligibility needs
+  (care-pathway [OQ-11](care-pathway/spec/16-open-questions.md)).
+- [ ] **TI-4 (S)** workforce-planning-management: record in its spec
+  where staff trauma-informed-care training and ICU-staff wellbeing
+  work belong. Lean: training attendance in talent development, and
+  **no per-person wellbeing measure anywhere** (family
+  [TBA §7](agents/share/time-based-analysis.md)). The care-pathway
+  triage refused both, and the refusal should not reappear one service
+  over.
+- [ ] **TI-5 (M)** care-pathway front-end: an instrument picker on the
+  measure form (range-checked client-side, server authoritative) and a
+  screening view showing reach, positive share and the T-15d run
+  chart, with the design label always visible. Depends: T-15b, T-15c,
+  T-15d.

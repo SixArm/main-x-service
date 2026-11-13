@@ -65,3 +65,35 @@ spec §16.
   credential boundary. *Lean: instance now; add an optional
   `journey_id` column populated only when the caller can read every
   leg, once T-14a exists.*
+- **OQ-10 — Families as people the pathway serves (PICS-F).** The ICU
+  psychology pathway triaged in T-15 supports relatives as well as
+  survivors. Post-intensive-care syndrome in family members is a
+  recognised condition, and families co-produced the pathway. An
+  instance has one `subject_ref`. Options: (a) a relative gets their
+  own instance on a family-support template, unlinked; (b) the same,
+  plus a link between the two instances; (c) family contacts are
+  events on the patient's instance, naming no one. (b) is a new
+  patient-to-patient relationship, which is more sensitive than any v1
+  edge kind and is not in the closed `entity-ref` registry. *Lean: (a)
+  and (c) now; (b) only with its own §10-style governance decision.*
+  (Raised by the T-15 triage, 2026-11-13.)
+- **OQ-11 — Eligibility for a standard the instance cannot see.** NICE
+  QS158 s4 applies to adults with **more than 4 days in critical care**
+  who are at risk of morbidity. The instance layer does not know
+  critical-care length of stay. A `patient_flow_stay` leg does, once
+  patient-flow serves a timeline. Options: (a) the caller filters the
+  cohort and the response says eligibility was not checked; (b) the
+  standard reads LOS from the stitched journey under the caller's
+  credential; (c) an operator-declared eligibility flag on the
+  instance. *Lean: (a) now, as T-15f states; (b) once the
+  patient-flow timeline exists, because (c) is an assertion nobody
+  verifies.*
+- **OQ-12 — Do reflective review cycles belong in a registry at all?**
+  T-15g would store PDSA / ROOTS reviews beside the template they
+  changed. Against: ROOTS is about a team, not a pathway identity; its
+  value is the facilitated conversation; a stored RAG is one query away
+  from the league table the manual refuses. For: the link between "we
+  changed the pathway" and "here is what the next cohort looked like"
+  (T-15d) is otherwise kept nowhere. *Lean: build only on a
+  deployment's request, with T-15g's refusals as acceptance criteria,
+  and revisit whether `organization` should own the team-level half.*

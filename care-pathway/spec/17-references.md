@@ -125,3 +125,36 @@ Emerging AI tools:
   sibling entity-level spec exemplar:
   [person/spec](../../person/spec/index.md).
 - axa: [axa](https://axa/) — the service framework.
+
+
+### 17.5 Trauma-informed care and recovery after critical illness
+
+Sources for the T-15 triage (2026-11-13).
+
+- *From Survival to Recovery: A Trauma-Informed, Patient-Centred and
+  Co-produced Critical Care Pathway* — Critical Care Psychology Service,
+  Cwm Taf Morgannwg UHB (Dr Michelle Smalley). Known only from secondary
+  summaries supplied to the triage. No primary write-up was found, so
+  its figures (38% → 12% "trauma symptoms") are recorded as **claims**,
+  with no instrument, threshold, timepoint or denominator.
+- Thirkle S, Kennedy A, Patel P, Sice P. [*ROOTS: a reflective
+  framework for mapping the implementation journey of trauma-informed
+  care — User Manual and Forms*](https://healthinnovationnenc.org.uk/wp-content/uploads/2023/04/The-ROOTS-Framework-User-Manual-29-03-21-1.pdf)
+  (Northumbria University, Tees, Esk and Wear Valleys NHS FT, 2021).
+  Free to copy and modify with its notice kept. Domains from Kennedy A,
+  *Developing real world system capability in trauma informed care*
+  (NENC AHSN, 2020).
+- Wade DM et al. [Effect of a nurse-led preventive psychological
+  intervention on symptoms of PTSD among critically ill patients (POPPI)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6439605/).
+  *JAMA* 2019. A 24-ICU cluster RCT with no effect at 6 months.
+- Wade DM et al. [Detecting acute distress and risk of future
+  psychological morbidity in critically ill patients: validation of the
+  Intensive care Psychological Assessment Tool](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4207352/).
+  *Crit Care* 2014;18:519. IPAT, 10 items, cut-off ≥7.
+- NICE [QS158 statement 4: follow-up after critical care discharge](https://www.nice.org.uk/guidance/QS158/chapter/quality-statement-4-follow-up-after-critical-care-discharge),
+  from [CG83](https://www.nice.org.uk/guidance/cg83): a review 2–3
+  months after discharge for adults with more than 4 days in critical
+  care who are at risk of morbidity; self-referral accepted at any time.
+- Sweeney A et al. A paradigm shift: relationships in trauma-informed
+  mental health services. *BJPsych Advances* 2018;24(5):319–333.
+
